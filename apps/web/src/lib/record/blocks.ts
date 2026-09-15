@@ -34,7 +34,7 @@
  * inferring from the space available, not from the data).
  */
 
-import { money, parse } from 'braindog-render';
+import { money, parse, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, type BlockResult } from './api.ts';
@@ -387,7 +387,33 @@ export function toSegments(block: BlockResult) {
           : [];
   /* `page`, because this is a page's evaluator: it is the one caller that may draw the page-only
      kinds whose rows it wrote itself. `table` has no rows to write and still degrades. */
-  return parse(['```' + head, ...rows, '```'].join('\n'), { page: true });
+  const segments = parse(['```' + head, ...rows, '```'].join('\n'), { page: true });
+  const projected =
+    !conflicted &&
+    !block.authored?.length &&
+    !block.metrics &&
+    !['bar', 'chips', 'gauge', 'cards', 'section'].includes(block.kind) &&
+    Boolean(block.register && block.columns.length > 0 && spec);
+  return projected && block.register
+    ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)
+    : segments;
+}
+
+/**
+ * EACH PROJECTED ROW NAMES THE RECORD ROW IT CAME FROM, after the parse, because the text in between carries no identity.
+ *
+ * One drawn row per entry, in the order `projectRows` wrote them. A parse that drew anything else, a degraded fence or a
+ * different number of rows, gets no refs at all: a card named by the wrong row would move somebody else's row.
+ */
+function withRefs(segments: ReturnType<typeof parse>, register: string, entries: BlockResult['entries']): ReturnType<typeof parse> {
+  const drawn = segments.filter((s): s is Block => s.type === 'block');
+  const only = drawn.length === 1 && segments.length === 1 ? drawn[0] : undefined;
+  if (!only || only.rows.length !== entries.length) return segments;
+  only.rows.forEach((row, i) => {
+    const entry = entries[i];
+    if (entry && entry.seq > 0) row.ref = { register, seq: entry.seq, version: entry.version };
+  });
+  return segments;
 }
 
 /**

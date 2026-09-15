@@ -33,7 +33,9 @@
   import Changes from './[id]/Changes.svelte';
   import { updatesOf } from './[id]/changes.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { answer as send, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
+  import { plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
+  import { answerQuestion } from '$lib/record/decide-write.ts';
+  import { invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import type { Question } from '$lib/record/schema.ts';
@@ -105,16 +107,20 @@
 
   /**
    * SENDING AN ANSWER, on a live record. `decide` takes no answer without its reason, so the press picks
-   * and this sends. A refusal stays on the card; a decision leaves the queue, which is read again.
+   * and this sends. A refusal stays on the card and is said as a warning; a conflict reads the queue
+   * again, because a row the proposal changes has moved; a decision leaves the queue, which is read
+   * again, and the shell reads `boot` again so the rail's count follows.
    */
   async function commit(q: Question, a: Answer) {
     if (!client || sending !== null) return;
     sending = q.id;
-    const out = await send(client, q.id, a.option, a.reason);
+    const out = await answerQuestion(location.origin, q.id, a.option, a.reason);
     sending = null;
     const next = new Map(fixes);
-    if (!out.ok) {
+    if (out.from !== 'written') {
       fixes = next.set(q.id, out.fix);
+      toasts.push(out.fix, { intent: 'warn' });
+      if (out.from === 'conflict') await readLive();
       return;
     }
     next.delete(q.id);
@@ -122,6 +128,7 @@
     answers = withdraw(answers, q.id);
     toasts.push(copy.decisionRecorded(a.title, q.id), { intent: 'good' });
     await readLive();
+    void invalidateAll();
   }
 
   /**

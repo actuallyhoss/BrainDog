@@ -42,7 +42,9 @@
   import Changes from './Changes.svelte';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { answer as send, park, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
+  import { plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
+  import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
+  import { invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
@@ -242,16 +244,27 @@
     /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
     if (sending) return;
     sending = true;
-    const out = await send(client, a.question, a.option, reason);
+    const out = await answerQuestion(location.origin, a.question, a.option, reason);
     sending = false;
-    if (!out.ok) {
-      fix = out.fix;
-      return;
-    }
+    if (await unsent(out, a.question)) return;
     fix = '';
     saved = true;
     committed = said;
     toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
+    void invalidateAll();
+  }
+
+  /**
+   * A WRITE THAT DID NOT LAND, said under the control and as a warning. A conflict is a row the
+   * proposal changes that moved since it was filed, so the question is read again before it is
+   * answered again. True when there is nothing more to do.
+   */
+  async function unsent(out: Written, id: string): Promise<boolean> {
+    if (out.from === 'written') return false;
+    fix = out.fix;
+    toasts.push(out.fix, { intent: 'warn' });
+    if (out.from === 'conflict') await readLive(id);
+    return true;
   }
 
   /** Parking it: said on the sample, sent to `decide` with the day and the why on a live record. */
@@ -266,15 +279,13 @@
     }
     if (!question || sending) return;
     sending = true;
-    const out = await park(client, question.id, wake, reason);
+    const out = await parkQuestion(location.origin, question.id, wake, reason);
     sending = false;
-    if (!out.ok) {
-      fix = out.fix;
-      return;
-    }
+    if (await unsent(out, question.id)) return;
     fix = '';
     deferring = false;
     toasts.push(copy.parkedUntil(day(wake)), { intent: 'good' });
+    void invalidateAll();
   }
 
   /**

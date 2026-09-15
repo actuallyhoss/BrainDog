@@ -382,6 +382,12 @@ export type InboxLine = {
   reason: string | null;
 };
 
+/**
+ * What filing or archiving an arrival did: the arrival, the state it is in now, the row it became when it was filed,
+ * and whether it was already so, in which case nothing was written.
+ */
+export type ArrivalSettled = { id: string; state: 'matched' | 'ignored'; entry: Entry | null; already: boolean };
+
 /** A page's place in the rail, when its declaration gives one in the shape `{ section, order }`. */
 const navOf = (nav: unknown): { section: string; order: number } | null => {
   if (typeof nav !== 'object' || nav === null) return null;
@@ -2576,6 +2582,60 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ),
     );
 
+  /**
+   * One arrival leaves the inbox: its state moves, and a `state` event on `inbox_raw:<id>` says who moved it and to what.
+   *
+   * THE EVENT IS NOT ABOUT A ROW, so it carries its own target kind rather than `appendEvent`'s `entry:`, the way the
+   * ingest's `match` and `extract` events do.
+   */
+  const settleArrival = (id: string, from: string, to: 'matched' | 'ignored', actor: string, note: string, batch: string): void => {
+    sparkMayWrite(actor, 'state');
+    sql.exec('UPDATE inbox_raw SET state = ? WHERE id = ?', to, id);
+    sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch) VALUES (?, ?, ?, 'state', ?, 'inbox_raw', 'state', ?, ?, ?, ?)",
+      mint(),
+      instant(clock.now()),
+      actor,
+      `inbox_raw:${id}`,
+      written(from),
+      written(to),
+      note,
+      batch,
+    );
+  };
+
+  /** The row a person filed this arrival as, found through the batch its `state` event shares with the row's `create`. */
+  const filedAs = (id: string): Entry | null => {
+    const settled = sql.one<{ batch: string | null }>(
+      "SELECT batch FROM event WHERE target = ? AND kind = 'state' AND to_v = ? ORDER BY rowid DESC LIMIT 1",
+      `inbox_raw:${id}`,
+      written('matched'),
+    );
+    if (!settled?.batch) return null;
+    const made = sql.one<{ target: string }>(
+      "SELECT target FROM event WHERE batch = ? AND kind = 'create' AND target LIKE 'entry:%' ORDER BY rowid LIMIT 1",
+      settled.batch,
+    );
+    return made ? byId(made.target.slice('entry:'.length), true) : null;
+  };
+
+  /**
+   * What a filed arrival's row is titled when the caller names no fields: its subject, or the first line of what it said.
+   * A header that is not text is not one, as `inboxBefore` reads it.
+   */
+  const arrivalTitle = (headers: string | null, body: string | null): string => {
+    let subject = '';
+    try {
+      const parsed: unknown = JSON.parse(headers ?? '{}');
+      const said = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).subject : undefined;
+      subject = typeof said === 'string' ? said.trim() : '';
+    } catch {
+      subject = '';
+    }
+    const line = (body ?? '').split('\n', 1)[0]?.trim() ?? '';
+    return (subject || line || 'An arrival from the inbox').slice(0, 200);
+  };
+
   const kernel = {
     transaction,
     allocate,
@@ -3008,6 +3068,60 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             reason: r.reason,
           };
         }),
+
+    /**
+     * File an arrival as a row: the row goes through the ordinary write path, signed like any write, and the arrival is
+     * marked `matched` with a `state` event in the same batch, in one transaction.
+     *
+     * `matched` AND NOT A NEW STATE. The DDL's seven already say what happened: something claimed the arrival and a row
+     * came of it. A person claiming it is told apart from an ingest by the event's actor, not by a word the ingest does
+     * not use.
+     *
+     * AGAIN IS THE SAME ANSWER. An arrival a person already filed answers with the row it became and writes nothing, so a
+     * retry whose answer was lost is one row and not two. An arrival in any state the inbox does not show is refused.
+     */
+    fileArrival: (id: string, register: string, fields: Patch | null, w: WriteContext): Result<ArrivalSettled> =>
+      transaction(() => {
+        const raw = sql.one<{ state: string; headers: string | null; body: string | null }>(
+          'SELECT state, headers, body FROM inbox_raw WHERE id = ?',
+          id,
+        );
+        if (!raw) return no<ArrivalSettled>('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
+        if (raw.state === 'matched') {
+          const filed = filedAs(id);
+          if (filed) return ok<ArrivalSettled>({ id, state: 'matched', entry: filed, already: true });
+        }
+        if (raw.state !== 'untriaged' && raw.state !== 'review')
+          return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival has already left the inbox, as ${raw.state}. Nothing was written.`, {
+            at: 'id',
+          });
+        const title = registers.get(register)?.title;
+        const patch: Patch = fields ?? (title ? { [title]: arrivalTitle(raw.headers, raw.body) } : {});
+        const batch = w.batch ?? mint();
+        const out = write(register, null, patch, { ...w, batch });
+        if (!out.ok) return out as unknown as Result<ArrivalSettled>;
+        settleArrival(id, raw.state, 'matched', w.actor, `Filed as ${register}#${out.value.seq ?? ''}.`, batch);
+        return ok<ArrivalSettled>({ id, state: 'matched', entry: out.value, already: false });
+      }),
+
+    /**
+     * Archive an arrival: marked `ignored`, with a `state` event, and its bytes kept. Nothing is filed.
+     *
+     * An arrival already archived is the same answer with nothing written; one in any other state the inbox does not show
+     * is refused, because it has already left the inbox some other way.
+     */
+    archiveArrival: (id: string, actor: string): Result<ArrivalSettled> =>
+      transaction(() => {
+        const raw = sql.one<{ state: string }>('SELECT state FROM inbox_raw WHERE id = ?', id);
+        if (!raw) return no<ArrivalSettled>('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
+        if (raw.state === 'ignored') return ok<ArrivalSettled>({ id, state: 'ignored', entry: null, already: true });
+        if (raw.state !== 'untriaged' && raw.state !== 'review')
+          return no<ArrivalSettled>('OUT_OF_BOUNDS', `This arrival has already left the inbox, as ${raw.state}. Nothing was changed.`, {
+            at: 'id',
+          });
+        settleArrival(id, raw.state, 'ignored', actor, 'Archived from the inbox.', mint());
+        return ok<ArrivalSettled>({ id, state: 'ignored', entry: null, already: false });
+      }),
 
     /* `seenAt()` WAS HERE AND IS GONE. Its only caller was `markRead`'s own return — it wrote the
        mark, then read it back through a second method — and `markRead` returns the mark now, which

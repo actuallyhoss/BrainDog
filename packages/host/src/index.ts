@@ -146,6 +146,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
   { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },
   { name: 'resumeAction', group: 'ADMIN', writes: true, what: 'Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it.' },
+  { name: 'fileArrival', group: 'ADMIN', writes: true, what: 'File one arrival from the inbox as a row in a list. The row is written like any other, and the arrival leaves the inbox.' },
+  { name: 'archiveArrival', group: 'ADMIN', writes: true, what: 'Take one arrival out of the inbox without filing it. Its bytes are kept, and asking twice is the same answer.' },
   { name: 'setPackConfig', group: 'ADMIN', writes: true, what: "Change a pack's settings. They are read the next time the pack is planned and installed." },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
@@ -326,6 +328,8 @@ export type RecordSurface = {
   disablePack(args: never, ctx: never): Promise<Result<unknown>>;
   enablePack(args: never, ctx: never): Promise<Result<unknown>>;
   resumeAction(args: never, ctx: never): Promise<Result<unknown>>;
+  fileArrival(args: never, ctx: never): Promise<Result<unknown>>;
+  archiveArrival(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
@@ -383,6 +387,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     disablePack: (a, ctx) => api.disablePack(a as never, ctx as never),
     enablePack: (a, ctx) => api.enablePack(a as never, ctx as never),
     resumeAction: (a, ctx) => api.resumeAction(a as never, ctx as never),
+    fileArrival: (a, ctx) => api.fileArrival(a as never, ctx as never),
+    archiveArrival: (a, ctx) => api.archiveArrival(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),

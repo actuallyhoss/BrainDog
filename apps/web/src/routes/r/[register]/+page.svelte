@@ -48,6 +48,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import * as pending from '$lib/record/pending.svelte.ts';
+  import { rowWriter, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -781,8 +782,67 @@
    * product take a row from a person and none of them can write one yet; holding the answer in
    * three different ways would be three things to change on the day one of them can.
    */
+  /* ── writes, when the list is a live record ───────────────────────────────── */
+
+  /**
+   * ON A LIVE RECORD EVERY GESTURE BELOW WRITES, and on the sample each says `notWritten` as before.
+   *
+   * THE ROW THE RECORD HANDS BACK IS DRAWN WHERE THE OLD ONE WAS. A changed row that jumped to where
+   * its new state sorts is the row the reader has to go and find again; a new row goes at the top.
+   * An answer for a question the screen has left is not drawn, and a refusal is still said.
+   */
+  let writer: RowWriter | null = null;
+  const writes = (): RowWriter => (writer ??= rowWriter(location.origin));
+  /** The sheet's add is out, so a second press does not send a second row. */
+  let writing = $state(false);
+
+  function landRow(entry: Entry) {
+    pages = pages.map((p) => p.map((e) => (e.seq === entry.seq ? entry : e)));
+  }
+
+  function addLanded(entry: Entry) {
+    pages = [[entry, ...(pages[0] ?? [])], ...pages.slice(1)];
+    matched += 1;
+    if (booted) booted = { ...booted, registers: booted.registers.map((r) => (r.id === id ? { ...r, count: r.count + 1 } : r)) };
+    receipt(entry.seq, { mark: copy.writeMarkAdded, intent: 'good' });
+  }
+
+  /** A write that did not land: the row as it now stands, when there is one, and the record's sentence. */
+  function missed(was: string, out: Exclude<Wrote, { ok: true }>) {
+    if (asked === was && out.why === 'conflict' && out.entry) landRow(out.entry);
+    toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  function setPatch(seq: number, field: string, value: Fields[string]) {
+    edits = new Map(edits).set(seq, { ...(edits.get(seq) ?? {}), [field]: value });
+  }
+
+  function dropPatch(seq: number, field: string) {
+    const next = new Map(edits);
+    const left = { ...(next.get(seq) ?? {}) };
+    delete left[field];
+    if (Object.keys(left).length === 0) next.delete(seq);
+    else next.set(seq, left);
+    edits = next;
+  }
+
   function addTypedRow() {
     if (problems.length > 0 || !decl) return;
+    /* THE SHEET STAYS OPEN UNTIL THE RECORD HAS THE ROW, so a refusal leaves everything typed where it was. */
+    if (!sample) {
+      if (writing) return;
+      writing = true;
+      const was = asked;
+      void writes()
+        .create(id, taken)
+        .then((out) => {
+          writing = false;
+          if (!out.ok) return missed(was, out);
+          if (asked === was) addLanded(out.entry);
+          closeCreate();
+        });
+      return;
+    }
     const named = display(id, decl.title, taken[decl.title]) ?? '';
     const seq = pending.add(id, taken);
     receipt(seq, { mark: copy.markNotWritten, intent: 'warn', undo: () => pending.drop(id, seq) });
@@ -801,6 +861,22 @@
        `obligations#7` is the one collision that would make the receipt point at the wrong row. */
     const title = decl?.title;
     if (!title) return;
+    /* ON A LIVE RECORD THE LINE EMPTIES AT ONCE, and what was typed goes back into it if the record says no. */
+    if (!sample) {
+      capture = '';
+      const was = asked;
+      void writes()
+        .create(id, { ...inherited, [title]: said })
+        .then((out) => {
+          if (!out.ok) {
+            missed(was, out);
+            if (capture === '') capture = said;
+            return;
+          }
+          if (asked === was) addLanded(out.entry);
+        });
+      return;
+    }
     /* THE SAME PLACE THE FIRST-RUN SCREEN PUTS ITS ROW. A row typed here and a row typed on `/start`
        are the same kind of thing, waiting on the same missing write path, and holding one of them
        in this component and the other in a module would be two answers to one question: the second
@@ -863,6 +939,21 @@
    */
   function setRowState(seq: number, state: string) {
     const said = state.replace(/_/g, ' ');
+    const field = decl?.state;
+    if (!sample && seq > 0 && field) {
+      const was = asked;
+      receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+      void writes()
+        .update(id, seq, { [field]: state }, rowAt(seq)?.version)
+        .then((out) => {
+          if (asked === was) clearReceipt(seq);
+          if (!out.ok) return missed(was, out);
+          if (asked !== was) return;
+          landRow(out.entry);
+          receipt(seq, { mark: said, intent: 'good' });
+        });
+      return;
+    }
     receipt(seq, { mark: said, intent: 'warn', undo: () => clearReceipt(seq) });
     toasts.push(copy.notWritten(`${id}#${seq} would be set to ${said}`), { intent: 'warn' });
   }
@@ -966,6 +1057,37 @@
     /* NOTHING CHANGED IS NOT AN EDIT. A receipt for a value somebody looked at and left alone is a
        row wearing `Not saved` for no reason, and after three of those the chip stops being read. */
     if (said === asText(shownValue(at.seq, at.field))) return;
+
+    /* ON A LIVE RECORD THE CELL SHOWS WHAT WAS TYPED WHILE IT SAVES. A refused value goes back into the
+       cell's editor, so it is corrected rather than typed again; a conflict draws the row as it now
+       stands first, so the retry is against the latest version. */
+    if (!sample && at.seq > 0) {
+      const was = asked;
+      const value = said === '' ? null : said;
+      setPatch(at.seq, at.field, value);
+      receipt(at.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+      void writes()
+        .update(id, at.seq, { [at.field]: value }, rowAt(at.seq)?.version)
+        .then((out) => {
+          if (asked !== was) {
+            if (!out.ok) toasts.push(out.fix, { intent: 'warn' });
+            return;
+          }
+          dropPatch(at.seq, at.field);
+          clearReceipt(at.seq);
+          if (out.ok) {
+            landRow(out.entry);
+            receipt(at.seq, { mark: copy.writeMarkSaved, intent: 'good' });
+            return;
+          }
+          missed(was, out);
+          if (editing === null) {
+            editing = at;
+            editValue = said;
+          }
+        });
+      return;
+    }
 
     /* AND TYPING THE ORIGINAL BACK IS NOT AN EDIT EITHER, IT IS AN UNDO. The comparison above is
        against what is on screen, so this one is against what the record holds: reaching the record's
@@ -1474,6 +1596,40 @@
     }
   }
 
+  /**
+   * Move every selected row's state: one change per row, then one sentence for all of them.
+   *
+   * ONE AT A TIME, so a refusal on the third row is the record's answer about that row and not one of
+   * eight racing answers. The toast says how many landed and, when one did not, the first reason.
+   */
+  async function setPickedState(state: string) {
+    const said = state.replace(/_/g, ' ');
+    const field = decl?.state;
+    if (sample || !field) {
+      toasts.push(copy.notWritten(`${picked.length} rows would be set to ${said}`), { intent: 'warn' });
+      return;
+    }
+    const was = asked;
+    const total = picked.length;
+    const rows = picked.filter((e) => e.seq > 0);
+    let landedCount = 0;
+    let first: string | null = null;
+    for (const e of rows) receipt(e.seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    for (const e of rows) {
+      const out = await writes().update(id, e.seq, { [field]: state }, e.version);
+      if (out.ok) landedCount += 1;
+      else first ??= out.fix;
+      if (asked !== was) continue;
+      clearReceipt(e.seq);
+      if (out.ok) {
+        landRow(out.entry);
+        receipt(e.seq, { mark: said, intent: 'good' });
+      } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
+    }
+    const line = copy.writeBulk(landedCount, total, said);
+    toasts.push(first ? `${line} ${first}` : line, landedCount === total ? {} : { intent: 'warn' });
+  }
+
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
     /* AND EACH ROW GETS ITS OWN `Put back`, WHICH THE BULK PATH DID NOT GIVE IT. Archiving one row
@@ -1787,10 +1943,7 @@
                   class="mi"
                   role="menuitem"
                   type="button"
-                  onclick={() =>
-                    toasts.push(copy.notWritten(`${picked.length} rows would be set to ${state.replace(/_/g, ' ')}`), {
-                      intent: 'warn',
-                    })}
+                  onclick={() => void setPickedState(state)}
                 >
                   <span class="mi-name">{state.replace(/_/g, ' ')}</span>
                 </button>
@@ -2483,7 +2636,7 @@
         weight="primary"
         type="submit"
         form="new-row"
-        disabled={problems.length > 0}
+        disabled={problems.length > 0 || writing}
         aria-describedby={problems.length > 0 ? 'new-row-why' : undefined}
       >
         {copy.addRow} {decl.one}

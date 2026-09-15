@@ -28,7 +28,16 @@ import { diffFault } from './diff.ts';
  */
 export type ParseOptions = { page?: boolean };
 
-export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean; depth?: number };
+/**
+ * Which record row a drawn row is, when a host drew it from one: its register, its number and the version it was read at.
+ *
+ * NEVER PARSED. A fence an author typed names no row, so only the host that projected the rows sets it, after the parse;
+ * it is what lets a moved card or a ticked task be written back to the row it came from, and the version makes a row
+ * somebody else changed first a conflict rather than an overwrite.
+ */
+export type RowRef = { register: string; seq: number; version: number };
+
+export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean; depth?: number; ref?: RowRef };
 
 export type Block = {
   type: 'block';

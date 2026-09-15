@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type Boot, type CallContext, type HistoryPage, type InboxPage, type WhatsNew } from '../src/index.ts';
+import type { ArrivalSettled } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -270,5 +271,61 @@ test('ONLY AN OWNER READS THE INBOX: a scoped token, a record-wide token, a writ
     assert.ok(out.refusal.fix.length > 20, `${who} was refused without a sentence`);
     assert.ok(!out.refusal.fix.includes('Invoice'), `${who} was told what the inbox holds`);
   }
+  sql.close();
+});
+
+const codeOf = (r: { ok: boolean }): string | null =>
+  r.ok ? null : 'refusal' in r ? (r as { refusal: { code: string } }).refusal.code : 'conflict';
+
+test('FILING AN ARRIVAL IS A ROW WRITTEN LIKE ANY OTHER, and the arrival leaves the inbox in the same batch', async () => {
+  const { api, sql, ids } = await inboxRecord();
+  const filed = value<ArrivalSettled>(await api.fileArrival({ id: ids[4]!, register: 'obligations' }, owner));
+  assert.equal(filed.state, 'matched');
+  assert.equal(filed.already, false);
+  assert.equal(filed.entry?.fields.what, 'Invoice 5', 'titled by the subject');
+
+  const events = sql.all<{ kind: string; actor: string }>(
+    "SELECT kind, actor FROM event WHERE batch = (SELECT batch FROM event WHERE target = ? AND kind = 'state')",
+    `inbox_raw:${ids[4]}`,
+  );
+  assert.deepEqual(events.map((e) => e.kind).sort(), ['create', 'state'], 'the row and the arrival in one batch');
+  assert.ok(events.every((e) => e.actor === 'p_1'), 'signed by who filed it');
+  assert.deepEqual(value<InboxPage>(await api.inbox({}, owner)).arrivals.map((a) => a.subject), ['Invoice 3', 'Invoice 2', 'Invoice 1']);
+  assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, 3);
+
+  const again = value<ArrivalSettled>(await api.fileArrival({ id: ids[4]!, register: 'diary' }, owner));
+  assert.equal(again.already, true, 'filing it again is the same answer');
+  assert.equal(again.entry?.id, filed.entry?.id);
+  assert.equal(sql.all<{ id: string }>("SELECT id FROM event WHERE kind = 'create'").length, 1, 'and no second row');
+
+  assert.equal(codeOf(await api.fileArrival({ id: ids[1]!, register: 'nothing' }, owner)) !== null, true);
+  assert.equal(value<InboxPage>(await api.inbox({}, owner)).arrivals.length, 3, 'a refused row left the arrival waiting');
+
+  const archived = value<ArrivalSettled>(await api.archiveArrival({ id: ids[2]! }, owner));
+  assert.deepEqual([archived.state, archived.already, archived.entry], ['ignored', false, null]);
+  assert.equal(value<ArrivalSettled>(await api.archiveArrival({ id: ids[2]! }, owner)).already, true);
+  assert.equal(
+    sql.all<{ id: string }>("SELECT id FROM event WHERE target = ? AND kind = 'state'", `inbox_raw:${ids[2]}`).length,
+    1,
+    'archiving twice is one event',
+  );
+  assert.equal(codeOf(await api.archiveArrival({ id: ids[4]! }, owner)), 'OUT_OF_BOUNDS', 'a filed arrival is not archived');
+  assert.equal(codeOf(await api.fileArrival({ id: ids[2]!, register: 'obligations' }, owner)), 'OUT_OF_BOUNDS', 'an archived one is not filed');
+  assert.equal(codeOf(await api.archiveArrival({ id: 'raw_nothing' }, owner)), 'OUT_OF_BOUNDS');
+  assert.equal(codeOf(await api.fileArrival({ id: ids[1]! } as never, owner)), 'REQUIRED_MISSING');
+  assert.equal(codeOf(await api.archiveArrival({ id: ids[1]!, register: 'diary' } as never, owner)), 'FIELD_UNKNOWN');
+  sql.close();
+});
+
+test('ONLY AN OWNER IN A BROWSER FILES OR ARCHIVES AN ARRIVAL, and a refused caller moves nothing', async () => {
+  const { api, sql, ids } = await inboxRecord();
+  const token: CallContext = { principal: { kind: 'token', id: 't_2', scope: 'write', person: 'p_1', level: 'owner' } };
+  const writer: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' } };
+  const heldToPart: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: ['obligations'] };
+  assert.equal(codeOf(await api.fileArrival({ id: ids[0]!, register: 'obligations' }, token)), 'NEEDS_BROWSER_SESSION');
+  assert.equal(codeOf(await api.archiveArrival({ id: ids[0]! }, project)), 'NEEDS_BROWSER_SESSION');
+  assert.notEqual(codeOf(await api.archiveArrival({ id: ids[0]! }, writer)), null, 'a writer archived an arrival');
+  assert.equal(codeOf(await api.fileArrival({ id: ids[0]!, register: 'obligations' }, heldToPart)), 'FORBIDDEN');
+  assert.equal(value<InboxPage>(await api.inbox({}, owner)).arrivals.length, 4);
   sql.close();
 });

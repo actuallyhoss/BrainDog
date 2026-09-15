@@ -120,6 +120,32 @@ test('the inbox is a read an owner makes, and a token is refused it', async () =
   sql.close();
 });
 
+test('filing and archiving an arrival are writes an owner makes, and a token is refused them', async () => {
+  const { api, call, sql } = await host();
+  const first = api.kernel.arrive({ channel: 'email', headers: { From: 'billing@fenwick.example', Subject: 'Your invoice' }, body: 'Total GBP 58.00', sha256: 'h1' });
+  const second = api.kernel.arrive({ channel: 'email', headers: { From: 'ap@halden.example', Subject: 'RE: Invoice 41' }, body: 'Paying on the 12th', sha256: 'h2' });
+  if (!first.ok || !second.ok) throw new Error('the arrivals were refused');
+
+  const filed = await call('fileArrival', { id: first.value.raw, register: 'obligations' });
+  assert.equal(filed.status, 200);
+  const value = filed.body.value as { state: string; already: boolean; entry: { seq: number; fields: { what: string } } };
+  assert.equal(value.state, 'matched');
+  assert.equal(value.already, false);
+  assert.equal(value.entry.fields.what, 'Your invoice');
+
+  const token: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'owner' } };
+  const refused = await call('archiveArrival', { id: second.value.raw }, token);
+  assert.equal(refused.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
+
+  const archived = await call('archiveArrival', { id: second.value.raw });
+  assert.equal((archived.body.value as { state: string }).state, 'ignored');
+  assert.deepEqual(((await call('inbox')).body.value as { arrivals: unknown[] }).arrivals, [], 'both left the inbox');
+
+  const gone = await call('archiveArrival', { id: 'raw_nothing' });
+  assert.equal(gone.body.refusal?.code, 'OUT_OF_BOUNDS');
+  sql.close();
+});
+
 test('A WRITE IS A POST, because a GET that changes something is a change a prefetch can make', async () => {
   const { call, sql } = await host();
   const wrong = await call('create');

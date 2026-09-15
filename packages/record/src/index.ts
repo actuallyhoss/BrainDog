@@ -67,6 +67,7 @@ import {
   type Waiting as DeviceWaiting,
   type EventLine as LogLine,
   type InboxLine,
+  type ArrivalSettled,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
@@ -2656,6 +2657,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const lines = kernel.inboxBefore(cursor ?? null, limit + 1);
       const arrivals = lines.slice(0, limit);
       return ok({ arrivals, cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null });
+    },
+
+    /**
+     * File one arrival from the inbox as a row in a list, and take it out of the inbox.
+     *
+     * AN OWNER'S, IN A BROWSER, AS THE INBOX IS. The row is an ordinary write, signed like any other, and the arrival it
+     * came from is marked in the same batch. With no `fields`, the row's title is the arrival's subject, or its first line.
+     */
+    async fileArrival(args: { id: string; register: string; fields?: Patch }, ctx: CallContext): Promise<Result<ArrivalSettled>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false, refusal: stop };
+      if (!wholeRecord(ctx))
+        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'register', 'fields']);
+      if (extra) return { ok: false, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which arrival? Name it by its id.', { at: 'id' });
+      if (typeof args.register !== 'string' || !args.register)
+        return no('REQUIRED_MISSING', 'Which list should this be filed in? Name it by its id.', { at: 'register' });
+      const fields: unknown = args.fields;
+      if (fields !== undefined && (typeof fields !== 'object' || fields === null || Array.isArray(fields)))
+        return no('VALUE_MALFORMED', 'The fields are an object of field names and their values.', { at: 'fields' });
+      return tail(
+        offRegister(
+          args.register,
+          kernel.fileArrival(args.id, args.register, (fields as Patch | undefined) ?? null, {
+            ...writerOf(ctx),
+            ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+          }),
+        ),
+      );
+    },
+
+    /**
+     * Take one arrival out of the inbox without filing it. Its bytes are kept, and nothing else changes.
+     *
+     * The same owner's check as `fileArrival`, and a second call is the same answer with nothing written.
+     */
+    async archiveArrival(args: { id: string }, ctx: CallContext): Promise<Result<ArrivalSettled>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false, refusal: stop };
+      if (!wholeRecord(ctx))
+        return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id']);
+      if (extra) return { ok: false, refusal: extra };
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which arrival? Name it by its id.', { at: 'id' });
+      return tail(kernel.archiveArrival(args.id, actorOf(ctx)));
     },
 
     /**

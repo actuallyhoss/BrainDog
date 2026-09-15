@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { KINDS, holeLabel, isKind } from 'braindog-render';
+  import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Table } from 'braindog-render/svelte';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -66,6 +66,46 @@
   });
 
   const live = $derived(got?.from === 'live' ? got : null);
+
+  /**
+   * ON A LIVE PAGE A MOVED CARD AND A TICKED TASK ARE WRITES to the row each came from, named by the `ref` the page
+   * answer carried. A refusal is the record's own sentence. A write that landed, or one that met a row changed first,
+   * reads the page again without blanking it, so the card's mark goes once the row agrees with it. The sample keeps its
+   * toasts.
+   */
+  async function reread() {
+    const asked = slug;
+    if (!reader) return;
+    const out = await reader.read(asked);
+    if ((route.params.slug ?? '') === asked && out.from === 'live') got = out;
+  }
+
+  async function writeRow(
+    ref: RowRef | undefined,
+    change: (m: typeof import('$lib/record/page-write.ts'), ref: RowRef) => Record<string, unknown> | null,
+    title: string,
+  ) {
+    if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
+    const m = await import('$lib/record/page-write.ts');
+    const patch = change(m, ref);
+    if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
+    const out = await m.updateRow(location.origin, ref, patch, title);
+    if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
+    if (out.from === 'written' || out.from === 'conflict') await reread();
+  }
+
+  function moveCard(block: LiveBlock, row: Row, to: string) {
+    const title = row.cells[1] ?? copy.cardFallback;
+    if (!live) return void toasts.push(copy.cardMovedTo(title, to), { intent: 'warn' });
+    const field = block.columns[0]?.field;
+    void writeRow(row.ref, (m, ref) => (field ? m.movePatch(ref, field, to) : null), title);
+  }
+
+  function tickTask(row: Row, done: boolean) {
+    const title = row.cells[0] ?? copy.cardFallback;
+    if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
+    void writeRow(row.ref, (m, ref) => m.tickPatch(ref, done), title);
+  }
   /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
   const result = $derived<{ page: PageDecl; blocks: LiveBlock[] } | undefined>(
     got?.from === 'live' ? got.page : got?.from === 'sample' ? (readPage(slug) ?? undefined) : undefined,
@@ -703,9 +743,8 @@
                 {#if segment.type === 'block'}<Block
                     block={segment}
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
-                    onmove={(row, to) => toasts.push(copy.cardMovedTo(row.cells[1] ?? copy.cardFallback, to), { intent: 'warn' })}
-                    ontick={(row, done) =>
-                      toasts.push(copy.taskTicked(row.cells[0] ?? copy.cardFallback, done), { intent: 'warn' })}
+                    onmove={(row, to) => moveCard(block, row, to)}
+                    ontick={(row, done) => tickTask(row, done)}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
               {/each}
             {/if}

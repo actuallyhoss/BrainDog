@@ -87,6 +87,30 @@
       busy = null;
     }
   }
+
+  /**
+   * Uninstall one. The sample keeps the sentence it always toasted; a record takes it out, and the list is read
+   * again, so what is drawn is what the record now holds. A refusal is the record's sentence, and a race reads again.
+   */
+  async function uninstall(id: string, name: string) {
+    if (!source || busy !== null) return;
+    busy = id;
+    try {
+      const out = await source.uninstall(id);
+      if (source.sample) {
+        toasts.push(out.ok ? (out.value.said ?? copy.notWritten(copy.uninstallWould(name))) : out.refusal.fix, { intent: 'warn' });
+        return;
+      }
+      if (out.ok) toasts.push(copy.uninstalled(name), { intent: 'good' });
+      else toasts.push(out.refusal.code === 'VERSION_STALE' ? copy.writeRaced : out.refusal.fix, { intent: 'warn' });
+      if (out.ok || out.refusal.code === 'VERSION_STALE') {
+        const again = await source.packs();
+        if (again.ok) states = again.value;
+      }
+    } finally {
+      busy = null;
+    }
+  }
 </script>
 
 <!--
@@ -211,11 +235,8 @@
             <Button
               weight="bare"
               tone="bad"
-              onclick={() =>
-                toasts.push(
-                  copy.notWritten(copy.uninstallWould(pack.name)),
-                  { intent: 'warn' },
-                )}
+              disabled={busy !== null}
+              onclick={() => uninstall(pack.id, pack.name)}
             >{copy.uninstall}</Button>
           {/if}
           </footer>

@@ -242,6 +242,37 @@ export type ActionRow = {
 /** `resumeAction`: the action that runs again now. */
 export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 
+/** One of the five levels a member holds, on the record or on one register. */
+export type Level = 'owner' | 'decide' | 'write' | 'append' | 'read';
+
+/** `members` and `invite`: one person, what they hold on the record, and where it differs. See `Member` in `@braindog/kernel`. */
+export type Member = {
+  person_id: string;
+  email: string | null;
+  name: string | null;
+  /** `null` is nothing on the record itself, which is not `read`. */
+  level: Level | null;
+  scoped: { register: string; level: Level }[];
+  seen_at: string | null;
+  suspended_at: string | null;
+};
+
+/** `listTokens` and `revokeToken`: one agent token, never the bearer. See `TokenRow` in `@braindog/kernel`. */
+export type TokenRow = {
+  id: string;
+  person_id: string;
+  scope: 'read' | 'propose' | 'write';
+  label: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  last_surface: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+};
+
+/** `createToken`: the only copy of the bearer there will ever be. Show it once, and keep it nowhere. */
+export type MintedToken = { id: string; bearer: string; scope: string; expires_at: string };
+
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
@@ -396,6 +427,34 @@ export function createClient(options: ClientOptions) {
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>
       call<unknown>('planPack', args as Record<string, unknown>),
+
+    /* THE ADMIN WRITES A SETTINGS SCREEN MAKES, SO A BROWSER SESSION FOR EACH. They were reachable through
+       `call` and had no name, which left the argument names unchecked on the screens that change who may
+       see a record. */
+    /** Apply the plan somebody read: `planHash` is the plan's, and `approve` the calls-out lines it printed. */
+    installPack: (args: { doc: unknown; source?: { kind: string; ref?: string }; planHash: string; approve?: string[] }) =>
+      call<unknown>('installPack', args as Record<string, unknown>),
+    /** Take a pack back out. Its declarations go and its rows stay. */
+    uninstallPack: (args: { id: string }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
+    packConfig: (args: { id: string }) => call<unknown>('packConfig', args as Record<string, unknown>),
+    /** Only the settings that changed; `null` puts one back to its default. */
+    setPackConfig: (args: { id: string; values: Record<string, unknown> }) => call<unknown>('setPackConfig', args as Record<string, unknown>),
+    /** Everything the person holds, not a patch: a register left out is taken away. */
+    invite: (args: {
+      person: string;
+      email?: string;
+      name?: string;
+      level?: Level;
+      registers?: Record<string, Level>;
+      why?: string;
+    }) => call<Member>('invite', args as Record<string, unknown>),
+    removeMember: (args: { person: string; why?: string }) => call<unknown>('removeMember', args as Record<string, unknown>),
+    createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number }) =>
+      call<MintedToken>('createToken', args as Record<string, unknown>),
+    revokeToken: (args: { id: string }) => call<TokenRow>('revokeToken', args as Record<string, unknown>),
+    /** The record as the lines of a `.dogl` file. Sealed bytes stay out unless the wrapping key is named. */
+    export: (args: { sections?: ('header' | 'data' | 'origin' | 'governance')[]; redactGrants?: boolean; kek_id?: string } = {}) =>
+      call<string[]>('export', args as Record<string, unknown>),
 
     /* THE TWO DATA WRITES A SCREEN MAKES WITHOUT CHANGING A ROW. `markRead` moves the reader's own
        mark and nothing else, and with no `upTo` the record uses its own newest event, so a caller

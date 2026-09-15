@@ -34,6 +34,7 @@
   import { Table } from 'braindog-render/svelte';
   import { readHistory, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
+  import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
 
   const id = $derived(page.params.register ?? '');
@@ -100,6 +101,45 @@
     const n = seq;
     if (Number.isInteger(n) && n >= 1) untrack(() => void readRow(register, n));
   });
+
+  /**
+   * A NOTE ON THE ROW, which is a `log`: it changes no field and lands in the history beside the row.
+   *
+   * THE BOX IS EMPTIED ONLY ONCE THE RECORD HAS THE NOTE, so a refusal leaves the words where they were
+   * typed. The history is read again after, and the new line in it is the answer, so there is no toast.
+   * On the sample it says what would have happened, like every other write there.
+   */
+  let noteText = $state('');
+  let noting = false;
+  let writer: RowWriter | null = null;
+
+  async function addNote(e: SubmitEvent) {
+    e.preventDefault();
+    const said = noteText.trim();
+    if (!said || noting || !row || unwritten) return;
+    if (!live) {
+      toasts.push(copy.notWritten(copy.noteWouldBeAdded), { intent: 'warn' });
+      return;
+    }
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    noting = true;
+    writer ??= rowWriter(location.origin);
+    const out = await writer.note(register, n, said);
+    noting = false;
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    if (askedFor !== key) return;
+    if (noteText.trim() === said) noteText = '';
+    const at = opened();
+    const h = await readHistory(location.origin, register, n);
+    const current = askedFor === key;
+    closed(!current || h.from !== 'refused', at);
+    if (current) told = h;
+  }
 
   const history = $derived(told && told.from !== 'refused' ? told.lines : []);
   /* THE RECORD'S ROW DOES NOT SAY WHO ADDED IT; its oldest event does. */
@@ -391,6 +431,16 @@
           <dd>{since(row.created, clock)}{#if addedBy} by {actorOf(addedBy)}{/if}</dd>
         </dl>
 
+        {#if !unwritten}
+          <form class="note-form" onsubmit={addNote}>
+            <label class="note-label" for="row-note">{copy.noteLabel}</label>
+            <div class="note-line">
+              <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" bind:value={noteText} />
+              {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
+            </div>
+          </form>
+        {/if}
+
         {#if told?.from === 'refused'}
           <h2 class="side-title">History</h2>
           <Empty kind="error" compact title={told.fix} />
@@ -601,6 +651,43 @@
 
   .number {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A NOTE ON THE ROW: one line and its button, the capture line's box at the size a finger needs. */
+  .note-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-5);
+  }
+
+  .note-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .note-line {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .note-input {
+    flex: 1;
+    min-inline-size: 0;
+    min-block-size: max(var(--ctl-h), var(--tap));
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+  }
+
+  .note-input:hover {
+    border-color: var(--edge);
   }
 
   .history {

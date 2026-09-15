@@ -171,8 +171,9 @@ for (const queue = [...routes]; queue.length > 0; ) {
   const at = queue.pop();
   /* THE SPECIFIER AS WRITTEN, then resolved two ways — `$lib/x.ts` is the app's own alias for
      `src/lib/x.ts`, and a relative one is relative to the importer. Anything else is a package, and
-     a package does not hold this app's copy. */
-  for (const m of (sources.get(at) ?? '').matchAll(/from\s*['"]([^'"\n]+)['"]/gu)) {
+     a package does not hold this app's copy. A DYNAMIC `import('…')` IS AN IMPORT TOO: a write module
+     a screen loads on the first press is rendered as surely as one it loads up front. */
+  for (const m of (sources.get(at) ?? '').matchAll(/(?:from\s*|import\s*\(\s*)['"]([^'"\n]+)['"]/gu)) {
     const spec = m[1];
     const to = spec.startsWith('$lib/')
       ? join(SRC, 'lib', spec.slice(5))

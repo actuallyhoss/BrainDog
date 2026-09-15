@@ -1495,6 +1495,41 @@ export const copy = {
      `no more than 3`, at the end of its heading row: a fragment with no subject, beside a count of
      4 it was failing. The words are here; the tone and its glyph come from the metric. */
   aimFor: (target: string) => `Aim for ${target}`,
+  /* Inbox and page-row writes (lane D) */
+  inboxFileInto: 'File it in',
+  inboxFiled: (row: string) => `Filed as ${row}. It has left the inbox.`,
+  inboxArchived: 'Archived. The email is kept, and it has left the inbox.',
+  inboxNoLists: 'This record has no lists to file it in yet.',
+  recordNotReached: 'The record could not be reached, so nothing was saved. Try again in a moment.',
+  pageRowConflict: (title: string) => `${title} was changed somewhere else first. The page has been read again, so try once more.`,
+  pageRowUnknown: 'This could not be saved from here, because the page did not say which row it is.',
+  pageRowNoState: 'This could not be saved from here, because its list has no state to mark it done with.',
+  /* Decide and page writes (lane B) */
+  decideConflict: 'A row this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
+  /* Row writes (lane A) */
+  writeConflict: (row: string) => `${row} was changed somewhere else first. It now shows the latest version, so check it and try again.`,
+  writeNotReached: 'The record could not be reached, so nothing was saved. Try again in a moment.',
+  writeMarkAdded: 'Added',
+  writeMarkSaved: 'Saved',
+  writeMarkSaving: 'Saving',
+  writeBulk: (landed: number, total: number, state: string) =>
+    landed === total ? `${total} ${total === 1 ? 'row' : 'rows'} set to ${state}.` : `${landed} of ${total} rows set to ${state}.`,
+  noteLabel: 'Add a note',
+  noteAdd: 'Add note',
+  noteWouldBeAdded: "The note would be added to this row's history",
+  /* Settings, vault and packs writes (lane C) */
+  writeRaced: 'The record changed while this was sent, so it has been read again.',
+  levelMoved: (name: string, to: string) => `${name} is set to ${to} across this record.`,
+  accessRemoved: (name: string) => `${name} no longer has access to this record.`,
+  exceptionRemoved: (list: string, to: string) => `${list} is back to ${to}.`,
+  exceptionAdded: (name: string, list: string, level: string) => `${name} is set to ${level} on ${list}.`,
+  exceptionList: 'List',
+  exceptionLevel: 'Level',
+  exceptionAdd: 'Add',
+  exceptionCancel: 'Cancel',
+  peopleUnrouted: 'This record does not list its people yet.',
+  exported: (file: string) => `${file} is in your downloads.`,
+  uninstalled: (pack: string) => `${pack} is uninstalled. The rows it created are still here.`,
 } as const;
 
 export type Copy = typeof copy;

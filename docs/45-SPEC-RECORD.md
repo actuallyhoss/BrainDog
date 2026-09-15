@@ -105,6 +105,8 @@ export type RecordApi = {
   deviceApprove(args: { user_code: string }, ctx: CallContext): Promise<Result<Approved>>;   // the owner, signed in within 15 minutes
   listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>>;                               // by handle, never the poll id
   revokeDevice(args: { handle: string }, ctx: CallContext): Promise<Result<DeviceRow>>;       // a login's token goes with it
+  fileArrival(args: { id: string; register: string; fields?: Patch }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // a row, and the arrival `matched`
+  archiveArrival(args: { id: string }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // the arrival `ignored`, its bytes kept
   // INTERNAL — 12
   drainSchedule(args: Record<string, never>, ctx: CallContext): Promise<Result<Drained>>;
   leaseOutbox(args: { kinds: OutboxKind[]; n: number }, ctx: CallContext): Promise<Result<OutboxRow[]>>;
@@ -951,6 +953,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 | `whatsNew` scope | a token held to one register: an event on another register, its declaration, a question over its rows, a line about access and a whole-record line are absent; a question on its own register is present; `whatsNew` and `recentHistory` agree |
 | `recentHistory` paging | pages of 3 join to the whole log newest first, no line twice, `cursor` `null` only on the last; a fractional `limit` is `VALUE_MALFORMED`; a caller who may only append to a register reads none of its lines |
 | `inbox` | five unmatched arrivals with one `ignored` → the other four newest first, their count equal to `boot`'s `counts.inbox`; pages of 3 join to the whole, no arrival twice; no `sha256` or raw `headers` in the answer; a fractional `limit` and a `cursor` of 0 are `VALUE_MALFORMED`; a token held to one register, a record-wide token, a `write` person, a person with no level and an owner held to one register are each `FORBIDDEN` |
+| `fileArrival` · `archiveArrival` | filing an arrival writes one row titled by its subject, with a `create` event and the arrival's `state` event in one batch, and the inbox and `counts.inbox` lose it; filing it again answers the same row and writes nothing; a refused row leaves the arrival waiting; archiving is `ignored`, twice is one event; archiving a filed arrival and filing an archived one are `OUT_OF_BOUNDS`; a token is `NEEDS_BROWSER_SESSION`, a writer is refused, and an owner held to one register is `FORBIDDEN` |
 | `boot` shell | `record`, `me` with the member's name, `counts.decide`, `counts.inbox` `null` below owner; the JSON of a scoped boot names no register, row or question outside the scope; `whatsNew` inside equals `whatsNew()` alone |
 | `index` | `open` = rows in non-terminal states; a register without `transitions` has `open: 0`; `fields` lists `{ id, type }`; `scope.repo` narrows only registers with `repos` |
 | `search` | a phrase with `"` and `OR` is matched literally; zero rows → one `search.empty` observation; with `vec` → the fused order |

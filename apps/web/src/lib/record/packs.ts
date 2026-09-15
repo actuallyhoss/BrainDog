@@ -46,7 +46,12 @@ export type Source = {
   config(id: string): Promise<Answer<PackConfig>>;
   /** Only the settings that changed. `null` puts one back to its default. */
   setConfig(id: string, values: Record<string, unknown>): Promise<Answer<ConfigSaved>>;
+  /** Take an add-on back out. Its declarations go and its rows stay. The sample says what would happen. */
+  uninstall(id: string): Promise<Answer<Uninstalled>>;
 };
+
+/** What `uninstallPack` answers, with only the key read here. The sample's carries the sentence it toasts. */
+export type Uninstalled = { id: string; said?: string };
 
 /** What a refused switch draws, and what its one button would send. */
 export type Blocked =
@@ -86,8 +91,9 @@ export type Caller = {
   packs(): Promise<Wire<PackState[]>>;
   disablePack(args: { id: string; alsoDisable?: string[] }): Promise<Wire<PackToggle>>;
   enablePack(args: { id: string }): Promise<Wire<PackToggle>>;
-  /* `packConfig` and `setPackConfig` have no named method on the client, so they go through `call`. */
-  call(name: string, args?: Record<string, unknown>): Promise<Wire<unknown>>;
+  packConfig(args: { id: string }): Promise<Wire<unknown>>;
+  setPackConfig(args: { id: string; values: Record<string, unknown> }): Promise<Wire<unknown>>;
+  uninstallPack(args: { id: string }): Promise<Wire<unknown>>;
 };
 
 /** The client's three arms as two. None of these calls sends a version, so a conflict is only a race. */
@@ -105,8 +111,9 @@ export function live(client: Caller): Source {
     disable: async (id, alsoDisable = []) =>
       said(await client.disablePack(alsoDisable.length > 0 ? { id, alsoDisable: [...alsoDisable] } : { id })),
     enable: async (id) => said(await client.enablePack({ id })),
-    config: async (id) => said(await client.call('packConfig', { id })) as Answer<PackConfig>,
-    setConfig: async (id, values) => said(await client.call('setPackConfig', { id, values })) as Answer<ConfigSaved>,
+    config: async (id) => said(await client.packConfig({ id })) as Answer<PackConfig>,
+    setConfig: async (id, values) => said(await client.setPackConfig({ id, values })) as Answer<ConfigSaved>,
+    uninstall: async (id) => said(await client.uninstallPack({ id })) as Answer<Uninstalled>,
   };
 }
 
@@ -123,7 +130,7 @@ export async function choose(client: Caller): Promise<{ source: Source; first: A
 
 /** The same choice for one add-on's settings, decided by its first `packConfig` call. */
 export async function openSettings(client: Caller, id: string): Promise<{ source: Source; first: Answer<PackConfig> }> {
-  const first = said(await client.call('packConfig', { id })) as Answer<PackConfig>;
+  const first = said(await client.packConfig({ id })) as Answer<PackConfig>;
   if (first.ok || !SAMPLE_WHEN.has(first.refusal.code)) return { source: live(client), first };
   const source = sample();
   return { source, first: await source.config(id) };
@@ -299,6 +306,13 @@ export function sample(at: () => string = () => new Date().toISOString()): Sourc
 
   return {
     sample: true,
+
+    /* NOTHING LEAVES THE SAMPLE. It answers with the sentence the screen has always shown, so the demo says what an
+       uninstall would do rather than acting one out. */
+    uninstall: async (id) =>
+      known(id)
+        ? { ok: true, value: { id, said: copy.notWritten(copy.uninstallWould(known(id)?.name ?? id)) } }
+        : unknown(id, 'id'),
 
     config: async (id) => (known(id) ? { ok: true, value: settingsOf(id) } : unknown(id, 'id')),
 

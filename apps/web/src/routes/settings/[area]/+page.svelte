@@ -28,11 +28,16 @@
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import {
     CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, noRecord, reachKey, revocable, sampleMachines,
-    sampleTokens, standing, type Answer, type DeviceRow, type Minted, type TokenRow,
+    sampleTokens, standing, type Answer, type DeviceRow, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   import { callsOutOf, words as actionWords, type CallOut } from '$lib/record/actions.ts';
+  /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
+  import {
+    addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
+    type ExportKind, type Wrote,
+  } from '$lib/record/settings-write.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -172,10 +177,14 @@
       return;
     }
     const at = opened();
-    const out = await agentClient.call<TokenRow>('revokeToken', { id: row.id });
+    const out = wrote(await agentClient.revokeToken({ id: row.id }));
     closed(true, at);
     if (out.ok) tokens = tokens.filter((t) => t.id !== row.id);
-    else if ('refusal' in out) toasts.push(out.refusal.fix, { intent: 'warn' });
+    else {
+      toasts.push(out.fix, { intent: 'warn' });
+      const held = await agentClient.listTokens();
+      if (held.ok) tokens = standing(held.value as TokenRow[]);
+    }
   }
 
   async function connectAgent(e: SubmitEvent) {
@@ -189,11 +198,12 @@
     minting = true;
     mintRefusal = '';
     const at = opened();
-    const out = await agentClient.call<Minted>('createToken', { scope: 'write', label, days: TOKEN_DAYS });
+    /* THE BEARER IS SHOWN ONCE, from this answer, and never stored, logged or written anywhere else. */
+    const out = wrote(await agentClient.createToken({ scope: 'write', label, days: TOKEN_DAYS }));
     closed(true, at);
     minting = false;
     if (!out.ok) {
-      mintRefusal = 'refusal' in out ? out.refusal.fix : '';
+      mintRefusal = out.fix;
       return;
     }
     minted = { label, bearer: out.value.bearer };
@@ -243,13 +253,18 @@
     if (!offer || installing || !agentClient) return;
     installing = true;
     const at = opened();
-    const out = await agentClient.call<unknown>('installPack', { doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) });
+    const out = wrote(await agentClient.installPack({ doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
     closed(true, at);
     installing = false;
     if (out.ok) {
       offer = null;
       toasts.push(vaultWords.packInstalled, { intent: 'good' });
-    } else offerSaid = 'refusal' in out ? out.refusal.fix : copy.notOnDemo;
+    } else if (!out.ok && out.from === 'refused' && out.code === 'PLAN_STALE') {
+      /* THE PLAN MOVED UNDER IT, so it is read again and shown again: what installs is what was shown.
+         The sentence says the plan moved only when a fresh plan is on screen to approve. */
+      await offerPack(agentClient);
+      offerSaid = offer ? out.fix : '';
+    } else offerSaid = out.fix;
   }
 
   const lines = $derived(connectLines(origin));
@@ -502,6 +517,10 @@
      * Pressing the level somebody already holds changes nothing, so nothing is what it says.
      */
     if (to === who.level) return;
+    if (peopleFrom === 'live') {
+      void settle(() => moveLevel(location.origin, who, to), copy.levelMoved(who.name, levelSaid(to)));
+      return;
+    }
     /**
      * THE DIRECTION IS THE EVENT'S, AND IT IS NO LONGER THE SENTENCE'S.
      *
@@ -521,8 +540,116 @@
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
      The check is here rather than in the control because it is a fact about the whole list. */
-  const owners = $derived(PEOPLE_ACCESS.filter((p) => p.level === 'owner' && p.since).length);
+  /**
+   * THE PEOPLE AREA'S ROWS: the record's members, or the sample's where there is no record.
+   *
+   * `reading` draws no list, so a live record never flashes somebody else's colleagues. A record that says no, or a
+   * host with no such read, draws its sentence in place of the list.
+   */
+  let people = $state<Person[]>([...PEOPLE_ACCESS]);
+  let peopleFrom = $state<'reading' | 'live' | 'sample' | 'unrouted' | 'refused'>('reading');
+  let peopleRefusal = $state('');
+  let peopleBusy = $state(false);
+  const peopleNow = () => (peopleFrom === 'live' ? Date.now() : NOW);
+
+  /* ON A RECORD EVERY OWNER COUNTS: `members` has no acceptance date, so `since` says nothing there. */
+  const owners = $derived(people.filter((p) => p.level === 'owner' && (peopleFrom === 'live' || p.since)).length);
   const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
+
+  $effect(() => {
+    if (area !== 'people') return;
+    untrack(() => void readPeopleNow());
+  });
+
+  async function readPeopleNow() {
+    const at = opened();
+    const out = await readPeople(location.origin);
+    if (out.from === 'live') people = out.people;
+    else if (out.from === 'sample') people = [...PEOPLE_ACCESS];
+    else people = [];
+    peopleRefusal = out.from === 'refused' ? out.fix : out.from === 'unrouted' ? copy.peopleUnrouted : '';
+    peopleFrom = out.from;
+    closed(true, at);
+  }
+
+  /**
+   * One write to who may see the record, then the list read again, so what is drawn is what the record holds.
+   * A refusal is the record's sentence; a race reads again too, before anybody presses twice.
+   */
+  async function settle(write: () => Promise<Wrote<unknown>>, done: string): Promise<boolean> {
+    if (peopleBusy) return false;
+    peopleBusy = true;
+    const at = opened();
+    const out = await write();
+    closed(true, at);
+    peopleBusy = false;
+    toasts.push(out.ok ? done : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    if (out.ok || (out.from === 'refused' && out.raced)) await readPeopleNow();
+    return out.ok;
+  }
+
+  /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's on a record and the sample's otherwise. */
+  const lists = $derived(
+    ((page.data as { index?: { registers?: readonly { id: string; name: string }[] } }).index?.registers ??
+      Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name }))),
+  );
+  let picking = $state<string | null>(null);
+  let pickList = $state('');
+  let pickLevel = $state<Level>('read');
+
+  function startException(p: Person) {
+    if (peopleFrom !== 'live') {
+      toasts.push(copy.notWritten(copy.exceptionWouldBeAdded(p.name)), { intent: 'warn' });
+      return;
+    }
+    picking = p.id;
+    pickList = lists.find((l) => !p.scoped.some((s) => s.register === l.id))?.id ?? lists[0]?.id ?? '';
+    pickLevel = 'read';
+  }
+
+  async function saveException(e: SubmitEvent, p: Person) {
+    e.preventDefault();
+    if (!pickList) return;
+    const name = lists.find((l) => l.id === pickList)?.name ?? pickList;
+    const ok = await settle(() => addException(location.origin, p, pickList, pickLevel), copy.exceptionAdded(p.name, name, levelSaid(pickLevel)));
+    if (ok) picking = null;
+  }
+
+  function takeAway(p: Person) {
+    if (peopleFrom !== 'live') toasts.push(copy.notWritten(copy.accessWouldGo(p.name)), { intent: 'warn' });
+    else void settle(() => removeAccess(location.origin, p), copy.accessRemoved(p.name));
+  }
+
+  function backToLevel(p: Person, register: string) {
+    const list = REGISTERS[register]?.name ?? lists.find((l) => l.id === register)?.name ?? register;
+    if (peopleFrom !== 'live') toasts.push(copy.notWritten(copy.exceptionWouldGo(list, levelSaid(p.level))), { intent: 'warn' });
+    else void settle(() => dropException(location.origin, p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
+  }
+
+  /* ── export: the record as a file, where there is a record to take it from ── */
+  let exporting = $state<ExportKind | null>(null);
+
+  /** The sample keeps the sentence it always said; a record hands the browser a `.dogl` file. */
+  async function takeCopy(kind: ExportKind, sampleSaid: string) {
+    if (exporting) return;
+    exporting = kind;
+    const at = opened();
+    const out = await exportFile(location.origin, kind, boot().index.slug);
+    closed(true, at);
+    exporting = null;
+    if (!out.ok) {
+      if (out.from === 'sample') toasts.push(copy.notWritten(sampleSaid));
+      else toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([out.value.text], { type: 'application/x-ndjson' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = out.value.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    toasts.push(copy.exported(out.value.name), { intent: 'good' });
+  }
 
   /**
    * WHETHER THERE IS ANYBODY TO COMPARE YOURSELF WITH, which is what most of this area is about.
@@ -532,7 +659,7 @@
    * second question asks that the product be smaller at one row than at four hundred and grow by
    * itself; this is the line that lets the People area do it.
    */
-  const alone = $derived(PEOPLE_ACCESS.length < 2);
+  const alone = $derived(people.length < 2);
 
   /**
    * AND YOU CANNOT TAKE YOUR OWN OWNERSHIP AWAY FROM THIS SCREEN.
@@ -922,12 +1049,18 @@
         control, and the segments, the exceptions, the two hints and the erasure appear on the day
         a second person exists, which is the day each of them means something.
       -->
-      {#if alone}
+      {#if peopleFrom === 'reading'}
+        <Section title={copy.whoCanSee}>{''}</Section>
+      {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
+        <Section title={copy.whoCanSee}>
+          <Empty kind="error" title={peopleRefusal} />
+        </Section>
+      {:else if alone}
         <Section title={copy.whoCanSee}>
           <p class="hint">{copy.onlyPerson}</p>
         </Section>
       {:else}
-        <Section title={copy.whoCanSee} count={PEOPLE_ACCESS.length}>
+        <Section title={copy.whoCanSee} count={people.length}>
           <p class="hint">{copy.accessScope}</p>
           <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
 
@@ -937,7 +1070,7 @@
                answer to the question this screen exists for. Who they are on the first line, what they
                can do on the second, and the sentence directly under the control that sets it. -->
           <ul class="whos">
-            {#each PEOPLE_ACCESS as p}
+            {#each people as p (p.id)}
               <li class="who">
                 <div class="who-head">
                   <Face name={p.name} you={self(p)} />
@@ -955,19 +1088,20 @@
                        ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
                        looked at, and saying so twice in one line is saying nothing. -->
                   <span class="who-detail">
+                    {#if peopleFrom === 'live'}
+                      <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
+                      {p.email || p.id} · {p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
+                    {:else}
                     {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
+                    {/if}
                   </span>
                   <span class="who-do">
                   <Button
                     weight="bare"
                     tone="bad"
-                    disabled={lastOwner(p) || self(p)}
+                    disabled={lastOwner(p) || self(p) || peopleBusy}
                     aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
-                    onclick={() =>
-                      toasts.push(
-                        copy.notWritten(copy.accessWouldGo(p.name)),
-                        { intent: 'warn' },
-                      )}
+                    onclick={() => takeAway(p)}
                   >{copy.removeAccess}</Button>
                   </span>
                 </div>
@@ -1002,7 +1136,7 @@
                         data-on={p.level === level ? '' : undefined}
                         aria-pressed={p.level === level ? 'true' : 'false'}
                         aria-label={level === null ? copy.noRecordLevelMeans : undefined}
-                        disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level)}
+                        disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level) || peopleBusy}
                         aria-describedby={lastOwner(p) && level !== 'owner'
                           ? 'last-owner'
                           : self(p) && level !== p.level
@@ -1047,16 +1181,8 @@
                                the safe direction, and red on it said the opposite. -->
                           <Button
                             weight="bare"
-                            onclick={() =>
-                              toasts.push(
-                                copy.notWritten(
-                                  copy.exceptionWouldGo(
-                                    REGISTERS[ex.register]?.name ?? ex.register,
-                                    levelSaid(p.level),
-                                  ),
-                                ),
-                                { intent: 'warn' },
-                              )}
+                            disabled={peopleBusy}
+                            onclick={() => backToLevel(p, ex.register)}
                           >{copy.removeException}</Button>
                         </li>
                       {/each}
@@ -1069,14 +1195,32 @@
                        IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
                        the list on a wide screen and read as belonging to the first exception. -->
                   <div class="ex-add">
+                  {#if picking === p.id}
+                    <!-- ONE LIST AND ONE LEVEL, then Add. It is the same `invite` as a level change, carrying the
+                         exceptions that stay, so nothing else they hold moves. -->
+                    <form class="ex-pick" onsubmit={(e) => saveException(e, p)}>
+                      <label class="ex-field">
+                        <span class="ex-label">{copy.exceptionList}</span>
+                        <select class="ex-select" bind:value={pickList}>
+                          {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+                        </select>
+                      </label>
+                      <label class="ex-field">
+                        <span class="ex-label">{copy.exceptionLevel}</span>
+                        <select class="ex-select" bind:value={pickLevel}>
+                          {#each LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+                        </select>
+                      </label>
+                      <Button weight="primary" type="submit" disabled={peopleBusy || !pickList}>{copy.exceptionAdd}</Button>
+                      <Button weight="bare" onclick={() => (picking = null)}>{copy.exceptionCancel}</Button>
+                    </form>
+                  {:else}
                   <Button
                     weight="bare"
-                    onclick={() =>
-                      toasts.push(
-                        copy.notWritten(copy.exceptionWouldBeAdded(p.name)),
-                        { intent: 'warn' },
-                      )}
+                    disabled={peopleBusy}
+                    onclick={() => startException(p)}
                   ><Icon name="plus" size="s" />{copy.addException}</Button>
+                  {/if}
                   </div>
                 </div>
               </li>
@@ -1785,8 +1929,9 @@
         <p class="hint">{copy.exportWhat}</p>
         <div class="row-actions">
           <Button
-            onclick={() =>
-              toasts.push(copy.notWritten('The whole record would be written to one .dog file, a SQLite database you can open with sqlite3'))}
+            disabled={exporting !== null}
+            aria-busy={exporting === 'record'}
+            onclick={() => takeCopy('record', 'The whole record would be written to one .dog file, a SQLite database you can open with sqlite3')}
           >{copy.export}</Button>
           <Button
             weight="bare"
@@ -1810,13 +1955,15 @@
         <div class="row-actions">
           <Button
             weight="quiet"
-            onclick={() =>
-              toasts.push(copy.notWritten('Your lists, pages, metrics and rules would be written as one readable pack, with none of your rows in it'))}
+            disabled={exporting !== null}
+            aria-busy={exporting === 'pack'}
+            onclick={() => takeCopy('pack', 'Your lists, pages, metrics and rules would be written as one readable pack, with none of your rows in it')}
           >{copy.exportPack}</Button>
           <Button
             weight="bare"
-            onclick={() =>
-              toasts.push(copy.notWritten('The rows would be written without where each one came from, which is a clean handover'))}
+            disabled={exporting !== null}
+            aria-busy={exporting === 'rows'}
+            onclick={() => takeCopy('rows', 'The rows would be written without where each one came from, which is a clean handover')}
           >{copy.exportRows}</Button>
         </div>
       </Section>
@@ -2101,6 +2248,39 @@
 
   .ex-add {
     margin-block-start: var(--sp-1);
+  }
+
+  /* THE PICKER WRAPS ON A PHONE rather than running off the side, and every control in it is a full control height. */
+  .ex-pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--sp-2);
+  }
+
+  .ex-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .ex-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .ex-select {
+    min-block-size: var(--ctl-h);
+    min-inline-size: var(--tap);
+    max-inline-size: 100%;
+    padding: 0 var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
   }
 
   .ex-level {

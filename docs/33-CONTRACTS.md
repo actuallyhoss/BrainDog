@@ -199,12 +199,12 @@ the alarm and the queue build a `system` context. The record derives `actor` and
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The eighty methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+**The eighty-two methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
 any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources, except `inbox`, an
 owner's in a browser · VAULT a browser session only · JOBS the browser four by session and the runner three by the
 runner's grant, every MCP token refused · ADMIN a browser session, or a bearer carrying an operation grant for that one
-operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 16 · 4 · 7 · 22 · 19, as 30 §5 counts
-them. `ROUTES` in `@braindog/host` routes 53 of the eighty at `/api/<method>`, 21 of them ADMIN.
+operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 16 · 4 · 7 · 24 · 19, as 30 §5 counts
+them. `ROUTES` in `@braindog/host` routes 55 of the eighty-two at `/api/<method>`, 23 of them ADMIN.
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
@@ -253,6 +253,8 @@ them. `ROUTES` in `@braindog/host` routes 53 of the eighty at `/api/<method>`, 2
 | ADMIN | `disablePack` | `{ id, alsoDisable? }`; any other key is `FIELD_UNKNOWN` | `{ id, state, changed, packs, declarations, said }`; the `pack` row and every row stay (04 §4). Refused, 422: `PACK_REQUIRED` with the dependents in `allowed`, which a second call passes as `alsoDisable`; `SCOPES_IN_USE` |
 | ADMIN | `enablePack` | `{ id }`; any other key is `FIELD_UNKNOWN` | the same shape, the declarations back over the same rows. Refused, 422: `PACK_DISABLED` with the pack still off in `allowed`, when this one leans on it |
 | ADMIN | `resumeAction` | `{ ingest }`; any other key is `FIELD_UNKNOWN`, and none is `REQUIRED_MISSING` | `{ ingest, kind }`: the paused `pull`, `call` or `poll` row pending and due now, with one `pull` event naming who resumed it; an action that is not paused is `OUT_OF_BOUNDS`. A 401, a 403 or `WRONG_KEY` pauses an action, and this is the only way it runs again; a key marked stale stays stale |
+| ADMIN | `fileArrival` | `{ id, register, fields? }`: `id` an `inbox_raw` id; with no `fields`, the register's title field takes the arrival's `subject` header, or the first line of its body; any other key is `FIELD_UNKNOWN`. An owner on `'*'` only: a token is `NEEDS_BROWSER_SESSION`, a caller held to part of the record `FORBIDDEN` | `{ id, state: 'matched', entry, already }`: the row written through `create`'s path, its events signed like any write, and the arrival `matched` with one `state` event on `inbox_raw:<id>` in the same batch. An arrival a person already filed answers with that row and `already: true`, writing nothing; an unknown id, or an arrival the inbox no longer shows, is `OUT_OF_BOUNDS`; a refused row is the write's own refusal, and the arrival stays where it was |
+| ADMIN | `archiveArrival` | `{ id }`; any other key is `FIELD_UNKNOWN`. The same reach as `fileArrival` | `{ id, state: 'ignored', entry: null, already }`, with one `state` event on `inbox_raw:<id>`; the bytes are kept. A second call is `already: true` and writes nothing; an unknown id, or an arrival already filed or otherwise gone from the inbox, is `OUT_OF_BOUNDS` |
 | ADMIN | `setPackConfig` | `{ id, values }`: each value checked against the manifest's `config:`, and `null` puts a setting back to its default; any other key is `FIELD_UNKNOWN` | `{ id, version, config, values, changed, said }`, with one `edit` event. Nothing installed changes: a declaration reads the new value the next time the pack is planned and installed. A pack this record does not have is `DECLARATION_UNKNOWN` |
 | ADMIN | `setDeclaration` | `{ body }` — one in-app declaration; no `mode` | the declaration's new version; a rule is tested and applied by `ruleTest` / `ruleApply`, never here |
 | ADMIN | `ruleApply` | `{ id, dry }` | `dry: true` → the `DryRun`; `false` → the rows written, no undo (07 §6) |

@@ -89,6 +89,37 @@
   }
 
   /**
+   * ON A LIVE RECORD THE TWO GESTURES WRITE. Filing puts the arrival in the list picked beside the button, titled by its
+   * subject; archiving keeps its bytes. Either way it leaves the list here and the next one opens. A refusal is the
+   * record's own sentence, and the arrival stays where it is. The sample keeps its toasts.
+   */
+  const lists = $derived<readonly { id: string; name: string }[]>(route.data.index?.registers ?? []);
+  let into = $state('');
+  const target = $derived(lists.some((l) => l.id === into) ? into : (lists[0]?.id ?? ''));
+  let busy = $state(false);
+  async function settle(item: InboxItem, gesture: 'file' | 'archive') {
+    if (busy) return;
+    if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
+    busy = true;
+    try {
+      const m = await import('$lib/record/inbox-write.ts');
+      const out =
+        gesture === 'file' ? await m.fileArrival(location.origin, item.id, target) : await m.archiveArrival(location.origin, item.id);
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      const had = live;
+      if (had) {
+        const at = had.items.findIndex((i) => i.id === item.id);
+        const items = had.items.filter((i) => i.id !== item.id);
+        live = { items, cursor: had.cursor };
+        if (open === item.id) open = items[at]?.id ?? items[at - 1]?.id ?? null;
+      }
+      toasts.push(out.state === 'ignored' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target));
+    } finally {
+      busy = false;
+    }
+  }
+
+  /**
    * THE SAMPLE COMPUTES ITS CONTENT SYNCHRONOUSLY, AND A LIVE RECORD DOES NOT.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
@@ -189,13 +220,26 @@
                    which has a consequence. The buttons are the instruction. -->
 
               <div class="actions">
-                <Button weight="primary" onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
-                  >{copy.fileIt}</Button
-                >
-                <Button
-                  weight="bare"
-                  onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
-                >{copy.archiveArrival}</Button>
+                {#if fromRecord}
+                  {#if lists.length > 0}
+                    <label class="file-into">
+                      <span class="file-label">{copy.inboxFileInto}</span>
+                      <select class="file-select" value={target} disabled={busy} onchange={(e) => (into = e.currentTarget.value)}>
+                        {#each lists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
+                      </select>
+                    </label>
+                  {/if}
+                  <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
+                  <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
+                {:else}
+                  <Button weight="primary" onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
+                    >{copy.fileIt}</Button
+                  >
+                  <Button
+                    weight="bare"
+                    onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
+                  >{copy.archiveArrival}</Button>
+                {/if}
               </div>
 
               {#if item.suggestion}
@@ -344,6 +388,30 @@
      than scrolled: at 320 "Leave it for another rule" ended at x=381 in a 320px viewport and read
      `Leave it for ano`. Half the inbox's verbs, on the screen that asks you to make a standing rule.
      At 390 it still spilled 8px past its own card. */
+  /* The list a filed email goes into sits beside the button that files it, at the height of every control here. */
+  .file-into {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .file-label {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .file-select {
+    min-block-size: var(--ctl-h);
+    max-inline-size: 100%;
+    font: inherit;
+  }
+
+  @media (pointer: coarse) {
+    .file-select {
+      min-block-size: var(--tap);
+    }
+  }
+
   .pattern-actions,
   .actions {
     flex-wrap: wrap;

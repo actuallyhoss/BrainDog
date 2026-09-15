@@ -96,7 +96,9 @@ test('WITH NO RECORD TO ASK THE SCREEN DRAWS THE SAMPLE, AND A RECORD THAT SAYS 
     packs: async () => packs,
     disablePack: async (args) => (sent.push(args), { ok: false, refusal: { code: 'PACK_REQUIRED', fix: 'x', allowed: ['work'] } }),
     enablePack: async (args) => (sent.push(args), { ok: false, conflict: {} }),
-    call: async () => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }),
+    packConfig: async () => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }),
+    setPackConfig: async () => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }),
+    uninstallPack: async (args) => (sent.push(args), { ok: true, value: { id: args.id } }),
   });
 
   const none = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }));
@@ -187,14 +189,14 @@ test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING
 
 test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setPackConfig WITH ONLY THE VALUES', async () => {
   const sent: { name: string; args: unknown }[] = [];
-  const caller = (config: Awaited<ReturnType<Caller['call']>>): Caller => ({
+  const session = { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } };
+  const caller = (config: Awaited<ReturnType<Caller['packConfig']>>): Caller => ({
     packs: async () => ({ ok: true, value: [] }),
     disablePack: async () => ({ ok: false, conflict: {} }),
     enablePack: async () => ({ ok: false, conflict: {} }),
-    call: async (name, args) => {
-      sent.push({ name, args });
-      return name === 'packConfig' ? config : { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } };
-    },
+    packConfig: async (args) => (sent.push({ name: 'packConfig', args }), config),
+    setPackConfig: async (args) => (sent.push({ name: 'setPackConfig', args }), session),
+    uninstallPack: async (args) => (sent.push({ name: 'uninstallPack', args }), session),
   });
 
   const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core');
@@ -211,4 +213,27 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
   const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger');
   assert.equal(no.source.sample, false);
   assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');
+});
+
+test('UNINSTALLING ON THE SAMPLE SAYS WHAT WOULD GO AND KEEPS IT; ON A RECORD IT SENDS uninstallPack', async () => {
+  const s = sample(() => AT);
+  const said = value(await s.uninstall('people'));
+  assert.equal(said.said, copy.notWritten(copy.uninstallWould('People')));
+  assert.ok(value(await s.packs()).some((p) => p.id === 'people'), 'the sample took an add-on out');
+  const none = await s.uninstall('no-such-pack');
+  assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
+
+  const sent: unknown[] = [];
+  const caller: Caller = {
+    packs: async () => ({ ok: true, value: [] }),
+    disablePack: async () => ({ ok: false, conflict: {} }),
+    enablePack: async () => ({ ok: false, conflict: {} }),
+    packConfig: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'x' } }),
+    setPackConfig: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'x' } }),
+    uninstallPack: async (args) => (sent.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner can take an add-on out.' } }),
+  };
+  const { source } = await choose(caller);
+  const refused = await source.uninstall('work');
+  assert.deepEqual(sent, [{ id: 'work' }]);
+  assert.equal(refused.ok ? '' : refused.refusal.fix, 'Only an owner can take an add-on out.');
 });
