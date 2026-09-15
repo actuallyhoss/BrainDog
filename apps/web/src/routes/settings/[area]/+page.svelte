@@ -32,7 +32,8 @@
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
-  import { words as actionWords } from '$lib/record/actions.ts';
+  import { callsOutOf, words as actionWords, type CallOut } from '$lib/record/actions.ts';
+  import CallsOut from '$lib/ui/CallsOut.svelte';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
@@ -208,6 +209,8 @@
    * back, so what installs is what was shown. Not now changes nothing.
    */
   let offer = $state<Plan | null>(null);
+  /* THE PLAN'S `calls_out`, beside the plan rather than in it, so `vault.ts` does not pull in `actions.ts`. */
+  let offerCalls = $state<CallOut[]>([]);
   let installing = $state(false);
   let offerSaid = $state('');
 
@@ -226,7 +229,9 @@
     const planned = await client.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
     closed(true, at);
     offerSaid = '';
-    offer = planned.ok ? planOf((planned.value as { diff?: unknown }).diff, packName) : null;
+    const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown } }).diff : undefined;
+    offer = planned.ok ? planOf(diff, packName) : null;
+    offerCalls = callsOutOf(diff?.calls_out);
   }
 
   async function installOffer() {
@@ -1435,6 +1440,7 @@
                   <dt>{copy.diffConflicts}</dt>
                   <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
                 {/if}
+                <CallsOut calls={offerCalls} hosted={DEPLOYMENT.kind !== 'self-host'} />
                 <dt>{copy.diffSeeds}</dt>
                 <dd>{offer.seeds}</dd>
                 <dt>{copy.diffTouches}</dt>
@@ -2214,6 +2220,13 @@
   .plan dd,
   .plan dd p {
     margin: 0;
+  }
+
+  /* ONE COLUMN ON A PHONE, for the reason the Packs screen's diff gives. */
+  @media (width < 640px) {
+    .plan {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .plan-adds {

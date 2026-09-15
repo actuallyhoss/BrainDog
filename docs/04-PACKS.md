@@ -426,7 +426,7 @@ applies, and uninstalling reverses both without data loss.
 `channel: call` posts to a literal https origin on a schedule, and a `channel: poll` fetches one and acts only
 when the answer changed ([25-CONNECTORS](25-CONNECTORS.md) §3.3). The diff prints each as
 `CALLS OUT <host> · every <n> · grant "<label>"`. The interval is fifteen minutes or the provider's floor,
-refused at install. A call's body is substituted and never evaluated. A refused key pauses the action until
+refused at install. The screen draws each as one line: what it does, the host, how often, the key by label, and SENDS, the record fields named in `sends:` (secret and file fields refused), then the runs a month they add against the hosted allowance. A call's body is substituted and never evaluated. A refused key pauses the action until
 somebody resumes it. The worst such a pack achieves is one scheduled request to a host named on the screen
 you approved.
 

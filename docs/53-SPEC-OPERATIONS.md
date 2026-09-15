@@ -486,6 +486,8 @@ Verify: under a test clock the four messages fire once each at days 0, 60, 83 an
 `FORBIDDEN`; `export` succeeds; a `pull.fetch` row goes `done` with no `Http.fetch`.
 Rollback: `billing = 'active'`. Nothing was written to the record, so nothing is undone.
 
+**Held is not lapsed.** A scheduled action on an `active` record that has used its month's allowance is `held`: the run is counted, the `pull` event says the day it runs again, and the record stays writable. While `lapsed`, runs are held too, and the lapse outranks the allowance: the event says the lapse sentence, and nothing runs again until `billing = 'active'`, whatever the month.
+
 ### 5.11 · Incident response
 
 Four incidents. The first step of each is a `log` note with the time you noticed; the last is the customer message.

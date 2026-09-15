@@ -25,7 +25,14 @@
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import { KINDS, configReads, configValue, digest, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Json } from '@braindog/kernel';
+import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+
+/**
+ * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
+ * and the fields. The same reading the record stores on a proposal, so a plan and a proposal print the same lines.
+ */
+export const egressOf = (decl: { kind: string; body: unknown }): Egress | null => (decl.kind === 'ingest' ? egressOfBody(decl.body) : null);
+export type { Egress };
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
@@ -119,7 +126,27 @@ export type Diff = {
    * calls, how often, and the key it sends by label. `line` is the diff's own sentence for it, and it
    * reads `CALLS OUT <host> · every <n> · grant "<label>"` (`04 §7`, `loop/DIRECTION.md` §0b).
    */
-  calls_out: { ingest: string; channel: string; host: string | null; every: string; grant: string | null; line: string }[];
+  calls_out: {
+    ingest: string;
+    channel: string;
+    method: 'GET' | 'POST';
+    host: string | null;
+    /** The interval, or empty for a call only a rule runs. */
+    every: string;
+    /** `schedule`, `rule` or `both`. */
+    trigger: 'schedule' | 'rule' | 'both';
+    /** The most rule-fired calls a day, or `null` when no rule runs it. */
+    per_day: number | null;
+    grant: string | null;
+    /** The fields that leave with a rule-fired call, each `register.field`. */
+    sends: string[];
+    project: string | null;
+    line: string;
+    /** The project action's own approval line, when it sends a key (a key is not kept per project yet). */
+    key_line: string | null;
+    /** Against what is installed: a new action, one whose host, key or fields differ, or the same. */
+    change: 'new' | 'changed' | 'same';
+  }[];
   /** Rules that would interrupt somebody rather than wait for the digest. */
   interrupts: string[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
@@ -822,7 +849,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     conflicts,
     seeds: { count: pack.seeds.length, registers: pack.seeds.map((s) => ({ register: s.register, rows: 1 })) },
     spawns: spawnsOf(pack),
-    calls_out: callsOf(pack),
+    calls_out: callsOf(pack, installed),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
@@ -1093,24 +1120,48 @@ const hostOf = (address: unknown): string | null => {
   }
 };
 
-const callsOf = (pack: Pack): Diff['calls_out'] =>
-  pack.declarations
-    .filter((d) => d.kind === 'ingest' && typeof (d.body as { every?: unknown }).every === 'string')
-    .map((d) => {
-      const body = d.body as { ingest?: string; channel?: string; every?: string; grant?: string; url?: unknown; fetch?: { base?: unknown } };
-      /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */
-      const host = hostOf(body.url) ?? (isObject(body.fetch) ? hostOf(body.fetch.base) : null);
-      const every = String(body.every);
-      const grant = typeof body.grant === 'string' ? body.grant : null;
-      return {
-        ingest: String(body.ingest ?? d.id),
-        channel: String(body.channel ?? 'pull'),
+const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
+  pack.declarations.flatMap((d) => {
+    const e = egressOf(d);
+    if (e === null) return [];
+    const body = d.body as { ingest?: string; url?: unknown; fetch?: { base?: unknown } };
+    /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */
+    const host = e.host ?? (isObject(body.fetch) ? hostOf(body.fetch.base) : null);
+    const line = host === e.host ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`);
+    /* WHAT THE OWNER HAS ALREADY APPROVED IS WHAT IS INSTALLED. A new action, or a new host, key or field on one, is
+       what this install asks for. */
+    const was = installed.declarations.find((i) => i.id === d.id);
+    let before: Egress | null = null;
+    if (was !== undefined)
+      try {
+        before = egressOf({ kind: was.kind, body: JSON.parse(was.body) as unknown });
+      } catch {
+        before = null;
+      }
+    const change: 'new' | 'changed' | 'same' =
+      was === undefined || before === null
+        ? 'new'
+        : before.host !== e.host || before.key !== e.key || before.sends.join('\n') !== e.sends.join('\n')
+          ? 'changed'
+          : 'same';
+    return [
+      {
+        ingest: e.ingest || String(body.ingest ?? d.id),
+        channel: e.channel,
+        method: e.method,
         host,
-        every,
-        grant,
-        line: `CALLS OUT ${host ?? 'no host declared'} · every ${every} · grant "${grant ?? 'none'}"`,
-      };
-    });
+        every: e.every ?? '',
+        trigger: e.trigger,
+        per_day: e.per_day,
+        grant: e.key,
+        sends: e.sends,
+        project: e.project,
+        line,
+        key_line: e.key_line,
+        change,
+      },
+    ];
+  });
 
 const interruptsOf = (pack: Pack): string[] =>
   pack.declarations

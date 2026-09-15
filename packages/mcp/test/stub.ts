@@ -39,6 +39,7 @@ export function stub(over: Partial<McpSurface<Ctx>> = {}) {
     handoff: said('handoff', { spoken: 'S1' }),
     meet: said('meet', { created: true }),
     sessionsLive: said('sessionsLive', []),
+    actions: said('actions', [] as unknown[]),
     ...over,
   };
   return { surface, calls };

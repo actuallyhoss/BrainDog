@@ -535,7 +535,13 @@ export const PACKS: PackInfo[] = [
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust
      screen that structurally cannot show the refusal it makes is a trust screen with a hole. */
-  { id: 'freelancer-uk', name: 'Freelancer UK', blurb: 'Invoices with VAT, statutory interest, and the payment terms clause.', version: '2.0.1', installed: false, registers: ['invoices', 'clients'], pages: ['invoicing'], author: 'k.marsh', titles: { invoices: 'Invoices', clients: 'Clients', invoicing: 'Invoicing' }, stars: 214, moves: [{ page: 'money', from: 10, to: 12 }] },
+  { id: 'freelancer-uk', name: 'Freelancer UK', blurb: 'Invoices with VAT, statutory interest, and the payment terms clause.', version: '2.0.1', installed: false, registers: ['invoices', 'clients'], pages: ['invoicing'], author: 'k.marsh', titles: { invoices: 'Invoices', clients: 'Clients', invoicing: 'Invoicing' }, stars: 214, moves: [{ page: 'money', from: 10, to: 12 }],
+    /* ONE OF EACH CHANNEL, so the diff draws the lines and the estimate with no record behind it. */
+    calls: [
+      { ingest: 'exchange-rates', channel: 'pull', host: 'api.frankfurter.app', every: '1d', key: null, sends: [] },
+      { ingest: 'bank-balance', channel: 'poll', host: 'api.starlingbank.com', every: '1h', key: 'Starling read', sends: [] },
+      { ingest: 'invoice-sent', channel: 'call', host: 'hooks.kmarsh.example', every: '1h', key: 'Invoice hook', sends: ['invoices.number', 'invoices.amount_due'] },
+    ] },
   /* AND THIS ONE COLLIDES. `services` is the `estate` pack's, and two packs owning one name is the
      failure `02 §1` builds the whole additive story on — so it is a CONFLICT rather than a change,
      and the install is refused rather than merged. */

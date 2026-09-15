@@ -11,6 +11,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  callLine,
+  callsOutOf,
+  estimateOf,
+  everyMs,
+  HOSTED_RUNS,
+  runsAMonth,
+  type CallOut,
   forProject,
   monthRange,
   often,
@@ -26,7 +33,8 @@ import {
   type ActionRow,
   type Fetch,
 } from './actions.ts';
-import { ACTION_SAMPLE } from './data.ts';
+import { ACTION_SAMPLE, PACKS } from './data.ts';
+import { packDiff } from './api.ts';
 import { signInFor } from './packs.ts';
 
 const NOW_MS = Date.parse('2026-09-15T12:00:00.000Z');
@@ -238,4 +246,56 @@ test('a month is five weeks at most, from the first, and every day lands in one'
   assert.equal(weeks[0]?.label, '1 Sep to 7 Sep');
   assert.equal(weeks[4]?.label, '29 Sep to 30 Sep');
   assert.deepEqual(monthRange(NOW_MS), { month: '2026-09', from: '2026-09-01', to: '2026-09-15' });
+});
+
+test('a week that has not started yet draws no bar, and the week today is in draws whole', () => {
+  const days = [{ day: '2026-09-01', runs: 1 }, { day: '2026-09-15', runs: 2 }];
+  assert.deepEqual(weeksOf(days, '2026-09', '2026-09-15').map((w) => [w.label, w.runs]), [['1 Sep to 7 Sep', 1], ['8 Sep to 14 Sep', 0], ['15 Sep to 21 Sep', 2]]);
+  assert.equal(weeksOf(days, '2026-09', '2026-10-02').length, 5);
+});
+
+test('an interval is runs a month without the jitter, in the kernel\'s grammar where m is minutes', () => {
+  assert.equal(runsAMonth('1h'), 730);
+  assert.equal(runsAMonth('15m'), 2920);
+  assert.equal(runsAMonth('1d'), 30);
+  assert.equal(runsAMonth('6h'), 122);
+  assert.equal(runsAMonth('1w'), 4);
+  assert.equal(runsAMonth('hourly'), null);
+  assert.equal(runsAMonth('0h'), null);
+  assert.equal(everyMs(' 2h '), 7_200_000);
+});
+
+test('the install says each call on one line, and the runs a month they add against the allowance', () => {
+  const calls = callsOutOf([
+    { ingest: 'kiln-status', channel: 'poll', host: 'status.kiln.example', every: '1h', grant: 'Kiln read', line: 'CALLS OUT status.kiln.example' },
+    { ingest: 'tell-kiln-shop', channel: 'call', host: 'hooks.kiln.example', every: '1h', grant: null, sends: ['invoices.seq', 'invoices.amount_due'] },
+    { ingest: 'broken' },
+    'nonsense',
+  ]);
+  assert.equal(calls.length, 2);
+  assert.equal(callLine(calls[0]!), 'Watches status.kiln.example, every hour, with the key "Kiln read"');
+  assert.equal(callLine(calls[1]!), 'Calls hooks.kiln.example, every hour, with no key, sends seq and amount due');
+  assert.equal(estimateOf(calls, true), "About 1,460 runs a month, 10% of this record's 15,000.");
+  assert.equal(estimateOf(calls, false), 'About 1,460 runs a month, with no monthly limit on this record.');
+  assert.equal(callLine({ ...calls[0]!, host: null, sends: [] }), 'Watches a host it does not name, every hour, with the key "Kiln read", sends no fields');
+});
+
+test('an estimate says less than 1%, says when runs would wait, and is absent when nothing has an interval', () => {
+  const one = (every: string): CallOut => ({ ingest: 'a', channel: 'pull', host: 'api.example', every, key: null, sends: null });
+  assert.equal(estimateOf([one('1d')], true), "About 30 runs a month, less than 1% of this record's 15,000.");
+  assert.equal(
+    estimateOf(Array.from({ length: 6 }, () => one('15m')), true),
+    "About 17,520 runs a month, more than this record's 15,000, so some runs would wait until the next month.",
+  );
+  assert.equal(estimateOf([one('when paid')], true), null);
+  assert.equal(estimateOf([], true), null);
+  assert.equal(HOSTED_RUNS, 15_000);
+});
+
+test('the sample pack that is not installed draws its calls in the diff', () => {
+  const pack = PACKS.find((p) => p.id === 'freelancer-uk');
+  assert.ok(pack);
+  const d = packDiff(pack);
+  assert.equal(d.calls.length, 3);
+  assert.equal(estimateOf(d.calls, true), "About 1,490 runs a month, 10% of this record's 15,000.");
 });

@@ -200,6 +200,7 @@ test('and it says what a pack would DO, before anybody has to read the file', as
       { ingest: 'npm', channel: 'pull', every: '6h', grant: 'g_1', extract: {}, writes: { register: 'skus' } },
       { ingest: 'balance', channel: 'poll', url: 'https://api.example.test/v1/balance', every: '1h', grant: 'example read', extract: {}, writes: { register: 'skus' } },
       { ingest: 'ping', channel: 'call', url: 'https://hooks.example.test/in?since={since:date}', every: '15m', grant: 'hook key', body: { text: 'up to {until}' } },
+      { ingest: 'made', channel: 'call', url: 'https://hooks.example.test/made', trigger: 'rule', grant: 'hook key', project: 'studio', sends: ['skus.code'] },
     ],
     seeds: [],
   });
@@ -208,9 +209,25 @@ test('and it says what a pack would DO, before anybody has to read the file', as
   assert.deepEqual(diff.spawns, [{ rule: 'expand', register: 'skus', bound: 60, when: 'state is approved' }]);
   /* EVERY HOST AN ACTION CALLS, AND HOW OFTEN, before anything is installed: the owner's third rule. */
   assert.deepEqual(diff.calls_out, [
-    { ingest: 'npm', channel: 'pull', host: null, every: '6h', grant: 'g_1', line: 'CALLS OUT no host declared · every 6h · grant "g_1"' },
-    { ingest: 'balance', channel: 'poll', host: 'api.example.test', every: '1h', grant: 'example read', line: 'CALLS OUT api.example.test · every 1h · grant "example read"' },
-    { ingest: 'ping', channel: 'call', host: 'hooks.example.test', every: '15m', grant: 'hook key', line: 'CALLS OUT hooks.example.test · every 15m · grant "hook key"' },
+    { ingest: 'npm', channel: 'pull', method: 'GET', host: null, every: '6h', trigger: 'schedule', per_day: null, grant: 'g_1', sends: [], project: null, line: 'CALLS OUT no host declared · every 6h · grant "g_1"', key_line: null, change: 'new' },
+    { ingest: 'balance', channel: 'poll', method: 'GET', host: 'api.example.test', every: '1h', trigger: 'schedule', per_day: null, grant: 'example read', sends: [], project: null, line: 'CALLS OUT api.example.test · every 1h · grant "example read"', key_line: null, change: 'new' },
+    { ingest: 'ping', channel: 'call', method: 'POST', host: 'hooks.example.test', every: '15m', trigger: 'schedule', per_day: null, grant: 'hook key', sends: [], project: null, line: 'CALLS OUT hooks.example.test · every 15m · grant "hook key"', key_line: null, change: 'new' },
+    /* A CALL A RULE RUNS: no clock, a daily ceiling, the fields that leave, and a line of its own for a key a project sends. */
+    {
+      ingest: 'made',
+      channel: 'call',
+      method: 'POST',
+      host: 'hooks.example.test',
+      every: '',
+      trigger: 'rule',
+      per_day: 100,
+      grant: 'hook key',
+      sends: ['skus.code'],
+      project: 'studio',
+      line: 'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends skus.code',
+      key_line: 'made runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project\'s action can send this key.',
+      change: 'new',
+    },
   ]);
   assert.ok(diff.warnings.some((w) => w.say.includes('arrives empty')));
 });

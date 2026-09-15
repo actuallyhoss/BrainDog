@@ -18,7 +18,7 @@ import type { ActionAnswer, ActionRequest } from '@braindog/kernel';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { actionExecutor, holding, lookupFor, meterPass, refusedAddress, type OpenKey, type Pinned, type Resolve, type Send } from '../src/actions.ts';
+import { actionExecutor, holding, lookupFor, meterPass, type OpenKey, type Pinned, type Resolve, type Send } from '../src/actions.ts';
 import { start } from '../src/server.ts';
 
 const ORIGIN = 'https://api.example.test';
@@ -105,42 +105,7 @@ test('AN ORIGIN NO ACTIVE DECLARATION NAMES IS REFUSED BEFORE ANYTHING IS SENT, 
   assert.equal(net.calls.length, 0);
 });
 
-test('EVERY PRIVATE, LOCAL AND SPECIAL RANGE IS REFUSED, in both families and in the IPv4 an IPv6 address carries', () => {
-  const refused: [string, string][] = [
-    ['0.0.0.0', 'unspecified'],
-    ['127.0.0.1', 'loopback'],
-    ['127.255.255.254', 'loopback'],
-    ['10.1.2.3', 'private'],
-    ['172.16.0.1', 'private'],
-    ['172.31.255.255', 'private'],
-    ['192.168.1.1', 'private'],
-    ['169.254.169.254', 'link-local'],
-    ['100.64.0.1', 'carrier-grade NAT'],
-    ['100.127.255.255', 'carrier-grade NAT'],
-    ['224.0.0.1', 'multicast'],
-    ['239.255.255.250', 'multicast'],
-    ['255.255.255.255', 'reserved'],
-    ['::', 'unspecified'],
-    ['::1', 'loopback'],
-    ['fe80::1', 'link-local'],
-    ['febf::1', 'link-local'],
-    ['fe80::1%eth0', 'link-local'],
-    ['fc00::1', 'unique-local'],
-    ['fd12:3456::1', 'unique-local'],
-    ['ff02::1', 'multicast'],
-    ['::ffff:127.0.0.1', 'loopback'],
-    ['::ffff:7f00:1', 'loopback'],
-    ['::ffff:10.0.0.1', 'private'],
-    ['::ffff:a9fe:a9fe', 'link-local'],
-    ['::127.0.0.1', 'loopback'],
-    ['64:ff9b::a9fe:a9fe', 'link-local'],
-    ['not an address', 'unreadable'],
-  ];
-  for (const [address, why] of refused) assert.equal(refusedAddress(address), why, address);
-
-  for (const address of [PUBLIC, '8.8.8.8', '172.32.0.1', '172.15.255.255', '100.128.0.1', '100.63.255.255', '192.169.0.1', '169.253.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', 'fec0::1'])
-    assert.equal(refusedAddress(address), null, address);
-});
+/* THE RANGE TABLE IS THE SHARED LOOP'S, and is asserted in packages/host/test/actions.test.ts. */
 
 test('A NAME IS REFUSED WHEN ANY ADDRESS IT RESOLVES TO IS PRIVATE, before the key is opened and before anything is sent', async () => {
   let opened = 0;

@@ -15,7 +15,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import { DEPLOYMENT, PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
+  import CallsOut from '$lib/ui/CallsOut.svelte';
   import { blocked, choose, words, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -126,6 +127,8 @@
       <dt>{copy.diffConflicts}</dt>
       <dd>{#each d.conflicts as c}<p>{c}</p>{/each}</dd>
     {/if}
+
+    <CallsOut calls={d.calls} hosted={DEPLOYMENT.kind !== 'self-host'} />
 
     <dt>{copy.diffSeeds}</dt>
     <dd>{d.seeds}</dd>
@@ -450,10 +453,9 @@
     grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-4);
     margin: 0;
-    padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    /* UNBOXED, as every other list is: the row's own inline padding, so the words line up with the row
+       above them instead of a sunk panel wider than the row it opened from. */
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
     color: var(--ink2);
     font-size: var(--t-sm);
     line-height: 1.6;
@@ -467,6 +469,17 @@
 
   .diff dd {
     margin: 0;
+  }
+
+  /* ONE COLUMN ON A PHONE: beside a label as wide as "Calls other services", each line wrapped to four. */
+  @media (width < 640px) {
+    .diff {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .diff dd + dt {
+      margin-block-start: var(--sp-2);
+    }
   }
 
   .diff dd p {

@@ -30,6 +30,7 @@ import {
   enablePack as enableDeclaredPack,
   installDeclarations,
   jcs,
+  lintBatch,
   packSettings as declaredPackSettings,
   readPackConfig,
   retireDeclarations,
@@ -104,11 +105,13 @@ import { analyse, observe, type Analysis, type Observation } from './observe.ts'
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import {
   ACTION_KINDS,
+  egressOf,
   fireAction,
   finishAction,
   listActions,
   originsOf,
   prepareAction,
+  queueCall,
   resumeAction as resumeScheduledAction,
   runActions as runScheduledActions,
   type ActionDecl,
@@ -208,8 +211,15 @@ export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as in
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, actionJitterMs, answerHash, originsOf } from './actions.ts';
-export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, Execute } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf } from './actions.ts';
+export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute } from './actions.ts';
+
+/**
+ * Several declarations proposed as one change, so one press installs and arms all of them.
+ *
+ * A PACK UPDATE THAT ADDS TWO ACTIONS IS ONE QUESTION, not two. `install` takes a bundle wherever it takes a declaration.
+ */
+export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
@@ -691,6 +701,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          is the one that says the key and the address are right (`loop/DIRECTION.md` §0b). */
       if (decl.kind === 'ingest' && (body.channel === 'call' || body.channel === 'poll') && typeof body.every === 'string')
         arm(body.channel as 'call' | 'poll', bare, { ingest: bare }, clock.now());
+      /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and it still gets its row: the row is what pausing, resuming and the list
+         read. Its one scheduled turn finds nothing to send and marks it done. */
+      else if (decl.kind === 'ingest' && body.channel === 'call' && body.trigger === 'rule')
+        arm('call', bare, { ingest: bare }, clock.now());
 
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
@@ -2048,6 +2062,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
     stateOf: (register) => registers.get(register)?.state ?? null,
     schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),
+    /* A RULE THAT RUNS A CALL QUEUES IT HERE, inside the write's transaction, so a write that rolls back sends nothing. */
+    call: (ingest, f) =>
+      queueCall(actionDeps(), { ingest, rule: f.rule, entry: f.entry, typeOf: (field) => f.schema.fields[field]?.type }),
     entry: (id) => byId(id),
     mint,
     nowMs: clock.now(),
@@ -2125,6 +2142,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     hasRegister: (register) => registers.has(register),
+    /* WHAT A CHANGE SENDS OUT, read from its declarations and nothing the proposer wrote about them. Only an action that
+       is new, or whose host, key or fields differ from the one installed, needs the owner's press. */
+    review: (to) => {
+      const listed: unknown[] = Array.isArray((to as { declarations?: unknown }).declarations) ? ((to as { declarations: unknown[] }).declarations) : [to];
+      const batch = listed.filter(
+        (d): d is Declaration =>
+          d !== null && typeof d === 'object' && typeof (d as Declaration).id === 'string' && typeof (d as Declaration).kind === 'string' && (d as Declaration).body !== null && typeof (d as Declaration).body === 'object',
+      );
+      if (batch.length === 0 || batch.length !== listed.length) return ok(null);
+      const egress = batch.flatMap((d) => {
+        const out = d.kind === 'ingest' ? egressOf(d.body) : null;
+        return out === null ? [] : [out];
+      });
+      if (egress.length === 0) return ok(null);
+      const fault = lintBatch(sql, batch);
+      if (fault) return { ok: false as const, refusal: fault };
+      const changed = egress.filter((e) => {
+        const was = actionDecl(e.ingest);
+        const before = was === null ? null : egressOf(was.decl);
+        return before === null || before.host !== e.host || before.key !== e.key || before.sends.join('\n') !== e.sends.join('\n');
+      });
+      if (changed.length === 0) return ok(null);
+      return ok({ egress: changed, approve: changed.flatMap((e) => (e.key_line === null ? [e.line] : [e.line, e.key_line])) });
+    },
     row: (register, at) => {
       const found = get(at, { includeDeleted: true });
       return found && found.register === register ? { id: found.id, deleted: found.deleted_at !== null } : null;
@@ -3170,7 +3211,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * reloaded is a register the write path still refuses — a failure that looks like the install
      * silently not working.
      */
-    async install(batch: readonly Declaration[]) {
+    async install(given: readonly (Declaration | DeclarationBundle)[]) {
+      /* A BUNDLE IS ITS DECLARATIONS, so an accepted change carrying several installs and arms them in one go. */
+      const batch: Declaration[] = given.flatMap((d) =>
+        Array.isArray((d as DeclarationBundle).declarations) ? (d as DeclarationBundle).declarations : [d as Declaration],
+      );
       const refused = schemaRefusal(state);
       if (refused) return refused;
       const cannot = unreadable(batch);

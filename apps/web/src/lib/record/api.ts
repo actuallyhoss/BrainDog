@@ -54,6 +54,7 @@ import { STALE_MS, findingsFrom, isStale } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
+import type { CallOut } from './actions.ts';
 
 /**
  * The currency the rows of one money field are in, or `null` when they are not all one.
@@ -1323,6 +1324,8 @@ export type PackDiff = {
   touches: string;
   /** True when the pack is not installed, so the counts are unknown rather than zero. */
   unread: boolean;
+  /** Every scheduled action it would add: `04 §3`'s `calls_out`. */
+  calls: readonly CallOut[];
 };
 
 export function packDiff(pack: PackInfo): PackDiff {
@@ -1395,6 +1398,7 @@ export function packDiff(pack: PackInfo): PackDiff {
        row at install time, so \"0 rows read\" is a guarantee." */
     touches: 'nothing you have written: 0 rows read, 0 of your rows changed',
     unread: !pack.installed,
+    calls: pack.calls ?? [],
   };
 }
 

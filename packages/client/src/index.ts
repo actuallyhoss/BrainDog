@@ -155,6 +155,39 @@ export type DeviceApproved = Pick<DeviceRow, 'handle' | 'reach' | 'scope' | 'lab
 /** One page of rows, with the keyset cursor that reaches the next one. */
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
+type ActionTotals = { runs: number; requests: number; bytes: number; failures: number };
+
+/**
+ * `actions`: one scheduled action. See `ActionRow` in `@braindog/kernel`.
+ *
+ * `key` IS THE KEY'S LABEL, never a value: the record builds the list from the vault's index and reads nothing sealed.
+ */
+export type ActionRow = {
+  ingest: string;
+  channel: 'pull' | 'call' | 'poll';
+  /** The project it runs for, or `null` for every project. */
+  project: string | null;
+  host: string | null;
+  every: string;
+  key: string | null;
+  state: 'pending' | 'firing' | 'paused' | 'done';
+  /** When it runs next, while it is pending or firing. */
+  next: string | null;
+  last: {
+    at: string;
+    outcome: 'ok' | 'changed' | 'unchanged' | 'paused' | 'failed' | 'refused' | 'dropped' | 'held';
+    status: number | null;
+    note: string;
+  } | null;
+  /** This calendar month so far, UTC. */
+  month: ActionTotals & { held: number };
+  /** This month by UTC day, oldest first. */
+  days: ({ day: string } & ActionTotals)[];
+};
+
+/** `resumeAction`: the action that runs again now. */
+export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
+
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
@@ -335,6 +368,11 @@ export function createClient(options: ClientOptions) {
     context: () => call<Context>('context'),
     /** Someone met in the work, a commit author or a sender, as the caller's run. */
     meet: (args: { name?: string; email?: string; handle?: string; where: string }) => call<Met>('meet', args as Record<string, unknown>),
+
+    /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
+       thing that starts a paused action again. */
+    actions: () => call<ActionRow[]>('actions'),
+    resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
   };
 }
 

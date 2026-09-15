@@ -22,6 +22,7 @@
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { keyNamed, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { sparkMayWrite } from './spark.ts';
@@ -84,6 +85,14 @@ export type GovernDeps = {
    * knowing what those are.
    */
   measure: (m: { source: string; where?: unknown; value: unknown }, window: string) => Result<{ value: number | null }>;
+  /**
+   * What a `change` would send out of the record, if it declares or changes a scheduled action.
+   *
+   * ONE PROPOSAL, ONE PRESS (`loop/research-scheduled-actions.md` step 13). The record lints the declarations the change
+   * carries and works out, from them alone, every host they call, how often, the key by label and the fields sent. It
+   * answers `null` when the change sends nothing new, and a refusal when the declarations would not install.
+   */
+  review?: (to: Record<string, unknown>) => Result<{ egress: Egress[]; approve: string[] } | null>;
 };
 
 /**
@@ -204,6 +213,20 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const wrong = checkBody(deps, p.body_kind, p.body ?? {});
   if (wrong) return { ok: false, refusal: wrong };
 
+  /* WHAT IT SENDS OUT IS WORKED OUT HERE, NEVER TAKEN FROM THE PROPOSER. An agent that wrote its own `egress` could
+     print a friendlier host than the one it declares, so whatever it wrote is dropped and the record's own reading
+     of the declarations is stored in its place. */
+  let body: Record<string, unknown> = p.body ?? {};
+  if (p.body_kind === 'change') {
+    const { egress: _theirs, approve: _theirLines, ...rest } = body;
+    body = rest;
+    if (deps.review && body.to && typeof body.to === 'object') {
+      const read = deps.review(body.to as Record<string, unknown>);
+      if (!read.ok) return read as Result<{ id: string }>;
+      if (read.value !== null) body = { ...body, egress: read.value.egress, approve: read.value.approve };
+    }
+  }
+
   const by = typeof actor === 'function' ? actor() : actor;
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
@@ -211,7 +234,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, ?, ?, 'open', ?, ?)",
     id,
     p.body_kind,
-    JSON.stringify(p.body ?? {}),
+    JSON.stringify(body),
     by,
     at,
   );
@@ -537,6 +560,14 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       install = (row.body_kind === 'pattern' ? body.ingest : body.to) as Record<string, unknown>;
       if (!install || typeof install !== 'object')
         return no<Decided>('VALUE_MALFORMED', `${id} carries nothing to install.`, { at: 'body' });
+      /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
+         it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
+      if (row.body_kind === 'change' && Array.isArray(body.egress))
+        for (const out of body.egress as { key?: unknown }[]) {
+          const label = typeof out?.key === 'string' ? out.key : null;
+          if (label !== null && keyNamed(deps.sql, label) === null)
+            return no<Decided>('REQUIRED_MISSING', `Add the key called "${label}" to the vault, then accept.`, { at: 'body.egress' });
+        }
     }
 
     /* THE PREDICTION, WRITTEN WITH THE DECISION AND IN THE SAME TRANSACTION.
@@ -566,7 +597,10 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     at,
   );
   deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
-  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option }));
+  /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
+     on the declaration staying as it was. */
+  const approved = option === 'accept' && row.body_kind === 'change' && Array.isArray(body.approve) ? { approved: body.approve } : {};
+  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved }));
   event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason);
 
   return ok({ decision, suggestion: id, status: 'resolved', wrote, ...(install === undefined ? {} : { install }) });

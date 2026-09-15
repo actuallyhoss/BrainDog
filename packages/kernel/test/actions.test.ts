@@ -15,6 +15,7 @@ import { fixOf, type Result } from '@braindog/ports';
 
 import {
   actionJitterMs,
+  summary,
   openRecord,
   type ActionAnswer,
   type ActionRequest,
@@ -453,4 +454,224 @@ test('THE LIST SAYS WHY AN ACTION IS PAUSED, counts a held run in the month, and
   const said_ = JSON.stringify(rows);
   assert.doesNotMatch(said_, /ciphertext|nonce|kek_2f/);
   for (const id of Object.values(keys)) assert.ok(!said_.includes(id), 'a grant id reached the list');
+});
+
+/* ── a call a rule runs, and the one press that approves it ─────────────── */
+
+const INVOICES: Declaration = {
+  id: 'register.invoices',
+  kind: 'register',
+  body: {
+    id: 'invoices',
+    name: 'Invoices',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'party', type: 'text' },
+      { id: 'token', type: 'secret' },
+      { id: 'scan', type: 'file' },
+      { id: 'state', type: 'enum', values: ['open', 'paid'], index: true },
+    ],
+  } as never,
+};
+
+/** A call only a rule runs: no clock, and the two fields it sends. */
+const HOOK = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'ingest.paid_hook',
+  kind: 'ingest',
+  body: {
+    ingest: 'paid_hook',
+    channel: 'call',
+    url: 'https://hooks.example.test/paid',
+    trigger: 'rule',
+    grant: 'hook key',
+    sends: ['invoices.what', 'invoices.party'],
+    ...over,
+  } as never,
+});
+
+const PAID = (over: Record<string, unknown> = {}): Declaration => ({
+  id: 'rule.paid',
+  kind: 'rule',
+  body: { rule: 'paid', register: 'invoices', when: 'state is paid', once_per: ['entry'], then: [{ run: 'paid_hook' }], ...over } as never,
+});
+
+const callJobs = (sql: NodeSql) =>
+  sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'pull.fetch' ORDER BY rowid").map((j) => JSON.parse(j.payload) as Record<string, unknown>);
+
+const bodyOf = <T>(sql: NodeSql, id: string): T => JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', id)!.body) as T;
+
+test('A RULE RUNS A CALL ONCE PER ROW, and the call sends only the fields its sends names', async () => {
+  const { k, sql, keys } = await record(INVOICES, HOOK({ body: { text: '{row.what} is paid', who: '{row.party}' } }), PAID());
+  /* A call only a rule runs still has its row, for pausing and the list. */
+  assert.equal(row(sql, 'call', 'paid_hook')?.state, 'pending');
+
+  const made = k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'paid' }, { actor: 'p_1' });
+  assert.ok(made.ok, fixOf(made));
+  const id = (made.value as { id: string }).id;
+  assert.deepEqual(callJobs(sql), [
+    { channel: 'call', ingest: 'paid_hook', grant: keys['hook key'], rule: 'paid', entry: id, row: { what: 'Invoice 41', party: 'Fenwick' } },
+  ]);
+
+  /* ONCE PER ROW: writing it again sends nothing new, and a row the rule does not match sends nothing. */
+  assert.ok(k.update('invoices', 'invoices#1', { party: 'Fenwick Cloud' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('invoices', { what: 'Invoice 42', state: 'open' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 1);
+
+  const stand = host(said(202, 'ok'));
+  const run = await k.runActions(stand.execute);
+  assert.equal(run.ran, 1, 'the rule-only row fired a scheduled run as well');
+  const [request] = stand.seen;
+  assert.ok(request);
+  assert.equal(request.method, 'POST');
+  assert.equal(request.url, 'https://hooks.example.test/paid');
+  assert.deepEqual(JSON.parse(request.body!), { text: 'Invoice 41 is paid', who: 'Fenwick' });
+  assert.doesNotMatch(JSON.stringify(request), /ciphertext|nonce|kek_2f/);
+
+  /* AND A DEAD-LETTER SUMMARY NEVER QUOTES THE FIELDS. */
+  const job = sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'pull.fetch'");
+  assert.equal(summary(job!.payload).row, '--withheld--');
+});
+
+test('THE HUNDRED AND FIRST CALL IN A DAY IS HELD, with one sentence, and counts as held rather than failed', async () => {
+  const { k, sql } = await record(INVOICES, HOOK(), PAID());
+  for (let i = 1; i <= 102; i++) assert.ok(k.create('invoices', { what: `Invoice ${i}`, state: 'paid' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 100);
+
+  const held = meters(sql, 'paid_hook');
+  assert.deepEqual(held.map((m) => m.outcome), ['held', 'held']);
+  assert.equal(held[0]!.note, 'paid_hook did not send invoices#101: it has made its 100 calls from rules today. That row will not be sent later; rules can start it again tomorrow.');
+  assert.equal(row(sql, 'call', 'paid_hook')?.state, 'pending', 'a held call is not a paused action');
+});
+
+test('A CALL A RULE RUNS PAUSES WHEN ITS KEY IS GONE, and queues nothing while it is paused', async () => {
+  const { k, sql } = await record(INVOICES, HOOK({ grant: 'absent key' }), PAID());
+  assert.ok(k.create('invoices', { what: 'Invoice 1', state: 'paid' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 0);
+  assert.equal(row(sql, 'call', 'paid_hook')?.state, 'paused');
+  assert.ok(k.create('invoices', { what: 'Invoice 2', state: 'paid' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 0);
+});
+
+test('APPLYING A RULE TO ROWS ALREADY THERE QUEUES NO CALLS, says how many it skipped, and a later edit sends none', async () => {
+  const { k, sql } = await record(INVOICES, HOOK());
+  for (let i = 1; i <= 3; i++) assert.ok(k.create('invoices', { what: `Invoice ${i}`, state: 'paid' }, { actor: 'p_1' }).ok);
+  assert.ok((await k.install([PAID()])).ok);
+
+  const dry = k.applyRule('paid', { dry: true });
+  assert.ok(dry.ok, fixOf(dry));
+  assert.equal(dry.value.calls_skipped, 3);
+  const applied = k.applyRule('paid');
+  assert.ok(applied.ok, fixOf(applied));
+  assert.equal(applied.value.calls_skipped, 3);
+  assert.equal(callJobs(sql).length, 0);
+
+  assert.ok(k.update('invoices', 'invoices#1', { party: 'Fenwick' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 0, 'an old row sent its call on its next edit');
+  /* A row written after it is news, so it sends. */
+  assert.ok(k.create('invoices', { what: 'Invoice 4', state: 'paid' }, { actor: 'p_1' }).ok);
+  assert.equal(callJobs(sql).length, 1);
+});
+
+test('A RULE THAT RUNS A CALL, AND THE CALL, ARE REFUSED AT INSTALL when they could send what nobody approved', async () => {
+  const { k } = await record();
+  const refusedWith = async (...decls: Declaration[]) => codeOf(await k.install([NOTES, INVOICES, ...decls]));
+
+  assert.equal(await refusedWith(HOOK(), PAID({ then: [{ run: 'nothing_here' }] })), 'DECLARATION_UNKNOWN');
+  assert.equal(await refusedWith(HOOK(), PAID({ once_per: undefined })), 'REQUIRED_MISSING');
+  assert.equal(await refusedWith(CALL(), PAID({ then: [{ run: 'ping' }] })), 'DECLARATION_INVALID');
+  /* NEVER A SECRET OR A FILE. */
+  assert.equal(await refusedWith(HOOK({ sends: ['invoices.token'] })), 'DECLARATION_INVALID');
+  assert.equal(await refusedWith(HOOK({ sends: ['invoices.scan'] })), 'DECLARATION_INVALID');
+  assert.equal(await refusedWith(HOOK({ sends: ['invoices.nope'] })), 'FIELD_UNKNOWN');
+  assert.equal(await refusedWith(HOOK({ sends: ['ledger.what'] })), 'REGISTER_UNKNOWN');
+  assert.equal(await refusedWith(HOOK({ sends: ['invoices.what', 'notes.what'] })), 'DECLARATION_INVALID');
+  /* A rule-only call has no clock, and a scheduled one has no row. */
+  assert.equal(await refusedWith(HOOK({ every: '1h' })), 'DECLARATION_INVALID');
+  assert.equal(await refusedWith(HOOK({ trigger: undefined, every: '1h' })), 'DECLARATION_INVALID');
+  assert.equal(await refusedWith(POLL({ trigger: 'rule' })), 'DECLARATION_INVALID');
+  /* A row's field only in the body, and only one it sends. */
+  assert.equal(await refusedWith(HOOK({ url: 'https://hooks.example.test/{row.what}' })), 'ACTION_EVALUATES');
+  assert.equal(await refusedWith(HOOK({ body: { text: '{row.token}' } })), 'ACTION_EVALUATES');
+
+  assert.equal(await refusedWith(HOOK({ trigger: 'both', every: '1h' }), PAID()), 'accepted');
+});
+
+test('AN AGENT PROPOSES ITS ACTIONS AS ONE CHANGE: every host, how often, the key and the fields, and one press arms them all', async () => {
+  const { k, sql } = await record(INVOICES);
+  const proposed = k.propose(
+    {
+      question: 'Send paid invoices to the studio hook?',
+      body_kind: 'change',
+      /* What the proposer says about its own egress is dropped, and the record's reading stored instead. */
+      body: { declaration_id: 'ingest.paid_hook', to: { declarations: [CALL(), HOOK(), PAID()] }, egress: [{ host: 'friendly.example.test' }] },
+    },
+    'p_1',
+  );
+  assert.ok(proposed.ok, fixOf(proposed));
+  const sg = (proposed.value as { id: string }).id;
+  const body = bodyOf<{
+    egress: { ingest: string; host: string; every: string | null; per_day: number | null; key: string; sends: string[] }[];
+    approve: string[];
+  }>(sql, sg);
+  assert.deepEqual(
+    body.egress.map((e) => [e.ingest, e.host, e.every, e.per_day, e.key, e.sends]),
+    [
+      ['ping', 'hooks.example.test', '15m', null, 'hook key', []],
+      ['paid_hook', 'hooks.example.test', null, 100, 'hook key', ['invoices.what', 'invoices.party']],
+    ],
+  );
+  assert.deepEqual(body.approve, [
+    'CALLS OUT hooks.example.test · every 15m · grant "hook key"',
+    `ping runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project's action can send this key.`,
+    'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what, invoices.party',
+  ]);
+  /* NOTHING IS ARMED BY ASKING. */
+  assert.ok(!row(sql, 'call', 'ping'));
+  assert.ok(!row(sql, 'call', 'paid_hook'));
+
+  const decided = k.decide(sg, { decide: { option: 'accept', reason: 'the owner read the hosts' } }, 'p_1');
+  assert.ok(decided.ok, fixOf(decided));
+  const install = (decided.value as { install?: unknown }).install;
+  assert.ok(install);
+  const put = await k.install([install as never]);
+  assert.ok(put.ok, fixOf(put as Result<unknown>));
+  assert.equal(row(sql, 'call', 'ping')?.state, 'pending');
+  assert.equal(row(sql, 'call', 'paid_hook')?.state, 'pending');
+  const decision = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'decide' ORDER BY rowid DESC LIMIT 1");
+  assert.deepEqual((JSON.parse(decision!.to_v) as { approved?: string[] }).approved, body.approve);
+
+  /* AND ONLY WHAT CHANGED ASKS AGAIN. The same actions carry no lines; a different field list does. */
+  const same = k.propose({ question: 'Again?', body_kind: 'change', body: { declaration_id: 'ingest.ping', to: { declarations: [CALL()] } } }, 'p_1');
+  assert.ok(same.ok, fixOf(same));
+  assert.equal(bodyOf<Record<string, unknown>>(sql, (same.value as { id: string }).id).approve, undefined);
+  const narrower = k.propose({ question: 'Send only the name?', body_kind: 'change', body: { declaration_id: 'ingest.paid_hook', to: HOOK({ sends: ['invoices.what'] }) } }, 'p_1');
+  assert.ok(narrower.ok, fixOf(narrower));
+  assert.deepEqual(bodyOf<{ approve: string[] }>(sql, (narrower.value as { id: string }).id).approve, [
+    'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what',
+  ]);
+});
+
+test('DECLINING ARMS NOTHING, a proposal that would not install is refused when filed, and accepting waits for every key', async () => {
+  const { k, sql } = await record(INVOICES);
+  const ask = (decls: Declaration[]) => {
+    const p = k.propose({ question: 'Turn these on?', body_kind: 'change', body: { declaration_id: decls[0]!.id, to: { declarations: decls } } }, 'p_1');
+    assert.ok(p.ok, fixOf(p));
+    return (p.value as { id: string }).id;
+  };
+
+  const declined = k.decide(ask([CALL(), POLL()]), { decide: { option: 'reject', reason: 'not these hosts' } }, 'p_1');
+  assert.ok(declined.ok, fixOf(declined));
+  assert.equal((declined.value as { install?: unknown }).install, undefined);
+  assert.ok(!row(sql, 'call', 'ping'));
+  assert.ok(!row(sql, 'poll', 'balance'));
+
+  /* A secret in sends is refused before anybody is asked. */
+  const bad = k.propose({ question: 'Send the token?', body_kind: 'change', body: { declaration_id: 'ingest.paid_hook', to: HOOK({ sends: ['invoices.token'] }) } }, 'p_1');
+  assert.equal(codeOf(bad), 'DECLARATION_INVALID');
+
+  const gone = ask([CALL({ grant: 'absent key' })]);
+  const waiting = k.decide(gone, { decide: { option: 'accept', reason: 'yes' } }, 'p_1');
+  assert.equal(codeOf(waiting), 'REQUIRED_MISSING');
+  assert.equal(sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', gone)?.status, 'open');
 });

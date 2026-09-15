@@ -63,6 +63,14 @@ export type RuleAction =
   | { create: { register: string; each?: string[]; bound: number; fields: Record<string, string> } }
   /** A question for a person, through the gate. It changes nothing by itself. */
   | { suggest: { question: string; options: string[] } }
+  /**
+   * Queue one run of a declared `call`, sending the fields of this row that the call's `sends:` names.
+   *
+   * A RULE NAMES AN ACTION, NEVER AN ADDRESS. The host, the key and the fields were declared on the call and approved
+   * when it was installed, so a rule can reach nothing the owner did not already see. `once_per` is mandatory, as it
+   * is on `notify`, and each action makes at most `RULE_CALLS_PER_DAY` of these a day.
+   */
+  | { run: string }
   | { stop: true };
 
 export type RuleDecl = {
@@ -89,6 +97,11 @@ export type RulesOutcome = {
   refused: Refusal[];
   suppressed: string[];
   stopped: boolean;
+  /**
+   * Every `run` the pass reached, with what became of it: queued, held at the day's ceiling, paused, unknown, or
+   * `skipped` where the pass queues no calls at all, which is a bulk apply over rows that were already there.
+   */
+  calls: { rule: string; ingest: string; outcome: 'queued' | 'held' | 'paused' | 'unknown' | 'skipped'; say: string }[];
 };
 
 export type RulesDeps = {
@@ -134,6 +147,13 @@ export type RulesDeps = {
   /** A question through the gate. It writes a suggestion and changes nothing else. */
   suggest: (question: string, options: string[], actor: string) => Result<{ id: string }>;
   schedule: (key: string, payload: unknown, pending: boolean) => boolean;
+  /**
+   * Queue one call a rule runs (`actions.ts`'s `queueCall`), or leave it out.
+   *
+   * ABSENT IS DELIBERATE. `applyRule` runs a rule over rows that are already there, and a bulk apply never queues a call:
+   * five thousand old invoices are not five thousand posts. The pass counts what it did not queue and says so.
+   */
+  call?: (ingest: string, fired: { rule: string; entry: Entry; schema: Schema }) => { ingest: string; outcome: 'queued' | 'held' | 'paused' | 'unknown'; say: string };
   /** One row by its id, hydrated — what a dry run walks without writing anything. */
   entry: (id: string) => Entry | null;
   mint: () => string;
@@ -166,7 +186,7 @@ export function order(rules: readonly RuleDecl[]): RuleDecl[] {
  * makes a rule's refusal a refusal rather than a half-applied row.
  */
 export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
-  const out: RulesOutcome = { fired: [], refused: [], suppressed: [], stopped: false };
+  const out: RulesOutcome = { fired: [], refused: [], suppressed: [], stopped: false, calls: [] };
   const schema = deps.schemaOf(fired.register);
   if (!schema) return out;
 
@@ -186,7 +206,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
        product; a `create` on every write is the same failure with a worse consequence; and a
        `suggest` on every write fills the gate with the same question. */
     const then = Array.isArray(rule.then) ? rule.then : [];
-    const wants = then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a);
+    const wants = then.some((a) => 'notify' in a || 'create' in a || 'suggest' in a || 'run' in a);
     const key = onceKey(rule, fired.entry);
     if (key !== null) {
       /* `false`, ALWAYS: the marker is a CLAIM and not a job. Inserting it `pending` because the
@@ -221,6 +241,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     const later: { in: string; note: string }[] = [];
     const made: { register: string; each?: string[]; bound: number; fields: Record<string, string> }[] = [];
     const asks: { question: string; options: string[] }[] = [];
+    const runs: string[] = [];
     let stop = false;
 
     for (const action of then) {
@@ -291,6 +312,11 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('suggest' in action) {
         asks.push(action.suggest);
         did.push('suggest');
+      } else if ('run' in action) {
+        /* HELD UNTIL THE WRITE HAS HAPPENED, like a note: a call about a row the register then refused is a post
+           about something that is not in the record. */
+        runs.push(action.run);
+        did.push(`run ${action.run}`);
       } else if ('stop' in action) {
         stop = true;
       }
@@ -348,6 +374,22 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       const opened = deps.suggest(fill(ask.question, fired.entry, deps.nowMs), ask.options, `rule:${rule.rule}`);
       if (refused(opened)) out.refused.push(opened.refusal);
       else happened = true;
+    }
+    for (const ingest of runs) {
+      /* NO `call` MEANS A BULK APPLY, which queues nothing and says how many it left. The marker is kept, so the next
+         edit of an old row does not send it either: rows that were already there are not news. */
+      if (deps.call === undefined) {
+        out.calls.push({ rule: rule.rule, ingest, outcome: 'skipped', say: `${ingest} is not run for rows that were already there.` });
+        happened = true;
+        continue;
+      }
+      const queued = deps.call(ingest, { rule: rule.rule, entry: fired.entry, schema });
+      out.calls.push({ rule: rule.rule, ...queued });
+      /* HELD COUNTS AS DONE FOR THIS ROW. The day's ceiling said no once, in a sentence, and a second write of the row
+         tomorrow is not the moment to send it. A paused action gives the marker back, so the row can run once resumed. */
+      if (queued.outcome === 'queued' || queued.outcome === 'held') happened = true;
+      else if (queued.outcome === 'unknown')
+        out.refused.push({ code: 'DECLARATION_UNKNOWN', fix: queued.say, at: 'then.run' });
     }
 
     /* AND THE MARKER GOES BACK IF NOTHING HAPPENED. A `create` whose axis was an empty list, or
@@ -708,6 +750,7 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
     else if ('notify' in a) out.push(`notify ${fill(a.notify.say, entry, deps.nowMs)}`);
     else if ('schedule' in a) out.push(`in ${a.schedule.in}, ${fill(a.schedule.note, entry, deps.nowMs)}`);
     else if ('stop' in a) out.push('stop');
+    else if ('run' in a) out.push(`run ${a.run}, which a rule applied to rows already there does not send`);
     else if ('link' in a) {
       /* A LINK THAT CANNOT BE MADE IS NAMED HERE, because the preview is where somebody finds out
          that half their rows name a party nobody has a row for. */
@@ -743,6 +786,8 @@ export type Applied = {
   /** What it did, in the words a person would use, for the first twenty. */
   sample: { spoken: string; would: string[] }[];
   refusals: Refusal[];
+  /** Calls the rule would have run on these rows and did not, because a bulk apply sends nothing. Absent when none. */
+  calls_skipped?: number;
 };
 
 /** One page of a bulk apply. Past it, run it again — a `while` nobody can stop is not a feature. */
@@ -792,7 +837,11 @@ export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean
 
   /* ONE RULE, and the pass is the ordinary one. Filtering the declarations rather than copying the
      action loop is what stops this becoming a second definition of what a rule does. */
-  const only: RulesDeps = { ...deps, rules: (register) => deps.rules(register).filter((r) => r.rule === rule.rule) };
+  /* AND NO `call`. Rows that were already there are not news to anybody, so a bulk apply queues no calls. */
+  const { call: _sendsNothing, ...quiet } = deps;
+  const only: RulesDeps = { ...quiet, rules: (register) => deps.rules(register).filter((r) => r.rule === rule.rule) };
+  const runsPerRow = (Array.isArray(rule.then) ? rule.then : []).filter((a) => 'run' in a).length;
+  let skipped = 0;
 
   for (const { id } of deps.sql.all<{ id: string }>(
     'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq',
@@ -817,12 +866,16 @@ export function applyRule(deps: RulesDeps, rule: RuleDecl, opts: { dry?: boolean
 
     const spoken = entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`;
     if (out.sample.length < 20) out.sample.push({ spoken, would: describe(deps, rule, entry) });
-    if (opts.dry) continue;
+    if (opts.dry) {
+      skipped += runsPerRow;
+      continue;
+    }
 
     const outcome = runRules(only, { entry, register: rule.register, batch: deps.mint(), actor: `rule:${rule.rule}` });
     out.refusals.push(...outcome.refused);
+    skipped += outcome.calls.filter((c) => c.outcome === 'skipped').length;
     if (outcome.fired.length) out.applied++;
   }
 
-  return ok(out);
+  return ok(skipped > 0 ? { ...out, calls_skipped: skipped } : out);
 }

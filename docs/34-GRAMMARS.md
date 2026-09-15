@@ -413,7 +413,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Aggregations | 11 | `sum count avg min max delta median distinct last running trend` | 08 §2 |
 | Combinators | 3 | `ratio diff product` | 08 §2 |
 | `derive:` combinators | 7 | `sum diff product ratio band via normalise` | 02 §5 |
-| Rule actions | 10 | `set untag move schedule suggest link notify tag create stop` | 07 §6 |
+| Rule actions | 11 | `set untag move schedule suggest link notify tag create run stop` | 07 §6 |
 | Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §4 |
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
 | Series kinds | 5 | `gauge flow cumulative unique fact` | 08 §3 |

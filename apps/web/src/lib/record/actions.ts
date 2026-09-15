@@ -296,18 +296,24 @@ export type UsageView = {
   records: Allowed[];
 };
 
-/** Days, in weeks from the first of the month: 1 to 7, 8 to 14, and on. A month is five bars at most. */
-export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[], month: string): UsageView['weeks'] {
+/**
+ * Days, in weeks from the first of the month: 1 to 7, 8 to 14, and on. A month is five bars at most.
+ *
+ * NO BAR FOR A WEEK THAT HAS NOT STARTED. `through` is today; a week after it drew as zero runs, which
+ * reads as nothing having run rather than nothing having happened yet.
+ */
+export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[], month: string, through?: string): UsageView['weeks'] {
   const [y, m] = month.split('-').map(Number);
-  const last = new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).getUTCDate();
+  const end = new Date(Date.UTC(y ?? 1970, m ?? 1, 0)).getUTCDate();
+  const last = through?.slice(0, 7) === month ? Math.min(end, Number(through.slice(8, 10))) : end;
   const out: UsageView['weeks'] = [];
   for (let start = 1; start <= last; start += 7) {
-    const end = Math.min(start + 6, last);
+    const stop = Math.min(start + 6, end);
     const runs = days
-      .filter((d) => d.day.slice(0, 7) === month && Number(d.day.slice(8, 10)) >= start && Number(d.day.slice(8, 10)) <= end)
+      .filter((d) => d.day.slice(0, 7) === month && Number(d.day.slice(8, 10)) >= start && Number(d.day.slice(8, 10)) <= stop)
       .reduce((n, d) => n + d.runs, 0);
     const name = MONTHS[(m ?? 1) - 1]?.slice(0, 3) ?? '';
-    out.push({ label: words.week(`${start} ${name}`, `${end} ${name}`), runs });
+    out.push({ label: words.week(`${start} ${name}`, `${stop} ${name}`), runs });
   }
   return out;
 }
@@ -315,7 +321,7 @@ export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[
 const sortNamed = (rows: Named[]): Named[] => rows.sort((a, b) => Number(a.faint) - Number(b.faint) || b.runs - a.runs || a.name.localeCompare(b.name));
 
 /** The record's own events, summed: what `/usage` draws when there is no ledger. Nothing about limits. */
-export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events' | 'sample'): UsageView {
+export function usageFromActions(rows: readonly ActionRow[], month: string, from: 'events' | 'sample', through?: string): UsageView {
   const totals = zero();
   const projects = new Map<string, Named>();
   const days = new Map<string, number>();
@@ -336,13 +342,13 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
     totals,
     projects: sortNamed([...projects.values()]),
     actions: sortNamed(actions),
-    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month),
+    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records: [],
   };
 }
 
 /** The ledger, as one view over every record the person owns. */
-export function usageFromLedger(said: AccountUsage, month: string): UsageView {
+export function usageFromLedger(said: AccountUsage, month: string, through?: string): UsageView {
   const totals = zero();
   const projects = new Map<string, Named>();
   const actions: Named[] = [];
@@ -377,7 +383,7 @@ export function usageFromLedger(said: AccountUsage, month: string): UsageView {
     totals,
     projects: sortNamed([...projects.values()]),
     actions: sortNamed(actions),
-    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month),
+    weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records,
   };
 }
@@ -403,15 +409,15 @@ export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Re
 export async function readUsage(io: Fetch, now: number, base = '', sampleNow: number = now): Promise<UsageRead> {
   const range = monthRange(now);
   const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
-  if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month) };
+  if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month, range.to) };
   if (!ledger.notFound && !SAMPLE_WHEN.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
 
   const events = await live(io, base).actions();
-  if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events') };
+  if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events', range.to) };
   if (events.refusal.code === 'ROUTE_UNKNOWN') return { ok: 'none' };
   if (!SAMPLE_WHEN.has(events.refusal.code)) return { ok: false, refusal: events.refusal };
-  const sampleMonth = monthRange(sampleNow).month;
-  return { ok: true, view: usageFromActions(ACTION_SAMPLE(), sampleMonth, 'sample') };
+  const sample = monthRange(sampleNow);
+  return { ok: true, view: usageFromActions(ACTION_SAMPLE(), sample.month, 'sample', sample.to) };
 }
 
 /** Counts as a person reads them in one row: `142 runs · 1,204 requests · 3.1 MB`, and failures when there are any. */
@@ -424,6 +430,119 @@ export const countsOf = (t: Totals): string =>
   ]
     .filter(Boolean)
     .join(' · ');
+
+/* ── what an install calls ─────────────────────────────────────────────── */
+
+/** The hosted plan's runs a month, per record (`research-scheduled-actions.md` §4.4). A self-host has none. */
+export const HOSTED_RUNS = 15_000;
+
+/** A month as a twelfth of a year, so an hourly action is 730 runs and twenty of them are 14,600. */
+const MONTH_MS = (365 / 12) * 86_400_000;
+
+/** The kernel's interval grammar (`pull.ts` `intervalMs`), where `m` is minutes. */
+export function everyMs(every: string): number | null {
+  const m = /^(\d{1,4})([smhdw])$/u.exec(every.trim());
+  if (!m) return null;
+  const unit = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 }[m[2] as 's' | 'm' | 'h' | 'd' | 'w'];
+  const ms = Number(m[1]) * unit;
+  return ms > 0 ? ms : null;
+}
+
+/**
+ * Runs a month from an interval, without the jitter.
+ *
+ * THE JITTER MOVES WHEN A RUN FIRES, NOT HOW MANY: it is a fixed offset per action (`jitterMs`), so the
+ * gap between two runs stays the interval.
+ */
+export function runsAMonth(every: string): number | null {
+  const ms = everyMs(every);
+  return ms === null ? null : Math.round(MONTH_MS / ms);
+}
+
+/** One scheduled action a pack's install or update would add, as the diff's `calls_out` carries it. */
+export type CallOut = {
+  ingest: string;
+  channel: Channel;
+  host: string | null;
+  every: string;
+  /** The key by its vault label, never the key. */
+  key: string | null;
+  /** The record fields it sends, or `null` when the diff does not say. */
+  sends: string[] | null;
+};
+
+const CHANNELS: ReadonlySet<string> = new Set(['pull', 'call', 'poll']);
+
+/**
+ * `planPack`'s `calls_out`, read defensively: the diff is the record's JSON, and a key it lacks is left
+ * unsaid rather than guessed. `grant` is the key's label. `sends` is read when a build carries it.
+ */
+export function callsOutOf(raw: unknown): CallOut[] {
+  if (!Array.isArray(raw)) return [];
+  const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+  return raw.flatMap((c): CallOut[] => {
+    if (typeof c !== 'object' || c === null) return [];
+    const o = c as Record<string, unknown>;
+    const ingest = str(o.ingest);
+    const every = str(o.every);
+    if (!ingest || !every) return [];
+    const channel = str(o.channel) ?? 'pull';
+    return [
+      {
+        ingest,
+        channel: (CHANNELS.has(channel) ? channel : 'pull') as Channel,
+        host: str(o.host),
+        every,
+        key: str(o.grant) ?? str(o.key),
+        sends: Array.isArray(o.sends) ? o.sends.filter((s): s is string => typeof s === 'string') : null,
+      },
+    ];
+  });
+}
+
+/** A declared field as a person reads it: `invoices.amount_due` is "amount due". */
+const fieldWords = (field: string): string => (field.split('.').pop() ?? field).replace(/_/gu, ' ');
+
+const andList = (items: readonly string[]): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+export const installWords = {
+  heading: 'Calls other services',
+  noHost: 'a host it does not name',
+  sends: (fields: readonly string[]) => (fields.length === 0 ? 'sends no fields' : `sends ${andList(fields.map(fieldWords))}`),
+  noKey: 'with no key',
+  estimate: (runs: number, allowance: number) => {
+    const pct = (runs / allowance) * 100;
+    const share = pct > 0 && pct < 1 ? 'less than 1%' : `${Math.round(pct)}%`;
+    const about = `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month`;
+    return runs > allowance
+      ? `${about}, more than this record's ${allowance.toLocaleString('en-GB')}, so some runs would wait until the next month.`
+      : `${about}, ${share} of this record's ${allowance.toLocaleString('en-GB')}.`;
+  },
+  noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit on this record.`,
+} as const;
+
+/** One line per action: what it does, the host, how often, the key by label, and the fields it sends. */
+export const callLine = (c: CallOut): string =>
+  [
+    `${words.verb[c.channel]} ${c.host ?? installWords.noHost}`,
+    often(c.every),
+    c.key ? words.key(c.key) : installWords.noKey,
+    c.sends ? installWords.sends(c.sends) : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+/**
+ * The sentence under the lines: runs a month these actions add, against the hosted allowance. `null`
+ * when no action has an interval to count, because a guess is not an estimate.
+ */
+export function estimateOf(calls: readonly CallOut[], hosted: boolean): string | null {
+  const counted = calls.map((c) => runsAMonth(c.every)).filter((n): n is number => n !== null);
+  if (counted.length === 0) return null;
+  const runs = counted.reduce((a, b) => a + b, 0);
+  return hosted ? installWords.estimate(runs, HOSTED_RUNS) : installWords.noLimit(runs);
+}
 
 /* ── the sample ─────────────────────────────────────────────────────────── */
 

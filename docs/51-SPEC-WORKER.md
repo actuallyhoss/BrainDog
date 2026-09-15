@@ -470,9 +470,11 @@ point — the DO loses precision silently (30 §13).
    package's; the platform's own retry of a throwing `alarm()` (09 §1) is a second ladder this host neither adds to
    nor suppresses.
 4. *Scheduled actions, September 15th 2026.* After the drain, `Record$.alarm` calls
-   `api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler })` with the executor of `src/actions.ts`. It sends
-   https only, to an origin an active declaration names; refuses a host written as a literal private or local address
-   with `postable()`; follows same-origin redirects, three at most; and gives a run 10 seconds and 2 MB. The key is
+   `api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler })` with the executor of `src/actions.ts`, which is
+   the shared send loop of `@braindog/host/actions` given `fetch` and this host's key opener. It sends https only, to
+   an origin an active declaration names; refuses a host written as a literal private or local address, `localhost` or
+   `.internal`; follows same-origin redirects, three at most; gives a run 10 seconds and 2 MB; and scrubs the key's
+   value from the answer and from every refusal sentence. The key is
    opened from the Worker key store (`keyOpener`, over `vault.ts`'s `openSealed`) only when `KEK` is bound. Unbound, an
    action that names a key sends nothing, and its run event carries *"This host holds no key store yet, so the key
    "<label>" was not opened and nothing was sent."* The kernel records that as a failure it does not retry and does
@@ -708,8 +710,8 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
    `device_grant.token_hash`; a theft of every table impersonates nobody (26 §2.1).
 5. **`redirect: 'manual'` and the private-range refusal** in `cfHttp` and `cfDispatch.webhook`; `connect`
    re-validates any `Location` against the declared origin before following (25 §7 rule 5).
-   *Scheduled actions, September 15th 2026.* The alarm's executor, `src/actions.ts`, holds the self-host's rules
-   (§5.10 step 4) and resolves no name. Cloudflare does not route a Worker's `fetch` to a private address, so the
+   *Scheduled actions, September 15th 2026.* The alarm's executor, `src/actions.ts`, runs the self-host's send loop,
+   `@braindog/host/actions` (§5.10 step 4), and passes it no `pin`, so it resolves no name. Cloudflare does not route a Worker's `fetch` to a private address, so the
    check the self-host makes after resolving a name is the platform's on this host; what the executor refuses itself
    is a host written as a literal private, loopback or link-local address, `localhost` or `.internal`.
 6. **The asset route is sandboxed**: type from bytes, SVG 415, `nosniff`, `default-src 'none'; sandbox`,

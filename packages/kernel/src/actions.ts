@@ -49,8 +49,13 @@ export type ActionDecl = {
   url?: string;
   /** `call` and `poll`: the key's vault label. `pull`: the grant's id, as `25 §9` has it. */
   grant?: string;
-  every: string;
+  /** Absent only on a `call` whose `trigger` is `rule`, which runs when a rule says so and on no clock. */
+  every?: string;
   floor?: string;
+  /** `call` only: what starts it. `schedule`, the default, runs on `every`; `rule` runs when a rule says `run:`; `both` does both. */
+  trigger?: 'schedule' | 'rule' | 'both';
+  /** `call` only, with a rule trigger: the fields of the rule's row it sends, each `<register>.<field>`. Never a secret or a file. */
+  sends?: string[];
   /** The project this action runs for. Absent is the whole record, which the meter calls `global`. */
   project?: string;
   /** `call` only: the JSON it posts, string leaves substituted and nothing evaluated. */
@@ -211,7 +216,9 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
   const found = deps.lookup(row.key);
   if (!found || found.decl.channel !== row.kind) return null;
   const { decl, pack } = found;
-  const every = Math.max(intervalMs(decl.every) ?? FLOOR_MS, FLOOR_MS);
+  /* A CALL ONLY A RULE RUNS HAS NO CLOCK. Its row exists so it can pause and be resumed, and firing it ends it. */
+  if (decl.trigger === 'rule') return null;
+  const every = Math.max(intervalMs(decl.every ?? '') ?? FLOOR_MS, FLOOR_MS);
 
   const key = keyNamed(deps.sql, decl.grant);
   if (!key) {
@@ -226,7 +233,8 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
 
   const busy = deps.sql.one(
     `SELECT 1 AS x FROM outbox WHERE kind = 'pull.fetch' AND state IN ('pending', 'leased', 'failed')
-     AND json_extract(payload, '$.channel') = ? AND json_extract(payload, '$.ingest') = ? LIMIT 1`,
+     AND json_extract(payload, '$.channel') = ? AND json_extract(payload, '$.ingest') = ?
+     AND json_extract(payload, '$.entry') IS NULL LIMIT 1`,
     row.kind,
     row.key,
   );
@@ -249,11 +257,27 @@ function fill(text: string, edges: { since: number; until: number }, encode: boo
   });
 }
 
-function fillBody(node: unknown, edges: { since: number; until: number }): unknown {
-  if (typeof node === 'string') return fill(node, edges, false);
-  if (Array.isArray(node)) return node.map((v) => fillBody(v, edges));
+const ROW = /\{row\.([A-Za-z0-9_]+)\}/g;
+const WHOLE_ROW = /^\{row\.([A-Za-z0-9_]+)\}$/;
+
+/**
+ * A call's body, substituted: `{since}` and `{until}`, and `{row.<field>}` from the fields a rule sent.
+ *
+ * A LEAF THAT IS ONE ROW FIELD AND NOTHING ELSE KEEPS ITS VALUE, so an amount stays a number. Inside other text it is
+ * written as text. A scheduled run has no row, so it substitutes nothing there.
+ */
+function fillBody(node: unknown, edges: { since: number; until: number }, row?: Record<string, unknown>): unknown {
+  if (typeof node === 'string') {
+    const whole = WHOLE_ROW.exec(node);
+    if (whole) return row?.[whole[1]!] ?? null;
+    return fill(node, edges, false).replace(ROW, (_all, field: string) => {
+      const value = row?.[field];
+      return value === undefined || value === null ? '' : typeof value === 'string' ? value : JSON.stringify(value);
+    });
+  }
+  if (Array.isArray(node)) return node.map((v) => fillBody(v, edges, row));
   if (node !== null && typeof node === 'object')
-    return Object.fromEntries(Object.entries(node as Record<string, unknown>).map(([k, v]) => [k, fillBody(v, edges)]));
+    return Object.fromEntries(Object.entries(node as Record<string, unknown>).map(([k, v]) => [k, fillBody(v, edges, row)]));
   return node;
 }
 
@@ -284,7 +308,7 @@ export type Ready = { job: OutboxRow; decl: ActionDecl; request: ActionRequest; 
  * host resolves, and the columns this reads are the two a person already sees on the vault screen.
  */
 export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered {
-  let payload: { channel?: string; ingest?: string; grant?: string };
+  let payload: { channel?: string; ingest?: string; grant?: string; row?: unknown };
   try {
     payload = JSON.parse(job.payload) as typeof payload;
   } catch {
@@ -324,7 +348,7 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered
   } catch {
     since = null;
   }
-  const every = Math.max(intervalMs(decl.every) ?? FLOOR_MS, FLOOR_MS);
+  const every = Math.max(intervalMs(decl.every ?? '') ?? FLOOR_MS, FLOOR_MS);
   const edges = { since: since !== null && Number.isFinite(since) ? since : deps.nowMs - every, until: deps.nowMs };
 
   /* SUBSTITUTED AFTER THE ORIGIN, so a value can never become part of the host. The declaration check
@@ -332,7 +356,17 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered
   const rest = address.slice(origin.length);
   const url = `${origin}${fill(rest, edges, true)}`;
   const method = channel === 'call' ? 'POST' : 'GET';
-  const body = channel === 'call' && decl.body !== undefined ? JSON.stringify(fillBody(decl.body, edges)) : undefined;
+  /* THE FIELDS A RULE SENT, AND ONLY THOSE. The record copied them when the rule fired; nothing here reads the record. A
+     call that declares no body sends them as they are. */
+  const sent = payload.row !== null && typeof payload.row === 'object' && !Array.isArray(payload.row) ? (payload.row as Record<string, unknown>) : undefined;
+  const body =
+    channel !== 'call'
+      ? undefined
+      : decl.body !== undefined
+        ? JSON.stringify(fillBody(decl.body, edges, sent))
+        : sent !== undefined
+          ? JSON.stringify(sent)
+          : undefined;
 
   return {
     job,
@@ -711,7 +745,7 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         channel,
         project: typeof decl.project === 'string' && decl.project !== '' ? decl.project : null,
         host: address && originOf(address) ? new URL(address).host : null,
-        every: decl.every,
+        every: decl.every ?? '',
         key: decl.grant === undefined || decl.grant === '' ? null : (keyNamed(sql, decl.grant)?.label ?? decl.grant),
         state,
         next: row && (state === 'pending' || state === 'firing') ? row.due_at : null,
@@ -720,6 +754,176 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         days,
       };
     });
+}
+
+/* ── what an action sends out, as the owner approves it ─────────────────── */
+
+/** How many calls one action makes from rules in one UTC day. The next one is held, with one sentence, and counts as held. */
+export const RULE_CALLS_PER_DAY = 100;
+
+/**
+ * One action's egress: where it calls, how often, which key by label, and which fields leave with it.
+ *
+ * WHAT THE OWNER READS BEFORE THE ONE PRESS (`loop/research-scheduled-actions.md` §5). The plan diff prints it as
+ * `calls_out`, and a proposal that adds or changes an action carries it as the lines approving it would arm.
+ */
+export type Egress = {
+  ingest: string;
+  channel: ActionKind;
+  method: 'GET' | 'POST';
+  host: string | null;
+  /** The interval it runs on, or `null` for a call only a rule runs. */
+  every: string | null;
+  trigger: 'schedule' | 'rule' | 'both';
+  /** The most rule-fired calls in a day, or `null` when no rule runs it. */
+  per_day: number | null;
+  /** The key by its label, or by a grant id for a `pull`. Never a value. */
+  key: string | null;
+  sends: string[];
+  project: string | null;
+  /** The diff's own sentence: `CALLS OUT <host> · every <n> · grant "<label>"`, and the trigger and fields when there are any. */
+  line: string;
+  /**
+   * A project action sending a key gets a line of its own (question 8). Keys are not kept per project yet, so every key
+   * is one any project's action can send, and approving this line is agreeing to that.
+   */
+  key_line: string | null;
+};
+
+/** The host an address names: the parsed host, or the authority as written when it will not parse, so a bad one still says where. */
+function hostOf(address: string | null): string | null {
+  if (address === null || address === '') return null;
+  try {
+    return new URL(address).host;
+  } catch {
+    return address.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/)[0] || null;
+  }
+}
+
+const joinedList = (items: readonly string[]): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/**
+ * The egress of one ingest body, or `null` when it calls nothing out.
+ *
+ * STATIC, FROM THE DECLARATION ALONE. A `pull` and a `poll` run on their interval; a `call` runs on its interval, when a
+ * rule says so, or both. Nothing here reads the record, so a pack's plan and a proposal print the same lines.
+ */
+export function egressOf(body: unknown): Egress | null {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
+  const d = body as Partial<ActionDecl> & { ingest?: unknown; channel?: unknown; every?: unknown; project?: unknown };
+  const channel = d.channel;
+  if (typeof channel !== 'string' || !(ACTION_KINDS as readonly string[]).includes(channel)) return null;
+  const trigger = channel === 'call' && (d.trigger === 'rule' || d.trigger === 'both') ? d.trigger : 'schedule';
+  const every = typeof d.every === 'string' ? d.every : null;
+  if (every === null && trigger === 'schedule') return null;
+
+  const host = hostOf(addressOf(d as ActionDecl));
+  const key = typeof d.grant === 'string' && d.grant !== '' ? d.grant : null;
+  const sends = trigger === 'schedule' || !Array.isArray(d.sends) ? [] : d.sends.filter((s): s is string => typeof s === 'string');
+  const project = typeof d.project === 'string' && d.project !== '' ? d.project : null;
+  const ingest = typeof d.ingest === 'string' ? d.ingest : '';
+  const perDay = trigger === 'schedule' ? null : RULE_CALLS_PER_DAY;
+
+  const when =
+    trigger === 'schedule'
+      ? `every ${every ?? ''}`
+      : `${trigger === 'both' ? `every ${every ?? ''} and ` : ''}when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`;
+  const line = `CALLS OUT ${host ?? 'no host declared'} · ${when} · grant "${key ?? 'none'}"${sends.length ? ` · sends ${sends.join(', ')}` : ''}`;
+  const key_line =
+    project !== null && key !== null
+      ? `${ingest} runs for the project ${project} and sends the key "${key}". Keys are not kept per project yet, so any project's action can send this key.`
+      : null;
+
+  return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, sends, project, line, key_line };
+}
+
+/* ── a call a rule runs ─────────────────────────────────────────────────── */
+
+export type CallQueued = {
+  ingest: string;
+  /** `unknown` is an action a rule may not run; `paused` is one waiting on somebody to resume it. */
+  outcome: 'queued' | 'held' | 'paused' | 'unknown';
+  say: string;
+};
+
+/**
+ * A rule fired on a row and says `run: <ingest>`: queue one call, carrying only the fields its `sends:` names.
+ *
+ * THE RECORD COPIES THE FIELDS HERE, when the rule fires, so the runner never reads the record. A field whose type is a
+ * secret or a file is never copied, whatever the declaration says, because the install lint is one check and this is
+ * the second.
+ *
+ * AT MOST `RULE_CALLS_PER_DAY` A DAY PER ACTION. A bulk change, such as five thousand invoices marked paid, becomes a
+ * hundred calls and a held sentence, not five thousand posts. A held call is metered as held, which is not a failure,
+ * and the owner is told once that day.
+ */
+export function queueCall(
+  deps: ActionDeps,
+  fired: {
+    ingest: string;
+    rule: string;
+    entry: { id: string; register: string; seq: number | null; fields: Record<string, unknown> };
+    typeOf: (field: string) => string | undefined;
+  },
+): CallQueued {
+  const { ingest, rule, entry } = fired;
+  const spoken = entry.seq === null ? entry.id : `${entry.register}#${entry.seq}`;
+  const found = deps.lookup(ingest);
+  if (!found || found.decl.channel !== 'call' || (found.decl.trigger !== 'rule' && found.decl.trigger !== 'both'))
+    return { ingest, outcome: 'unknown', say: `${rule} runs ${ingest}, which is not a call a rule may run, so nothing was sent for ${spoken}.` };
+  const { decl } = found;
+  const address = addressOf(decl);
+  const host = address && originOf(address) ? new URL(address).host : null;
+
+  const state = deps.sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'call' AND key = ?", ingest)?.state;
+  if (state === 'paused')
+    return { ingest, outcome: 'paused', say: `${ingest} is paused, so nothing was sent for ${spoken}. It sends again once somebody resumes it.` };
+
+  const key = keyNamed(deps.sql, decl.grant);
+  if (!key) {
+    pause(deps, 'call', ingest, `${ingest} is paused: the key "${decl.grant ?? ''}" it sends is not in the vault.`);
+    return { ingest, outcome: 'paused', say: `${ingest} is paused, because the key "${decl.grant ?? ''}" it sends is not in the vault.` };
+  }
+
+  const day = instant(deps.nowMs).slice(0, 10);
+  const today =
+    deps.sql.one<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM outbox WHERE kind = 'pull.fetch' AND created >= ?
+       AND json_extract(payload, '$.ingest') = ? AND json_extract(payload, '$.entry') IS NOT NULL`,
+      day,
+      ingest,
+    )?.n ?? 0;
+  if (today >= RULE_CALLS_PER_DAY) {
+    const target = `declaration:ingest.${ingest}`;
+    const told = deps.sql.one(
+      "SELECT 1 AS x FROM event WHERE kind = 'pull' AND target = ? AND ts >= ? AND json_extract(to_v, '$.outcome') = 'held' LIMIT 1",
+      target,
+      day,
+    );
+    const say = `${ingest} did not send ${spoken}: it has made its ${RULE_CALLS_PER_DAY} calls from rules today. That row will not be sent later; rules can start it again tomorrow.`;
+    meter(deps, { ingest, channel: 'call', host, project: decl.project, status: null, outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0 }, say);
+    if (!told)
+      deps.notify({
+        actor: `ingest:${ingest}`,
+        say,
+        because: `A call a rule runs is sent at most ${RULE_CALLS_PER_DAY} times a day, so a change to many rows cannot become that many posts.`,
+      });
+    return { ingest, outcome: 'held', say };
+  }
+
+  const row: Record<string, unknown> = {};
+  for (const said of decl.sends ?? []) {
+    const dot = said.indexOf('.');
+    const register = said.slice(0, dot);
+    const field = said.slice(dot + 1);
+    if (dot < 1 || register !== entry.register) continue;
+    const type = fired.typeOf(field);
+    if (type === undefined || type === 'secret' || type === 'file') continue;
+    row[field] = entry.fields[field] ?? null;
+  }
+  deps.enqueue({ channel: 'call', ingest, grant: key.id, rule, entry: entry.id, row });
+  return { ingest, outcome: 'queued', say: `${rule} queued ${ingest} for ${spoken}.` };
 }
 
 /** Every origin the active scheduled actions name. The self-host sends to these and to nothing else. */

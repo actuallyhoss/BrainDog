@@ -242,7 +242,7 @@ then:
 once_per: [entry, renews]     # never twice for the same renewal date
 ```
 
-### Nine actions and one terminator, closed
+### Ten actions and one terminator, closed
 
 | Action | Does |
 |---|---|
@@ -254,14 +254,42 @@ once_per: [entry, renews]     # never twice for the same renewal date
 | `suggest` | open a suggestion with options for a human |
 | `link` | set a `ref` field to a resolved row |
 | **`create`** | write bounded rows into a declared register — §6.1 |
+| `run` | queue one run of a declared `call`, sending the fields of this row that the call's `sends:` names |
 | `stop` | halt rule evaluation for this entry |
 
-Nine actions — `tag`, `untag`, `set`, `move`, `notify`, `schedule`, `suggest`, `link`, `create` —
+Ten actions (`tag`, `untag`, `set`, `move`, `notify`, `schedule`, `suggest`, `link`, `create`, `run`)
 plus `stop`, which is a **terminator** rather than an action: it does nothing to the row, it halts
-evaluation. Stated as ten would be wrong, and stated as nine without naming `stop` would be
+evaluation. Stated as eleven would be wrong, and stated as ten without naming `stop` would be
 incomplete.
 
-No `http`. No `run`. No `delete`. A rule that needs any of those is an agent.
+No `http`. No `delete`. A rule never names an address. A rule that needs either of those is an agent.
+
+**`run` names a call, and the call holds everything that leaves.** The host, the key by label and the
+fields are declared on the call and approved when it is installed, so a rule can reach nothing the owner
+has not already seen:
+
+```yaml
+ingest: paid_hook
+channel: call
+url: https://hooks.example.test/paid
+trigger: rule                 # schedule (the default), rule, or both; a rule-only call takes no every
+grant: hook key
+sends: [invoices.what, invoices.party]
+body: { text: "{row.what} is paid" }   # optional; without one the sent fields go as they are
+```
+
+- **Only the fields `sends:` names.** The record copies them into the outbox row when the rule fires,
+  and the runner never reads the record. A field whose type is `secret` or `file` is refused in
+  `sends:` at install, and skipped again when the row is copied. `{row.<field>}` stands only in a
+  body, only for a field `sends:` names, and never in the address.
+- **Once per row.** A rule with `run` must declare `once_per` (`REQUIRED_MISSING` otherwise). A `run`
+  naming no installed call, or a call whose trigger is `schedule`, is refused at install
+  (`DECLARATION_UNKNOWN`, `DECLARATION_INVALID`).
+- **At most 100 a day per action.** The next one is held with one sentence, metered as `held` rather
+  than as a failure, and the owner is told once that day. A paused action queues nothing, and a key
+  that is not in the vault pauses it.
+- **Never from a bulk apply.** Running a rule over rows that were already there queues no calls; the
+  apply counts what it skipped as `calls_skipped`.
 
 **`register:` is mandatory on a rule; a rule runs over one register**, and `field: renews` resolves
 against it at install. *(An earlier draft's canonical example had no such key, and the dry run in this
@@ -269,7 +297,7 @@ section somehow knew it meant `register.services`.)*
 
 ### The shapes
 
-Ten, written out, because six of them had no syntax an implementer could parse:
+Eleven, written out, because six of them had no syntax an implementer could parse:
 
 ```yaml
 - { set: { field: category, to: "{{merchant}}" } }          # one declared field; a literal or an interpolation
@@ -281,6 +309,7 @@ Ten, written out, because six of them had no syntax an implementer could parse:
 - { notify: { tone: warn, say: "…", urgent: false } }        # the engine fills because, to and key — 09 §4
 - { tag: x }
 - { create: { register: skus, each: [sizes, colours], bound: 60, fields: { … } } }   # §6.1
+- { run: paid_hook }                                        # a declared call with trigger: rule or both; once_per required
 - stop                                                      # a bare word, always last
 ```
 

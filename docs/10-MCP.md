@@ -271,11 +271,12 @@ standards-track way to do it.
 | **`boot`** | the first-screen read: the registers the caller may read with their row counts, the record's `now`, the live runs and the open suggestions, in one call |
 | **`whoami`** | who this token is, its scope and its record — what a new session reads first; `ttlMs` 0 |
 | **`skill/<name>`** | the text of one skill, listed with when to use it |
+| **`actions`** | every scheduled action (`pull`, `call`, `poll`): what it calls, how often, its key by label only, whether it is paused and why, its last run and this month so far; `ttlMs` a minute. Starting a paused one again is `resumeAction`, which is ADMIN and a person's |
 
 **Every resource is backed by a method**, so [ADR-018](16-DECISIONS.md)'s rule holds by
-construction: `schema` `digest/today` `page` `metric` `sessions/live` `context` `boot` and `whoami` are the methods
-`schema({ register })` `digestToday()` `page({ slug })` `metric({ id })` `sessionsLive()` `context()` `boot()` and
-`whoami()` of [30-BLUEPRINT](30-BLUEPRINT.md) §5. `decisions` is `governance({ register: 'suggestion' })`, the open
+construction: `schema` `digest/today` `page` `metric` `sessions/live` `context` `boot` `whoami` and `actions` are the
+methods `schema({ register })` `digestToday()` `page({ slug })` `metric({ id })` `sessionsLive()` `context()` `boot()`
+`whoami()` and `actions()` of [30-BLUEPRINT](30-BLUEPRINT.md) §5. `decisions` is `governance({ register: 'suggestion' })`, the open
 suggestions, and `skill/<name>` is `list` over the skills register by name, so neither is a read path of its own. The
 move that decides stays a person's act (§5). URIs are `braindog:<path>`; `schema`, `page`, `metric` and `skill` are
 templates, and every resource carries `ttlMs`: the table is [44-SPEC-MCP](44-SPEC-MCP.md) §4.7. Three more are

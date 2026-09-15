@@ -403,6 +403,7 @@ export type Credential = {
  * lives and everything else reads it.
  */
 import type { EventKind } from '@braindog/kernel';
+import type { CallOut } from './actions.ts';
 export type { EventKind };
 
 export type AuditEvent = {
@@ -449,6 +450,8 @@ export type PackInfo = {
   moves?: readonly { page: string; from: number; to: number }[];
   /** A name this pack declares that the record already has. `04 §3`'s `CONFLICTS`. */
   conflicts?: readonly string[];
+  /** The scheduled actions it would add, as `planPack`'s `calls_out` carries them (`04 §7`). */
+  calls?: readonly CallOut[];
   /**
    * What the pack calls the things it declares, for a pack this record has not installed.
    *

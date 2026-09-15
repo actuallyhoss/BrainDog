@@ -64,6 +64,8 @@ export type McpSurface<C> = {
   handoff?(args: Args, ctx: C): Answer;
   meet?(args: Args, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
+  /** Every scheduled action, with its key by label only. READ+, and optional for the same reason as the four above. */
+  actions?(ctx: C): Answer;
 };
 
 /**
@@ -318,6 +320,7 @@ const TTL = new Map([
   ['boot', MINUTE],
   ['digest', MINUTE],
   ['decisions', MINUTE],
+  ['actions', MINUTE],
   ['page', MINUTE],
   ['metric', MINUTE],
   ['schema', HOUR],
@@ -343,6 +346,7 @@ const FIXED: readonly Resource[] = [
   ),
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
+  resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
 ];
 
 /** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
@@ -479,6 +483,10 @@ export function tools<C>(surface: McpSurface<C>) {
     if (head === 'sessions' && rest === 'live')
       return surface.sessionsLive ? surface.sessionsLive({}, ctx) : unbuilt('sessions/live', 'Nothing else lists live sessions yet.');
     if (head === 'decisions' && !rest) return surface.governance({ register: 'suggestion' } as never, ctx);
+    /* THE RECORD'S LIST AS IT ANSWERS IT. Its `key` is the vault's label and nothing sealed is read to build it, so
+       there is nothing here to take out; a second filter would be a second place to keep in step. */
+    if (head === 'actions' && !rest)
+      return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');
     if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
     const named = NAMED.test(rest);
     if (head === 'schema' && named) return surface.schema({ register: rest }, ctx);

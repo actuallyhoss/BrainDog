@@ -420,9 +420,12 @@ export function openChangeSuggestion(
  * KEYS AND THE FIRST 120 CHARACTERS, and never the fields that are the reason the job existed:
  * `texts`, a body, a token. A dead-letter item is READ by whoever the record belongs to, and a
  * failure report that quotes the credential it failed to use has published it.
+ *
+ * AND `row`, the fields a rule-fired call carries to its host. They are the record's own data, sent only where the
+ * owner approved, and a dead-letter item is not that place.
  */
 export function summary(payload: string): Record<string, string> {
-  const withheld = new Set(['texts', 'text', 'html', 'body', 'ciphertext', 'token', 'secret', 'vectors', 'password']);
+  const withheld = new Set(['texts', 'text', 'html', 'body', 'ciphertext', 'token', 'secret', 'vectors', 'password', 'row']);
   let parsed: unknown;
   try {
     parsed = JSON.parse(payload);

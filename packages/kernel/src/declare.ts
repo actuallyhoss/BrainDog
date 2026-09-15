@@ -971,7 +971,7 @@ const PATH_SEGMENT_CEILING = 16;
  * ingest that never fires and an ingest that fires correctly look identical from the outside until
  * somebody notices a month of arrivals sitting untriaged.
  */
-function ingestBody(decl: Declaration): Refusal | null {
+function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
   const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown };
   const id = decl.id;
 
@@ -1048,7 +1048,7 @@ function ingestBody(decl: Declaration): Refusal | null {
     if (said) return said;
   }
 
-  if (body.channel === 'call' || body.channel === 'poll') return actionFault(decl, body.channel);
+  if (body.channel === 'call' || body.channel === 'poll') return actionFault(decl, body.channel, installed);
 
   return null;
 }
@@ -1060,9 +1060,15 @@ const ACTION_PLACEHOLDERS = ['since', 'until'] as const;
 /** The formats a time takes. `:int` is `25 §3.1`'s fifth, and it formats a page or a probe, never a time. */
 const TIME_FORMATS = ['date', 'instant', 'epoch_s', 'epoch_ms'] as const;
 /** The names `25 §3.1` closes over. A brace group that begins with one of these is a substitution or a refusal. */
-const PLACEHOLDER_NAME = /^(since|until|page|probe\.[A-Za-z0-9_]*|grant\.[A-Za-z0-9_]*)/;
+const PLACEHOLDER_NAME = /^(since|until|page|row\.[A-Za-z0-9_]*|probe\.[A-Za-z0-9_]*|grant\.[A-Za-z0-9_]*)/;
 /** `42 §4.7`'s ceiling on a fetch body, kept for a call's. */
 const BODY_BYTES = 8_192;
+/** What starts a `call`. Absent is `schedule`. */
+const CALL_TRIGGERS = ['schedule', 'rule', 'both'] as const;
+/** The most fields one call sends. Each is printed in the install diff. */
+const SENDS_CEILING = 32;
+/** `<register>.<field>`, both in the identifier grammar. */
+const SENDS_NAME = /^([a-z][a-z0-9_]{0,31})\.([a-z][a-z0-9_]{0,31})$/;
 
 /**
  * One string a scheduled action sends, checked for substitution and nothing more.
@@ -1072,7 +1078,7 @@ const BODY_BYTES = 8_192;
  * optional format, or it is an expression and it is refused. `${…}` is refused wherever it is, because
  * it is the shape of a template language and nothing here is one.
  */
-function substitutionFault(text: string): string | null {
+function substitutionFault(text: string, sent: ReadonlySet<string> | null = null): string | null {
   if (text.includes('${')) return `${JSON.stringify(text.slice(0, 60))} holds a \`\${…}\`, which is an expression. Write {since} or {until} and nothing else.`;
   for (const m of text.matchAll(/\{([^{}]*)\}/g)) {
     const inner = m[1] ?? '';
@@ -1081,6 +1087,15 @@ function substitutionFault(text: string): string | null {
     const rest = inner.slice(name.length);
     /* `{sinceX}` names no placeholder, so it is literal text like any other brace group. */
     if (/^[A-Za-z0-9_]/.test(rest)) continue;
+    /* A ROW'S FIELD, ONLY IN A BODY AND ONLY ONE THE CALL SENDS. `sent` is `null` in an address, where no row's
+       value may ever stand, and otherwise the fields `sends:` names. */
+    if (name.startsWith('row.')) {
+      const field = name.slice('row.'.length);
+      if (sent === null) return `{${inner}} puts a row's field in the address. A row's fields go in the body, and only the ones sends: names.`;
+      if (rest !== '' || !sent.has(field))
+        return `{${inner}} is not a field this call sends. Write {row.<field>} for a field listed in sends:, with no format.`;
+      continue;
+    }
     if (!(ACTION_PLACEHOLDERS as readonly string[]).includes(name))
       return `{${inner}} has nothing to stand for on a scheduled action. Only {since} and {until} do.`;
     if (rest === '') continue;
@@ -1109,12 +1124,50 @@ function stringLeaves(node: unknown, at: string, out: [string, string][] = []): 
  * THE INTERVAL IS AT LEAST FIFTEEN MINUTES, or the provider's own higher floor. AND THE BODY IS
  * SUBSTITUTION ONLY. Each has its own code, because each has its own fix.
  */
-function actionFault(decl: Declaration, channel: 'call' | 'poll'): Refusal | null {
+function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Known): Refusal | null {
   const body = decl.body as {
     url?: unknown; grant?: unknown; every?: unknown; floor?: unknown; body?: unknown; project?: unknown;
-    writes?: { register?: unknown };
+    writes?: { register?: unknown }; trigger?: unknown; sends?: unknown;
   };
   const id = decl.id;
+
+  /* WHAT STARTS IT, AND WHAT LEAVES WITH IT. A poll has neither: it runs on its clock and sends no body. A call a rule
+     runs has no clock, and sends only the fields `sends:` names, which the install diff prints. */
+  if (channel === 'poll' && (body.trigger !== undefined || body.sends !== undefined))
+    return bad('DECLARATION_INVALID', `${id} is a poll, which runs on its interval and sends no row, so it takes no trigger or sends.`, body.trigger !== undefined ? 'trigger' : 'sends');
+  if (body.trigger !== undefined && !(CALL_TRIGGERS as readonly string[]).includes(body.trigger as string))
+    return bad('DECLARATION_INVALID', `${String(body.trigger)} is not what starts a call.`, 'trigger', CALL_TRIGGERS as unknown as string[]);
+  const trigger = (body.trigger ?? 'schedule') as (typeof CALL_TRIGGERS)[number];
+
+  const sent = new Set<string>();
+  if (body.sends !== undefined) {
+    if (trigger === 'schedule')
+      return bad('DECLARATION_INVALID', `${id} sends fields of a row, and only a rule has a row. Write trigger: rule or trigger: both.`, 'sends');
+    if (!Array.isArray(body.sends) || body.sends.length === 0 || body.sends.length > SENDS_CEILING)
+      return bad('DECLARATION_INVALID', `${id}'s sends is a list of one to ${SENDS_CEILING} fields, each written register.field.`, 'sends');
+    let register: string | null = null;
+    for (const [i, said] of (body.sends as unknown[]).entries()) {
+      const at = `sends[${i}]`;
+      const m = typeof said === 'string' ? SENDS_NAME.exec(said) : null;
+      if (!m) return bad('DECLARATION_INVALID', `${id} sends ${JSON.stringify(said)}, and a field it sends is written register.field.`, at);
+      const [, from, field] = m as unknown as [string, string, string];
+      if (register !== null && from !== register)
+        return bad('DECLARATION_INVALID', `${id} sends fields of ${register} and of ${from}, and a rule's row belongs to one register.`, at);
+      register = from;
+      sent.add(field);
+      /* NEVER A SECRET OR A FILE. A key leaves the record only as the key the call names, by reference, and a file is
+         not a field a call carries. Checked against the register when the record can see it. */
+      if (installed === undefined) continue;
+      const shape = installed.get(`register.${from}`);
+      if (shape === undefined) return bad('REGISTER_UNKNOWN', `${id} sends ${said}, and there is no register called ${from}.`, at);
+      const declared = (Array.isArray(shape.fields) ? shape.fields : []) as { id?: unknown; type?: unknown; of?: unknown }[];
+      const f = declared.find((x) => x?.id === field);
+      if (f === undefined) return bad('FIELD_UNKNOWN', `${id} sends ${said}, and ${from} has no field called ${field}.`, at);
+      const kind = f.type === 'list' ? f.of : f.type;
+      if (kind === 'secret' || kind === 'file')
+        return bad('DECLARATION_INVALID', `${id} sends ${said}, which is a ${String(kind)}. A call never sends a secret or a file.`, at);
+    }
+  }
 
   if (typeof body.url !== 'string' || body.url === '')
     return bad('DECLARATION_INVALID', `${id} is a ${channel} and names no url. Write the whole https:// address it calls.`, 'url');
@@ -1145,10 +1198,16 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll'): Refusal | nul
   if (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40)
     return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the vault it sends.`, 'grant');
 
-  if (typeof body.every !== 'string')
-    return bad('ACTION_INTERVAL_TOO_SHORT', `${id} says no interval. Write every: 15m or longer.`, 'every');
-  const interval = intervalFault({ ingest: String((decl.body as { ingest?: unknown }).ingest ?? id), every: body.every, ...(typeof body.floor === 'string' ? { floor: body.floor } : {}) });
-  if (interval) return interval;
+  /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and one that wrote a clock anyway would read as running on it. */
+  if (trigger === 'rule') {
+    if (body.every !== undefined)
+      return bad('DECLARATION_INVALID', `${id} runs only when a rule runs it, so it takes no every. Write trigger: both to run it on a clock as well.`, 'every');
+  } else {
+    if (typeof body.every !== 'string')
+      return bad('ACTION_INTERVAL_TOO_SHORT', `${id} says no interval. Write every: 15m or longer.`, 'every');
+    const interval = intervalFault({ ingest: String((decl.body as { ingest?: unknown }).ingest ?? id), every: body.every, ...(typeof body.floor === 'string' ? { floor: body.floor } : {}) });
+    if (interval) return interval;
+  }
 
   if (body.project !== undefined && (typeof body.project !== 'string' || body.project === ''))
     return bad('DECLARATION_INVALID', `${id}'s project is the id of the project it runs for, or absent for the whole record.`, 'project');
@@ -1168,7 +1227,8 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll'): Refusal | nul
     if (new TextEncoder().encode(JSON.stringify(body.body)).length > BODY_BYTES)
       return bad('OUT_OF_BOUNDS', `${id}'s body is over 8 KB. A call's body is printed whole in the install diff.`, 'body');
     for (const [at, text] of stringLeaves(body.body, 'body')) {
-      const wrong = substitutionFault(text);
+      /* A scheduled run has no row, so `{row.x}` stands for nothing there; a run a rule starts has the fields it sends. */
+      const wrong = substitutionFault(text, trigger === 'schedule' ? null : sent);
       if (wrong) return bad('ACTION_EVALUATES', wrong, at);
     }
   }
@@ -2076,7 +2136,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   if (decl.kind === 'metric') return metricBody(decl);
   if (decl.kind === 'page') return pageBody(decl, installed);
   if (decl.kind === 'theme') return themeBody(decl);
-  if (decl.kind === 'ingest') return ingestBody(decl);
+  if (decl.kind === 'ingest') return ingestBody(decl, installed);
 
   /**
    * A STANDALONE `block.<id>` DECLARATION WAS CHECKED BY NOTHING, AND IT IS DRAWN BY NOTHING.
@@ -2141,6 +2201,29 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
     const once = (decl.body as { once_per?: unknown }).once_per;
     if (once !== undefined && (!Array.isArray(once) || once.some((k) => typeof k !== 'string')))
       return bad('DECLARATION_INVALID', `A rule's once_per is a list of field names, and ${decl.id}'s is not.`, 'once_per');
+
+    /* A RULE THAT RUNS A CALL NAMES ONE THE OWNER ALREADY APPROVED. The host, the key and the fields it sends are on
+       the call, so the rule can reach nothing new; and it runs once per row, because a call on every write of a row
+       is the same post sent again each time somebody fixes a typo. */
+    const then = (decl.body as { then?: unknown }).then;
+    for (const [i, action] of (Array.isArray(then) ? then : []).entries()) {
+      if (!action || typeof action !== 'object' || !('run' in action)) continue;
+      const at = `then[${i}].run`;
+      const run = (action as { run?: unknown }).run;
+      if (typeof run !== 'string' || !/^[a-z][a-z0-9_]*$/.test(run))
+        return bad('DECLARATION_INVALID', `${decl.id} runs ${JSON.stringify(run)}, and run: is the id of a declared call.`, at);
+      if (once === undefined)
+        return bad('REQUIRED_MISSING', `${decl.id} runs ${run} and declares no once_per, so it would send on every write of the row.`, 'once_per');
+      if (installed === undefined) continue;
+      const call = installed.get(`ingest.${run}`) as { channel?: unknown; trigger?: unknown; sends?: unknown } | undefined;
+      if (call === undefined) return bad('DECLARATION_UNKNOWN', `${decl.id} runs ${run}, and there is no action called ${run}.`, at);
+      if (call.channel !== 'call' || (call.trigger !== 'rule' && call.trigger !== 'both'))
+        return bad('DECLARATION_INVALID', `${decl.id} runs ${run}, which is not a call a rule may start. Give ${run} trigger: rule or trigger: both.`, at);
+      const register = (decl.body as { register?: unknown }).register;
+      const from = Array.isArray(call.sends) && typeof call.sends[0] === 'string' ? call.sends[0].split('.')[0] : null;
+      if (from !== null && from !== register)
+        return bad('DECLARATION_INVALID', `${decl.id} is about ${String(register)}, and ${run} sends fields of ${from}.`, at);
+    }
     return null;
   }
   if (decl.kind !== 'register') return null;
@@ -2551,6 +2634,22 @@ export async function installDeclarations(
  * opened its own transaction unable to join.
  */
 /** Who declared what, from the column rather than from the body — see `Owners`. */
+/**
+ * Validate a batch against the record as it would be once the batch lands, and write nothing.
+ *
+ * FOR A PROPOSAL, which is read by a person before it is installed. A declaration the gate would accept and the install
+ * would then refuse is a question answered for nothing, so the same checks run when it is filed.
+ */
+export function lintBatch(sql: Sql, batch: readonly Declaration[]): Refusal | null {
+  const known = knownTo(sql, batch);
+  const owners = ownersTo(sql, batch);
+  for (const decl of batch) {
+    const fault = validate(decl, known, owners);
+    if (fault) return fault;
+  }
+  return null;
+}
+
 function ownersTo(sql: Sql, batch: readonly Declaration[]): Owners {
   const owners = new Map<string, string | null>();
   for (const row of sql.all<{ id: string; pack_id: string | null }>(

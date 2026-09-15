@@ -1,5 +1,5 @@
 code:   PULL_REQUEST_REFUSED
 via:    rpc
-raises: apps/selfhost/src/actions.ts
+raises: packages/host/src/actions.ts
 at:     source
 fix:    Check what the provider answered; this action does not expect that answer.
