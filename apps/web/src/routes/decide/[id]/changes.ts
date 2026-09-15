@@ -27,7 +27,10 @@ export type Change =
 export type Updated = { at: string; title: string; changes: Change[] };
 
 type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string }[] };
-type Row = { seq: number; version: number; fields: Record<string, unknown> };
+type Row = { id?: string; seq: number | null; version: number; fields: Record<string, unknown> };
+
+/** A row's internal id, which a proposal may name a row by instead of its spoken id. */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 
 const text = (v: unknown): string => (v === null || v === undefined ? '' : typeof v === 'string' ? v : JSON.stringify(v));
 
@@ -66,8 +69,9 @@ export function updatesOf(
   const out: Updated[] = [];
   for (const r of body.rows) {
     if (typeof r.at !== 'string' || typeof r.patch !== 'object' || r.patch === null) continue;
-    const seq = Number(/(\d+)$/u.exec(r.at)?.[1]);
-    const row = held.find((e) => e.seq === seq);
+    const at = r.at;
+    const seq = Number(/(\d+)$/u.exec(at)?.[1]);
+    const row = held.find((e) => e.id === at) ?? (ROW_ID.test(at) ? undefined : held.find((e) => e.seq === seq));
     if (!row) continue;
     const changes: Change[] = [];
     for (const [field, after] of Object.entries(r.patch as Record<string, unknown>)) {

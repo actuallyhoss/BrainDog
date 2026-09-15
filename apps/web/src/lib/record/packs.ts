@@ -9,7 +9,10 @@
  * `.svelte.ts` file, so the state and the reading of a refusal live here and the screen only assigns.
  */
 
-import { PACKS } from './data.ts';
+import { exponentOf } from 'braindog-render';
+
+import { copy } from '../copy.ts';
+import { PACKS, PACK_SETTINGS } from './data.ts';
 
 /** A refusal as the record writes one, with only the keys this screen reads. */
 export type Refusal = { code: string; fix: string; at?: string | undefined; allowed?: readonly string[] | undefined };
@@ -22,12 +25,27 @@ export type PackState = { id: string; version: string | null; disabled_at: strin
 /** What `disablePack` and `enablePack` answer. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
 
+/** The six types a setting may take (`loop/research-modular.md` §1.3). */
+export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration';
+
+/** One setting as `packConfig` answers it. */
+export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string };
+
+/** What `packConfig` answers: what the manifest declares, and the value each setting holds now. */
+export type PackConfig = { id: string; version: string | null; config: Record<string, ConfigDecl>; values: Record<string, unknown> };
+
+/** What `setPackConfig` answers. */
+export type ConfigSaved = PackConfig & { changed: string[]; said: string };
+
 export type Source = {
   /** True while this tab is drawing the sample. */
   sample: boolean;
   packs(): Promise<Answer<PackState[]>>;
   disable(id: string, alsoDisable?: readonly string[]): Promise<Answer<PackToggle>>;
   enable(id: string): Promise<Answer<PackToggle>>;
+  config(id: string): Promise<Answer<PackConfig>>;
+  /** Only the settings that changed. `null` puts one back to its default. */
+  setConfig(id: string, values: Record<string, unknown>): Promise<Answer<ConfigSaved>>;
 };
 
 /** What a refused switch draws, and what its one button would send. */
@@ -63,11 +81,13 @@ export function blocked(id: string, refusal: Refusal, asked: readonly string[] =
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
 
-/** The three client methods this screen calls, so a test can hand in something that is not a socket. */
+/** The client methods these screens call, so a test can hand in something that is not a socket. */
 export type Caller = {
   packs(): Promise<Wire<PackState[]>>;
   disablePack(args: { id: string; alsoDisable?: string[] }): Promise<Wire<PackToggle>>;
   enablePack(args: { id: string }): Promise<Wire<PackToggle>>;
+  /* `packConfig` and `setPackConfig` have no named method on the client, so they go through `call`. */
+  call(name: string, args?: Record<string, unknown>): Promise<Wire<unknown>>;
 };
 
 /** The client's three arms as two. None of these calls sends a version, so a conflict is only a race. */
@@ -85,6 +105,8 @@ export function live(client: Caller): Source {
     disable: async (id, alsoDisable = []) =>
       said(await client.disablePack(alsoDisable.length > 0 ? { id, alsoDisable: [...alsoDisable] } : { id })),
     enable: async (id) => said(await client.enablePack({ id })),
+    config: async (id) => said(await client.call('packConfig', { id })) as Answer<PackConfig>,
+    setConfig: async (id, values) => said(await client.call('setPackConfig', { id, values })) as Answer<ConfigSaved>,
   };
 }
 
@@ -98,6 +120,142 @@ export async function choose(client: Caller): Promise<{ source: Source; first: A
   const source = sample();
   return { source, first: await source.packs() };
 }
+
+/** The same choice for one add-on's settings, decided by its first `packConfig` call. */
+export async function openSettings(client: Caller, id: string): Promise<{ source: Source; first: Answer<PackConfig> }> {
+  const first = said(await client.call('packConfig', { id })) as Answer<PackConfig>;
+  if (first.ok || !SAMPLE_WHEN.has(first.refusal.code)) return { source: live(client), first };
+  const source = sample();
+  return { source, first: await source.config(id) };
+}
+
+/* ── the settings form ──────────────────────────────────────────────────── */
+
+export const words = {
+  settings: 'Settings',
+  /* THE ONE SENTENCE. The record fills `{{config:}}` when a pack is installed, so a saved value waits for that. */
+  when: 'A change takes effect the next time this add-on is installed or updated.',
+  save: 'Save',
+  reset: 'Reset',
+  saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
+  changed: (names: readonly string[]) => `${names.join(', ')} changed`,
+  unit: 'Unit',
+  units: { days: 'days', hours: 'hours', minutes: 'minutes', seconds: 'seconds' },
+} as const;
+
+export type Unit = keyof typeof words.units;
+
+/** Largest first, so a stored duration is drawn in the biggest unit it is a whole number of. */
+export const UNITS: readonly (readonly [Unit, number])[] = [
+  ['days', 86_400],
+  ['hours', 3_600],
+  ['minutes', 60],
+  ['seconds', 1],
+];
+
+/** What one control holds while somebody edits it. Each type reads the part that is its own. */
+export type Draft = { text: string; on: boolean; unit: Unit };
+
+type Money = { amount: number; currency: string };
+const isMoney = (v: unknown): v is Money =>
+  typeof v === 'object' && v !== null && typeof (v as Money).amount === 'number' && typeof (v as Money).currency === 'string';
+
+/** A setting's name as a person reads it: the manifest's label, or its key in words. */
+export const labelOf = (key: string, decl: ConfigDecl): string =>
+  decl.label ?? key.replace(/_/g, ' ').replace(/^./u, (c) => c.toUpperCase());
+
+/**
+ * The currency a money setting is typed in: its own value's, its default's, or else the first other
+ * money setting's in the same add-on. Printed beside the box and never typed, as the row form does.
+ */
+export function currencyOf(settings: PackConfig, key: string): string | null {
+  const own = [settings.values[key], settings.config[key]?.default].find(isMoney);
+  if (own) return own.currency;
+  for (const [k, d] of Object.entries(settings.config)) {
+    const other = d.type === 'money' ? [settings.values[k], d.default].find(isMoney) : undefined;
+    if (other) return other.currency;
+  }
+  return null;
+}
+
+/** The control's starting state for a stored value. */
+export function draftOf(decl: ConfigDecl, value: unknown): Draft {
+  const blank: Draft = { text: '', on: false, unit: 'days' };
+  if (value === null || value === undefined) return blank;
+  switch (decl.type) {
+    case 'bool':
+      return { ...blank, on: value === true };
+    case 'money': {
+      if (!isMoney(value)) return blank;
+      const exp = exponentOf(value.currency);
+      return { ...blank, text: (value.amount / 10 ** exp).toFixed(exp) };
+    }
+    case 'duration': {
+      const n = Number(value);
+      const [unit, size] = UNITS.find(([, s]) => Number.isInteger(n) && n % s === 0) ?? ['seconds', 1];
+      return { ...blank, text: String(n / size), unit };
+    }
+    default:
+      return { ...blank, text: String(value) };
+  }
+}
+
+/**
+ * The value a control would send, or why it cannot be sent yet.
+ *
+ * ONLY MONEY IS CHECKED HERE, with the row form's own two sentences, because a figure in the wrong
+ * shape would be rounded into a different amount. Everything else goes as typed, and the record's
+ * refusal is what is shown beside the field.
+ */
+export function valueOf(decl: ConfigDecl, draft: Draft, currency: string | null): { ok: true; value: unknown } | { ok: false; why: string } {
+  switch (decl.type) {
+    case 'bool':
+      return { ok: true, value: draft.on };
+    case 'money': {
+      const raw = draft.text.trim();
+      if (currency === null) return { ok: true, value: raw };
+      const exp = exponentOf(currency);
+      if (!/^-?\d+(\.\d+)?$/u.test(raw)) return { ok: false, why: copy.moneyShape };
+      if ((raw.split('.')[1] ?? '').length > exp) return { ok: false, why: copy.moneyPlaces(exp) };
+      return { ok: true, value: { amount: Math.round(Number(raw) * 10 ** exp), currency } };
+    }
+    case 'duration': {
+      const raw = draft.text.trim();
+      const size = UNITS.find(([u]) => u === draft.unit)?.[1] ?? 1;
+      return { ok: true, value: /^\d+$/u.test(raw) ? Number(raw) * size : raw };
+    }
+    default:
+      return { ok: true, value: draft.text };
+  }
+}
+
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Whether a setting holds its default, so Reset has nothing to do. */
+export const isDefault = (decl: ConfigDecl, value: unknown): boolean => same(value, decl.default);
+
+/** What Save would send: only the settings whose value moved, and the ones that cannot be sent yet. */
+export function changesOf(settings: PackConfig, drafts: Readonly<Record<string, Draft>>): { values: Record<string, unknown>; wrong: Record<string, string> } {
+  const values: Record<string, unknown> = {};
+  const wrong: Record<string, string> = {};
+  for (const [key, decl] of Object.entries(settings.config)) {
+    const draft = drafts[key];
+    if (!draft) continue;
+    const out = valueOf(decl, draft, currencyOf(settings, key));
+    if (!out.ok) wrong[key] = out.why;
+    else if (!same(out.value, settings.values[key])) values[key] = out.value;
+  }
+  return { values, wrong };
+}
+
+/** The setting a refusal names, when it names one, so its sentence is drawn beside that field. */
+export const fieldAt = (refusal: Refusal): string | null => (refusal.at?.startsWith('values.') ? refusal.at.slice('values.'.length) : null);
+
+/**
+ * Whether the answer to a refusal is signing in again: a session that is not a browser's, or not the
+ * owner's. The same two the Agents settings and the Vault offer the button for.
+ */
+export const signInFor = (refusal: Refusal): boolean => refusal.code === 'NEEDS_BROWSER_SESSION' || refusal.code === 'FORBIDDEN';
 
 /* ── the sample ─────────────────────────────────────────────────────────── */
 
@@ -130,9 +288,48 @@ export function sample(at: () => string = () => new Date().toISOString()): Sourc
   const known = (id: string) => installed.find((p) => p.id === id);
   const declarations = (ids: readonly string[]) => ids.flatMap((id) => (known(id)?.registers ?? []).map((r) => `register.${r}`));
   const unknown = (id: string, where: string) => refuse('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: where });
+  /* WHAT SOMEBODY CHOSE IN THIS TAB, by add-on. A setting that is absent holds its default. */
+  const chosen = new Map<string, Record<string, unknown>>();
+  const settingsOf = (id: string): PackConfig => {
+    const config = (PACK_SETTINGS[id] ?? {}) as Record<string, ConfigDecl>;
+    const set = chosen.get(id) ?? {};
+    const values = Object.fromEntries(Object.entries(config).map(([k, d]) => [k, k in set ? set[k] : (d.default ?? null)]));
+    return { id, version: known(id)?.version ?? null, config, values };
+  };
 
   return {
     sample: true,
+
+    config: async (id) => (known(id) ? { ok: true, value: settingsOf(id) } : unknown(id, 'id')),
+
+    /* THE RECORD'S OWN CHECKS, the ones a form cannot make for itself: the names, and an enum's values. */
+    setConfig: async (id, values) => {
+      if (!known(id)) return unknown(id, 'id');
+      if (Object.keys(values).length === 0) return refuse('REQUIRED_MISSING', 'values is a map of setting names to the value each should hold.', { at: 'values' });
+      const current = settingsOf(id);
+      const declared = Object.keys(current.config);
+      const set = { ...(chosen.get(id) ?? {}) };
+      for (const [key, value] of Object.entries(values)) {
+        const decl = current.config[key];
+        if (!decl)
+          return refuse('FIELD_UNKNOWN', declared.length === 0 ? `${id} declares no settings.` : `${id} has no setting called ${key}. It has ${declared.join(', ')}.`, {
+            at: `values.${key}`,
+            allowed: declared,
+          });
+        if (value === null) delete set[key];
+        else if (decl.type === 'enum' && !decl.values?.includes(String(value)))
+          return refuse('ENUM_VALUE_UNKNOWN', `The setting ${key} is one of ${decl.values?.join(', ')}, and ${JSON.stringify(value)} is not.`, {
+            at: `values.${key}`,
+            allowed: decl.values ?? [],
+          });
+        else set[key] = value;
+      }
+      chosen.set(id, set);
+      const next = settingsOf(id);
+      const changed = declared.filter((k) => JSON.stringify(next.values[k]) !== JSON.stringify(current.values[k]));
+      const names = changed.map((k) => labelOf(k, next.config[k] as ConfigDecl));
+      return { ok: true, value: { ...next, changed, said: copy.notWritten(words.changed(names)) } };
+    },
     packs: async () => ({
       ok: true,
       value: installed.map((p) => ({ id: p.id, version: p.version, disabled_at: off.get(p.id) ?? null, registers: [...p.registers] })),

@@ -194,6 +194,67 @@ A `channel: webhook` ingest carries `verify:` where a pull carries `fetch:` —
 token; an unverified payload is stored `untriaged` and never matched ([12-SECURITY](12-SECURITY.md) §3).
 `grant:` is a vault label here too, never a literal.
 
+### 3.3 · `call` and `poll`, the scheduled actions
+
+*(Added September 15th 2026 for `loop/DIRECTION.md` §0b.)* Two more channels sit beside `pull` inside the
+same `ingest` kind. A **`call`** posts to an endpoint on a schedule. A **`poll`** fetches an endpoint on a
+schedule and acts through a rule only when the answer changes. Both are smaller than a `pull`: one literal
+address, one key and one interval.
+
+```yaml
+ingest: balance
+channel: poll
+url: https://api.example.test/v1/balance?since={since:date}   # a literal https origin; {since} and {until} only after it
+grant: example read                     # the key's vault label, never the key
+every: 1h                               # fifteen minutes at least, or the provider's floor
+floor: 1h                               # optional: the provider's own floor, when it is higher
+project: studio                         # optional: the scope its usage is metered under; absent is global
+extract: { amount: { after: "balance " } }
+writes: { register: balances }          # required on a poll, or a change could reach no rule
+```
+
+```yaml
+ingest: ping
+channel: call
+url: https://hooks.example.test/in
+grant: hook key
+every: 15m
+body: { text: "Summary up to {until:date}" }   # JSON, 8 KB at most; string leaves substituted, nothing evaluated
+```
+
+| Key | `call` | `poll` | Rule |
+|---|---|---|---|
+| `url` | required | required | starts `https://`; the host is written out in full, with no brace, `$`, `@`, `%` or space in it |
+| `grant` | required | required | a vault label of at most 40 characters |
+| `every` | required | required | at least fifteen minutes, and at least `floor:` when one is declared |
+| `body` | optional | refused | an object of at most 8 KB; each string leaf may use `{since}` and `{until}` |
+| `writes.register` | optional | required | the ingest pipeline's own `extract:` and `writes:` |
+
+Substitution is §3.1's with fewer names. `{since}` and `{until}` are the only placeholders a scheduled action
+has values for, with the formats `date`, `instant`, `epoch_s` and `epoch_ms`. `{since}` is the last successful
+run, or one interval ago before there was one. `{page}`, `{probe.<name>}`, `{grant.<name>}` and `${` are
+refused. Any other brace group is literal text. A value is substituted only after the origin, so it can never
+become part of the host.
+
+The install diff prints one line for each, the same line a `pull` prints:
+
+```
+CALLS OUT api.example.test · every 1h · grant "example read"
+```
+
+Five refusals, raised at install by the kernel's declaration check and counted in
+[30-BLUEPRINT](30-BLUEPRINT.md) §6's connector family:
+
+| Code | When |
+|---|---|
+| `ACTION_NOT_HTTPS` | `url:` is not an `https://` address |
+| `ACTION_HOST_COMPUTED` | the host is not written out in full: a placeholder, a user name, or anything computed |
+| `ACTION_GRANT_MISSING` | no key is named by its vault label |
+| `ACTION_INTERVAL_TOO_SHORT` | `every:` is under fifteen minutes or under the declared `floor:`. A `pull` under the floor answers this code too |
+| `ACTION_EVALUATES` | the address or a body leaf computes rather than substitutes |
+
+How they run is §9 and [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1.
+
 ---
 
 ## 4 · What nine real APIs did to it
@@ -550,6 +611,15 @@ ackOutbox`), so connect never sees a key at rest and the record never makes the 
 | **Jitter is mandatory and deterministic** | twenty connectors declaring `every: 1h` become due at the same instant → one wake → twenty runs in one Worker invocation. At `max_pages: 50` that is **1,000 subrequests — exactly the Workers Paid ceiling, and 20× the Free ceiling of 50.** Derive it from `hash(record_id ‖ ingest_id)` so it is **stable**: random jitter makes *"why was there a gap at 04:00"* unanswerable. There is **one** formula and it is connect's — `jitterSeconds(recordId, ingestId, every)`, a SHA-256 over `record_id ‖ 0x1F ‖ ingest_id` modulo a window of `every / 10` clamped to 30 s–15 min — and the record writes the `due_at` the ack carries back ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.8) |
 | **The Worker leases a bounded batch** | ≤5 runs per invocation, `lease_size × max_pages ≤ 200`. Jitter prevents the pile-up; the lease cap survives jitter being wrong |
 | **A minimum interval, refused at install** | 15 minutes, or any declared provider floor. Banks are hard-floored at **6 hours by law** — SCA-RTS Art 36(5), *"no more than four times in a 24-hour period"* |
+
+**The runner for `pull`, `call` and `poll`, as built September 15th 2026.** The kernel's `runActions(execute)`
+claims the due rows of the three kinds, leases up to five `pull.fetch` jobs, and hands each request to an
+executor the host passes in, so the record never makes the call. The request names its key by id and label,
+and the host opens it outside the record. The jitter is `actionJitterMs(record, pack, action, every)`, this
+section's window with the pack added to what is hashed, so two packs that declare the same action name land
+apart. Every run writes one `pull` event with its usage. A `pull` it runs is read through the ingest
+pipeline's `extract:`; paging and `map:` stay with connect. The self-host runs it on its timer. The Worker's
+alarm does not run it yet ([09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1).
 
 ### What the user sees
 

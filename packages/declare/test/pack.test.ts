@@ -198,13 +198,20 @@ test('and it says what a pack would DO, before anybody has to read the file', as
         then: [{ create: { register: 'skus', each: ['sizes'], bound: 60, fields: { code: 'x' } } }],
       },
       { ingest: 'npm', channel: 'pull', every: '6h', grant: 'g_1', extract: {}, writes: { register: 'skus' } },
+      { ingest: 'balance', channel: 'poll', url: 'https://api.example.test/v1/balance', every: '1h', grant: 'example read', extract: {}, writes: { register: 'skus' } },
+      { ingest: 'ping', channel: 'call', url: 'https://hooks.example.test/in?since={since:date}', every: '15m', grant: 'hook key', body: { text: 'up to {until}' } },
     ],
     seeds: [],
   });
   const diff = await plan(value<Pack>(await normalise(doc)), EMPTY);
 
   assert.deepEqual(diff.spawns, [{ rule: 'expand', register: 'skus', bound: 60, when: 'state is approved' }]);
-  assert.deepEqual(diff.calls_out, [{ ingest: 'npm', every: '6h', grant: 'g_1' }]);
+  /* EVERY HOST AN ACTION CALLS, AND HOW OFTEN, before anything is installed: the owner's third rule. */
+  assert.deepEqual(diff.calls_out, [
+    { ingest: 'npm', channel: 'pull', host: null, every: '6h', grant: 'g_1', line: 'CALLS OUT no host declared · every 6h · grant "g_1"' },
+    { ingest: 'balance', channel: 'poll', host: 'api.example.test', every: '1h', grant: 'example read', line: 'CALLS OUT api.example.test · every 1h · grant "example read"' },
+    { ingest: 'ping', channel: 'call', host: 'hooks.example.test', every: '15m', grant: 'hook key', line: 'CALLS OUT hooks.example.test · every 15m · grant "hook key"' },
+  ]);
   assert.ok(diff.warnings.some((w) => w.say.includes('arrives empty')));
 });
 

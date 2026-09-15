@@ -16,7 +16,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
-  import { blocked, choose, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { blocked, choose, words, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -194,8 +194,10 @@
               {/if}
             </p>
           {/if}
-          {#if pack}
           <footer class="pack-foot">
+            <!-- EVERY INSTALLED ADD-ON HAS THIS, catalogued or not: whether it declares settings is the page's to say. -->
+            <Button weight="bare" href="/packs/{state.id}">{words.settings}</Button>
+          {#if pack}
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>
               {copy.installDiff}
             </Button>
@@ -211,9 +213,9 @@
                   { intent: 'warn' },
                 )}
             >{copy.uninstall}</Button>
-          </footer>
-          {#if diff === pack.id}{@render plan(pack)}{/if}
           {/if}
+          </footer>
+          {#if pack && diff === pack.id}{@render plan(pack)}{/if}
         </article>
       {/each}
     </div>
@@ -431,6 +433,7 @@
   .pack-foot {
     display: flex;
     gap: var(--sp-1);
+    flex-wrap: wrap;
     margin-block-start: auto;
     padding-block-start: var(--sp-3);
     margin-inline: calc(var(--sp-4) * -1);

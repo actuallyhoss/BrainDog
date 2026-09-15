@@ -30,8 +30,28 @@ CREATE INDEX schedule_due ON schedule(state, due_at);
 earlier draft here listed six, had no `CHECK`, and left `attempts` nullable.)*
 
 *(Amended September 15th 2026 for `DIRECTION.md` §0b: the `CHECK` gains `call` and `poll` beside
-`pull`, the outbound and watching halves of a scheduled action, both metered per account in the
-Directory rather than in this table. `loop/research-modular.md` §3.2 and §3.3 have the detail.)*
+`pull`, the outbound and watching halves of a scheduled action. The DDL above is migration 1's and stays
+pinned. Migration 5, `0005_schedule_actions`, rebuilds the table with twelve kinds and copies every row.
+`loop/research-modular.md` §3.2 and §3.3 have the detail.)*
+
+**The scheduled actions' runner, built September 15th 2026.** One kernel function, `runActions(execute)`,
+runs `pull`, `call` and `poll`. It claims their due rows through `drainSchedule`, limited to those three
+kinds. Each fire queues one `pull.fetch` job naming the action, its channel and its key by id, unless a job
+for the same action is still pending, leased or waiting on its retry. It then leases up to five jobs, turns
+each into a request, hands the request to an executor the host passes in, and finishes each run in its own
+transaction. The executor runs outside every transaction, so the kernel holds no network code and no lock
+while somebody else's server answers. A 2xx re-arms at `now + every + jitter`, and the jitter is arithmetic
+over the record, the pack and the action, never random. A `poll` hashes the answer and hands it to the ingest
+pipeline only when the hash differs from the last one it kept, so its rule fires on a change and on nothing
+else. A 429, a 5xx, a timeout or the network acks the job `failed` and walks the outbox ladder below. A 401
+or a 403 is never retried: the row goes `paused`, the key is marked stale, an event records it, and the
+owner is told through `notify`. Only `resumeAction`, an ADMIN method, starts it again. Every run writes one
+`pull` event carrying `runs`, `requests`, `bytes`, `ms` and `failures`, scoped to the action's `project` or
+to `global`.
+
+**Not in this pass.** The Worker's alarm does not run `runActions` yet; the self-host does (below). The
+Directory's per-account usage ledger is not built either: the usage sits on each run's event, and a ledger
+that sums it per account is later work.
 
 `state` has **five** values — `pending` · `firing` · `done` · `failed` · `paused`. `paused` is a
 connector's row after its credential was rejected or its ladder ran out (§2,
@@ -135,6 +155,14 @@ The same `schedule` table, drained by one `setTimeout` loop that re-computes its
 is also the belt for an abandoned lease ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13 #5). *(An earlier
 draft made it a no-op because the poller shares the process — sharing a process is not being woken.)*
 
+**The timer runs the scheduled actions too** *(September 15th 2026)*. When `start` is given `actions`, which
+`main.ts` always passes, every tick of the poller and every wake calls `runActions` with the self-host's
+executor, `apps/selfhost/src/actions.ts`, and `pull.fetch` is kept out of the deliverer's lease. The executor
+sends only to an https origin that an active declaration names, read again on every run. It follows a
+redirect only to the same origin, three at most, and refuses one to any other host. It gives a run ten
+seconds and reads at most two megabytes, counted as the answer streams. It opens the key by reference from
+the key store for that one request and sends it as a bearer, and nothing it opens goes back to the record.
+
 ---
 
 ## 2 · What gets scheduled
@@ -148,6 +176,8 @@ draft made it a no-op because the poller shares the process — sharing a proces
 | `purge` | a row soft-deleted 30 days ago; the hourly session sweep ([02-DATA-MODEL](02-DATA-MODEL.md) §1) | housekeeping |
 | `rotate` | a credential's rotation interval | "this token is 11 months old" |
 | `pull` | a connector's `fetch.schedule` — [25-CONNECTORS](25-CONNECTORS.md) §9. Its states are `pending · firing · paused`: a fire sets `firing` and writes one `pull.fetch` outbox row carrying `{ ingest_id, declaration_version, grant_id }` and nothing more — connect fetches the sealed grant itself; the ack returns the row to `pending` with the next `due_at`; `dead`, or a rejected credential, sets `paused` plus one item; the first `due_at` at install is `now` ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D8) | fetch npm downloads at 04:10 |
+| `call` | an ingest's `channel: call`, an outbound POST on its `every:` ([25-CONNECTORS](25-CONNECTORS.md) §3.3). Armed at install and due now; a fire queues one `pull.fetch` job; a refused key pauses it until somebody resumes it | post a summary to a webhook every morning |
+| `poll` | an ingest's `channel: poll`, a GET on its `every:` whose answer reaches its rule only when it changed ([25-CONNECTORS](25-CONNECTORS.md) §3.3) | watch a balance hourly |
 | `analyse` | the self-improvement detector — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.3 | weekly |
 | `score` | a prediction's `score_at` — [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) §4.6 | score D41's prediction on 1 Oct |
 | `snapshot` | a metric's `snapshot:` — [08-METRICS](08-METRICS-AND-ANALYTICS.md) §2.6 | nightly, overwrite yesterday |

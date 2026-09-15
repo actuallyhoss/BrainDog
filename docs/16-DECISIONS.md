@@ -1392,6 +1392,14 @@ host from what `openForGrant` returns sealed; the plaintext goes back once, to a
 grant, rather than to a browser ([12-SECURITY](12-SECURITY.md) §6 rule 9). The Worker checks the grant and
 answers `NOT_IN_THIS_BUILD` until it has a key store bound.
 
+*Note, September 15th 2026, later the same day:* the Worker has its key store, and this decision holds across the
+RPC boundary. `apps/worker/src/keys.ts` reads the root key only from the `KEK` binding, a Worker secret or a
+Secrets Store binding. With it bound, provisioning wraps a new record's three keys, and the key doors seal and open
+in the Worker exactly as the self-host does: the Durable Object's `depositGrant` calls the Worker's `seal` back over
+RPC, so the object receives sealed bytes and performs no crypto. Unbound, nothing changes. A record provisioned
+before the binding has no wrapped keys and its doors say so in one sentence
+([51-SPEC-WORKER](51-SPEC-WORKER.md) §8 rule 3).
+
 **Rejected:** decryption inside the object. It would give the record a `KeyStore` port and make a
 compromised record a compromised vault; today a compromised record yields ciphertext.
 

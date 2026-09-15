@@ -134,7 +134,7 @@ somewhere, and somewhere is currently a notes app. So BrainDog stores them, prop
 ```
   Cloud                                     Self-host
   ─────                                     ─────────
-  Root KEK — Cloudflare Secrets Store       Root KEK — env var or a file with 0600
+  Root KEK — Secrets Store or Worker secret  Root KEK — env var or a file with 0600
       │  (account-level; 100 secrets max,        │
       │   1 KB each — so it holds ONE key,       │
       │   never a key per customer)              │
@@ -290,6 +290,14 @@ FOR" is structural rather than remembered.
    *(Added September 15th 2026, `loop/research-agent-path.md` step 18. `tools/gates/secret-grep.mjs` holds
    the value's shapes in the three files that may name it, and follows a call to a function in the same file
    whose return type names the brand.)*
+   *(Added September 15th 2026, later the same day: the Worker's key store. `apps/worker/src/keys.ts` reads the
+   root key only from the `KEK` binding, a Worker secret or a Secrets Store binding of that name, holding 32 bytes
+   as 64 hex characters or base64url, with the self-host's fingerprint. Unbound, both doors check the grant and
+   answer `NOT_IN_THIS_BUILD`, and records are provisioned without wrapped keys. Bound, provisioning wraps a new
+   record's three keys, and the Worker seals and opens exactly as the self-host does: the record's `depositGrant`
+   calls the Worker's `seal` back over RPC, so the Durable Object receives only sealed bytes. A record created
+   before the binding answers "Keys need a record created after this host key store was bound, and this record is
+   older than that." A bound value that is not 32 bytes is refused, never taken as unbound.)*
 
 
 ### 6.1 · The device-authorisation grant, and five refinements from the predecessor

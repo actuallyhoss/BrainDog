@@ -1897,6 +1897,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * Start a paused scheduled action again, now: a `pull`, `call` or `poll` (`loop/DIRECTION.md` §0b).
+     *
+     * THE ONLY WAY ONE STARTS AGAIN. A 401 or a 403 pauses an action rather than retrying it, because retrying
+     * a refused key against somebody's auth endpoint is how an account gets locked, and the owner is told when
+     * it happens. So resuming is a decision a person makes, in a browser, like turning a pack back on.
+     */
+    async resumeAction(args: { ingest: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['ingest']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.ingest !== 'string' || !args.ingest) return no('REQUIRED_MISSING', 'Which action?', { at: 'ingest' });
+      return tail(kernel.resumeAction(args.ingest, actorOf(ctx)));
+    },
+
+    /**
      * Every pack, on or off, with the registers each holds. A read, because a list of names is not a change.
      *
      * OFF IS NOT ABSENT. A disabled pack is here with its `disabled_at`, and so is a pack the seed owns

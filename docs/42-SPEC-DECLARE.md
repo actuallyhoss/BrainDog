@@ -343,7 +343,7 @@ a string ≤ 200.
 | Key | Type | Required | Default | Closed list |
 |---|---|---|---|---|
 | `ingest` | `Id` | yes | — | — |
-| `channel` | — | yes | — | `email webhook pull paste api` (30 §1) |
+| `channel` | — | yes | — | `email webhook pull paste api call poll`; the last two are scheduled actions, 25 §3.3 |
 | `match` | predicate, backend `inbox_raw` | all channels but `pull`; forbidden on `pull` | — | fields `from to subject body channel state ts` |
 | `skip` | 1–16 of `{ when: predicate on inbox_raw, reason: text ≤ 120 }` — 07 §2's skip list | no | `[]` | — |
 | `verify` | `{ kind: hmac_sha256, header: header name, grant: text ≤ 40 }` | no; `webhook` only | the URL's path token | — |
@@ -353,8 +353,14 @@ a string ≤ 200.
 | `writes` | `{ register: Id \| Route, confidence? }` or `{ series: Id, kind, unit }` | yes | `confidence: exact` | `confidence ∈ exact proposed needs-review` (a pull: `exact proposed`) · `kind ∈ gauge flow cumulative unique fact` · `unit ∈ count ms bytes money.<Cur> pct.bp` |
 | `dedupe` | 1–4 field ids, or `{ near: { on: [Id…], day: Id, prefix?: { field: Id, chars?: int 1–64 } } }` — 07 §2's fuzzy dedupe | no | — | — |
 | `on_conflict` | — | no | `skip`; `update` on a pull | `skip update new` |
+| `url` | a literal `https://` address; `{since}` and `{until}` only after the origin | `call` `poll` | — | `ACTION_NOT_HTTPS` · `ACTION_HOST_COMPUTED` · `ACTION_EVALUATES` |
+| `grant` | text ≤ 40, a vault label | `call` `poll` | — | `ACTION_GRANT_MISSING` |
+| `every` · `floor` | `Interval`; `every` ≥ 15m and ≥ `floor` | `every` on `call` `poll` | — | `ACTION_INTERVAL_TOO_SHORT`, on a `pull` too |
+| `project` | text | no | the whole record, metered as `global` | — |
+| `body` | an object ≤ 8 KB; string leaves substituted, never evaluated | no; `call` only | — | `OUT_OF_BOUNDS` over 8 KB · `ACTION_EVALUATES` |
 
-A **`Route`** is `{ by: 1–2 field ids, to: 1–16 of { when: [text…], register: Id } }` — 07 §2's routing table; every `register` it
+The scheduled actions' keys, `url` `grant` `every` `floor` `project` `body`, are checked by the kernel at install
+(`packages/kernel/src/declare.ts`, September 15th 2026), and their codes are 30 §6's. A **`Route`** is `{ by: 1–2 field ids, to: 1–16 of { when: [text…], register: Id } }` — 07 §2's routing table; every `register` it
 names resolves like `writes.register`. A **form** (43 §4.3, whose keys this schema accepts exactly — 43 §13 D6) is one object
 with one key: `{ after: text }` · `{ before: text }` · `{ between: [text, text] }` · `{ text: { anchor? } }` · `{ money: { anchor?, currency?: Cur } }` ·
 `{ date: { format, anchor? } }` · `{ int: { anchor? } }` · `{ decimal: { anchor?, sep?: "." \| "," } }` · `{ enum: { map: { literal: value } ≤ 64, anchor? } }` ·
@@ -464,7 +470,7 @@ type Diff = {
   conflicts: { id: string; pack: string; version: string }[];           // another pack's active declaration
   seeds:     { count: number; registers: { register: string; rows: number }[] };
   spawns:    { rule: string; register: string; bound: number; when: string }[];
-  calls_out: { ingest: string; host: string; every: string; grant: string; scopes: string[]; body?: string }[];
+  calls_out: { ingest: string; channel: string; host: string | null; every: string; grant: string | null; line: string }[];   // line: CALLS OUT <host> · every <n> · grant "<label>"
   interrupts: string[];                                                 // rules with notify urgent: true, 09 §5
   touches:   { rows_read: 0; rows_written: 0 };                        // by construction — a pack cannot read a row
   orphans:   number;                                                    // rows under retired registers; > 0 is WOULD_ORPHAN in v1 (§5.7)

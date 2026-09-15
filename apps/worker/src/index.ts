@@ -20,11 +20,11 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, serveApi, withSession, type VaultGrantSeen } from '@braindog/host';
+import { handlersFor, hintsOf, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
-import { createRecordApi, type CallContext, type Limited, type RecordApi } from '@braindog/record';
+import { createRecordApi, type CallContext, type Deposited, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
@@ -35,6 +35,7 @@ import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { inward, isRecordId, servesApi, servesAuth, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
+import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerVault, servesVault } from './vault.ts';
 
 /**
@@ -73,6 +74,14 @@ type Env = {
   SESSION_SECRET?: string;
   /** The operator's bearer for `/auth/provision` and `/auth/claim/mint`, a secret too. Unset: both are 404. */
   PROVISION_KEY?: string;
+  /**
+   * The root key agents' keys are wrapped under, `12 §6`: 32 bytes written as 64 hex characters or base64url, put with
+   * `wrangler secret put KEK --env <environment>`, or a Secrets Store binding of the same name. A different value per
+   * environment. Unset, and the key doors answer `NOT_IN_THIS_BUILD` and provisioning makes records without wrapped
+   * keys, as before. Set, and every record provisioned from then on is made with its three keys wrapped under it.
+   * `keys.ts` is the only reader.
+   */
+  KEK?: KekBinding;
   /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
   AUTH_MAIL_FROM?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
@@ -279,6 +288,36 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.vaultGrant(bearer);
+  }
+
+  /** The fingerprint this record's vault is wrapped by, or `null` for a record made before the key store was bound. */
+  async wrappingKey(): Promise<string | null> {
+    const api = await this.#record();
+    return api.kernel.refused() ? null : api.kernel.wrappingKey();
+  }
+
+  /**
+   * A key deposited through the key door. AN RPC AND NEVER A ROUTE: `depositGrant` is INTERNAL.
+   *
+   * `seal` IS THE WORKER'S, CALLED BACK OVER RPC. The value stays in the Worker's closure and this object receives
+   * only the sealed bytes `seal` returns, which is ADR-062 across the RPC boundary.
+   */
+  async depositGrant(
+    args: { label?: unknown; opens?: unknown; kind?: unknown },
+    grant: VaultGrant,
+    hints: SessionHints,
+    seal: (target: SealTarget) => Promise<Result<Sealed>>,
+  ): Promise<Result<Deposited>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.depositGrant(args, grant, hints, seal);
+  }
+
+  /** A key's sealed material, for the Worker to open. AN RPC AND NEVER A ROUTE: `openForGrant` is INTERNAL. */
+  async openForGrant(args: { label?: unknown; credential?: unknown }, grant: VaultGrant, hints: SessionHints, kekId: string): Promise<Result<OpenedForGrant>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.openForGrant(args, grant, hints, kekId);
   }
 
   /** How it went. The ladder walks from here, and a failed ack arms the `retry` row that tails. */
@@ -653,13 +692,28 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
 }
 
-/** `/api/vault/*`: the grant is checked by the record its bearer names, and then `vault.ts` answers. */
+/**
+ * `/api/vault/*`: the grant is checked by the record its bearer names, and then `vault.ts` answers.
+ *
+ * THE DOORS GET KEYS ONLY WHEN `KEK` IS BOUND, and the store is opened inside them, after the grant, so a key store
+ * that will not open says so only to a grant holder.
+ */
 function keyDoor(request: Request, env: Env): Promise<Response> {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const record = (id: string) => env.RECORD.get(env.RECORD.idFromName(id));
   return serveWorkerVault(request, {
-    knows: (record) => directory.knows(record),
-    vaultGrant: async (record, bearer) =>
-      (await env.RECORD.get(env.RECORD.idFromName(record)).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
+    knows: (id) => directory.knows(id),
+    vaultGrant: async (id, bearer) => (await record(id).vaultGrant(bearer)) as unknown as Result<VaultGrantSeen>,
+    keys: isBound(env.KEK)
+      ? {
+          store: () => keyStoreOf(env.KEK),
+          wrappingKey: (id) => record(id).wrappingKey(),
+          depositGrant: async (id, args, grant, hints, seal) =>
+            (await record(id).depositGrant(args, grant as unknown as VaultGrant, hints, seal)) as unknown as Result<Deposited>,
+          openForGrant: async (id, args, grant, hints, kekId) =>
+            (await record(id).openForGrant(args, grant as unknown as VaultGrant, hints, kekId)) as unknown as Result<OpenedForGrant>,
+        }
+      : undefined,
   });
 }
 
@@ -760,11 +814,14 @@ const letter = (link: string): string =>
  *
  * THE RECORD BEFORE THE NAME, `51 §13 D21`: a Directory row never points at a record that failed to be made.
  *
- * WITHOUT VAULT KEYS UNTIL THE KEK BINDING IS LIVE. `createRecord` takes the three keys wrapped, and absent
- * until there is something to wrap them with, and this Worker has no KeyStore yet. Such a record reads,
- * writes and signs people in; it cannot seal a grant or sign an export until keys are wrapped for it.
+ * WITH ITS THREE KEYS WRAPPED WHEN `KEK` IS BOUND, and without them when it is not. `createRecord` takes the keys
+ * wrapped, and absent until there is something to wrap them with. A record made without them reads, writes and signs
+ * people in; it cannot seal a grant or sign an export, and binding `KEK` later does not give it keys.
+ *
+ * THE STORE IS OPENED FIRST, so a bound value that is not a key refuses before the Directory writes anything.
  */
 async function provision(env: Env, args: { slug: string; email: string; name?: string }): Promise<Result<Provisioned>> {
+  const store = await keyStoreOf(env.KEK);
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const ready = await directory.prepare(args.slug, args.email, args.name ?? null);
   if (ready.refusal) return { ok: false, refusal: ready.refusal };
@@ -778,6 +835,7 @@ async function provision(env: Env, args: { slug: string; email: string; name?: s
     tz: 'UTC',
     locale: 'en',
     owner: { id: owner.id, email: owner.email, name: owner.name },
+    ...(store ? { keys: await recordKeys(store, id) } : {}),
   });
   if (made) return { ok: false, refusal: made };
   const unnamed = await directory.name(args.slug, args.email, id);

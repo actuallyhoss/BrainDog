@@ -542,6 +542,22 @@ export const PACKS: PackInfo[] = [
   { id: 'type-foundry', name: 'Type foundry', blurb: 'Licences, cuts, and who is allowed to use what.', version: '0.4.0', installed: false, registers: ['licences', 'cuts', 'services'], pages: ['licensing'], author: 'a.brandt', titles: { licences: 'Licences', cuts: 'Cuts', licensing: 'Licensing' }, stars: 37, conflicts: ['services'] },
 ];
 
+/**
+ * The settings the sample's Money add-on declares, one of each of the six types, so `/packs/money-core`
+ * draws a whole form with no record behind it. Every other sample add-on declares none.
+ */
+export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration'; values?: readonly string[]; default?: unknown; label?: string }>>> = {
+  'money-core': {
+    heading: { type: 'text', label: 'Page heading', default: 'Money' },
+    reminders: { type: 'enum', label: 'Reminders', values: ['weekly', 'monthly', 'never'], default: 'weekly' },
+    digest_day: { type: 'enum', label: 'Digest day', values: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], default: 'mon' },
+    chase_overdue: { type: 'bool', label: 'Chase overdue invoices', default: true },
+    late_fee: { type: 'money', label: 'Late fee', default: { amount: 4000, currency: 'GBP' } },
+    year_end: { type: 'day', label: 'Year end', default: '2027-04-05' },
+    lead_time: { type: 'duration', label: 'Remind before due', default: 604_800 },
+  },
+};
+
 /* ── what happened while you were away ───────────────────────────────────
    The read mark advances when the person LEAVES the screen, never when it opens: the predecessor
    shipped the other way round and found that For You had never once drawn its second half, because

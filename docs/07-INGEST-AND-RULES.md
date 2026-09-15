@@ -30,6 +30,11 @@ eight-kind list in [04-PACKS](04-PACKS.md) §1 stays closed. Both are safe by th
 in [25-CONNECTORS](25-CONNECTORS.md) §4 and §7: a literal origin, one preflight, the install diff
 naming every host. `loop/research-modular.md` §3.2 has the detail and the runner it still needs.)*
 
+*(Built September 15th 2026: both channels install, arm and run. A `call` is fired by its schedule; a rule
+that fires a `call` is not built. The runner is [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1's and the
+grammar is [25-CONNECTORS](25-CONNECTORS.md) §3.3. `inbox_raw.channel` still counts five, because a poll's
+answer arrives as `pull`.)*
+
 ---
 
 ## 2 · Everything lands raw first

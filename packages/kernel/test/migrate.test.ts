@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 4, format: 1, applied: [1, 2, 3, 4] });
+  assert.deepEqual(result.value, { kernel: 5, format: 1, applied: [1, 2, 3, 4, 5] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -51,9 +51,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 4);
+  assert.equal(sql.all('SELECT version FROM migration').length, 5);
   sql.close();
 });
 
@@ -114,7 +114,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -239,6 +239,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '16c5b5dc98bfba0191673904850dad59761cfba49680b037aef9333dfc7dc676',
     '53e31fd7d2c5a0e3e356de5567f115d0ceec87b0d3fa80a18487a3a7e7ed4d74',
     'b80b1b26094c9f805a67446187ce6a947fd03511a3445db0c041ffc123d3b144',
+    '1a851bda87fb1f20a5d1d2005feebad7efcd6d88b54f4f91e3e97a4aca6e1b4b',
   ]);
 });
 
@@ -250,7 +251,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
   const shipped = statements(MIGRATIONS[0]!.sql).find((s) => s.startsWith('CREATE TABLE device_grant'))!;
   sql.exec('DROP TABLE device_grant');
   sql.exec(shipped);
-  sql.exec('DELETE FROM migration WHERE version = 4');
+  sql.exec('DELETE FROM migration WHERE version >= 4');
   const row = ['fake-poll-id', 'fake-hash', 'denied', 'runner', 'old-box', null, null, 5, '2026-09-01T00:00:00.000Z', null, null, null];
   sql.exec(
     'INSERT INTO device_grant (id, code_hash, status, reach, label, ua, token_hash, tries, expires, approved_by, approved_at, last_used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -259,7 +260,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4]);
+  assert.deepEqual(result.value.applied, [4, 5]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },

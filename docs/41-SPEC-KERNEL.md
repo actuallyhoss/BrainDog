@@ -136,6 +136,11 @@ error (an in-transaction helper called outside one; an internal event with a wro
 `SqlError` it does not map — `CONSTRAINT` is mapped to `UNIQUE_VIOLATION`; every other adapter code is a defect
 the record's 500 handler reports. Nothing else crosses the boundary.
 
+*(Added September 15th 2026.)* `runActions(execute, { limit?, scheduler? }) → Promise<ActionsRun>` runs one pass
+of the scheduled actions with the host's executor. `resumeAction(ingest, actor) → Result<{ ingest, kind }>`
+starts a paused one again. `actionOrigins() → string[]` names every https origin an active `pull`, `call` or
+`poll` declares. `arrive(arrival, only?)` takes the one declaration a scheduled answer is offered to.
+
 ### The types
 
 ```ts
@@ -249,6 +254,8 @@ packages/kernel/
 │   ├── migrations/0001_kernel.ts   the DDL of 30 §1 plus the seed rows, as one exported string
 │   ├── migrations/0002_session.ts  register.session, the kernel's one register, as its canonical bytes
 │   ├── migrations/0004_device.ts   device_grant rebuilt: the seventh reach, vault, and its scope
+│   ├── migrations/0005_schedule_actions.ts   schedule rebuilt with call and poll: twelve kinds
+│   ├── actions.ts                  scheduled actions: fire, prepare, finish, meter, resume; the host passes the executor
 │   ├── migrate.ts                  the runner, the checksum, the ledger, schemaState
 │   ├── device.ts                   device grants, RFC 8628: start, approve, poll, list, revoke, vaultGrant, the sweep
 │   ├── coerce.ts                   the sixteen types → canonical JSON; TEXT_* detection; ULID; spoken ids; derive
@@ -277,6 +284,7 @@ holds what the kernel knows about the one register it declares (§5.4 step 1.4).
 | `events.ts` | `appendEvent`, `REDACTED`, `redactedValue()`, `eventRows()` for a write, `replay`, `observe` | ~110 |
 | `fts.ts` | `projectedText(decl, fields)`, `project(rowid, entry)`, `rebuildFts()` | ~50 |
 | `schedule.ts` | `reminderRows(decl, entry, now)`, `expandRepeat()`, `cancelRange()`, `schedule()`, `outbox()`, `sweepSessions()` (§5.8) | ~200 |
+| `actions.ts` | `fireAction`, `prepareAction`, `finishAction`, `meter`, `runActions`, `resumeAction`, `originsOf`, `actionJitterMs`: the scheduled actions of [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1, with no network in them; the host passes the executor | ~550 |
 | `session.ts` | `sessionDeclaration()`, read from migration 0002's bytes and never retyped; `findSession()`, rungs 1 to 4 of the ladder; `opening()`; `KERNEL_WRITTEN`; `isStale()` at 45 minutes; the `SessionHints` type | ~120 |
 | `dogl.ts` | `TABLES` (31 rows: name · section · columns · pk), `projection()`, `refreshManifest()`, `exportDogl()`, `importDogl()`, `verifySig()` | ~300 |
 | `erase.ts` | `purge()`, `erase()` — the store list of §5.9 as data | ~150 |
@@ -989,7 +997,9 @@ missing `dog_sig` → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READ
 entry → `IMPORT_NOT_EMPTY`; a write between two pages → `CHECKSUM_MISMATCH` on the second; a `migration` row in
 the file numbered past this build's last → `SCHEMA_NEWER`; an unknown column in `#table entry …` is reported and dropped.
 
-**Migrations**: `test/migrate.test.ts`: a fresh database → `kernel = 4`, `format = 1`, `applied = [1, 2, 3, 4]`; migration 4 copies every `device_grant` row and its `CHECK` takes `vault` and refuses an eighth reach;
+**Scheduled actions**: `test/actions.test.ts`: each of the five `ACTION_` refusals at install, arming at install, deterministic jitter, a request that names its key and never carries it, a 401 or 403 that pauses and resumes only through `resumeAction`, one usage event per run scoped to a project or `global`, a poll that reaches its rule only on a change, the ladder on a 5xx, and a pack turned off, on and uninstalled.
+
+**Migrations**: `test/migrate.test.ts`: a fresh database → `kernel = 5`, `format = 1`, `applied = [1, 2, 3, 4, 5]` (migration 5 rebuilds `schedule` with `call` and `poll`); migration 4 copies every `device_grant` row and its `CHECK` takes `vault` and refuses an eighth reach;
 `dog_meta.format = '1'`, 31 `dog_section` rows of which 6 are `local`; `applyMigrations` twice applies nothing and
 changes no row, index or ledger line; the checksums of `0001_kernel.ts` and `0002_session.ts` equal constants in
 the test (an edit to an applied migration fails here first); a record at migration 1 with registers, rows and

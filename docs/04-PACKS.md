@@ -312,7 +312,7 @@ two more are raised by the pack path. `REGISTER_UNRESOLVED` refuses planning or 
 page `requires` or block source, or metric `source` names a list this record does not hold and the pack does not
 declare. Its sentence names the first-party pack that declares the list when there is one, so Money alone on an
 empty record is told to install People and Portfolio first. `CONFIG_TYPE_UNSUPPORTED` refuses a setting of a type §2
-leaves out. 30 §6 now counts a hundred and seventeen.)* *An earlier draft of this table had no code column, and the last
+leaves out. 30 §6 now counts a hundred and twenty-two.)* *An earlier draft of this table had no code column, and the last
 row compared a `braindog` version the app does not have.* A dialect fault is never one of these — a
 document is not parsed at write; it degrades at render ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §3).
 
@@ -421,6 +421,14 @@ record id in the query string — so there are none.
 **The worst a malicious pack achieves is a misleading page — plus, if it declares a `source:`, one
 scheduled GET to a host printed on the screen you approved.** Both are shown by the diff before it
 applies, and uninstalling reverses both without data loss.
+
+**Scheduled actions spend the same row twice more** *(September 15th 2026, `loop/DIRECTION.md` §0b)*. A
+`channel: call` posts to a literal https origin on a schedule, and a `channel: poll` fetches one and acts only
+when the answer changed ([25-CONNECTORS](25-CONNECTORS.md) §3.3). The diff prints each as
+`CALLS OUT <host> · every <n> · grant "<label>"`. The interval is fifteen minutes or the provider's floor,
+refused at install. A call's body is substituted and never evaluated. A refused key pauses the action until
+somebody resumes it. The worst such a pack achieves is one scheduled request to a host named on the screen
+you approved.
 
 ### The one thing packs cannot protect against, stated plainly
 

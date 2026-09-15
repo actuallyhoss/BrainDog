@@ -384,5 +384,14 @@
      SIGN-IN SHIPS SWITCHED OFF, AND THESE ARE ITS SWITCHES. Without `SESSION_SECRET` (32 characters or
      more) `/auth/methods` says `not-configured` and every other `/auth` route is 404. `PROVISION_KEY`
      is the third secret: the operator's bearer for `/auth/provision` and `/auth/claim/mint`, which make a
-     record and hand back its 24-hour claim link; without it both are 404. */
+     record and hand back its 24-hour claim link; without it both are 404.
+
+     `KEK` IS THE FOURTH, AND THE KEY DOORS' SWITCH (12 §6, 51 §8 rule 3). Its name is declared here and its value
+     never is: 32 bytes as 64 hex characters or base64url, a different value per environment, put at the prompt with
+     `wrangler secret put KEK --env <environment>`, or bound from Secrets Store by the drafted
+     `secrets_store_secrets` block above under the same name, never both. Without it `/api/vault/*` answers
+     `NOT_IN_THIS_BUILD` after checking the grant, and `/auth/provision` makes records with no wrapped keys. With it,
+     records provisioned from then on get their three keys, and one made before keeps none. It is deliberately not
+     listed under `secrets.required`: that key fails the first deploy of an environment while the secret is unset,
+     and unset is a supported state. `KEK_PREV` is not read yet. */
 }

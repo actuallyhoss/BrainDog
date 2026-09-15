@@ -907,8 +907,12 @@ function achromatic(value: string): boolean {
 
 /* ── an ingest ───────────────────────────────────────────────────────────── */
 
-/** `30 §1`'s five channels, and the list is closed because `arrive` has an arm per channel. */
-const CHANNELS_IN = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
+/**
+ * The seven channels an ingest declares: `30 §1`'s five, which `inbox_raw` holds, and `call` and `poll`,
+ * the two scheduled actions (`07 §1`, amended). Closed, because `arrive` and the runner each have an arm
+ * per channel. A `poll`'s answer arrives as `pull`, so the table's five stay five.
+ */
+const CHANNELS_IN = ['email', 'webhook', 'pull', 'paste', 'api', 'call', 'poll'] as const;
 
 /**
  * The thirteen forms of `07 §3`: ten extractors and three combinators.
@@ -974,7 +978,7 @@ function ingestBody(decl: Declaration): Refusal | null {
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
     return bad(
       'DECLARATION_INVALID',
-      `${id} arrives by ${JSON.stringify(body.channel ?? null)}, and there are five channels.`,
+      `${id} arrives by ${JSON.stringify(body.channel ?? null)}, and there are seven channels.`,
       'channel',
       CHANNELS_IN as unknown as string[],
     );
@@ -1040,12 +1044,153 @@ function ingestBody(decl: Declaration): Refusal | null {
      at install precisely because one enforced at fire time is one somebody finds out about after
      they have written the declaration and waited for the first run. */
   if (body.channel === 'pull') {
-    const said = checkInterval(decl.body as unknown as PullDecl);
-    if (!said.ok && 'refusal' in said) return bad('DECLARATION_INVALID', said.refusal.fix, said.refusal.at ?? 'every');
+    const said = intervalFault(decl.body as unknown as PullDecl);
+    if (said) return said;
   }
+
+  if (body.channel === 'call' || body.channel === 'poll') return actionFault(decl, body.channel);
 
   return null;
 }
+
+/* ── a scheduled action: `call` and `poll` ──────────────────────────────── */
+
+/** What a `call` or a `poll` substitutes, and nothing else: the window's two edges (`25 §3.1`). */
+const ACTION_PLACEHOLDERS = ['since', 'until'] as const;
+/** The formats a time takes. `:int` is `25 §3.1`'s fifth, and it formats a page or a probe, never a time. */
+const TIME_FORMATS = ['date', 'instant', 'epoch_s', 'epoch_ms'] as const;
+/** The names `25 §3.1` closes over. A brace group that begins with one of these is a substitution or a refusal. */
+const PLACEHOLDER_NAME = /^(since|until|page|probe\.[A-Za-z0-9_]*|grant\.[A-Za-z0-9_]*)/;
+/** `42 §4.7`'s ceiling on a fetch body, kept for a call's. */
+const BODY_BYTES = 8_192;
+
+/**
+ * One string a scheduled action sends, checked for substitution and nothing more.
+ *
+ * SUBSTITUTION, NEVER EVALUATION (`25 §3.1`). A brace group that names no placeholder is literal text,
+ * so a GraphQL body survives; a brace group that names one is either exactly that placeholder, with an
+ * optional format, or it is an expression and it is refused. `${…}` is refused wherever it is, because
+ * it is the shape of a template language and nothing here is one.
+ */
+function substitutionFault(text: string): string | null {
+  if (text.includes('${')) return `${JSON.stringify(text.slice(0, 60))} holds a \`\${…}\`, which is an expression. Write {since} or {until} and nothing else.`;
+  for (const m of text.matchAll(/\{([^{}]*)\}/g)) {
+    const inner = m[1] ?? '';
+    const name = PLACEHOLDER_NAME.exec(inner)?.[1];
+    if (name === undefined) continue;
+    const rest = inner.slice(name.length);
+    /* `{sinceX}` names no placeholder, so it is literal text like any other brace group. */
+    if (/^[A-Za-z0-9_]/.test(rest)) continue;
+    if (!(ACTION_PLACEHOLDERS as readonly string[]).includes(name))
+      return `{${inner}} has nothing to stand for on a scheduled action. Only {since} and {until} do.`;
+    if (rest === '') continue;
+    const format = rest.startsWith(':') ? rest.slice(1) : null;
+    if (format === null || !(TIME_FORMATS as readonly string[]).includes(format))
+      return `{${inner}} is not a substitution. Write {${name}}, or {${name}:date}, :instant, :epoch_s or :epoch_ms, with no operator.`;
+  }
+  return null;
+}
+
+/** Every string leaf of a call's body, with its path, so a refusal can say where. */
+function stringLeaves(node: unknown, at: string, out: [string, string][] = []): [string, string][] {
+  if (typeof node === 'string') out.push([at, node]);
+  else if (Array.isArray(node)) node.forEach((v, i) => stringLeaves(v, `${at}[${i}]`, out));
+  else if (node !== null && typeof node === 'object')
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) stringLeaves(v, `${at}.${k}`, out);
+  return out;
+}
+
+/**
+ * A `call` or a `poll`, checked where it is written (`loop/DIRECTION.md` §0b).
+ *
+ * THE ORIGIN IS LITERAL AND HTTPS, because the install diff prints it and a host built from data is a
+ * host nobody approved: `25 §7` rule 4, and the fifth of Airbyte's connectors that interpolate their
+ * host. THE KEY IS NAMED, by its label, because the owner has to know which key leaves and to where.
+ * THE INTERVAL IS AT LEAST FIFTEEN MINUTES, or the provider's own higher floor. AND THE BODY IS
+ * SUBSTITUTION ONLY. Each has its own code, because each has its own fix.
+ */
+function actionFault(decl: Declaration, channel: 'call' | 'poll'): Refusal | null {
+  const body = decl.body as {
+    url?: unknown; grant?: unknown; every?: unknown; floor?: unknown; body?: unknown; project?: unknown;
+    writes?: { register?: unknown };
+  };
+  const id = decl.id;
+
+  if (typeof body.url !== 'string' || body.url === '')
+    return bad('DECLARATION_INVALID', `${id} is a ${channel} and names no url. Write the whole https:// address it calls.`, 'url');
+
+  if (!/^https:\/\//i.test(body.url))
+    return bad('ACTION_NOT_HTTPS', `${id} calls ${JSON.stringify(body.url.slice(0, 80))}, and a scheduled action calls an https:// address only.`, 'url');
+
+  /* THE AUTHORITY AS WRITTEN, up to the first character that ends it for a URL parser. A backslash ends
+     it too, because the WHATWG parser reads one as a slash on https. */
+  const authority = body.url.slice('https://'.length).split(/[/?#\\]/)[0] ?? '';
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(body.url);
+  } catch {
+    parsed = null;
+  }
+  const host = authority.toLowerCase().replace(/:443$/, '');
+  if (authority === '' || /[{}$@%\s]/.test(authority) || parsed === null || parsed.host !== host)
+    return bad(
+      'ACTION_HOST_COMPUTED',
+      `${id}'s host must be written out in full, with no placeholder, no user name and nothing computed, so the install diff can print it.`,
+      'url',
+    );
+
+  const inUrl = substitutionFault(body.url.slice('https://'.length + authority.length));
+  if (inUrl) return bad('ACTION_EVALUATES', inUrl, 'url');
+
+  if (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40)
+    return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the vault it sends.`, 'grant');
+
+  if (typeof body.every !== 'string')
+    return bad('ACTION_INTERVAL_TOO_SHORT', `${id} says no interval. Write every: 15m or longer.`, 'every');
+  const interval = intervalFault({ ingest: String((decl.body as { ingest?: unknown }).ingest ?? id), every: body.every, ...(typeof body.floor === 'string' ? { floor: body.floor } : {}) });
+  if (interval) return interval;
+
+  if (body.project !== undefined && (typeof body.project !== 'string' || body.project === ''))
+    return bad('DECLARATION_INVALID', `${id}'s project is the id of the project it runs for, or absent for the whole record.`, 'project');
+
+  if (channel === 'poll') {
+    if (body.body !== undefined) return bad('DECLARATION_INVALID', `${id} is a poll, and a poll sends no body.`, 'body');
+    /* A POLL ACTS THROUGH A RULE, and a rule is about a register. An answer that changes and writes
+       nowhere changes nothing anybody can see. */
+    if (typeof body.writes?.register !== 'string')
+      return bad('DECLARATION_INVALID', `${id} is a poll and writes to no register, so a changed answer would reach no rule.`, 'writes.register');
+    return null;
+  }
+
+  if (body.body !== undefined) {
+    if (body.body === null || typeof body.body !== 'object' || Array.isArray(body.body))
+      return bad('DECLARATION_INVALID', `${id}'s body is one object, sent as JSON.`, 'body');
+    if (new TextEncoder().encode(JSON.stringify(body.body)).length > BODY_BYTES)
+      return bad('OUT_OF_BOUNDS', `${id}'s body is over 8 KB. A call's body is printed whole in the install diff.`, 'body');
+    for (const [at, text] of stringLeaves(body.body, 'body')) {
+      const wrong = substitutionFault(text);
+      if (wrong) return bad('ACTION_EVALUATES', wrong, at);
+    }
+  }
+  return null;
+}
+
+/**
+ * An interval, against the floor: a malformed one is a declaration fault, and one under the floor has its own code.
+ *
+ * THE SAME CODE FOR ALL THREE CHANNELS. A `pull` every minute and a `poll` every minute are one fact,
+ * and the owner's rule is one sentence: fifteen minutes, or the provider's own higher floor.
+ */
+function intervalFault(decl: PullDecl): Refusal | null {
+  const said = checkInterval(decl);
+  if (said.ok || !('refusal' in said)) return null;
+  return bad(
+    said.refusal.code === 'OUT_OF_BOUNDS' ? 'ACTION_INTERVAL_TOO_SHORT' : 'DECLARATION_INVALID',
+    said.refusal.fix,
+    said.refusal.at ?? 'every',
+  );
+}
+
 
 /** Every `field:` a `match:` names, against what `inbox_raw` actually holds. */
 function matchFault(node: unknown, id: string, at: string): Refusal | null {

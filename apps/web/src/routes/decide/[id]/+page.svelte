@@ -40,7 +40,7 @@
   import Changes from './Changes.svelte';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { answer as send, park, plainOf, readOne, type One } from '$lib/record/governance.ts';
+  import { answer as send, park, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
@@ -151,7 +151,7 @@
     /* AND A COMMITTED QUESTION IS AS INERT AS A DECIDED ONE. The guard tested the record and not
        this session, so after a commit the number keys still moved a highlight behind the settled
        block and the commit chord was one field away from firing twice. */
-    if (!question || question.decided || committed) return;
+    if (!question || question.decided || committed || (from === 'live' && live?.closed)) return;
     const typing = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
     /* ONLY FROM INSIDE THE REASON FIELD, and only with content — 19 §4's own row. This branch ran
@@ -381,6 +381,9 @@
           </div>
         {/if}
       </div>
+    {:else if from === 'live' && live?.closed}
+      <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again. -->
+      <p class="cost-age">{governed.closed(question.id)}</p>
     {:else}
       <section class="cost">
         {#if question.cost}

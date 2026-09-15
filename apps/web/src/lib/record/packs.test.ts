@@ -9,7 +9,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { blocked, choose, sample, type Caller, type PackState } from './packs.ts';
+import {
+  blocked,
+  changesOf,
+  choose,
+  draftOf,
+  fieldAt,
+  isDefault,
+  openSettings,
+  sample,
+  signInFor,
+  words,
+  type Caller,
+  type Draft,
+  type PackConfig,
+  type PackState,
+} from './packs.ts';
 import { copy } from '../copy.ts';
 
 const AT = '2026-09-15T12:00:00.000Z';
@@ -81,6 +96,7 @@ test('WITH NO RECORD TO ASK THE SCREEN DRAWS THE SAMPLE, AND A RECORD THAT SAYS 
     packs: async () => packs,
     disablePack: async (args) => (sent.push(args), { ok: false, refusal: { code: 'PACK_REQUIRED', fix: 'x', allowed: ['work'] } }),
     enablePack: async (args) => (sent.push(args), { ok: false, conflict: {} }),
+    call: async () => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }),
   });
 
   const none = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }));
@@ -98,4 +114,101 @@ test('WITH NO RECORD TO ASK THE SCREEN DRAWS THE SAMPLE, AND A RECORD THAT SAYS 
   const raced = await yes.source.enable('work');
   assert.deepEqual(sent, [{ id: 'portfolio' }, { id: 'portfolio', alsoDisable: ['work'] }, { id: 'work' }]);
   assert.equal(raced.ok ? '' : raced.refusal.code, 'VERSION_STALE');
+});
+
+/* ── settings ───────────────────────────────────────────────────────────── */
+
+const settingsOf = async (): Promise<PackConfig> => value(await sample(() => AT).config('money-core'));
+const draftsOf = (s: PackConfig): Record<string, Draft> =>
+  Object.fromEntries(Object.entries(s.config).map(([k, d]) => [k, draftOf(d, s.values[k])]));
+
+test('THE SAMPLE DECLARES ONE OF EACH TYPE ON ONE ADD-ON, AND NONE ON THE OTHERS', async () => {
+  const s = sample(() => AT);
+  const money = value(await s.config('money-core'));
+  assert.deepEqual(Object.values(money.config).map((d) => d.type).sort(), ['bool', 'day', 'duration', 'enum', 'enum', 'money', 'text']);
+  assert.deepEqual(money.values.late_fee, { amount: 4000, currency: 'GBP' });
+  assert.deepEqual(value(await s.config('people')).config, {});
+  const none = await s.config('no-such-pack');
+  assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
+});
+
+test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async () => {
+  const s = await settingsOf();
+  const drafts = draftsOf(s);
+  assert.equal(drafts.late_fee?.text, '40.00');
+  assert.deepEqual([drafts.lead_time?.text, drafts.lead_time?.unit], ['7', 'days']);
+  assert.equal(drafts.chase_overdue?.on, true);
+  assert.equal(drafts.digest_day?.text, 'mon');
+  assert.deepEqual(changesOf(s, drafts), { values: {}, wrong: {} });
+
+  const edited: Record<string, Draft> = {
+    ...drafts,
+    late_fee: { ...drafts.late_fee!, text: '45.5' },
+    lead_time: { ...drafts.lead_time!, text: '2', unit: 'hours' },
+    chase_overdue: { ...drafts.chase_overdue!, on: false },
+  };
+  assert.deepEqual(changesOf(s, edited).values, { late_fee: { amount: 4550, currency: 'GBP' }, lead_time: 7200, chase_overdue: false });
+
+  /* A FIGURE IN THE WRONG SHAPE IS HELD BACK, in the row form's own words, and nothing else is. */
+  const wrong = changesOf(s, { ...drafts, late_fee: { ...drafts.late_fee!, text: '45.555' }, heading: { ...drafts.heading!, text: 'Cash' } });
+  assert.deepEqual(wrong, { values: { heading: 'Cash' }, wrong: { late_fee: copy.moneyPlaces(2) } });
+});
+
+test('THE DEMO SAVES IN THE TAB AND SAYS NOTHING WAS SAVED; RESET PUTS THE DEFAULT BACK', async () => {
+  const s = sample(() => AT);
+  const saved = value(await s.setConfig('money-core', { reminders: 'monthly', late_fee: { amount: 5000, currency: 'GBP' } }));
+  assert.deepEqual(saved.changed, ['reminders', 'late_fee']);
+  assert.equal(saved.said, copy.notWritten(words.changed(['Reminders', 'Late fee'])));
+  assert.equal(value(await s.config('money-core')).values.reminders, 'monthly');
+  assert.ok(!isDefault(saved.config.reminders!, saved.values.reminders));
+
+  const reset = value(await s.setConfig('money-core', { reminders: null }));
+  assert.deepEqual(reset.changed, ['reminders']);
+  assert.equal(reset.values.reminders, 'weekly');
+  assert.ok(isDefault(reset.config.reminders!, reset.values.reminders));
+  assert.deepEqual(reset.values.late_fee, { amount: 5000, currency: 'GBP' }, 'a reset of one setting moved another');
+});
+
+test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING IN AGAIN', async () => {
+  const s = sample(() => AT);
+  const enumWrong = await s.setConfig('money-core', { reminders: 'hourly' });
+  assert.ok(!enumWrong.ok);
+  assert.equal(enumWrong.refusal.code, 'ENUM_VALUE_UNKNOWN');
+  assert.equal(fieldAt(enumWrong.refusal), 'reminders');
+  const unknown = await s.setConfig('people', { colour: 'dark' });
+  assert.ok(!unknown.ok);
+  assert.deepEqual([unknown.refusal.code, unknown.refusal.fix], ['FIELD_UNKNOWN', 'people declares no settings.']);
+  assert.equal(fieldAt({ code: 'REQUIRED_MISSING', fix: 'x', at: 'values' }), null);
+
+  assert.equal(signInFor({ code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app.' }), true);
+  assert.equal(signInFor({ code: 'FORBIDDEN', fix: 'Only an owner.' }), true);
+  assert.equal(signInFor({ code: 'ENUM_VALUE_UNKNOWN', fix: 'x' }), false);
+});
+
+test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setPackConfig WITH ONLY THE VALUES', async () => {
+  const sent: { name: string; args: unknown }[] = [];
+  const caller = (config: Awaited<ReturnType<Caller['call']>>): Caller => ({
+    packs: async () => ({ ok: true, value: [] }),
+    disablePack: async () => ({ ok: false, conflict: {} }),
+    enablePack: async () => ({ ok: false, conflict: {} }),
+    call: async (name, args) => {
+      sent.push({ name, args });
+      return name === 'packConfig' ? config : { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.' } };
+    },
+  });
+
+  const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core');
+  assert.equal(none.source.sample, true);
+  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 7);
+
+  const live: PackConfig = { id: 'ledger', version: '1.0.0', config: { cadence: { type: 'enum', values: ['weekly', 'monthly'] } }, values: { cadence: 'monthly' } };
+  const yes = await openSettings(caller({ ok: true, value: live }), 'ledger');
+  assert.equal(yes.source.sample, false);
+  const refused = await yes.source.setConfig('ledger', { cadence: 'weekly' });
+  assert.deepEqual(sent.at(-1), { name: 'setPackConfig', args: { id: 'ledger', values: { cadence: 'weekly' } } });
+  assert.ok(!refused.ok && signInFor(refused.refusal));
+
+  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger');
+  assert.equal(no.source.sample, false);
+  assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');
 });

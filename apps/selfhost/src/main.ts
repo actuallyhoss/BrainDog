@@ -433,6 +433,8 @@ async function serve(): Promise<void> {
     ...(shell === undefined ? {} : { shell }),
     sessionKey,
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
+    /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
+    actions: {},
   });
   /* `importKey` copied it, so these are the last copies this process holds as bytes. */
   sessionKey.fill(0);

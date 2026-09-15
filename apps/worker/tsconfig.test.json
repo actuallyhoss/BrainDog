@@ -3,6 +3,7 @@
   "include": [
     "test/**/*.ts",
     "src/alarm.ts",
+    "src/keys.ts",
     "src/route.ts",
     "src/session.ts",
     "src/vault.ts"

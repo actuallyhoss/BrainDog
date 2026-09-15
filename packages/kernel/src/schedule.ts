@@ -348,7 +348,7 @@ export const due = (sql: Sql, now: number, limit = 100) =>
 
 /* ── the alarm handler ──────────────────────────────────────────── */
 
-/** The ten the DDL's `CHECK` admits. */
+/** The twelve migration 5's `CHECK` admits: 0001's ten, and `call` and `poll` beside `pull`. */
 export const SCHEDULE_KINDS = [
   'digest',
   'reminder',
@@ -357,6 +357,8 @@ export const SCHEDULE_KINDS = [
   'purge',
   'rotate',
   'pull',
+  'call',
+  'poll',
   'analyse',
   'score',
   'snapshot',
@@ -403,12 +405,19 @@ export function drainSchedule(
   deps: AckDeps,
   handlers: Partial<Record<ScheduleKind, Handler>>,
   limit = 100,
+  /**
+   * Only these kinds, when given. The runner of scheduled actions claims `pull`, `call` and `poll` and
+   * nothing else, so a reminder is never sent from inside a loop that is waiting on somebody's API.
+   */
+  kinds?: readonly ScheduleKind[],
 ): Drained {
+  const only = kinds === undefined ? '' : ` AND kind IN (${kinds.map(() => '?').join(', ') || "''"})`;
   const claimed = sql.all<Claimed>(
     `UPDATE schedule SET state = 'firing'
-     WHERE id IN (SELECT id FROM schedule WHERE state = 'pending' AND due_at <= ? ORDER BY due_at LIMIT ?)
+     WHERE id IN (SELECT id FROM schedule WHERE state = 'pending' AND due_at <= ?${only} ORDER BY due_at LIMIT ?)
      RETURNING id, kind, key, payload, attempts, due_at`,
     new Date(deps.nowMs).toISOString(),
+    ...(kinds ?? []),
     Math.max(0, Math.floor(limit)),
   );
 

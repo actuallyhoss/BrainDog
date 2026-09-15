@@ -106,7 +106,7 @@ export function r2Blobs(bucket: R2Bucket): Blobs;
 export function aiInference(env: Env): Inference;            // env.AI through the gateway
 export function cfDispatch(env: Env): Dispatch;              // EMAIL binding · VAPID via @pushforge/builder · fetch
 export function cfHttp(): Http;                              // fetch, redirect: 'manual', private ranges refused, 2 MB
-export function secretsKeyStore(env: Env): KeyStore;         // KEK from Secrets Store; kekId = 34 §5
+export function keyStoreOf(kek: KekBinding | undefined): Promise<KeyStore | null>;   // built in src/keys.ts: KEK, a Worker secret or a Secrets Store binding; null when unbound; kekId = 34 §5
 export function r2Snapshots(env: Env, rec: DurableObjectStub<Record>, id: RecordId): Snapshots;
 
 // apps/worker/src/auth.ts
@@ -149,7 +149,7 @@ about *what* to do is in a package.
 interface Env {
   RECORD: DurableObjectNamespace<Record>; SPARK: DurableObjectNamespace<Spark>; DIRECTORY: DurableObjectNamespace<Directory>;
   OUTBOX_Q: Queue<OutboxMessage>; BLOBS: R2Bucket; AI: Ai; ASSETS: Fetcher;
-  KEK: SecretsStoreSecret; KEK_PREV?: SecretsStoreSecret;      // one key, never one per customer — 12 §6
+  KEK?: string | SecretsStoreSecret; KEK_PREV?: SecretsStoreSecret;   // one key, never one per customer (12 §6); unset is no key store (§8 rule 3)
   EMAIL: SendEmail; TELEMETRY: AnalyticsEngineDataset; RL_READ: RateLimit; RL_WRITE: RateLimit;
   AI_GATEWAY: string; AGE_RECIPIENT: string; PUBLIC_HOST: string;
   SESSION_SECRET?: string; PROVISION_KEY?: string; AUTH_MAIL_FROM?: string;   // two secrets and the sign-in sender (§5.8)
@@ -381,9 +381,10 @@ server key, and adds the operator's two.
 | `POST /auth/claim/mint` | `claim.mint` | a `PROVISION_KEY` bearer; a new claim link for a person already provisioned |
 | `POST /auth/device/start` · `/poll` · `/approve`; `/auth/invite`; `/auth/switch` | none yet | specified, not built |
 
-Self-service sign-up is not built: a hosted record is made by the operator today. Until the KEK Secrets Store
-binding is live, a provisioned record has no vault keys; it reads, writes and signs people in, and cannot seal a
-grant or sign an export until keys are wrapped for it.
+Self-service sign-up is not built: a hosted record is made by the operator today. A record provisioned while `KEK`
+is bound is made with its three keys wrapped under it. One provisioned without it has no vault keys, and binding
+`KEK` later does not give it any: it reads, writes and signs people in, cannot seal a grant or sign an export, and
+its key doors answer the sentence in §8 rule 3.
 
 The lockout (12 §8) is 49 §5.5's, over `dir_fail`: reserve before compare; ten compared and the eleventh a **429**
 with `Retry-After`, sticky for fifteen minutes; a first strike forgotten after fifteen minutes; an address cleared
@@ -668,10 +669,21 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
 2. **No outbound call from `Record` except `wake()`.** `Record`'s ports are `{ Sql, Scheduler, Clock }`; `fetch`,
    `Inference`, `Dispatch` are not in scope — structurally, not by review (ADR-002, 31 §2). `Spark` speaks only to
    the configured model; the Worker does everything else.
-3. **The KEK never leaves the Worker.** `secretsKeyStore` imports it as a non-extractable `CryptoKey`; the record
+3. **The KEK never leaves the Worker.** `keyStoreOf` in `src/keys.ts` imports it as a non-extractable `CryptoKey`; the record
    receives and returns sealed material only (`openGrant`/`bindGrant`); AES-GCM, HKDF and Ed25519 run in the
    Worker (12 §6, ADR-062). No log line, telemetry point, push payload or prompt carries a plaintext — the
    `secret-grep` gate.
+   *The key doors, September 15th 2026.* `KEK` is a Worker secret (`wrangler secret put KEK --env <environment>`)
+   or a Secrets Store binding of that name, holding 32 bytes as 64 hex characters or base64url; the fingerprint is the
+   self-host's, so one root key names itself the same way on both hosts. A bound value that is not 32 bytes is a
+   refusal and never an absent store. Unbound, `/api/vault/deposit` and `/api/vault/open` check the vault grant and
+   answer `NOT_IN_THIS_BUILD`, and `/auth/provision` makes records without wrapped keys, exactly as before. Bound,
+   provisioning wraps a new record's three keys (`recordKeys`), and the doors seal and open in `src/vault.ts` through
+   `packages/host/src/vault.ts`: the record's `depositGrant` calls the Worker's `seal` back over RPC, so the value
+   stays in the Worker and only sealed bytes reach the object, and a read is answered once with `no-store`. A record
+   provisioned before the binding answers `NOT_IN_THIS_BUILD` with *"Keys need a record created after this host key
+   store was bound, and this record is older than that."* `KEK_PREV` is not read yet: a record wrapped under another
+   root key answers `WRONG_KEY`.
 4. **Bearers are hashes at rest**, the secret half is compared by the record against `token.hash` or
    `device_grant.token_hash`; a theft of every table impersonates nobody (26 §2.1).
 5. **`redirect: 'manual'` and the private-range refusal** in `cfHttp` and `cfDispatch.webhook`; `connect`

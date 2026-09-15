@@ -34,14 +34,20 @@ export type Governor = {
 export type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string }[] };
 
 /** A row a proposal would update, as `get` answers it. */
-export type Held = { id?: string; seq: number; version: number; fields: Record<string, unknown> };
+export type Held = { id?: string; register?: string; seq: number | null; version: number; fields: Record<string, unknown> };
 
 /** What a diff is drawn from: each named register's declaration and the rows it would change. */
 export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]> };
 
 export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Record<string, RowsetBody> };
 
-export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined };
+/** `closed` is a question no longer open: a decision, or a suggestion somebody has settled. */
+export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean };
+
+export const words = {
+  /* A settled suggestion whose decision this screen could not find among the ones it reads. */
+  closed: (id: string) => `${id} is no longer open.`,
+} as const;
 
 /** Where a screen's rows came from. */
 export type Read<T> = { from: 'live'; value: T } | { from: 'sample' } | { from: 'refused'; fix: string };
@@ -75,8 +81,11 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
   return { id, title: asked?.trim() || id, cost: '', rank, opened: text(row.opened_at), options };
 }
 
-/** One decision row as the ledger draws it. `answer` is the option's id; the question is its own. */
-export function decisionOf(row: Row): Question {
+/**
+ * One decision row as the ledger draws it. `answer` is the option's id, so the options come from the
+ * suggestion it settled, when that is known, and a screen names the option by its label.
+ */
+export function decisionOf(row: Row, settled?: Row): Question {
   const id = String(row.id);
   return {
     id,
@@ -84,9 +93,48 @@ export function decisionOf(row: Row): Question {
     cost: '',
     rank: 0,
     opened: text(row.ts),
-    options: [],
+    options: settled ? questionOf(settled, undefined, 0).options : [],
     decided: { option: text(row.answer), reason: text(row.reason), by: text(row.decided_by), at: text(row.ts) },
   };
+}
+
+/**
+ * Which suggestion each decision settled, by decision id.
+ *
+ * THE RECORD DOES NOT SAY. A decision row keeps the question's words and the option's id, and a
+ * suggestion row keeps neither its question nor its decision, so the pair is read from what both do
+ * keep: a suggestion no longer open, opened before the decision, that offers the option it recorded.
+ * Oldest decision first, each suggestion taken once, and a suggestion named as the question or an
+ * `options` body naming that option before an accept or a reject, which any proposal offers.
+ */
+export function pairs(decisions: readonly Row[], suggestions: readonly Row[]): Map<string, Row> {
+  const out = new Map<string, Row>();
+  const taken = new Set<string>();
+  const by = (key: string) => (a: Row, b: Row) => (text(a[key]) < text(b[key]) ? -1 : text(a[key]) > text(b[key]) ? 1 : 0);
+  /* The record lists newest first, so reversed, a tie on the instant keeps the order they were filed in. */
+  const settled = [...suggestions].reverse().filter((s) => s.status !== 'open').sort(by('opened_at'));
+  for (const d of [...decisions].reverse().sort(by('ts'))) {
+    const answer = text(d.answer);
+    const fits = settled.filter(
+      (s) => !taken.has(String(s.id)) && text(s.opened_at) <= text(d.ts) && questionOf(s, undefined, 0).options.some((o) => o.key === answer),
+    );
+    const s = fits.find((f) => String(f.id) === text(d.question)) ?? fits.find((f) => f.body_kind === 'options') ?? fits[0];
+    if (!s) continue;
+    taken.add(String(s.id));
+    out.set(String(d.id), s);
+  }
+  return out;
+}
+
+const listed = (out: Wire<unknown>): Row[] => (out.ok && Array.isArray(out.value) ? out.value.filter(isRow) : []);
+
+/** Every suggestion and every decision this screen reads, for `pairs`. */
+async function everything(client: Governor): Promise<{ suggestions: Row[]; decisions: Row[] }> {
+  const [suggestions, decisions] = await Promise.all([
+    client.governance({ register: 'suggestion', status: 'all', limit: 200 }),
+    client.governance({ register: 'decision', limit: 200 }),
+  ]);
+  return { suggestions: listed(suggestions), decisions: listed(decisions) };
 }
 
 /** The body of a `rowset` suggestion, or nothing. */
@@ -112,11 +160,14 @@ export function plainOf(registers: Readonly<Record<string, Decl>>) {
 }
 
 const isDecl = (v: unknown): v is Decl => isRow(v) && Array.isArray(v.fields);
-const isHeld = (v: unknown): v is Held => isRow(v) && typeof v.seq === 'number' && typeof v.version === 'number' && isRow(v.fields);
+const isHeld = (v: unknown): v is Held =>
+  isRow(v) && (typeof v.seq === 'number' || v.seq === null) && typeof v.version === 'number' && isRow(v.fields);
 
 /**
- * The declarations and the rows the proposals would update. A row is asked for by the number its spoken
- * id ends in; one the record will not give back draws nothing, which is what `updatesOf` does with it.
+ * The declarations and the rows the proposals would update. A row named by its spoken id is asked for
+ * by the number that id ends in, and a row named by its internal id is asked for by that id, which
+ * `get` reads the way it reads a spoken one. A row the record will not give back, or that is in
+ * another register, draws nothing, which is what `updatesOf` does with it.
  */
 export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): Promise<Rows> {
   const registers: Record<string, Decl> = {};
@@ -127,10 +178,10 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
       if (decl.ok && isDecl(decl.value)) registers[body.register] = decl.value;
     }
     for (const r of body.rows) {
-      const seq = typeof r.at === 'string' ? /^(?:[a-z_]+#|[A-Z]+)(\d+)$/u.exec(r.at)?.[1] : undefined;
-      if (seq === undefined) continue;
-      const got = await client.get(body.register, Number(seq));
-      if (got.ok && isHeld(got.value)) (rows[body.register] ??= []).push(got.value);
+      if (typeof r.at !== 'string' || r.at === '') continue;
+      const seq = /^(?:[a-z_]+#|[A-Z]+)(\d+)$/u.exec(r.at)?.[1];
+      const got = seq === undefined ? await client.call('get', { spoken: r.at }) : await client.get(body.register, Number(seq));
+      if (got.ok && isHeld(got.value) && (got.value.register ?? body.register) === body.register) (rows[body.register] ??= []).push(got.value);
     }
   }
   return { registers, rows };
@@ -145,33 +196,36 @@ function missed(out: Wire<unknown>): Read<never> {
 const questionsAsked = (booted: Awaited<ReturnType<Governor['boot']>> | null): Map<string, string | undefined> =>
   new Map((booted?.ok ? (booted.value.waiting ?? []) : []).map((w) => [w.id, w.question]));
 
-/** The queue: the open suggestions, the decisions, and the rows the open ones would change. */
+/** The queue: the open suggestions, the decisions with their options, and the rows the open ones would change. */
 export async function readQueue(client: Governor): Promise<Read<Queue>> {
-  const [open, booted, decisions] = await Promise.all([
-    client.governance({ status: 'open' }),
-    client.boot(),
-    client.governance({ register: 'decision' }),
-  ]);
+  const [open, booted, all] = await Promise.all([client.governance({ status: 'open' }), client.boot(), everything(client)]);
   if (!open.ok) return missed(open);
   const asked = questionsAsked(booted);
-  const rows = Array.isArray(open.value) ? open.value.filter(isRow) : [];
+  const rows = listed(open);
   const rowsets: Record<string, RowsetBody> = {};
   for (const r of rows) {
     const body = rowsetOf(r);
     if (body) rowsets[String(r.id)] = body;
   }
+  const settled = pairs(all.decisions, all.suggestions);
   return {
     from: 'live',
     value: {
       open: rows.map((r, i) => questionOf(r, asked.get(String(r.id)), i + 1)),
-      decided: decisions.ok && Array.isArray(decisions.value) ? decisions.value.filter(isRow).map(decisionOf) : [],
+      decided: all.decisions.map((d) => decisionOf(d, settled.get(String(d.id)))),
       rowsets,
       ...(await heldBy(client, Object.values(rowsets))),
     },
   };
 }
 
-/** One question by id: a suggestion `SG<n>`, or a decision `D<n>`. A row the record does not give is `null`. */
+/**
+ * One question by id: a suggestion `SG<n>`, or a decision `D<n>`. A row the record does not give is `null`.
+ *
+ * A SUGGESTION NO LONGER OPEN IS DRAWN SETTLED: what was decided, by whom, when and why, from the
+ * decision that settled it, under the question that decision kept. Its rows are not read, because
+ * a diff against rows the decision has already written would show nothing, or something else.
+ */
 export async function readOne(client: Governor, id: string): Promise<Read<One>> {
   const decision = /^D\d+$/u.test(id);
   const [got, booted] = await Promise.all([
@@ -179,17 +233,26 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
     decision ? null : client.boot(),
   ]);
   if (!got.ok) return missed(got);
-  if (!isRow(got.value)) return { from: 'live', value: { question: null, rowset: undefined, registers: {}, rows: {} } };
+  if (!isRow(got.value)) return { from: 'live', value: { question: null, rowset: undefined, registers: {}, rows: {}, closed: false } };
   const row = got.value;
-  const rowset = decision ? undefined : rowsetOf(row);
-  return {
-    from: 'live',
-    value: {
-      question: decision ? decisionOf(row) : questionOf(row, questionsAsked(booted).get(id), 1),
-      rowset,
-      ...(await heldBy(client, rowset ? [rowset] : [])),
-    },
-  };
+
+  if (decision) {
+    const all = await everything(client);
+    const settled = pairs(all.decisions.some((d) => d.id === row.id) ? all.decisions : [...all.decisions, row], all.suggestions);
+    return { from: 'live', value: { question: decisionOf(row, settled.get(id)), rowset: undefined, registers: {}, rows: {}, closed: true } };
+  }
+
+  const drawn = questionOf(row, questionsAsked(booted).get(id), 1);
+  if (row.status === 'open') {
+    const rowset = rowsetOf(row);
+    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false } };
+  }
+  const all = await everything(client);
+  const settled = pairs(all.decisions, all.suggestions);
+  const by = all.decisions.find((d) => settled.get(String(d.id))?.id === row.id);
+  const decided = by ? decisionOf(by).decided : undefined;
+  const question = by ? { ...drawn, title: text(by.question) || id, ...(decided ? { decided } : {}) } : drawn;
+  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true } };
 }
 
 const sentOf = (out: Wire<unknown>): Sent =>

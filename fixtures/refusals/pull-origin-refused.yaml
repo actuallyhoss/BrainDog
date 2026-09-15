@@ -1,0 +1,5 @@
+code:   PULL_ORIGIN_REFUSED
+via:    rpc
+raises: apps/selfhost/src/actions.ts
+at:     source
+fix:    Call only an origin an installed declaration names; nothing was sent.

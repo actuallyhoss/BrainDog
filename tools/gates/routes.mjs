@@ -56,8 +56,10 @@ const SAMPLES = {
   '[token]': '9f2a7c41d8b3',
 };
 
-/** A job id is not a suggestion id, and `[id]` is both. Keyed by the route it sits under. */
-const BY_ROUTE = { '/jobs/[id]': 'j_7Q2F' };
+/** A job id or a pack id is not a suggestion id, and `[id]` is all three. Keyed by the route it sits
+ *  under. `people` is a pack the seeded record holds: the seed writes no `pack` row, so a pack is
+ *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name. */
+const BY_ROUTE = { '/jobs/[id]': 'j_7Q2F', '/packs/[id]': 'people' };
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {

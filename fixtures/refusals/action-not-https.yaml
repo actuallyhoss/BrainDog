@@ -1,0 +1,5 @@
+code:   ACTION_NOT_HTTPS
+via:    install
+raises: packages/kernel/src/declare.ts
+at:     url
+fix:    Write the whole https:// address the action calls.

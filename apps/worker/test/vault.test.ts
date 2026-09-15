@@ -2,9 +2,9 @@
  * The Worker's key doors: which paths they are, the order they check in, and that a vault grant is the only bearer
  * that gets as far as the gap.
  *
- * NO KEY STORE IS BOUND ON THE WORKER, so a valid grant ends at `NOT_IN_THIS_BUILD`. What is held here is that
- * nothing short of a valid grant reaches that sentence, and that the record is only addressed once the Directory
- * knows it, because naming a Durable Object that does not exist creates it.
+ * WITHOUT `KEK` BOUND, a valid grant ends at `NOT_IN_THIS_BUILD`. What is held here is that nothing short of a valid
+ * grant reaches that sentence, and that the record is only addressed once the Directory knows it, because naming a
+ * Durable Object that does not exist creates it. The doors with the key store bound are `vault-keys.test.ts`.
  */
 
 import { test } from 'node:test';
@@ -93,4 +93,14 @@ test('THE ROUTE ASKS FOR THE KEY DOORS BEFORE THE API, which would otherwise tak
   const api = source.indexOf('servesApi(');
   assert.ok(vault > 0, 'the Worker does not route the key doors');
   assert.ok(api > 0 && vault < api, 'the key doors are routed after the API');
+});
+
+test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors get keys only when it is bound, and provisioning opens it first', () => {
+  const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
+  assert.match(source, /keys: isBound\(env\.KEK\)\s*\?/, 'the key doors get keys whether or not KEK is bound');
+  const provision = source.slice(source.indexOf('async function provision('));
+  const opened = provision.indexOf('keyStoreOf(env.KEK)');
+  assert.ok(opened > 0 && opened < provision.indexOf('directory.prepare('), 'provisioning writes before it opens the key store');
+  assert.match(provision, /\.\.\.\(store \? \{ keys: await recordKeys\(store, id\) \} : \{\}\)/, 'provisioning does not wrap keys when the store is bound');
+  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 3, 'something other than the doors and provisioning reads KEK');
 });

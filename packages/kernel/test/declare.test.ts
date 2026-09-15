@@ -1552,12 +1552,13 @@ test('and a path is 43 §4.4’s grammar, because one outside it reaches nothing
   assert.equal(fetch({ probe: { read: { who: 'user id' } } }), 'PATH_INVALID');
 });
 
-test('and an ingest arrives by one of the five channels, and a pull is still held to its floor', () => {
+test('and an ingest arrives by one of the seven channels, and a pull is still held to its floor', () => {
   for (const channel of ['email', 'webhook', 'paste', 'api'])
     assert.equal(refusedWith(ingest({ channel })), null, `${channel} is a channel`);
   assert.equal(refusedWith(ingest({ channel: 'sms' })), 'DECLARATION_INVALID');
   /* THE ONE CHECK THIS KIND ALREADY HAD, kept: `25 §9`'s floor, refused where it is written. */
-  assert.equal(refusedWith(ingest({ channel: 'pull', every: '1m', match: undefined, extract: undefined })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ channel: 'pull', every: '1m', match: undefined, extract: undefined })), 'ACTION_INTERVAL_TOO_SHORT');
+  assert.equal(refusedWith(ingest({ channel: 'pull', every: 'often', match: undefined, extract: undefined })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined })), null);
 });
 

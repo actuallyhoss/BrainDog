@@ -402,6 +402,8 @@
     <Section title="Decided" count={DECIDED.length}>
       <ul class="ledger">
         {#each DECIDED.slice(0, DOM_CAP) as q}
+          <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
+          {@const chose = q.options.find((o) => o.key === q.decided?.option)?.title}
           <li>
             <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. `SG31` in the
                  leading column was a code expanded nowhere; the question is what tells these rows
@@ -410,7 +412,7 @@
               <span class="seq"><Icon name="check" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
-                <span class="line-detail">{q.decided?.reason}</span>
+                <span class="line-detail">{#if chose}<span class="decided-choice">{chose}</span> {/if}{q.decided?.reason}</span>
               </span>
               <span class="line-when">{since(q.decided?.at ?? '', now)}<span class="decided-id">{q.id}</span></span>
             </a>
@@ -672,6 +674,11 @@
       grid-row: 2;
       justify-content: flex-start;
     }
+  }
+
+  .decided-choice {
+    color: var(--ink2);
+    font-weight: 500;
   }
 
   .decided-id::before {

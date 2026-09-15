@@ -159,9 +159,9 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and seventeen, counted, in nine
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-two, counted, in nine
  * families — 52 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
- * lifecycle · 2 dialect · 5 spark · 7 connector · 4 host and client."* A sentence that counts is a
+ * lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
  * that has to say the same thing in two places.
@@ -248,10 +248,15 @@ const SPARK = [
   'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SPARK_BUDGET_SPENT',
 ] as const;
 
-/** Connector — 7. */
+/** Connector — 12. */
 const CONNECTOR = [
   'PULL_AUTH_REJECTED', 'PULL_PROVIDER_UNAVAILABLE', 'PULL_REQUEST_REFUSED', 'PULL_EXPECT_FAILED',
   'PULL_SHAPE_MISMATCH', 'PULL_ORIGIN_REFUSED', 'PULL_LEASE_EDGE',
+  /* Scheduled actions, 2026-09-15: `call` and `poll` refused where they are declared. An origin that is
+     not https, a host built from data, no key named, an interval under the floor, and a url or body
+     that computes rather than substitutes (`loop/DIRECTION.md` §0b, `25 §3.1`). */
+  'ACTION_NOT_HTTPS', 'ACTION_HOST_COMPUTED', 'ACTION_GRANT_MISSING', 'ACTION_INTERVAL_TOO_SHORT',
+  'ACTION_EVALUATES',
 ] as const;
 
 /**
@@ -268,7 +273,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and fifteen, in `30 §6`'s order. */
+/** The hundred and twenty-two, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
 ] as const;
@@ -281,7 +286,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and fifteen. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and twenty-two. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

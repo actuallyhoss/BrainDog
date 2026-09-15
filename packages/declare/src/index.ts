@@ -114,8 +114,12 @@ export type Diff = {
   seeds: { count: number; registers: { register: string; rows: number }[] };
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
-  /** Every connector that would leave the record, and what it would open. */
-  calls_out: { ingest: string; every: string; grant: string | null }[];
+  /**
+   * Every scheduled action that would leave the record: a `pull`, a `call` or a `poll`, with the host it
+   * calls, how often, and the key it sends by label. `line` is the diff's own sentence for it, and it
+   * reads `CALLS OUT <host> · every <n> · grant "<label>"` (`04 §7`, `loop/DIRECTION.md` §0b).
+   */
+  calls_out: { ingest: string; channel: string; host: string | null; every: string; grant: string | null; line: string }[];
   /** Rules that would interrupt somebody rather than wait for the digest. */
   interrupts: string[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
@@ -1076,12 +1080,36 @@ const spawnsOf = (pack: Pack): Diff['spawns'] =>
         }));
     });
 
+/**
+ * The host an address names, as the diff prints it: `new URL`'s host, or the authority as written when the
+ * address will not parse, so a declaration the kernel is about to refuse still says where it pointed.
+ */
+const hostOf = (address: unknown): string | null => {
+  if (typeof address !== 'string' || address === '') return null;
+  try {
+    return new URL(address).host;
+  } catch {
+    return address.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/)[0] || null;
+  }
+};
+
 const callsOf = (pack: Pack): Diff['calls_out'] =>
   pack.declarations
     .filter((d) => d.kind === 'ingest' && typeof (d.body as { every?: unknown }).every === 'string')
     .map((d) => {
-      const body = d.body as { ingest?: string; every?: string; grant?: string };
-      return { ingest: String(body.ingest ?? d.id), every: String(body.every), grant: body.grant ?? null };
+      const body = d.body as { ingest?: string; channel?: string; every?: string; grant?: string; url?: unknown; fetch?: { base?: unknown } };
+      /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */
+      const host = hostOf(body.url) ?? (isObject(body.fetch) ? hostOf(body.fetch.base) : null);
+      const every = String(body.every);
+      const grant = typeof body.grant === 'string' ? body.grant : null;
+      return {
+        ingest: String(body.ingest ?? d.id),
+        channel: String(body.channel ?? 'pull'),
+        host,
+        every,
+        grant,
+        line: `CALLS OUT ${host ?? 'no host declared'} · every ${every} · grant "${grant ?? 'none'}"`,
+      };
     });
 
 const interruptsOf = (pack: Pack): string[] =>

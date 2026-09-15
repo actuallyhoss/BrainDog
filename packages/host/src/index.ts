@@ -138,6 +138,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
   { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },
+  { name: 'resumeAction', group: 'ADMIN', writes: true, what: 'Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it.' },
   { name: 'setPackConfig', group: 'ADMIN', writes: true, what: "Change a pack's settings. They are read the next time the pack is planned and installed." },
   { name: 'setDeclaration', group: 'ADMIN', writes: true, what: 'Set one declaration from the app, through the same lint a pack gets.' },
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
@@ -314,6 +315,7 @@ export type RecordSurface = {
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
   disablePack(args: never, ctx: never): Promise<Result<unknown>>;
   enablePack(args: never, ctx: never): Promise<Result<unknown>>;
+  resumeAction(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -366,6 +368,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     disablePack: (a, ctx) => api.disablePack(a as never, ctx as never),
     enablePack: (a, ctx) => api.enablePack(a as never, ctx as never),
+    resumeAction: (a, ctx) => api.resumeAction(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),

@@ -31,11 +31,12 @@ import {
   type CookieMode,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
-import type { OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
+import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
+import { actionExecutor, keyOpener, type OpenKey, type Send } from './actions.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -424,6 +425,14 @@ export async function start(options: {
   sessionKey?: Uint8Array | undefined;
   /** `BRAINDOG_TRUST_PROXY=1`: count the lockout against the address the proxy saw, not the proxy's own. */
   trustProxy?: boolean | undefined;
+  /**
+   * Run the scheduled actions, `pull`, `call` and `poll`, on this process's timer (`loop/DIRECTION.md` §0b).
+   *
+   * OFF UNLESS ASKED, because an action sends a request to somebody else's server, and a test that installs a
+   * pack should not. `main.ts` turns it on. `send` and `openKey` are for tests: the defaults are `fetch` and
+   * the key store above, and `./actions.ts` says what either may send.
+   */
+  actions?: { send?: Send | undefined; openKey?: OpenKey | undefined } | undefined;
 } & (
     | {
         /**
@@ -495,6 +504,32 @@ export async function start(options: {
     }
   };
 
+  /* `pull.fetch` IS THE RUNNER'S WHEN THE RUNNER IS ON. A deliverer handed the same kind would lease a scheduled
+     action's job and send it without the origin check, the redirect rule or the cap. */
+  const delivers: readonly OutboxKind[] = options.actions ? (options.delivers ?? []).filter((k) => k !== 'pull.fetch') : (options.delivers ?? []);
+
+  /**
+   * One pass of the scheduled actions, never two at once.
+   *
+   * THE TAIL ONLY WHEN IT DID SOMETHING. The tail rings the doorbell, the doorbell is `poll`, and `poll` comes
+   * back here: a pass that re-armed nothing and ran nothing stops the circle rather than spinning it.
+   */
+  let execute: Execute | null = null;
+  let acting = false;
+  const act = async (): Promise<void> => {
+    if (!options.actions || acting) return;
+    acting = true;
+    try {
+      execute ??= actionExecutor(api, { openKey: options.actions.openKey ?? keyOpener(api, options.keys), send: options.actions.send });
+      const out = await api.kernel.runActions(execute);
+      if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
+    } catch (e) {
+      console.error('actions:', e instanceof Error ? e.message : String(e));
+    } finally {
+      acting = false;
+    }
+  };
+
   /**
    * Lease, deliver, ack. One pass.
    *
@@ -502,10 +537,11 @@ export async function start(options: {
    * queue that keeps filling is drained by the doorbell rather than by a `while` nobody can stop.
    */
   const poll = async (): Promise<void> => {
+    await act();
     if (!options.deliver) return;
     let jobs: OutboxRow[];
     try {
-      jobs = api.kernel.leaseOutbox(options.delivers, 10);
+      jobs = api.kernel.leaseOutbox(delivers, 10);
     } catch (e) {
       console.error('lease:', e instanceof Error ? e.message : String(e));
       return;
@@ -567,7 +603,7 @@ export async function start(options: {
     sql,
     clock,
     scheduler,
-    delivers: options.delivers ?? [],
+    delivers: options.actions ? [...delivers, 'pull.fetch'] : delivers,
     sign,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started

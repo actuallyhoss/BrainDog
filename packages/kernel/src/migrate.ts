@@ -18,6 +18,7 @@ import kernel0001 from './migrations/0001_kernel.ts';
 import session0002 from './migrations/0002_session.ts';
 import packDisabled0003 from './migrations/0003_pack_disabled.ts';
 import device0004 from './migrations/0004_device.ts';
+import scheduleActions0005 from './migrations/0005_schedule_actions.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -27,13 +28,15 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 2, slug: 'session', sql: session0002 },
   { version: 3, slug: 'pack_disabled', sql: packDisabled0003 },
   { version: 4, slug: 'device', sql: device0004 },
+  { version: 5, slug: 'schedule_actions', sql: scheduleActions0005 },
 ];
 
 /**
  * `PRAGMA user_version`, the `.dog` format revision of `30-BLUEPRINT` §11. Migration 2 adds a row and
  * its indexes and no table or column. Migration 3 adds one nullable column, which an older file
  * imports without (the positional read in `dogl.ts` takes fewer columns), so the format is still 1.
- * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1.
+ * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1. Migration 5
+ * rebuilds `schedule` with two more kinds, and no file carries a schedule row either.
  */
 export const FORMAT_VERSION = 1 as const;
 

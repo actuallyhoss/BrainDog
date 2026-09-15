@@ -103,6 +103,19 @@ import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, 
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import {
+  ACTION_KINDS,
+  fireAction,
+  finishAction,
+  originsOf,
+  prepareAction,
+  resumeAction as resumeScheduledAction,
+  runActions as runScheduledActions,
+  type ActionDecl,
+  type ActionDeps,
+  type ActionsRun,
+  type Execute,
+} from './actions.ts';
+import {
   bindGrant,
   getGrant,
   listGrants,
@@ -194,6 +207,8 @@ export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as in
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, actionJitterMs, answerHash, originsOf } from './actions.ts';
+export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionsRun, Execute } from './actions.ts';
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
@@ -671,6 +686,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          works: the first fetch is the one that tells you the credential is right. */
       if (decl.kind === 'ingest' && body.channel === 'pull' && typeof body.every === 'string')
         arm('pull', bare, { ingest: bare }, clock.now());
+      /* A `call` OR A `poll` IS ARMED THE SAME WAY AND FROM THE SAME MOMENT, for the same reason: the first run
+         is the one that says the key and the address are right (`loop/DIRECTION.md` §0b). */
+      if (decl.kind === 'ingest' && (body.channel === 'call' || body.channel === 'poll') && typeof body.every === 'string')
+        arm(body.channel as 'call' | 'poll', bare, { ingest: bare }, clock.now());
 
       /* A METRIC WITH `snapshot:` REMEMBERS ITS OWN READINGS. Five past midnight, so the day it is
          about is finished and nothing else is competing for the alarm. */
@@ -2063,6 +2082,35 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return row ? (JSON.parse(row.body) as PullDecl) : null;
   };
 
+  /** The active declaration a scheduled action runs from, and its pack, or `null` when it is retired or its pack is off. */
+  const actionDecl = (ingest: string): { decl: ActionDecl; pack: string | null } | null => {
+    const row = sql.one<{ body: string; pack_id: string | null }>(
+      "SELECT body, pack_id FROM declaration WHERE id = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 0",
+      `ingest.${ingest}`,
+    );
+    return row ? { decl: JSON.parse(row.body) as ActionDecl, pack: row.pack_id } : null;
+  };
+
+  /**
+   * What the scheduled actions' runner needs (`actions.ts`).
+   *
+   * AN ANSWER ARRIVES THROUGH THE ONE INGEST PATH, offered to the one declaration that asked for it, so what it
+   * writes is written by `write` and its rules cascade like any other row's. The channel is `pull` because
+   * `inbox_raw` knows five channels, and a poll's answer is a fetch of something the record already owns.
+   */
+  const actionDeps = (): ActionDeps => ({
+    sql,
+    recordId: recordIdentity(sql)?.id ?? 'self',
+    nowMs: clock.now(),
+    mint,
+    enqueue: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
+    notify: (said) => void notify(digestDeps(), { ...said, urgent: true }),
+    ack: (args) => ack(sql, ackDeps(), args),
+    lookup: actionDecl,
+    arrive: (decl, body, sha256) =>
+      kernel.arrive({ channel: 'pull', body, sha256 }, { ...(decl as unknown as IngestDecl), channel: 'pull' } as IngestDecl),
+  });
+
   /**
    * What the gate needs: the counters, and the write path for the rows an accepted `rowset` writes.
    *
@@ -2310,6 +2358,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return out.paused ? 'kept' : out.nextMs;
     },
 
+    /* A scheduled `call` or `poll` (`loop/DIRECTION.md` §0b): one request queued, and the next run armed. A
+       declaration that is gone, or whose pack is off, ends the row, and a key that is gone pauses it. */
+    call: (row) => fireAction(actionDeps(), row),
+    poll: (row) => fireAction(actionDeps(), row),
+
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */
     rotate: (row) => rotateDue(sql, vaultDeps('system'), row.payload),
@@ -2437,7 +2490,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ),
     );
 
-  return {
+  const kernel = {
     transaction,
     allocate,
     reload,
@@ -2548,14 +2601,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * write. The same payload twice produces the same record twice, and a payload nobody wrote a
      * pattern for is a row somebody can see rather than a silence.
      */
-    arrive: (arrival: Arrival): Result<Arrived> => {
+    arrive: (arrival: Arrival, only?: IngestDecl): Result<Arrived> => {
       const out = arrive(
         {
           sql,
+          /* `only` IS A SCHEDULED ACTION'S ANSWER, offered to the declaration that fetched it and to no other. */
           ingests: () =>
-            sql
-              .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
-              .map((r) => JSON.parse(r.body) as IngestDecl),
+            only
+              ? [only]
+              : sql
+                  .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
+                  .map((r) => JSON.parse(r.body) as IngestDecl),
           schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
           write: (register, spoken, patch, actor) => write(register, spoken, patch, { actor }),
           /* THE LOOKUP PATH, which is the third of the three and the one that was still open — named
@@ -2618,6 +2674,42 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     applyPull: (finish: { ingest: string; outcome: 'ok' | 'paused'; cursor?: string; dueAtMs?: number; error?: string }) =>
       transaction(() => applyPull(pullDeps(), finish)),
+
+    /**
+     * One pass of the scheduled actions: claim the due `pull`, `call` and `poll` rows, send each job through the
+     * host's executor, finish each, and re-arm (`loop/DIRECTION.md` §0b).
+     *
+     * THE EXECUTOR IS AN ARGUMENT, so there is no network in the kernel. Every step is its own transaction and
+     * the executor runs between them, outside all of them.
+     */
+    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler } = {}): Promise<ActionsRun> {
+      try {
+        return await runScheduledActions(
+          {
+            drain: () => transaction(() => drainSchedule(sql, ackDeps(), HANDLERS, 100, ACTION_KINDS)),
+            lease: (n) => transaction(() => lease(sql, ackDeps(), ['pull.fetch'], n)),
+            prepare: (job) => transaction(() => prepareAction(actionDeps(), job)),
+            finish: (ready, answer, hash) => transaction(() => finishAction(actionDeps(), ready, answer, hash)),
+          },
+          execute,
+          opts.limit ?? 5,
+        );
+      } finally {
+        if (opts.scheduler) await tail(opts.scheduler);
+      }
+    },
+
+    /** Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it. */
+    resumeAction: (ingest: string, actor: string) =>
+      transaction(() => resumeScheduledAction({ sql, mint, nowMs: clock.now() }, ingest, actor)),
+
+    /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
+    actionOrigins: (): string[] =>
+      originsOf(
+        sql
+          .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
+          .map((r) => JSON.parse(r.body) as ActionDecl),
+      ),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
     block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
@@ -3294,7 +3386,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         /* ITS SCHEDULE ROWS GO WITH IT. A digest for a page nobody has any more is a notification
            about nothing, arriving every Monday for ever. */
         sql.exec(
-          `DELETE FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'snapshot')
+          `DELETE FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot')
            AND key IN (SELECT substr(id, instr(id, '.') + 1) FROM declaration WHERE pack_id = ?)`,
           id,
         );
@@ -3327,4 +3419,5 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* Four arguments and no fifth: a `Door` is the kernel's own to open. */
     write: (register: string, ref: string | null, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
   };
+  return kernel;
 }
