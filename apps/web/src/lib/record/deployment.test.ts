@@ -114,7 +114,9 @@ test('a night that kept nothing is not counted as a copy that is kept', () => {
      exists because *"a backup that silently gave up is worse than none"*. */
   const kept = SNAPSHOTS.filter((s) => s.failed === null).length;
   assert.ok(kept < SNAPSHOTS.length, 'no night failed, so this proves nothing');
-  assert.match(AREA, /count=\{SNAPSHOTS\.filter\(\(s\) => s\.failed === null\)\.length\}/u, 'the heading counts the failed night again');
+  /* `copyLines` IS THE LIST THE SCREEN DRAWS: the record's copies where there is a record, and these same
+     `SNAPSHOTS` where there is not. The count follows the list, and still leaves out a night that kept nothing. */
+  assert.match(AREA, /count=\{copyLines\.filter\(\(s\) => s\.failed === null\)\.length\}/u, 'the heading counts the failed night again');
 });
 
 test('and the delete field does not put the answer in the box', () => {

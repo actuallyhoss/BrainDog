@@ -39,6 +39,12 @@
     type ExportKind, type Wrote,
   } from '$lib/record/settings-write.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
+  /* Lane F: backups, putting a copy back, erasing a person and deleting the record. */
+  import { backUpNow, deleteRecordNow, downloadSnapshot, erasePerson, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
+  import type { Snapshot as KeptCopy } from '@braindog/client';
+  /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
+  import { inviteEmail, inviteLink, readInvites, withdrawInvite } from '$lib/record/settings-write.ts';
+  import type { Invitation } from '@braindog/client';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
@@ -626,6 +632,68 @@
     else void settle(() => dropException(location.origin, p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
   }
 
+  /* ── inviting somebody: the link the owner sends, and the ones still waiting ── */
+
+  /**
+   * THE LINK IS SHOWN ONCE AND KEPT NOWHERE. The record answers the mint with the only copy of the token and keeps
+   * its hash, so this is the one moment it can be copied; `madeLink` is the screen holding it until the person is
+   * done with it, and nothing writes it anywhere else.
+   */
+  let inviteTo = $state('');
+  let inviteLevel = $state<Level>('read');
+  let inviting = $state(false);
+  let madeLink = $state<{ email: string; link: string } | null>(null);
+  let waitingInvites = $state<Invitation[]>([]);
+
+  $effect(() => {
+    if (area !== 'people') return;
+    untrack(() => void readInvitesNow());
+  });
+
+  /** Every invitation still waiting. A host older than invitations, or one with no record, lists none. */
+  async function readInvitesNow() {
+    const out = await readInvites(location.origin);
+    waitingInvites = out.from === 'live' ? out.invites : [];
+  }
+
+  /** One link, for one address, at the level chosen. Nothing is mailed: the owner sends it themselves. */
+  async function makeInvite(e: SubmitEvent) {
+    e.preventDefault();
+    const email = inviteTo.trim();
+    if (!email || inviting) return;
+    if (peopleFrom !== 'live') {
+      toasts.push(copy.notWritten('A single-use link would be made, bound to that one address and good for 24 hours'), { intent: 'warn' });
+      return;
+    }
+    inviting = true;
+    const at = opened();
+    const out = await inviteEmail(location.origin, email, inviteLevel);
+    closed(true, at);
+    inviting = false;
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    madeLink = { email: out.value.invitation.email, link: inviteLink(location.origin, out.value.token) };
+    inviteTo = '';
+    await readInvitesNow();
+  }
+
+  /** The one copy, to the clipboard, with the toast that says whether it got there. */
+  function copyLink() {
+    if (madeLink) void clipboard.put(madeLink.link, copy.inviteLinkLabel);
+  }
+
+  /** Withdraw one. Its link stops working at once, and the list is read again. */
+  async function withdraw(inv: Invitation) {
+    if (peopleFrom !== 'live') {
+      toasts.push(copy.notWritten(copy.inviteWithdrawn(inv.email)), { intent: 'warn' });
+      return;
+    }
+    const done = await settle(() => withdrawInvite(location.origin, inv.id), copy.inviteWithdrawn(inv.email));
+    if (done) await readInvitesNow();
+  }
+
   /* ── export: the record as a file, where there is a record to take it from ── */
   let exporting = $state<ExportKind | null>(null);
 
@@ -649,6 +717,151 @@
     a.click();
     URL.revokeObjectURL(url);
     toasts.push(copy.exported(out.value.name), { intent: 'good' });
+  }
+
+  /* ── backups, erasure and deletion: the live record's answer, and the sample's toast where there is no record ── */
+
+  /** Where the backups list came from. `refused` is a host that keeps no copies, and its sentence is drawn instead. */
+  let copiesFrom = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
+  let copiesSaid = $state('');
+  let liveCopies = $state<KeptCopy[]>([]);
+  let backingUp = $state(false);
+  /* THE COPY WAITING ON A CONFIRM, and nothing is put back until it is pressed a second time. */
+  let restoring = $state<string | null>(null);
+  let restoreBusy = $state(false);
+  let deleting = $state(false);
+  let deletedSaid = $state('');
+
+  type CopyLine = { id: string; at: string; bytes: number; rows: number | null; failed: string | null };
+  /* A LIVE RECORD IS NEVER DRAWN THE SAMPLE'S COPIES: a host that keeps none shows its sentence over an empty list. */
+  const copyLines = $derived<CopyLine[]>(
+    copiesFrom === 'live' ? liveCopies.map((c) => ({ ...c, rows: null, failed: null })) : copiesFrom === 'refused' ? [] : SNAPSHOTS,
+  );
+  const copiesNow = () => (copiesFrom === 'live' ? Date.now() : NOW);
+
+  $effect(() => {
+    if (area !== 'backups') {
+      restoring = null;
+      return;
+    }
+    untrack(() => void readCopies());
+  });
+
+  async function readCopies() {
+    const at = opened();
+    const out = await readSnapshots(location.origin);
+    if (out.from === 'live') liveCopies = out.snapshots;
+    copiesSaid = out.from === 'refused' ? out.fix : '';
+    copiesFrom = out.from;
+    closed(true, at);
+  }
+
+  async function backUp() {
+    if (backingUp) return;
+    backingUp = true;
+    const at = opened();
+    const out = await backUpNow(location.origin);
+    closed(true, at);
+    backingUp = false;
+    if (out.ok) {
+      toasts.push(copy.backedUp(out.value.id), { intent: 'good' });
+      await readCopies();
+    } else if (out.from === 'sample')
+      toasts.push(copy.notWritten('A backup of the whole record would be written now, and counted against the thirty'), { intent: 'warn' });
+    else toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  async function downloadCopy(id: string) {
+    const at = opened();
+    const out = await downloadSnapshot(location.origin, id);
+    closed(true, at);
+    if (!out.ok) {
+      if (out.from === 'sample') toasts.push(copy.notWritten(`${id} would be downloaded exactly as it sits on disk, signed`), { intent: 'warn' });
+      else toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    const url = URL.createObjectURL(out.value.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = out.value.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    toasts.push(copy.exported(out.value.name), { intent: 'good' });
+  }
+
+  /** The confirmed copy put back. The record keeps what it held as a copy first, so this is undoable from the list. */
+  async function restoreCopy() {
+    if (!restoring || restoreBusy) return;
+    restoreBusy = true;
+    const at = opened();
+    const out = await restoreSnapshot(location.origin, restoring);
+    closed(true, at);
+    restoreBusy = false;
+    if (out.ok) {
+      restoring = null;
+      toasts.push(copy.restoredTo(out.value.bookmark, out.value.kept ?? ''), { intent: 'good' });
+      await readCopies();
+    } else toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  /** Cloud's "restore to a time": the sample's toast, or the record's own answer, which on Cloud today says it cannot yet. */
+  async function restoreToTime() {
+    const at = opened();
+    const out = await restoreSnapshot(location.origin, '');
+    closed(true, at);
+    if (out.ok) await readCopies();
+    else if (out.from === 'sample')
+      toasts.push(
+        copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone, and the history ends there, with one line saying you went back'),
+        { intent: 'warn' },
+      );
+    else toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  let eraseOpen = $state(false);
+  let eraseWho = $state('');
+  let eraseBasis = $state('');
+  let erasePersonId = $state('');
+  let eraseBusy = $state(false);
+
+  /* THE FORM OPENS ONLY ON A RECORD. The sample keeps the sentence it always said. */
+  function startErase() {
+    if (peopleFrom !== 'live') toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' });
+    else eraseOpen = true;
+  }
+
+  async function eraseNow() {
+    if (eraseBusy) return;
+    eraseBusy = true;
+    const at = opened();
+    const who = eraseWho.trim();
+    const out = await erasePerson(location.origin, { subjects: who ? [who] : [], ...(erasePersonId ? { personId: erasePersonId } : {}), basis: eraseBasis.trim() });
+    closed(true, at);
+    eraseBusy = false;
+    if (out.ok) {
+      toasts.push(copy.erasedRows(out.value.rows), { intent: 'good' });
+      eraseOpen = false;
+      eraseWho = '';
+      eraseBasis = '';
+      erasePersonId = '';
+      await readPeopleNow();
+    } else if (out.from === 'sample') toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' });
+    else toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  async function deleteNow() {
+    if (deleting) return;
+    deleting = true;
+    const at = opened();
+    const out = await deleteRecordNow(location.origin, typedSlug.trim());
+    closed(true, at);
+    deleting = false;
+    if (out.ok) {
+      deletedSaid = copy.recordDeleted(RECORD);
+      toasts.push(deletedSaid, { intent: 'good' });
+    } else if (out.from === 'sample')
+      toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'warn' });
+    else toasts.push(out.fix, { intent: 'warn' });
   }
 
   /**
@@ -1237,13 +1450,62 @@
 
       <Section title={copy.inviteTitle}>
         <p class="hint">{copy.inviteHow}</p>
-        <div class="row-actions">
-          <Button
-            weight="primary"
-            onclick={() =>
-              toasts.push(copy.notWritten('A single-use link would be sent, bound to that one address and good for 24 hours'), { intent: 'warn' })}
-          ><Icon name="plus" size="s" />{copy.invitePerson}</Button>
-        </div>
+        <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
+             the owner sends the link themselves, and somebody expecting an email would wait for one that never comes. -->
+        <p class="hint">{copy.inviteNoMail}</p>
+        <form class="code-form" onsubmit={makeInvite}>
+          <label class="code-label" for="invite-email">{copy.inviteEmailLabel}</label>
+          <div class="code-row">
+            <div class="field field-lg">
+              <input
+                class="field-input"
+                id="invite-email"
+                type="email"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                bind:value={inviteTo}
+              />
+            </div>
+            <label class="ex-field">
+              <span class="ex-label">{copy.inviteLevelLabel}</span>
+              <select class="ex-select" bind:value={inviteLevel}>
+                {#each LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+              </select>
+            </label>
+            <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim()} aria-busy={inviting}>
+              <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
+            </Button>
+          </div>
+        </form>
+
+        {#if madeLink}
+          <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
+               the last of it; Done takes it off the screen deliberately rather than by navigation. -->
+          <div class="invite-made">
+            <p class="hint">{copy.inviteLinkReady(madeLink.email)}</p>
+            <div class="code-row">
+              <div class="field field-lg">
+                <input class="field-input" id="invite-link" type="text" readonly aria-label={copy.inviteLinkLabel} value={madeLink.link} />
+              </div>
+              <Button weight="primary" onclick={copyLink}>{copy.inviteCopyLink}</Button>
+              <Button weight="quiet" onclick={() => (madeLink = null)}>{copy.inviteDone}</Button>
+            </div>
+          </div>
+        {/if}
+
+        {#if waitingInvites.length > 0}
+          <p class="invites-head">{copy.invitesWaiting}</p>
+          <ul class="invites">
+            {#each waitingInvites as inv (inv.id)}
+              <li class="invite">
+                <span class="invite-who">{inv.email}</span>
+                <span class="invite-when">{copy.inviteWaitingRow(levelSaid(inv.level ?? 'read'), inv.expires_at.slice(0, 10))}</span>
+                <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </Section>
 
       <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
@@ -1255,10 +1517,34 @@
         <Section title={copy.erasePerson}>
           <div class="danger">
             <p class="danger-title">{copy.eraseWhat}</p>
-            <Button
-              tone="bad"
-              onclick={() => toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' })}
-            >{copy.erasePerson}</Button>
+            {#if eraseOpen}
+              <label class="code-label" for="erase-person">{copy.eraseWhichPerson}</label>
+              <div class="field field-lg">
+                <select class="field-input" id="erase-person" bind:value={erasePersonId}>
+                  <option value="">{copy.eraseNobody}</option>
+                  {#each people.filter((p) => p.level !== 'owner') as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+                </select>
+              </div>
+              <label class="code-label" for="erase-who">{copy.eraseWho}</label>
+              <div class="field field-lg">
+                <input class="field-input" id="erase-who" type="text" autocomplete="off" spellcheck="false" bind:value={eraseWho} />
+              </div>
+              <label class="code-label" for="erase-basis">{copy.eraseBasis}</label>
+              <div class="field field-lg">
+                <input class="field-input" id="erase-basis" type="text" autocomplete="off" bind:value={eraseBasis} />
+              </div>
+              <div class="row-actions">
+                <Button
+                  tone="bad"
+                  disabled={eraseBusy || (!eraseWho.trim() && !erasePersonId) || !eraseBasis.trim()}
+                  aria-busy={eraseBusy}
+                  onclick={eraseNow}
+                >{copy.eraseNow}</Button>
+                <Button weight="bare" disabled={eraseBusy} onclick={() => (eraseOpen = false)}>{copy.keepAsIs}</Button>
+              </div>
+            {:else}
+              <Button tone="bad" onclick={startErase}>{copy.erasePerson}</Button>
+            {/if}
           </div>
         </Section>
       {/if}
@@ -1738,10 +2024,12 @@
       <!-- THE COUNT IS WHAT IS KEPT, and a night that kept nothing is not one. It read "What is kept
            · 4" over three copies and a row saying *nothing kept* — counting the failure as a backup,
            which is the same class of error as hiding it. -->
-      <Section title={copy.kept} count={SNAPSHOTS.filter((s) => s.failed === null).length}>
+      <Section title={copy.kept} count={copyLines.filter((s) => s.failed === null).length}>
         <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
              first backup has not run it describes a policy over nothing, above nothing. -->
-        {#if SNAPSHOTS.length === 0}
+        {#if copiesFrom === 'refused'}
+          <p class="hint" role="status">{copiesSaid}</p>
+        {:else if copyLines.length === 0}
           <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
         {:else}
         <!-- THE POLICY IS THE HOST'S, and this sentence was Cloud's schedule and the self-host's
@@ -1752,7 +2040,7 @@
         <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.keptSelfHost(SNAPSHOTS_KEPT) : copy.keptCloud(SNAPSHOTS_KEPT)}</p>
         {/if}
         <ul class="ledger">
-          {#each SNAPSHOTS as snap}
+          {#each copyLines as snap (snap.id)}
             <li data-intent={snap.failed ? 'bad' : undefined}>
               <div class="line">
                 <span class="seq">
@@ -1762,14 +2050,14 @@
                 </span>
                 <span class="line-main">
                   <span class="line-title">{snap.id}</span>
-                  <span class="line-detail">{relative(snap.at, NOW)}</span>
+                  <span class="line-detail">{relative(snap.at, copiesNow())}</span>
                 </span>
                 <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
                      silently gave up is worse than none" — which is the argument for these two
                      routes existing, and the list drew four identical successes. `13 §6`: the
                      record's own `note` is rendered, not a sentence written here. -->
                 <span class="line-amount">
-                  <span class="means">{snap.failed ? copy.snapshotFailed : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
+                  <span class="means">{snap.failed ? copy.snapshotFailed : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
                 </span>
                 <span class="line-when">
                   {#if snap.failed}<span class="why-failed">{snap.failed}</span>
@@ -1778,11 +2066,11 @@
                          `Content-Disposition: attachment`. A self-host's only way back is putting a
                          copy back by hand, so the copy has to be reachable. Cloud's prefix is not
                          served to a browser, so there is nothing to offer. -->
-                    {#if DEPLOYMENT.kind === 'self-host'}
-                      <Button
-                        weight="bare"
-                        onclick={() => toasts.push(copy.notWritten(`${snap.id} would be downloaded exactly as it sits on disk, signed`), { intent: 'warn' })}
-                      >{copy.download}</Button>
+                    {#if copiesFrom === 'live' || (copiesFrom !== 'refused' && DEPLOYMENT.kind === 'self-host')}
+                      <Button weight="bare" onclick={() => downloadCopy(snap.id)}>{copy.download}</Button>
+                    {/if}
+                    {#if copiesFrom === 'live'}
+                      <Button weight="bare" onclick={() => (restoring = snap.id)}>{copy.restoreThis}</Button>
                     {/if}
                   {/if}
                 </span>
@@ -1791,10 +2079,7 @@
           {/each}
         </ul>
         <div class="row-actions">
-          <Button
-            weight="primary"
-            onclick={() => toasts.push(copy.notWritten('A backup of the whole record would be written now, and counted against the thirty'), { intent: 'warn' })}
-          >{copy.snapshotNow}</Button>
+          <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
         </div>
       </Section>
 
@@ -1823,8 +2108,17 @@
         and not the button, which is the one thing a person comes to a backups screen to do.
       -->
       <Section title={copy.restore}>
-        <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.restoreSelfHost : copy.restoreCloud}</p>
-        {#if DEPLOYMENT.kind !== 'self-host'}
+        <p class="hint">{copiesFrom === 'live' ? copy.restoreLive : DEPLOYMENT.kind === 'self-host' ? copy.restoreSelfHost : copy.restoreCloud}</p>
+        {#if restoring}
+          <div class="danger">
+            <p class="danger-title">{copy.restoreConfirm(restoring)}</p>
+            <div class="row-actions">
+              <Button tone="bad" disabled={restoreBusy} aria-busy={restoreBusy} onclick={restoreCopy}>{copy.restoreThis}</Button>
+              <Button weight="bare" disabled={restoreBusy} onclick={() => (restoring = null)}>{copy.keepAsIs}</Button>
+            </div>
+          </div>
+        {/if}
+        {#if DEPLOYMENT.kind !== 'self-host' && copiesFrom !== 'live'}
           <ul class="facts">
             <!-- WHAT IT COSTS, BEFORE THE PRESS. `53 §5.5`: a bookmark restore rewinds the database,
                  so every write after the chosen instant is gone — and its own rollback is another
@@ -1835,9 +2129,7 @@
             <li><span class="fact-key">{copy.restoreBack}</span><span class="fact-value">{copy.restoreBackHow}</span></li>
           </ul>
           <div class="row-actions">
-            <Button
-              onclick={() => toasts.push(copy.notWritten('A time would be picked, and the record put back to it, with every write after it gone, and the history ends there, with one line saying you went back'), { intent: 'warn' })}
-            >{copy.restoreTo}</Button>
+            <Button onclick={restoreToTime}>{copy.restoreTo}</Button>
             <!-- `53 §5.5`'s precondition: *"the owner knows the last good instant — `/audit` shows
                  every write with its time"*. The control that answers it is one link away. -->
             <Button weight="bare" href="/audit">{copy.findTheMoment}</Button>
@@ -1907,10 +2199,12 @@
           <Button
             tone="bad"
             disabled={typedSlug.trim() !== boot().index.slug}
-            onclick={() => toasts.push(copy.notWritten(`You would be asked to sign in again, and then ${RECORD} and every copy of it would be gone`), { intent: 'warn' })}
+            aria-busy={deleting}
+            onclick={deleteNow}
             >{copy.deleteRecord(RECORD)}</Button
           >
           </div>
+          {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
         </div>
       </Section>
 
@@ -2267,6 +2561,44 @@
 
   .ex-label {
     color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* The invitations still waiting: a row per address, the control at the end of the line. */
+  .invites-head {
+    margin: var(--sp-3) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .invites {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .invite {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block: var(--sp-2);
+  }
+
+  .invite + .invite {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .invite-who {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .invite-when {
+    flex: 1 1 20ch;
+    color: var(--dim);
     font-size: var(--t-sm);
   }
 

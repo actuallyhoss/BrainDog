@@ -18,7 +18,8 @@
   import { DEPLOYMENT, PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { installWords } from '$lib/record/actions.ts';
-  import { blocked, choose, words, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { blocked, choose, installPlanned, packDocument, planInstall, words, type Blocked, type Offer, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { words as vaultWords } from '$lib/record/vault.ts';
   import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -37,11 +38,69 @@
   let blocks = $state<Record<string, Blocked>>({});
   let busy = $state<string | null>(null);
   let source: Source | null = null;
+  let client: ReturnType<typeof createClient> | null = null;
+  /** True once the record answered, so Install plans and installs instead of saying what it would do. */
+  let live = $state(false);
 
   const installed = $derived(states ?? []);
-  const available = $derived(PACKS.filter((p) => !p.installed && !installed.some((s) => s.id === p.id)));
+  /* ON A RECORD, EVERY CATALOGUE ENTRY IT DOES NOT HOLD. `installed` on an entry is the sample's own fact. */
+  const available = $derived(PACKS.filter((p) => (live || !p.installed) && !installed.some((s) => s.id === p.id)));
 
   let diff = $state<string | null>(null);
+
+  /** The record's plan for one add-on, drawn under it until Install or Not now. */
+  let offer = $state<Offer | null>(null);
+
+  /** A plan names registers and pages by id; the reader is asked about names. */
+  const planName =
+    (pack: PackInfo) =>
+    (kind: 'register' | 'page', key: string): string =>
+      pack.titles?.[key] ?? (kind === 'register' ? REGISTERS[key]?.name : PAGES[key]?.title) ?? key.charAt(0).toUpperCase() + key.slice(1);
+
+  /**
+   * Install, first press: the record's plan for this add-on, drawn under it. An entry nothing ships a document for is
+   * said as not installable yet, on a record as on the sample.
+   */
+  async function offerInstall(pack: PackInfo) {
+    if (!client || busy !== null) return;
+    busy = pack.id;
+    try {
+      const doc = await packDocument(pack.id);
+      if (!doc) {
+        toasts.push(copy.packNotInstallable(pack.name), { intent: 'warn' });
+        return;
+      }
+      const out = await planInstall(client, pack.id, doc, planName(pack));
+      if (!out.ok) {
+        toasts.push(out.refusal.fix, { intent: 'warn' });
+        return;
+      }
+      offer = out.value;
+      diff = null;
+    } finally {
+      busy = null;
+    }
+  }
+
+  /** Install, second press: the plan that is on screen. A plan the record has moved past is planned and drawn again. */
+  async function installOffer(pack: PackInfo) {
+    if (!client || !source || !offer || busy !== null) return;
+    busy = pack.id;
+    try {
+      const out = await installPlanned(client, offer, planName(pack));
+      if (!out.ok) {
+        toasts.push(out.fix, { intent: 'warn' });
+        if (out.again) offer = out.again;
+        return;
+      }
+      offer = null;
+      toasts.push(copy.packInstalledNamed(pack.name), { intent: 'good' });
+      const again = await source.packs();
+      if (again.ok) states = again.value;
+    } finally {
+      busy = null;
+    }
+  }
 
   /**
    * THE LIST IS THE RECORD'S NOW, READ ONCE, and the sample's when there is no record to read.
@@ -52,8 +111,10 @@
    */
   onMount(() => {
     void read(async () => {
-      const chosen = await choose(createClient({ base: location.origin }));
+      client = createClient({ base: location.origin });
+      const chosen = await choose(client);
       source = chosen.source;
+      live = !chosen.source.sample;
       if (!chosen.first.ok) {
         refused = chosen.first.refusal;
         return false;
@@ -276,9 +337,10 @@
                      the row form uses for its own disabled submit. -->
                 <Button
                   weight="quiet"
-                  disabled={Boolean(pack.conflicts?.length)}
-                  aria-describedby={pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
+                  disabled={(!live && Boolean(pack.conflicts?.length)) || busy !== null || offer?.id === pack.id}
+                  aria-describedby={!live && pack.conflicts?.length ? `conflict-${pack.id}` : undefined}
                   onclick={() => {
+                    if (live) return void offerInstall(pack);
                     /* A PACK THAT CALLS OUT ASKS ONCE, and the lines it asks about are opened under it. The sample
                        saves nothing either way, and says so. */
                     const calls = packDiff(pack).calls.length;
@@ -292,19 +354,49 @@
                       { intent: 'warn' },
                     );
                   }}
-                >{copy.install}</Button>
+                >{busy === pack.id && offer?.id !== pack.id ? copy.packPlanning : copy.install}</Button>
               </span>
             </div>
             <!-- THE REASON IS BESIDE THE BUTTON, NOT INSIDE THE DISCLOSURE. `02 §5`'s objection to a
                  disabled control is that it "invites a question the UI cannot answer" — which is
                  exactly what it would be if the answer lived behind a panel that is closed by
                  default. One sentence, always, next to the control it disables. -->
-            {#if pack.conflicts?.length}
+            {#if !live && pack.conflicts?.length}
               <p class="pack-refused" id="conflict-{pack.id}">
                 {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
               </p>
             {/if}
-            {#if diff === pack.id}{@render plan(pack)}{/if}
+            {#if offer?.id === pack.id}
+              <!-- THE RECORD'S OWN PLAN, the lines Install approves and nothing else. -->
+              <dl class="diff">
+                <dt>{copy.diffAdds}</dt>
+                <dd>
+                  {#if offer.plan.summary}<p>{offer.plan.summary}</p>{/if}
+                  <ul class="diff-adds">
+                    {#each offer.plan.adds as add (add.kind + add.name)}
+                      <li>
+                        <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+                        <span class="diff-name">{add.name}</span>
+                        {#if add.detail}<span class="diff-detail">{add.detail}</span>{/if}
+                      </li>
+                    {/each}
+                  </ul>
+                </dd>
+                {#if offer.plan.conflicts.length}
+                  <dt>{copy.diffConflicts}</dt>
+                  <dd>{#each offer.plan.conflicts as c (c)}<p>{c}</p>{/each}</dd>
+                {/if}
+                <CallsOut calls={offer.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+                <dt>{copy.diffSeeds}</dt>
+                <dd>{offer.plan.seeds}</dd>
+                <dt>{copy.diffTouches}</dt>
+                <dd>{offer.plan.touches}</dd>
+              </dl>
+              <div class="offer-actions">
+                <Button weight="primary" disabled={busy !== null || offer.plan.conflicts.length > 0} onclick={() => void installOffer(pack)}>{copy.install}</Button>
+                <Button weight="bare" disabled={busy !== null} onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+              </div>
+            {:else if diff === pack.id}{@render plan(pack)}{/if}
           </li>
         {/each}
       </ul>
@@ -542,6 +634,13 @@
   .diff-detail {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .offer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    padding: 0 var(--sp-3) var(--sp-3);
   }
 
   .pack-refused {

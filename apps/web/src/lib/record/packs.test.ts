@@ -15,8 +15,12 @@ import {
   choose,
   draftOf,
   fieldAt,
+  installPlanned,
   isDefault,
   openSettings,
+  packDocument,
+  planInstall,
+  type Installer,
   sample,
   signInFor,
   words,
@@ -33,6 +37,51 @@ const value = <T>(r: { ok: true; value: T } | { ok: false; refusal: { code: stri
   assert.ok(r.ok, r.ok ? '' : `${r.refusal.code}: ${r.refusal.fix}`);
   return r.value;
 };
+
+test('INSTALLING PLANS FIRST, SENDS THE PLAN THAT WAS SHOWN, AND PLANS AGAIN WHEN THE RECORD MOVED', async () => {
+  const doc = await packDocument('estate');
+  assert.ok(doc, 'estate ships a document');
+  assert.equal(await packDocument('freelancer-uk'), null, 'an entry with no document is not installable');
+  assert.equal((await packDocument('agents'))?.pack, 'agents');
+
+  const sent: { name: string; args: Record<string, unknown> }[] = [];
+  let hash = '12.abc';
+  let stale = true;
+  const diff = () => ({
+    diff: { planHash: hash, adds: [{ id: 'register.services', summary: '9 fields' }], seeds: { count: 3 }, approve: ['calls example.com'], calls_out: [] },
+  });
+  const client: Installer = {
+    planPack: async (args) => (sent.push({ name: 'planPack', args }), { ok: true, value: diff() }),
+    installPack: async (args) => {
+      sent.push({ name: 'installPack', args });
+      if (stale) {
+        stale = false;
+        hash = '13.def';
+        return { ok: false, refusal: { code: 'PLAN_STALE', fix: 'The record changed since this plan. Read it again.' } };
+      }
+      return { ok: true, value: { id: 'estate' } };
+    },
+  };
+  const nameOf = (_: 'register' | 'page', id: string) => (id === 'services' ? 'Services' : id);
+
+  const planned = value(await planInstall(client, 'estate', doc, nameOf));
+  assert.equal(planned.plan.planHash, '12.abc');
+  assert.deepEqual(planned.plan.adds, [{ kind: 'list', name: 'Services', detail: '9 fields' }]);
+  assert.deepEqual(planned.approve, ['calls example.com']);
+  assert.deepEqual(sent[0]?.args, { doc, source: { kind: 'local' } });
+
+  const first = await installPlanned(client, planned, nameOf);
+  assert.ok(!first.ok);
+  assert.equal(first.again?.plan.planHash, '13.def', 'a stale plan is planned again and drawn');
+  assert.deepEqual(sent[1]?.args, { doc, source: { kind: 'local' }, planHash: '12.abc', approve: ['calls example.com'] });
+
+  assert.deepEqual(await installPlanned(client, first.again!, nameOf), { ok: true });
+  assert.equal(sent.at(-1)?.args.planHash, '13.def');
+
+  const refused: Installer = { ...client, planPack: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner can install.' } }) };
+  const no = await planInstall(refused, 'estate', doc, nameOf);
+  assert.ok(!no.ok && no.refusal.fix === 'Only an owner can install.');
+});
 
 test('THE SAMPLE LISTS EVERY INSTALLED ADD-ON, AND ONE TURNED OFF IS STILL LISTED', async () => {
   const s = sample(() => AT);

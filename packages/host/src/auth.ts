@@ -32,9 +32,11 @@
 import type { AssertionJSON, Auth, AuthCall, AuthFlow, AuthResult, Mail, Methods, RegistrationJSON, Refusal, Result, Who } from '@braindog/ports';
 
 import { DEVICE_ROUTES, serveDevice, type DeviceDoor, type DeviceFlow } from './device.ts';
+import { INVITE_ROUTES, serveInvite, type InviteDoor, type InviteFlow } from './invite.ts';
 import { httpStatus } from './index.ts';
 
 export { DEVICE_ROUTES, type DeviceAsk, type DeviceDoor, type DeviceFlow, type DeviceStarted } from './device.ts';
+export { INVITE_ROUTES, type InviteDoor, type InviteFlow, type InviteSeen } from './invite.ts';
 
 /* ── the account ─────────────────────────────────────────────────────────── */
 
@@ -93,7 +95,7 @@ export type AuthRoute = {
    * The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim.
    * The two device flows reach a record and never the Directory, and `device.ts` answers them.
    */
-  flow: AuthFlow | 'provision' | DeviceFlow;
+  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow;
   /** The server key is the self-host's, and provisioning is the Worker's; everything else is both. */
   on: 'both' | 'selfhost' | 'worker';
   /** Nothing, the session cookie, or the operator's key. A route that needs a session still answers without one: 401. */
@@ -124,6 +126,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   ...DEVICE_ROUTES,
+  ...INVITE_ROUTES,
 ];
 
 /** Why `/auth/methods` offers nothing: no key to take the MACs under, or an origin no cookie can be set on. */
@@ -351,6 +354,8 @@ export type AuthDoor = {
   reached?: string | undefined;
   /** The record's half of the device grant. Absent where no device may sign in, and both device routes are 404. */
   device?: DeviceDoor | undefined;
+  /** The record and Directory halves of an invitation link. Absent where nobody can accept one, and the route is 404. */
+  invite?: InviteDoor | undefined;
 };
 
 type Header = readonly [string, string];
@@ -493,6 +498,10 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
   /* NO SESSION CAN BE HELD, SO NO WAY IN IS OFFERED: an open self-host has none to have, and an origin no
      cookie can be set on would mint one with nowhere to go. */
   if (door.open || mode === null) return off();
+
+  /* AN INVITATION IS SPENT BY SIGNING IN, so it is answered after the checks every browser route has, and its
+     session reaches the cookie through the same `answered`. */
+  if (route.flow === 'invite') return serveInvite(body, sid, door, (out) => answered(out, mode));
 
   const call = callOf(route.flow as AuthFlow, body, sid, door.ip);
   if (!call) return off();

@@ -1600,3 +1600,58 @@ test("A PAGE'S FIGURES GO WHERE ITS ROWS GO, and a caller scoped away from their
   assert.ok(!JSON.stringify(theirs).includes('120000'), 'an amount from a register outside the ceiling');
   sql.close();
 });
+
+/* ── invitations ─────────────────────────────────────────────────────────── */
+
+/** A created record on a host that says whether it can take invitations. */
+const inviting = async (invitations?: () => string | null) => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock, sign: SIGNER, ...(invitations === undefined ? {} : { invitations }) });
+  assert.ok((await api.kernel.install([OBLIGATIONS, NOTES])).ok);
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'ada@example.com' } }).ok);
+  return { api, sql, clock };
+};
+
+test('AN INVITATION BY ADDRESS is an owner in a browser: never a token, never a member, never a credential-less caller', async () => {
+  const { api } = await inviting(() => null);
+  const ask = { email: 'bo@example.com', level: 'read' as const };
+
+  assert.equal(refusal(await api.invite(ask, token('write'))).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.invite(ask, token('read'))).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.invite(ask, person('decide'))).code, 'LEVEL_REQUIRED');
+  assert.equal(refusal(await api.invite(ask, { ...owner, credentialed: false })).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.invitations(token('write'))).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.revokeInvite({ id: 'i_x' }, token('write'))).code, 'NEEDS_BROWSER_SESSION');
+  assert.deepEqual(value(await api.invitations(owner)), [], 'a refused invitation was minted');
+});
+
+test('A HOST WITH NO SIGN-IN MINTS NO LINK, and says why in its own words', async () => {
+  const bare = await inviting();
+  const out = refusal(await bare.api.invite({ email: 'bo@example.com', level: 'read' }, owner));
+  assert.equal(out.code, 'NOT_IN_THIS_BUILD');
+  assert.match(out.fix, /sign-in/);
+
+  const worker = await inviting(() => 'Sign-in needs SESSION_SECRET.');
+  assert.deepEqual(refusal(await worker.api.invite({ email: 'bo@example.com', level: 'read' }, owner)).fix, 'Sign-in needs SESSION_SECRET.');
+  assert.deepEqual(value(await worker.api.invitations(owner)), []);
+});
+
+test('MINT, LOOK, ACCEPT, AND THE LINK IS SPENT: the whole of an invitation through the record', async () => {
+  const { api } = await inviting(() => null);
+  const minted = value<{ invitation: { id: string; email: string }; token: string }>(
+    await api.invite({ email: 'bo@example.com', level: 'write' }, owner),
+  );
+  assert.deepEqual(value<{ id: string }[]>(await api.invitations(owner)).map((i) => i.id), [minted.invitation.id]);
+  assert.ok(!JSON.stringify(value(await api.invitations(owner))).includes(minted.token.split('.')[1] ?? '?'), 'the listing carries the link');
+
+  assert.deepEqual(value<{ email: string }>(await api.acceptInvite({ token: minted.token })).email, 'bo@example.com');
+  value(await api.acceptInvite({ token: minted.token, person: { id: 'p_2', email: 'bo@example.com' } }));
+  assert.equal(api.kernel.access('p_2')?.level, 'write');
+  assert.equal(refusal(await api.acceptInvite({ token: minted.token, person: { id: 'p_2', email: 'bo@example.com' } })).code, 'UNAUTHORIZED');
+
+  const again = value<{ invitation: { id: string }; token: string }>(await api.invite({ email: 'cy@example.com', level: 'read' }, owner));
+  value(await api.revokeInvite({ id: again.invitation.id }, owner));
+  assert.equal(refusal(await api.acceptInvite({ token: again.token, person: { id: 'p_3', email: 'cy@example.com' } })).code, 'UNAUTHORIZED');
+  assert.equal(api.kernel.access('p_3'), null);
+});

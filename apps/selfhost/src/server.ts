@@ -35,6 +35,9 @@ import {
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
+import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
+import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
+import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
@@ -128,6 +131,16 @@ const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.
 /** A write that a page somewhere else sent, riding on this process's ambient authority. */
 const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only from a page this BrainDog served.', at: 'origin' };
 
+/** Why an owner cannot invite anybody here: nobody but the owner can sign in, so the link would lead nowhere. */
+const INVITES_OFF = 'Nobody else can sign in to this BrainDog yet, so an invitation link would lead nowhere. Start it with BRAINDOG_TOKEN, a session key and a directory first.';
+
+/**
+ * AN ADDRESS THAT CAN ALREADY SIGN IN: a person with a passkey, or with a record. Somebody made here and never
+ * finished is not one, so a link opened twice does not lock them out.
+ */
+const KNOWN = `SELECT 1 AS x FROM dir_person p WHERE lower(p.email) = lower(?)
+  AND (EXISTS (SELECT 1 FROM dir_passkey k WHERE k.person = p.id) OR EXISTS (SELECT 1 FROM dir_member m WHERE m.person = p.id))`;
+
 const SAFE = new Set(['GET', 'HEAD']);
 
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
@@ -148,7 +161,8 @@ type Site = {
   /** The key doors: a vault grant's bearer, and this process's key store when it has one. */
   vault: VaultDoor;
   /** `/account/*`: the Directory's usage ledger, for a signed-in person. */
-  usage: AccountDoor['usage'];
+  /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
+  snapshots: FileSnapshots | undefined;  usage: AccountDoor['usage'];
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -486,6 +500,35 @@ export async function start(options: {
   const sql = openSqlite(options.file);
   const dirSql = openSqlite(options.directory ?? ':memory:');
 
+  /* THE COPIES THIS HOST KEEPS, beside the record file (`53 §5.4`): `VACUUM INTO`, the whole file, six local tables
+     included, because it is a backup of the instance and not an export. */
+  const kept = options.file === ':memory:' ? undefined : fileSnapshots(sql, options.file, clock.now);
+  /* SET ONCE THE RECORD IS DELETED: every request after that is told so, and nothing touches the closed file. */
+  let gone = false;
+
+  /**
+   * Delete the record, `53 §5.9` as it applies to one file on one machine.
+   *
+   * THE ALARM BEFORE THE STORAGE, so no timer wakes a dead record; then the file, its sidecars and its copies; then the
+   * Directory releases the name. A final snapshot is not taken: on a self-host it would sit in the directory being
+   * removed, which is exactly what `53 §5.9` step 4 removes on Cloud too.
+   *
+   * THE DIRECTORY IS REMOVED WHOLE ONLY WHEN IT IS THE RECORD'S OWN, `<data>/<slug>/record.dog` with no installation
+   * files beside it. A record served from a file elsewhere loses that file and its copies, and nothing else.
+   */
+  const destroy = async (): Promise<void> => {
+    gone = true;
+    scheduler.stop();
+    if (ticker) clearInterval(ticker);
+    const record = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
+    sql.close();
+    if (record && ledger) ledger.close(record);
+    const at = dirOf(options.file);
+    const own = baseOf(options.file) === 'record.dog' && !present(joinPath(at, 'directory.sqlite')) && !present(joinPath(at, 'kek'));
+    if (own) removeTree(at, { recursive: true, force: true });
+    else for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots')]) removeTree(p, { recursive: true, force: true });
+  };
+
   /* The alarm and the record refer to each other: the record arms the alarm after every write, and
      the alarm drains the record when it fires. The scheduler is built first and the record is what
      it drains, which is why this one binding is written before the thing it names exists. */
@@ -613,18 +656,23 @@ export async function start(options: {
     return resolved ? resolved(bytes) : null;
   };
 
+  /* WHETHER AN INVITATION CAN BE SPENT HERE, known once sign-in is decided below. Until then, and wherever sign-in
+     is off, it cannot. */
+  let invitesOff: string | null = INVITES_OFF;
   api = await createRecordApi({
     sql,
     clock,
     scheduler,
     delivers: options.actions ? [...delivers, 'pull.fetch'] : delivers,
     sign,
+    invitations: () => invitesOff,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
        No `SPARK_ENDPOINT`: `31 §2` has this host at rank 21 and `spark` at 13 and unbuilt, so
        claiming a Spark here would be claiming something nothing serves. */
-    build: { app: options.build ?? env.BRAINDOG_BUILD ?? '', spark: false },
+    snapshots: kept,
+    destroy,    build: { app: options.build ?? env.BRAINDOG_BUILD ?? '', spark: false },
   });
 
   const refused = api.kernel.refused();
@@ -669,6 +717,12 @@ export async function start(options: {
      The 500 says what happened in one sentence and the socket is closed, which is the promise
      `serveApi` makes one layer down and the one this layer was breaking. */
   const server = createServer((req, res) => {
+    /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
+    if (gone) {
+      res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted. Create another with braindog init.' } }));
+      return;
+    }
     void answer(req, res, handlers, site, shell, trustProxy).catch((e: unknown) => {
       const why = e instanceof Error ? e.message : String(e);
       try {
@@ -695,6 +749,7 @@ export async function start(options: {
   const key = options.sessionKey;
   const token = options.token;
   const off: 'open' | 'directory' | 'insecure' | 'key' | null = token === undefined ? 'open' : options.directory === undefined ? 'directory' : mode === null ? 'insecure' : key === undefined ? 'key' : null;
+  invitesOff = off === null ? null : INVITES_OFF;
   const directory: Directory = createDirectory(
     dirSql,
     clock,
@@ -722,11 +777,29 @@ export async function start(options: {
     hosts: new Set([...loopback, new URL(origin).host]),
     origins: new Set([...loopback.map((h) => `http://${h}`), origin]),
     vault: vaultDoor(api, options.keys),
+    snapshots: kept,
     door: {
       on: 'selfhost',
       origin,
       auth: directory.auth,
       open: token === undefined,
+      /* AN INVITATION LINK IS SPENT BY SIGNING IN, so it is taken only where somebody can: the record says who may join,
+         and the Directory makes the person and holds the session. */
+      ...(off === null
+        ? {
+            invite: {
+              look: (inviteToken: string) => api.acceptInvite({ token: inviteToken }) as never,
+              accept: async (inviteToken: string, person: { id: string; email: string }) => {
+                const out = await api.acceptInvite({ token: inviteToken, person });
+                if (!out.ok) return out;
+                const record = inviteToken.slice(0, inviteToken.indexOf('.'));
+                return directory.knows(record) ? directory.join(record, person.id) : out;
+              },
+              known: async (email: string) => Boolean(dirSql.one(KNOWN, email)),
+              person: async (email: string) => directory.person$(email),
+            },
+          }
+        : {}),
       /* A DEVICE SIGNS IN ONLY WHERE SOMEBODY CAN APPROVE IT WITH A CREDENTIAL: a session, or the server key. An
          open self-host needs no bearer, and `deviceApprove` refuses its credential-less owner anyway. One record,
          so a slug has nothing to choose between. */
@@ -760,7 +833,7 @@ export async function start(options: {
       new Promise<void>((r) => {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
-        server.close(() => (sql.close(), dirSql.close(), r()));
+        server.close(() => (gone || sql.close(), dirSql.close(), r()));
       }),
   };
 }
@@ -838,7 +911,9 @@ async function answer(
 
   const seen = await contextFor(request, req.headers.host ?? '', site);
   /* THE SESSION HEADERS ON EVERY DOOR, checked: the record reads a token's and ignores anybody else's. */
-  if ('ctx' in seen) return write(res, await serveApi(request, handlers, withSession(seen.ctx, sessionOf(request.headers))), seen.cookie);
+  /* A KEPT COPY AS THE FILE IT IS (`49 §5.13`): `GET /api/snapshots/<id>`, for whoever `snapshots` answers. */
+  const copyAsked = /^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(path);
+  if (copyAsked && method === 'GET' && 'ctx' in seen) return write(res, await copyOf(decodeURIComponent(copyAsked[1]!), seen.ctx, site), seen.cookie);  if ('ctx' in seen) return write(res, await serveApi(request, handlers, withSession(seen.ctx, sessionOf(request.headers))), seen.cookie);
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
      a credential nobody minted, a credential belonging to somebody who is not on the record, and a
      record with no owner who may act — so a client could not tell which of the three to do something
@@ -855,6 +930,30 @@ async function answer(
   return write(res, json(503, { ok: false }));
 }
 
+/**
+ * One kept copy, streamed with `Content-Disposition: attachment` (`49 §5.13`).
+ *
+ * THE SAME CHECK AS THE LIST. `snapshots` is an owner's in a browser, so a copy is reachable by exactly whoever may see
+ * that it exists, and an id that is not in the list is refused rather than turned into a path.
+ */
+async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Response> {
+  const listed = await site.api.snapshots(ctx);
+  if (!listed.ok) return json(httpStatus(listed), listed);
+  const file = listed.value.some((s) => s.id === id) ? (site.snapshots?.path(id) ?? null) : null;
+  if (!file) {
+    const out = { ok: false as const, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+    return json(httpStatus(out), out);
+  }
+  const slug = site.api.kernel.identity()?.slug ?? 'record';
+  return new Response(readWhole(file), {
+    status: 200,
+    headers: {
+      'content-type': 'application/vnd.sqlite3',
+      'content-disposition': `attachment; filename="${slug}-${id}.dog"`,
+      'cache-control': 'no-store',
+    },
+  });
+}
 /**
  * `POST /mcp`, for an agent's MCP client (`loop/research-agent-path.md` §1.3, §1.7).
  *

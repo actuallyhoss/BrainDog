@@ -76,7 +76,7 @@
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
      screen claiming you are already in. */
   const bare = $derived(
-    page.url.pathname === '/start' || page.url.pathname === '/signin' || page.url.pathname.startsWith('/s/'),
+    page.url.pathname === '/start' || page.url.pathname === '/signin' || page.url.pathname === '/invite' || page.url.pathname.startsWith('/s/'),
   );
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why

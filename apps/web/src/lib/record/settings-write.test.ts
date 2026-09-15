@@ -8,7 +8,25 @@ import assert from 'node:assert/strict';
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
 import type { Person } from './schema.ts';
-import { addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote } from './settings-write.ts';
+import {
+  addException,
+  backUpNow,
+  deleteRecordNow,
+  downloadSnapshot,
+  dropException,
+  erasePerson,
+  exportFile,
+  inviteEmail,
+  inviteLink,
+  moveLevel,
+  readInvites,
+  readPeople,
+  readSnapshots,
+  removeAccess,
+  restoreSnapshot,
+  withdrawInvite,
+  wrote,
+} from './settings-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -117,4 +135,78 @@ test('an export is the record as a .dogl file, cut to the sections each copy car
   );
   const none = await exportFile(BASE, 'record', 'studio', host(() => new Response('<html>', { status: 404 })).io);
   assert.equal(none.ok ? '' : none.from, 'sample');
+});
+
+test('backups, erasure and deletion send what each gesture names, and read the three answers', async () => {
+  const snap = { id: '2026-09-16T12-00-00Z-now', at: '2026-09-16T12:00:00.000Z', bytes: 4096 };
+  const { io, sent } = host((path) => json(200, { ok: true, value: path === '/api/snapshots' ? [snap] : path === '/api/snapshot' ? snap : null }));
+  assert.deepEqual(await readSnapshots(BASE, io), { from: 'live', snapshots: [snap] });
+  assert.deepEqual(await backUpNow(BASE, io), { ok: true, value: snap });
+  await restoreSnapshot(BASE, snap.id, io);
+  await erasePerson(BASE, { subjects: ['Mara Quill'], personId: 'p_bo', basis: 'Article 17 request' }, io);
+  await deleteRecordNow(BASE, 'the-studio', io);
+  assert.deepEqual(sent.map((s) => [s.path, s.method, s.body]), [
+    ['/api/snapshots', 'GET', null],
+    ['/api/snapshot', 'POST', {}],
+    ['/api/restore', 'POST', { bookmark: snap.id }],
+    ['/api/erase', 'POST', { subjects: ['Mara Quill'], personId: 'p_bo', basis: 'Article 17 request' }],
+    ['/api/deleteRecord', 'POST', { slug: 'the-studio' }],
+  ]);
+
+  assert.deepEqual(await readSnapshots(BASE, host(null).io), { from: 'sample' });
+  const worker = host(() => json(501, { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.' } })).io;
+  assert.deepEqual(await readSnapshots(BASE, worker), { from: 'refused', code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.' });
+  assert.deepEqual(await backUpNow(BASE, worker), { ok: false, from: 'refused', code: 'NOT_IN_THIS_BUILD', fix: 'Export a copy from Settings.', raced: false });
+  const gone = await deleteRecordNow(BASE, 'the-studio', host(null).io);
+  assert.equal(!gone.ok && gone.from, 'sample');
+});
+
+test('a kept copy downloads as the file the host named, and a refusal is read the one way', async () => {
+  const file = host(() => new Response(new Uint8Array([83, 81, 76]), { status: 200, headers: { 'content-disposition': 'attachment; filename="the-studio-x.dog"' } }));
+  const got = await downloadSnapshot(BASE, 'x', file.io);
+  assert.ok(got.ok);
+  if (got.ok) {
+    assert.equal(got.value.name, 'the-studio-x.dog');
+    assert.equal(got.value.blob.size, 3);
+  }
+  assert.deepEqual(file.sent.map((s) => [s.path, s.method]), [['/api/snapshots/x', 'GET']]);
+
+  const refused = await downloadSnapshot(BASE, 'x', host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.' } })).io);
+  assert.deepEqual(refused, { ok: false, from: 'refused', code: 'OUT_OF_BOUNDS', fix: 'x is not one of the copies this record keeps.', raced: false });
+  const off = await downloadSnapshot(BASE, 'x', host(null).io);
+  assert.equal(!off.ok && off.from, 'sample');
+  const html = await downloadSnapshot(BASE, 'x', host(() => new Response('<html>', { status: 404 })).io);
+  assert.equal(!html.ok && html.from, 'sample');
+});
+
+test('an invitation is minted for one address, handed back once as a link, listed and withdrawn', async () => {
+  const invitation = {
+    id: 'inv_1', email: 'bo@example.com', level: 'write' as const, registers: {}, invited_by: 'p_ada',
+    created_at: '2026-09-16T12:00:00.000Z', expires_at: '2026-09-17T12:00:00.000Z',
+  };
+  const made = { invitation, token: 'rec_1.thesecret' };
+  const { io, sent } = host((path) =>
+    json(200, {
+      ok: true,
+      value: path === '/api/invitations' ? [invitation] : path === '/api/revokeInvite' ? { id: 'inv_1', revoked_at: '2026-09-16T13:00:00.000Z' } : made,
+    }),
+  );
+  assert.deepEqual(await inviteEmail(BASE, '  bo@example.com ', 'write', io), { ok: true, value: made });
+  assert.deepEqual(await readInvites(BASE, io), { from: 'live', invites: [invitation] });
+  assert.ok((await withdrawInvite(BASE, 'inv_1', io)).ok);
+  assert.deepEqual(sent.map((s) => [s.path, s.method, s.body]), [
+    ['/api/invite', 'POST', { email: 'bo@example.com', level: 'write' }],
+    ['/api/invitations', 'GET', null],
+    ['/api/revokeInvite', 'POST', { id: 'inv_1' }],
+  ]);
+
+  /* THE LINK IS THIS ORIGIN AND THE TOKEN IN THE FRAGMENT, whatever trailing slashes the origin arrived with. */
+  assert.equal(inviteLink('http://record.test/', made.token), 'http://record.test/invite#rec_1.thesecret');
+
+  /* A HOST OLDER THAN INVITATIONS, AND ONE WITH NO RECORD BEHIND IT, BOTH LIST NONE rather than draw a refusal. */
+  const old = host(() => json(422, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This record has no such method.' } })).io;
+  assert.deepEqual(await readInvites(BASE, old), { from: 'sample' });
+  assert.deepEqual(await readInvites(BASE, host(null).io), { from: 'sample' });
+  const said = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner sees invitations.' } })).io;
+  assert.deepEqual(await readInvites(BASE, said), { from: 'refused', fix: 'Only an owner sees invitations.' });
 });

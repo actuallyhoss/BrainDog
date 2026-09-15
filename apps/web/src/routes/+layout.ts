@@ -47,7 +47,7 @@ export async function load({ url }): Promise<Shell> {
      control that could have fixed it. */
   const declared =
     booted.from === 'live' ? booted.boot.registers.length : booted.from === 'sample' ? shell.index.registers.length : null;
-  const spared = url.pathname === '/start' || url.pathname === '/signin' || url.pathname.startsWith('/s/');
+  const spared = url.pathname === '/start' || url.pathname === '/signin' || url.pathname === '/invite' || url.pathname.startsWith('/s/');
   if (declared === 0 && !spared) redirect(307, '/start');
 
   return shell;

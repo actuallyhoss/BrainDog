@@ -270,8 +270,31 @@ export type TokenRow = {
   revoked_at: string | null;
 };
 
+/** `invitations`: one invitation still waiting to be used. Never its link. */
+export type Invitation = {
+  id: string;
+  email: string;
+  level: Level | null;
+  registers: Record<string, Level>;
+  invited_by: string;
+  created_at: string;
+  expires_at: string;
+};
+
+/** `invite` by address: the invitation, and the only copy of its link's token. Show the link once, and keep it nowhere. */
+export type Invited = { invitation: Invitation; token: string };
+
 /** `createToken`: the only copy of the bearer there will ever be. Show it once, and keep it nowhere. */
 export type MintedToken = { id: string; bearer: string; scope: string; expires_at: string };
+
+/** `snapshot` and `snapshots`: one copy of the whole record, by the id `restore` takes. */
+export type Snapshot = { id: string; at: string; bytes: number };
+
+/** `restore`: the copy the record went back to, and the copy of what it was just before. */
+export type Restored = { bookmark: string; at: string; kept: string | null };
+
+/** `erase`: what the cascade touched, store by store. The subject is never in it. */
+export type EraseReport = { id: string; at: string; subjects: number; rows: number; counts: Record<string, number>; keys: number };
 
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
@@ -424,6 +447,8 @@ export function createClient(options: ClientOptions) {
     deviceApprove: (args: { user_code: string }) => call<DeviceApproved>('deviceApprove', args as Record<string, unknown>),
     revokeDevice: (args: { handle: string }) => call<DeviceRow>('revokeDevice', args as Record<string, unknown>),
     listGrants: () => call<unknown[]>('listGrants'),
+    /* VAULT, SO A BROWSER SESSION AND A SIGN-IN IN THE LAST FIFTEEN MINUTES. The bytes go and the row stays. */
+    revokeGrant: (args: { id: string }) => call<null>('revokeGrant', args as Record<string, unknown>),
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>
       call<unknown>('planPack', args as Record<string, unknown>),
@@ -448,6 +473,11 @@ export function createClient(options: ClientOptions) {
       registers?: Record<string, Level>;
       why?: string;
     }) => call<Member>('invite', args as Record<string, unknown>),
+    /* AN ADDRESS, NOT A PERSON: a single-use link good for 24 hours, handed back once. Nothing is mailed. */
+    inviteByEmail: (args: { email: string; level?: Level; registers?: Record<string, Level> }) =>
+      call<Invited>('invite', args as Record<string, unknown>),
+    invitations: () => call<Invitation[]>('invitations'),
+    revokeInvite: (args: { id: string }) => call<{ id: string; revoked_at: string }>('revokeInvite', args as Record<string, unknown>),
     removeMember: (args: { person: string; why?: string }) => call<unknown>('removeMember', args as Record<string, unknown>),
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
@@ -455,6 +485,19 @@ export function createClient(options: ClientOptions) {
     /** The record as the lines of a `.dogl` file. Sealed bytes stay out unless the wrapping key is named. */
     export: (args: { sections?: ('header' | 'data' | 'origin' | 'governance')[]; redactGrants?: boolean; kek_id?: string } = {}) =>
       call<string[]>('export', args as Record<string, unknown>),
+
+    /* BACKUPS, ERASURE AND DELETION: ADMIN, so a browser session. A host that keeps no copies, or cannot delete a
+       record from the app, refuses `NOT_IN_THIS_BUILD` with a sentence saying what does work. */
+    /** A copy of the whole record, now. */
+    snapshot: (args: { label?: string } = {}) => call<Snapshot>('snapshot', args as Record<string, unknown>),
+    /** The copies this host keeps, newest first. */
+    snapshots: () => call<Snapshot[]>('snapshots'),
+    /** Put the record back to one kept copy. What it was is kept as a copy first. */
+    restore: (args: { bookmark: string; at?: string }) => call<Restored>('restore', args as Record<string, unknown>),
+    /** Erase a person: every value naming them, in one transaction. There is no undo. */
+    erase: (args: { subjects: string[]; personId?: string; basis: string }) => call<EraseReport>('erase', args as Record<string, unknown>),
+    /** Delete this record. `slug` is its name, typed to confirm. */
+    deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 
     /* THE TWO DATA WRITES A SCREEN MAKES WITHOUT CHANGING A ROW. `markRead` moves the reader's own
        mark and nothing else, and with no `upTo` the record uses its own newest event, so a caller

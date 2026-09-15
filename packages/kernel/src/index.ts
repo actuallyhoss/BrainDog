@@ -55,7 +55,21 @@ import {
   type ScheduleKind,
 } from './schedule.ts';
 import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
+import {
+  GONE as INVITE_GONE,
+  acceptInvitation,
+  listInvitations,
+  lookInvitation,
+  mintInvitation,
+  revokeInvitation,
+  secretOf as inviteSecret,
+  tokenParts as inviteParts,
+  type InvitationRow,
+  type InviteArgs,
+  type Invited,
+} from './invitations.ts';
 import {
   SCOPES,
   createToken,
@@ -180,6 +194,8 @@ export { EVENT_KINDS, isEventKind } from './events.ts';
 export type { EventKind } from './events.ts';
 export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
+export { ERASED } from './erase.ts';
+export type { EraseReport, EraseRequest } from './erase.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
@@ -206,6 +222,8 @@ export type { MeetArgs, Met } from './people.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export type { Member } from './members.ts';
+export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
+export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { Minted, Scope, TokenRow, Verified } from './token.ts';
 export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
@@ -2272,6 +2290,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     random: (n: number) => crypto.getRandomValues(new Uint8Array(n)),
   });
 
+  /**
+   * The stored hash for an invitation link's token, or `null` when the token is not one, or names another record.
+   *
+   * THE SAME SHA-256 A TOKEN IS STORED UNDER, from the same seam, so there is one digest in the kernel and not two.
+   */
+  const inviteHash = async (token: string): Promise<string | null> => {
+    const parts = inviteParts(token);
+    if (!parts || parts.record !== recordIdentity(sql)?.id) return null;
+    return tokenDeps().digest(parts.secret);
+  };
+
   /** What the two ladders need beyond SQL: an id, the suggestion counter, and one instant. */
   const ackDeps = (): AckDeps => ({
     mint,
@@ -3237,6 +3266,38 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     verifyToken: (bearer: string, surface?: string): Promise<Result<Verified>> =>
       verifyToken(tokenDeps(), bearer, surface),
 
+    /* ── invitations, 12 §3 ───────────────────────────────── */
+
+    /** Mint one for an address. The link's token is in the answer once, and only its hash is kept. */
+    createInvitation: async (by: string, args: InviteArgs): Promise<Result<Invited>> => {
+      const deps = tokenDeps();
+      const secret = inviteSecret(deps.random(32));
+      const hash = await deps.digest(secret);
+      return attempt(sql, transaction, () => mintInvitation({ ...memberDeps(), recordId: deps.recordId }, by, args, secret, hash));
+    },
+
+    /** Every invitation still waiting. Never the hash. */
+    listInvitations: (): InvitationRow[] => listInvitations(sql, clock.now()),
+
+    /** Withdraw one, idempotently. */
+    revokeInvitation: (id: string): Result<{ id: string; revoked_at: string }> =>
+      transaction(() => revokeInvitation(sql, clock.now(), id)),
+
+    /**
+     * The live invitation a link's token names, or `accept` it for a person the host has verified.
+     *
+     * A TOKEN FOR ANOTHER RECORD IS A DEAD LINK HERE, answered in the same words as a spent one.
+     */
+    lookInvitation: async (token: string): Promise<Result<InvitationRow>> => {
+      const hash = await inviteHash(token);
+      return hash === null ? no<InvitationRow>('UNAUTHORIZED', INVITE_GONE, { at: 'token' }) : lookInvitation(sql, clock.now(), hash);
+    },
+    acceptInvitation: async (token: string, person: { person: string; email: string; name?: string }): Promise<Result<Member>> => {
+      const hash = await inviteHash(token);
+      if (hash === null) return no<Member>('UNAUTHORIZED', INVITE_GONE, { at: 'token' });
+      return attempt(sql, transaction, () => acceptInvitation({ ...memberDeps(), recordId: () => recordIdentity(sql)?.id ?? null }, hash, person));
+    },
+
     /* ── device grants, 12 §6.1 ───────────────────────────── */
 
     /** A device asks for a code. INTERNAL: the host calls it from `/auth/device`, limited per address. */
@@ -3460,6 +3521,80 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         rebuildFts();
       }
       return out;
+    },
+
+    /**
+     * Erase a person: `02 §10`'s cascade in one transaction, and one `erase` event naming them only as a hash.
+     *
+     * THE REFUSALS COME FIRST AND WRITE NOTHING. A subject under three characters would take half the record with it;
+     * a basis that names the person would write them again into the one row an erasure keeps; and an owner is not
+     * erased, because a record whose owner is gone is a record nobody can act on.
+     *
+     * `personId` ADDS THE PERSON'S OWN EMAIL AND NAME to the subjects, and removes their `member` rows.
+     */
+    async erase(req: EraseRequest, actor: string): Promise<Result<EraseReport>> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const given: unknown = (req as { subjects?: unknown } | undefined)?.subjects;
+      if (!Array.isArray(given) || given.some((s) => typeof s !== 'string'))
+        return no('VALUE_MALFORMED', 'subjects is a list of what names the person: a name, an email.', { at: 'subjects' });
+      if (given.some((s: string) => s.trim().length < 3))
+        return no('VALUE_MALFORMED', 'A subject is three characters or more, so an erasure cannot take half the record with it.', { at: 'subjects' });
+      const basis = typeof req.basis === 'string' ? req.basis.trim() : '';
+      if (!basis) return no('REQUIRED_MISSING', 'Say the legal basis for the erasure. It is kept with the record of it.', { at: 'basis' });
+
+      const subjects: string[] = [...(given as string[])];
+      const people: string[] = [];
+      if (req.personId !== undefined) {
+        if (typeof req.personId !== 'string' || !req.personId) return no('VALUE_MALFORMED', 'personId is the id of a person on this record.', { at: 'personId' });
+        const p = sql.one<{ id: string; email: string | null; name: string | null }>('SELECT id, email, name FROM person WHERE id = ?', req.personId);
+        if (!p) return no('OUT_OF_BOUNDS', `${req.personId} is not a person on this record.`, { at: 'personId' });
+        people.push(p.id);
+        for (const v of [p.email, p.name]) if (v && v !== ERASED && v.trim().length >= 3) subjects.push(v);
+      }
+      const matched = subjectsOf(subjects);
+      if (matched.length === 0) return no('REQUIRED_MISSING', 'Name the person: a name or an email, three characters or more.', { at: 'subjects' });
+      if (matched.some((s) => basis.toLowerCase().includes(s)))
+        return no('VALUE_MALFORMED', 'The basis names the person, and the basis is the one thing an erasure keeps. Say it without them.', { at: 'basis' });
+
+      for (const p of sql.all<{ id: string; email: string | null; name: string | null }>('SELECT id, email, name FROM person'))
+        if (!people.includes(p.id) && matched.some((s) => s === (p.email ?? '').trim().toLowerCase() || s === (p.name ?? '').trim().toLowerCase()))
+          people.push(p.id);
+      const owner = people.find((p) => sql.one("SELECT 1 AS x FROM member WHERE person_id = ? AND register = '*' AND level = 'owner'", p));
+      if (owner) return no('LEVEL_REQUIRED', 'An owner cannot be erased. Move them to another level first, from People.', { at: 'personId' });
+
+      const hashes: string[] = [];
+      for (const s of matched) {
+        const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+        hashes.push([...bytes].map((b) => b.toString(16).padStart(2, '0')).join(''));
+      }
+      sparkMayWrite(actor, 'erase');
+      const at = instant(clock.now());
+      return ok(
+        transaction(() =>
+          eraseSubjects({ sql, mint, at, actor, enqueue: (payload) => void enqueue(sql, mint, clock.now(), 'erase.r2', payload) }, matched, people, basis, hashes),
+        ),
+      );
+    },
+
+    /**
+     * A lifecycle event the host's own work earns: a snapshot's `export`, a restore's `restore.pitr` (`45 §5.6`).
+     *
+     * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
+     */
+    lifecycle(kind: 'export' | 'restore.pitr', actor: string, note: string, to?: string): string {
+      sparkMayWrite(actor, kind);
+      const id = mint();
+      sql.exec(
+        'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)',
+        id,
+        instant(clock.now()),
+        actor,
+        kind,
+        to === undefined ? null : jcs(to),
+        note.slice(0, 280),
+      );
+      return id;
     },
 
     /**

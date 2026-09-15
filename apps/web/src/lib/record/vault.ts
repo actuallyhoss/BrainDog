@@ -150,7 +150,17 @@ export function namesOf(rows: readonly { id: string; fields: Record<string, unkn
 /* ── the keys ─────────────────────────────────────────────────────────── */
 
 /** One row of the Keys index. `project` is a name, or null for a global key. */
-export type KeyRow = { id: string; label: string; opens: string; project: string | null; sealed: boolean; opened: number; lastOpened: string | null };
+export type KeyRow = {
+  id: string;
+  label: string;
+  opens: string;
+  project: string | null;
+  sealed: boolean;
+  opened: number;
+  lastOpened: string | null;
+  /** The grant `revokeGrant` names, where this row points at one. An index row points at none. */
+  grant: string | null;
+};
 
 /** `listGrants`, with only the keys read here. */
 export type GrantState = { id: string; opened: number; last_opened: string | null; revoked_at: string | null };
@@ -184,6 +194,7 @@ export function keysOf(
       const project = typeof r.fields.project === 'string' ? (names.get(r.fields.project) ?? words.someProject) : null;
       return {
         id: r.id,
+        grant: grant ? grant.id : null,
         label: String(r.fields.label ?? ''),
         opens: String(r.fields.opens ?? ''),
         project,
@@ -241,7 +252,11 @@ export function sampleKeys(vault: readonly { id: string; label: string; opens: s
   return vault
     .map((c): KeyRow => {
       const o = opened[c.id];
-      return { id: c.id, label: c.label, opens: c.opens, project: o?.project ?? null, sealed: o?.sealed ?? false, opened: o?.opened ?? 0, lastOpened: o?.lastOpened ?? null };
+      /* THE SAMPLE NAMES NO GRANT: there is no record behind it to take one out of service. */
+      return {
+        id: c.id, label: c.label, opens: c.opens, project: o?.project ?? null,
+        sealed: o?.sealed ?? false, opened: o?.opened ?? 0, lastOpened: o?.lastOpened ?? null, grant: null,
+      };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 }

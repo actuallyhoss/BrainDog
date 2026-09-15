@@ -12,7 +12,7 @@
  * `NEEDS_BROWSER_SESSION` or `FORBIDDEN`, and that refusal's `fix` is what the person reads.
  */
 
-import { createClient, type Level, type Member } from '@braindog/client';
+import { createClient, type EraseReport, type Invitation, type Invited, type Level, type Member, type Restored, type Snapshot } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import type { Fetch } from './boot-live.ts';
@@ -106,6 +106,34 @@ export async function removeAccess(base: string, p: Person, io?: Fetch): Promise
   return wrote(await clientOf(base, io).removeMember({ person: p.id }));
 }
 
+/* ── invitations ──────────────────────────────────────────────────────── */
+
+/**
+ * The link an invitation is opened at. The token rides in the fragment, so it never reaches a server log, a proxy or a
+ * `Referer`: `/invite` reads it and clears it before anything else.
+ */
+export const inviteLink = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}/invite#${token}`;
+
+/** Mint one for an address. The answer holds the only copy of the link, to show once and keep nowhere. */
+export async function inviteEmail(base: string, email: string, level: Level, io?: Fetch): Promise<Wrote<Invited>> {
+  return wrote(await clientOf(base, io).inviteByEmail({ email: email.trim(), level }));
+}
+
+export type InvitesRead = { from: 'live'; invites: Invitation[] } | { from: 'sample' } | { from: 'refused'; fix: string };
+
+/** Every invitation still waiting, newest first. A host older than invitations lists none. */
+export async function readInvites(base: string, io?: Fetch): Promise<InvitesRead> {
+  const out = wrote(await clientOf(base, io).invitations());
+  if (out.ok) return { from: 'live', invites: out.value };
+  if (out.from === 'sample' || out.code === 'ROUTE_UNKNOWN') return { from: 'sample' };
+  return { from: 'refused', fix: out.fix };
+}
+
+/** Withdraw one. Its link stops working at once. */
+export async function withdrawInvite(base: string, id: string, io?: Fetch): Promise<Wrote<{ id: string; revoked_at: string }>> {
+  return wrote(await clientOf(base, io).revokeInvite({ id }));
+}
+
 /* ── export ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -128,4 +156,65 @@ export async function exportFile(base: string, kind: ExportKind, slug: string, i
   const out = wrote(await clientOf(base, io).export(sections ? { sections: [...sections] } : {}));
   if (!out.ok) return out;
   return { ok: true, value: { name: `${slug || 'record'}${suffix}.dogl`, text: `${out.value.join('\n')}\n` } };
+}
+
+/* ── backups, erasure and deletion ──────────────────────────────────────── */
+
+export type SnapshotsRead = { from: 'live'; snapshots: Snapshot[] } | { from: 'sample' } | { from: 'refused'; code: string; fix: string };
+
+/**
+ * The copies the host keeps. A host that keeps none (the Worker today) is `refused`, with its sentence, and the screen
+ * draws that instead of the sample's list: a live record is never shown copies it does not have.
+ */
+export async function readSnapshots(base: string, io?: Fetch): Promise<SnapshotsRead> {
+  const out = wrote(await clientOf(base, io).snapshots());
+  if (out.ok) return { from: 'live', snapshots: out.value };
+  if (out.from === 'sample') return { from: 'sample' };
+  return { from: 'refused', code: out.code, fix: out.fix };
+}
+
+/** A copy of the whole record, now. */
+export async function backUpNow(base: string, io?: Fetch): Promise<Wrote<Snapshot>> {
+  return wrote(await clientOf(base, io).snapshot({}));
+}
+
+/** Put the record back to one kept copy; what it holds now is kept as a copy first. */
+export async function restoreSnapshot(base: string, bookmark: string, io?: Fetch): Promise<Wrote<Restored>> {
+  return wrote(await clientOf(base, io).restore({ bookmark }));
+}
+
+/** Erase a person, by what names them and, when they are on the record, who they are. */
+export async function erasePerson(base: string, args: { subjects: string[]; personId?: string; basis: string }, io?: Fetch): Promise<Wrote<EraseReport>> {
+  return wrote(await clientOf(base, io).erase(args));
+}
+
+/** Delete the record. `slug` is its name as the person typed it. */
+export async function deleteRecordNow(base: string, slug: string, io?: Fetch): Promise<Wrote<{ slug: string; deleted: true }>> {
+  return wrote(await clientOf(base, io).deleteRecord({ slug }));
+}
+
+/**
+ * One kept copy as the file a browser saves (`GET /api/snapshots/<id>`, `49 §5.13`).
+ *
+ * NOT THROUGH THE CLIENT, which reads JSON: the answer is the SQLite file itself. A refusal is still JSON and still read
+ * the one way. No answer at all, or one that is not the record's, is the sample's: there is no record to fetch from.
+ */
+export async function downloadSnapshot(base: string, id: string, io?: Fetch): Promise<Wrote<{ name: string; blob: Blob }>> {
+  let res: Response;
+  try {
+    res = await (io ?? fetch)(`${base}/api/snapshots/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+  } catch {
+    return { ok: false, from: 'sample', fix: '' };
+  }
+  if (res.ok) {
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? `${id}.dog`;
+    return { ok: true, value: { name, blob: await res.blob() } };
+  }
+  let said: { refusal?: { code: string; fix: string } } | null = null;
+  try {
+    said = (await res.json()) as { refusal?: { code: string; fix: string } };
+  } catch {
+    said = null;
+  }
+  return wrote({ ok: false, refusal: said?.refusal ?? { code: 'UNREACHABLE', fix: '' } });
 }

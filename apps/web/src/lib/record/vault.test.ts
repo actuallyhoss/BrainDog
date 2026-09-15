@@ -129,9 +129,11 @@ test('a key row joins its grant for the counts, and a row with no grant is an in
   ];
   const keys = keysOf(rows, grants, names);
   assert.deepEqual(keys.map((k) => k.label), ['Admin panel', 'Briefed', 'Stripe'], 'retired rows are gone and the order is the label');
-  assert.deepEqual(keys.find((k) => k.id === 'c1'), { id: 'c1', label: 'Stripe', opens: 'Payments', project: 'Kiln', sealed: true, opened: 5, lastOpened: '2026-09-14T10:00:00Z' });
-  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', label: 'Admin panel', opens: 'The panel', project: null, sealed: false, opened: 0, lastOpened: null });
+  assert.deepEqual(keys.find((k) => k.id === 'c1'), { id: 'c1', label: 'Stripe', opens: 'Payments', project: 'Kiln', sealed: true, opened: 5, lastOpened: '2026-09-14T10:00:00Z', grant: 'g1' });
+  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', label: 'Admin panel', opens: 'The panel', project: null, sealed: false, opened: 0, lastOpened: null, grant: null });
   assert.equal(keys.find((k) => k.id === 'c4')?.opened, 2);
+  /* THE GRANT IS WHAT `revokeGrant` NAMES, and a row that holds its counts instead names none. */
+  assert.equal(keys.find((k) => k.id === 'c4')?.grant, null);
 });
 
 test('a key whose grant was revoked is not sealed any more', () => {

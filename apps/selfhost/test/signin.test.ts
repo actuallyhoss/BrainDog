@@ -190,6 +190,15 @@ test('A SESSION READS AND WRITES /api, A PAGE ELSEWHERE CANNOT USE IT, AND AN AG
 
     /* A fresh proof opens the vault. */
     assert.equal((await s.call('/api/listGrants', { sid })).status, 200);
+
+    /* AND THE ONE VAULT WRITE A SCREEN REACHES. The session gets as far as the record, which says there is no such
+       grant; the bearer minted from that same session never gets that far. */
+    const revoked = await s.call('/api/revokeGrant', { sid, body: { id: 'g_nowhere' } });
+    assert.equal(revoked.status, 422, JSON.stringify(revoked.body));
+    assert.equal(revoked.body?.refusal?.code, 'OUT_OF_BOUNDS', 'the record, not the router, is what answered');
+    const barred = await s.call('/api/revokeGrant', { bearer, body: { id: 'g_nowhere' } });
+    assert.equal(barred.status, 403);
+    assert.equal(barred.body?.refusal?.code, 'NEEDS_BROWSER_SESSION');
     s.clean();
   } finally {
     await s.close();

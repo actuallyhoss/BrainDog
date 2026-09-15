@@ -129,6 +129,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
   { name: 'listGrants', group: 'VAULT', writes: false, what: 'What each credential opens. Never the credential.' },
+  { name: 'revokeGrant', group: 'VAULT', writes: true, what: 'Take a credential out of service. The bytes go; the row stays, because what it opened is a fact.' },
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
     takes: { rule: 'json', limit: 'integer' } },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
@@ -153,7 +154,9 @@ export const ROUTES: readonly Route[] = [
   { name: 'retireDeclaration', group: 'ADMIN', writes: true, what: 'Retire one. Its rows stay; a declaration is a shape.' },
   { name: 'ruleApply', group: 'ADMIN', writes: true, what: 'Run one rule over the rows already there. `dry` first: there is no undo.' },
   { name: 'members', group: 'ADMIN', writes: false, what: 'Who is on this record, at what level, and where.' },
-  { name: 'invite', group: 'ADMIN', writes: true, what: 'Put somebody on, or move them. A level per register.' },
+  { name: 'invite', group: 'ADMIN', writes: true, what: 'Put somebody on, or move them. A level per register. An address alone mints a single-use link, sent by nobody.' },
+  { name: 'invitations', group: 'ADMIN', writes: false, what: 'Every invitation still waiting to be used. Never a link.' },
+  { name: 'revokeInvite', group: 'ADMIN', writes: true, what: 'Withdraw an invitation. Its link stops working at once.' },
   { name: 'removeMember', group: 'ADMIN', writes: true, what: 'Take somebody off. Never the last owner.' },
   { name: 'listTokens', group: 'ADMIN', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
   { name: 'createToken', group: 'ADMIN', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
@@ -166,6 +169,11 @@ export const ROUTES: readonly Route[] = [
      the record is a GET a proxy may replay and a browser may prefetch. */
   { name: 'export', group: 'ADMIN', writes: true, what: 'The record as a file: line per row, and it imports back.' },
   { name: 'import', group: 'ADMIN', writes: true, what: 'A file into an EMPTY record. Anything else is a merge nobody asked for.' },
+  { name: 'snapshot', group: 'ADMIN', writes: true, what: 'A copy of the whole record, now, kept by this host. A host that keeps none says so.' },
+  { name: 'snapshots', group: 'ADMIN', writes: false, what: 'The copies this host keeps, newest first, each with when it was taken and its size.' },
+  { name: 'restore', group: 'ADMIN', writes: true, what: 'Put the record back to one kept copy. What it was is kept as a copy first.' },
+  { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
+  { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this record, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
@@ -176,20 +184,29 @@ export const ROUTES: readonly Route[] = [
 ];
 
 /**
- * The three vault methods that touch sealed material are DELIBERATELY NOT HERE.
+ * The two vault methods that CARRY sealed material are DELIBERATELY NOT HERE.
  *
- * `45-SPEC-RECORD` puts VAULT behind a browser session, and neither host can yet tell one from a
- * bearer token — so routing `openGrant` would make a credential reachable by anything holding a
- * token, which is the one thing this product says it does not do. `listGrants` is here because it
- * carries what a key OPENS and never the key. The others arrive when a host can prove a session.
+ * BOTH HOSTS CAN NOW PROVE A SESSION. `withSession` puts `provedAt` on the context from the session
+ * row and from nowhere else, so the record's vault gate refuses every bearer `NEEDS_BROWSER_SESSION`
+ * and sends a session older than fifteen minutes back to sign in (`12 §6` rules 2 and 3). That is why
+ * `listGrants` and `revokeGrant` are routed: neither carries a byte of a credential in either
+ * direction, and `revokeGrant` takes an id and destroys bytes.
+ *
+ * `openGrant` AND `bindGrant` STILL ARE NOT, and a session is not what they are waiting for. They are
+ * the two ends of the sealed shape: `openGrant` answers sealed material a browser cannot open, and
+ * `bindGrant` takes sealed material a browser cannot make, because the key store is the host's and the
+ * record never sees a plaintext credential (ADR-062). Reaching them from a screen needs a host step
+ * that seals and opens for a session, as `/api/vault/deposit` and `/api/vault/open` do for a vault
+ * grant's bearer — and that door refuses any request carrying an `Origin`, which every page sends.
  */
 export const UNROUTED = [
   'openGrant',
   'bindGrant',
-  'revokeGrant',
   'createRecord',
   'deviceStart',
   'devicePoll',
+  /* Whoever calls it with a person puts that person on the record. `/auth/invite` calls it, after a sign-in. */
+  'acceptInvite',
   'vaultGrant',
   /* The key doors' record half: `vault.ts` calls them after `vaultGrant`, with sealed bytes only. */
   'depositGrant',
@@ -313,6 +330,7 @@ export type RecordSurface = {
   page(args: never, ctx: never): Promise<Result<unknown>>;
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
+  revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
@@ -338,6 +356,8 @@ export type RecordSurface = {
   ruleApply(args: never, ctx: never): Promise<Result<unknown>>;
   members(ctx: never): Promise<Result<unknown>>;
   invite(args: never, ctx: never): Promise<Result<unknown>>;
+  invitations(ctx: never): Promise<Result<unknown>>;
+  revokeInvite(args: never, ctx: never): Promise<Result<unknown>>;
   removeMember(args: never, ctx: never): Promise<Result<unknown>>;
   listTokens(ctx: never): Promise<Result<unknown>>;
   createToken(args: never, ctx: never): Promise<Result<unknown>>;
@@ -347,6 +367,11 @@ export type RecordSurface = {
   revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
   export(args: never, ctx: never): Promise<Result<unknown>>;
   import(args: never, ctx: never): Promise<Result<unknown>>;
+  snapshot(args: never, ctx: never): Promise<Result<unknown>>;
+  snapshots(ctx: never): Promise<Result<unknown>>;
+  restore(args: never, ctx: never): Promise<Result<unknown>>;
+  erase(args: never, ctx: never): Promise<Result<unknown>>;
+  deleteRecord(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
   attach(args: never, ctx: never): Promise<Result<unknown>>;
@@ -372,6 +397,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     page: (a, ctx) => api.page(a as never, ctx as never),
     metric: (a, ctx) => api.metric(a as never, ctx as never),
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
+    revokeGrant: (a, ctx) => api.revokeGrant(a as never, ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
@@ -397,6 +423,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     ruleApply: (a, ctx) => api.ruleApply(a as never, ctx as never),
     members: (_a, ctx) => api.members(ctx as never),
     invite: (a, ctx) => api.invite(a as never, ctx as never),
+    invitations: (_a, ctx) => api.invitations(ctx as never),
+    revokeInvite: (a, ctx) => api.revokeInvite(a as never, ctx as never),
     removeMember: (a, ctx) => api.removeMember(a as never, ctx as never),
     listTokens: (_a, ctx) => api.listTokens(ctx as never),
     createToken: (a, ctx) => api.createToken(a as never, ctx as never),
@@ -406,6 +434,11 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),
     export: (a, ctx) => api.export(a as never, ctx as never),
     import: (a, ctx) => api.import(a as never, ctx as never),
+    snapshot: (a, ctx) => api.snapshot(a as never, ctx as never),
+    snapshots: (_a, ctx) => api.snapshots(ctx as never),
+    restore: (a, ctx) => api.restore(a as never, ctx as never),
+    erase: (a, ctx) => api.erase(a as never, ctx as never),
+    deleteRecord: (a, ctx) => api.deleteRecord(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
     attach: (a, ctx) => api.attach(a as never, ctx as never),

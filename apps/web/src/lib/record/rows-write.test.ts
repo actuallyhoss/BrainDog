@@ -178,6 +178,78 @@ test('a number typed into a box goes as a number, an emptied box as null, and a 
   assert.deepEqual(outbound('obligations', { party: 12 }, none), { party: 12 });
 });
 
+test('archiving sets deleted_at at the version read, and restoring sends it back as null', async () => {
+  const { io, sent } = host((url, body) => {
+    const walked = refs(url);
+    if (walked) return walked;
+    const patch = (body?.patch ?? {}) as Record<string, unknown>;
+    const version = Number(body?.version ?? 0) + 1;
+    return json(200, { ok: true, value: row({ version, deleted_at: patch.deleted_at === null ? null : '2026-09-16T10:00:00.000Z' }) });
+  });
+  const writer = rowWriter(BASE, io);
+  const gone = await writer.archive('obligations', 2, 7);
+  assert.equal(gone.ok, true);
+  if (!gone.ok) return;
+  const [archived] = writes(sent);
+  assert.equal(archived?.url.pathname, '/api/update');
+  assert.equal(archived?.body?.version, 7);
+  const patch = archived?.body?.patch as Record<string, unknown>;
+  assert.deepEqual(Object.keys(patch), ['deleted_at']);
+  assert.equal(typeof patch.deleted_at, 'string', 'an archive sends a deleted_at that is not null');
+  assert.equal(gone.entry.version, 8);
+
+  const back = await writer.restore('obligations', 2, gone.entry.version);
+  assert.equal(back.ok, true);
+  assert.deepEqual(writes(sent)[1]?.body, { register: 'obligations', seq: 2, patch: { deleted_at: null }, version: 8 });
+});
+
+test("an archive the record refuses is its own sentence, and a moved row comes back as it stands", async () => {
+  const fix = 'Only somebody who can write to obligations can archive its rows.';
+  const refused = host((url) => refs(url) ?? json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));
+  assert.deepEqual(await rowWriter(BASE, refused.io).archive('obligations', 2, 7), { ok: false, why: 'refused', fix });
+
+  const moved = host((url) => refs(url) ?? json(409, { ok: false, conflict: { version: 9, current: row({ version: 9 }), actor: 'p_2' } }));
+  const out = await rowWriter(BASE, moved.io).restore('obligations', 2, 7);
+  if (out.ok || out.why !== 'conflict') return assert.fail(`expected a conflict, got ${JSON.stringify(out)}`);
+  assert.equal(out.entry?.version, 9);
+});
+
+test('a saved view is one page declaration over the list, with its filter, order and columns', async () => {
+  const { io, sent } = host((url) => refs(url) ?? json(200, { ok: true, value: { id: 'page.x', version: 1 } }));
+  const writer = rowWriter(BASE, io);
+  const address = { filters: [{ field: 'state', op: 'in', values: ['open', 'part'] }, { field: 'party', op: 'in', values: ['3'] }], q: '', sort: { field: 'due', dir: 'asc' as const } };
+  const out = await writer.saveView('obligations', 'Obligations: Status is open or part', address, ['what', 'due']);
+  assert.equal(out.ok, true);
+  if (!out.ok) return;
+  assert.match(out.slug, /^obligations-[a-z0-9]+$/u);
+  assert.equal(out.id, `page.${out.slug}`);
+  const [saved] = writes(sent);
+  assert.equal(saved?.url.pathname, '/api/setDeclaration');
+  const body = saved?.body?.body as Record<string, unknown>;
+  assert.equal(body.page, out.slug);
+  assert.deepEqual(body.nav, { section: copy.viewsSection, order: 900 });
+  assert.deepEqual(body.requires, ['register.obligations']);
+  assert.deepEqual(body.blocks, [
+    {
+      kind: 'table',
+      span: 12,
+      source: 'register.obligations',
+      where: { all: [{ field: 'state', in: ['open', 'part'] }, { field: 'party', is: PERSON }] },
+      order: [{ field: 'due', dir: 'asc' }],
+      columns: [{ field: 'what' }, { field: 'due' }],
+      empty: copy.viewEmpty,
+    },
+  ]);
+
+  assert.deepEqual(await writer.dropView(out.id), { ok: true });
+  assert.equal(writes(sent)[1]?.url.pathname, '/api/retireDeclaration');
+  assert.deepEqual(writes(sent)[1]?.body, { id: out.id });
+
+  const fix = 'Only an owner can change what this record declares.';
+  const refused = host((url) => refs(url) ?? json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));
+  assert.deepEqual(await rowWriter(BASE, refused.io).saveView('obligations', 'x', address, []), { ok: false, why: 'refused', fix });
+});
+
 test('both register screens write through this module', () => {
   for (const at of ['../../routes/r/[register]/+page.svelte', '../../routes/r/[register]/[seq]/+page.svelte']) {
     const page = readFileSync(new URL(at, import.meta.url), 'utf8');

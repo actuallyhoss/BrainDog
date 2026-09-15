@@ -376,6 +376,21 @@ export const no = <T>(code: string, fix: string, extra: Omit<Refusal, 'code' | '
   refusal: { code, fix, ...extra },
 });
 
+/**
+ * `33 §1` port 9: the copies a host keeps of one whole record, by id.
+ *
+ * THE HOST'S, NOT THE RECORD'S. A self-host writes `VACUUM INTO` files beside the record (`53 §5.4`); the Worker has
+ * no such file, and its sealed nightly copy needs a key only the operator holds, so it passes no store and the record
+ * refuses `snapshot`, `snapshots` and `restore` with `NOT_IN_THIS_BUILD`. `restore` throws a sentence a person can
+ * read when a copy cannot be put back in place.
+ */
+export type Snapshot = { id: string; at: string; bytes: number };
+export interface Snapshots {
+  take(label: string): Promise<Snapshot>;
+  list(): Promise<Snapshot[]>;
+  restore(id: string): Promise<void>;
+  prune(keep: number): Promise<void>;
+}
 /* Sign-in's seam between a host and the Directory, type-only like everything above. */
 export type {
   AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, Mail, Methods, PasskeyInfo,

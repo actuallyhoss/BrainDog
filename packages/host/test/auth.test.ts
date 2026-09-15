@@ -58,6 +58,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/provision worker',
       'POST /auth/device both',
       'POST /auth/device/token both',
+      'POST /auth/invite both',
     ],
   );
 });

@@ -22,9 +22,9 @@ import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
-import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';
-import type { Entry, Fields } from './schema.ts';
+import type { Entry, Fields, Filter } from './schema.ts';
 import { declaredValue } from './where.ts';
 
 export type Wrote =
@@ -62,10 +62,49 @@ export function outbound(register: string, fields: Fields, refs: ReadonlyMap<str
   return out;
 }
 
+/** What the list's address says about the rows on screen: the chips, the search box and the order. */
+export type Address = { filters: readonly Filter[]; q: string; sort: { field: string; dir: 'asc' | 'desc' } | undefined };
+
+export type Saved = { ok: true; slug: string; id: string } | { ok: false; why: 'refused' | 'unreachable'; fix: string };
+
+/**
+ * A saved view, as a page the kernel already validates: one table over the list, with the address's filter and order.
+ *
+ * A PAGE AND NOT A NAMED PREDICATE. `02 §5` makes a saved view a register's `predicates:`, and the kernel still refuses
+ * that key (`REGISTER_UNBUILT`), so the view is the declaration the record can hold today: a page under Views, drawn
+ * live at `/p/<slug>`, which `retireDeclaration` takes back out. The columns are the ones the list was drawing.
+ */
+export function viewPage(register: string, slug: string, title: string, address: Address, columns: readonly string[], refs: Refs): Record<string, unknown> {
+  const where = treeOf(register, address.filters, address.q, refs);
+  const order = orderOf(address.sort);
+  return {
+    page: slug,
+    title,
+    nav: { section: copy.viewsSection, order: 900 },
+    requires: [`register.${register}`],
+    blocks: [
+      {
+        kind: 'table',
+        span: 12,
+        source: `register.${register}`,
+        ...(where ? { where } : {}),
+        ...(order ? { order } : {}),
+        ...(columns.length > 0 ? { columns: columns.slice(0, 16).map((field) => ({ field })) } : {}),
+        empty: copy.viewEmpty,
+      },
+    ],
+  };
+}
+
 export type RowWriter = {
   create(register: string, fields: Fields, note?: string): Promise<Wrote>;
   update(register: string, seq: number, patch: Fields, version?: number): Promise<Wrote>;
+  /** Archive a row: `deleted_at` set, so every list leaves it out and `restore` brings it back. */
+  archive(register: string, seq: number, version?: number): Promise<Wrote>;
+  restore(register: string, seq: number, version?: number): Promise<Wrote>;
   note(register: string, seq: number, note: string): Promise<Noted>;
+  saveView(register: string, title: string, address: Address, columns: readonly string[]): Promise<Saved>;
+  dropView(id: string): Promise<Noted>;
 };
 
 /** A writer for one tab. The ref maps it walks are kept, the way the readers keep theirs. */
@@ -138,19 +177,41 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
     return stale ? refsFor(register) : refs;
   }
 
+  /** A write that answers no row: the record's sentence, or the calm one when nothing answered. */
+  const noted = (out: { ok: true } | Failed): Noted => {
+    if (out.ok) return { ok: true };
+    if ('refusal' in out && out.refusal.code === 'UNREACHABLE') return { ok: false, why: 'unreachable', fix: copy.writeNotReached };
+    return { ok: false, why: 'refused', fix: 'refusal' in out ? out.refusal.fix : copy.writeRaced };
+  };
+
+  async function update(register: string, seq: number, patch: Fields, version?: number): Promise<Wrote> {
+    const refs = await refsHolding(register, patch);
+    const out = await client.update({ register, seq, patch: outbound(register, patch, refs), ...(version === undefined ? {} : { version }) });
+    if (!out.ok) return failed(register, seq, out, refs);
+    return { ok: true, entry: entryOf(register, out.value as RecordRow, refs) };
+  }
+
   return {
+    update,
+    /* THE RECORD STAMPS ITS OWN INSTANT on a non-null `deleted_at`, so what is sent only has to be not null. */
+    archive: (register, seq, version) => update(register, seq, { deleted_at: new Date().toISOString() }, version),
+    restore: (register, seq, version) => update(register, seq, { deleted_at: null }, version),
+    async saveView(register, title, address, columns) {
+      const refs = await refsFor(register);
+      const slug = `${register.replace(/_/g, '-')}-${Date.now().toString(36)}`;
+      const out = await client.call('setDeclaration', { body: viewPage(register, slug, title, address, columns, refs) });
+      const said = noted(out as { ok: true } | Failed);
+      return said.ok ? { ok: true, slug, id: `page.${slug}` } : said;
+    },
+    async dropView(id) {
+      return noted((await client.call('retireDeclaration', { id })) as { ok: true } | Failed);
+    },
     async create(register, fields, note) {
       const refs = await refsHolding(register, fields);
       const out = await client.create({ register, fields: outbound(register, fields, refs), ...(note ? { note } : {}) });
       if (!out.ok) return failed(register, null, out, refs);
       /* THE NEW ROW IS NOT IN THIS REGISTER'S KEPT MAP, so the map is dropped and walked again when next asked for. */
       maps.delete(register);
-      return { ok: true, entry: entryOf(register, out.value as RecordRow, refs) };
-    },
-    async update(register, seq, patch, version) {
-      const refs = await refsHolding(register, patch);
-      const out = await client.update({ register, seq, patch: outbound(register, patch, refs), ...(version === undefined ? {} : { version }) });
-      if (!out.ok) return failed(register, seq, out, refs);
       return { ok: true, entry: entryOf(register, out.value as RecordRow, refs) };
     },
     async note(register, seq, note) {

@@ -32,14 +32,14 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 5, format: 1, applied: [1, 2, 3, 4, 5] });
+  assert.deepEqual(result.value, { kernel: 6, format: 1, applied: [1, 2, 3, 4, 5, 6] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     .map((r) => r.name)
     .filter((n) => !n.startsWith('sqlite_') && !n.startsWith('entry_fts_'));
-  // Thirty-one in `30-BLUEPRINT` §1, counted there and counted here.
-  assert.equal(tables.length, 31, `tables: ${tables.join(', ')}`);
+  // Thirty-one in `30-BLUEPRINT` §1, and `invitation` from migration 6.
+  assert.equal(tables.length, 32, `tables: ${tables.join(', ')}`);
   for (const wanted of ['record', 'declaration', 'migration', 'counter', 'entry', 'event', 'schedule', 'outbox'])
     assert.ok(tables.includes(wanted), `${wanted} is missing`);
   sql.close();
@@ -51,9 +51,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 5);
+  assert.equal(sql.all('SELECT version FROM migration').length, 6);
   sql.close();
 });
 
@@ -114,7 +114,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -181,7 +181,7 @@ test('every table is placed in a section, and every section holds tables', async
   // in code: a table nobody placed would travel or not travel by accident.
   const { sql } = await open();
   const rows = sql.all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section');
-  assert.equal(rows.length, 31);
+  assert.equal(rows.length, 32);
   /* FIVE, not four: `origin` is its own section because a `.dog` can be exported without the raw
      inbound material an ingest kept — an email body is a customer's mail, not their record. */
   assert.deepEqual(
@@ -240,6 +240,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '53e31fd7d2c5a0e3e356de5567f115d0ceec87b0d3fa80a18487a3a7e7ed4d74',
     'b80b1b26094c9f805a67446187ce6a947fd03511a3445db0c041ffc123d3b144',
     '1a851bda87fb1f20a5d1d2005feebad7efcd6d88b54f4f91e3e97a4aca6e1b4b',
+    'a8e547ecac71bd29c0359924239c99a0414d8e893c0af70751f2a9950ea5d5b8',
   ]);
 });
 
@@ -260,7 +261,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5]);
+  assert.deepEqual(result.value.applied, [4, 5, 6]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },

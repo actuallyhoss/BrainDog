@@ -19,6 +19,7 @@ import session0002 from './migrations/0002_session.ts';
 import packDisabled0003 from './migrations/0003_pack_disabled.ts';
 import device0004 from './migrations/0004_device.ts';
 import scheduleActions0005 from './migrations/0005_schedule_actions.ts';
+import invitation0006 from './migrations/0006_invitation.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -29,6 +30,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 3, slug: 'pack_disabled', sql: packDisabled0003 },
   { version: 4, slug: 'device', sql: device0004 },
   { version: 5, slug: 'schedule_actions', sql: scheduleActions0005 },
+  { version: 6, slug: 'invitation', sql: invitation0006 },
 ];
 
 /**
@@ -37,6 +39,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * imports without (the positional read in `dogl.ts` takes fewer columns), so the format is still 1.
  * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1. Migration 5
  * rebuilds `schedule` with two more kinds, and no file carries a schedule row either.
+ * Migration 6 adds `invitation`, a `local` table no file carries, so it is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

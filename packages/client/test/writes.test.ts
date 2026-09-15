@@ -51,3 +51,20 @@ test('packConfig is a read, so a GET with the id in the query', async () => {
   assert.ok(out.ok);
   assert.deepEqual(net.seen, [{ path: '/api/packConfig', method: 'GET', body: undefined }]);
 });
+
+test('backups, erasure and deletion: the list is a GET, and every other one a POST of its own arguments', async () => {
+  const net = recording(null);
+  const c = createClient({ base: 'https://braindog.example', fetch: net.fetch });
+  await c.snapshot();
+  await c.snapshots();
+  await c.restore({ bookmark: '2026-09-16T12-00-00Z-now' });
+  await c.erase({ subjects: ['Mara Quill'], personId: 'p_2', basis: 'Article 17 request' });
+  await c.deleteRecord({ slug: 'the-studio' });
+  assert.deepEqual(net.seen, [
+    { path: '/api/snapshot', method: 'POST', body: {} },
+    { path: '/api/snapshots', method: 'GET', body: undefined },
+    { path: '/api/restore', method: 'POST', body: { bookmark: '2026-09-16T12-00-00Z-now' } },
+    { path: '/api/erase', method: 'POST', body: { subjects: ['Mara Quill'], personId: 'p_2', basis: 'Article 17 request' } },
+    { path: '/api/deleteRecord', method: 'POST', body: { slug: 'the-studio' } },
+  ]);
+});

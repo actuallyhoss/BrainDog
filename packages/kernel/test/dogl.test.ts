@@ -268,7 +268,7 @@ test('the header travels, the local section does not', async () => {
 
   for (const wanted of ['dog_meta', 'dog_section', 'dog_manifest', 'entry', 'event', 'declaration', 'counter', 'dog_sig'])
     assert.ok(named.includes(wanted), `${wanted} is not in the file`);
-  for (const local of ['token', 'auth_fail', 'observation', 'device_grant', 'job'])
+  for (const local of ['token', 'auth_fail', 'observation', 'device_grant', 'job', 'invitation'])
     assert.ok(!named.includes(local), `${local} is local and travelled`);
 
   // `dog_sig` IS LAST, whatever section it sits in, so a signer appends one line to the end of a

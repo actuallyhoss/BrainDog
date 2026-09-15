@@ -12,7 +12,9 @@
 import { exponentOf } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { callsOutOf, type CallOut } from './actions.ts';
 import { PACKS, PACK_SETTINGS } from './data.ts';
+import { planOf, type Plan } from './vault.ts';
 
 /** A refusal as the record writes one, with only the keys this screen reads. */
 export type Refusal = { code: string; fix: string; at?: string | undefined; allowed?: readonly string[] | undefined };
@@ -115,6 +117,59 @@ export function live(client: Caller): Source {
     setConfig: async (id, values) => said(await client.setPackConfig({ id, values })) as Answer<ConfigSaved>,
     uninstall: async (id) => said(await client.uninstallPack({ id })) as Answer<Uninstalled>,
   };
+}
+
+/* ── installing one from the catalogue ──────────────────────────────────── */
+
+/** The two client methods an install calls, apart from `Caller` so the switch tests need not stub them. */
+export type Installer = {
+  planPack(args: { doc: unknown; source?: { kind: string } }): Promise<Wire<unknown>>;
+  installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[] }): Promise<Wire<unknown>>;
+};
+
+/** A plan somebody is reading: the record's diff in the screen's words, the calls it makes, and the lines Install approves. */
+export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; calls: CallOut[]; approve: string[] };
+
+/**
+ * The document behind a catalogue entry, or `null` for one nothing ships yet.
+ *
+ * LOADED WHEN INSTALL IS PRESSED, because the seed is every first-party declaration and most visits never install.
+ */
+export async function packDocument(id: string): Promise<Record<string, unknown> | null> {
+  const seed = await import('@braindog/seed');
+  return id === seed.AGENTS_PACK.manifest.id ? seed.agentsPackDocument() : seed.firstPartyDocument(id);
+}
+
+/**
+ * Ask the record what installing a document would do. The plan is what the screen draws, and its `planHash` is what
+ * Install sends back, so what installs is what was shown.
+ */
+export async function planInstall(client: Installer, id: string, doc: Record<string, unknown>, nameOf: (kind: 'register' | 'page', id: string) => string): Promise<Answer<Offer>> {
+  const planned = said(await client.planPack({ doc, source: { kind: 'local' } }));
+  if (!planned.ok) return planned;
+  const diff = (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } } | null)?.diff;
+  const plan = planOf(diff, nameOf);
+  if (!plan) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.writeRaced } };
+  const approve = Array.isArray(diff?.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
+  return { ok: true, value: { id, doc, plan, calls: callsOutOf(diff?.calls_out), approve } };
+}
+
+/**
+ * Install the plan that was shown. `PLAN_STALE` means the record moved since, so it is planned again and the fresh plan
+ * comes back beside the sentence, for the person to read before pressing again.
+ */
+export async function installPlanned(
+  client: Installer,
+  offer: Offer,
+  nameOf: (kind: 'register' | 'page', id: string) => string,
+): Promise<{ ok: true } | { ok: false; fix: string; again: Offer | null }> {
+  const out = said(
+    await client.installPack({ doc: offer.doc, source: { kind: 'local' }, planHash: offer.plan.planHash, ...(offer.approve.length > 0 ? { approve: offer.approve } : {}) }),
+  );
+  if (out.ok) return { ok: true };
+  if (out.refusal.code !== 'PLAN_STALE') return { ok: false, fix: out.refusal.fix, again: null };
+  const fresh = await planInstall(client, offer.id, offer.doc, nameOf);
+  return fresh.ok ? { ok: false, fix: out.refusal.fix, again: fresh.value } : { ok: false, fix: fresh.refusal.fix, again: null };
 }
 
 /** The two answers that mean there is no record here, the same two `data/record.ts` falls back on. */

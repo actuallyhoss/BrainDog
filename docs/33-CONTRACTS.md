@@ -140,6 +140,8 @@ interface Snapshots {
 // Cloud: PITR bookmarks, plus the nightly walk — scheduled() → snapshot (ADMIN, as system) → an export.r2 outbox row →
 // Snapshots.take writes the .dogl.age under the record's R2 prefix (51 §13 D8; 53 §13 #8). Self-host: VACUUM INTO,
 // nightly, keep 30 — a full copy that keeps the six local tables and never leaves the host (§6).
+// Wired September 16th 2026: the self-host also takes one on demand from `snapshot` and serves `snapshots` and `restore`
+// over them; the Worker passes no store, so those three refuse NOT_IN_THIS_BUILD with a sentence pointing at Export.
 
 // ─── Ingress — an entrypoint contract, not a port ──────────────────────────────────────────
 interface Ingress {
@@ -199,12 +201,12 @@ the alarm and the queue build a `system` context. The record derives `actor` and
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The eighty-two methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+**The eighty-three methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
 any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources, except `inbox`, an
 owner's in a browser · VAULT a browser session only · JOBS the browser four by session and the runner three by the
 runner's grant, every MCP token refused · ADMIN a browser session, or a bearer carrying an operation grant for that one
-operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 16 · 4 · 7 · 24 · 19, as 30 §5 counts
-them. `ROUTES` in `@braindog/host` routes 55 of the eighty-two at `/api/<method>`, 23 of them ADMIN.
+operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 16 · 4 · 7 · 27 · 19, as 30 §5 counts
+them. `ROUTES` in `@braindog/host` routes 63 of the eighty-five at `/api/<method>`, 30 of them ADMIN (recounted September 16th 2026 from the table itself, which the `router-groups` gate prints).
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
@@ -258,19 +260,22 @@ them. `ROUTES` in `@braindog/host` routes 55 of the eighty-two at `/api/<method>
 | ADMIN | `setPackConfig` | `{ id, values }`: each value checked against the manifest's `config:`, and `null` puts a setting back to its default; any other key is `FIELD_UNKNOWN` | `{ id, version, config, values, changed, said }`, with one `edit` event. Nothing installed changes: a declaration reads the new value the next time the pack is planned and installed. A pack this record does not have is `DECLARATION_UNKNOWN` |
 | ADMIN | `setDeclaration` | `{ body }` — one in-app declaration; no `mode` | the declaration's new version; a rule is tested and applied by `ruleTest` / `ruleApply`, never here |
 | ADMIN | `ruleApply` | `{ id, dry }` | `dry: true` → the `DryRun`; `false` → the rows written, no undo (07 §6) |
-| ADMIN | `invite` | `{ email, levels }` — the owner mints; one email, 24 h | the invitation; acceptance is `acceptInvite` |
+| ADMIN | `invite` | `{ person, level?, registers? }` moves somebody already known; `{ email, level?, registers? }` mints an invitation — one address, 24 h | the member rows, or `{ invitation, token }`: the link's token, answered once and stored only as `sha256`. A host where nobody can sign in refuses `NOT_IN_THIS_BUILD` with its own sentence, an address already on the record is `ALREADY_KNOWN`, and a token is `NEEDS_BROWSER_SESSION`. Nothing is mailed; acceptance is `acceptInvite` |
+| ADMIN | `invitations` | `{}` | every invitation still waiting, newest first, each `{ id, email, level, registers, invited_by, created_at, expires_at }`. Never a link and never a hash |
+| ADMIN | `revokeInvite` | `{ id }` | `{ id, revoked_at }`; the link stops working at once. One already used, withdrawn or run out is `OUT_OF_BOUNDS` |
 | ADMIN | `export` | `{ cursor?, sections?, redactGrants? }` | one page of `.dogl` lines (≤ 1,000 rows) + the next cursor; `system` for the nightly backup (§9) |
 | ADMIN | `import` | `{ lines }` — the whole `.dogl` | the `ImportReport`; into an empty record only (§9) |
-| ADMIN | `erase` | `{ subjects, personId?, basis }` — a subject is three characters or more | the report; the stores of 02 §10 in one transaction, R2 through the outbox |
-| ADMIN | `restore` | `{ bookmark, at? }` | writes `restore.pitr`; on Cloud the Worker runs `pitr(at)` first (§9) |
-| ADMIN | `snapshot` | `{ label? }` | one outbox row the host's `Snapshots.take` consumes (§1) |
+| ADMIN | `erase` | `{ subjects, personId?, basis }` — a subject is three characters or more | the report; the stores of 02 §10 in one transaction, R2 through the outbox; an owner is not erasable (`LEVEL_REQUIRED`), and a basis naming the subject is `VALUE_MALFORMED` |
+| ADMIN | `restore` | `{ bookmark, at? }` | writes `restore.pitr`; on Cloud the Worker runs `pitr(at)` first (§9). A self-host puts back one of its kept copies, the record kept first as `before-restore`, from a sign-in in the last 15 minutes where the host knows one; the Worker refuses `NOT_IN_THIS_BUILD` until `pitr(at)` is wired |
+| ADMIN | `snapshot` | `{ label? }` | `{ id, at, bytes }` from the host's `Snapshots.take` (§9), and one `export` event; a host with no store refuses `NOT_IN_THIS_BUILD`, the Worker today, whose copy is sealed to a key only the operator holds |
+| ADMIN | `snapshots` | none | the copies the host keeps, newest first, `{ id, at, bytes }[]`; a self-host streams one at `GET /api/snapshots/<id>` (amended September 16th 2026) |
 | ADMIN | `createToken` | `{ scope, name }` — one scope word, the ladder's top | the bearer `<rec_id>.<secret>`, shown once; the row stores `sha256(secret)` |
 | ADMIN | `listTokens` | `{}` | the tokens with `last_used_at`, `last_surface`; never a secret |
 | ADMIN | `revokeToken` | `{ id }` | nothing |
 | ADMIN | `deviceApprove` | `{ user_code }`, by the owner from a sign-in proved in the last 15 minutes; five wrong codes deny every waiting device | `{ handle, reach, scope, label, ua }`; an `access.grant` event names the approver |
 | ADMIN | `listDevices` | `{}` | every device grant by its handle, with its status, reach, label and last use; never a poll id, a code or a bearer |
 | ADMIN | `revokeDevice` | `{ handle }` | the row, now `revoked`, and a login's token revoked with it; an unknown handle is `OUT_OF_BOUNDS` |
-| ADMIN | `deleteRecord` | `{ slug }` — typed to confirm; a browser session, re-authenticated | the record is gone: the Worker `destroy()`s the object and removes the R2 prefix (§10) |
+| ADMIN | `deleteRecord` | `{ slug }` — typed to confirm; a browser session, re-authenticated | the record is gone: the Worker `destroy()`s the object and removes the R2 prefix (§10). A self-host removes the record file, its copies and its Directory name, and answers 503 after; the Worker refuses `NOT_IN_THIS_BUILD` until the sealed final snapshot is wired |
 | INTERNAL | `drainSchedule` | `{}` | the alarm handler: the due rows fired, the next `due_at` |
 | INTERNAL | `leaseOutbox` | `{ kinds, n }` | the leased rows; one statement, so a double drain finds nothing |
 | INTERNAL | `ackOutbox` | `{ id, state, result?, error? }` — object form, the one shape | nothing; `infer.*` write-backs ride `result` inside the ack's transaction |
@@ -282,7 +287,7 @@ them. `ROUTES` in `@braindog/host` routes 55 of the eighty-two at `/api/<method>
 | INTERNAL | `applyPull` | `{ outbox, n, raw, rows?, ingest }` — one page of a pull | `{ wrote, kept }`; refused on a lease that is not this run's |
 | INTERNAL | `sealedGrant` | `{ grant_id }` | `{ ciphertext, nonce, aad, kek_id, wrapped_dek }` for a connector run |
 | INTERNAL | `changed` | `{ since }` | `{ version, registers }` — the live channel's frame |
-| INTERNAL | `acceptInvite` | `{ invitation, person }` — the Directory's verified person | `person_record`, the `person` mirror, the `member` rows, one `access.grant` event per register |
+| INTERNAL | `acceptInvite` | `{ token, person }` — the link's token and the Directory's verified person, which `POST /auth/invite` has just signed in; with no `person` it only looks | the `person` mirror, the `member` rows and one `access.grant` event per register, written as `system` with the invitation id in the note, and the row marked accepted in the same transaction. Spent, withdrawn or run out is `OUT_OF_BOUNDS`, and the token is compared by its hash |
 | INTERNAL | `deviceStart` | `{ reach, label, ua?, scope? }` and the caller's address | `{ device_code, user_code, expires, interval }`; the eleventh start from one address in 15 minutes is `{ ok: false, retryAfter }`. The host adds `verification_uri` and `expires_in` |
 | INTERNAL | `devicePoll` | `{ device_code }` | `{ pending: true, interval }`, or `{ pending: false, bearer, reach, scope, expires }` once, after approval |
 | INTERNAL | `vaultGrant` | a `vault` reach's bearer | `{ handle, scope, person, expires }` for the host's key doors; `verifyToken` never accepts one |
@@ -427,10 +432,13 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/logout` | POST | both | ends the session and clears the cookie |
 | `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always `<origin>/settings/agents`. `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
 | `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when `BRAINDOG_TOKEN` is set |
+| `/auth/invite` | POST | both | `{ inviteToken, accept? }`, the token from the link's fragment: without `accept` it looks and spends nothing, answering `{ email, expires_at, signedInAs }`. With it, somebody signed in at that address goes on the record; an address that can already sign in here is 401 and signs in first; a new address is made, put on the record and given a session. A self-host whose owner has no passkey is 409, because its server key stops working at the second person |
 | `/auth/provision` · `/auth/claim/mint` | POST | Cloud | the operator's, behind `PROVISION_KEY`: a record, its Directory rows and a 24-hour claim link handed back, never mailed |
 
 Specified and not built: `/auth/device/approve` (the operation grant of
-§10), `/auth/invite` and `/auth/switch`. They keep these paths when they land.
+§10) and `/auth/switch`. They keep these paths when they land. *(`/auth/invite` landed September 16th 2026, as a POST taking the
+token in its body: the link is `<origin>/invite#<token>` and the fragment keeps the token out of logs, proxies and `Referer`,
+as a sign-in link's does.)*
 
 **The `/account/*` routes.** `ACCOUNT_ROUTES` in `packages/host/src/auth.ts` is this table as data, and both hosts
 answer it through one `serveAccount`. The session cookie is the only credential it reads: a bearer, no cookie, a host
@@ -630,7 +638,7 @@ verify with the same key and import to the same rows.
 | **Export from a self-host** | `VACUUM INTO`, strip the six `local` tables, vacuum again, write the manifest and signature into the copy — that is the export; the untouched `VACUUM INTO` copy is the snapshot (§6) |
 | **What travels** | every table except `dog_section = 'local'` — six: `token device_grant auth_fail observation job job_event`; the other twenty-five travel. `grant` rows travel with `ciphertext` sealed, and `vault_key` travels — a KEK-wrapped key is nothing without the KEK, and a restored record must open its own vault; `--redact-grants` drops them; `--sections` narrows to `data`, `origin`, `governance` |
 | **Import** | `POST /api/import` takes the whole `.dogl` as one `text/plain` body — there is no page protocol over HTTP; the record's batching (≤ 30 rows × ≤ 3 parameters) is internal to `importDogl`. Only into an empty record (`IMPORT_NOT_EMPTY`); verify signature and manifest (`SIGNATURE_INVALID`, `CHECKSUM_MISMATCH`); refuse a `user_version` above the reader's (`FORMAT_NEWER_THAN_READER`); run kernel migrations on the imported rows; rebuild `entry_fts` from `entry`; write one `import` event — so export → import → export differs by exactly that one appended event. It is not the write path — `event` rows keep their actors — but nothing bypasses validation |
-| **Restore** | `restore({ bookmark, at? })` is one ADMIN method: on Cloud the Worker performs `pitr(at)` first and then calls it, and it writes `restore.pitr` into the restored storage. A self-host has no PITR and does not serve `restore`: the path is `braindog import` into a fresh record, or a snapshot put back offline (§6) |
+| **Restore** | `restore({ bookmark, at? })` is one ADMIN method: on Cloud the Worker performs `pitr(at)` first and then calls it, and it writes `restore.pitr` into the restored storage. A self-host has no PITR; it serves `restore` over its kept `VACUUM INTO` copies, a bookmark being a copy's id, and `braindog import` into a fresh record stays the path for anything else (§6). The Worker refuses `restore` with `NOT_IN_THIS_BUILD` until `pitr(at)` is wired (amended September 16th 2026) |
 | **Migrations** | `packages/kernel/src/migrations/NNNN_<slug>.ts`, each exporting its SQL string; applied in numeric order by `applyMigrations` (INTERNAL) from the DO constructor under `blockConcurrencyWhile`, before any cache load — a fresh database never throws on open; each in one `transactionSync` that inserts its `migration` row; a module carrying `-- format-bump` sets `PRAGMA user_version` — best effort inside the record (a conformance case measures whether the DO permits it, and the refusal is swallowed explicitly), and set by the CLI or the self-host when a `.dog` is materialised; a checksum mismatch or a database newer than the code sets a module-level refusal (`SCHEMA_MISMATCH` \| `SCHEMA_NEWER`) that every RPC returns as 503 until a deploy fixes it — per record on a self-host. Never rolled back, never percentage-rolled: fix-forward |
 
 Three numbers, one home each: `PRAGMA user_version` = the format revision (1 at v1); `MAX(migration.version)` = the
@@ -666,7 +674,7 @@ tables are `dir_`-prefixed, at Directory version 3.
 |---|---|
 | Sign up | Cloud: email → magic link → `createRecord` (INTERNAL) writes the record first — the record row, the owner's `person` mirror, `member('*', 'owner')` — then the Directory rows `record_dir` and `person_record`; sign-up generates the record DEK, the connector DEK and the signing key ([12-SECURITY](12-SECURITY.md) §6); a passkey is registered after, from phase 3. Self-host: closed — `init` and invitations; an unknown email at `/auth/magic/start` gets 200 and no mail |
 | Sign in | passkey first where one exists, the magic link as the fallback — the self-host's only path in phase 2; both produce a `session` row, which carries the record; a self-host also takes its server key at `/auth/token`; **no passwords** |
-| Invite | `invite({ email, levels })` (ADMIN, the owner) mints an invitation — one email, 24 h; the invitee signs in behind `GET /auth/invite/<token>` and the host calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes `person_record`, the record's `person` mirror, the `member` rows and one `access.grant` event per register |
+| Invite | `invite({ email, level?, registers? })` (ADMIN, the owner) mints an invitation — one address, 24 h, the token stored as `sha256` and answered once. No host mails it: the owner copies the link out of Settings. The invitee opens `<origin>/invite#<token>`, presses Accept, and `POST /auth/invite` signs them in and calls `acceptInvite` (INTERNAL) with the Directory's verified person, which writes the record's `person` mirror, the `member` rows and one `access.grant` event per register |
 | Agent token | minted from a browser session (`createToken`) or by `braindog login`'s device flow; scoped `read` / `propose` / `write` — one word stored, the ladder's top; the bearer is `<rec_id>.<secret>` and the record's `token` table stores `sha256(secret)` with `last_used_at` and `last_surface`; one record |
 | Device grant | six digits, ten minutes, five tries; `code_hash = sha256(id ‖ ':' ‖ user_code)` — `id` is the poll id, never the code; approved by the owner from a sign-in proved in the last 15 minutes (`deviceApprove`); `verification_uri` is `${origin}/settings/agents`; `device_grant.reach` names what the grant reaches — `login` or `runner` mint a 90-day bearer in `token_hash`; the CLI, an agent and a runner all enrol this way |
 | Operation grant | `reach ∈ export \| import \| pack \| token`: from a browser session the owner approves **one named operation** after seeing its summary; the approval is single-use, expires in ten minutes, is recorded in `device_grant.reach` and an `access.grant` event, and the bearer then reaches exactly that ADMIN method once with `ctx.op` set (§4; [ADR-060](16-DECISIONS.md) as amended) |

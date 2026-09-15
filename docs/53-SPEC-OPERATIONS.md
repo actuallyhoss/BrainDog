@@ -273,6 +273,8 @@ with counts* — both cookie, ADMIN (51 D8); Settings → backups draws them. A 
 31 tables, the six `local` ones included, because it is a backup of the instance and not an export — signed over the 25
 the manifest covers; `verify` reports 25 (§13 #10).
 
+*Amended September 16th 2026.* A self-host takes one on demand as well as nightly: `snapshot` runs `VACUUM INTO <slug>/snapshots/<time>Z-<label>.dog` (0600, thirty kept, a `before-restore` copy never the one that prunes), writes one `export` event, and `GET /api/snapshots/<id>` streams the file to whoever `snapshots` answers. Settings → backups → *Restore this copy* calls `restore({ bookmark: <id> })`: the owner, from a sign-in in the last 15 minutes where the host knows one; the record is kept as a `before-restore` copy first, the copy's tables are put back in one transaction, the search index is rebuilt, and one `restore.pitr` event is written into the restored record. A copy written by other migrations is refused `OUT_OF_BOUNDS` and changes nothing. Cloud serves none of the three yet: the `.dogl.age` needs the operator's age recipient and the `export.r2` delivery, and (a)'s bookmark dance is not wired, so `snapshot`, `snapshots` and `restore` refuse `NOT_IN_THIS_BUILD` with a sentence, and nothing is written.
+
 **Verifying a backup is restorable** — the operator, monthly, one random record plus the ops record (§9).
 
 Precondition: the age identity on the operator's machine (§8); `braindog` and `docker` installed; a `log` note naming the
@@ -297,7 +299,7 @@ starts at step 3 with `<slug>/snapshots/<date>.dog`.
 |---|---|
 | a bad write, rule, import or corruption inside 30 days, Cloud | **(a) PITR** |
 | older than 30 days, or the object is gone, Cloud | **(b) from `.dogl.age`** |
-| self-host | **(c) `import` into a fresh directory** |
+| self-host | **(c) `restore` from a kept copy (§5.4), or `import` into a fresh directory** |
 
 **(a) PITR.** The owner, Settings → backups → *restore to a time* — `POST /api/restore { at }`, cookie, ADMIN
 (51 §5.14).
@@ -460,6 +462,8 @@ Verify: the slug resolves to nothing; `BLOBS.list({ prefix: 'rec_<id>/' })` is e
 storage went (51 §9).
 Rollback: none after step 2. Before it, stop. After it, the platform's own 30-day window is the last trace, and by day
 +30 nothing of the record remains anywhere.
+
+*Amended September 16th 2026.* On a self-host `deleteRecord` is steps 2, 4 and 5 for one file: the scheduler stops, the record file with its `-wal`, `-shm` and `snapshots/` goes (the whole `<slug>/` directory when it is the record's own), the Directory releases the slug, and every later request answers 503 `RECORD_UNAVAILABLE`. There is no step 1, because the final copy would sit in the directory being removed. The Worker refuses `NOT_IN_THIS_BUILD`, and deletes nothing, until step 1's sealed snapshot is wired.
 
 ### 5.10 · Billing lapse
 

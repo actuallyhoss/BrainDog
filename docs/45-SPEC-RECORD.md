@@ -62,7 +62,7 @@ export type RecordApi = {
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
   // PEOPLE: 1, added with the agents pack (loop/research-agent-path.md §5.6)
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
-  // READ+ — 11
+  // READ+ — 13
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
   schema(args: { register: string }, ctx: CallContext): Promise<Result<unknown>>;
@@ -88,17 +88,21 @@ export type RecordApi = {
   claimJob(args: { runner_id?: string }, ctx: CallContext): Promise<Result<Claim | Idle>>;
   postJobEvent(args: JobEventIn, ctx: CallContext): Promise<Result<Ack>>;
   readCancel(args: { job_id: string }, ctx: CallContext): Promise<Result<{ cancel: 0 | 1; lease_until: string | null }>>;
-  // ADMIN — 16
+  // ADMIN — 22
   planPack(args: { doc: unknown; source?: PackSource }, ctx: CallContext): Promise<Result<Diff>>;
   installPack(args: { doc: unknown; source?: PackSource; planHash: string }, ctx: CallContext): Promise<Result<Applied>>;
   uninstallPack(args: { id: string }, ctx: CallContext): Promise<Result<Retired>>;
   setDeclaration(args: SetDeclarationArgs, ctx: CallContext): Promise<Result<DeclarationOutcome>>;
-  invite(args: InviteArgs, ctx: CallContext): Promise<Result<MemberRow[]>>;
+  invite(args: InviteArgs, ctx: CallContext): Promise<Result<MemberRow[] | Invited>>;   // an address in place of a person mints a link
+  invitations(ctx: CallContext): Promise<Result<Invitation[]>>;                         // added September 16th 2026 — never a link
+  revokeInvite(args: { id: string }, ctx: CallContext): Promise<Result<{ id: string; revoked_at: string }>>;   // added September 16th 2026
   export(args: ExportArgs, ctx: CallContext): Promise<Result<DoglPage>>;
   import(args: { lines: string[] }, ctx: CallContext): Promise<Result<ImportReport>>;
   erase(args: EraseRequest, ctx: CallContext): Promise<Result<EraseReport>>;
-  restore(args: { bookmark: string; phase: 'request' | 'done' }, ctx: CallContext): Promise<Result<{ bookmark: string }>>;
-  snapshot(args: Record<string, never>, ctx: CallContext): Promise<Result<{ outbox: string }>>;          // added
+  restore(args: { bookmark: string; at?: string }, ctx: CallContext): Promise<Result<Restored>>;                      // one method, 30 §5
+  snapshot(args: { label?: string }, ctx: CallContext): Promise<Result<Snapshot>>;                         // added
+  snapshots(ctx: CallContext): Promise<Result<Snapshot[]>>;                                                 // added September 16th 2026
+  deleteRecord(args: { slug: string }, ctx: CallContext): Promise<Result<{ slug: string; deleted: true }>>; // added September 16th 2026
   createToken(args: { scope: Scope; name: string; expires_at?: string }, ctx: CallContext): Promise<Result<TokenMinted>>;   // added
   listTokens(args: Record<string, never>, ctx: CallContext): Promise<Result<TokenRow[]>>;              // added
   revokeToken(args: { id: string }, ctx: CallContext): Promise<Result<null>>;                          // added
@@ -107,7 +111,7 @@ export type RecordApi = {
   revokeDevice(args: { handle: string }, ctx: CallContext): Promise<Result<DeviceRow>>;       // a login's token goes with it
   fileArrival(args: { id: string; register: string; fields?: Patch }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // a row, and the arrival `matched`
   archiveArrival(args: { id: string }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // the arrival `ignored`, its bytes kept
-  // INTERNAL — 12
+  // INTERNAL — 13
   drainSchedule(args: Record<string, never>, ctx: CallContext): Promise<Result<Drained>>;
   leaseOutbox(args: { kinds: OutboxKind[]; n: number }, ctx: CallContext): Promise<Result<OutboxRow[]>>;
   ackOutbox(args: { id: string; state: 'done' | 'failed'; result?: unknown; error?: string }, ctx: CallContext): Promise<Result<null>>;
@@ -120,6 +124,7 @@ export type RecordApi = {
   deviceStart(args: { reach: Reach; label: string; ua?: string; scope?: string }, ip: string): Promise<Result<DeviceCode> | Limited>;   // counted per address, 12 §6.1
   devicePoll(args: { device_code: string }): Promise<Result<DeviceWaiting | Exchanged>>;   // the bearer once, after approval
   vaultGrant(bearer: string): Promise<Result<VaultGrant>>;                                 // a vault reach's bearer, for the host's key doors
+  acceptInvite(args: { token: string; person?: Invitee }): Promise<Result<Invited | MemberRow[]>>;   // `/auth/invite`, with the verified person; no person only looks
 };
 
 export const GROUPS: Record<keyof RecordApi, Group>;        // every method's group, for the router gate — §8
@@ -132,9 +137,10 @@ export const DIALECT: readonly DialectLine[];                                   
 export type { CallContext, Result, Refusal, Entry, Level, Scope, Projection, ProjectedRow, /* every args and value type above */ };
 ```
 
-Fifty-five methods: 9 · 11 · 4 · 6 · 14 · 11 — the forty-four of 30 §5 plus the eleven of §13 #1; `test/groups.test.ts`
+Seventy methods: 12 · 13 · 4 · 6 · 22 · 13 — the forty-four of 30 §5, the eleven of §13 #1, and the fifteen added since,
+each noted where it is declared; DATA's twelve are its nine plus the two RUNS and the one PEOPLE method above; `test/groups.test.ts`
 counts `GROUPS`. *(An earlier draft of this spec said forty-four; the hosts' specs 47, 49 and 51 each named a method
-the record had to have.)*
+the record had to have. Recounted September 16th 2026, when the sentence still claimed fifty-five against seventy declarations.)*
 
 | Group | Reachable by (`principal.kind`, then §5.1's checks) | Where the gate runs |
 |---|---|---|
@@ -641,15 +647,25 @@ RETURNING *
 
 **`invite({ person, levels, why })`** — `owner`, or `system` at invitation acceptance (§13 #8). tx: `INSERT INTO person(id, email, name) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name`; `old = SELECT register, level FROM member WHERE person_id = ?`; `DELETE FROM member WHERE person_id = ?`; per `levels` row `INSERT INTO member(person_id, register, level, seen_at) VALUES (?, ?, ?, ?)` keeping the old `'*'` row's `seen_at`; per changed register: `appendEvent` `access.grant` (new or raised) or `access.revoke` (removed or lowered) — `target` = person id, `target_kind 'member'`, `field` = register, `from_v` = old level or NULL, `to_v` = new level or NULL, `note = why` (20 §1). `levels: []` revokes everything. Removing the last `owner` on `'*'` → `LEVEL_REQUIRED` at `levels` (`wanted: 'one owner'`). Return the rows.
 
+**`invite({ email, level?, registers? })`** (amended September 16th 2026) — an ADDRESS in place of a person mints an invitation and puts nobody on the record yet. `credentialed === false` → `NEEDS_BROWSER_SESSION`, and a host where nobody can sign in → `NOT_IN_THIS_BUILD` with that host's own sentence, injected as the `invitations` dep, because the record cannot know whether a link would lead anywhere. An address already on the record → `ALREADY_KNOWN`. Then: `secret` = base64url of 32 random bytes, `hash = hex(await sha256(secret))` outside the transaction; tx: any live invitation for the same address withdrawn, `INSERT INTO invitation(id, hash, email, level, registers, invited_by, created_at, expires_at)` with `expires_at = now + 24 h`. **No event, because nobody's access changed yet.** Return `{ invitation, token }` where `token` is `<rec_id>.<secret>` — the only copy, answered once, and in no log. The `invitation` table is `local` in `dog_section`, so no link travels in an export.
+
+**`invitations()`** — every row with `accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now`, newest first, without `hash`. **`revokeInvite({ id })`** — `UPDATE invitation SET revoked_at = ? WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL`; 0 rows → `OUT_OF_BOUNDS` at `id`.
+
+**`acceptInvite({ token, person? })`** (INTERNAL, §5.11) — the host calls it at `POST /auth/invite` with the Directory's verified person. The token is split at the dot, the record id compared and the secret hashed; a row that is not live is `OUT_OF_BOUNDS` with the one sentence every dead link gets, which never says which of used, withdrawn or run out it was. With no `person` it only looks, spending nothing. With one, in one transaction: `invite` as `system`, `note = 'Accepted invitation <id>.'`, then `UPDATE invitation SET accepted_at = ?, accepted_by = ?`. The events are `invite`'s own `access.grant` rows, so acceptance adds no event kind.
+
 **`export({ cursor, sections, redactGrants })`** — `owner`, `op: 'export'`, or `system` (the nightly backup): `cursor === null` → `appendEvent({ kind: 'export', actor, note: JCS { sections, redactGrants } })` in its own statement; then `kernel.exportDogl(cursor, { sections, redactGrants })` — page 0 refreshes `dog_meta` and `dog_manifest`, then ≤ 1,000 row lines per page, `dog_sig` last for the signer (41 §5.10). The host signs and streams; the record never sees the signing key's plaintext.
 
 **`import({ lines })`** — `owner` or `op: 'import'`: `kernel.importDogl(lines, ctx)` — `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, the copy in one transaction, `rebuildFts`, one `import` event (41 §5.11). Then `tail()` — imported schedule rows need an alarm.
 
-**`erase({ subjects, personId, basis })`** — `report = await kernel.erase(req, ctx)` (the stores of 02 §10 in one transaction, one `erase` event, an `erase.r2` outbox row — 41 §2); `tail()`.
+**`erase({ subjects, personId, basis })`** — `report = await kernel.erase(req, ctx)` (the stores of 02 §10 in one transaction, one `erase` event, an `erase.r2` outbox row — 41 §2); `tail()`. Refused before anything is written: a subject under three characters or a non-list `subjects` (`VALUE_MALFORMED`), no basis (`REQUIRED_MISSING`), a basis that names a subject (`VALUE_MALFORMED`), a `personId` not on the record (`OUT_OF_BOUNDS`), and any matched person holding `owner` on `*` (`LEVEL_REQUIRED`). `to_v` is the SHA-256 of each subject, never the subject.
 
-**`restore({ bookmark, phase })`** — two phases, because a bookmark restore rewinds the database and any event written before it is lost (§13 #8): `request` → gate only, return `{ bookmark }`; the host applies the bookmark and the object restarts on the restored state (33 §9). `done` → on the restored session, `appendEvent({ kind: 'restore.pitr', actor, to_v: bookmark, note: 'restored by ' + actor })`. The self-host has no bookmark mechanism and does not mount `restore`; its path is `import` into a fresh directory.
+**`restore({ bookmark, at? })`** (amended September 16th 2026, one method as 30 §5 has it) — `admin(ctx)`; no `Snapshots` port → `NOT_IN_THIS_BUILD` (the Worker, until its `pitr(at)` is wired); a sign-in older than 15 minutes where the host knows one → `NEEDS_BROWSER_SESSION`; a `bookmark` that is not a kept copy → `OUT_OF_BOUNDS` with `allowed` the kept ids. Then `Snapshots.take('before-restore')`, `Snapshots.restore(bookmark)` (a copy it cannot put back throws a sentence, returned as `OUT_OF_BOUNDS`), `reload()`, `rebuildFts()`, and one `restore.pitr` event written after, into the restored record, `to_v` the bookmark; `tail()`. Returns `{ bookmark, at, kept }`. The self-host's bookmark is a copy's id; `import` into a fresh directory stays its path for anything else.
 
-**`snapshot()`** — `owner`: tx `kernel.outbox({ kind: 'export.r2', payload: { requested_by: actor } })`; `tail()`. The Worker exports and uploads; the self-host's `Snapshots.take` (33 §1). Return `{ outbox }`. "Snapshot now" — 12 §8.
+**`snapshot({ label? })`** (amended September 16th 2026) — `admin(ctx)`; no `Snapshots` port → `NOT_IN_THIS_BUILD` with a sentence pointing at Export (the Worker: its copy is a `.dogl.age` sealed to the operator's age recipient and delivered by `export.r2`, neither wired); `label` one lower-case word, default `now`. `Snapshots.take(label)`, one `export` event with `note = 'snapshot ' + id + ' ' + bytes + ' bytes'`; `tail()`. Returns `{ id, at, bytes }`. "Snapshot now" — 12 §8.
+
+**`snapshots()`** — `admin(ctx)`; no port → `NOT_IN_THIS_BUILD`; else `Snapshots.list()`, newest first.
+
+**`deleteRecord({ slug })`** — `admin(ctx)`; no `destroy` port → `NOT_IN_THIS_BUILD` (the Worker, until 53 §5.9 step 1's sealed final snapshot is wired); a sign-in older than 15 minutes → `NEEDS_BROWSER_SESSION`; `slug` absent → `REQUIRED_MISSING`, not the record's own → `VALUE_MALFORMED`. Then the host's `destroy()`, and nothing after it, not even `tail()`.
 
 **`createToken({ scope, name, expires_at })`** — any `person` (a token is capped by its person — 20 §6), `op: 'token'` admitted. `value` = base64url of 32 random bytes; `hash = hex(await sha256(value))` (WebCrypto, outside the transaction); tx: `INSERT INTO token(id, person_id, hash, scope, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)` with `person_id = principal.id`; `appendEvent({ kind: 'access.grant', actor, target: 'token:' + id, target_kind: 'token', to_v: scope, note: name })`. Return `{ id, token: value, scope, name, created_at }` — the value once, never stored (12 §3). `scope` is one word; the host expands the ladder `read ⊂ propose ⊂ write` into the principal's `scope[]`.
 

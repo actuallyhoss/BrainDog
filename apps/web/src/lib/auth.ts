@@ -281,6 +281,36 @@ export function takeLink(hash: string, clear: () => void): Link | null {
   return token ? { kind: m[1] === 'claim' ? 'claim' : 'magic', token } : null;
 }
 
+/**
+ * Read an invitation's token off `/invite#<token>`, once, clearing the address first for the reason `takeLink` gives.
+ */
+export function takeInvite(hash: string, clear: () => void): string | null {
+  const token = hash.replace(/^#/, '').trim();
+  if (!token) return null;
+  clear();
+  return token;
+}
+
+/** What an invitation says before anybody accepts it: the address it is for, when it runs out, and who is signed in. */
+export type InviteSeen = { email: string; expiresAt: string; signedInAs: string | null };
+
+/** Look at an invitation. Nothing is spent. */
+export async function lookInvite(token: string, io: Io = live()): Promise<Said<InviteSeen>> {
+  const out = await call(io, '/auth/invite', { inviteToken: token });
+  if (!out.ok) return out;
+  const v = out.value;
+  if (!isObj(v) || typeof v.email !== 'string') return { ok: false, kind: 'refused', fix: null };
+  return {
+    ok: true,
+    value: { email: v.email, expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '', signedInAs: typeof v.signedInAs === 'string' ? v.signedInAs : null },
+  };
+}
+
+/** Accept it: the person signed in, or a new person made and signed in, is put on the record. */
+export async function acceptInvite(token: string, io: Io = live()): Promise<Said<Who>> {
+  return signedIn(call(io, '/auth/invite', { inviteToken: token, accept: true }));
+}
+
 /* ── the browser half of WebAuthn ────────────────────────────────────────────────────────────────
    The host speaks base64url and the browser wants bytes. `parseCreationOptionsFromJSON` and
    `toJSON()` would do this, and older Safari has neither, so it is done by hand. */

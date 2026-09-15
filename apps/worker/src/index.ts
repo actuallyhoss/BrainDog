@@ -21,9 +21,9 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { handlersFor, hintsOf, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
-import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type Provisioned } from '@braindog/host/auth';
+import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
@@ -38,6 +38,13 @@ import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesMcp } f
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerVault, servesVault } from './vault.ts';
+
+/** Why an owner cannot invite anybody here: an invitation is spent by signing in, and sign-in needs its secret. */
+const INVITES_OFF = 'Sign-in is off on this host until SESSION_SECRET is set, so an invitation link would lead nowhere.';
+
+/** An address that can already sign in: a person with a passkey, or with a record. */
+const KNOWN_ADDRESS = `SELECT 1 AS x FROM dir_person p WHERE lower(p.email) = lower(?)
+  AND (EXISTS (SELECT 1 FROM dir_passkey k WHERE k.person = p.id) OR EXISTS (SELECT 1 FROM dir_member m WHERE m.person = p.id))`;
 
 /**
  * Cloudflare's `send_email` binding. `from` is the sender Email Service needs; sign-in mail sets it from
@@ -181,6 +188,8 @@ export class Record$ extends DurableObject<Env> {
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. */
         delivers: DELIVERS,
+        /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
+        invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
       });
 
       /* ARM FROM WHAT THE RECORD ALREADY HOLDS, INSIDE THE BLOCK. An object is evicted between
@@ -323,7 +332,17 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /** The fingerprint this record's vault is wrapped by, or `null` for a record made before the key store was bound. */
-  async wrappingKey(): Promise<string | null> {
+/**
+   * An invitation link: looked at with a token alone, or spent for the person `/auth/invite` has just made or signed in.
+   *
+   * AN RPC AND NEVER A ROUTE, like `create`: whoever calls it with a person puts that person on this record.
+   */
+  async acceptInvite(args: { token: string; person?: { id: string; email: string } }): Promise<Result<unknown>> {
+    const api = await this.#record();
+    return api.acceptInvite(args);
+  }
+
+    async wrappingKey(): Promise<string | null> {
     const api = await this.#record();
     return api.kernel.refused() ? null : api.kernel.wrappingKey();
   }
@@ -508,6 +527,23 @@ export class Directory$ extends DurableObject<Env> {
   /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
   resolve(slug: string): { record: string; slug: string } | null {
     return this.#directory().resolve(slug);
+  }
+
+  /** An address that can already sign in: a person with a passkey or a record. `/auth/invite` sends them to sign in first. */
+  inviteKnown(email: string): boolean {
+    this.#directory();
+    return Boolean(storageSql(this.ctx.storage).one(KNOWN_ADDRESS, email));
+  }
+
+  /** The person an invitation makes, found or made by address. */
+  invitee(email: string): Result<{ id: string; email: string }> {
+    const made = this.#directory().person$(email);
+    return made.ok ? { ok: true, value: { id: made.value.id, email: made.value.email } } : made;
+  }
+
+  /** The record an accepted invitation names, reachable by its new member. */
+  joinRecord(record: string, person: string): Result<null> {
+    return this.#directory().join(record, person);
   }
 
   /**
@@ -829,8 +865,37 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     /* THE NAME THE REQUEST CAME BY, so a device that reached this Worker at another address is not sent to
        `PUBLIC_HOST` to be approved. Devices sign in only where sign-in is on, because approving needs a session. */
     reached: url.host,
-    ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env) } : {}),
+    ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env), invite: invites(env) } : {}),
   });
+}
+
+/**
+ * An invitation link's two halves, over RPC: the record its token names, and the Directory.
+ *
+ * THE TOKEN CARRIES ITS RECORD ID, as a bearer does, so the object is found without a search. A token naming no
+ * record this Directory holds is a dead link, in the same words as a spent one.
+ */
+function invites(env: Env): InviteDoor {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const recordOf = async (inviteToken: string) => {
+    const id = inviteToken.slice(0, Math.max(0, inviteToken.indexOf('.')));
+    return isRecordId(id) && (await directory.knows(id)) ? { id, stub: env.RECORD.get(env.RECORD.idFromName(id)) } : null;
+  };
+  const gone = { ok: false as const, refusal: { code: 'UNAUTHORIZED', fix: INVITE_GONE, at: 'token' } };
+  return {
+    look: async (inviteToken) => {
+      const found = await recordOf(inviteToken);
+      return found ? ((await found.stub.acceptInvite({ token: inviteToken })) as unknown as Result<{ email: string; expires_at: string }>) : gone;
+    },
+    accept: async (inviteToken, person) => {
+      const found = await recordOf(inviteToken);
+      if (!found) return gone;
+      const out = (await found.stub.acceptInvite({ token: inviteToken, person })) as unknown as Result<unknown>;
+      return out.ok ? ((await directory.joinRecord(found.id, person.id)) as unknown as Result<null>) : out;
+    },
+    known: async (email) => Boolean(await directory.inviteKnown(email)),
+    person: async (email) => (await directory.invitee(email)) as unknown as Result<{ id: string; email: string }>,
+  };
 }
 
 /**

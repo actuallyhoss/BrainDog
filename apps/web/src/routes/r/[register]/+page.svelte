@@ -733,6 +733,10 @@
    * The toast stays for the archive done from the keyboard with the row off screen.
    */
   function archive(seq: number) {
+    if (!sample && seq > 0) {
+      void archiveOnRecord([seq], `${id}#${seq}`);
+      return;
+    }
     /* `warn`, LIKE EVERY OTHER RECEIPT ON THIS SCREEN. This was the one drawn with no tone, beside
        four that pass one, and it says `Archived` over a row nothing happened to: the toast beside
        it says "would be archived. Nothing was saved yet." Same fact, two registers. */
@@ -1382,7 +1386,8 @@
     }
     if (e.altKey && e.key.toLowerCase() === 'v') {
       e.preventDefault();
-      toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
+      if (sample) toasts.push(copy.notWritten(copy.viewWouldBeSaved), { intent: 'warn' });
+      else void saveView();
       return;
     }
     if (e.altKey && e.key.toLowerCase() === 'b') {
@@ -1630,8 +1635,97 @@
     toasts.push(first ? `${line} ${first}` : line, landedCount === total ? {} : { intent: 'warn' });
   }
 
+  /**
+   * Archive rows on the record, one at a time, and give each one back from where it is drawn.
+   *
+   * THE ROW STAYS WHERE IT WAS, wearing `Archived` and `Put back`, the receipt the sample has always drawn; the record
+   * leaves it out of the next read. Put back and the toast's undo are the same write the other way: `deleted_at` null,
+   * at the version the archive answered with. No dialog, because an undo says what happened and a dialog asks first.
+   */
+  async function archiveOnRecord(seqs: readonly number[], named: string) {
+    const was = asked;
+    const landed: Entry[] = [];
+    let first: string | null = null;
+    for (const seq of seqs) receipt(seq, { mark: copy.writeMarkSaving, intent: 'warn' });
+    for (const seq of seqs) {
+      const out = await writes().archive(id, seq, rowAt(seq)?.version);
+      if (out.ok) landed.push(out.entry);
+      else first ??= out.fix;
+      if (asked !== was) continue;
+      clearReceipt(seq);
+      if (out.ok) {
+        const row = out.entry;
+        landRow(row);
+        receipt(seq, { mark: copy.markArchived, undo: () => void restoreOnRecord([row]) });
+      } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
+    }
+    if (landed.length === 0) {
+      toasts.push(first ?? copy.writeNotReached, { intent: 'warn' });
+      return;
+    }
+    const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
+    toasts.push(first ? `${line} ${first}` : line, { undo: () => void restoreOnRecord(landed), ...(first ? { intent: 'warn' as const } : {}) });
+  }
+
+  /**
+   * `⌥V` on a live record: what is on screen, saved as a page under Views, and that page opened.
+   *
+   * NO NAMING DIALOG. The address already says which rows these are, so the name is the list and its filter in the
+   * list's own words, and the toast's undo retires the page and comes back here. See `viewPage` for why it is a page.
+   */
+  async function saveView() {
+    if (!decl) return;
+    if (filters.length === 0 && q === '') {
+      toasts.push(copy.viewNeedsFilter, { intent: 'warn' });
+      return;
+    }
+    const clauses = filters.map((f) => {
+      const field = decl.fields.find((d) => d.id === f.field);
+      return copy.filterClause(field ? labelOf(field) : f.field, f.values.map((v) => v.replace(/_/g, ' ')), f.op);
+    });
+    const title = copy.viewTitle(decl.name, copy.filterReads(q ? [...clauses, `"${q}"`] : clauses));
+    const back = `${page.url.pathname}${page.url.search}`;
+    const drawn = columns.map((c) => c.field).filter((f) => f !== 'select' && f !== 'act' && f !== 'seq');
+    const out = await writes().saveView(id, title, { filters, q, sort }, drawn);
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    await goto(`/p/${out.slug}`);
+    toasts.push(copy.viewSaved(title), {
+      undo: () =>
+        void writes()
+          .dropView(out.id)
+          .then((gone) => {
+            if (gone.ok) void goto(back);
+            else toasts.push(gone.fix, { intent: 'warn' });
+          }),
+    });
+  }
+
+  /** Put archived rows back. A row this screen has read since is sent at the version it now holds. */
+  async function restoreOnRecord(rows: readonly Entry[]) {
+    const was = asked;
+    let first: string | null = null;
+    for (const e of rows) {
+      const out = await writes().restore(id, e.seq, rowAt(e.seq)?.version ?? e.version);
+      if (!out.ok) first ??= out.fix;
+      if (asked !== was) continue;
+      if (out.ok) {
+        landRow(out.entry);
+        receipt(e.seq, { mark: copy.writeMarkRestored, intent: 'good' });
+      } else if (out.why === 'conflict' && out.entry) landRow(out.entry);
+    }
+    if (first) toasts.push(first, { intent: 'warn' });
+  }
+
   function archiveSelected() {
     const seqs = picked.map((e) => e.seq);
+    if (!sample && seqs.every((seq) => seq > 0)) {
+      selected = new Set();
+      void archiveOnRecord(seqs, `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`);
+      return;
+    }
     /* AND EACH ROW GETS ITS OWN `Put back`, WHICH THE BULK PATH DID NOT GIVE IT. Archiving one row
        writes a receipt carrying an undo, so the row keeps a way back for as long as it is drawn.
        Archiving eight wrote eight receipts with no undo on any of them and put the only way back in

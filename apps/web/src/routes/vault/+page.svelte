@@ -130,6 +130,29 @@
     if (out.ok) machines = out.rows;
     else toasts.push(out.fix, { intent: 'warn' });
   }
+  /**
+   * A KEY OUT OF SERVICE. `revokeGrant` is VAULT, so this reaches the record only from a browser session proved in
+   * the last fifteen minutes; the bytes are destroyed and the row stays, because what it opened is a fact.
+   *
+   * THE INDEX IS READ AGAIN rather than patched here, so the line a person reads is the record and not a guess.
+   */
+  async function retireKey(k: KeyRow) {
+    if (from !== 'live' || !client || !k.grant) {
+      toasts.push(copy.notOnDemo, { intent: 'warn' });
+      return;
+    }
+    const at = opened();
+    const out = await client.revokeGrant({ id: k.grant });
+    closed(true, at);
+    if (!out.ok) {
+      toasts.push('refusal' in out ? out.refusal.fix : copy.writeRaced, { intent: 'warn' });
+      return;
+    }
+    toasts.push(copy.keyRevoked(k.label), { intent: 'good' });
+    const [credentials, grants] = await Promise.all([client.list({ register: 'credentials', limit: 200 }), client.listGrants()]);
+    type Row = { id: string; fields: Record<string, unknown>; state: string | null };
+    if (credentials.ok) keys = keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names);
+  }
 </script>
 
 <svelte:head><title>{titleOf(copy.vault)}</title></svelte:head>
@@ -204,6 +227,12 @@
               </span>
             </div>
             {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
+            {#if k.grant && k.sealed}
+              <!-- ONLY WHERE THERE IS SOMETHING TO TAKE OUT OF SERVICE: an index row points at no grant. -->
+              <div class="who-do">
+                <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>

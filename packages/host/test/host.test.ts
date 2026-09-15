@@ -257,3 +257,26 @@ test('A CONFLICT LEAVES THE HOST AS A CONFLICT, body and all', async () => {
   assert.equal(body.conflict.actor, 'p_ada');
   assert.deepEqual(body.conflict.current, { id: 'obligations#1', fields: { due: '2026-07-27' } });
 });
+
+test('BACKUPS, ERASURE AND DELETION ARE ROUTED, ADMIN, and a host with no store of copies answers 501 with a sentence', async () => {
+  const { call, sql } = await host();
+  const admin = ROUTES.filter((r) => ['snapshot', 'snapshots', 'restore', 'erase', 'deleteRecord'].includes(r.name));
+  assert.deepEqual(admin.map((r) => [r.name, r.group, r.writes]), [
+    ['snapshot', 'ADMIN', true],
+    ['snapshots', 'ADMIN', false],
+    ['restore', 'ADMIN', true],
+    ['erase', 'ADMIN', true],
+    ['deleteRecord', 'ADMIN', true],
+  ]);
+  for (const [name, body] of [['snapshots', undefined], ['snapshot', { label: 'now' }], ['restore', { bookmark: 'x' }], ['deleteRecord', { slug: 'x' }]] as const) {
+    const out = await call(name, body);
+    assert.equal(out.status, 501, `${name} answered ${out.status}`);
+    assert.equal(out.body.refusal?.code, 'NOT_IN_THIS_BUILD');
+    assert.ok((out.body.refusal?.fix ?? '').length > 30);
+  }
+  const token: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'owner' } };
+  const erased = await call('erase', { subjects: ['Someone Else'], basis: 'a request' }, token);
+  assert.equal(erased.status, 403);
+  assert.equal(erased.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
+  sql.close();
+});

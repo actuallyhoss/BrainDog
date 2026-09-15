@@ -15,7 +15,7 @@
  * an RPC and an exception does not survive the trip with its sentence intact.
  */
 
-import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
+import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 import {
   install,
@@ -28,6 +28,8 @@ import {
   unresolvedFault,
 } from '@braindog/declare';
 import { no, ok } from '@braindog/ports';
+import type { EraseReport, EraseRequest } from '@braindog/kernel';
+import type { InvitationRow } from '@braindog/kernel';
 import {
   fill,
   GRANT_KINDS,
@@ -145,6 +147,30 @@ export type CallContext = {
 
 /** How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`. */
 const FRESH = 15 * 60_000;
+
+/**
+ * What a host with no store of copies answers (`33 §1` port 9). The Worker is one: its nightly copy is sealed to a key
+ * only the operator holds, and going back to a time is not wired there yet. Nothing was changed, and the sentence says
+ * what does work.
+ */
+const NO_SNAPSHOTS: Refusal = {
+  code: 'NOT_IN_THIS_BUILD',
+  fix: 'This deployment does not keep backups you can take from the app yet. Export a copy from Settings, which works everywhere.',
+  at: 'host',
+};
+const NO_RESTORE: Refusal = {
+  code: 'NOT_IN_THIS_BUILD',
+  fix: 'Going back to an earlier copy is not available on this deployment yet. Nothing was changed.',
+  at: 'host',
+};
+const NO_DELETE: Refusal = {
+  code: 'NOT_IN_THIS_BUILD',
+  fix: 'Deleting a record from the app is not available on this deployment yet, so nothing was deleted. Ask support to delete it.',
+  at: 'host',
+};
+
+/** `restore`: the copy the record went back to, and the copy of what it was just before. */
+export type Restored = { bookmark: string; at: string; kept: string | null };
 
 /** Device starts one address may make in fifteen minutes before the next waits (`12 §3`, the `device:` key). */
 const STARTS = 10;
@@ -572,8 +598,28 @@ export type RecordDeps = {
    * THE HOST TELLS THE RECORD, and never the other way round. The build is a fact about the
    * deployment, and the same record code runs under a Worker, a test and the CLI.
    */
-  build?: Build | undefined;
+  /**
+   * The copies this host keeps of the whole record (`33 §1` port 9). Absent, `snapshot`, `snapshots` and `restore`
+   * refuse `NOT_IN_THIS_BUILD`.
+   */
+  snapshots?: Snapshots | undefined;
+  /**
+   * Remove this record from the host: its storage, its copies and its name (`53 §5.9`). It runs last, after every
+   * check, and the record answers nothing afterwards. Absent, `deleteRecord` refuses `NOT_IN_THIS_BUILD`.
+   */
+  destroy?: (() => Promise<void>) | undefined;  build?: Build | undefined;
+  /**
+   * Why this host cannot take an invitation, or `null` when it can.
+   *
+   * THE HOST KNOWS AND THE RECORD DOES NOT. An invitation is spent by signing in, and only a host knows whether
+   * anybody can: a Worker with no `SESSION_SECRET`, or a self-host in open mode, has no sign-in to spend one with.
+   * Absent is the same as a host that cannot, so a link is never minted for a door that is not there.
+   */
+  invitations?: (() => string | null) | undefined;
 };
+
+/** What `invite` says when the host never said it can take invitations. */
+const INVITES_OFF = 'This BrainDog has no sign-in switched on, so an invitation link would lead nowhere. Set up sign-in first.';
 
 export async function createRecordApi(deps: RecordDeps) {
   const kernel = await openRecord(deps.sql, deps.clock, {
@@ -583,8 +629,8 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build'>) {
-  const { sql, clock, scheduler, build } = deps;
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations'>) {
+  const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
    *
@@ -2221,10 +2267,66 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * AN INVITATION IS THE WHOLE OF WHAT THEY HOLD, not a patch: a register left out of a second one
      * is a register taken away, revoked out loud rather than left standing.
      */
-    async invite(args: { person: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string }, ctx: CallContext) {
+    async invite(args: { person?: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      return tail(kernel.invite(actorOf(ctx), args ?? ({} as never)));
+      /* AN ADDRESS AND NO PERSON IS AN INVITATION (`30 §5`, `12 §3`): a single-use link for that one address, good
+         for 24 hours, handed back once to copy. Nothing is mailed, by this or by anything. */
+      if (!args?.person && typeof args?.email === 'string') {
+        /* A link somebody spends from anywhere outlives a machine's loopback boundary, as a bearer does. */
+        if (ctx.credentialed === false)
+          return {
+            ok: false as const,
+            refusal: {
+              code: 'NEEDS_BROWSER_SESSION',
+              fix: 'An invitation link works from anywhere, so minting one needs a credential. Sign in, or send BRAINDOG_TOKEN.',
+              at: 'principal',
+            },
+          };
+        /* AND ONLY WHERE SOMEBODY CAN SIGN IN TO SPEND IT. A link to a host with sign-in off is a link to a 404. */
+        const why = invitations === undefined ? INVITES_OFF : invitations();
+        if (why !== null) return no('NOT_IN_THIS_BUILD', why, { at: 'email' });
+        return tail(
+          await kernel.createInvitation(actorOf(ctx), {
+            email: args.email,
+            ...(args.level === undefined ? {} : { level: args.level }),
+            ...(args.registers === undefined ? {} : { registers: args.registers }),
+          }),
+        );
+      }
+      return tail(kernel.invite(actorOf(ctx), (args ?? {}) as never));
+    },
+
+    /** Every invitation still waiting to be used, newest first. Never a link: those exist once, when minted. */
+    async invitations(ctx: CallContext): Promise<Result<InvitationRow[]>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.listInvitations());
+    },
+
+    /** Withdraw one. The link stops working at once, and a second call answers as the first did. */
+    async revokeInvite(args: { id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!args?.id) return no('REQUIRED_MISSING', 'Which invitation?', { at: 'id' });
+      return tail(kernel.revokeInvitation(args.id));
+    },
+
+    /**
+     * The invitation a link names, or, with the person a host has just verified, spend it.
+     *
+     * INTERNAL, AND NEVER A ROUTE. Whoever calls this with a `person` puts that person on the record, so the only
+     * way here is a host's `/auth/invite`, after it has signed that person in. The token is the link's own proof;
+     * the address it was minted for must be the address the person signed in with.
+     */
+    async acceptInvite(args: { token: string; person?: { id: string; email: string; name?: string } }): Promise<Result<unknown>> {
+      if (typeof args?.token !== 'string' || !args.token) return no('REQUIRED_MISSING', 'Which invitation?', { at: 'token' });
+      if (args.person === undefined) {
+        const found = await kernel.lookInvitation(args.token);
+        return found.ok ? ok({ email: found.value.email, expires_at: found.value.expires_at }) : found;
+      }
+      const { id, email, name } = args.person;
+      return tail(await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) }));
     },
 
     /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */
@@ -2437,6 +2539,111 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(await kernel.import(args.lines));
     },
 
+    /* ── ADMIN: BACKUPS, ERASURE AND DELETION ──────────── */
+
+    /**
+     * A copy of the whole record, now, kept by this host (`53 §5.4`, "snapshot now").
+     *
+     * AN `export` EVENT SAYS IT HAPPENED, as the Worker's nightly copy does when its upload is acknowledged (`45 §5.9`):
+     * a copy of every row left the live file, and the log is where somebody asks whether anything did.
+     */
+    async snapshot(args: { label?: string } | undefined, ctx: CallContext): Promise<Result<Snapshot>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!snapshots) return { ok: false as const, refusal: NO_SNAPSHOTS };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['label']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const label: unknown = args?.label ?? 'now';
+      if (typeof label !== 'string' || !/^[a-z][a-z0-9-]{0,23}$/.test(label))
+        return no('VALUE_MALFORMED', 'A label is one short lower-case word, such as nightly or final.', { at: 'label' });
+      const taken = await snapshots.take(label);
+      kernel.lifecycle('export', actorOf(ctx), `snapshot ${taken.id} ${taken.bytes} bytes`);
+      return tail(ok(taken));
+    },
+
+    /** The copies this host keeps, newest first, each with when it was taken and how large it is. */
+    async snapshots(ctx: CallContext): Promise<Result<Snapshot[]>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!snapshots) return { ok: false as const, refusal: NO_SNAPSHOTS };
+      return ok(await snapshots.list());
+    },
+
+    /**
+     * Put the record back to one of the copies (`33 §9`, one method; the self-host's bookmark is a copy's id).
+     *
+     * WHAT IT WAS IS KEPT FIRST. A copy named `before-restore` is taken before anything is replaced, so going back is
+     * itself undoable from the same list, which is `53 §5.5`'s rollback for a restore in the one form a file host has.
+     *
+     * A SIGN-IN IN THE LAST FIFTEEN MINUTES where the host knows when that was, because this replaces everything
+     * written since the copy. The `restore.pitr` event is written after, into the restored record, or the restore
+     * would rewind it too.
+     */
+    async restore(args: { bookmark: string; at?: string }, ctx: CallContext): Promise<Result<Restored>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!snapshots) return { ok: false as const, refusal: NO_RESTORE };
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return {
+          ok: false as const,
+          refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to restore this record. Going back replaces everything written since.', at: 'principal' },
+        };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['bookmark', 'at']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.bookmark !== 'string' || !args.bookmark)
+        return no('REQUIRED_MISSING', 'Which copy? Name it as the list of backups does.', { at: 'bookmark' });
+      const kept = await snapshots.list();
+      const chosen = kept.find((s) => s.id === args.bookmark);
+      if (!chosen)
+        return no('OUT_OF_BOUNDS', `${args.bookmark} is not one of the copies this record keeps.`, { at: 'bookmark', allowed: kept.map((s) => s.id) });
+
+      const before = await snapshots.take('before-restore');
+      try {
+        await snapshots.restore(chosen.id);
+      } catch (e) {
+        return no('OUT_OF_BOUNDS', e instanceof Error ? e.message : String(e), { at: 'bookmark' });
+      }
+      kernel.reload();
+      kernel.rebuildFts();
+      const who = actorOf(ctx);
+      kernel.lifecycle('restore.pitr', who, `restored to ${chosen.id} by ${who}; the record as it was is kept as ${before.id}`, chosen.id);
+      return tail(ok({ bookmark: chosen.id, at: chosen.at, kept: before.id }));
+    },
+
+    /**
+     * Erase a person (`53 §5.8`, `02 §10`). The kernel does the cascade; this is the owner's door to it.
+     *
+     * AN OWNER IN A BROWSER, and no token of any kind: an erasure cannot be undone, and PITR must not be used to undo it.
+     */
+    async erase(args: EraseRequest, ctx: CallContext): Promise<Result<EraseReport>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['subjects', 'personId', 'basis']);
+      if (extra) return { ok: false as const, refusal: extra };
+      return tail(await kernel.erase(args ?? ({} as EraseRequest), actorOf(ctx)));
+    },
+
+    /**
+     * Delete this record (`02 §9`, `53 §5.9`): the slug typed, a recent sign-in where the host knows one, then the host.
+     *
+     * NOTHING RUNS AFTER THE HOST'S PART, not even the alarm's tail, because there is no record left to arm it on.
+     */
+    async deleteRecord(args: { slug: string }, ctx: CallContext): Promise<Result<{ slug: string; deleted: true }>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!destroy) return { ok: false as const, refusal: NO_DELETE };
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to delete this record. Nothing was deleted.', at: 'principal' } };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['slug']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.slug !== 'string' || !args.slug.trim())
+        return no('REQUIRED_MISSING', 'Type the name of this record to delete it.', { at: 'slug' });
+      const slug = kernel.identity()?.slug ?? '';
+      if (!slug || args.slug.trim() !== slug)
+        return no('VALUE_MALFORMED', `Type ${slug || 'the name of this record'} exactly to delete it. Nothing was deleted.`, { at: 'slug' });
+      await destroy();
+      return ok({ slug, deleted: true as const });
+    },
     /* ── VAULT ────────────────────────────────────────────────── */
 
     /** Every grant, in the order a person reads them. Sealed bytes never leave through here. */
