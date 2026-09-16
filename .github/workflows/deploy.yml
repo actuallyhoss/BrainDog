@@ -75,10 +75,16 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # THE BUILD TUPLE IS THE WHOLE POINT OF STEP 6. `33 §407` has `/api/version` answer an `app`
-      # field, and `deploy-parity` compares it against this exact string — so the build and the
-      # check have to be given the same value, which is why it is computed once here and read from
-      # the environment twice below rather than recomputed.
+      # THE BUILD TUPLE IS THE WHOLE POINT OF STEP 6. `33 §4` has the Worker answer this string at
+      # `/.well-known/braindog-build`, and `deploy-parity` compares it against this exact value, so
+      # the build and the check have to be given the same one: it is computed once here and read
+      # from the environment twice below rather than recomputed.
+      #
+      # THE CHECK READS IT THERE AND NOT AT `/api/version`, WHICH IS A REPAIR RATHER THAN A
+      # PREFERENCE. `/api/version` is a record route and takes a bearer; this job holds none, so the
+      # first deploy that ran end to end went red at Parity with a 401 from it. The build id is a
+      # fact about the Worker version and not about any record, so it is served where reading it
+      # opens nothing, and the record boundary stays exactly where it was.
       - name: The build id this deploy is
         run: echo "BRAINDOG_BUILD=$(date -u +%Y.%m.%d)+$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
 

@@ -94,7 +94,7 @@ installs with `--frozen-lockfile`, and carries `timeout-minutes` equal to its §
 | 1–3 | checkout at `workflow_run.head_sha` · setup · frozen install | — |
 | 4 | `BRAINDOG_BUILD=<YYYY.MM.DD>+<sha7> pnpm --filter ./apps/web build` — the date from `date -u`, the sha from `GITHUB_SHA` | — |
 | 5 | `pnpm --filter ./apps/worker exec wrangler deploy` with `CLOUDFLARE_API_TOKEN` (secret, deploy-scoped) and `CLOUDFLARE_ACCOUNT_ID` (var) | wrangler fails |
-| 6 | `DEPLOY_HOST=<vars.DEPLOY_HOST> pnpm gates -- --only deploy-parity` | the live shell's hashes differ from `build/`; `/api/version` does not carry this run's `app` tuple |
+| 6 | `DEPLOY_HOST=<vars.DEPLOY_HOST> pnpm gates -- --only deploy-parity` | the live shell's hashes differ from `build/`; `/.well-known/braindog-build` does not carry this run's `app` tuple |
 
 **`release.yml`** — `on: push: tags: ['render-v*', 'cli-v*']`. `permissions: { contents: read, id-token: write }`.
 No npm token exists anywhere ([31-STACK](31-STACK.md) §6).
@@ -178,7 +178,7 @@ files. Each script gate, its inputs, its assertion, its failure line's `what`, a
 | `shot-allowlist` | `apps/web/src/**` markup literals; `apps/web/src/lib/shot-allowlist.json` | the committed list equals the extraction, both ways (ADR-050) | `allow-list stale: +n −m` | 500 |
 | `conformance-count` | `packages/ports/test/results/*.json`; `CASES`; `reference.json` | every host's `ran` = `CASES.length − skipped`; equal across hosts; every skip printed with its reason; every trace equals the reference; `provisional: false` once `apps/worker` exists (37 §9.4) | `host <h> ran n of m` · `trace differs at case <id>` · `reference still provisional` | 100 |
 | `compat-date` | `apps/worker/wrangler.jsonc` | `compatibility_date ≥ budgets.worker.compatDateFloor` | `compatibility_date <d> below floor` | 20 |
-| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of live `/` and `/_app/version.json` equal the build's; `/api/version` `app` equals `BRAINDOG_BUILD` | `live <path> differs` · `live app tuple is <x>` | 70,000 |
+| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of live `/` and `/_app/version.json` equal the build's; `/.well-known/braindog-build` `app` equals `BRAINDOG_BUILD` | `live <path> differs` · `live app tuple is <x>` | 70,000 |
 | `grant-note` | the `corpus` record, materialised — it seeds two grants (40 §4.1) | no `grant.*` event note contains its grant's `label` or `opens` (12 §8) | `grant note leaks <label\|opens>` | 2,000 |
 | `harness-constants` | `apps/web/test/**` except `env.ts` | no `localhost`, `127.0.0.1`, `:<4 digits>`, `http(s)://` literal | `harness literal outside env.ts` | 50 |
 | `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2; the dead-class report | one `what` per rule, §5.2 | 1,500 |
@@ -438,7 +438,10 @@ the gate this becomes when the corpus record exists.
 
 1. For `/` and `/_app/version.json`: fetch `https://${DEPLOY_HOST}<path>` with `Cache-Control: no-cache`;
    SHA-256 the body; compare with `apps/web/build/index.html` and `apps/web/build/_app/version.json`.
-2. Fetch `/api/version`; assert `app === BRAINDOG_BUILD`.
+2. Fetch `/.well-known/braindog-build`; assert `app === BRAINDOG_BUILD`. That path is public and
+   `/api/version` is not: the build id belongs to the Worker version rather than to a record, and this
+   gate holds no bearer. An unset build answers `null`, which reads as an absent tuple rather than as
+   one that merely differs.
 3. On mismatch, retry every `budgets.deploy.parityIntervalMs` up to `parityAttempts` (propagation), then red with
    both hashes. A network failure after the last attempt exits `3`.
 
@@ -725,7 +728,7 @@ preloads a 40 KB chunk and whose manifest imports the editor statically) — und
 - `ponytail:` `css-rules` is a regex tokeniser over first-party CSS we control, not a CSS parser; add `postcss` (dev only) the first time a real rule is missed or a false red needs a hand-written exception.
 - `ponytail:` `graph` does layers 3–5 of 31 §3 by regex over import specifiers; add ESLint flat + `import-x` when a rule needs an AST (re-exports, type-only imports, `import.meta`).
 - `ponytail:` `mcp-budget` counts with 44's `tokenBudget`, a calibrated heuristic; the day 44 swaps in a real tokenizer this gate changes nothing.
-- `ponytail:` `deploy-parity` checks `/`, `/_app/version.json` and `/api/version`; add the hashed asset list from `build/` when a stale sub-asset is ever served with a fresh shell.
+- `ponytail:` `deploy-parity` checks `/`, `/_app/version.json` and `/.well-known/braindog-build`; add the hashed asset list from `build/` when a stale sub-asset is ever served with a fresh shell.
 - `ponytail:` the browser matrix runs Chromium only; add WebKit for the `focus`, `targets` and `grid-contract` specs when a Safari-only layout bug reaches a user.
 - `ponytail:` no sharding, no retries, no flaky-test quarantine; shard at the §7 budget, and a flaky spec is fixed or deleted, never retried.
 - `ponytail:` the property test runs 1,000 cases in CI (33 §8 said 10,000); raise `budgets.property.runs` when a seed is found that 1,000 runs missed twice.
@@ -793,7 +796,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 14 | **`gate1.yml` is a report.** It never fails and maps to no gate; 33 §8's *one-to-one* mapping holds for the other four workflows | 33 §8 |
 | 15 | **Each conformance host writes `packages/ports/test/results/<host>.json`** (§4) so `conformance-count` has an artefact to read; the reference's `provisional` flag and `CONFORMANCE_WRITE=1` are 37 §9.3's, adopted as written | 37 §3, §9.3 (add the results file); 33 §3 |
 | 16 | **INP on the target phone is a release checklist row, not a workflow step**, until an ADB harness exists | 18 §6; 53 |
-| 17 | **`deploy-parity` also checks `/api/version`** — the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
+| 17 | **`deploy-parity` also checks the deployed build id**, at the public `/.well-known/braindog-build` rather than at `READ+` `/api/version`, which takes a bearer this job has never held: the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
 | 18 | **`refusal-fixtures` is a script and seven runners.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
 | 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half (decision 13), and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
 | 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | BUILD.md |
@@ -814,7 +817,7 @@ Twenty-two, counted.
 - [ ] `env.ts` is the only file under `apps/web/test/` with a host or port literal
 - [ ] `braindog-render@0.0.1` and `braindog-cli@0.0.1` were published by hand; both packages have Trusted Publishing configured; the token used is revoked
 - [ ] `pnpm release render 0.1.0` produced a tag, and `release.yml` published it with automatic provenance
-- [ ] `deploy.yml` deployed once and `deploy-parity` was green on the live host, including `/api/version`
+- [ ] `deploy.yml` deployed once and `deploy-parity` was green on the live host, including `/.well-known/braindog-build`
 - [ ] `braindog --version` prints `app <date>+<sha> · format 1 · kernel <n> · primitives 1`
 - [ ] every workflow's wall time is under its §7 budget, read from the run list
 - [ ] every amendment in §13 is applied to its design document in this revision

@@ -34,7 +34,7 @@ import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass } from './act
 import { alarmScheduler } from './alarm.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesMcp } from './route.ts';
+import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
@@ -683,6 +683,30 @@ const json = (body: unknown, status: number, extra: [string, string][] = []): Re
   });
 
 /**
+ * `GET /.well-known/braindog-build`: which build this Worker version is, to anybody who asks.
+ *
+ * A DEPLOYMENT IS NOT A RECORD, and that distinction is the whole of why this route exists. The
+ * `app` tuple also rides on `/api/version`, which is `READ+` and rightly so: that route answers what
+ * changed in one customer's record, and it takes a bearer. `deploy-parity` was reading the build
+ * through it, so the first production deploy that ran end to end went red with a 401 at the step
+ * whose job is to prove the deploy landed. The two obvious repairs were both wrong: making a record
+ * route public widens a boundary to answer a question that is not about records, and teaching the
+ * check to shrug at a 401 makes a check that cannot see indistinguishable from one that found
+ * nothing. So the fact moved to where it belongs instead.
+ *
+ * AN UNSET BUILD ANSWERS `null` AND NEVER `""`. `BRAINDOG_BUILD` is declared empty in
+ * `wrangler.jsonc` so a deploy that forgot `--var` leaves an empty string rather than a missing
+ * binding, and saying that out loud as `null` is what the record already does at `/api/version`. A
+ * gate handed `""` reads a tuple that is merely unequal; handed `null` it reads a deployment that
+ * was never told which build it is, which is the true thing.
+ *
+ * THROUGH `json()`, LIKE EVERY OTHER ANSWER THIS FILE WRITES, so it carries `no-store`. A cached
+ * build id is a gate measuring an edge rather than the deploy, on the one request where that is the
+ * entire question being asked.
+ */
+const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null }, 200);
+
+/**
  * The one answer to every way of not being let in.
  *
  * ONE SENTENCE FOR ALL THREE: no bearer, a bearer this record does not know, and a name no record
@@ -765,6 +789,9 @@ export default {
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    /* THE DEPLOYMENT'S OWN BUILD ID, BEFORE ANYTHING ELSE, because it asks nothing of the Directory,
+       of a record or of whoever is calling. */
+    if (servesBuild(url.pathname)) return buildId(env);
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. */
     if (servesAuth(url.pathname)) return signIn(request, env, ctx);
     if (servesAccount(url.pathname)) return account(request, env);

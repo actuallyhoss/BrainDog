@@ -68,6 +68,21 @@ export const servesAccount = (pathname: string): boolean => /^\/+account(?:\/|$)
  */
 export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathname);
 
+/**
+ * `/.well-known/braindog-build`: which version of this Worker is answering, and no record is asked.
+ *
+ * IT IS NOT A RECORD QUESTION, which is the whole reason it is not `/api/version`. That route is
+ * `READ+` because it answers one record's own activity cursor, so reading the deployed build through
+ * it meant carrying a bearer for a question with no record in it. The build id is a property of the
+ * Worker version, so it is answered where nothing has to be opened to read it, beside the
+ * `/.well-known/braindog-key` that `braindog verify` reads with no credential (`33 §4`).
+ *
+ * `/.well-known/*` IS IN `run_worker_first`, which is what makes this path the Worker's at all. Off
+ * that list the app shell answers here with `index.html` and a 200, which is worse than a 404
+ * because it looks like a working endpoint (`apps/worker/wrangler.jsonc`).
+ */
+export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+braindog-build\/*$/.test(pathname);
+
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */
 export const isRecordId = (x: string): boolean => REC_ID.test(x);
 
