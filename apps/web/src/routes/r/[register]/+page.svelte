@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { columnsFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -645,15 +645,9 @@
    * once, and layout never measures a cell.
    */
   function weighed<C extends { field: string; width: string }>(c: C, isTitle: boolean): C {
-    /* THE SPOKEN ID GIVES WAY. Its 11ch was sized for a project's mark and `#999` in one cell, and
-       the mark has since moved in front of the title, so on Keys the column held `#6` in 102px while
-       "Fenwick Cloud recovery codes" was cut beside it. It takes the digits the rows in hand have,
-       plus the `#` and the cell's padding, and never less than eight. */
-    if (c.field === 'seq') {
-      let top = 0;
-      for (const e of result.entries) if (e.seq > top) top = e.seq;
-      return { ...c, width: `${Math.max(8, String(top).length + 6)}ch` };
-    }
+    /* THE SPOKEN ID GIVES WAY. On Keys an 11ch column held `#6` in 102px while "Fenwick Cloud
+       recovery codes" was cut beside it. It takes the digits the rows in hand have (`seqWidth`). */
+    if (c.field === 'seq') return { ...c, width: seqWidth(result.entries) };
     const track = /^minmax\(([^,]+),\s*[\d.]+fr\)$/.exec(c.width);
     if (!track) return c;
     let longest = 0;

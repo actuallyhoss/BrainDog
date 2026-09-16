@@ -16,7 +16,7 @@
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -95,6 +95,8 @@
      five-thousand-row answer was rendered whole. `Table` draws the line that says so. */
   const shown = $derived(result.entries.slice(0, DOM_CAP));
   const rows = $derived(view ? toRows(view.register, shown, columns) : []);
+  /* The `#` column holds the digits of the highest id in hand, as on the list this view narrows. */
+  const sized = $derived(columns.map((c) => (c.field === 'seq' ? { ...c, width: seqWidth(result.entries) } : c)));
 
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
@@ -231,7 +233,7 @@
     {:else}
     <div class="table-slot" class:gone={result.entries.length === 0}>
       <Table
-        {columns}
+        columns={sized}
         {rows}
         total={result.matched}
         cap={DOM_CAP}

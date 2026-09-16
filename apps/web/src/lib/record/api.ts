@@ -450,16 +450,10 @@ export function identityFor(register: string, fields: Readonly<Record<string, un
    eye loses the row — which in a money ledger means reading a figure off the wrong line (13 §4.2). */
 
 const WIDTH: Record<string, string> = {
-  // 6ch is the number's width and not the CELL's: the cell also carries its padding, so `#10`
-  // truncated where `#9` did not. An identifier truncates in the middle by rule, which meant the
-  // spoken id — the whole point of the column — came out as `#…`.
-  //
-  // AND IT HAPPENED AGAIN, THE MOMENT THE COLUMN GAINED A SECOND THING. The `#` cell now leads
-  // with the mark of the thing the row belongs to, because it is the one column every projection
-  // has and `columnsFor` caps the default at ten, which leaves `thing` out of Money's. A mark and
-  // its gap are about a character and a half, so 9ch held `#13` yesterday and truncated it today,
-  // to `#…`, which is the same failure this comment was written for. 11ch fits a mark and `#999`.
-  seq: '11ch',
+  // The number's width plus the cell's padding: `#99`. The project's mark used to lead this cell and
+  // sized it at 11ch; it moved in front of the title, so a list with longer ids widens the column
+  // from the rows in hand with `seqWidth`.
+  seq: '8ch',
   money: '15ch',
   day: '15ch',
   /* A FOSSIL SIZED FOR A STRING IT NO LONGER PRINTS. `20ch` fits `2026-09-03T11:57:00.000Z`, which
@@ -508,6 +502,13 @@ const END = new Set(['money', 'day', 'instant', 'int', 'decimal', 'duration']);
  * changes which side of that switch a column starts on, and the switch has been there since the
  * screen was written.
  */
+/** The `#` column's width for the rows in hand: the digits of the highest id, the `#` and the cell's padding, never under 8ch. */
+export function seqWidth(entries: readonly { seq: number }[]): string {
+  let top = 0;
+  for (const e of entries) if (e.seq > top) top = e.seq;
+  return `${Math.max(8, String(top).length + 6)}ch`;
+}
+
 export function columnsFor(register: string, declared?: RegisterDecl): Column[] {
   /* THE BUILT-IN DECLARATION FIRST, then the one the record sent: a list a pack brought, or one somebody made, is not in
      `REGISTERS`, and without its own declaration here it drew rows with no cells in them. */

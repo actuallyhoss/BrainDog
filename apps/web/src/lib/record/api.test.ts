@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, packDiff, page, readableFields, readBlock, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, readableFields, readBlock, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -925,4 +925,12 @@ test('A LIST THE BUILT-IN SAMPLE DOES NOT KNOW TAKES ITS COLUMNS FROM THE DECLAR
   };
   assert.deepEqual(columnsFor('suppliers', declared as never).map((c) => c.field), ['seq', 'name', 'city']);
   assert.deepEqual(columnsFor('tasks', declared as never), columnsFor('tasks'), 'a built-in list took a declaration over its own');
+});
+
+test('the # column is 8ch for short ids and widens with the digits of the highest id in hand', () => {
+  assert.equal(columnsFor('obligations').find((c) => c.field === 'seq')?.width, '8ch');
+  assert.equal(seqWidth([]), '8ch');
+  assert.equal(seqWidth([{ seq: 7 }, { seq: 42 }]), '8ch');
+  assert.equal(seqWidth([{ seq: 999 }, { seq: 3 }]), '9ch');
+  assert.equal(seqWidth([{ seq: 12345 }]), '11ch');
 });
