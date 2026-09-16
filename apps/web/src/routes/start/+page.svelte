@@ -72,6 +72,22 @@
    */
   let made = $state<number | null>(null);
 
+  /** What the record did with the typed row: the sequence it got, or why it did not land. */
+  type Saved = { ok: true; seq: number | null } | { ok: false; why: string };
+
+  /**
+   * What the record did with it, and `null` while the demo is holding the row instead.
+   *
+   * THE SEQUENCE IS HELD FOR THE REASON `made` IS HELD. This screen does not navigate away from its
+   * own outcome, so the form is still on screen with everything in it and the button still live:
+   * correcting a typo and pressing again is the ordinary thing to do, and on a record that press
+   * has to change the row it wrote rather than leave a second one behind.
+   */
+  let saved = $state<Saved | null>(null);
+
+  /** The submit is out, so Enter held down does not send the same row twice. */
+  let writing = $state(false);
+
   /**
    * The number under each choice, and it did nothing.
    *
@@ -498,6 +514,11 @@
        it across a change of choice would point the next press's `replace` at a row in a list nobody
        is looking at. The row already added stays where it is and keeps its own `Put back`. */
     made = null;
+    /* AND THE WRITTEN ROW GOES WITH IT TOO, for the same reason one list further along: `saved`
+       holds a sequence inside one register, so carrying it across a change of choice would point
+       the next press's update at a row in a list nobody is looking at. The row that was written
+       stays in the record, where it belongs. */
+    saved = null;
   });
 
   const choice = $derived(CHOICES.find((c) => c.key === picked));
@@ -515,50 +536,100 @@
   /**
    * The first row.
    *
-   * IT SAYS WHAT IT WOULD HAVE WRITTEN AND GOES WHERE THE ROW WOULD BE. This app is a mock-up of
-   * the record and has no write path; the rule it keeps everywhere else is that an action which
-   * cannot happen says so once, in the toast, rather than doing nothing — because a control that
-   * does nothing is indistinguishable from a broken one. This is the highest-stakes control in the
-   * product and it was the one that broke that rule.
+   * IT IS A WRITE NOW, WHEREVER THERE IS A RECORD TO TAKE IT. This function had no live branch at
+   * all: it put the row in `pending` and said "Nothing was saved yet." whatever it was looking at.
+   * So the person most likely to have a record of their own pressed the most consequential button
+   * in the product, on the screen `19 §6` is written around, and was told the one true fact they
+   * had typed went nowhere. It had gone nowhere, and they had to type it again somewhere else.
+   *
+   * THE DEMO IS UNCHANGED, AND SO IS THE ARGUMENT FOR IT. There is no record behind the sample, so
+   * the row waits in `pending` and wears `Not saved` on the list, which is what that half of this
+   * function has always said and is still the truth about it.
+   *
+   * WHICH ONE IS `recordOrSample`, the source `make` and `remember` already read, so the three
+   * presses on this screen agree about what they are looking at rather than each deciding.
    */
-  function commit(event: SubmitEvent) {
+  async function commit(event: SubmitEvent) {
     event.preventDefault();
     if (!choice) return;
     /* THE BUTTON IS ALREADY DISABLED WHEN THIS IS TRUE. Kept as the second door, because Enter in a
        text field submits a form whatever its button looks like. */
     if (problems.length > 0) return;
-    /**
-     * AND THE ROW IS THE ROW THEY THEN SEE, which it was not.
-     *
-     * A friction pass ranked this first of the ten things costing a person the most, and the
-     * measurement is the whole argument: four clicks, twenty-five keystrokes, six decisions, three
-     * screens, **zero rows**. The list this screen offers to open holds thirty-eight rows belonging
-     * to a fictional studio and the one thing the person typed is nowhere in it, with nothing on
-     * either screen saying why.
-     *
-     * IT IS NOT A WRITE AND IT DOES NOT CLAIM TO BE. `pending` holds it for the life of the tab,
-     * the list draws it where it will be, and it wears `Not saved` on the row: the same receipt
-     * every other verb in this product leaves, so a person meets one product rather than one
-     * product and one exception. The sentence under this form already says nothing was saved; what
-     * changes is that the row exists to be looked at while that is true.
-     */
-    /* PRESSING AGAIN CORRECTS THE ROW, it does not add another. `replace` answers `false` when the
-       row is no longer waiting, which is what happens after `Put back` on the list, and then this
-       adds one as it did the first time rather than quietly restoring a row somebody removed. */
-    /* THE FIRST PRESS DOES NOT TOAST ANY MORE, AND THE SECOND ONE DOES. Both used to, and the first
-       read "the first row in Money would be written, but nothing was saved yet.": lower case, and
-       drawn at y 713 to 776 on a 390px phone straight across the outcome below, whose first line
-       said the same thing. That outcome IS this screen's answer, for the reason written over it, so
-       a toast on top was one fact twice with one copy hiding the other. A second press moves
-       nothing on the screen, because the outcome is already there, so it keeps a toast, and the
-       toast says what happened: the row was changed. */
-    if (made !== null && pending.replace(choice.key, made, taken)) {
-      toasts.push(copy.notWritten(firstRun.rowChanged(thing, list)));
-    } else {
-      made = pending.add(choice.key, taken);
+    /* AND THE SAME DOOR FOR A PRESS WHILE ONE IS IN FLIGHT, which on a record is a second row. */
+    if (writing) return;
+    writing = true;
+    try {
+      const client = createClient({ base: location.origin });
+      const chosen = await recordOrSample(client);
+      if (chosen.source.sample) {
+        /**
+         * AND THE ROW IS THE ROW THEY THEN SEE, which it was not.
+         *
+         * A friction pass ranked this first of the ten things costing a person the most, and the
+         * measurement is the whole argument: four clicks, twenty-five keystrokes, six decisions,
+         * three screens, **zero rows**. The list this screen offers to open holds thirty-eight rows
+         * belonging to a fictional studio and the one thing the person typed is nowhere in it, with
+         * nothing on either screen saying why.
+         *
+         * IT IS NOT A WRITE AND IT DOES NOT CLAIM TO BE. `pending` holds it for the life of the
+         * tab, the list draws it where it will be, and it wears `Not saved` on the row: the same
+         * receipt every other verb in this product leaves, so a person meets one product rather
+         * than one product and one exception. The sentence under this form already says nothing was
+         * saved; what changes is that the row exists to be looked at while that is true.
+         */
+        /* PRESSING AGAIN CORRECTS THE ROW, it does not add another. `replace` answers `false` when the
+           row is no longer waiting, which is what happens after `Put back` on the list, and then this
+           adds one as it did the first time rather than quietly restoring a row somebody removed. */
+        /* THE FIRST PRESS DOES NOT TOAST ANY MORE, AND THE SECOND ONE DOES. Both used to, and the first
+           read "the first row in Money would be written, but nothing was saved yet.": lower case, and
+           drawn at y 713 to 776 on a 390px phone straight across the outcome below, whose first line
+           said the same thing. That outcome IS this screen's answer, for the reason written over it, so
+           a toast on top was one fact twice with one copy hiding the other. A second press moves
+           nothing on the screen, because the outcome is already there, so it keeps a toast, and the
+           toast says what happened: the row was changed. */
+        if (made !== null && pending.replace(choice.key, made, taken)) {
+          toasts.push(copy.notWritten(firstRun.rowChanged(thing, list)));
+        } else {
+          made = pending.add(choice.key, taken);
+        }
+        saved = null;
+      } else {
+        saved = await write(client, choice.key);
+      }
+      said = true;
+      void remember();
+    } finally {
+      writing = false;
     }
-    said = true;
-    void remember();
+  }
+
+  /**
+   * The typed row, into the record.
+   *
+   * THE VALUES GO AS THE FORM HANDS THEM OVER. `RowForm` builds `taken` in the shapes the record
+   * stores: an enum in the spelling its own declaration uses, money as an amount and a currency, a
+   * number as a number. The first-run form asks for the title and what the register requires, and
+   * none of the five tiles requires a `ref`, which is the one field type that would need another
+   * row looked up before this could be sent.
+   *
+   * A SECOND PRESS CHANGES THE ROW IT WROTE, the way a second press on the demo corrects the row
+   * `pending` is holding. Without it the ordinary act of fixing a typo and pressing again leaves
+   * two rows in somebody's record on their first minute, and this screen stays put with the form
+   * still filled in, which is an invitation to do exactly that.
+   *
+   * WHY IT DID NOT LAND IS THE RECORD'S OWN SENTENCE, read the three ways `rows-write.ts` reads
+   * one: the refusal's `fix`, the calm sentence when nothing answered at all, and the raced one
+   * when the record moved while this was in flight.
+   */
+  async function write(client: ReturnType<typeof createClient>, register: string): Promise<Saved> {
+    const at = saved !== null && saved.ok ? saved.seq : null;
+    const done = at === null ? await client.create({ register, fields: taken }) : await client.update({ register, seq: at, patch: taken });
+    if (!done.ok)
+      return { ok: false, why: 'refusal' in done ? (done.refusal.code === 'UNREACHABLE' ? copy.writeNotReached : done.refusal.fix) : copy.writeRaced };
+    /* THE SECOND PRESS IS THE ONE THAT TOASTS, for the reason the demo's second press does: the
+       outcome under the button is already there from the first, so nothing else on screen moves. */
+    if (at !== null) toasts.push(firstRun.rowChangedSaved(thing, list), { intent: 'good' });
+    return { ok: true, seq: (done.value as { seq?: number | null }).seq ?? at };
   }
 
   /**
@@ -815,7 +886,7 @@
           <Button
             weight="primary"
             type="submit"
-            disabled={problems.length > 0}
+            disabled={problems.length > 0 || writing}
             aria-describedby={problems.length > 0 ? 'first-why' : undefined}>{copy.addTheRow}</Button
           >
           <!-- BACK IS A NAVIGATION TOO, so the browser's own Back and this button end up in the
@@ -843,15 +914,37 @@
                  twice more before it said where the row was, so the one thing that had happened
                  came last. That it is not saved is now said once as a sentence and once as the name
                  of the mark the reader will find on the row. -->
-            <p class="kept-what">{firstRun.rowIsThere(thing, list, copy.markNotWritten)}</p>
+            <!-- AND WHAT HAPPENED DEPENDS ON WHICH RECORD THIS IS. Every sentence below the first
+                 was written about the demo, and all three of them are false of a record that has
+                 just taken the row: it is saved, it is not marked, and the rows around it are the
+                 person's own rather than a fictional studio's. `saved` is `null` on the demo. -->
+            {#if saved === null}
+              <p class="kept-what">{firstRun.rowIsThere(thing, list, copy.markNotWritten)}</p>
+            {:else if saved.ok}
+              <p class="kept-what">{firstRun.rowSaved(thing, list)}</p>
+            {:else}
+              <!-- THE RECORD'S OWN SENTENCE, WHICH IS THE ONLY ONE THAT SAYS WHAT TO DO NEXT. The
+                   form is still on screen with everything in it, so a refusal a person can read is
+                   a refusal they can answer by changing a field and pressing again. -->
+              <p class="kept-what">{firstRun.rowNotSaved(thing, saved.why)}</p>
+            {/if}
             {#if known}
               <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
             {/if}
-            <p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>
-            <p class="kept-why">{firstRun.keptExamples}</p>
-            <div class="actions">
-              <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
-            </div>
+            {#if saved === null}
+              <p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>
+              <p class="kept-why">{firstRun.keptExamples}</p>
+            {:else if saved.ok}
+              <p class="kept-why">{firstRun.keptSaved}</p>
+            {/if}
+            <!-- AND THE WAY ONWARD IS OFFERED ONLY WHERE THERE IS A ROW AT THE END OF IT. A refused
+                 row is not on that list, so sending somebody to look for it would be the screen
+                 undoing the sentence above. -->
+            {#if saved === null || saved.ok}
+              <div class="actions">
+                <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
+              </div>
+            {/if}
           </div>
         {/if}
       </form>

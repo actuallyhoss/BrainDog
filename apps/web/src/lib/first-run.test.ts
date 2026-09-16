@@ -86,5 +86,17 @@ test('THE OUTCOME STARTS WITH A CAPITAL AND NAMES THE ROW, for every tile', () =
     assert.ok(thing, `${c.label} has no name for the row it makes`);
     assert.match(firstRun.rowIsThere(thing, 'Money', copy.markNotWritten), /^[A-Z].* is at the top of the Money list, marked Not saved\.$/u);
     assert.match(copy.notWritten(firstRun.rowChanged(thing, 'Money')), /^[A-Z].* on the Money list was changed, but nothing was saved yet\.$/u);
+
+    /* AND THE SAME THREE ON A RECORD THAT TOOK THE ROW. The demo's sentences say it is waiting and
+       marked; these say it is saved and where it lives, and neither set is drawn for the other. */
+    assert.match(firstRun.rowSaved(thing, 'Money'), /^[A-Z].* is saved to your record, at the top of the Money list\.$/u);
+    assert.match(firstRun.rowChangedSaved(thing, 'Money'), /^[A-Z].* on the Money list was changed\.$/u);
   }
+
+  /* A REFUSAL IS THE RECORD'S OWN SENTENCE, PASSED THROUGH WHOLE. The screen names the row and then
+     stops: what to do about it is a rule the record holds and this file does not. */
+  assert.equal(
+    firstRun.rowNotSaved('Your invoice', 'Amount cannot be left out.'),
+    'Your invoice was not saved. Amount cannot be left out.',
+  );
 });

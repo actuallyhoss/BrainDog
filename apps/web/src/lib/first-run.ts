@@ -193,6 +193,35 @@ export const firstRun = {
    */
   rowChanged: (thing: string, list: string) => `${thing} on the ${list} list was changed`,
 
+  /**
+   * AND THE SAME THREE SENTENCES FOR A RECORD THAT CAN BE WRITTEN TO.
+   *
+   * THE FOUR ABOVE ARE THE DEMO'S AND ONLY THE DEMO'S. They say the row is waiting, marked, and
+   * that nothing was saved, which is true of a tab holding a row in `pending` and false of a record
+   * that has just taken one. The screen used to say them whatever it was looking at, so the person
+   * most likely to have a record of their own was told their first row went nowhere.
+   *
+   * WHAT WAS SAVED AND WHERE IT NOW LIVES, in that order, because the row is the thing they did and
+   * the list is where they will find it again. The demo's sentence names the mark to look for; this
+   * one has no mark to name, so it says the durable fact instead.
+   */
+  rowSaved: (thing: string, list: string) => `${thing} is saved to your record, at the top of the ${list} list.`,
+  /* THE OTHER HALF OF `keptNothingWhy`, and the opposite fact. That one says how long a waiting row
+     lasts, because the honest answer is until the tab closes. This one answers the same question
+     for a row the record holds, and the answer is the reason somebody typed it. */
+  keptSaved: 'It is in the record now, so it is there when you come back.',
+  /**
+   * AND A FIRST ROW THE RECORD WOULD NOT TAKE SAYS WHY, IN THE RECORD'S OWN WORDS.
+   *
+   * `fix` IS PASSED THROUGH AND NOT SUMMARISED. A refusal carries the sentence that says what to do
+   * about it, and a screen that replaces it with its own wording is a screen guessing at a rule it
+   * does not hold. The shape is `shapeRefused`'s, one turn up, for the same reason.
+   */
+  rowNotSaved: (thing: string, fix: string) => `${thing} was not saved. ${fix}`,
+  /* WHAT A SECOND PRESS SAYS ON A RECORD. `rowChanged` is the demo's fragment, and it is a fragment
+     because `copy.notWritten` finishes it with the half that is not true here. */
+  rowChangedSaved: (thing: string, list: string) => `${thing} on the ${list} list was changed.`,
+
   /** The label above the first field. Written per choice, because "Your first money" is not English. */
   firstField: {
     obligations: 'Your first invoice',

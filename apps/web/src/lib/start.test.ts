@@ -142,8 +142,32 @@ test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate'
    * write and it does not claim to be. `pending` holds it for the life of the tab and the list
    * draws it wearing `Not saved`, which is the same receipt every other verb in this product
    * leaves.
+   *
+   * AND THAT IS THE DEMO, WHICH IS WHAT THIS ASSERTION NOW SAYS.
+   *
+   * THE ARGUMENT ABOVE RESTS ON A PREMISE THAT WAS TRUE OF THE WHOLE APP AND IS NOW TRUE OF HALF OF
+   * IT. "It is not a write" was never a ruling that the first row must not be written; it was the
+   * honest description of a build with no write path, and `pending.svelte.ts` says so in as many
+   * words: "THE HONEST FIX IS NOT A WRITE PATH, WHICH DOES NOT EXIST YET." It exists now. `make`
+   * and `remember`, fifty lines up this same file, branch on `chosen.source.sample` and write
+   * through `client.create`, and the list screen writes this same form's output through
+   * `rows-write.ts`.
+   *
+   * SO THE SENTENCE SURVIVES WHERE ITS PREMISE DOES. There is no record behind the sample, so the
+   * row waits in `pending` and wears `Not saved`, exactly as before and for the reason given above.
+   * On a record there is somewhere to put it, and a screen that answered a person's first true fact
+   * with "Nothing was saved yet." while holding a record that would have taken it was reporting the
+   * state of the build rather than the state of their row, which is what `19 §9` bans.
+   *
+   * THE ASSERTION IS SCOPED RATHER THAN DELETED, so the demo half cannot quietly become a write on
+   * some later pass without this going red: the waiting row has to come after the sample branch
+   * opens. What the other half does is the test below.
    */
-  assert.match(commit, /pending\.add\(choice\.key, taken\)/u, 'the row the person typed goes nowhere');
+  assert.match(
+    commit,
+    /chosen\.source\.sample[\s\S]*pending\.add\(choice\.key, taken\)/u,
+    'the demo row no longer waits in `pending`, or it waits for a record that could have taken it',
+  );
   assert.match(startPage, /bind:taken/u, 'the form holds what was typed and hands out nothing');
 
   /* AND THE OUTCOME IS ON THE SCREEN, not only in a toast that a later navigation can take with it. */
@@ -156,6 +180,41 @@ test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate'
      screen and said nothing about the one thing the person had just done. */
   assert.match(startPage, /firstRun\.rowIsThere/u, 'the outcome does not say where the row went');
   assert.match(startPage, /\/r\/\$\{choice\.key\}\?first=1/u, 'the way onward lost its address');
+});
+
+/**
+ * AND ON A RECORD, THE FIRST ROW IS WRITTEN TO IT.
+ *
+ * `commit` HAD NO LIVE BRANCH AT ALL. It put the row in `pending` and printed "Nothing was saved
+ * yet." whatever it was looking at, so the person most likely to have a record of their own pressed
+ * the most consequential button in the product and was told the one fact they had typed went
+ * nowhere. It had: they had to type it again somewhere else, having been given no reason.
+ *
+ * A SOURCE READ, for the reason the test above gives: there is no behaviour to drive here without a
+ * browser, and the outcome only exists after a submit the browser gates do not perform.
+ */
+test('THE FIRST ROW IS WRITTEN WHERE THERE IS A RECORD, and says why when it is not', () => {
+  const at = startPage.indexOf('async function write(');
+  assert.ok(at > 0, 'the first-run screen has no live write');
+  const write = startPage.slice(at, startPage.indexOf(BODY_END, at));
+
+  assert.match(write, /client\.create\(\{ register, fields: taken \}\)/u, 'the row the person typed is not written to the record');
+  /* A SECOND PRESS IS THE ORDINARY ONE. The form stays on screen with everything in it, so fixing a
+     typo and pressing again is what a person does next, and on a record that must not be a row. */
+  assert.match(write, /client\.update\(\{ register, seq: at, patch: taken \}\)/u, 'a second press leaves a second row in somebody’s record');
+
+  /* THE THREE WAYS A WRITE DOES NOT LAND, read as `rows-write.ts` reads them: the record's own
+     sentence, the calm one when nothing answered, and the raced one when the record moved. */
+  assert.match(write, /done\.refusal\.code === 'UNREACHABLE' \? copy\.writeNotReached/u, 'a record that did not answer is reported as a refusal');
+  assert.match(write, /done\.refusal\.fix/u, 'a refused first row does not say why, in the record’s words');
+  assert.match(write, /copy\.writeRaced/u, 'a write the record raced says nothing');
+
+  /* AND THE OUTCOME SAYS WHICH OF THE THREE HAPPENED. The demo's three sentences are false of a
+     record that has just taken the row, so each one is drawn only where it is true. */
+  assert.match(startPage, /firstRun\.rowSaved\(thing, list\)/u, 'a saved first row is not said to be saved');
+  assert.match(startPage, /firstRun\.rowNotSaved\(thing, saved\.why\)/u, 'a refused first row does not reach the screen');
+  assert.match(startPage, /\{firstRun\.keptSaved\}/u, 'the outcome does not say where a saved row now lives');
+  assert.match(startPage, /firstRun\.rowChangedSaved\(thing, list\)/u, 'a corrected row on a record says nothing');
 });
 
 test('and the answer is reset when the question changes', () => {
