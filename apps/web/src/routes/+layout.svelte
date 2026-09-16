@@ -184,10 +184,12 @@
      long as this one takes to arrive, which is the window every browser gate measures in. */
   beforeNavigate(leaving);
 
-  let sampleSaid = $state(pref.read().sampleSaid === true);
+  let dismissed = $state(pref.read().sampleSaid === true);
+  /* AND A LIVE RECORD IS NOT THE SAMPLE: the bar told somebody reading their own record that nothing they did was saved. */
+  const sampleSaid = $derived(dismissed || data.live === true);
 
   function putSampleAway() {
-    sampleSaid = true;
+    dismissed = true;
     pref.write({ sampleSaid: true });
   }
 
