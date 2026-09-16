@@ -137,6 +137,15 @@ test('a figure is drawn from the record\'s reading, and one refused or over no r
   assert.equal(rest.length + 2, FIGURE_IDS.length);
 });
 
+test('A FIGURE OVER A LIST THE RECORD DOES NOT HOLD IS NOT ASKED FOR', async () => {
+  const { io, sent } = host(() => json(200, { ok: true, value: { value: 1, unit: null, rows: 1, met: true, refusals: [] } }));
+  assert.deepEqual(await paletteReader(BASE, io).figures([{ id: 'courses' }, { id: 'assignments' }]), []);
+  assert.equal(sent.length, 0);
+  const money = FIGURE_IDS.filter((id) => METRICS[id]?.source === 'register.obligations');
+  await paletteReader(BASE, io).figures([{ id: 'obligations' }]);
+  assert.equal(sent.length, money.length);
+});
+
 test('only the newest query is answered, however the replies arrive', async () => {
   const replies = new Map<string, (v: string) => void>();
   const asked: string[] = [];

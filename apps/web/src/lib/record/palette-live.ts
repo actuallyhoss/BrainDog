@@ -11,6 +11,7 @@
 import { createClient } from '@braindog/client';
 
 import type { Metric, SearchResult } from './api.ts';
+import { METRICS } from './declared.ts';
 import type { Fetch } from './boot-live.ts';
 import { tileOf } from './news-live.ts';
 import { FIGURE_IDS, recentOf, roundRobin, type Changed, type List, type Recent } from './palette.ts';
@@ -21,7 +22,8 @@ export type Hits = { value: SearchResult; fix: string | null };
 export type Reader = {
   find(q: string, limit: number): Promise<Hits>;
   recent(lists: readonly List[], cap: number): Promise<Recent[]>;
-  figures(): Promise<Metric[]>;
+  /** The figures over the lists the record holds. With no lists given, every figure this build declares. */
+  figures(lists?: readonly { id: string }[]): Promise<Metric[]>;
 };
 
 /** How many lines of the log are asked for to find a handful of distinct rows. */
@@ -44,13 +46,17 @@ export function paletteReader(base: string, io?: Fetch): Reader {
       const out = await client.recentHistory({ limit: LOG_LINES }).catch(() => null);
       return out?.ok ? recentOf(out.value.events as readonly Changed[], lists, cap) : [];
     },
-    async figures() {
-      const read = await Promise.all(FIGURE_IDS.map((id) => client.metric(id).catch(() => null)));
+    async figures(lists) {
+      /* A FIGURE OVER A LIST THE RECORD DOES NOT HOLD IS NOT ASKED FOR. Every figure here is Money's, the estate's or
+         a project's, so a student's record answered twenty refusals each time the palette opened. */
+      const held = lists ? new Set(lists.map((l) => `register.${l.id}`)) : null;
+      const ids = held ? FIGURE_IDS.filter((id) => held.has(String(METRICS[id]?.source))) : FIGURE_IDS;
+      const read = await Promise.all(ids.map((id) => client.metric(id).catch(() => null)));
       /* A FIGURE WITH NO ROWS BEHIND IT HAS NO DOOR, and the palette lists doors. One the record will not work out for
          this caller is left out rather than named. */
       return read.flatMap((out, i) => {
         if (!out?.ok) return [];
-        const tile = tileOf(FIGURE_IDS[i]!, out.value as Parameters<typeof tileOf>[1]);
+        const tile = tileOf(ids[i]!, out.value as Parameters<typeof tileOf>[1]);
         return tile.href ? [tile] : [];
       });
     },

@@ -117,7 +117,7 @@ export const FOUNDER = {
               { metric: 'cash-now', label: 'Cash now' },
               { metric: 'in-30d', label: 'Coming in, 30 days' },
               { metric: 'out-30d', label: 'Going out, 30 days' },
-              { metric: 'datapoints-30d', label: 'Numbers reported, 30 days' },
+              { metric: 'datapoints-30d', label: 'Reported, 30 days' },
             ],
           },
           {

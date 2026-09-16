@@ -63,7 +63,23 @@
     names?: Names | undefined;
   } = $props();
 
-  const decl = $derived(REGISTERS[register]);
+  /**
+   * THE LIST AS THE RECORD DECLARES IT, when this build does not ship it. A use case's own list (Assignments, Datapoints)
+   * drew its count and no card at all on a phone, because the card plan was read from the build's table only. The
+   * record is asked once (`remote.ts` `learn`), and the cards are drawn when it answers.
+   */
+  let learnt = $state(0);
+  const decl = $derived(learnt >= 0 ? REGISTERS[register] : undefined);
+  $effect(() => {
+    const asked = register;
+    if (REGISTERS[asked]) return;
+    void Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')])
+      .then(([{ createClient }, remote]) => remote.learn((id) => createClient({ base: location.origin }).schema(id), asked, new Map()))
+      .then(() => {
+        if (REGISTERS[asked]) learnt += 1;
+      })
+      .catch(() => undefined);
+  });
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
 
   /**

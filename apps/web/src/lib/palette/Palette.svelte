@@ -283,7 +283,7 @@
     let gone = false;
     const known = lists;
     reader()
-      .then((r) => Promise.all([r.recent(known, RECENT_CAP), r.figures()]))
+      .then((r) => Promise.all([r.recent(known, RECENT_CAP), r.figures(known)]))
       .then(
         ([recent, figures]) => {
           if (!gone) extra = { recent, figures };

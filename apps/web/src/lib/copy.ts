@@ -594,6 +594,8 @@ export const copy = {
   /* THE RECORD ITSELF IS EMPTY, which is a different sentence from every list being empty and from
      nothing needing you. It is the state of the first hour and nothing could say it. */
   recordEmpty: 'Nothing in the record yet.',
+  /** A use case's pack going in or out, in the feed: "Added the Student use case". */
+  useCaseEvent: (verb: string, name: string) => `${verb} the ${name} use case`,
   recordEmptyBody: 'A record holds what a business is made of: what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
   startHere: 'Start here',
   noPacksYet: 'No add-ons installed.',
