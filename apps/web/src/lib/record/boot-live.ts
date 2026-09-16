@@ -130,6 +130,28 @@ function exportText(e: EventLine): string | null {
   return null;
 }
 
+/**
+ * ACCESS GIVEN OR TAKEN AWAY, AS A SENTENCE. The kind is the record's (`access.grant`) and it reached Home as "Access
+ * grant": a key made for an agent, a device let in, or a person given a level. What it reaches is in `to`, a key's or a
+ * device's label in `note`, and a person's level may be on one list, named in `field`.
+ */
+const SCOPES: Readonly<Record<string, string>> = { read: 'read', propose: 'read and propose', write: 'read and write' };
+function accessText(e: EventLine): string | null {
+  if (e.kind !== 'access.grant' && e.kind !== 'access.revoke') return null;
+  const given = e.kind === 'access.grant';
+  const label = e.note && e.note.trim() !== '' ? `: ${e.note.trim()}` : '';
+  const level = typeof (given ? e.to : e.from) === 'string' ? String(given ? e.to : e.from).replaceAll('_', ' ') : null;
+  if (e.target_kind === 'token') {
+    const can = typeof e.to === 'string' ? SCOPES[e.to] : undefined;
+    return given ? `Made a key${can ? ` that can ${can}` : ''}${label}` : `Took back a key${label}`;
+  }
+  if (e.target_kind === 'device_grant') return given ? `Let a device sign in${label}` : `Signed a device out${label}`;
+  const list = e.field && e.field !== '*' ? (REGISTERS[e.field]?.name ?? e.field) : null;
+  const on = list ? ` on ${list}` : ' to this record';
+  if (given) return level ? `Gave someone ${level} access${on}` : `Gave someone access${on}`;
+  return level ? `Took away someone's ${level} access${on}` : `Took away someone's access${on}`;
+}
+
 /** One line of the log in the words the feed draws. */
 function textOf(e: EventLine): string {
   if (e.register !== null) {
@@ -139,7 +161,7 @@ function textOf(e: EventLine): string {
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
   if (e.kind === 'decide' && e.title) return `Decided: ${e.title}`;
-  const pack = packText(e) ?? exportText(e);
+  const pack = packText(e) ?? exportText(e) ?? accessText(e);
   if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
 }

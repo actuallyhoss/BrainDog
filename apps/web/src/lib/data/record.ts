@@ -165,6 +165,9 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
       if (!out.ok) return out;
       const decl = declOf(out.value as RegisterDecl);
       declared.set(register, decl);
+      /* AND KEPT BESIDE THE BUILD'S OWN LISTS, as `remote.ts` `learn` keeps one, because every cell is formatted through
+         `display`, which reads the field's type from there. A use case's list drew a datapoint's When as the raw instant. */
+      if (!REGISTERS[register]) REGISTERS[register] = relabel({ ...decl, id: register }, labels());
       return { ok: true, value: relabel(decl, labels()) };
     },
     page: (register, a, cursor) => ask(register, a, cursor, PAGE),

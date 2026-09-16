@@ -112,6 +112,15 @@ test("an export's note is said as a sentence, not in the kernel's words", () => 
   assert.equal(at('sections header, data, grants redacted'), 'Exported part of the record');
 });
 
+test('access given or taken away reads as a sentence, never as "Access grant"', () => {
+  const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
+  assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');
+  assert.equal(at({ target_kind: 'member', field: 'obligations', to: 'read' }), 'Gave someone read access on Money');
+  assert.equal(at({ kind: 'access.revoke', target_kind: 'member', field: '*', from: 'write', to: null }), "Took away someone's write access to this record");
+  assert.equal(at({ target_kind: 'token', to: 'propose', note: 'Claude on the laptop' }), 'Made a key that can read and propose: Claude on the laptop');
+  assert.equal(at({ target_kind: 'device_grant', to: 'login' }), 'Let a device sign in');
+});
+
 test('a pack install names the list it brought, not the bare verb', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ actor: 'system', target_kind: 'pack', ...over })] as never, null)[0]?.text;
   assert.equal(at({ kind: 'install', target: 'pack:estate' }), 'Added the Services list');
