@@ -128,14 +128,15 @@
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    min-block-size: var(--tap);
-    padding-inline: var(--sp-3);
+    min-block-size: var(--rail-item-h);
+    padding-inline: var(--sp-2);
     border: 0;
     background: none;
     border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
     text-decoration: none;
     cursor: pointer;
     white-space: nowrap;
@@ -146,11 +147,10 @@
     color: var(--ink);
   }
 
-  /* WHERE YOU ARE, SAID THE WAY THE RAIL SAYS IT: the name in full ink and a mark that does not
-     depend on colour alone, which here is the underline the tab bar already uses. */
+  /* Where you are, said the way the rail says it: `s2` and full ink, no accent. */
   .bar-item[aria-current='page'] {
+    background: var(--s2);
     color: var(--ink);
-    box-shadow: inset 0 -2px 0 0 var(--accent);
   }
 
   .bar-name {

@@ -78,9 +78,10 @@
     text-decoration: none;
   }
 
+  /* Ink and an ink bar, so here is a shape as well as a shade, with no accent. */
   .tab[aria-current='page'] {
     color: var(--ink);
-    box-shadow: inset 0 2px 0 0 var(--accent);
+    box-shadow: inset 0 2px 0 0 var(--ink);
   }
 
   .badge-slot {
@@ -93,9 +94,11 @@
     inset-inline-start: 11px;
     min-inline-size: 16px;
     padding: 0 4px;
-    background: var(--tone-fill, var(--edge));
+    /* A count, not a filled chip: the intent is the text colour on the bar's own ground. */
+    background: var(--sunk);
     border-radius: var(--r-pill);
-    color: var(--accent-ink);
+    color: var(--tone, var(--ink2));
+    font-weight: 500;
     /* THE SCALE'S SMALLEST STEP, NOT A NUMBER. This was `10px`, which the type scale does not
        have and `52 §5.2`'s second rule forbids; it survived because that rule is not implemented
        (see `loop/finding-css-rules.md`). `--t-xs` is 12px, so the badge is 2px larger here, which

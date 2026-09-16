@@ -69,20 +69,18 @@
     pointer-events: auto;
   }
 
-  /* A toast is over the page, so it is one of the two things in the product allowed a shadow. It
-     takes the RAISED surface and a full-strength edge rather than the accent: a report of something
-     that already happened is not an alert, and the stack is often three deep. */
+  /* Over the page, so it is allowed `--e2`: s1, a hairline, no accent (DESIGN-BRIEF 4.9). */
   .toast {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
-    background: var(--s3);
-    border: 1px solid var(--edge);
+    background: var(--s1);
+    border: 1px solid var(--line);
     border-radius: var(--r-md);
     box-shadow: var(--e2);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     animation: toast-in var(--d-enter) var(--ease-spring);
   }
 
@@ -112,20 +110,19 @@
     min-inline-size: 0;
   }
 
-  /* The undo is the LOUD thing in the toast, because it is the only thing in it that does anything.
-     A row of two grey links, one of which gives you your data back, weights them the same. */
+  /* The undo is the loud thing in the toast: a secondary button in ink, not an accent link. */
   /* AND IT IS A 44px TARGET ON A THUMB. It was 28 — the only control in the product that gives you
      your data back, on a countdown, at two thirds of the floor. */
   .undo {
     flex: none;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-4);
+    padding: 0 var(--sp-3);
     background: none;
     border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-    color: var(--accent-text);
+    border-radius: var(--r-sm);
+    color: var(--ink);
     font: inherit;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -133,8 +130,7 @@
   }
 
   .undo:hover {
-    background: var(--accent-wash);
-    border-color: var(--accent);
+    background: var(--s2);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
@@ -154,7 +150,7 @@
   }
 
   .close:hover {
-    background: var(--hover-wash);
+    background: var(--s2);
     color: var(--ink);
   }
 

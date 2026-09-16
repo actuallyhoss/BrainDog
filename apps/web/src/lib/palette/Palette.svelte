@@ -941,9 +941,9 @@
     max-block-size: 100dvh;
     margin: 0;
     padding: 0;
-    background: var(--s2);
+    background: var(--s1);
     border: 0;
-    border-inline-start: 1px solid var(--edge);
+    border-inline-start: 1px solid var(--line);
     color: var(--ink);
     box-shadow: var(--e3);
     overflow: hidden;
@@ -1069,8 +1069,8 @@
   .p-group {
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 600;
+    font-size: var(--t-xs);
+    font-weight: 500;
   }
 
   /* `--ctl-h`, BECAUSE THESE ARE THE PHONE'S ROUTE TO SEVERAL PLACES. 38px, adjacent, with no gap
@@ -1092,17 +1092,14 @@
     cursor: pointer;
   }
 
-  /* The same tint the rail uses for "here", because it is the same idea: one row out of a list is
-     the one you are on. It was `--s3` plus a 2px bar, which on a light palette is one rung of the
-     surface ladder away from the ground it sits on: a highlight you have to hunt for in the one
-     control that exists to be driven from the keyboard. */
+  /* The cursor row takes the rail's "here": `s2` and full ink, no accent wash. */
   .p-row[data-cursor] {
-    background: var(--accent-wash);
+    background: var(--s2);
     color: var(--ink);
   }
 
   .p-row[data-cursor] :global(.icon) {
-    color: var(--accent-text);
+    color: var(--ink2);
   }
 
   /* A CAP, NOT A `flex: none`. A question's title is a whole sentence and the panel has the room for

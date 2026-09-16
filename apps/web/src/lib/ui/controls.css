@@ -46,10 +46,14 @@
   .tile:active,
   .choice:active,
   .mi:active {
-    transform: scale(var(--press-scale));
     opacity: var(--press-dim);
     transition-duration: var(--d-press);
     transition-timing-function: var(--ease-push);
+  }
+
+  /* The scale is for buttons only; rows and tabs never scale (DESIGN-BRIEF 4.10). */
+  .btn:active:not(:disabled) {
+    transform: scale(var(--press-scale));
   }
 
   .field {
@@ -58,15 +62,12 @@
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    background: var(--s1);
+    /* An input is where the boundary is the affordance, so it takes `edge` (DESIGN-BRIEF 4.1). */
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
-  }
-
-  .field:hover {
-    border-color: var(--edge);
   }
 
   /* The ring is drawn on the WRAPPER, because the input inside it has no border of its own and a
@@ -151,7 +152,7 @@
     padding: 2px;
     background: var(--sunk);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
   }
 
   /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, and each is 44 wide as well as
@@ -187,7 +188,7 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 1px solid transparent;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -202,12 +203,10 @@
     color: var(--ink2);
   }
 
-  /* A pill lifted out of the track, the way the reference product draws its chosen option. */
+  /* The chosen option is a shape in the track, not only a shade: a surface step and a hairline. */
   .segment[data-on] {
-    background: var(--s3);
+    background: var(--s2);
     border-color: var(--line);
-    box-shadow: var(--e1);
     color: var(--ink);
-    font-weight: 600;
   }
 }

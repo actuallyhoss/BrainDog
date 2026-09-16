@@ -581,8 +581,7 @@
     overscroll-behavior: contain;
   }
 
-  /* Rail on the darker ground, work on the lighter one, one hairline between them, and no inset
-     panel: nothing floats, so nothing needs a shadow to explain why it floats. The work area is the
+  /* Rail and canvas on the sunk ground, the work lifted onto `bg` in its own panel. The panel is the
      ONE scroll container, so the rail never moves and the window shows exactly one scrollbar. */
   /**
    * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS.
@@ -599,6 +598,7 @@
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
+    background: var(--sunk);
   }
 
   /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
@@ -618,7 +618,8 @@
      work that boundary is the strip's own bottom edge rather than a line down the left of the page. */
   .shell[data-shape='bar'] .body,
   .shell[data-shape='menu'] .body {
-    border-inline-start: 0;
+    margin-block-start: 0;
+    margin-inline-start: var(--sp-2);
   }
 
   /* One button, at the start of the strip, at the size every other target in the shell is. */
@@ -629,12 +630,13 @@
     min-block-size: var(--tap);
     margin: var(--sp-2) var(--sp-3);
     padding-inline: var(--sp-3);
-    background: var(--s3);
+    background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
   }
 
@@ -645,16 +647,18 @@
   /* THE SAMPLE BAR. A note, not an alarm: nothing is wrong and nothing is urgent, and the day it
      looks like an error is the day it gets dismissed unread. It is the same treatment the register
      screen gives what the record noticed, for the same reason. */
+  /* A page-level banner (DESIGN-BRIEF 4.9): a full-width strip at the top of the panel, `s1` and a
+     bottom hairline only. Not a floating card, and no accent wash. */
   .sample {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2) var(--sp-5);
+    gap: var(--sp-1) var(--sp-5);
     align-items: center;
     justify-content: space-between;
-    margin: var(--sp-4) var(--sp-6) 0;
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
-    background: var(--accent-wash);
-    border-radius: var(--r-lg);
+    min-block-size: 40px;
+    padding: var(--sp-1) var(--sp-4) var(--sp-1) var(--sp-6);
+    background: var(--s1);
+    border-block-end: 1px solid var(--line);
   }
 
   .sample-said {
@@ -662,16 +666,17 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   .sample-said strong {
     color: var(--ink);
+    font-weight: 500;
   }
 
   .sample-acts {
     display: inline-flex;
-    gap: var(--sp-3);
+    gap: var(--sp-1);
     align-items: center;
   }
 
@@ -708,36 +713,49 @@
      102x36 on a phone, on every screen in the product at once, which is the only reason the number
      was small enough to notice. `min-block-size` and not `block-size`, because a label that wraps
      grows and 44 is the floor rather than the size. */
-  .sample-go {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--ctl-h);
-    padding: var(--sp-2) var(--sp-4);
-    background: var(--accent);
-    border: 1px solid var(--accent-edge);
-    border-radius: var(--r-pill);
-    color: var(--accent-ink);
-    font-size: var(--t-sm);
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-
+  .sample-go,
   .sample-away {
     display: inline-flex;
     align-items: center;
-    min-block-size: var(--ctl-h);
-    padding: var(--sp-2) var(--sp-3);
-    background: none;
-    border: 0;
-    color: var(--ink2);
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
     font-size: var(--t-sm);
-    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  /* The page's one primary: ink fill, never a pill. */
+  .sample-go {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .sample-go:hover {
+    background: var(--primary-hover);
+  }
+
+  .sample-away {
+    background: none;
+    color: var(--ink2);
   }
 
   .sample-away:hover {
+    background: var(--s2);
     color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .sample-go,
+    .sample-away {
+      min-block-size: var(--ctl-h);
+    }
   }
 
   /**
@@ -761,8 +779,7 @@
     .sample {
       gap: var(--sp-2) var(--sp-3);
       align-items: center;
-      margin: var(--sp-3) var(--sp-4) 0;
-      padding: var(--sp-2) var(--sp-3);
+      padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-4);
       /* It still WRAPS, because "Start your own" and "Put this away" beside a bold sentence do not
          fit 390px and shrinking either below the 44px floor is the one thing a small screen may
          not trade. Two rows instead of six is the whole of the fix. */
@@ -790,12 +807,8 @@
       gap: 0;
     }
 
-    .sample-go {
-      padding: var(--sp-2) var(--sp-3);
-    }
-
     .sample-away {
-      padding: var(--sp-2);
+      padding: 0 var(--sp-2);
     }
   }
 
@@ -823,8 +836,12 @@
   .body {
     animation: arrive var(--d-move) var(--ease-out) backwards;
     min-inline-size: 0;
+    /* The lifted panel (DESIGN-BRIEF 4.4): `bg` on the sunk canvas, a hairline, `--r-md`, inset from
+       the window edges, and no shadow. */
+    margin: var(--sp-2) var(--sp-2) var(--sp-2) 0;
     background: var(--bg);
-    border-inline-start: 1px solid var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
     overflow-y: auto;
     overscroll-behavior: contain;
     /* Below 900px the launcher floats over the bottom-right corner of every surface, so every
@@ -853,7 +870,7 @@
     inline-size: 52px;
     block-size: 52px;
     padding: 0;
-    background: var(--s3);
+    background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-pill);
     box-shadow: var(--e2);
@@ -899,7 +916,9 @@
     }
 
     .body {
+      margin: 0;
       border: 0;
+      border-radius: 0;
       /* IT RESERVED 88px FOR A BAR THAT IS 90 ON AN IPHONE AND 56 ON A PHONE WITH NO HOME
          INDICATOR: two pixels of the last row under the bar on one, and thirty-two pixels of
          nothing on the other. Three files were each doing this sum and two of them got a
@@ -934,9 +953,12 @@
 
     /* The sample bar is the first thing at the top of a phone, which is where that button floats,
        so it ends before it, as the page head already does. */
-    .sample,
     .unsaved {
       margin-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
+    }
+
+    .sample {
+      padding-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
     }
   }
 

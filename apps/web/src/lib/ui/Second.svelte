@@ -92,7 +92,7 @@
 
   h2 {
     margin: 0;
-    font-size: var(--t-lg);
+    font-size: var(--t-base);
     font-weight: 600;
     color: var(--ink);
   }
@@ -122,11 +122,8 @@
     padding: var(--sp-4);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    /* `background: var(--raise)` — a SHADOW token in a background property, which computed to
-       `none` while `--raise` was `none` and so looked deliberate. It wants the raised surface, and
-       that is `--s1`, which is what every other card in the product sits on. */
+    /* In the flow, so no shadow. */
     background: var(--s1);
-    box-shadow: var(--raise);
     color: inherit;
     font: inherit;
     text-align: start;
@@ -134,8 +131,7 @@
   }
 
   .one:hover {
-    border-color: var(--edge);
-    background: var(--sunk);
+    background: var(--s2);
   }
 
   .one:focus-visible {
@@ -144,7 +140,8 @@
   }
 
   .label {
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 500;
   }
 
   .what {
