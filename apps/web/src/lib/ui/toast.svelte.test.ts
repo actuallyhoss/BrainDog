@@ -61,9 +61,14 @@ const LIFE = 10_000;
  * that left one armed would expire a toast belonging to the test after it.
  */
 function fresh(t: TestContext): void {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  /* EMPTIED BEFORE THE CLOCK IS TAKEN OVER, AND THAT ORDER IS LOAD BEARING. A toast left by the test
+     before holds a handle from that test's mocked clock, and handing one of those to the clearTimeout
+     of a NEW mocked clock leaves the new one unable to fire timers it accepted. That cost an hour on
+     the clipboard file, where the symptom was a test that hung rather than failed. Emptied first,
+     under the real clock, only real handles are ever cleared by the real clearTimeout. */
   for (const toast of [...toasts.items]) toasts.dismiss(toast.id);
   toasts.release();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
 }
 
 /**
@@ -262,6 +267,118 @@ test('FOUR, THEN THE OLDEST GOES, so the stack cannot cover the work it is repor
     toasts.items.map((toast) => toast.text),
     ['Archived obligations#3', 'Archived obligations#4', 'Archived obligations#5', 'Archived obligations#6'],
     'the cap dropped the newest toasts instead of the oldest',
+  );
+});
+
+test('AN EVICTED TOAST TAKES ITS COUNTDOWN WITH IT, rather than expiring later over a stack it has left', (t) => {
+  fresh(t);
+
+  /* The pushes are spread over the clock so that the first toast's window closes on its own, a clear
+     second before the windows of the toasts that pushed it off the end. Pushed together they would
+     all expire in the same tick and the evicted one's countdown would be indistinguishable. */
+  toasts.push('Archived obligations#1', { undo: () => {} });
+  t.mock.timers.tick(1_000);
+  const live = [2, 3, 4].map((n) => toasts.push(`Archived obligations#${n}`));
+  t.mock.timers.tick(1_000);
+  /* The fifth is what puts the first over the cap. */
+  toasts.push('Archived obligations#5');
+  assert.equal(toasts.items.length, 4);
+
+  /**
+   * THE SEAM. A countdown's callback is `() => this.dismiss(id)` and looks the method up on the
+   * instance when it fires, so an own property catches exactly the expiries and nothing else. The
+   * timer is private and a leaked one is invisible from outside; this is what makes it visible.
+   */
+  const expired: number[] = [];
+  const inherited = Object.getPrototypeOf(toasts) as { dismiss: (id: number) => void };
+  toasts.dismiss = function (id: number) {
+    expired.push(id);
+    inherited.dismiss.call(this, id);
+  };
+
+  try {
+    /* THE EVICTED TOAST'S OWN WINDOW CLOSES HERE, eight seconds after it left the screen. */
+    t.mock.timers.tick(LIFE - 2_000);
+    assert.deepEqual(expired, [], 'the evicted toast kept counting down and expired over a stack it had left eight seconds earlier');
+
+    /* AND THE GUARD AGAINST A VACUOUS PASS, which is the failure this repository is written against:
+       if the mocked clock fired nothing at all, the assertion above would hold for the wrong reason.
+       The three pushed a second later are due now, and they must be heard. */
+    t.mock.timers.tick(1_000);
+    assert.deepEqual(expired, live, 'the mocked clock fired no expiry at all, so the check above proves nothing');
+  } finally {
+    delete (toasts as unknown as Record<string, unknown>)['dismiss'];
+  }
+});
+
+test('and an offer that has been pushed off the end cannot be reached by the shortcut', (t) => {
+  fresh(t);
+  const reg = register();
+  reg.archive('alpha');
+
+  /* THE CLAIM, AND WHAT IT IS NOT. `undoLast` reads the live stack, so an evicted offer is already
+     out of its reach: this test holds that and does not fail against a stack that leaks the timer.
+     It is here because the reach is what the person feels. The offer they made four toasts ago is
+     GONE rather than wrong, and the press they make lands on the newest offer instead. */
+  toasts.push('Archived obligations#1', { undo: () => reg.restore('alpha') });
+  for (const n of [2, 3, 4, 5]) toasts.push(`Archived obligations#${n}`, { undo: () => {} });
+
+  assert.equal(toasts.undoLast(), true);
+  assert.deepEqual(reg.archived, ['alpha'], 'a press of undo reached an offer that had been off the screen since the fifth toast arrived');
+});
+
+/* ── 7. an undo that fails ───────────────────────────────────────────────── */
+
+test('AN UNDO THAT THROWS IS STILL SPENT, so nobody presses it again over a half applied undo', (t) => {
+  fresh(t);
+  let ran = 0;
+  const id = toasts.push('Archived obligations#2', {
+    undo: () => {
+      ran++;
+      throw new Error('the row could not be restored');
+    },
+  });
+
+  /* THE THROW PROPAGATES, and that is the choice rather than an oversight: a swallowed error is how
+     an undo that did not work looks exactly like one that did, on the one control in this app whose
+     failure loses a row. What must not survive it is the offer. */
+  assert.throws(() => toasts.run(id), /could not be restored/u);
+
+  assert.deepEqual(toasts.items, [], 'the undo threw and its toast stayed on screen, still offering an undo that half ran');
+
+  toasts.run(id);
+  assert.equal(ran, 1, 'a second press reached a callback that had already run and thrown part of the way through');
+});
+
+test('and the shortcut spends it too, rather than leaving it under the next press', (t) => {
+  fresh(t);
+  let ran = 0;
+  toasts.push('Archived obligations#2', {
+    undo: () => {
+      ran++;
+      throw new Error('the row could not be restored');
+    },
+  });
+
+  assert.throws(() => toasts.undoLast(), /could not be restored/u);
+  assert.equal(toasts.undoLast(), false, 'the failed offer was still the newest offer, so the next press ran it again');
+  assert.equal(ran, 1);
+});
+
+test('and a report that only reports is unharmed by the offer above it failing', (t) => {
+  fresh(t);
+  const copied = toasts.push('Copied obligations#2.');
+  const id = toasts.push('Archived obligations#2', {
+    undo: () => {
+      throw new Error('the row could not be restored');
+    },
+  });
+
+  assert.throws(() => toasts.run(id));
+  assert.deepEqual(
+    toasts.items.map((toast) => toast.id),
+    [copied],
+    'a failed undo took the rest of the stack with it, or left its own toast behind',
   );
 });
 

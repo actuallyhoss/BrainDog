@@ -40,7 +40,16 @@ class Toasts {
 
   push(text: string, opts: { undo?: () => void; intent?: Toast['intent'] } = {}): number {
     const id = this.#next++;
-    this.items = [...this.items, { id, text, undo: opts.undo, intent: opts.intent }].slice(-CAP);
+    const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent }];
+
+    /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
+       countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds
+       later and writes to `items` anyway, which is every toast then on screen re-rendering on behalf
+       of one that has not existed since. */
+    const over = next.length - CAP;
+    if (over > 0) for (const gone of next.slice(0, over)) this.dismiss(gone.id);
+
+    this.items = next.slice(-CAP);
     this.#arm(id);
     return id;
   }
@@ -66,10 +75,24 @@ class Toasts {
     return true;
   }
 
-  /** Runs the undo and takes the toast with it: the offer was single-use and is now spent. */
+  /**
+   * Runs the undo and takes the toast with it: the offer was single-use and is now spent.
+   *
+   * SPENT EVEN WHEN IT THROWS, which is the whole of the `finally`. An undo that failed part of the
+   * way through and left its own offer standing invites a second press over a half applied undo, on
+   * the one control in this product whose failure loses a row.
+   *
+   * THE THROW ITSELF IS NOT SWALLOWED. An error caught here would make an undo that did not work
+   * look exactly like one that did: the toast goes, the row does not come back, and nothing is
+   * reported anywhere. Propagating leaves it to the browser's own error reporting, which is a worse
+   * account than a designed one and a far better account than silence.
+   */
   run(id: number) {
-    this.items.find((t) => t.id === id)?.undo?.();
-    this.dismiss(id);
+    try {
+      this.items.find((t) => t.id === id)?.undo?.();
+    } finally {
+      this.dismiss(id);
+    }
   }
 
   hold() {
