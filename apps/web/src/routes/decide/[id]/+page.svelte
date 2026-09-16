@@ -32,7 +32,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { day, since } from 'braindog-render';
+  import { day, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
@@ -420,7 +420,7 @@
       <section class="cost">
         {#if question.cost}
           <h2 class="cost-label">{copy.costOfDelay}</h2>
-          <p class="cost-body">{question.cost}</p>
+          <p class="cost-body">{symbolText(question.cost)}</p>
         {/if}
         <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
       </section>

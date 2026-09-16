@@ -26,7 +26,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { tick, untrack } from 'svelte';
-  import { since } from 'braindog-render';
+  import { since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
   import { ROWSETS } from '$lib/record/data.ts';
@@ -305,7 +305,7 @@
                      nowhere. It stays, because the feed says "Opened SG31" and a reader looking for
                      that question should find it here; it no longer comes first. -->
                 <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-                {#if q.cost}<span class="q-cost">{q.cost}</span>{/if}
+                {#if q.cost}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
                 <span class="q-head">
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
                   <span class="q-age">opened {since(q.opened, now)}</span>

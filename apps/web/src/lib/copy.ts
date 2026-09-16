@@ -800,6 +800,8 @@ export const copy = {
   packScopesInUse: (names: string[]) => `Its projects are still used by ${list(names)}`,
   installDiff: 'What this adds',
   packNothingToSet: 'This add-on has nothing to set.',
+  packNotInstalled: (id: string) => `There is no add-on called ${id} on this record.`,
+  packNotInstalledWhy: 'Add-ons shows the ones this record has, and the ones it could add.',
   packNothingToSetWhy: 'It adds the lists and pages below, and nothing about it needs choosing.',
   /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those

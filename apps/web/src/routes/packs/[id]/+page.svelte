@@ -51,6 +51,8 @@
 
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
   let refusal = $state('');
+  /** The record does not hold this add-on at all, which is an address and not a failure. */
+  let unknown = $state(false);
   let settings = $state<PackConfig | null>(null);
   let drafts = $state<Record<string, Draft>>({});
   let source: Source | null = null;
@@ -88,6 +90,7 @@
       from = 'ready';
     } else {
       refusal = chosen.first.refusal.fix;
+      unknown = chosen.first.refusal.code === 'DECLARATION_UNKNOWN';
       from = 'refused';
     }
     closed(chosen.first.ok, at);
@@ -172,7 +175,16 @@
 
 {#if from === 'refused'}
   <div class="page">
-    <Empty kind="error" heading title={refusal}>
+    <!-- AN ADD-ON THAT IS NOT INSTALLED IS NOT AN ERROR. It drew the red warning glyph over the
+         record's own sentence, which starts with the id in lower case; a mistyped address reads
+         as the place it is, with the way back to the list of add-ons. -->
+    <Empty
+      kind={unknown ? 'no-results' : 'error'}
+      glyph={unknown ? 'packs' : undefined}
+      heading
+      title={unknown ? copy.packNotInstalled(String(page.params.id)) : refusal}
+      body={unknown ? copy.packNotInstalledWhy : undefined}
+    >
       {#snippet actions()}<Button href="/packs">{copy.packs}</Button>{/snippet}
     </Empty>
   </div>
