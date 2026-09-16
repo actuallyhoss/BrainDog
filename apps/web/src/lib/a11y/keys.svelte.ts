@@ -43,8 +43,13 @@ export function typing(): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
 }
 
-/** `lockScroll` is a COUNTER, not a boolean, so two overlays closing in the wrong order do not
-    unlock early. `overlaid() > 0` silences every hotkey except close. */
+/** `overlays` IS A COUNTER, not a boolean, so two overlays closing in the wrong order do not
+    unlock early, and `covered()` reads it.
+
+    IT SILENCES EVERY UNMODIFIED KEY, WHICH IS NOT THE SAME AS "every hotkey except close". The
+    shell stands down on `covered() && !mod`, so with a sheet open Mod+K still opens the palette and
+    Mod+Z still undoes, and Esc is handled by the `<dialog>` itself rather than by anything here.
+    This comment said `lockScroll` and `overlaid()` for a long time and neither has ever existed. */
 class Overlays {
   #count = $state(0);
   get depth() {

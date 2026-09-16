@@ -4,7 +4,7 @@
   Its body is `88dvh − var(--kb)` and its bottom edge sits `var(--kb)` up, so the active field is
   not underneath the keyboard. `--kb` is written by `$lib/a11y/keyboard.ts`, which the shell starts;
   this sentence used to be here with nothing behind it, and the term subtracted zero for the life of
-  the build. `lockScroll` is a counter, and Esc closes ONE layer per press and stops rather than
+  the build. `overlays` is a counter, and Esc closes ONE layer per press and stops rather than
   falling through (19 §4).
 
   Open is longer than close, always: a panel opens in 280ms and closes in 160ms. Opening is

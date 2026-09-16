@@ -227,8 +227,10 @@
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
 
-    // `overlaid() > 0` silences every hotkey except close. The counter, not a boolean, so two
-    // overlays closing in the wrong order do not unlock early.
+    // `covered()` drops every UNMODIFIED key, which is what the line below says and not what this
+    // comment used to claim: a modified chord still runs under an open layer, and Esc is the
+    // `<dialog>`’s own. The depth is a counter rather than a boolean so two overlays closing in
+    // the wrong order do not unlock early.
     if (overlays.depth > 0 && !mod) return;
 
     // Never while typing. One test, in the registry, and no screen implements its own.
