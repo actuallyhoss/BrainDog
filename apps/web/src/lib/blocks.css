@@ -102,14 +102,22 @@
     --tone-fill: var(--info-fill);
   }
 
+  /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL (DESIGN-BRIEF 4.1). The renderer still emits
+     the glyph with its name for a screen reader; what is drawn is one 6px mark in the intent's fill,
+     and the word beside it (a date, a state) carries the meaning in text. */
   .glyph {
-    color: var(--tone, var(--dim));
-    /* Belt and braces with the U+FE0E in the token: a colour emoji here would be a colour no theme
-       chose and no validator measured. */
-    font-variant-emoji: text;
-    font-size: var(--t-xs);
-    line-height: 1;
+    display: inline-block;
     flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
+    color: transparent;
+    line-height: var(--dot);
+    overflow: hidden;
+    text-indent: 100%;
+    white-space: nowrap;
+    vertical-align: middle;
   }
 
   /* ── the block frame ────────────────────────────────────────────────────
@@ -132,22 +140,34 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-2);
+    margin-block-end: var(--sp-3);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--t-base);
     font-weight: 600;
   }
 
   /* ── panel: note, quote ─────────────────────────────────────────────────── */
 
+  /* AN INLINE CALLOUT (DESIGN-BRIEF 4.9): the raised surface and nothing else. No stripe down the
+     leading edge, no tinted ground, no border in the dark; the intent is the mark at top left. */
   .panel {
     margin: 0;
-    padding: var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--line);
-    border-inline-start: 3px solid var(--tone, var(--edge));
+    border: 1px solid transparent;
     border-radius: var(--r-md);
     color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  :root[data-scheme='light'] .panel {
+    border-color: var(--line);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-scheme='dark']) .panel {
+      border-color: var(--line);
+    }
   }
 
   .panel p + p {
@@ -159,15 +179,18 @@
      block flow — a grid here would break `measure`'s reading width. */
   .panel[data-marked] {
     position: relative;
-    padding-inline-start: calc(var(--sp-4) + 1.4em);
+    padding-inline-start: calc(var(--sp-4) + var(--icon-m) + var(--sp-2));
   }
 
   .panel-glyph {
     position: absolute;
     inset-inline-start: var(--sp-4);
-    inset-block-start: var(--sp-4);
-    color: var(--tone);
+    inset-block-start: var(--sp-3);
+    inline-size: var(--icon-m);
+    color: var(--tone, var(--ink2));
+    font-variant-emoji: text;
     line-height: inherit;
+    text-align: center;
   }
 
   blockquote.panel {
@@ -194,7 +217,12 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
-    overflow: hidden;
+  }
+
+  /* NO BOX AND NO RULES BETWEEN THE FIGURES (DESIGN-BRIEF 4.6). Space separates the stats; a board's
+     lanes keep their hairline further down, because a lane is a column and not a figure. */
+  .grid:has(> .cell) {
+    gap: var(--sp-5) var(--sp-6);
   }
 
   .cell {
@@ -214,22 +242,23 @@
        spanning under it with it. `fit-content(100%)` is identical when the label fits, so the glyph
        still sits right after it, and wraps it when it does not. */
     grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    /* Rows pack to the top, so a figure sits on the same line as its neighbours whatever the note under it wraps to. */
+    align-content: start;
     align-items: center;
-    row-gap: 3px;
+    row-gap: var(--sp-1);
     column-gap: var(--sp-2);
-    /* The table's inset, so the figures start where a table's cells do on the same page. */
-    padding: var(--sp-4) var(--sp-3);
-  }
-
-  .cell + .cell {
-    border-inline-start: 1px solid var(--line);
+    padding-block: var(--sp-2);
   }
 
   /* A FIGURE THAT IS A DOOR SAYS SO WITHOUT SHOUTING. Underlining a tile would make a dashboard
      look like a list of links; what it gets is the same hover surface every other openable thing in
      the product gets, and the focus ring the sheet already defines. The colour does not change,
      because the figure's tone is what its colour is FOR. */
+  /* The hover wash needs room round the words, so a linked figure borrows it from the gap. */
   a.cell {
+    margin-inline: calc(-1 * var(--sp-3));
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-md);
     color: inherit;
     text-decoration: none;
   }
@@ -246,9 +275,7 @@
     grid-area: label;
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 500;
-
-
+    font-weight: 400;
   }
 
   .cell .glyph {
@@ -263,8 +290,8 @@
     color: var(--ink);
     font-size: var(--t-xl);
     font-weight: 500;
-    letter-spacing: -0.028em;
-    line-height: 1.15;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
     font-variant-numeric: tabular-nums;
   }
 
@@ -285,7 +312,7 @@
 
   .cell-figure .amount-code {
     font-size: 0.5em;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .cell-note {
@@ -294,11 +321,10 @@
     font-size: var(--t-xs);
   }
 
-  /* A FIGURE IS INK UNLESS IT IS WRONG. Colouring every toned figure puts three shouting numbers on
-     one band and the reader stops hearing any of them; the glyph carries `good` and `warn`, and red
-     is spent on the one thing that is actually late. */
-  .cell[data-intent='bad'] .cell-figure {
-    color: var(--tone);
+  /* A FIGURE IS ALWAYS INK, even when it is wrong. The dot beside the label says so and the note
+     under the figure says why; a red number is the loudest thing on a page and says the least. */
+  .cell[data-intent] .cell-figure {
+    color: var(--ink);
   }
 
   .board-col {
@@ -312,7 +338,7 @@
      between them is four stacks, not four columns — the eye has to infer the boundary from where
      the cards happen to end, which is exactly what fails when one column is empty. */
   .board-col + .board-col {
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--line-soft);
   }
 
   .board-head {
@@ -323,9 +349,7 @@
     color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
-    font-weight: 700;
-
-
+    font-weight: 500;
   }
 
   .board-count {
@@ -336,17 +360,18 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .card {
+  /* Scoped to the lane: `.card` is a common name, and a page's own card must not inherit a board's.
+     A board card is a raised surface with no border; the lane's hairline is the structure. */
+  .board-col .card {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: var(--sp-3);
-    background: var(--s2);
-    border: 1px solid var(--line);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
     border-radius: var(--r-sm);
   }
 
-  .card-title {
+  .board-col .card-title {
     color: var(--ink);
     font-size: var(--t-sm);
   }
@@ -355,14 +380,14 @@
      A card is draggable only where the host passed `onmove`, so every rule below describes a board
      that can actually be changed. A board that cannot draws none of these attributes at all. */
 
-  .card[draggable='true'] {
+  .board-col .card[draggable='true'] {
     cursor: grab;
     /* The pointer picks up the CARD, not the words in it: a native drag that begins as a text
        selection drags the sentence and leaves the card sitting where it was. */
     user-select: none;
   }
 
-  .card[data-carrying] {
+  .board-col .card[data-carrying] {
     cursor: grabbing;
     opacity: 0.45;
   }
@@ -392,13 +417,13 @@
    * in dark, where the ten per cent version measured 1.15 and 1.09.
    */
   .board-col[data-drop] {
-    background-image: linear-gradient(var(--accent-wash), var(--accent-wash));
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
+    box-shadow: inset 0 0 0 1px var(--edge);
   }
 
   /* NOT SAVED, IN WORDS: the register's receipt chip, in the one place a card has room for it.
      Untoned on purpose, because a word carries its own meaning and needs no hue to do it. */
-  .card-mark {
+  .board-col .card-mark {
     align-self: start;
     margin-block-start: var(--sp-1);
     padding: 1px 6px;
@@ -406,12 +431,12 @@
     border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-xs);
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.35;
     white-space: nowrap;
   }
 
-  .card-detail {
+  .board-col .card-detail {
     color: var(--dim);
     font-size: var(--t-xs);
   }
@@ -427,7 +452,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
     align-items: start;
-    gap: var(--sp-3);
+    gap: 0 var(--sp-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -442,14 +467,16 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    /* No box: space and one soft hairline above, so a run of cards reads as a list set in columns
+       rather than a wall of identical rounded panels. */
+    padding: var(--sp-4) 0;
+    border-block-start: 1px solid var(--line-soft);
   }
 
-  .cards-item:has(.cards-title a):hover {
-    background: var(--s2);
+  .cards-item:has(.cards-title a):hover .cards-title {
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
   }
 
   /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. */
@@ -473,14 +500,14 @@
     block-size: 28px;
     color: var(--ink2);
     font-size: var(--t-xs);
-    font-weight: 650;
+    font-weight: 500;
     line-height: 1;
   }
 
   /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
      holds in every theme and for every reader where a hue would not. */
   .cards-mark {
-    background: var(--s3);
+    background: var(--s2);
     border-radius: var(--r-sm);
   }
 
@@ -503,8 +530,8 @@
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-weight: 500;
+    letter-spacing: -0.005em;
     overflow-wrap: anywhere;
   }
 
@@ -520,7 +547,6 @@
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: var(--r-lg);
   }
 
   .cards-when {
@@ -548,8 +574,8 @@
     color: var(--ink);
     font-size: var(--t-xl);
     font-weight: 500;
-    letter-spacing: -0.028em;
-    line-height: 1.15;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
     font-variant-numeric: tabular-nums;
   }
 
@@ -557,7 +583,7 @@
      it fronts, not a fixed step. */
   .cards-figure .amount-code {
     font-size: 0.5em;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .cards-label {
@@ -608,7 +634,7 @@
   .cards-ring .cards-value {
     grid-area: value;
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
@@ -618,13 +644,13 @@
 
   .cards-ring-track {
     fill: none;
-    stroke: var(--s3);
+    stroke: var(--s2);
     stroke-width: 4;
   }
 
   .cards-ring-fill {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--ink2);
     stroke-width: 4;
     stroke-linecap: round;
   }
@@ -688,9 +714,9 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-xl);
+    font-size: var(--t-base);
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.005em;
     line-height: var(--lh-tight);
   }
 
@@ -715,10 +741,10 @@
   .sec-toggle {
     display: inline-flex;
     align-items: center;
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
-    background: var(--s2);
-    border-radius: var(--r-pill);
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    background: none;
+    border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -731,7 +757,7 @@
   }
 
   .sec-toggle:hover {
-    background: var(--s3);
+    background: var(--s2);
     color: var(--ink);
   }
 
@@ -813,7 +839,7 @@
   }
 
   .feed-new {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .feed-rows {
@@ -829,7 +855,7 @@
     gap: var(--sp-1) var(--sp-3);
     min-block-size: var(--row-h);
     padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--line-soft);
     font-size: var(--t-ui);
   }
 
@@ -840,7 +866,7 @@
   /* THE COUNT IS WHAT IS READ FIRST, so it leads, in tabular figures down one edge. */
   .feed-count {
     color: var(--dim);
-    font-weight: 600;
+    font-weight: 500;
     text-align: end;
     font-variant-numeric: tabular-nums;
   }
@@ -850,13 +876,13 @@
     display: grid;
     place-items: center;
     align-self: center;
-    inline-size: 22px;
-    block-size: 22px;
-    background: var(--hold-wash);
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--s2);
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-xs);
-    font-weight: 650;
+    font-weight: 500;
     line-height: 1;
   }
 
@@ -878,7 +904,7 @@
 
   .feed-who {
     color: var(--ink2);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .feed-what > .glyph {
@@ -887,7 +913,7 @@
 
   /* NEW IS BRIGHTER, and the head's "N new" and the line below say it in words as well. */
   .feed-row[data-new] .feed-count {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .feed-row[data-new] .feed-who {
@@ -942,8 +968,7 @@
 
   .diff-lines {
     padding-block: var(--sp-2);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-md);
     overflow: hidden;
   }
@@ -973,12 +998,12 @@
   }
 
   .diff-line[data-op='add'] {
-    background: var(--accent-wash);
+    background: var(--hold-wash);
     color: var(--ink);
   }
 
   .diff-line[data-op='add'] .diff-mark {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .diff-line[data-op='del'] .diff-text {
@@ -1028,7 +1053,7 @@
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--line-soft);
   }
 
   .row:last-child {
@@ -1095,7 +1120,9 @@
      never actually applied — the four-track grid always won. Nothing downstream of 400px has been
      getting the two-track layout the query below describes; it only ever looked like it did because
      nobody was testing at 320-390px against a git blame instead of the running app. */
-  .item {
+  /* SCOPED TO `.list`. A bare `.item` in this layer reached every component that names a row
+     "item", the rail first, which had to undo it. The renderer only ever emits one inside a list. */
+  .list > .item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) minmax(0, auto) auto;
     gap: var(--sp-3);
@@ -1103,7 +1130,7 @@
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--line-soft);
   }
 
   /**
@@ -1116,7 +1143,7 @@
    * gets the line.
    */
   @media (width < 400px) {
-    .item {
+    .list > .item {
       grid-template-columns: auto minmax(0, 1fr);
       gap: var(--sp-1) var(--sp-3);
     }
@@ -1179,9 +1206,9 @@
 
   .prop-track {
     position: relative;
-    block-size: 8px;
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--line) 55%, transparent);
+    block-size: 4px;
+    border-radius: var(--r-pill);
+    background: var(--s2);
     overflow: hidden;
   }
 
@@ -1196,8 +1223,8 @@
     inset-block: 0;
     inset-inline-start: 0;
     inline-size: calc(var(--magnitude) * 100%);
-    border-radius: 4px;
-    background: var(--tone-fill, color-mix(in srgb, var(--ink) 62%, var(--s1)));
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, color-mix(in srgb, var(--ink2) 40%, transparent));
   }
 
   .prop-label {
@@ -1207,6 +1234,7 @@
 
   .prop-value {
     color: var(--ink);
+    font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
@@ -1225,7 +1253,7 @@
   }
 
   .prop-row[data-hole]:hover {
-    background: var(--warn-wash);
+    background: var(--s2);
   }
 
   /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only
@@ -1298,21 +1326,16 @@
     align-items: center;
     gap: var(--sp-2);
     padding: 5px var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-sm);
     white-space: nowrap;
   }
 
-  .pill[data-intent] {
-    border-color: color-mix(in srgb, var(--tone) 45%, transparent);
-  }
-
   .pill-glyph {
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: 999px;
-    background: var(--tone-fill, var(--edge));
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
     flex: none;
   }
 
@@ -1325,15 +1348,13 @@
 
   .pill-figure {
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
   .pill-word {
     color: var(--dim);
     font-size: var(--t-sm);
-
-
   }
 
   /* ── list: todo, steps, timeline ────────────────────────────────────────── */
@@ -1350,11 +1371,11 @@
   /* `.item`'s own base rule sits above, before the `@media (width < 400px)` block that narrows
      it to two tracks — see the comment there for why it has to come first. */
 
-  .item:last-child {
+  .list > .item:last-child {
     border-block-end: 0;
   }
 
-  .list[data-kind='steps'] .item {
+  .list[data-kind='steps'] > .item {
     grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto;
     counter-increment: step;
   }
@@ -1380,9 +1401,8 @@
 
   .item-state {
     color: var(--dim);
-    font-size: var(--t-sm);
-
-
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
     text-align: end;
   }
 
@@ -1394,7 +1414,7 @@
     block-size: 17px;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    color: var(--earn);
+    color: var(--bg);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
     align-self: center;
@@ -1408,16 +1428,18 @@
   button.item-marker {
     appearance: none;
     padding: 0;
-    background: none;
+    background-color: transparent;
     cursor: pointer;
   }
 
+  /* A ticked box is one of the accent's four jobs: the checked state (DESIGN-BRIEF 4.1). */
   .item-marker[data-done='yes'] {
-    border-color: var(--earn);
+    background-color: var(--accent);
+    border-color: var(--accent);
   }
 
   /* Three tracks now, not four: the tone travels with the title. */
-  .list[data-kind='timeline'] .item {
+  .list[data-kind='timeline'] > .item {
     grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
   }
 
@@ -1450,7 +1472,7 @@
     }
 
     .table-cards li + li .table-card {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--line-soft);
     }
 
     .table-card {
@@ -1605,7 +1627,7 @@
      of text with nothing round it; a row somebody points at wants air above and below the words, and
      at Comfortable this lands on 44, the size of a target. Density still moves it by the same steps. */
   .table-region {
-    --tr-h: calc(var(--row-h) + 10px);
+    --tr-h: var(--table-row-h);
     overflow: auto;
   }
 
@@ -1619,7 +1641,7 @@
     grid-template-columns: var(--cols);
     align-items: center;
     min-block-size: var(--tr-h);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--line-soft);
   }
 
   /* THE HEADER IS A QUIET LINE OF NAMES, NOT A BAND. A column header is a word you read once and
@@ -1631,7 +1653,8 @@
      IT NO LONGER STICKS, because it never did. The region is its own scroll container and grows to
      its rows, so nothing ever scrolled under the header: `sticky` was inert and its fill was the band. */
   .th-row {
-    border-block-end: 1px solid var(--line);
+    min-block-size: 32px;
+    border-block-end-color: var(--line);
   }
 
   /* THE CONTAINING BLOCK FOR THE COLUMN'S HIDDEN NAME. `.th-name` is absolutely positioned, and its
@@ -1642,7 +1665,7 @@
     position: relative;
     padding: var(--sp-1) var(--sp-3);
     color: var(--dim);
-    font-size: var(--t-sm);
+    font-size: var(--t-xs);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -1684,7 +1707,7 @@
 
   .td {
     padding: 0 var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink);
     line-height: var(--tr-h);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1713,7 +1736,7 @@
      table with no intent in it pays nothing for the gutter it would never use. */
   .table[data-toned] .td[data-glyph] {
     position: relative;
-    padding-inline-start: calc(var(--sp-3) + 1.2em);
+    padding-inline-start: calc(var(--sp-3) + var(--dot) + var(--sp-2));
   }
 
   .td-glyph {
@@ -1722,14 +1745,24 @@
     inset-inline-start: var(--sp-3);
     display: inline-flex;
     align-items: center;
-    color: var(--tone);
-    /* `--tone` and not `--tone-fill`: a glyph is text, so it takes the pair that has to survive a
-       contrast check. */
-    font-size: var(--t-sm);
+    /* Drawn as the row's one dot; the glyph's text stays for a screen reader only. */
+    inline-size: var(--dot);
+    overflow: hidden;
+    color: transparent;
+    white-space: nowrap;
     /* The cell sets `line-height: var(--row-h)` to centre one line of text. An absolutely positioned
        box takes its own line box and inherited that height, which pushed the glyph below the middle
        of the row — visible as a mark sitting under its own row rather than in it. */
     line-height: 1;
+  }
+
+  .td-glyph::before {
+    content: '';
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--faint));
   }
 
   /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
@@ -1747,7 +1780,7 @@
   }
 
   .rowgroup .tr:is(:hover, [data-focused], [aria-selected='true']) {
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     border-block-end-color: transparent;
   }
 
@@ -1768,14 +1801,11 @@
     background: var(--s2);
   }
 
-  .rowgroup .tr[data-focused]::before {
-    content: '';
-    position: absolute;
-    inset-block: var(--sp-2);
-    inset-inline-start: 0;
-    inline-size: 3px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
+  /* The keyboard's place is the focus ring, not a coloured bar down the row's edge, and only while the
+     grid has focus: at rest the caret row is the selected surface and nothing louder. */
+  .table-region:focus-within .rowgroup .tr[data-focused] {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   /* THE TONE'S COLOUR IS DROPPED ON A SELECTED ROW, AND THE SHAPE IS NOT.
@@ -1802,11 +1832,7 @@
      the third, and the count said three while two were shaded. The band survives either way because
      it is a box-shadow. */
   .rowgroup .tr[aria-selected='true'] {
-    background: var(--accent-wash);
-  }
-
-  .tr[data-intent] .td {
-    color: var(--ink2);
+    background: var(--s2);
   }
 
   /* THE COLUMN THAT CARRIES THE TONE SAYS IT IN THE TONE'S COLOUR, AS TEXT, WITH NOTHING BEHIND IT.
@@ -1836,9 +1862,8 @@
 
   .media {
     margin: 0;
-    padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);
@@ -1853,9 +1878,7 @@
     display: block;
     margin-block-end: var(--sp-2);
     color: var(--dim);
-    font-size: var(--t-sm);
-
-
+    font-size: var(--t-xs);
   }
 
   /* ── the visible fence ──────────────────────────────────────────────────
@@ -1863,7 +1886,6 @@
      when the author is an agent it is the only feedback channel there is (05 §3). */
 
   .block-degraded .media {
-    border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
     border-start-start-radius: 0;
     border-start-end-radius: 0;
   }
@@ -1892,10 +1914,8 @@
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-3);
-    background-color: var(--s1);
-    background-image: linear-gradient(var(--warn-wash), var(--warn-wash));
-    border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
-    border-block-end: 0;
+    background: var(--s1);
+    border-block-end: 1px solid var(--line-soft);
     border-start-start-radius: var(--r-md);
     border-start-end-radius: var(--r-md);
     color: var(--ink2);
@@ -1909,9 +1929,10 @@
 
   .degraded-action {
     margin-inline-start: auto;
-    padding: 2px var(--sp-2);
-    background: none;
-    border: 1px solid var(--edge);
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-2);
+    background: var(--s1);
+    border: 1px solid var(--line);
     border-radius: var(--r-sm);
     color: var(--ink);
     font-size: var(--t-xs);
@@ -1919,9 +1940,8 @@
   }
 
   .needs-client {
-    padding: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px dashed var(--edge);
     border-radius: var(--r-md);
     color: var(--dim);
     font-size: var(--t-sm);
@@ -1945,10 +1965,10 @@
      for the size half of it and defeat the point of inheriting the rest. */
   .hole {
     padding: 1px var(--sp-2);
-    background: none;
-    border: 1px dashed color-mix(in srgb, var(--warn) 60%, var(--line));
+    background: var(--s1);
+    border: 1px dashed var(--edge);
     border-radius: var(--r-sm);
-    color: var(--warn);
+    color: var(--ink2);
     font: inherit;
     font-size: 0.92em;
     cursor: pointer;

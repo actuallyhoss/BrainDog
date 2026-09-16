@@ -835,9 +835,9 @@
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     align-items: start;
-    gap: var(--sp-5);
+    gap: var(--sp-7) var(--sp-6);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
-    max-inline-size: 1560px;
+    max-inline-size: var(--page-max);
   }
 
   .block-slot {
@@ -864,12 +864,13 @@
      read as one undifferentiated column and the eye had nothing to jump between. It is the second
      level of the page's hierarchy — under the page title, over everything in the block — and now
      it takes the size `Section` gives every other heading at that level. */
+  /* Section size, not page size: 20px belongs to the page title alone (DESIGN-BRIEF 4.8). */
   .block-name {
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-lg);
+    font-size: var(--t-base);
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.005em;
   }
 
   /* Every block header names its source, and `o` opens that register PRE-FILTERED to the block's
@@ -879,8 +880,8 @@
     align-items: center;
     gap: var(--sp-2);
     margin-inline-start: auto;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--dim);
+    font-size: var(--t-xs);
     text-decoration: none;
   }
 
@@ -924,12 +925,11 @@
     min-inline-size: 0;
     margin: 0;
     padding: var(--sp-4);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     line-height: 1.7;
     overflow-x: auto;
   }
@@ -949,7 +949,8 @@
      bordered card; a second border around it reads as two nested boxes rather than as "this one".
      The same 2px inset the register grid uses for its focused row, for the same reason. */
   .block-slot[data-cursor] {
-    box-shadow: inset 3px 0 0 0 var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: var(--sp-2);
     border-radius: var(--r-sm);
   }
 
@@ -1088,11 +1089,6 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .block-slot :global(.cell + .cell) {
-      border-inline-start: 0;
-      border-block-start: 1px solid var(--line);
-    }
-
     /**
      * AND A STAT GOES TWO-UP, BECAUSE THE REASON ABOVE STOPPED BEING TRUE OF THE PAGE IT CITED.
      *
@@ -1112,34 +1108,16 @@
      * board's lanes two-up on a phone are two columns of cards at 170px, which is a different
      * decision from this one and nobody has taken it.
      *
-     * HAIRLINES FROM BORDERS, AND THEY WERE A 1px GAP OVER A `--line` GROUND. That reads only
-     * while every cell paints a surface over the ground, which made each figure a box, and the grid
-     * has no box now. So a cell below the first row takes a rule above it and a cell in the second
-     * column a rule before it, and which cells those are turns on whether the first one spans.
+     * NO HAIRLINES BETWEEN THEM. Space separates figures (DESIGN-BRIEF 4.6), on a phone as on a
+     * desktop.
      */
     .block-slot :global(.grid:has(> .cell)) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .block-slot :global(.grid:has(> .cell) > .cell) {
-      border: 0;
-    }
-
-    .block-slot :global(.grid:has(> .cell) > .cell:nth-child(n + 3)),
-    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(2)) {
-      border-block-start: 1px solid var(--line);
-    }
-
-    .block-slot :global(.grid:has(> .cell) > .cell:nth-child(even)) {
-      border-inline-start: 1px solid var(--line);
-    }
-
-    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(even)) {
-      border-inline-start: 0;
-    }
-
-    .block-slot :global(.grid:has(> .cell:first-child:nth-last-child(odd)) > .cell:nth-child(odd):not(:first-child)) {
-      border-inline-start: 1px solid var(--line);
+    /* No rules between the figures on a phone either; the grid's gap separates them. */
+    .block-slot :global(.grid:has(> .cell)) {
+      gap: var(--sp-4) var(--sp-5);
     }
 
     .block-slot :global(.grid:has(> .cell) > .cell:first-child:nth-last-child(odd)) {

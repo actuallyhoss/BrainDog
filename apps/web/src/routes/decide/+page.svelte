@@ -294,24 +294,23 @@
       {/snippet}
 
       <ol class="queue">
-        {#each open as q, i (q.id)}
+        {#each open as q (q.id)}
           {@const said = answers.get(q.id)}
           {@const updates = changed.get(q.id) ?? []}
           <li class="q">
             <a class="q-open" href="/decide/{q.id}">
-              <span class="q-rank num">{i + 1}</span>
               <span class="q-body">
                 <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. It led with `SG34` in the id
                      face, which Home took out of its leading column because `SG` is expanded
                      nowhere. It stays, because the feed says "Opened SG31" and a reader looking for
                      that question should find it here; it no longer comes first. -->
+                <span class="q-title" id="q-{q.id}-title">{q.title}</span>
+                {#if q.cost}<span class="q-cost">{q.cost}</span>{/if}
                 <span class="q-head">
                   {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
                   <span class="q-age">opened {since(q.opened, now)}</span>
                   <span class="q-id">{q.id}</span>
                 </span>
-                <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-                {#if q.cost}<span class="q-cost">{q.cost}</span>{/if}
               </span>
               <Icon name="chevron" size="m" />
             </a>
@@ -393,7 +392,7 @@
                        is found rather than chosen. The argument is over `take`. -->
                   {#each optionsOf(q) as o (o.key)}
                     <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
-                      {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
+                      {o.title}{#if o.recommended}<span class="rec">Suggested</span>{/if}
                     </Button>
                   {/each}
                 </div>
@@ -435,60 +434,48 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-7);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
-    max-inline-size: 980px;
+    max-inline-size: var(--page-max);
   }
 
   .queue {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   /**
-   * THE CARD IS THE LIST ITEM NOW, AND THE LINK IS THE TOP OF IT.
-   *
-   * It used to be the `<a>` itself, with the rank, the body and the chevron inside, which is
-   * precisely why the options could only ever be a printed sentence. `overflow: hidden` so the
-   * rule under the link stops at the corner radius rather than squaring it off.
+   * A QUESTION IS A SECTION OF THE LIST, NOT A CARD. Space and a soft divider separate one from the
+   * next; a box, a border and a shadow round each made a queue of four read as four forms. The link
+   * is the top of the item and the answers sit under it as siblings, because a button may not live
+   * inside a link.
    */
   .q {
     display: flex;
     flex-direction: column;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    overflow: hidden;
-    transition: border-color var(--d-state) var(--ease-out);
+    gap: var(--sp-3);
+    padding-block: var(--sp-5);
+    border-block-end: 1px solid var(--line-soft);
   }
 
-  .q:hover {
-    border-color: var(--edge);
+  .q:first-child {
+    padding-block-start: var(--sp-2);
+  }
+
+  .q:last-child {
+    border-block-end: 0;
   }
 
   .q-open {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-4);
     align-items: start;
-    padding: var(--sp-4);
     color: var(--ink);
     text-decoration: none;
-  }
-
-  /* The rank is the argument, so it is drawn like one: big, quiet, and first. */
-  .q-rank {
-    inline-size: 2ch;
-    color: var(--dim);
-    font-size: var(--t-lg);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-    text-align: end;
   }
 
   .q-body {
@@ -498,85 +485,86 @@
     min-inline-size: 0;
   }
 
+  .q-title {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+
+  .q-open:hover .q-title {
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+  }
+
+  .q-cost {
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   .q-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
-  /* The id is last now and takes the line's own dim ink; the thing the question is about is first
-     and takes the brighter one the id used to have. */
   .q-entity {
     color: var(--ink2);
   }
 
+  /* The identifier ends the line, in the id face and quiet: it is there for whoever meets it in the
+     log, not to be read first. */
   .q-id {
+    color: var(--dim);
     font-family: var(--font-id);
-    letter-spacing: -0.02em;
   }
 
-  /* BETWEEN ITEMS, NOT BEFORE NAMED ONES. The dots were on `.q-entity` and `.q-age` because the id
-     was always first; with the entity optional and leading, a named rule would print a dot at the
-     start of the line for a question about nothing. */
+  /* Between items, so a question about nothing does not open its line with a dot. */
   .q-head > span + span::before {
     content: '·';
     margin-inline-end: var(--sp-2);
-  }
-
-  .q-title {
-    font-size: var(--t-md);
-    letter-spacing: -0.008em;
-  }
-
-  .q-cost {
-    max-inline-size: var(--measure);
     color: var(--dim);
-    font-size: var(--t-ui);
   }
 
-  .q :global(.icon) {
+  .q-open :global(.icon) {
     align-self: center;
     color: var(--dim);
   }
 
-  .q-changes {
-    padding: var(--sp-3) var(--sp-4);
-    border-block-start: 1px solid var(--line);
+  .q-open:hover :global(.icon) {
+    color: var(--ink2);
   }
 
-  /* WHERE THE LINK STOPS AND THE CONTROLS START, drawn rather than left to be inferred. The two
-     regions are siblings and a person has to be able to see that the row below is not part of the
-     thing above it. */
   .q-act {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
-    border-block-start: 1px solid var(--line);
   }
 
-  /* WRAPPING, NOT SCROLLING. Three options at 320px are three lines of buttons; a horizontal
-     scroller here would hide the third answer behind a gesture on the screen whose whole subject is
-     that all the answers are visible. */
+  /* Wrapping, not scrolling: every answer stays visible on a phone. */
   .q-options {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
 
-  /* THE GATE'S `.card-rec`, INSIDE A BUTTON. `--earn` as text with no tint under it: the ground is
-     the button's own `--s3`, `--s2` on hover and `--s1` pressed, and those are three of the five
-     surfaces theme check G certifies every intent against as text. A tint would be the pair
-     `Chip.svelte` measured failing today, so the border carries the colour and the word the meaning. */
+  @media (pointer: fine) {
+    .q-options :global(.btn.btn) {
+      min-block-size: var(--ctl-h-sm);
+    }
+  }
+
+  /* THE SUGGESTION IS A WORD, IN THE QUIET INK. A green chip beside one answer made the machine's
+     pick the loudest thing in the queue; a word inside the control is read with the option's name
+     and leaves every option the same weight. */
   .rec {
-    padding: 1px var(--sp-2);
-    border: 1px solid color-mix(in srgb, var(--earn) 45%, transparent);
-    border-radius: var(--r-sm);
-    color: var(--earn);
-    font-size: var(--t-xs);
-    font-weight: 500;
+    color: var(--dim);
+    font-weight: 400;
   }
 
   .said {
@@ -606,7 +594,7 @@
     inline-size: 100%;
     min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-3);
-    background: var(--sunk);
+    background: var(--s1);
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
     color: var(--ink);
@@ -684,6 +672,7 @@
   }
 
   .decided-choice {
+    margin-inline-end: var(--sp-1);
     color: var(--ink2);
     font-weight: 500;
   }

@@ -437,7 +437,7 @@
                 <span class="card-n num">{i + 1}</span>
                 <h3 class="card-title">{option.title}</h3>
                 <!-- Shown, never pre-selected. -->
-                {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
+                {#if option.recommended}<span class="card-rec">Suggested</span>{/if}
               </header>
               <p class="card-body">{option.body}</p>
               <Button weight={highlighted === option.key ? 'primary' : 'quiet'} onclick={() => choose(option.key)}>
@@ -539,7 +539,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--sp-6) var(--sp-9);
-    max-inline-size: 1060px;
+    max-inline-size: var(--page-max);
   }
 
   .cost {
@@ -547,7 +547,7 @@
   }
 
   .cost-label {
-    color: var(--warn);
+    color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -590,10 +590,14 @@
 
   /* Told how many things it contains. `auto-fit` with three items in a 962px column generated SEVEN
      tracks, four of them empty — a 550px slab of border colour, with every selector correct (05 §4). */
+  /* The options sit on the page's own ground, side by side, with space between them. The chosen one
+     takes the raised surface; its button is the page's one primary. The negative inset keeps the text
+     of the first option on the heading's edge while the chosen one still has room for its surface. */
   .cards {
     display: grid;
     grid-template-columns: repeat(var(--cells, 3), minmax(0, 1fr));
-    gap: var(--sp-3);
+    gap: var(--sp-2);
+    margin-inline: calc(-1 * var(--sp-4));
   }
 
   .cards[data-cells='2'] {
@@ -605,15 +609,16 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    transition: border-color var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .card[data-on] {
-    border-color: var(--accent);
+    background: var(--s1);
+  }
+
+  .card > :global(.btn) {
+    align-self: start;
   }
 
   .card-head {
@@ -632,22 +637,20 @@
   }
 
   .card[data-on] .card-n {
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .card-title {
-    flex: 1;
     font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--t-base);
     font-weight: 500;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
 
+  /* The suggestion as a word in the quiet ink, not a green chip. */
   .card-rec {
-    padding: 1px var(--sp-2);
-    border: 1px solid color-mix(in srgb, var(--earn) 45%, transparent);
-    border-radius: var(--r-sm);
-    color: var(--earn);
+    margin-inline-start: var(--sp-1);
+    color: var(--dim);
     font-size: var(--t-xs);
   }
 
@@ -658,12 +661,25 @@
     line-height: 1.55;
   }
 
+  /* An inline callout: the raised surface and nothing round it in the dark, a hairline in the light. */
   .commit {
-    padding: var(--sp-4);
+    max-inline-size: var(--measure);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--accent);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
-    box-shadow: var(--raise);
+  }
+
+  :global(:root[data-scheme='light']) .commit,
+  :global(:root[data-scheme='light']) .settled {
+    border-color: var(--line);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :global(:root:not([data-scheme='dark'])) .commit,
+    :global(:root:not([data-scheme='dark'])) .settled {
+      border-color: var(--line);
+    }
   }
 
   .commit-wake {
@@ -672,15 +688,15 @@
     gap: var(--sp-3);
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .commit-date {
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    background: var(--s1);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);
@@ -720,7 +736,7 @@
   .commit-field {
     inline-size: 100%;
     padding: var(--sp-3);
-    background: var(--sunk);
+    background: var(--bg);
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
     color: var(--ink);
@@ -765,10 +781,9 @@
   }
 
   .settled {
-    padding: var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--line);
-    border-inline-start: 3px solid var(--earn);
+    border: 1px solid transparent;
     border-radius: var(--r-md);
     max-inline-size: var(--measure);
   }
@@ -777,16 +792,20 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .settled-head :global(.icon) {
     color: var(--earn);
-    font-size: var(--t-ui);
   }
 
   .settled-choice {
     margin-block: var(--sp-2) var(--sp-1);
-    font-family: var(--font-display);
-    font-size: var(--t-lg);
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
   .settled-reason {
@@ -816,6 +835,19 @@
        reason field above the fold. Decisions get made from a phone (19 §3). */
     .cards {
       grid-template-columns: minmax(0, 1fr);
+      margin-inline: 0;
+    }
+
+    .card {
+      padding-inline: 0;
+      border-block-start: 1px solid var(--line-soft);
+      border-radius: 0;
+    }
+
+    .card[data-on] {
+      padding-inline: var(--sp-3);
+      border-block-start-color: transparent;
+      border-radius: var(--r-md);
     }
   }
 </style>

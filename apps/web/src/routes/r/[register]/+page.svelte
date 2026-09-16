@@ -3024,7 +3024,7 @@
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-md);
     color: var(--ink2);
   }
@@ -3046,8 +3046,8 @@
     text-wrap: pretty;
   }
 
-  .seen-said strong { color: var(--ink); font-weight: 600; }
-  .seen-field { color: var(--ink); font-style: normal; font-weight: 600; }
+  .seen-said strong { color: var(--ink); font-weight: 500; }
+  .seen-field { color: var(--ink); font-style: normal; font-weight: 500; }
 
   /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement — "Five of those
      in one unwrapping track reached 335px inside a 320px screen". The register's bar has the
@@ -3079,15 +3079,15 @@
    * record stores and the empty state quotes.
    */
   .segmented {
-    background: var(--s2);
-    border-radius: var(--r-pill);
+    background: var(--s1);
+    border-radius: var(--r-sm);
   }
 
   .segment {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink2);
     font-weight: 500;
   }
@@ -3102,7 +3102,6 @@
 
   .segment[data-on] {
     background: var(--s3);
-    box-shadow: var(--raise);
     color: var(--ink);
     font-weight: 500;
   }
@@ -3125,8 +3124,8 @@
 
   /* The search box is a pill too, so the bar is one family of shapes. */
   .bar > .field {
-    background: var(--s2);
-    border-radius: var(--r-pill);
+    background: var(--s1);
+    border-radius: var(--r-sm);
   }
 
   /* Display ends the bar: it changes how the list looks, not what it holds. */
@@ -3245,11 +3244,10 @@
     gap: var(--sp-2);
     margin-block-end: var(--sp-3);
     padding: var(--sp-2) var(--sp-3);
-    background: var(--accent-wash);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    background: var(--s1);
     border-radius: var(--r-md);
-    color: var(--accent-text);
-    font-size: var(--t-ui);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .picked-word {
@@ -3263,7 +3261,9 @@
   }
 
   .picked-n {
-    font-weight: 700;
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   /* The pointer's way in. It is `tabindex="-1"` — a grid has one tab stop — so it never takes focus
@@ -3389,12 +3389,12 @@
    */
   .fresh {
     display: inline-block;
-    inline-size: 3px;
-    block-size: 1em;
+    inline-size: var(--dot);
+    block-size: var(--dot);
     margin-inline-end: var(--sp-2);
-    background: var(--accent);
+    background: var(--info-fill);
     border-radius: var(--r-pill);
-    vertical-align: text-bottom;
+    vertical-align: middle;
     animation: fresh-in var(--d-enter) var(--ease-out);
   }
 
@@ -3441,7 +3441,7 @@
     padding-inline: var(--sp-4) var(--sp-2);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
   }
@@ -3475,13 +3475,14 @@
   }
 
   .capture-go {
-    padding: 2px var(--sp-3);
-    background: var(--accent);
-    border: 1px solid var(--accent-edge);
-    border-radius: var(--r-pill);
-    color: var(--accent-ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-sm);
+    color: var(--bg);
+    font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
   }
 
@@ -3600,7 +3601,7 @@
     padding: 0;
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .filter-values {
@@ -3681,7 +3682,7 @@
   .peek dt {
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .peek dd {
