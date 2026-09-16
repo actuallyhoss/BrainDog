@@ -14,6 +14,8 @@
 import { refused, type Result } from '@braindog/ports';
 
 import { INSTRUCTIONS } from './instructions.ts';
+
+export { INSTRUCTIONS };
 import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Tool } from './index.ts';
 
 /** Newest first. `initialize` answers with one of these, as `negotiate` picks it. */

@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { INSTRUCTIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -142,7 +143,7 @@ test('initialize and tools/list answer without touching the host, and the list i
   const init = await s.ask('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
   assert.equal(init.result.protocolVersion, '2025-06-18');
   assert.equal(init.result.serverInfo.name, 'braindog');
-  assert.match(init.result.instructions, /^BrainDog is one person's business record/);
+  assert.match(init.result.instructions, /^BrainDog is one person's record/);
 
   const listed = await s.ask('tools/list');
   assert.equal(listed.result.tools.length, 14);
@@ -311,6 +312,12 @@ test('a command from a later step says so, and an unknown one is not echoed unle
   assert.equal(help.status, 0);
   assert.match(help.stdout, /^braindog login <host> \[--vault <project\|\*>\]\n[\s\S]*^braindog keys put <label>[\s\S]*^braindog keys exec <label[\s\S]*^braindog skills sync \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools scan \[--host <host>\] \[--dry-run\]\n[\s\S]*^braindog tools write \[--scope user\|project\] \[--dry-run\]\n[\s\S]*^braindog mcp /m);
   assert.doesNotMatch(help.stdout, /Not built yet: .*(?:skills|tools)/);
+
+  /* EVERY COMMAND THE SERVER'S INSTRUCTIONS NAME IS ONE THIS HELP LISTS. They told every agent to run
+     `braindog key add`, which was never a command, so the one way to deposit a key was a typo. */
+  const named = [...INSTRUCTIONS.matchAll(/braindog ([a-z]+(?: [a-z]+)?)/g)].map((m) => m[1]!);
+  assert.ok(named.length > 0, 'the instructions name no command, so this proves nothing');
+  for (const command of named) assert.match(help.stdout, new RegExp(`^braindog ${command}(?![a-z])`, 'm'), command);
 });
 
 /* ── last, over everything above ───────────────────────────────────────── */
