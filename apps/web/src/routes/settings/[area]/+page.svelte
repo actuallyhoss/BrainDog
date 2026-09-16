@@ -806,6 +806,14 @@
   );
   const copiesNow = () => (copiesFrom === 'live' ? Date.now() : NOW);
 
+  /* A COPY IS NAMED BY ITS DAY, AND A DAY READS AS THE REST OF THE PRODUCT WRITES ONE: `3 Sep 2026`,
+     not `2026-09-03` (DESIGN-SYSTEM APPENDIX C14). An id that is not a day is shown as it is. */
+  const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const copyDay = (id: string): string => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id);
+    return m ? `${Number(m[3])} ${SHORT_MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}` : id;
+  };
+
   $effect(() => {
     if (area !== 'backups') {
       restoring = null;
@@ -2194,7 +2202,7 @@
                   {:else}<Icon name="archive" size="s" />{/if}
                 </span>
                 <span class="line-main">
-                  <span class="line-title">{snap.id}</span>
+                  <span class="line-title">{copyDay(snap.id)}</span>
                   <span class="line-detail">{relative(snap.at, copiesNow())}</span>
                 </span>
                 <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
