@@ -15,7 +15,7 @@
 
 import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
 
-import { iconFor, NOW, REGISTERS, type boot, type NavEntry } from './api.ts';
+import { iconFor, NOW, PACKS, REGISTERS, type boot, type NavEntry } from './api.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
 import type { NewsItem } from './schema.ts';
@@ -78,6 +78,25 @@ export const actorFor = (actor: string, me: string | null): string =>
 
 const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
+/**
+ * A pack event in the words of the lists it brought.
+ *
+ * `install` HAS NO REGISTER, NO TITLE AND NO NOTE, so it fell through to the kind itself and Home
+ * drew "The record itself / Install" twice on a first run, naming nothing. The lists a pack holds
+ * are what a person chose on `/start`, so the line names them: "Added the Services list". A pack
+ * this build does not know keeps its id, which is still more than the verb alone.
+ */
+const PACK_VERB: Record<string, string> = { install: 'Added', uninstall: 'Removed', upgrade: 'Updated', retire: 'Retired' };
+function packText(e: EventLine): string | null {
+  const verb = PACK_VERB[e.kind];
+  if (e.target_kind !== 'pack' || !verb || !e.target) return null;
+  const id = e.target.replace(/^pack:/u, '');
+  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  if (names.length === 0) return `${verb} the ${id} add-on`;
+  if (names.length === 1) return `${verb} the ${names[0]} list`;
+  return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
 /** One line of the log in the words the feed draws. */
 function textOf(e: EventLine): string {
   if (e.register !== null) {
@@ -87,6 +106,8 @@ function textOf(e: EventLine): string {
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
   if (e.kind === 'decide' && e.title) return `Decided: ${e.title}`;
+  const pack = packText(e);
+  if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
 }
 

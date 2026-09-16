@@ -94,6 +94,13 @@ test('a line of the log becomes a feed item in words, and the reader is "you"', 
   assert.equal(newsOf([line({ kind: 'export' })] as never, null)[0]?.href, '/audit');
 });
 
+test('a pack install names the list it brought, not the bare verb', () => {
+  const at = (over: Record<string, unknown>) => newsOf([line({ actor: 'system', target_kind: 'pack', ...over })] as never, null)[0]?.text;
+  assert.equal(at({ kind: 'install', target: 'pack:estate' }), 'Added the Services list');
+  assert.equal(at({ kind: 'uninstall', target: 'pack:estate' }), 'Removed the Services list');
+  assert.equal(at({ kind: 'install', target: 'pack:nobody-knows' }), 'Added the nobody-knows add-on');
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
