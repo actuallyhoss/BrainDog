@@ -118,7 +118,7 @@ Twenty-one route files, counted. The hosts enumerate none of them; an unknown pa
 | `live` | `{ state: 'open' \| 'polling' \| 'offline'; since: number; spark: boolean }` | `offline` only after a failed write or a failed poll, never from `navigator.onLine` alone (19 §6); `spark` is `GET /api/version`'s word (46 §5.1), `false` until read |
 | `palette` | `{ open, mode: 'filter' \| 'spark' \| 'job', q, cursor, job?: JobId, ask?: string }` | `mode: 'spark'` is unreachable while `live.spark === false` |
 | `jobs` | `Map<JobId, { job: Job; events: JobEvent[]; after: number }>` | module state owned by no component, so closing the palette stops nothing; `after` is monotonic |
-| `overlaid` | `number` | a counter, never a boolean; `> 0` silences every hotkey except close and locks scroll |
+| `overlays.depth` | `number` | a counter, never a boolean; `covered()` silences every *unmodified* key and locks scroll. A modified chord still runs under an open layer, and `Esc` is the `<dialog>`’s own |
 | `prefs` | `Prefs` (§4.7) | mirrored to the `bd_pref` cookie on every change |
 | `toasts` | `Toast[]`, ≤ 60 | an undo entry exists only for an `applied` write, built from the returned row |
 | `keys` | the registry (§4.2) | no screen binds a key outside it; `?` reads it |
@@ -285,7 +285,7 @@ export function typing(): boolean;                 // the ONE test: activeElemen
 export function sheet(): Binding[];                // what `?` draws, with remaps applied
 ```
 
-Dispatch order on `keydown`: `overlaid() > 0` → only `Esc` and the palette's own scope · `typing()` → only chords
+Dispatch order on `keydown`: `covered()` → only modified chords, and `Esc` from the `<dialog>` itself · `typing()` → only chords
 with `⌘`/`Ctrl` and `Esc` · a `g` armed within 1,000 ms → the go-to table · the focused scope → `document`.
 `Character keys: off` (Settings → keyboard) drops every `bare: true` binding. Remaps live in `prefs.keys`.
 
@@ -513,7 +513,7 @@ mechanism 2, amended in §13 D1). Per device — §10.
 
 ### 5.5 · The palette — `Palette.svelte`, `parse.ts`, `rows.ts`
 
-1. `<dialog>`, the combobox pattern, `overlaid++` on open, `lockScroll()`; the input accepts typing from the first
+1. `<dialog>`, the combobox pattern, `overlays.open()`; the input accepts typing from the first
    frame; the result count is a `role="status"` debounced 250 ms (13 §7).
 2. `parse(q)` → `{ prefix: '>' | '#' | '@' | '/' | null, spoken?: { prefix, n } | { register, seq }, text }`
    using 34 §4's two regexes. `D41` resolves directly; `tasks#125` resolves; `#125` is plain text and **never
