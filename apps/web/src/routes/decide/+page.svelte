@@ -316,7 +316,6 @@
                   <span class="q-id">{q.id}</span>
                 </span>
               </span>
-              <Icon name="chevron" size="m" />
             </a>
 
             {#if updates.length}
@@ -473,11 +472,11 @@
     border-block-end: 0;
   }
 
+  /* NO CHEVRON. One sat at the far edge of every question, 500px from the words it pointed at, on a
+     list whose title already underlines under the pointer and whose whole block is the link. It was
+     a mark repeated five times that said nothing the title did not. */
   .q-open {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sp-4);
-    align-items: start;
+    display: block;
     color: var(--ink);
     text-decoration: none;
   }
@@ -533,15 +532,6 @@
     content: '·';
     margin-inline-end: var(--sp-2);
     color: var(--dim);
-  }
-
-  .q-open :global(.icon) {
-    align-self: center;
-    color: var(--dim);
-  }
-
-  .q-open:hover :global(.icon) {
-    color: var(--ink2);
   }
 
   .q-act {
