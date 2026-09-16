@@ -125,7 +125,9 @@
     <!-- Bars until the first answer, so the sample never shows over a live record. -->
     <Waiting />
   {:else if answer.from === 'refused'}
-    <Empty kind="error" title={answer.fix} />
+    <Empty kind="error" title={answer.fix}>
+      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    </Empty>
   {:else if found.total === 0}
     <Empty kind="no-results" title={copy.searchNone} query={q}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}

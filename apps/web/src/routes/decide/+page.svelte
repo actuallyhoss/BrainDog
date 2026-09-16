@@ -275,7 +275,9 @@
     <!-- Bars, and after 300ms, until the first read answers. -->
     <Waiting />
   {:else if from === 'refused'}
-    <Empty kind="error" title={refusal} />
+    <Empty kind="error" title={refusal}>
+      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    </Empty>
   {:else if open.length === 0}
     <Empty
       kind="cleared"

@@ -141,7 +141,9 @@
 
 <div class="page">
   {#if refused}
-    <Empty kind="error" title={refused} />
+    <Empty kind="error" title={refused}>
+      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    </Empty>
   {:else if !answered || unrouted}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}

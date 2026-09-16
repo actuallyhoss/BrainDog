@@ -312,7 +312,9 @@
   {#if from === 'sample'}<p class="demo" role="note">{copy.notOnDemo}</p>{/if}
 
   {#if from === 'refused'}
-    <Empty kind="error" title={refusal} />
+    <Empty kind="error" title={refusal}>
+      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    </Empty>
   {:else}
     {#if waiting.length}
       <Section title={words.waiting} count={waiting.length}>

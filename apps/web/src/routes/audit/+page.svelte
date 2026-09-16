@@ -383,7 +383,9 @@
     `no-data-yet` and `no-results` collapsed, which `19 §6` calls the failure.
   -->
   {#if refused}
-    <Empty kind="error" title={refused} />
+    <Empty kind="error" title={refused}>
+      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+    </Empty>
   {:else if route.data.live && !live}
     <!-- Bars while the live log is on its way, rather than a blank panel under the title. -->
     <Waiting />

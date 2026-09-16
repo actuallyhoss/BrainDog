@@ -241,7 +241,9 @@
   <Section title={copy.installed} count={installed.length}>
     <div class="grid-packs">
       {#if refused}
-        <Empty kind="error" title={refused.fix} />
+        <Empty kind="error" title={refused.fix}>
+          {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+        </Empty>
       {:else if states && installed.length === 0}
         <Empty kind="no-data-yet" title={copy.noPacksYet} body={copy.noPacksBody} />
       {/if}
