@@ -84,12 +84,13 @@
 
   async function writeRow(
     ref: RowRef | undefined,
-    change: (m: typeof import('$lib/record/page-write.ts'), ref: RowRef) => Record<string, unknown> | null,
+    change: (m: typeof import('$lib/record/page-write.ts'), ref: RowRef, decl: import('$lib/record/page-write.ts').Declared | null) => Record<string, unknown> | null,
     title: string,
   ) {
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
     const m = await import('$lib/record/page-write.ts');
-    const patch = change(m, ref);
+    /* THE REGISTER AS THE RECORD DECLARES IT, so a list a pack brought is ticked and moved by its own states. */
+    const patch = change(m, ref, await m.schemaOf(location.origin, ref.register));
     if (!patch) return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
     const out = await m.updateRow(location.origin, ref, patch, title);
     if (out.from !== 'written') toasts.push(out.fix, { intent: 'warn' });
@@ -100,13 +101,13 @@
     const title = row.cells[1] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.cardMovedTo(title, to), { intent: 'warn' });
     const field = block.columns[0]?.field;
-    void writeRow(row.ref, (m, ref) => (field ? m.movePatch(ref, field, to) : null), title);
+    void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title);
   }
 
   function tickTask(row: Row, done: boolean) {
     const title = row.cells[0] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
-    void writeRow(row.ref, (m, ref) => m.tickPatch(ref, done), title);
+    void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title);
   }
   /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
   const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
 import type { Fetch as ClientFetch } from './pages-live.ts';
-import { arrangedBody, movePatch, saveArrangement, tickPatch, updateRow, type Fetch } from './page-write.ts';
+import { arrangedBody, movePatch, saveArrangement, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -45,6 +45,32 @@ test("a moved card's column goes back to the declared value", () => {
   const declared = withState.fields.find((f) => f.id === field)!.values!.find((v) => v.includes('_')) ?? withState.done![0]!;
   const drawn = declared.replaceAll('_', ' ').toUpperCase();
   assert.deepEqual(movePatch({ register: withState.id, seq: 1, version: 1 }, field, drawn), { [field]: declared });
+});
+
+test('A LIST THIS BUILD HAS NEVER HEARD OF IS TICKED AND MOVED BY THE STATES THE RECORD DECLARES FOR IT', async () => {
+  const shots = {
+    id: 'shots',
+    state: 'stage',
+    done: ['wrapped', 'cut'],
+    fields: [{ id: 'stage', type: 'enum', values: ['to_shoot', 'in_edit', 'wrapped', 'cut'] }],
+  };
+  const ref = { register: 'shots', seq: 4, version: 2 };
+  assert.equal(tickPatch(ref, true), null, 'the fixture is a register the built-in sample declares');
+  assert.deepEqual(tickPatch(ref, true, shots), { stage: 'wrapped' });
+  assert.deepEqual(tickPatch(ref, false, shots), { stage: 'to_shoot' });
+  assert.deepEqual(movePatch(ref, 'stage', 'In edit', shots), { stage: 'in_edit' });
+
+  let asked = 0;
+  const io: ClientFetch = async (input) => {
+    asked++;
+    assert.ok(String(input).endsWith('/api/schema?register=shots'), String(input));
+    return json(200, { ok: true, value: shots });
+  };
+  assert.deepEqual(await schemaOf('http://schema.test', 'shots', io), shots);
+  assert.deepEqual(await schemaOf('http://schema.test', 'shots', io), shots);
+  assert.equal(asked, 1, 'a register was asked for again on the next gesture');
+  const refused: ClientFetch = async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } });
+  assert.equal(await schemaOf('http://schema.test', 'other', refused), null);
 });
 
 test('the change is one update of that row at the version the page read, with the session', async () => {

@@ -30,14 +30,27 @@ export type Updated =
   | { from: 'conflict'; fix: string }
   | { from: 'unreachable'; fix: string };
 
+/**
+ * What a patch needs to know about a register: its state field, which states are terminal, and each field's values.
+ *
+ * THE RECORD'S OWN DECLARATION, read with `schema`, and the built-in one only when there is none. A pack installed on the
+ * record declares registers this build has never heard of, and a board or a checklist over one of those was a gesture
+ * that answered "no state to say it with" about a register that has one.
+ */
+export type Declared = { state?: string | undefined; done?: readonly string[] | undefined; fields: readonly { id: string; values?: readonly string[] | undefined }[] };
+
+const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
+
 /** The patch that puts a card in the column `to`, which is drawn as the screen spells it. */
-export const movePatch = (ref: RowRef, field: string, to: string): Record<string, unknown> => ({
-  [field]: declaredValue(ref.register, field, to),
-});
+export function movePatch(ref: RowRef, field: string, to: string, decl?: Declared | null): Record<string, unknown> {
+  if (!decl) return { [field]: declaredValue(ref.register, field, to) };
+  const values = decl.fields.find((f) => f.id === field)?.values;
+  return { [field]: values?.find((v) => norm(v) === norm(to)) ?? to };
+}
 
 /** The patch that marks a task done or not done, or `null` when its register declares no state to say it with. */
-export function tickPatch(ref: RowRef, done: boolean): Record<string, unknown> | null {
-  const decl = REGISTERS[ref.register];
+export function tickPatch(ref: RowRef, done: boolean, declared?: Declared | null): Record<string, unknown> | null {
+  const decl = declared ?? REGISTERS[ref.register];
   const field = decl?.state;
   if (!decl || !field) return null;
   const terminal = decl.done ?? [];
@@ -47,6 +60,30 @@ export function tickPatch(ref: RowRef, done: boolean): Record<string, unknown> |
 }
 
 const fetched: Fetch = (url, init) => fetch(url, init);
+
+const isDeclared = (v: unknown): v is Declared =>
+  typeof v === 'object' && v !== null && Array.isArray((v as { fields?: unknown }).fields);
+
+/**
+ * A register's declaration as the record holds it, or `null` when the record will not say.
+ *
+ * KEPT PER TAB AND PER REGISTER, because a board is moved many times and its register does not change between moves.
+ */
+const declared = new Map<string, Promise<Declared | null>>();
+export function schemaOf(base: string, register: string, io?: ClientFetch): Promise<Declared | null> {
+  const key = `${base} ${register}`;
+  let held = declared.get(key);
+  if (!held) {
+    held = createClient({ base, ...(io ? { fetch: io } : {}) })
+      .schema(register)
+      .then((out) => (out.ok && isDeclared(out.value) ? out.value : null))
+      .catch(() => null);
+    /* A REFUSAL IS NOT KEPT, so a record that could not answer once is asked again on the next gesture. */
+    void held.then((d) => d === null && declared.delete(key));
+    declared.set(key, held);
+  }
+  return held;
+}
 
 /** One row's change, at the version the page read it at. `title` is what a conflict's sentence calls the row. */
 export async function updateRow(base: string, ref: RowRef, patch: Record<string, unknown>, title: string, io: Fetch = fetched): Promise<Updated> {
