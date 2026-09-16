@@ -25,7 +25,7 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 
@@ -33,21 +33,33 @@ import { chromium } from '@playwright/test';
 
 import { answers, forward, startRecord } from '../../../tools/gates/record.mjs';
 
+/**
+ * `--from=<url>` SHOOTS A RUNNING APP INSTEAD OF THE BUILD, for the days the record app is being
+ * redesigned and its build lags its source: `node scripts/product.mjs --from=http://localhost:5317`.
+ * The dev server reads its own sample record, so no record is started and nothing is forwarded.
+ */
+const FROM = process.argv.find((a) => a.startsWith('--from='))?.slice('--from='.length) ?? null;
+
 const ROOT = join(import.meta.dirname, '..', '..', 'web', 'build');
 const OUT = join(import.meta.dirname, '..', 'static', 'shots');
 const PORT = 5188;
 
 /** Each shot, and what it has to be showing. `do` runs after load, before the shutter. */
 const SHOTS = [
-  { name: 'home', route: '/' },
+  // `webp`: the landing page's hero serves this one, so it gets a WebP beside its PNG.
+  { name: 'home', route: '/', webp: true },
   { name: 'grid', route: '/r/obligations' },
   { name: 'money', route: '/p/money' },
   { name: 'project', route: '/p/kiln' },
   // The one that is a STATE rather than a route: arranging has no URL, by design.
-  { name: 'arrange', route: '/p/kiln', act: async (page) => {
+  {
+    name: 'arrange',
+    route: '/p/kiln',
+    act: async (page) => {
       await page.locator('.arrange-slot button').first().click({ timeout: 4000 });
       await page.waitForSelector('[role="listitem"]', { timeout: 4000 });
-    } },
+    },
+  },
 ];
 
 const TYPES = {
@@ -60,36 +72,45 @@ const TYPES = {
   '.json': 'application/json',
 };
 
-if (!(await stat(ROOT).catch(() => null))) {
+if (!FROM && !(await stat(join(ROOT, 'index.html')).catch(() => null))) {
   console.error('  no record-app build at apps/web/build. `pnpm build` first.');
   process.exit(1);
 }
 
-const record = await startRecord();
+const record = FROM ? null : await startRecord();
 
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', 'http://x');
-  if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
-  const rel = decodeURIComponent(url.pathname).slice(1);
-  if (rel.includes('..')) return res.writeHead(400).end();
-  for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-    const file = join(ROOT, candidate);
-    const info = await stat(file).catch(() => null);
-    if (!info?.isFile()) continue;
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
-    return createReadStream(file).pipe(res);
-  }
-  if (!Object.hasOwn(TYPES, extname(rel))) {
-    res.writeHead(200, { 'content-type': TYPES['.html'] });
-    return createReadStream(join(ROOT, 'index.html')).pipe(res);
-  }
-  res.writeHead(404).end();
-});
-await new Promise((r) => server.listen(PORT, r));
-await answers(`http://localhost:${PORT}`);
+const server = FROM
+  ? null
+  : createServer(async (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://x');
+      if (url.pathname.startsWith('/api/')) return forward(req, res, record.base);
+      const rel = decodeURIComponent(url.pathname).slice(1);
+      if (rel.includes('..')) return res.writeHead(400).end();
+      for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
+        const file = join(ROOT, candidate);
+        const info = await stat(file).catch(() => null);
+        if (!info?.isFile()) continue;
+        res.writeHead(200, {
+          'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
+        });
+        return createReadStream(file).pipe(res);
+      }
+      if (!Object.hasOwn(TYPES, extname(rel))) {
+        res.writeHead(200, { 'content-type': TYPES['.html'] });
+        return createReadStream(join(ROOT, 'index.html')).pipe(res);
+      }
+      res.writeHead(404).end();
+    });
+const BASE = FROM ?? `http://localhost:${PORT}`;
+if (server && record) {
+  await new Promise((r) => server.listen(PORT, r));
+  await answers(BASE);
+}
 
 await mkdir(OUT, { recursive: true });
 const browser = await chromium.launch();
+/* A blank page of its own does the encoding, because the app's page can navigate under it. */
+const encoder = await browser.newPage();
 
 /**
  * AND A PHONE, WHICH IS THE HALF THAT WAS MISSING.
@@ -130,27 +151,61 @@ for (const size of SIZES)
     const page = await context.newPage();
 
     for (const shot of SHOTS) {
-      await page.goto(`http://localhost:${PORT}${shot.route}`, { waitUntil: 'networkidle' });
-      /* THE SCREEN SAYS WHEN IT HAS DRAWN, and a list that reads the record has not drawn when its
+      if (shot.act && size.suffix !== '') continue;
+      /* A DEV SERVER RELOADS WHEN ITS SOURCE CHANGES, and a reload mid-capture is a thrown
+         screenshot rather than a wrong one, so a failed attempt is simply taken again. */
+      let png;
+      const name = `${shot.name}${size.suffix}-${scheme}`;
+      for (let attempt = 1; !png; attempt++) {
+        try {
+          await page.goto(`${BASE}${shot.route}`, { waitUntil: 'networkidle' });
+          /* THE SCREEN SAYS WHEN IT HAS DRAWN, and a list that reads the record has not drawn when its
          heading has. `data-screen` is the app's own answer; a shot that timed out waiting for it is
          still taken, because a picture of what went wrong is more use than no picture. */
-      await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
-      // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
-      await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-      /* AND THE ACT IS THE LAPTOP'S. `arrange` presses a control that a phone lays out somewhere
+          await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
+          // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
+          await page.addStyleTag({
+            content: '.rowgroup{content-visibility:visible !important}',
+          });
+          /* AND THE ACT IS THE LAPTOP'S. `arrange` presses a control that a phone lays out somewhere
          else or not at all, and a shot whose setup silently failed is a picture of the screen
          before the thing it is meant to be showing. It is skipped rather than guessed at, and the
          phone falls back to the wide capture for that one. */
-      if (shot.act && size.suffix === '') await shot.act(page);
-      if (shot.act && size.suffix !== '') continue;
-      await page.waitForTimeout(300);
-      const file = join(OUT, `${shot.name}${size.suffix}-${scheme}.png`);
-      await page.screenshot({ path: file });
-      console.log(`  static/shots/${shot.name}${size.suffix}-${scheme}.png`);
+          if (shot.act && size.suffix === '') await shot.act(page);
+          await page.waitForTimeout(300);
+          png = await page.screenshot({ path: join(OUT, `${name}.png`) });
+        } catch (error) {
+          if (attempt >= 3) throw error;
+          await page.waitForTimeout(2000);
+        }
+      }
+      if (shot.webp) {
+        /* AND A WEBP BESIDE IT, which is what the page serves: the PNG of one screen is over a
+           megabyte and the hero is the largest paint on the page. The PNG stays for `og:image`,
+           because a preview fetcher is somebody else's server and not every one decodes WebP. The
+           browser encodes it, so the script needs no image library. */
+        const webp = await encoder.evaluate(async (b64) => {
+          const img = new Image();
+          img.src = `data:image/png;base64,${b64}`;
+          await img.decode();
+          const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          const blob = await canvas.convertToBlob({
+            type: 'image/webp',
+            quality: 0.9,
+          });
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          let out = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          return btoa(out);
+        }, png.toString('base64'));
+        await writeFile(join(OUT, `${name}.webp`), Buffer.from(webp, 'base64'));
+      }
+      console.log(`  static/shots/${name}.png${shot.webp ? ' and .webp' : ''}`);
     }
     await context.close();
   }
 
 await browser.close();
-server.close();
-await record.close();
+server?.close();
+await record?.close();

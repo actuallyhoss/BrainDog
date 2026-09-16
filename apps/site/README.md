@@ -21,19 +21,19 @@ node scripts/shot.mjs # screenshots of the BUILT site, both schemes
 ## It is the same design system, not a lookalike
 
 Same tokens, same generated palette, same mark, same corner radii, because it imports
-`@braindog/skin` rather than copying it. The pill, the tinted glyph and its four hues are the
-site's own, in `src/app.css`, so the three pages draw them one way. The one thing it does that the
-record app refuses is the translucent blurred bar: the app will not put translucency behind a
-column of small tabular digits, and a marketing page has no such column.
+`@braindog/skin` rather than copying it. It follows the app's redesign (`loop/DESIGN-BRIEF.md`,
+sections 3 and 4): a monochrome ground, headings in Geist, the primary button in ink, and colour
+spent only on state. The button and the glyph are the site's own, in `src/app.css`, so the three
+pages draw them one way. No kicker over a heading, no glow, no tinted card, no translucent bar.
 
-## The pictures are drawn, not photographed
+## The hero is photographed, the rest is drawn
 
-The landing page shows the product as small drawn moments rather than screenshots. The hero
-(`src/lib/Moment.svelte`) is the demo's home screen filling up while you watch, the bento
-(`src/lib/bento/`, with `Fields.svelte`) is seven features in miniature, and
-`src/lib/Steps.svelte` is the one chain in the demo that runs from an email to rows. They are
-markup and tokens, so they paint with the first byte of HTML, read at phone size, wear whichever
-palette the tokens say and cost no image request.
+The hero is the demo's real home screen, `static/shots/home-*.webp`, with the phone's own capture
+on a phone and one per scheme, so the first picture a stranger sees is the product and not an
+illustration of it. The bento (`src/lib/bento/`, with `Fields.svelte`) is seven features in
+miniature, and `src/lib/Steps.svelte` is the one chain in the demo that runs from an email to rows.
+Those are markup and tokens, so they paint with the first byte of HTML, read at phone size and wear
+whichever palette the tokens say.
 
 **Nothing in them is invented.** Every label, figure, name and time is read off the demo record
 (`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`) and lives in `copy.ts` with
@@ -45,8 +45,9 @@ asked for no motion, and the a11y gate, see the whole picture standing still. A 
 the pointer. A list that gains rows moves inside a box of fixed height, so nothing on the page
 shifts once per loop.
 
-`static/shots/` is no longer rendered by any page. `home-light.png` is still the `og:image` in
-`src/app.html`, and `scripts/product.mjs` still writes the set from the app's build.
+`scripts/product.mjs` writes `static/shots/` from the app's build, or from a running app with
+`--from=http://localhost:5317` while the build lags the source. The page serves the `home` WebPs;
+`home-light.png` is the `og:image` in `src/app.html`, because not every preview fetcher decodes WebP.
 
 ## The copy is one file
 
@@ -64,7 +65,7 @@ software does. The voice, in five rules:
 
 Which is why the changelog opens with the state of the product, the pricing page says out loud that
 neither plan is open yet, the section about agents says which half of the MCP surface is connected,
-and the landing page ends on three things the product will not do.
+and the landing page ends on what is not built yet and three things the product will not do.
 
 **The claims go stale faster than the code does.** `copy.ts` is checked against `REPORT.md` rather
 than against last week's copy: the changelog said *"Nothing has shipped yet"* for six days after the

@@ -18,7 +18,7 @@
     {#each c.figures as f}
       <li class="fig">
         <span class="fig-label">{f.label}{#if f.late}<span class="late"><Icon name="alert" size="s" /></span>{/if}</span>
-        <span class="fig-value num"><span class="code">{f.currency}</span> {f.amount}</span>
+        <span class="fig-value num">{f.amount}</span>
       </li>
     {/each}
   </ul>
@@ -29,7 +29,7 @@
       <line class="zero" x1="0" x2="320" y1="72" y2="72" />
       <path class="area" d="M0 18H44V32H96V24H150V46H206V38H250V86H320V96H0z" />
       <path class="line" d="M0 18H44V32H96V24H150V46H206V38H250V86H320" pathLength="1" />
-      <circle class="dot" cx="250" cy="72" r="5.5" />
+      <circle class="dot" cx="250" cy="72" r="4" />
     </svg>
   </div>
 </div>
@@ -61,7 +61,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    box-shadow: none;
   }
 
   .fig-label {
@@ -83,13 +83,6 @@
     font-weight: 600;
     letter-spacing: -0.02em;
     white-space: nowrap;
-  }
-
-  /* The currency quiet in front of the figure, as the app draws it. */
-  .code {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    letter-spacing: 0.02em;
   }
 
   .walk {
@@ -129,13 +122,13 @@
   }
 
   .area {
-    fill: color-mix(in srgb, var(--accent) 14%, transparent);
+    fill: var(--hover-wash);
   }
 
   .line {
     fill: none;
-    stroke: var(--accent-text);
-    stroke-width: 2.5;
+    stroke: var(--ink2);
+    stroke-width: 1.5;
     stroke-linejoin: round;
     stroke-dasharray: 1;
     stroke-dashoffset: 0;

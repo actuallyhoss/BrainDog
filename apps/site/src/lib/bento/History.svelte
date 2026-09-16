@@ -44,7 +44,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    box-shadow: none;
     font-size: var(--t-sm);
   }
 
@@ -161,7 +161,7 @@
 
   @keyframes flash {
     0% {
-      background-color: var(--accent-wash);
+      background-color: var(--hover-wash);
     }
 
     30%,

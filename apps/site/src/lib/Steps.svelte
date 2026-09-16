@@ -99,7 +99,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    block-size: 32px;
+    block-size: 24px;
   }
 
   /* `--z-raise`, the same step `apps/web`s drop line takes. This is a local stacking need only,
@@ -110,22 +110,23 @@
     z-index: var(--z-raise);
     display: grid;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    background: var(--accent);
+    inline-size: 24px;
+    block-size: 24px;
+    background: var(--bg);
+    border: 1px solid var(--ink2);
     border-radius: var(--r-pill);
     box-shadow: 0 0 0 6px var(--bg);
-    color: var(--accent-ink);
-    font-size: var(--t-sm);
-    font-weight: 700;
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
   }
 
   /* The rail runs from this node, across the gap, to the next one. `::after` is the filled half. */
   .rail {
     position: absolute;
-    inset-inline: 32px calc(var(--gap) * -1);
-    inset-block-start: 15px;
-    block-size: 2px;
+    inset-inline: 24px calc(var(--gap) * -1);
+    inset-block-start: 12px;
+    block-size: 1px;
     background: var(--line);
   }
 
@@ -133,14 +134,15 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--accent);
+    background: var(--ink2);
   }
 
   .step-title {
     margin-block-start: var(--sp-4);
-    font-size: var(--t-lg);
-    line-height: 1.25;
-    letter-spacing: -0.018em;
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
     text-wrap: balance;
   }
 
@@ -161,7 +163,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
-    box-shadow: var(--e2);
+    box-shadow: none;
     font-size: var(--t-sm);
   }
 
@@ -223,7 +225,7 @@
     background: var(--s2);
     border: 1px dashed var(--edge);
     border-radius: var(--r-sm);
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .draft-name {
@@ -250,7 +252,7 @@
     display: flex;
     align-items: center;
     block-size: 1.35em;
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .opt {
@@ -261,12 +263,12 @@
     padding-inline: var(--sp-3);
     background: var(--s2);
     border: 1px solid var(--line);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink);
   }
 
   .opt.rec {
-    border-color: var(--accent);
+    border-color: var(--ink);
   }
 
   .opt-title {
@@ -276,9 +278,9 @@
   .badge {
     padding-block: 1px;
     padding-inline: 8px;
-    background: var(--accent-wash);
+    background: var(--hover-wash);
     border-radius: var(--r-pill);
-    color: var(--accent-text);
+    color: var(--ink);
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -332,7 +334,7 @@
     }
 
     .step {
-      padding-inline-start: 48px;
+      padding-inline-start: 40px;
     }
 
     .node {
@@ -344,14 +346,14 @@
     }
 
     .rail {
-      inset-inline: 15px auto;
-      inset-block: 32px 0;
-      inline-size: 2px;
+      inset-inline: 12px auto;
+      inset-block: 24px 0;
+      inline-size: 1px;
       block-size: auto;
     }
 
     .step-title {
-      margin-block-start: 4px;
+      margin-block-start: 0;
     }
   }
 
@@ -401,28 +403,28 @@
   @keyframes light-2 {
     0%,
     32% {
-      background: var(--s2);
-      color: var(--ink2);
+      border-color: var(--line);
+      color: var(--dim);
     }
 
     35%,
     100% {
-      background: var(--accent);
-      color: var(--accent-ink);
+      border-color: var(--ink2);
+      color: var(--ink);
     }
   }
 
   @keyframes light-3 {
     0%,
     65% {
-      background: var(--s2);
-      color: var(--ink2);
+      border-color: var(--line);
+      color: var(--dim);
     }
 
     68%,
     100% {
-      background: var(--accent);
-      color: var(--accent-ink);
+      border-color: var(--ink2);
+      color: var(--ink);
     }
   }
 
@@ -493,7 +495,7 @@
     }
 
     52% {
-      box-shadow: 0 0 0 4px var(--accent-wash);
+      box-shadow: 0 0 0 4px var(--hover-wash);
     }
 
     60%,

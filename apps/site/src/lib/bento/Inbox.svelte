@@ -33,7 +33,7 @@
   <div class="row">
     <p class="row-head">
       <span class="row-title">{c.row}</span>
-      <span class="amount num"><span class="code">{c.currency}</span> {c.amount}</span>
+      <span class="amount num">{c.amount}</span>
     </p>
     <p class="party">{c.party}</p>
     <p class="line"><Face name={c.rule} size="s" /><span class="line-text">{c.line}</span></p>
@@ -55,7 +55,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    box-shadow: none;
   }
 
   .mail {
@@ -127,7 +127,7 @@
     display: block;
     inline-size: 2px;
     block-size: 14px;
-    background: var(--accent);
+    background: var(--ink);
     border-radius: var(--r-pill);
     transform-origin: 50% 0;
   }
@@ -169,11 +169,6 @@
     color: var(--ink);
     font-weight: 600;
     white-space: nowrap;
-  }
-
-  .code {
-    color: var(--dim);
-    font-size: var(--t-xs);
   }
 
   .party {
@@ -279,13 +274,13 @@
     34% {
       opacity: 0;
       transform: translateY(6px);
-      background-color: var(--accent-wash);
+      background-color: var(--hover-wash);
     }
 
     42% {
       opacity: 1;
       transform: none;
-      background-color: var(--accent-wash);
+      background-color: var(--hover-wash);
     }
 
     60%,

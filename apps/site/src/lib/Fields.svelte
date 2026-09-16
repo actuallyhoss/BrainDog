@@ -71,7 +71,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+    box-shadow: none;
     overflow: hidden;
   }
 
@@ -89,7 +89,7 @@
 
   .reg {
     color: var(--ink);
-    font-family: var(--font-display);
+    font-family: var(--font-ui);
     font-size: var(--t-md);
     font-weight: 600;
     letter-spacing: -0.014em;
@@ -134,16 +134,12 @@
   }
 
   /**
-   * THE ONE COLOURED COLUMN, AND IT IS THE SUBJECT OF THE SECTION.
-   *
-   * `--info` is the note role: this is what the record knows about the field, as opposed to what
-   * the row happens to hold. The identifier face for the same reason the row number takes it, and
-   * because a type is a word the machine reads.
+   * THE TYPE COLUMN, in the quiet ink rather than a colour. It is words a person reads ("a date",
+   * "one of four"), so it takes the text face; colour on this page is kept for state.
    */
   .type {
     margin: 0;
-    color: var(--info);
-    font-family: var(--font-id);
+    color: var(--dim);
     font-size: var(--t-sm);
   }
 
@@ -162,7 +158,7 @@
   .ok {
     display: flex;
     align-self: center;
-    color: var(--earn);
+    color: var(--dim);
   }
 
   @media (prefers-reduced-motion: no-preference) {

@@ -71,7 +71,7 @@
 
   .into {
     display: grid;
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .file {
@@ -84,9 +84,9 @@
     padding-block: var(--sp-3) calc(var(--sp-3) + 3px);
     padding-inline: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--edge);
     border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    box-shadow: none;
   }
 
   .file-glyph {
@@ -94,9 +94,9 @@
     place-items: center;
     inline-size: 36px;
     block-size: 36px;
-    background: var(--accent-wash);
+    background: var(--hover-wash);
     border-radius: var(--r-sm);
-    color: var(--accent-text);
+    color: var(--ink);
   }
 
   .file-main {
@@ -111,7 +111,7 @@
   }
 
   .ext {
-    color: var(--accent-text);
+    color: var(--dim);
     font-family: var(--font-id);
   }
 
@@ -124,14 +124,14 @@
     position: absolute;
     inset-block-end: 0;
     inset-inline: 0;
-    block-size: 3px;
+    block-size: 2px;
     background: var(--hover-wash);
   }
 
   .bar {
     display: block;
     block-size: 100%;
-    background: var(--accent);
+    background: var(--ink2);
     transform-origin: 0 50%;
   }
 

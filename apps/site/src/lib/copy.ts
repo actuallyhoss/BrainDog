@@ -35,8 +35,8 @@ export const site = {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'Everything about your business that is not just code, in one typed, append-only database ' +
-        'your agents can read and write.',
+        'What your business is owed, what renews, who you work with and what you decided, in one ' +
+        'record that you and your AI agents keep up to date.',
     },
     pricing: {
       title: 'Pricing · BrainDog',
@@ -64,16 +64,19 @@ export const site = {
   hero: {
     title: 'Give your business a memory',
     sub:
-      'The money, services, people and decisions behind your business, in one record that you ' +
-      'and your agents keep together.',
-    /* The changelog's own status line, as a way in for the reader who wants proof before a demo. */
-    badge: { tag: 'Changelog', text: 'The app is live. Nothing is for sale yet.' },
+      'What you are owed, what renews, who you work with and what you decided, in one record that ' +
+      'you and your AI agents keep up to date.',
     /* `Open the demo` opens the demo, where nothing needs an account; `note` says so under it. */
     primary: 'Open the demo',
     secondary: 'See how it works',
     note:
-      'The demo is a made-up business, not yours. There is no sign-up and no billing, and nothing ' +
-      'you type into it is kept.',
+      'The demo is a made-up business, not yours. There is no sign-up and no billing yet, and ' +
+      'nothing you type into it is kept.',
+    /* THE PICTURE UNDER THE PROMISE is the demo's home screen, photographed by
+       `scripts/product.mjs`, so its alt text says what that screen holds. */
+    shotAlt:
+      'The home screen of the demo record, The Studio: what it is owed and what is due, the ' +
+      'questions waiting on a decision, and what its agents and rules did while you were away.',
   },
 
   /** The demo's projects, with the mark and the frozen hue the seed gives each one. */
@@ -83,69 +86,19 @@ export const site = {
     Tallow: { name: 'Tallow', mark: 'square', hue: 261 },
   },
 
-  /**
-   * THE HERO: the demo's home screen, filling up while you watch.
-   *
-   * The feed is the demo's own "since you were away", replayed oldest to newest, and the questions
-   * are its four open ones in the order the record ranks them. The needs carry no age because the
-   * demo's question dates and its feed disagree about SG31, and a drawing does not pick a side.
-   */
-  moment: {
-    label:
-      'The home screen of the demo record filling up: Codex opens the Kiln licensing question, a ' +
-      'renewal rule marks a domain as lapsing, a reply rule notes when Halden will pay, and Claude ' +
-      'adds two services from the Fenwick invoice, while What needs you grows to four questions.',
-    record: 'The Studio',
-    initial: 'T',
-    date: 'Thursday 3 September',
-    counts: ['2', '3', '4'],
-    pending: 'to decide',
-    needsTitle: 'What needs you',
-    recommends: 'Recommends',
-    needs: [
-      { title: 'The backup on 2026-09-03 did not run', recommends: 'Run it now', cost: null, project: null },
-      {
-        title: 'Does Kiln licence per-seat, per-product, or one flat studio price?',
-        recommends: 'Per product',
-        cost: null,
-        project: 'Kiln',
-      },
-      {
-        title: 'Does Portage keep sending from portagemail.example, or move to the apex?',
-        recommends: 'Keep the subdomain',
-        cost: null,
-        project: 'Portage',
-      },
-      {
-        title: 'Does Tallow get retired, or parked for another year?',
-        recommends: null,
-        cost: 'Parking costs GBP 14.00 a year',
-        project: 'Tallow',
-      },
-    ],
-    feedTitle: 'Since you were away',
-    feed: [
-      { who: 'Claude', what: 'Added 2 services from the Fenwick invoice', age: '3h ago' },
-      { who: 'Reply rule', what: 'Halden replied on 2026-041: payment run on the 12th', age: '9h ago' },
-      { who: 'Renewal rule', what: 'kilnfonts.example moved to lapsing because auto-renew is off', age: '1d ago' },
-      { who: 'Codex', what: 'Opened SG31, the Kiln licensing question', age: '1d ago' },
-      { who: 'Claude', what: 'Set the year-end date on Pell & Vine', age: '2d ago' },
-      { who: 'You', what: 'Added the Overdue stat cell', age: '4d ago' },
-    ],
-  },
-
   /** SEVEN SMALL MOMENTS, each a real feature in miniature, drawn from the same demo record. */
   bento: {
-    kicker: 'Inside the record',
-    title: 'Everything that is not just code, in one place.',
-    body: 'Each of these is a small piece of the demo, a made-up business called The Studio.',
+    title: 'The whole business, in one record.',
+    body:
+      'Money, services, people, keys and decisions, each kept as rows with a type. Every picture ' +
+      'here is a small piece of the demo, a made-up studio called The Studio.',
     money: {
       title: 'Money, owed and owing',
       caption: 'What you are owed, what is late, and the balance walked forward to the first day it would go under.',
       figures: [
-        { label: 'Owed to you', currency: 'GBP', amount: '28,320.00', late: false },
-        { label: 'Due in 30 days', currency: 'GBP', amount: '26,690.00', late: false },
-        { label: 'Overdue to pay', currency: 'GBP', amount: '10,540.00', late: true },
+        { label: 'Owed to you', amount: '£28,320.00', late: false },
+        { label: 'Due in 30 days', amount: '£26,690.00', late: false },
+        { label: 'Overdue to pay', amount: '£10,540.00', late: true },
       ],
       walked: 'Walked forward',
       under: 'First day under',
@@ -168,19 +121,22 @@ export const site = {
       caption: 'A rule reads the reply and writes it onto the invoice it is about.',
       from: 'ap@halden.example',
       subject: 'RE: Invoice 2026-041',
-      preview: 'Apologies for the delay. This is with our finance team and should clear in the next payment run on the 12th.',
+      preview:
+        'Apologies for the delay. This is with our finance team and should clear in the next payment run on the 12th.',
       age: '9h ago',
       rule: 'Reply rule',
       row: 'Invoice 2026-041, brand system',
       party: 'Halden Type Co · Owed to you',
-      currency: 'GBP',
-      amount: '4,800.00',
+      amount: '£4,800.00',
       line: 'Halden replied on 2026-041: payment run on the 12th',
     },
     vault: {
       title: 'Keys, without the keys',
       caption: 'The vault records what each key opens. The key itself is never in a row, and agents are refused it.',
-      key: { label: 'Fenwick deploy key', opens: 'Workers deploys for kiln.example' },
+      key: {
+        label: 'Fenwick deploy key',
+        opens: 'Workers deploys for kiln.example',
+      },
       other: { label: 'Nordhaven API', opens: 'DNS for five domains' },
       stale: 'Due for rotation',
       opens: 'Opens',
@@ -195,11 +151,36 @@ export const site = {
       head: 'History',
       only: 'Only ever added',
       events: [
-        { seq: '4192', who: 'Claude', what: 'Created services#6, Object storage', age: '3h ago' },
-        { seq: '4188', who: 'Reply rule', what: 'Added a note to obligations#1', age: '9h ago' },
-        { seq: '4181', who: 'You', what: 'Moved tasks#12 from open to done', age: '14h ago' },
-        { seq: '4174', who: 'Renewal rule', what: 'Moved services#2 from live to lapsing', age: '1d ago' },
-        { seq: '4160', who: 'Codex', what: 'Opened SG31, Kiln licensing model', age: '1d ago' },
+        {
+          seq: '4192',
+          who: 'Claude',
+          what: 'Created services#6, Object storage',
+          age: '3h ago',
+        },
+        {
+          seq: '4188',
+          who: 'Reply rule',
+          what: 'Added a note to obligations#1',
+          age: '9h ago',
+        },
+        {
+          seq: '4181',
+          who: 'You',
+          what: 'Moved tasks#12 from open to done',
+          age: '14h ago',
+        },
+        {
+          seq: '4174',
+          who: 'Renewal rule',
+          what: 'Moved services#2 from live to lapsing',
+          age: '1d ago',
+        },
+        {
+          seq: '4160',
+          who: 'Codex',
+          what: 'Opened SG31, Kiln licensing model',
+          age: '1d ago',
+        },
       ],
     },
     export: {
@@ -224,9 +205,13 @@ export const site = {
         register: 'Money',
         row: 'item #4',
         fields: [
-          { label: 'Description', type: 'text', value: 'Corporation tax, payment on account' },
+          {
+            label: 'Description',
+            type: 'text',
+            value: 'Corporation tax, payment on account',
+          },
           { label: 'Which way', type: 'one of two', value: 'owed by me' },
-          { label: 'Amount', type: 'money', value: 'GBP 19,100.00' },
+          { label: 'Amount', type: 'money', value: '£19,100.00' },
           { label: 'Due', type: 'a date', value: '7 Sep 2026' },
           { label: 'Status', type: 'one of four', value: 'open' },
         ],
@@ -243,22 +228,33 @@ export const site = {
    * about four minutes. Better it comes from us.
    */
   steps: {
-    kicker: 'With your agents',
     title: 'Agents propose. You decide.',
     body:
       'Nothing an agent does to the record is quiet. It proposes, the record asks you, and your ' +
       'answer is kept beside the rows it made.',
     items: [
-      { title: 'An agent proposes', body: 'The assistant reads the Fenwick invoice and drafts the two services on it.' },
-      { title: 'The record asks you', body: 'One question, with the options and the one it recommends.' },
-      { title: 'You decide, and it is written down', body: 'Your answer, your reason, and each new row with a name and a time.' },
+      {
+        title: 'An agent proposes',
+        body: 'The assistant reads the Fenwick invoice and drafts the two services on it.',
+      },
+      {
+        title: 'The record asks you',
+        body: 'One question, with the options and the one it recommends.',
+      },
+      {
+        title: 'You decide, and it is written down',
+        body: 'Your answer, your reason, and each new row with a name and a time.',
+      },
     ],
-    mail: { from: 'billing@fenwick.example', subject: 'Your September invoice is ready' },
+    mail: {
+      from: 'billing@fenwick.example',
+      subject: 'Your September invoice is ready',
+    },
     proposer: 'The assistant',
     proposes: 'drafted two services',
     drafts: [
-      { name: 'Object storage', cost: 'GBP 41.00 monthly' },
-      { name: 'Workers plan', cost: 'GBP 5.00 monthly' },
+      { name: 'Object storage', cost: '£41.00 monthly' },
+      { name: 'Workers plan', cost: '£5.00 monthly' },
     ],
     question: 'Add the two services on the Fenwick invoice?',
     options: [
@@ -267,7 +263,8 @@ export const site = {
     ],
     recommended: 'Recommended',
     answered: 'Answered: Add both',
-    reason: 'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.',
+    reason:
+      'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.',
     written: [
       { seq: '4192', id: 'services#6', name: 'Object storage' },
       { seq: '4191', id: 'services#7', name: 'Workers plan' },
@@ -282,8 +279,8 @@ export const site = {
 
   /** What a reader can hold the product to, and what it cannot do yet, side by side. */
   trust: {
-    kicker: 'Said out loud',
-    title: 'Yours to keep, and plain about the rest.',
+    title: 'Plain about what it is.',
+    keepTitle: 'Yours to keep',
     keep: [
       {
         title: 'An open licence',
@@ -316,7 +313,7 @@ export const site = {
 
   /** Stated because a page that lists only strengths is a page nobody believes twice. */
   limits: {
-    title: 'Three things it will not do.',
+    title: 'What it will not do',
     items: [
       {
         title: 'It is not an accounting package.',
@@ -334,12 +331,11 @@ export const site = {
   },
 
   closing: {
-    body: 'The demo opens on The Studio, a made-up business with four questions waiting for you.',
+    body: 'The demo opens on The Studio, a made-up business with questions already waiting for you.',
     secondary: 'See the pricing',
   },
 
   pricing: {
-    kicker: 'Pricing',
     title: 'Two ways to run it.',
     body: 'The same software either way. Hosting is the only thing being sold.',
     /**
@@ -387,14 +383,12 @@ export const site = {
   },
 
   changelog: {
-    kicker: 'What shipped',
     lede: "What shipped and when, in the repository's own words.",
     count: (entries: number, days: number) => `${entries} entries over ${days} days`,
   },
 
   footer: {
     tagline: 'Give your business a memory',
-    licence: 'Apache-2.0',
     columns: [
       {
         title: 'Product',
@@ -411,7 +405,12 @@ export const site = {
         /* `Licence` and not `Open source`: the source and design links 404 while the repository is
            private, and the licence is the claim that is true today. */
         title: 'Licence',
-        links: [{ label: 'Apache-2.0', href: 'https://www.apache.org/licenses/LICENSE-2.0' }],
+        links: [
+          {
+            label: 'Apache-2.0',
+            href: 'https://www.apache.org/licenses/LICENSE-2.0',
+          },
+        ],
       },
     ],
   },

@@ -61,7 +61,7 @@
 <header class="bar">
   <div class="bar-in">
     <a class="brand" href="/">
-      <Mark height={26} />
+      <Mark height={22} />
       <span class="wordmark">{site.product}</span>
     </a>
 
@@ -104,11 +104,10 @@
   <div class="foot-in">
     <div class="foot-brand">
       <a class="brand" href="/">
-        <Mark height={22} />
+        <Mark height={20} />
         <span class="wordmark">{site.product}</span>
       </a>
       <p class="foot-tagline">{site.footer.tagline}</p>
-      <p class="foot-licence">{site.footer.licence}</p>
     </div>
 
     {#each site.footer.columns as column}
@@ -135,7 +134,7 @@
     padding-inline: var(--sp-4);
     background: var(--s3);
     border: 1px solid var(--edge);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink);
     transform: translateY(-200%);
   }
@@ -144,29 +143,29 @@
     transform: none;
   }
 
-  /* Translucent and blurred, and this is the ONE place in the product that gets to be: a marketing
-     page has no column of small tabular digits for the blur to cost anything against. */
+  /* Solid, with a hairline under it. It was translucent and blurred, and glass is one of the
+     surfaces the redesign retired: the page under the bar is words, and words behind frosted words
+     are noise. */
   .bar {
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-hint);
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
+    background: var(--bg);
     border-block-end: 1px solid var(--line);
   }
 
   .bar-in,
   .foot-in {
-    max-inline-size: 1140px;
+    max-inline-size: var(--site-max);
     margin-inline: auto;
-    padding-inline: var(--sp-5);
+    padding-inline: var(--sp-6);
   }
 
   .bar-in {
     display: flex;
     align-items: center;
     gap: var(--sp-4);
-    padding-block: 10px;
+    padding-block: 8px;
   }
 
   /* `--ctl-h` is 36 on a fine pointer and 44 under a thumb: as small as a mouse allows, as large as
@@ -183,9 +182,9 @@
   .wordmark {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-lg);
+    font-size: var(--t-md);
     font-weight: 600;
-    letter-spacing: -0.022em;
+    letter-spacing: -0.02em;
   }
 
   .links {
@@ -200,9 +199,9 @@
     align-items: center;
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     font-weight: 500;
     text-decoration: none;
     transition:
@@ -212,7 +211,6 @@
 
   .links a:hover,
   .links a[aria-current] {
-    background: var(--hover-wash);
     color: var(--ink);
   }
 
@@ -236,9 +234,9 @@
     place-items: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    background: var(--s1);
+    background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink);
     cursor: pointer;
     list-style: none;
@@ -264,8 +262,8 @@
     padding: var(--sp-2);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e3);
+    border-radius: var(--r-md);
+    box-shadow: var(--e2);
   }
 
   /* CLOSED, THE PANEL IS NOT LAID OUT AT ALL. A closed disclosure only skips painting its content,
@@ -281,7 +279,7 @@
     justify-content: space-between;
     min-block-size: var(--tap);
     padding-inline: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--ink);
     font-size: var(--t-md);
     font-weight: 500;
@@ -322,12 +320,6 @@
   .foot-tagline {
     color: var(--dim);
     font-size: var(--t-sm);
-  }
-
-  .foot-licence {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
   }
 
   .foot-col {

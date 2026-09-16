@@ -16,7 +16,7 @@
 <div class="vault" aria-hidden="true">
   <div class="cred">
     <p class="cred-head">
-      <span class="glyph key" data-hue="warn"><Icon name="key" size="s" /></span>
+      <span class="glyph key"><Icon name="key" size="s" /></span>
       <span class="name">{c.key.label}</span>
       <span class="stale">{c.stale}</span>
     </p>
@@ -27,7 +27,7 @@
   </div>
 
   <div class="cred cred-quiet">
-    <span class="glyph key" data-hue="info"><Icon name="key" size="s" /></span>
+    <span class="glyph key"><Icon name="key" size="s" /></span>
     <span class="quiet-main"><span class="name">{c.other.label}</span><span class="opens">{c.other.opens}</span></span>
   </div>
 
@@ -52,7 +52,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    box-shadow: none;
   }
 
   .cred-head {
@@ -77,8 +77,6 @@
     margin-inline-start: auto;
     padding-block: 1px;
     padding-inline: 8px;
-    background: var(--warn-wash);
-    border-radius: var(--r-pill);
     color: var(--warn);
     font-size: var(--t-xs);
     font-weight: 600;
@@ -232,7 +230,7 @@
     }
 
     32% {
-      box-shadow: 0 0 0 4px var(--warn-wash);
+      box-shadow: 0 0 0 4px var(--hover-wash);
     }
 
     44%,

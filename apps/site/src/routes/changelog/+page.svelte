@@ -19,7 +19,6 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
-  import Tag from '$lib/Tag.svelte';
   import type { Hue } from '$lib/icons.ts';
   import { APP, SOURCE, site } from '$lib/copy.ts';
 
@@ -576,7 +575,6 @@
 </svelte:head>
 
 <section class="head">
-  <Tag icon="observe" hue="earn" label={site.changelog.kicker} />
   <h1 class="title">{site.nav.changelog}</h1>
   <p class="lede">{site.changelog.lede}</p>
   <!-- THE COUNTS ARE COUNTED, from the list below, so they cannot drift from it. -->
@@ -588,14 +586,13 @@
   </p>
 
   <div class="status">
-    <span class="live" aria-hidden="true"><span class="pulse"></span></span>
     <div class="status-copy">
-      <h2 class="status-title">{STATUS.title}</h2>
+      <h2 class="status-title"><span class="live" aria-hidden="true"></span>{STATUS.title}</h2>
       <p class="status-body">{STATUS.body}</p>
       <!-- ONE ACTION WHILE THE REPOSITORY IS PRIVATE, and it is this page's filled primary: the
            status says the app is live, and this is how you see that it is. -->
       <p class="status-links">
-        <a class="btn btn-primary" href={APP}>{site.nav.open}<Icon name="arrow" /></a>
+        <a class="btn btn-primary" href={APP}>{site.nav.open}<Icon name="arrow" size="s" /></a>
         {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
       </p>
     </div>
@@ -625,19 +622,19 @@
 <style>
   .head,
   .log {
-    max-inline-size: 900px;
+    max-inline-size: 960px;
     margin-inline: auto;
-    padding-inline: var(--sp-5);
+    padding-inline: var(--sp-6);
   }
 
   .head {
-    padding-block: clamp(48px, 7vw, 96px) var(--sp-6);
+    padding-block: clamp(56px, 7vw, 104px) var(--sp-6);
   }
 
   .title {
-    margin-block-start: var(--sp-4);
-    font-size: clamp(40px, 3.4vw + 22px, 68px);
-    line-height: 1.02;
+    font-size: clamp(36px, 2.4vw + 22px, 56px);
+    font-weight: 600;
+    line-height: 1.04;
     letter-spacing: -0.04em;
   }
 
@@ -645,7 +642,7 @@
     max-inline-size: 46ch;
     margin-block-start: var(--sp-3);
     color: var(--ink2);
-    font-size: var(--t-lg);
+    font-size: clamp(17px, 0.4vw + 15px, 20px);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -664,34 +661,18 @@
     font-size: var(--t-sm);
   }
 
-  /* The state of the product, as the one card on the page with a pulse on it: it is the only thing
-     here that is about now rather than a day in the past. */
+  /* The state of the product, as a plain block between two hairlines with one dot of state on
+     it: it is the only thing here that is about now rather than a day in the past. */
   .status {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-4);
     margin-block-start: var(--sp-6);
-    padding: var(--sp-5);
-    background: var(--accent-ground);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
-    border-radius: calc(var(--r-lg) + 4px);
-    box-shadow: var(--e2);
+    padding-block: var(--sp-5);
+    border-block-start: 1px solid var(--line);
   }
 
   .live {
-    position: relative;
-    display: grid;
     flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    background: color-mix(in srgb, var(--earn) 14%, transparent);
-    border-radius: var(--r-pill);
-  }
-
-  .pulse {
-    inline-size: 10px;
-    block-size: 10px;
+    inline-size: var(--dot);
+    block-size: var(--dot);
     background: var(--earn);
     border-radius: var(--r-pill);
   }
@@ -700,19 +681,23 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
   .status-title {
-    font-size: var(--t-lg);
-    letter-spacing: -0.018em;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .status-body {
     max-inline-size: 66ch;
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     line-height: 1.6;
     text-wrap: pretty;
   }
@@ -748,8 +733,8 @@
     letter-spacing: 0;
   }
 
-  /* A RAIL DOWN THE DAY, and a dot on it for each entry in the entry's own hue, so a day reads as
-     a short run of things that happened rather than a stack of paragraphs. */
+  /* A RAIL DOWN THE DAY, and a quiet mark on it for each entry, so a day reads as a short run of
+     things that happened rather than a stack of paragraphs. The kind's colour is on its label. */
   .entries {
     display: flex;
     flex-direction: column;
@@ -767,32 +752,28 @@
   .entry::before {
     content: '';
     position: absolute;
-    inset-block-start: 0.55em;
-    inset-inline-start: calc(var(--sp-5) * -1 - 5px);
-    inline-size: 9px;
-    block-size: 9px;
-    background: var(--hue);
+    inset-block-start: 0.6em;
+    inset-inline-start: calc(var(--sp-5) * -1 - 3px);
+    inline-size: 5px;
+    block-size: 5px;
+    background: var(--edge);
     border-radius: var(--r-pill);
     box-shadow: 0 0 0 3px var(--bg);
   }
 
-  /* A pill on the title's own line: the word is in the ink and the hue is a dot and a wash, so the
-     kind reads the same to somebody who does not see green. */
+  /* A label on the title's own line: the word is in the ink and the hue is only a dot, so the kind
+     reads the same to somebody who does not see green. */
   .kind {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin-inline-end: var(--sp-2);
-    padding-block: 2px;
-    padding-inline: 8px 10px;
-    background: var(--hue-wash);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    margin-inline-end: var(--sp-3);
+    color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-xs);
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: 0;
-    vertical-align: 0.15em;
+    vertical-align: 0.1em;
   }
 
   .dot {
@@ -803,41 +784,20 @@
   }
 
   .entry-title {
-    font-size: var(--t-lg);
-    letter-spacing: -0.018em;
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
     text-wrap: pretty;
   }
 
   .entry-body {
     max-inline-size: 74ch;
-    margin-block-start: var(--sp-3);
+    margin-block-start: var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 1.7;
+    line-height: 1.65;
     text-wrap: pretty;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .live::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border: 2px solid var(--earn);
-      border-radius: var(--r-pill);
-      animation: pulse 2.4s var(--ease-out) infinite;
-    }
-  }
-
-  @keyframes pulse {
-    from {
-      opacity: 0.7;
-      transform: scale(0.5);
-    }
-
-    to {
-      opacity: 0;
-      transform: scale(1.4);
-    }
   }
 
   @media (width < 760px) {
@@ -864,12 +824,6 @@
       font-size: var(--t-md);
     }
 
-    .status {
-      flex-direction: column;
-      gap: var(--sp-3);
-      padding: var(--sp-4);
-    }
-
     .status-links {
       align-self: stretch;
       flex-direction: column;
@@ -880,7 +834,7 @@
     }
 
     .entry::before {
-      inset-inline-start: calc(var(--sp-4) * -1 - 5px);
+      inset-inline-start: calc(var(--sp-4) * -1 - 3px);
     }
   }
 </style>

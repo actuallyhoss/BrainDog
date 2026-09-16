@@ -10,7 +10,6 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
-  import Tag from '$lib/Tag.svelte';
   import { APP, BUILD, site } from '$lib/copy.ts';
 
   const p = site.pricing;
@@ -26,30 +25,21 @@
 </svelte:head>
 
 <section class="wrap head">
-  <div class="head-copy">
-    <Tag icon="money" hue="earn" label={p.kicker} />
-    <h1 class="title">{p.title}</h1>
-    <p class="lede">{p.body}</p>
-  </div>
+  <h1 class="title">{p.title}</h1>
+  <p class="lede">{p.body}</p>
   <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can be
-       accepted today. Saying so once, before the cards, is what lets the cards describe the plans in
-       the present tense without the page lying. -->
+       accepted today. Saying so once, before the plans, is what lets the plans describe themselves
+       in the present tense without the page lying. -->
   <div class="status">
-    <span class="glyph" data-hue="warn"><Icon name="clock" /></span>
-    <div class="status-copy">
-      <h2 class="status-title">{p.statusTitle}</h2>
-      <p class="status-body">{p.status}</p>
-    </div>
+    <h2 class="status-title"><span class="dot" aria-hidden="true"></span>{p.statusTitle}</h2>
+    <p class="status-body">{p.status}</p>
   </div>
 </section>
 
 <section class="wrap plans">
   {#each [p.self, p.hosted] as plan, i}
     <article class="plan" data-featured={i === 1 ? '' : undefined}>
-      <div class="plan-top">
-        <span class="glyph" data-hue={i === 1 ? 'accent' : 'info'}><Icon name={i === 1 ? 'thing' : 'home'} /></span>
-        <h2 class="plan-name">{plan.name}</h2>
-      </div>
+      <h2 class="plan-name">{plan.name}</h2>
       <p class="plan-price">
         <span class="plan-figure num">{plan.price}</span>
         <span class="plan-unit">{plan.unit}</span>
@@ -57,17 +47,17 @@
       <p class="plan-body">{plan.body}</p>
       <ul class="plan-points">
         {#each plan.points as point}
-          <li><span class="tick"><Icon name="check" /></span>{point}</li>
+          <li><span class="tick"><Icon name="check" size="s" /></span>{point}</li>
         {/each}
       </ul>
       <!--
-        THE SELF-HOSTED CARD HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE: its action sent you to
+        THE SELF-HOSTED PLAN HAS NO ACTION WHILE THE REPOSITORY IS PRIVATE: its action sent you to
         build instructions nobody can read. An absent control and not a disabled one, because a
         greyed button under a price is a product telling you it does not want your business. The
-        sentence above the cards already says neither plan is open yet.
+        sentence above the plans already says neither plan is open yet.
       -->
       {#if i === 1}
-        <a class="btn btn-primary btn-lg" href={APP}>{plan.cta}<Icon name="arrow" /></a>
+        <a class="btn btn-primary btn-lg" href={APP}>{plan.cta}<Icon name="arrow" size="s" /></a>
       {:else if BUILD}
         <a class="btn btn-lg" href={BUILD}>{plan.cta}</a>
       {/if}
@@ -76,129 +66,99 @@
 </section>
 
 <section class="wrap honest">
-  <div class="honest-card">
-    <span class="glyph" data-hue="accent"><Icon name="info" /></span>
-    <div>
-      <h2 class="honest-title">{p.honestTitle}</h2>
-      <p class="honest-body">{p.honest}</p>
-    </div>
-  </div>
+  <h2 class="honest-title">{p.honestTitle}</h2>
+  <p class="honest-body">{p.honest}</p>
 </section>
 
 <style>
   .wrap {
-    max-inline-size: 1000px;
+    max-inline-size: 960px;
     margin-inline: auto;
-    padding-inline: var(--sp-5);
+    padding-inline: var(--sp-6);
   }
 
   .head {
-    position: relative;
-    isolation: isolate;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
-    align-items: end;
-    gap: var(--sp-6) var(--sp-7);
-    padding-block: clamp(48px, 7vw, 96px) var(--sp-7);
+    padding-block: clamp(56px, 7vw, 104px) var(--sp-7);
   }
 
   .title {
-    margin-block-start: var(--sp-4);
-    font-size: clamp(40px, 3.4vw + 22px, 68px);
-    line-height: 1.02;
+    font-size: clamp(36px, 2.4vw + 22px, 56px);
+    font-weight: 600;
+    line-height: 1.04;
     letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
   .lede {
-    max-inline-size: 40ch;
+    max-inline-size: 48ch;
     margin-block-start: var(--sp-4);
     color: var(--ink2);
-    font-size: var(--t-lg);
+    font-size: clamp(17px, 0.4vw + 15px, 20px);
     line-height: 1.5;
     text-wrap: pretty;
   }
 
-  /* A fact about the state of the product, not an alarm: a quiet card with a clock on it. */
+  /* A fact about the state of the product, not an alarm: a line of text with one dot of state. */
   .status {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
-  }
-
-  .status-copy {
-    min-inline-size: 0;
+    max-inline-size: 68ch;
+    margin-block-start: var(--sp-6);
+    padding-block-start: var(--sp-5);
+    border-block-start: 1px solid var(--line);
   }
 
   .status-title {
-    font-family: var(--font-ui);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     font-size: var(--t-base);
     font-weight: 600;
     letter-spacing: 0;
   }
 
+  .dot {
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    background: var(--warn);
+    border-radius: var(--r-pill);
+  }
+
   .status-body {
     margin-block-start: var(--sp-1);
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     line-height: 1.6;
     text-wrap: pretty;
   }
 
-  /* `align-items: start` and the cards stop being the same height, because the free plan has no
+  /* `align-items: start` and the plans stop being the same height, because the free plan has no
      action under it while the repository is private. */
   .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-    gap: var(--sp-4);
+    gap: var(--sp-3);
   }
 
   .plan {
-    position: relative;
-    isolation: isolate;
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    overflow: hidden;
     padding: var(--sp-6);
-    background: var(--s1);
+    background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: calc(var(--r-lg) + 4px);
-    box-shadow: var(--e1);
+    border-radius: var(--r-lg);
   }
 
-  /* The hosted plan takes the ACCENT EDGE, a ground tinted towards it and a light from above, and
-     nothing else: no ribbon, no "most popular", no scale transform. */
+  /* The hosted plan takes a firmer edge and nothing else: no tint, no glow, no ribbon, no "most
+     popular", no scale transform. */
   .plan[data-featured] {
-    background: var(--accent-ground);
-    border-color: var(--accent);
-    box-shadow: var(--e2);
-  }
-
-  .plan[data-featured]::before {
-    content: '';
-    position: absolute;
-    z-index: -1;
-    inset-block: -50% 50%;
-    inset-inline: 0;
-    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
-  }
-
-  .plan-top {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
+    border-color: var(--edge);
   }
 
   .plan-name {
-    font-size: var(--t-lg);
-    letter-spacing: -0.018em;
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .plan-price {
@@ -206,15 +166,13 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-block-start: var(--sp-2);
   }
 
   .plan-figure {
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: clamp(44px, 3vw + 24px, 64px);
+    font-size: clamp(40px, 2vw + 28px, 52px);
     font-weight: 600;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.04em;
     line-height: 1;
   }
 
@@ -225,15 +183,15 @@
 
   .plan-body {
     color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: 1.5;
+    font-size: var(--t-base);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
   .plan-points {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     margin: 0;
     /* `padding-inline: 0` is load-bearing: base.css resets a list's MARGIN and not its padding. */
     padding-inline: 0;
@@ -256,47 +214,32 @@
     display: flex;
     align-items: center;
     block-size: 1.45em;
-    color: var(--earn);
+    color: var(--dim);
   }
 
   .plan .btn {
+    align-self: flex-start;
     margin-block-start: var(--sp-3);
   }
 
   /* The page's own bottom: the shell puts no margin over the footer. */
   .honest {
-    padding-block: var(--sp-6) var(--sp-8);
-  }
-
-  .honest-card {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-4);
-    padding: var(--sp-5);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    padding-block: var(--sp-7) var(--sp-8);
   }
 
   .honest-title {
-    font-size: var(--t-md);
-    letter-spacing: -0.014em;
+    font-size: var(--t-base);
+    font-weight: 600;
+    letter-spacing: 0;
   }
 
   .honest-body {
-    max-inline-size: 70ch;
-    margin-block-start: var(--sp-2);
+    max-inline-size: 68ch;
+    margin-block-start: var(--sp-1);
     color: var(--ink2);
     font-size: var(--t-base);
     line-height: 1.6;
     text-wrap: pretty;
-  }
-
-  @media (width < 900px) {
-    .head {
-      grid-template-columns: minmax(0, 1fr);
-      align-items: start;
-    }
   }
 
   @media (width < 760px) {
@@ -310,22 +253,12 @@
       padding-inline: var(--sp-4);
     }
 
-    .lede {
-      font-size: var(--t-md);
-    }
-
     .plan {
       padding: var(--sp-5);
     }
 
     .plan .btn {
       align-self: stretch;
-    }
-
-    .honest-card {
-      flex-direction: column;
-      gap: var(--sp-3);
-      padding: var(--sp-4);
     }
   }
 </style>

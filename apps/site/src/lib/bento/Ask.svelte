@@ -42,7 +42,7 @@
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    box-shadow: none;
     font-size: var(--t-sm);
   }
 
@@ -86,12 +86,12 @@
     padding-inline: var(--sp-3);
     background: var(--s2);
     border: 1px solid var(--line);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--ink);
   }
 
   .opt.rec {
-    border-color: var(--accent);
+    border-color: var(--ink);
   }
 
   .radio {
@@ -105,14 +105,14 @@
   }
 
   .rec .radio {
-    border-color: var(--accent);
+    border-color: var(--ink);
   }
 
   .rec .radio::after {
     content: '';
     inline-size: 6px;
     block-size: 6px;
-    background: var(--accent);
+    background: var(--ink);
     border-radius: var(--r-pill);
   }
 
@@ -124,9 +124,9 @@
   .badge {
     padding-block: 1px;
     padding-inline: 8px;
-    background: var(--accent-wash);
+    background: var(--hover-wash);
     border-radius: var(--r-pill);
-    color: var(--accent-text);
+    color: var(--ink);
     font-size: var(--t-xs);
     font-weight: 600;
     white-space: nowrap;
@@ -185,13 +185,13 @@
     }
 
     28% {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-wash);
+      border-color: var(--ink);
+      box-shadow: 0 0 0 4px var(--hover-wash);
     }
 
     36%,
     100% {
-      border-color: var(--accent);
+      border-color: var(--ink);
       box-shadow: none;
     }
   }
