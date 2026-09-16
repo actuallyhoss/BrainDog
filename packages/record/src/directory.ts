@@ -218,6 +218,11 @@ export type Named = { record: string; slug: string };
 /** A record this person can reach. What they may DO in it is the record's answer, not this one's. */
 export type Membership = { record: string; slug: string | null; closed: boolean };
 
+/** What a record answers when it is asked directly: the level this person holds there, and its own name. `null` for either is "not on this record", the same answer as one it never joined. */
+export type SwitcherAsk = { level: string | null; name: string | null };
+/** One row of the switcher: a record this person can reach, its name, and the level they actually hold there. */
+export type SwitcherRow = { slug: string; name: string; level: string };
+
 export type Directory = ReturnType<typeof createDirectory>;
 
 /* ── plans and usage ─────────────────────────────────────────────────────── */
@@ -669,6 +674,42 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
           person,
         )
         .map((r) => ({ record: r.record, slug: r.slug, closed: r.closed_at !== null })),
+
+    /**
+     * Every open record this person can reach, each with its name and the level they actually hold
+     * there: the record switcher's rows, and the one read `recordsOf` above says it cannot answer
+     * alone.
+     *
+     * THE DIRECTORY SAYS WHICH; THE RECORD SAYS WHAT. `recordsOf` carries no level on purpose, and
+     * its own comment says why: `invite` and `join` write two tables nothing writes in one transaction,
+     * so a level kept here would drift from the one the record enforces the moment anybody was
+     * invited rather than joined. `ask` is how each open record answers for itself, in its own
+     * words, so the level and the name here are never a second copy of either.
+     *
+     * A RECORD THAT ANSWERS WITH NO LEVEL IS LEFT OUT, not shown with a level nobody granted. The
+     * Directory still naming somebody after the record has removed them is not a contradiction to
+     * paper over: it is what "removed" looks like before the two tables agree, and the row that does
+     * not lie about it is no row at all. A closed record, or one with no live name, is left out the
+     * same way `recordsOf`'s own callers already filter it.
+     */
+    switcherRows: async (person: string, ask: (record: string) => Promise<SwitcherAsk> | SwitcherAsk): Promise<SwitcherRow[]> => {
+      const open = sql
+        .all<{ record: string; slug: string | null; closed_at: string | null }>(
+          `SELECT m.record AS record,
+                  (SELECT s.slug FROM dir_slug s WHERE s.record = m.record AND s.released_at IS NULL) AS slug,
+                  (SELECT r.closed_at FROM dir_record r WHERE r.id = m.record) AS closed_at
+             FROM dir_member m WHERE m.person = ? ORDER BY m.rowid`,
+          person,
+        )
+        .filter((r) => r.closed_at === null && r.slug !== null);
+      const rows = await Promise.all(
+        open.map(async (r): Promise<SwitcherRow | null> => {
+          const held = await ask(r.record);
+          return held.level === null ? null : { slug: r.slug as string, name: held.name ?? (r.slug as string), level: held.level };
+        }),
+      );
+      return rows.filter((r): r is SwitcherRow => r !== null);
+    },
 
     /**
      * Can this person reach this record at all?

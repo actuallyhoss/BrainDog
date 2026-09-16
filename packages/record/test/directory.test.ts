@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DIRECTORY_VERSION, createDirectory, type Directory, type Membership, type Named, type Person } from '../src/directory.ts';
+import { DIRECTORY_VERSION, createDirectory, type Directory, type Membership, type Named, type Person, type SwitcherAsk } from '../src/directory.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -168,6 +168,58 @@ test('WHICH RECORDS DOES THIS PERSON REACH — the question a record cannot answ
 
   assert.equal(refusal(d.join('rec_nothing', bo.id)).at, 'record');
   assert.equal(refusal(d.join(made.record, 'p_nobody')).at, 'person');
+  sql.close();
+});
+
+/* ── the switcher's rows: the Directory says which, the record says what ────── */
+
+test('A MEMBER OF ONE RECORD CANNOT SEE ANOTHER through the switcher, whatever the Directory alone would say', async () => {
+  /* THE DIRECTORY IS NOT ASKED FOR TRUST HERE. `bo` reaches both `the-studio` and `kiln` by
+     `recordsOf`'s own table, and the fixture's `ask` answers truthfully for one and refuses the
+     other, the way a real record answers `access(person)` from its own `member` table. The row for
+     the record `bo` is not actually on must never appear, whatever the Directory's join says. */
+  const { d, sql } = directory();
+  const made = studio(d);
+  const bo = value<Person>(d.person$('bo@example.com'));
+  value<Named & { person: string }>(d.provision({ slug: 'kiln', email: 'bo@example.com' }));
+  value(d.join(made.record, bo.id));
+
+  const ask = (record: string): SwitcherAsk =>
+    /* `kiln` is `bo`'s own record: `provision` makes the caller its owner, and `the-studio` is
+       Ada's. `bo` was only ever added to the Directory's map, never to that record's member table,
+       which is exactly the drift `recordsOf`'s own comment describes. */
+    record === made.record ? { level: null, name: 'The Studio' } : { level: 'owner', name: 'Kiln' };
+
+  const rows = await d.switcherRows(bo.id, ask);
+  assert.deepEqual(rows, [{ slug: 'kiln', name: 'Kiln', level: 'owner' }], 'the record bo is not a real member of leaked through');
+  sql.close();
+});
+
+test('THE SWITCHER NAMES A RECORD BY ITS OWN ANSWER, falls back to the slug, and leaves out the closed and the unnamed', async () => {
+  const { d, sql } = directory();
+  const made = studio(d);
+  const bo = value<Person>(d.person$('bo@example.com'));
+  const kiln = value<Named & { person: string }>(d.provision({ slug: 'kiln', email: 'bo@example.com' }));
+  value(d.join(made.record, bo.id));
+
+  // No name from the record at all: the slug is what a person reads instead of a blank row.
+  const noName = await d.switcherRows(bo.id, (record): SwitcherAsk => ({ level: record === made.record ? 'read' : 'owner', name: null }));
+  assert.deepEqual(
+    noName.sort((a, b) => a.slug.localeCompare(b.slug)),
+    [
+      { slug: 'kiln', name: 'kiln', level: 'owner' },
+      { slug: 'the-studio', name: 'the-studio', level: 'read' },
+    ],
+  );
+
+  // A closed record is left out, the same as `recordsOf`'s own callers already filter it.
+  value(d.close(kiln.record));
+  const afterClose = await d.switcherRows(bo.id, (): SwitcherAsk => ({ level: 'owner', name: 'Kiln' }));
+  assert.deepEqual(afterClose.map((r) => r.slug), ['the-studio']);
+
+  // Nobody home: an empty list, and never a refusal.
+  const nobody = value<Person>(d.person$('ghost@example.com'));
+  assert.deepEqual(await d.switcherRows(nobody.id, (): SwitcherAsk => ({ level: 'owner', name: 'x' })), []);
   sql.close();
 });
 

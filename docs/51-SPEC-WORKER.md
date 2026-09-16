@@ -396,6 +396,14 @@ same file, over the Directory's RPC `Directory.usage(person, range)`. It reads t
 and answers what the records that person owns used. With no cookie, or without `SESSION_SECRET`, it is 401
 `UNAUTHORIZED`.
 
+**`/account/records`, September 16th 2026.** The record switcher's rows: `GET /account/records` is the same
+`serveAccount`, over `Directory$.recordsFor(person)`. It asks `Directory.recordsOf(person)` which OPEN records this
+person can reach, then asks each one's own `Record$.switcherRow(person)`, through `idFromName(rec_id)` and never the
+slug, for the level they actually hold there and the name the record calls itself. A record that answers with no
+level is left out: the Directory can still list somebody a record has since removed, because `join`/`leave` and
+`invite`/`removeMember` write two tables nothing writes in one transaction, and the honest row in that gap is no
+row at all.
+
 ### 5.9 · The DO `Sql` adapter (`sql-do.ts`)
 
 ```ts

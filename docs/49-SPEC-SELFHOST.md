@@ -234,6 +234,7 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | the sign-in routes of 33 §4 (`AUTH_ROUTES`), the operator's two excepted: `/auth/methods` · `/auth/session` · `/auth/token` · `/auth/magic/start` · `/auth/magic/redeem` · `/auth/passkeys` · `/auth/passkey/remove` · `/auth/logout` | GET · POST | none, or the session cookie | AUTH | 2 |
 | `/auth/invite` | GET | none | AUTH | 2 |
 | `/account/usage?from&to` (`ACCOUNT_ROUTES`): what the records the signed-in person owns used, from the Directory's ledger | GET | the session cookie | AUTH | 2 |
+| `/account/records` (`ACCOUNT_ROUTES`): every open record the signed-in person can reach, each named and levelled by that record's own answer: the record switcher's rows | GET | the session cookie | AUTH | 2 |
 | `/auth/device` · `/auth/device/token` · `/auth/device/approve` | POST | none · none · cookie | AUTH | 2 |
 | `/auth/passkey/register/options` · `/auth/passkey/register` · `/auth/passkey/assert/options` · `/auth/passkey/assert` | POST | cookie · cookie · none · none | AUTH | 3 |
 | `/ws` | GET | — | PUBLIC | 404 in phase 2 (§13 #4) |

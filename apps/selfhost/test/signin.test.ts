@@ -342,3 +342,30 @@ test('GET /account/usage IS THE SIGNED-IN PERSON’S LEDGER: a cookie and nothin
     await s.close();
   }
 });
+
+test('GET /account/records IS THE SWITCHER\'S ROW: the one record this process holds, named by itself, at the level the caller actually holds there', async () => {
+  const s = await stack();
+  try {
+    const nobody = await s.call('/account/records');
+    assert.equal(nobody.status, 401);
+    assert.equal(nobody.body?.refusal?.code, 'UNAUTHORIZED');
+
+    /* THE SERVER KEY AS A BEARER IS NOT A PERSON EITHER, the same as `/account/usage` above. */
+    const bearer = await s.call('/account/records', { bearer: s.serverKey ?? '' });
+    assert.equal(bearer.status, 401);
+
+    const sid = await s.keyIn();
+    const mine = await s.call('/account/records', { sid });
+    assert.equal(mine.status, 200, mine.raw);
+    /* THE NAME AND THE LEVEL ARE THE RECORD'S OWN ANSWER, not a second copy of either: `The Studio`
+       is `createRecord`'s own `name`, and `owner` is what `access(person)` reads off the `member`
+       table `createRecord` wrote, never a constant this test asserts because the Directory said so. */
+    assert.deepEqual(mine.body?.value as unknown as { slug: string; name: string; level: string }[], [{ slug: 'the-studio', name: 'The Studio', level: 'owner' }]);
+
+    const posted = await s.call('/account/records', { body: {}, sid });
+    assert.equal(posted.status, 405);
+    s.clean();
+  } finally {
+    await s.close();
+  }
+});

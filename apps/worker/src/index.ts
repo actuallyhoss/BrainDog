@@ -294,6 +294,19 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
+   * The switcher's `ask`: what this person may do here, and what this record calls itself.
+   *
+   * BOTH FROM THIS RECORD'S OWN TABLES, and neither is a second copy of a fact held elsewhere:
+   * `access` above is the same `member` table read the same way, and `kernel.identity()` is what
+   * `boot` names the record by. The Directory cannot answer either question about a record that is
+   * not itself.
+   */
+  async switcherRow(person: string): Promise<{ level: string | null; name: string | null }> {
+    const api = await this.#record();
+    return { level: api.kernel.access(person)?.level ?? null, name: api.kernel.identity()?.name ?? null };
+  }
+
+  /**
    * Make this record: its identity, its owner and the owner's membership. The operator's provisioning only.
    *
    * AN RPC AND NEVER A ROUTE. `createRecord` is INTERNAL, because whoever calls it becomes the owner, and the
@@ -568,6 +581,19 @@ export class Directory$ extends DurableObject<Env> {
       .recordsOf(person)
       .filter((m) => !m.closed)
       .map((m) => ({ record: m.record, slug: m.slug }));
+  }
+
+  /**
+   * The switcher's rows, finished: every open record this person can reach, each with its name and
+   * the level they actually hold there. `GET /account/records`.
+   *
+   * `reaches` ABOVE STOPS AT WHICH; this asks each one what, over RPC to that record's own object,
+   * through `idFromName(rec_id)` and never the slug, so a rename never changes which object answers
+   * (ADR-061). `switcherRows` is `@braindog/record/directory`'s: it drops a record that answers with
+   * no level, which is a person the Directory still lists and the record has since removed.
+   */
+  async recordsFor(person: string): Promise<{ slug: string; name: string; level: string }[]> {
+    return this.#directory().switcherRows(person, (record) => this.env.RECORD.get(this.env.RECORD.idFromName(record)).switcherRow(person));
   }
 }
 
@@ -872,6 +898,7 @@ async function account(request: Request, env: Env): Promise<Response> {
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
     auth: (env.SESSION_SECRET ?? '').length >= 32 ? (((call: AuthCall) => directory.auth(call)) as unknown as Auth) : null,
     usage: (person, range) => directory.usage(person, range) as unknown as Promise<Result<AccountUsage>>,
+    records: async (person) => ({ ok: true as const, value: await directory.recordsFor(person) }),
   });
 }
 

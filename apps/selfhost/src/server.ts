@@ -165,9 +165,10 @@ type Site = {
   vault: VaultDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
-  /** `/account/*`: the Directory's usage ledger, for a signed-in person. */
+  /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
   /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
   snapshots: FileSnapshots | undefined;  usage: AccountDoor['usage'];
+  records: AccountDoor['records'];
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -784,6 +785,20 @@ export async function start(options: {
   const origins = new Set([...loopback.map((h) => `http://${h}`), origin]);
   site = {
     usage: directory.usage,
+    /* THE ONE RECORD THIS PROCESS HOLDS, AND ONLY THAT ONE. `switcherRows` asks every record the
+       Directory says this person can reach, and a self-host process can truthfully answer only for
+       the record it has open, which is the same limit `serve()`'s own comment states for every
+       other read: "a self-host serves the one record it has... answering for whichever one
+       happened to sort first would be a person reading somebody else's record." Any other id gets
+       `null`, which `switcherRows` reads as "not on this record" and leaves out, rather than a
+       guess about a file this process never opened. */
+    records: async (person) => {
+      const here = api.kernel.identity()?.id;
+      const rows = await directory.switcherRows(person, (record) =>
+        record === here ? { level: api.kernel.access(person)?.level ?? null, name: api.kernel.identity()?.name ?? null } : { level: null, name: null },
+      );
+      return { ok: true as const, value: rows };
+    },
     api,
     token,
     origin,
@@ -917,7 +932,7 @@ async function answer(
   if (/^\/+auth(?:\/|$)/.test(path))
     return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy), reached: req.headers.host ?? '' }));
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
-  if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage }));
+  if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage, records: site.records }));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 

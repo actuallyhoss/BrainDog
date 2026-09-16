@@ -51,6 +51,10 @@ export type AccountRoute = { path: string; method: 'GET'; on: 'both'; needs: 'se
  */
 export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/usage', method: 'GET', on: 'both', needs: 'session', what: 'What the records you own used between two days, and each month so far against its allowance.' },
+  /* THE SWITCHER'S INDEX, and not an authorisation: every open record this person can REACH, by
+     the level they actually hold there. `usage` above answers for records this person OWNS; this
+     answers for every one they can open at all, which is the wider question the sidebar asks. */
+  { path: '/account/records', method: 'GET', on: 'both', needs: 'session', what: 'Which records you can reach, each with its name and the level you hold there.' },
 ];
 
 /** What a host hands `serveAccount`: its origin, the Directory's sign-in or `null` where nobody signs in, and the ledger. */
@@ -58,6 +62,8 @@ export type AccountDoor = {
   origin: string;
   auth: Auth | null;
   usage: (person: string, range: { from: string; to: string }) => Result<unknown> | Promise<Result<unknown>>;
+  /** `/account/records`: every open record this person can reach, each `{ slug, name, level }`. */
+  records: (person: string) => Result<unknown> | Promise<Result<unknown>>;
 };
 
 /**
@@ -77,13 +83,17 @@ export async function serveAccount(request: Request, door: AccountDoor): Promise
   const mode = cookieMode(door.origin);
   const sid = mode === null ? undefined : readSid(request, mode);
   if (!door.auth || mode === null || sid === undefined)
-    return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to see what your records used.' });
+    return refusal(401, { code: 'UNAUTHORIZED', fix: path === '/account/records' ? 'Sign in to see which records you can reach.' : 'Sign in to see what your records used.' });
   const seen = await door.auth({ flow: 'session', sid });
   if (seen.status !== 200) return answered(seen, mode);
 
-  /* A ROTATION REACHES THE COOKIE whatever the ledger answers. */
+  /* A ROTATION REACHES THE COOKIE whatever the row below answers. */
   const kept: Header[] = seen.session === undefined ? [] : [['set-cookie', seen.session === 'clear' ? clearCookie(mode) : sessionCookie(seen.session.sid, mode)]];
-  const out = await door.usage((seen.body as Who).person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
+  const person = (seen.body as Who).person;
+  const out =
+    path === '/account/records'
+      ? await door.records(person)
+      : await door.usage(person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
   return reply(out.ok ? 200 : httpStatus(out), out, kept);
 }
 

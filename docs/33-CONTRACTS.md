@@ -456,6 +456,7 @@ both hosts, behind the session, and named here.
 | Route | Method | Host | Does |
 |---|---|---|---|
 | `/account/usage` | GET | both | `?from=YYYY-MM-DD&to=YYYY-MM-DD`: `{ from, to, totals, records }`, what the records the signed-in person owns used between the two days, each with its month so far against its plan's allowance. A day in another shape is `VALUE_MALFORMED`; a range that runs backwards or covers more than a year and a day is `OUT_OF_BOUNDS` |
+| `/account/records` | GET | both | `{ slug, name, level }[]`, every open record the signed-in person can reach, each named and levelled by that record's own answer rather than the Directory's: the record switcher's rows. A record the Directory still lists but which answers with no level is left out, never shown with one nobody granted |
 
 `Cache-Control: no-store` on `/api/*` and `/mcp`; no CORS; `run_worker_first: ['/api/*', '/mcp', '/a', '/a/*', '/in/*',
 '/s/*', '/ws', '/ws/*', '/auth/*', '/account/*', '/.well-known/*']`, the list in `apps/worker/wrangler.jsonc`. INTERNAL methods have no route. There is no admin scope: VAULT never
