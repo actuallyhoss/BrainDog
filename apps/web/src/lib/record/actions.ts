@@ -243,7 +243,9 @@ export function stateOf(row: ActionRow, now: number): Said {
   const last = row.last;
   if (row.state === 'paused') {
     const refused = Boolean(last && (last.status === 401 || last.status === 403) && row.key);
-    const missing = !refused && last?.outcome === 'paused' && last.status === null && Boolean(row.key);
+    /* A PAUSE WITH NO RUN BEHIND IT IS A KEY THAT WAS NOT IN THE VAULT WHEN THE ACTION FIRED: the kernel pauses the row
+       there and meters nothing, so `last` is empty or an older run. Nothing else pauses an action without a paused run. */
+    const missing = !refused && Boolean(row.key) && (last?.outcome !== 'paused' || last.status === null);
     const why = refused ? words.refusedKey(host, row.key!) : missing ? words.missingKey(row.key!) : words.paused;
     const reconnect = refused || missing ? { href: reconnectHref(row.key!, row.ingest), label: refused ? words.reconnect : words.addTheKey } : undefined;
     return { line: why, tone: 'warn', resume: true, usage: false, ...(reconnect ? { reconnect } : {}) };

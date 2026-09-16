@@ -98,7 +98,14 @@ test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, a
   assert.match(gone.line, /not in the vault/);
   assert.equal(gone.reconnect?.label, 'Add the key');
 
-  const plain = stateOf(row({ state: 'paused', last: null }), NOW_MS);
+  /* THE KERNEL PAUSES A ROW WHOSE KEY IS NOT IN THE VAULT AT FIRE TIME, before any run, so there is no paused run to read. */
+  for (const last of [null, { at: '2026-09-14T06:11:00.000Z', outcome: 'ok' as const, status: 200, note: '' }]) {
+    const fired = stateOf(row({ state: 'paused', last }), NOW_MS);
+    assert.match(fired.line, /not in the vault/);
+    assert.equal(fired.reconnect?.label, 'Add the key', 'a key missing when the action fired offered no way to add it');
+  }
+
+  const plain = stateOf(row({ state: 'paused', last: null, key: null }), NOW_MS);
   assert.equal(plain.reconnect, undefined, 'a pause with no key to blame offered to reconnect one');
 
   const live = stateOf(row({}), NOW_MS);
