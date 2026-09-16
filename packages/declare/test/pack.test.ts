@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { install, normalise, plan, satisfies, uninstall, type Diff, type Host, type Installed, type Pack } from '../src/index.ts';
+import { SEEDS_PER_REGISTER, install, normalise, plan, satisfies, uninstall, type Diff, type Host, type Installed, type Pack } from '../src/index.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
@@ -152,10 +152,15 @@ test('AND A CREDENTIAL IS NEVER IN ONE, because a pack is a file people email ea
   assert.ok((await normalise(DOC({ declarations: [{ ingest: 'hsbc', channel: 'pull', token: '' }], seeds: [] }))).ok);
 });
 
-test('and a seed is one example row in the pack’s own register', async () => {
+test('and a seed is an example row in the pack’s own register, a few per list at most', async () => {
   assert.equal(refusal(await normalise(DOC({ seeds: [{ register: 'ghosts', fields: {} }] }))).at, 'seeds');
-  const twice = DOC({ seeds: [{ register: 'obligations', fields: {} }, { register: 'obligations', fields: {} }] });
-  assert.match(refusal(await normalise(twice)).fix, /seeds obligations twice/);
+  const row = { register: 'obligations', fields: {} };
+  const twice = value<Pack>(await normalise(DOC({ seeds: [row, row] })));
+  assert.equal(twice.seeds.length, 2, 'two examples in one list are two rows');
+  const many = DOC({ seeds: Array.from({ length: SEEDS_PER_REGISTER + 1 }, () => row) });
+  const said = refusal(await normalise(many));
+  assert.equal(said.code, 'PACK_MALFORMED');
+  assert.match(said.fix, new RegExp(`at most ${SEEDS_PER_REGISTER} example rows`));
 });
 
 test('and one document written two ways is one checksum', async () => {

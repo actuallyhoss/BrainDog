@@ -40,6 +40,15 @@ export { AUDIENCES, LABEL_KEY, MODULES, VOICE_KEYS, labelSetting, labelsOf, norm
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
 const PACK_ID = /^[a-z][a-z0-9-]{1,63}$/;
+/** The most example rows a pack gives one list (`42 §5.2` step 5). */
+export const SEEDS_PER_REGISTER = 8;
+
+/** A pack's example rows counted per list, in the order the lists are first seeded. */
+const seedRows = (seeds: readonly { register: string }[]): { register: string; rows: number }[] => {
+  const rows = new Map<string, number>();
+  for (const s of seeds) rows.set(s.register, (rows.get(s.register) ?? 0) + 1);
+  return [...rows].map(([register, n]) => ({ register, rows: n }));
+};
 /**
  * A REGISTER'S NAME BECOMES SQL AND EVERY OTHER NAME BECOMES AN ADDRESS, and that is the whole of
  * why there are two grammars here rather than one.
@@ -458,11 +467,13 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
 
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
   const seeds: Seed[] = [];
-  const seeded = new Set<string>();
+  /* A FEW EXAMPLES PER LIST, NOT ONE. A guide opens on the six stages a project passes and a board on more than one
+     ticket, so one row per list made a use case open half told. The ceiling keeps an example set an example. */
+  const seeded = new Map<string, number>();
   /* A MAPPING IS THE NATURAL YAML MISTAKE, and treating it as no seeds at all meant an install that
      quietly planted nothing while the plan reported `seeds: 0` and looked correct. */
   if (doc.seeds !== undefined && !Array.isArray(doc.seeds))
-    return malformed('Seeds are a list of examples, one per register.', 'seeds');
+    return malformed(`Seeds are a list of examples, at most ${SEEDS_PER_REGISTER} per register.`, 'seeds');
   for (const seed of Array.isArray(doc.seeds) ? doc.seeds : []) {
     if (!isObject(seed) || typeof seed.register !== 'string' || !isObject(seed.fields))
       return malformed('A seed is a register and the fields of one example row.', 'seeds');
@@ -470,8 +481,10 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
        the middle of a business it does not describe. */
     if (!registers.has(seed.register))
       return malformed(`${id} seeds ${seed.register}, which it does not declare.`, 'seeds');
-    if (seeded.has(seed.register)) return malformed(`${id} seeds ${seed.register} twice.`, 'seeds');
-    seeded.add(seed.register);
+    const count = (seeded.get(seed.register) ?? 0) + 1;
+    if (count > SEEDS_PER_REGISTER)
+      return malformed(`${id} seeds ${seed.register} ${count} times, and a list takes at most ${SEEDS_PER_REGISTER} example rows.`, 'seeds');
+    seeded.set(seed.register, count);
 
     /* A SEEDED REGISTER DECLARES `tags`, or its examples cannot be told from its real rows — and
        nobody deletes what they cannot identify. The `example` marker is a value in that field
@@ -865,7 +878,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     changes,
     retires,
     conflicts,
-    seeds: { count: pack.seeds.length, registers: pack.seeds.map((s) => ({ register: s.register, rows: 1 })) },
+    seeds: { count: pack.seeds.length, registers: seedRows(pack.seeds) },
     spawns: spawnsOf(pack),
     calls_out: calls,
     approve: calls.flatMap((c) => (c.change === 'same' ? [] : c.key_line === null ? [c.line] : [c.line, c.key_line])),

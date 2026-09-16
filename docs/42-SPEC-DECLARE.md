@@ -200,7 +200,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `license` | `^[A-Za-z0-9.+-]{1,64}$` — SPDX syntax, not the list | yes | — | — |
 | `declarations` | 1–256 objects, each with exactly one kind key | yes | — | the eight kinds |
 | `requires` | `{ format?: int ≥ 1, primitives?: int ≥ 1, packs?: { PackId: Range } }` | no | `{ format: 1, primitives: 1, packs: {} }` | — |
-| `seeds` | `[{ register: Id, fields: object, note? }]`, at most one per register | no | `[]` | — |
+| `seeds` | `[{ register: Id, fields: object, note? }]`, at most eight per register | no | `[]` | — |
 | `provides` | `[DeclId]` — **derived**; written out, it must equal the derived set (`PROVIDES_MISMATCH`) | no | derived | — |
 | `note` | text ≤ 280 — 21 §11: a note is data, not a YAML comment. Legal on every declaration, field, block, section and action below | no | — | — |
 | `config` | up to 32 settings, `{ <key>: { type, values?, default?, label?, note? } }`, checked by the kernel's `readConfig`; on the manifest only when it holds a setting, so a pack without one keeps its checksum. A body reads one as `{{config:<key>}}`, filled by `plan` and `install` from the chosen value, else the default; every placeholder names a declared setting with a default | no | none | text, enum, bool, money, day, duration |
@@ -550,7 +550,7 @@ Invariants: `adds ∩ changes ∩ retires ∩ conflicts = ∅` by id · `conflic
 4. `provides`: derive the id list. If the manifest wrote one, compare as sets: each entry not derived → `PROVIDES_MISMATCH`
    (04 §5's copy), each derived id not listed → `PROVIDES_MISMATCH` with `found` absent.
 5. `seeds[j]`: `register` must be one of this pack's registers, else `CREATE_FOREIGN_REGISTER` at `seeds[j].register`;
-   a second seed for one register → `PACK_MALFORMED`, fix `one example row per register`; the register must declare a `tags`
+   a ninth seed for one register → `PACK_MALFORMED`, fix `at most 8 example rows`; the register must declare a `tags`
    field of `list<text>` to carry the `example` marker (§13 D9), else `FIELD_UNKNOWN` at `seeds[j].fields.tags`.
 6. Refusals are collected, not short-circuited, capped at 50 (`ponytail:` a cap, not a stream). Any → return them.
 7. Build `Pack`: every predicate site of §5.3 becomes `where.flatten(where.parse(json))` — same-quantifier nesting flattens on
@@ -946,7 +946,7 @@ forms from `schemas`). BUILD.md places it in phase 1 beside the kernel.
 | D6 | The `Range` grammar of §4.2; prerelease per SemVer 2.0 §11 | 04 §5 Versioning |
 | D7 | `INDEXES_OVER_CAP` counts fields with `index` or `unique`; `key:` is one index and is not counted | 02 §5 caps |
 | D8 | Money and quantity index names take a third segment: `entry_i_<reg>__<f>__amount` / `__currency`, `__value` / `__unit` | 34 §4 · 30 §1 |
-| D9 | **Seeds:** `seeds: [{ register, fields, note? }]`, at most one per register, own registers only, no `ref`/`secret`/`file` values; applied after every declaration row, in manifest order, through the write path with `cascade = false`, actor the installer; a refusal rolls the install back. **The `example` marker is the value `example` in the register's `tags` field** — a `list<text>` field named `tags` that a register with seeds, or with a `tag`/`untag` rule action, must declare (`FIELD_UNKNOWN` otherwise): 02 §1 puts the marker in a `list<text>` inside `fields`, 41 K6 admits only declared fields, and the `tag` action names no field, so one conventional field is the only reading that satisfies all three | 04 §2 · 19 §6 · 02 §1 · 07 §6 |
+| D9 | **Seeds:** `seeds: [{ register, fields, note? }]`, at most eight per register, own registers only, no `ref`/`secret`/`file` values; applied after every declaration row, in manifest order, through the write path with `cascade = false`, actor the installer; a refusal rolls the install back. **The `example` marker is the value `example` in the register's `tags` field** — a `list<text>` field named `tags` that a register with seeds, or with a `tag`/`untag` rule action, must declare (`FIELD_UNKNOWN` otherwise): 02 §1 puts the marker in a `list<text>` inside `fields`, 41 K6 admits only declared fields, and the `tag` action names no field, so one conventional field is the only reading that satisfies all three | 04 §2 · 19 §6 · 02 §1 · 07 §6 |
 | D10 | Block ids follow `Id`; 22 §3's `burnRate` reads `burn_rate`. For 36: the fence regex `^[a-z]+` admits no pack kind with a digit or `_` — widen it or keep pack kinds page-only | 22 §3 · 34 §2.1 |
 | D11 | A pack kind's `accepts` names are legal keys on a page block of that kind, typed as §4.6 (`register metric number text`) | 06 §1.1 · 22 §3 |
 | D12 | `install(diff, host, approved)` builds the kernel's `InstallBatch` and calls `installDeclarations`; `uninstall` calls `retireDeclarations`; `Host` is the structural slice of `Kernel` (41 §2) with the `CallContext` bound by the record's `installPack(pack, planHash)`, which re-plans first. No SQL lives in this package | 45 (record) · 41 (`InstallBatch` gains `retire` and `seeds`) |
