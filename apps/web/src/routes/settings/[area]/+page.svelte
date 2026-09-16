@@ -429,6 +429,9 @@
   /* ON UNLESS SOMEBODY SAID OTHERWISE. No document states the default; `29 §3`'s triggers are
      described as firing, so on is the only reading consistent with the section. */
   let suggestPages = $state(held.suggestPages ?? true);
+  /* THE RAIL UNLESS SOMEBODY SAID OTHERWISE. `19 §3` keeps the sidebar as the default in bold, and
+     the other two shapes are offered rather than defaulted. */
+  let navShape = $state<'rail' | 'bar' | 'menu'>(held.navShape ?? 'rail');
 
   let accent = $state<string | null>(held.theme ?? null);
   let accentWrong = $state<string | null>(null);
@@ -487,8 +490,11 @@
      forgetting it is the one somebody notices within a minute. And *Suggest new pages*, which is the
      other switch on this surface and would otherwise be the third control in this product to move a
      tick, write nothing, and come back on. */
+  /* AND THE SHAPE OF THE NAVIGATION, which the shell picks up from the write itself rather than on
+     the next reload: it is the one preference on this screen that changes the thing this screen is
+     drawn inside. */
   $effect(() => {
-    pref.write({ chars, suggestPages });
+    pref.write({ chars, suggestPages, navShape });
   });
 
   /**
@@ -1217,6 +1223,32 @@
         Saying that is the whole difference between a switch somebody turns off once and a switch
         somebody is afraid of.
       -->
+      <!--
+        WHERE THE NAVIGATION LIVES, which is this area's own subject and was not on it.
+
+        `19 §3` carries five shapes and three conditions. Two of the five are not choices: the tab
+        bar is what a narrow screen gets whatever is picked here, and the collapsed rail is a width
+        rather than a shape, set by `⌘\` and by the control at the head of the rail because a wide
+        monitor and a laptop honestly want different answers. The three that are choices are here.
+
+        AND THE PHONE SENTENCE IS NOT A DISCLAIMER. A reader who picks a top bar and then opens the
+        same record on a phone should have been told what they will find, rather than discovering
+        that the setting they chose is one this product quietly overrules.
+      -->
+      <Section title={copy.navShape}>
+        <p class="hint">{copy.navShapeHint}</p>
+        <div class="segmented" role="group" aria-label={copy.navShape}>
+          {#each [['rail', copy.navShapeRail, 'rows'], ['bar', copy.navShapeBar, 'grid'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon]}
+            <button type="button" class="segment" aria-pressed={navShape === v} data-on={navShape === v ? '' : undefined} onclick={() => (navShape = v)}>
+              <Icon name={icon} size="s" />
+              {label}
+            </button>
+          {/each}
+        </div>
+        <p class="hint">{copy.navShapeOnPhone}</p>
+        <p class="hint">{copy.perDevice}</p>
+      </Section>
+
       <Section title={copy.suggestPages}>
         <p class="hint">{copy.suggestPagesHint}</p>
         <div class="segmented" role="group" aria-label={copy.suggestPages}>

@@ -150,6 +150,7 @@ test('a flag name is never also a preference', () => {
     theme: true,
     contrast: true,
     sidebar: true,
+    navShape: true,
     chars: true,
     suggestPages: true,
     seen: true,

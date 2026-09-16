@@ -42,6 +42,7 @@
 
   import { named } from '$lib/env.ts';
   import TabBar from '$lib/ui/TabBar.svelte';
+  import TopBar from '$lib/ui/TopBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
@@ -131,6 +132,36 @@
   let railIcons = $state(pref.read().sidebar === false);
 
   /**
+   * WHICH SHAPE OF NAVIGATION THIS PERSON CHOSE, from `19 §3`'s three.
+   *
+   * The rail is the default and stays the default. A top bar is one strip that says how many pages
+   * it has put behind More; the menu keeps nothing on screen and opens the whole sectioned list as
+   * the sheet below. Both lean on that sheet rather than on a second nav of their own, because the
+   * sheet is already every section, every list and the four utilities, in the reader's own order.
+   *
+   * BELOW 900px NONE OF THIS APPLIES AND THE TAB BAR STAYS, which is §3's second condition and is
+   * enforced in CSS a few rules down rather than here: a shape that let somebody put an
+   * eighteen-entry strip across a phone would be a shape that breaks their phone.
+   */
+  let shape = $state<'rail' | 'bar' | 'menu'>(pref.read().navShape ?? 'rail');
+
+  /**
+   * AND IT IS RE-READ WHEN IT IS WRITTEN, because the control that sets it is INSIDE the thing it
+   * changes.
+   *
+   * `/settings/navigation` is a screen in this shell, and this shell mounts once for the life of the
+   * tab. So choosing Top bar wrote the cookie, left the rail exactly where it was, and came back
+   * correct on the next reload: a control that works and looks broken. `pref.write` announces every
+   * write for exactly this, and the listener re-reads rather than being told, so nothing here has to
+   * know which key moved.
+   */
+  $effect(() => {
+    const reread = () => (shape = pref.read().navShape ?? 'rail');
+    window.addEventListener('bdpref', reread);
+    return () => window.removeEventListener('bdpref', reread);
+  });
+
+  /**
    * The bar saying this is a sample record, and the way out of it.
    *
    * A STRANGER LANDED ON SOMEBODY ELSE'S COMPANY WITH NO EXPLANATION. Booting into a complete
@@ -158,6 +189,10 @@
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
   function toggleRail() {
+    /* A WIDTH IS NOT A THING A TOP BAR HAS. `⌘\` is the rail's own chord, and on the other two
+       shapes it wrote a preference that nothing on screen could show, so the one feedback the chord
+       gives was that nothing happened. It does nothing where there is no rail to narrow. */
+    if (shape !== 'rail') return;
     railIcons = !railIcons;
     pref.write({ sidebar: !railIcons });
   }
@@ -278,21 +313,41 @@
        first third. That is the artefact somebody hands an accountant. -->
   <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
-  <div class="shell" data-rail={railIcons ? 'icons' : undefined}>
-    <div class="rail-slot">
-      <Sidebar
-        icons={railIcons}
-        ontoggle={toggleRail}
-        nav={data.nav}
-        pen={data.pen}
-        record={data.index.name}
-        records={data.me.records}
-        live={data.live}
-        registers={data.index.registers}
-        open={data.open}
-        inbox={data.inbox}
-      />
-    </div>
+  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
+    {#if shape === 'rail'}
+      <div class="rail-slot">
+        <Sidebar
+          icons={railIcons}
+          ontoggle={toggleRail}
+          nav={data.nav}
+          pen={data.pen}
+          record={data.index.name}
+          records={data.me.records}
+          live={data.live}
+          registers={data.index.registers}
+          open={data.open}
+          inbox={data.inbox}
+        />
+      </div>
+    {:else}
+      <div class="bar-slot">
+        {#if shape === 'bar'}
+          <TopBar entries={numbered} open={data.open} inbox={data.inbox} onmore={() => (moreOpen = true)} />
+        {:else}
+          <!--
+            THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
+            the smallest chrome there is, for somebody who lives in the palette.
+
+            IT IS NAMED FOR THE SHEET IT OPENS. The control said "Menu" and opened a sheet titled
+            "More" in an early draft, which is two words for one place. `19 §9`'s rule is that the
+            interface says the word a person would say, and there is only one word here to say.
+          -->
+          <button type="button" class="menu-open tap" onclick={() => (moreOpen = true)}>
+            <Icon name="more" size="m" /><span>{copy.more}</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
 
     <!--
       `{#key}`, SO ARRIVING SOMEWHERE IS AN EVENT AND NOT A REPAINT.
@@ -352,7 +407,11 @@
     a different product, and a second overlay that does most of what the palette does is a second
     place to look for one thing. The button opens the palette that already exists.
   -->
-  <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
+  <!-- `data-shape`, BECAUSE THE RAIL IS WHAT REPLACED THIS BUTTON ABOVE 900px AND THE OTHER TWO
+       SHAPES HAVE NO RAIL. The rule below hides it only where a rail is carrying the same control at
+       its foot; on a top bar or a menu the search this product makes the primary way to reach a row
+       would otherwise have no visible control at all on a desktop. -->
+  <button type="button" class="launcher tap" data-shape={shape} onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
     <Icon name="search" size="l" />
   </button>
 
@@ -516,6 +575,47 @@
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
+  }
+
+  /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
+     reason the rail's column is: its height is its own declaration, and this grid never has to know
+     which of the two is in it. */
+  .shell[data-shape='bar'],
+  .shell[data-shape='menu'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .bar-slot {
+    min-inline-size: 0;
+  }
+
+  /* The hairline belongs to the boundary between the nav and the work, and with the nav above the
+     work that boundary is the strip's own bottom edge rather than a line down the left of the page. */
+  .shell[data-shape='bar'] .body,
+  .shell[data-shape='menu'] .body {
+    border-inline-start: 0;
+  }
+
+  /* One button, at the start of the strip, at the size every other target in the shell is. */
+  .menu-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
+    margin: var(--sp-2) var(--sp-3);
+    padding-inline: var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    cursor: pointer;
+  }
+
+  .menu-open:hover {
+    background: var(--s2);
   }
 
   /* THE SAMPLE BAR. A note, not an alarm: nothing is wrong and nothing is urgent, and the day it
@@ -718,7 +818,7 @@
      disc fixed to this corner sat on top of whatever row was beneath it: four controls on
      `/r/obligations` at 1440 by 900. Below 900 there is no rail and the button stays, in the header. */
   @media (width >= 900px) {
-    .launcher {
+    .launcher[data-shape='rail'] {
       display: none;
     }
   }
@@ -729,8 +829,21 @@
       display: none;
     }
 
+    /* `19 §3`'S SECOND CONDITION, AND IT IS ONE RULE. Below 900px the tab bar is the navigation
+       whatever the shape says, so the strip goes and the grid is one column with one row again —
+       without the second half of that, `main` would sit in an `auto` row inside a `100dvh` box with
+       `overflow: hidden` and every screen would end where the window does. */
+    .bar-slot {
+      display: none;
+    }
+
     .shell {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .shell[data-shape='bar'],
+    .shell[data-shape='menu'] {
+      grid-template-rows: minmax(0, 1fr);
     }
 
     .body {

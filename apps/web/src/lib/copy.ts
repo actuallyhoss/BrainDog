@@ -1260,6 +1260,23 @@ export const copy = {
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
   perDevice: 'This setting is remembered on this device.',
 
+  /* The shape of the navigation — `19 §3`'s table, in the words a reader would use for each one.
+     The labels name the THING and not the setting: somebody choosing between these is picking
+     where their navigation lives, so "Sidebar" and "Top bar" are the answer and "Rail" is ours. */
+  navShape: 'Where your navigation lives',
+  navShapeHint: 'The sidebar holds a list of any length, in sections you arrange. A top bar holds a few entries in one strip and puts the rest behind More. The menu keeps nothing on screen and opens the whole list when you ask for it.',
+  navShapeRail: 'Sidebar',
+  navShapeBar: 'Top bar',
+  navShapeMenu: 'Menu',
+  /* AND THE ONE CONDITION THAT IS NOT A TASTE. A narrow screen keeps the tab bar whatever this
+     says, and a reader who picks a top bar and then opens their phone deserves to have been told
+     rather than to find out. */
+  navShapeOnPhone: 'On a narrow screen the bottom tab bar is used whatever you pick here. A strip of eighteen entries across a phone is not a navigation.',
+  /* WHAT THE TOP BAR IS HIDING, SAID AS A NUMBER. `19 §3` makes this the condition that stops a
+     chosen top bar becoming the rejected default: it "states how many entries sit behind More
+     rather than quietly swallowing them". */
+  navBehindMore: (n: number) => `More, and ${n.toLocaleString('en')} ${n === 1 ? 'page' : 'pages'} behind it`,
+
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
   /* IT SAID ANYBODY COULD FETCH IT AT `/.well-known/braindog-key`, and there is no such route in

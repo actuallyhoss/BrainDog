@@ -40,10 +40,10 @@
  * second; one check catches both, and what follows is a description of its answer rather than the
  * record it is kept in.
  *
- * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `chars`,
- * `suggestPages`, `seen`, `columns`, `nav`, `defined`, `sampleSaid`, `railShut`. Nine are covered
- * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `suggestPages`, `nav`, `sampleSaid` and
- * `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
+ * `Pref` holds fifteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `navShape`,
+ * `chars`, `suggestPages`, `seen`, `columns`, `nav`, `defined`, `sampleSaid`, `railShut`. Ten are
+ * covered here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `navShape`, `suggestPages`,
+ * `nav`, `sampleSaid` and `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
  * file had spent a paragraph excusing itself from covering a field the type did not have; it is
  * covered now, on the load, because turning it off empties a list. `sampleSaid` and `railShut`
  * arrived later still and were measured by nothing and excused by nothing, which is the hole the
@@ -166,6 +166,37 @@ const CASES = [
        still in the DOM and still queryable — a probe that counts them reports "no change" about a
        control that works, which is the same lie in the other direction. */
     probe: () => String(Math.round(document.querySelector('.rail-slot, nav.rail')?.getBoundingClientRect().width ?? -1)),
+  },
+  {
+    /**
+     * `navShape` — which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
+     *
+     * THE ONE PREFERENCE WHERE A LAZY PROBE WOULD GO GREEN ON A BROKEN BUILD, and it would do it
+     * the opposite way round from `sidebar` two cases up. `sidebar` leaves its anchors in the DOM,
+     * so counting them lies about a control that works; this one REPLACES one nav with another, so
+     * a probe that counted nav links would report a difference between a top bar and a menu no
+     * matter which of the two was drawn, and would keep reporting it if the shell drew the rail
+     * every time and the strip on top of it.
+     *
+     * SO IT IS WHICH OF THE THREE IS PRESENT, all three counted on every load. `1 0 0` is the rail,
+     * `0 1 0` the top bar, `0 0 1` the menu button, and a build that ignored the preference comes
+     * back `1 0 0` three times, which is exactly what this gate is for.
+     */
+    name: 'navShape',
+    what: 'which navigation the shell draws (19 §3)',
+    route: '/',
+    /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
+       tab bar stays below 900px whatever the shape says, so the same three values there are one
+       answer three times, correctly. */
+    /* `undefined` IS THE RAIL, which `19 §3` keeps as the default in bold, so the first value is
+       "unset" rather than `'rail'`. */
+    values: [{}, { navShape: 'bar' }, { navShape: 'menu' }],
+    probe: () =>
+      [
+        document.querySelectorAll('nav.rail').length,
+        document.querySelectorAll('nav.topbar').length,
+        document.querySelectorAll('button.menu-open').length,
+      ].join(' '),
   },
   {
     /**

@@ -57,6 +57,31 @@ export type Pref = {
    * what makes this a width rather than a disappearance.
    */
   sidebar?: boolean | undefined;
+  /**
+   * WHERE THE NAVIGATION LIVES: the rail, a top bar, or nothing but a button.
+   *
+   * `undefined` IS THE RAIL, which `19 §3` makes the default in bold and keeps there. The three
+   * shapes are that section's own table: the rail, sectioned and arrangeable; a top bar, one
+   * horizontal strip of spine then declared entries, overflowing into More and SAYING HOW MANY it
+   * has put there; and the menu, no persistent nav at all, one button opening the whole sectioned
+   * list as a sheet. Below 900px the tab bar stays whatever this says, because a shape choice that
+   * lets somebody put an eighteen-entry top bar on a phone is a choice to break their phone.
+   *
+   * IT IS NOT `sidebar`, AND THE TWO ARE NOT ONE SETTING. `sidebar` is whether the rail is narrow,
+   * which is a fact about the screen in front of you: a wide monitor and a laptop honestly want
+   * different answers, so it stays per device where it has always been. The shape is a fact about
+   * how somebody reads, and it should follow them.
+   *
+   * PER DEVICE, AND `19 §3` SAYS IT SHOULD NOT BE. *"The shape follows the person, so it is the
+   * record's, not the cookie's."* It is in this file for the same reason `suggestPages` is, said in
+   * that field's own comment eight lines down: there is no table among `30 §1`'s thirty-one that
+   * could hold a preference and no `setPref` in `45 §5`, so the record cannot keep one yet. The
+   * screen says which it is rather than letting somebody assume the durable one.
+   *
+   * `ponytail:` move to a `member('*')` column and a `setPref` method with `suggestPages`, in one
+   * migration, because they are the same deviation and they are on the same screen.
+   */
+  navShape?: 'rail' | 'bar' | 'menu' | undefined;
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
   /**
@@ -183,6 +208,7 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   theme: (v) => typeof v === 'string',
   contrast: (v) => typeof v === 'boolean',
   sidebar: (v) => typeof v === 'boolean',
+  navShape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
   chars: (v) => typeof v === 'boolean',
   suggestPages: (v) => typeof v === 'boolean',
   sampleSaid: (v) => typeof v === 'boolean',
@@ -235,6 +261,22 @@ export function write(change: Pref): Pref {
        sent anywhere that matters, and a `Secure` cookie is silently dropped on `http://localhost`,
        which is where a self-host is first opened. */
     document.cookie = `${NAME}=${encodeURIComponent(JSON.stringify(next))}; path=/; max-age=${YEAR}; samesite=lax`;
+
+  /**
+   * AND THE SHELL IS TOLD, because one preference is set from INSIDE the thing it changes.
+   *
+   * Every other setting here is read once by whoever needs it: `app.html` stamps three onto the
+   * document before first paint, and the rest are read by the screen that draws them. `navShape` is
+   * the first that a screen sets and the SHELL AROUND THAT SCREEN draws, and the shell is mounted
+   * once for the life of the tab. So choosing Top bar on `/settings/navigation` wrote the cookie,
+   * changed nothing anybody could see, and came back on the next reload: a control that works and
+   * looks broken, which is the one state worse than a control that does nothing.
+   *
+   * ONE EVENT FOR EVERY WRITE rather than one for this key, because a second reader of a second
+   * preference would otherwise add a second mechanism. It carries nothing: a listener re-reads, the
+   * way it would have on the reload it is replacing.
+   */
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('bdpref'));
 
   return next;
 }
