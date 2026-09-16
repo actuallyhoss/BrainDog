@@ -90,6 +90,7 @@ export {
   relative,
   since,
   stamp,
+  valueWord,
   yesno,
   type TypedForm,
   leadingCode,

@@ -16,7 +16,7 @@
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING, leadingCode, symbolFigure, symbolText } from './format.ts';
+import { MISSING, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -159,7 +159,7 @@ function grid(b: Block, o: RenderOptions): string {
     const body = columns
       .map(
         (col) =>
-          `<div class="board-col"><h4 class="board-head">${escape(col)}</h4>${b.rows
+          `<div class="board-col"><h4 class="board-head">${escape(valueWord(col, true))}</h4>${b.rows
             .filter((r) => r.cells[0] === col)
             .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${cell('card-detail', r.cells[2], o)}</div>`)
             .join('')}</div>`,
@@ -247,7 +247,7 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
     .filter((r) => (r.cells[1] ?? '') !== '' && (r.cells[2] ?? '') !== '')
     .map(
       (r) =>
-        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true"></span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(r.cells[2] ?? '')}</span>${toneGlyph(r.tone)}</span>`,
+        `<span class="pill"${toneAttrs(r.tone)}><span class="pill-glyph" data-glyph="${escape(r.cells[0] ?? '')}" aria-hidden="true"></span><span class="pill-figure num">${escape(r.cells[1] ?? '')}</span><span class="pill-word">${escape(valueWord(r.cells[2] ?? ''))}</span>${toneGlyph(r.tone)}</span>`,
     )
     .join('');
   return `<div class="inline">${body}</div>`;

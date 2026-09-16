@@ -10,7 +10,7 @@ import { lanes } from './board.ts';
 import { ringDash, ringOf, trendOf } from './cards.ts';
 import { diffPlan, diffRows, lineDiff } from './diff.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
-import { leadingCode, symbolFigure, symbolText, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { leadingCode, symbolFigure, symbolText, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING, valueWord } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -1532,4 +1532,15 @@ test('a sentence has its figures drawn with symbols and keeps its words', () => 
   assert.equal(symbolText('no more than GBP 20,000.00 · not enough history'), 'no more than £20,000.00 · not enough history');
   assert.equal(symbolText('EGP 1,573.00 and GBP −14.00'), 'EGP 1,573.00 and −£14.00');
   assert.equal(symbolText('SG31 is open'), 'SG31 is open');
+});
+
+test('a stored value is drawn as a word: a lane head starts with a capital, a chip keeps its phrase, an initialism is spelled', () => {
+  assert.equal(valueWord('open', true), 'Open');
+  assert.equal(valueWord('in_review', true), 'In review');
+  assert.equal(valueWord('domain'), 'domain');
+  assert.equal(valueWord('saas'), 'SaaS');
+  assert.equal(valueWord('cli', true), 'CLI');
+  const html = toHTML(parse('```chips\nglyph | 6 | saas\n```\n\n```board\nopen | Chase Halden\n```'));
+  assert.match(html, /<span class="pill-word">SaaS<\/span>/);
+  assert.match(html, /<h4 class="board-head">Open<\/h4>/);
 });

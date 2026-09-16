@@ -411,6 +411,29 @@ export function bytes(n: number): string {
 
 export const yesno = (v: boolean): string => (v ? 'yes' : 'no');
 
+/** Stored values that are initialisms, spelled the way a person writes them. */
+const INITIALISMS: Readonly<Record<string, string>> = {
+  saas: 'SaaS', api: 'API', vat: 'VAT', url: 'URL', dns: 'DNS', ssl: 'SSL', tls: 'TLS', seo: 'SEO',
+  ai: 'AI', mcp: 'MCP', cli: 'CLI', paye: 'PAYE', cis: 'CIS',
+};
+
+/**
+ * A STORED VALUE AS A WORD. A board groups on a status and a chips block counts by a kind, and
+ * both drew the value the record keeps: `open 8` over a column, `6 saas` in a row of chips. The
+ * host spells the same values `Open` and `SaaS` a click away, so the renderer does too.
+ *
+ * `lead` is for a word that stands alone, a column's heading, and starts it with a capital. A word
+ * that follows a figure (`6 domain`) reads as part of a phrase and keeps its case, except an
+ * initialism, which is never lower case. Only a whole value is matched: an author's own sentence
+ * is not rewritten.
+ */
+export function valueWord(value: string, lead = false): string {
+  const word = value.replace(/_/g, ' ');
+  const known = INITIALISMS[word.toLowerCase()];
+  if (known) return known;
+  return lead ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+}
+
 /** A ref reads as its spoken id, which is the string a person says out loud. */
 export const ref = (spoken: string): string => {
   const i = spoken.indexOf('#');

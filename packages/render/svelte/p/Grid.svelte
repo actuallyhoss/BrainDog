@@ -14,6 +14,7 @@
   import { tick } from 'svelte';
   import { inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
+  import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
 
@@ -330,7 +331,7 @@
         <!-- The count is the column's whole reason to have a header. A board is read by comparing
              heights, and heights lie the moment one column scrolls and another does not — so the
              number sits beside the name rather than being inferred from the stack. -->
-        <h4 class="board-head" role={live ? 'rowheader' : undefined}>{lane.name}<span class="board-count num">{lane.cards.length}</span></h4>
+        <h4 class="board-head" role={live ? 'rowheader' : undefined}>{valueWord(lane.name, true)}<span class="board-count num">{lane.cards.length}</span></h4>
         {#each lane.cards as card (card.at)}
           <div
             class="card"

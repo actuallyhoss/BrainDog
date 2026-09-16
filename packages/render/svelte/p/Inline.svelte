@@ -9,7 +9,7 @@
   an unknown glyph draws nothing rather than shifting the columns.
 -->
 <script lang="ts">
-  import { TONES, type Block, type RenderOptions } from '../../src/index.ts';
+  import { TONES, valueWord, type Block, type RenderOptions } from '../../src/index.ts';
 
   // `opts` is part of every primitive's signature and is not read here: a chip is a glyph, a figure
   // and a word, and none of the three may contain an inline run.
@@ -23,7 +23,7 @@
     <span class="pill" data-intent={row.tone}>
       <span class="pill-glyph" data-glyph={row.cells[0] ?? ''} aria-hidden="true"></span>
       <span class="pill-figure num">{row.cells[1]}</span>
-      <span class="pill-word">{row.cells[2]}</span>
+      <span class="pill-word">{valueWord(row.cells[2] ?? '')}</span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
       {/if}
