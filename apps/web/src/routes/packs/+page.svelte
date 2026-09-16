@@ -66,7 +66,7 @@
     if (!client || busy !== null) return;
     busy = pack.id;
     try {
-      const doc = await packDocument(pack.id);
+      const doc = await packDocument(pack.id, live ? installed : undefined);
       if (!doc) {
         toasts.push(copy.packNotInstallable(pack.name), { intent: 'warn' });
         return;

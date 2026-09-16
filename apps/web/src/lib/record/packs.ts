@@ -134,10 +134,26 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * The document behind a catalogue entry, or `null` for one nothing ships yet.
  *
  * LOADED WHEN INSTALL IS PRESSED, because the seed is every first-party declaration and most visits never install.
+ *
+ * FOR THE RECORD IT GOES INTO, WHEN THE SCREEN KNOWS WHICH PACKS THAT RECORD HOLDS. People sent whole pointed at
+ * Projects, so installing People alone was refused on a record without them; a link to a list the record will not
+ * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And the examples are the record's
+ * use case's, or none: a module added here never brings the sample studio's rows into somebody's record.
  */
-export async function packDocument(id: string): Promise<Record<string, unknown> | null> {
+export async function packDocument(id: string, installed?: readonly PackState[]): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed');
-  return id === seed.AGENTS_PACK.manifest.id ? seed.agentsPackDocument() : seed.firstPartyDocument(id);
+  if (id === seed.AGENTS_PACK.manifest.id) return seed.agentsPackDocument();
+  if (installed === undefined) return seed.firstPartyDocument(id);
+  const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
+  const { useCase } = await import('@braindog/seed/usecases');
+  const on = installed.filter((p) => p.disabled_at === null);
+  const own = seed.FIRST_PARTY.includes(id as never) ? seed.firstPartyManifest(id as never).provides : [];
+  const holds = [...on.flatMap((p) => p.registers), ...own.flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []))];
+  const speaking = on.find((p) => p.id.startsWith('usecase-'))?.id.slice('usecase-'.length);
+  const u = speaking === undefined ? undefined : useCase(speaking);
+  const doc = u ? moduleDocument(u, id, { today: dayOf(Date.now()), holds }) : seed.firstPartyDocument(id, { holds, seeds: [] });
+  if (doc && Array.isArray(doc.seeds) && doc.seeds.length === 0) delete doc.seeds;
+  return doc;
 }
 
 /**

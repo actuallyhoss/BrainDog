@@ -297,3 +297,16 @@ test('UNINSTALLING ON THE SAMPLE SAYS WHAT WOULD GO AND KEEPS IT; ON A RECORD IT
   assert.deepEqual(sent, [{ id: 'work' }]);
   assert.equal(refused.ok ? '' : refused.refusal.fix, 'Only an owner can take an add-on out.');
 });
+
+test('PEOPLE ALONE, FROM THE ADD-ONS SCREEN: no "Met in" without Projects, and none of the sample studio\'s rows', async () => {
+  const bare = [{ id: 'usecase-student', version: '1.0.0', disabled_at: null, registers: ['courses', 'assignments'] }];
+  type Doc = { declarations: { register?: string; fields?: { id: string; to?: string }[] }[]; seeds?: unknown[] };
+  const alone = (await packDocument('people', bare)) as Doc;
+  const people = alone.declarations.find((d) => d.register === 'people');
+  assert.ok(people, 'the document declares People');
+  assert.ok(!people.fields?.some((f) => f.to === 'things'), 'People points at Projects on a record without them');
+  assert.equal(alone.seeds, undefined, 'a module added here brings no example rows');
+  const withProjects = (await packDocument('people', [{ id: 'portfolio', version: null, disabled_at: null, registers: ['things'] }])) as Doc;
+  assert.ok(withProjects.declarations.find((d) => d.register === 'people')?.fields?.some((f) => f.to === 'things'), 'a record with Projects gets the link');
+  assert.ok((await packDocument('people'))?.seeds, 'with no record to go into, the document is as it always was');
+});
