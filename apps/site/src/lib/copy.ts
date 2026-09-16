@@ -207,7 +207,7 @@ export const site = {
       caption: 'Export is one SQLite file with every row, the fields each register declared, and every event.',
       parts: ['Money', 'Services', 'People', 'Projects', 'History'],
       file: 'The Studio',
-      ext: '.dog',
+      ext: '.brain',
       what: 'One SQLite file',
     },
     /**

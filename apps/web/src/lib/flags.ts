@@ -29,7 +29,7 @@
  *
  *   - A RECORD DECLARATION. This product's thesis is that everything is a declaration in a versioned
  *     record, and a release flag is the one thing that must not be. A record is restored from a
- *     `.dog` file onto a laptop months later (`kernel/src/members.ts`: the mirror "is the one that
+ *     `.brain` file onto a laptop months later (`kernel/src/members.ts`: the mirror "is the one that
  *     travels"), and it would arrive naming branches that no longer exist in any build. The record
  *     outlives the code by design; a flag has to die before the code does. What IS a declaration is a
  *     CAPABILITY - which packs already are - and the difference is lifetime, not shape. See the

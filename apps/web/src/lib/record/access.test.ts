@@ -449,7 +449,7 @@ test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () =
   /**
    * `53 §4`: *"generated on first run; the public half in **Settings → export** and at the well-known
    * URL 03 §4 names"*. `53 §5.4` step 3 has the operator paste it into
-   * `braindog verify latest.dogl --key <…>`, and `48 §5.6` says the answer without it reads
+   * `braindog verify latest.brainl --key <…>`, and `48 §5.6` says the answer without it reads
    * `unpinned` — the file's own key proves integrity, and origin is `--key`'s job. The screen had
    * neither half.
    *
@@ -516,7 +516,12 @@ test('and the *Suggest new pages* switch that `19 §2` says the area exists for'
      afraid of. */
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
   assert.match(src, /suggestPages = \$state\(held\.suggestPages \?\? true\)/u, 'the switch does not read the store, so it comes back on');
-  assert.match(src, /pref\.write\(\{ chars, suggestPages \}\)/u, 'the switch does not write the store');
+  /* THE KEYS IT WRITES, NOT THE EXACT ARGUMENT LIST. This pinned `{ chars, suggestPages }`
+     literally, so the first preference added to that same write broke a test whose own message is
+     about whether the switch writes the store at all — `navShape` did exactly that. What matters
+     is that this call carries `suggestPages`; which other preferences travel beside it is the
+     screen's business and will change again. */
+  assert.match(src, /pref\.write\(\{[^}]*\bsuggestPages\b[^}]*\}\)/u, 'the switch does not write the store');
   assert.match(copy.suggestPagesHint, /Nothing is ever placed for you/iu);
   assert.match(copy.suggestOffWhy, /untouched/iu, 'turning it off does not say that placed pages are safe');
   /* `19 §3` and `29 §4` both say it belongs to the record; `50 §10` owns the deviation. The screen

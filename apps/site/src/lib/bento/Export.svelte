@@ -1,7 +1,9 @@
 <!--
   Export: every register and the whole history, into one file.
 
-  `.dog` is the record's own format, one SQLite database (`docs/03-DOG-FORMAT.md`). The file card
+  `.brain` is the record's own format, one SQLite database (`docs/03-DOG-FORMAT.md`, whose filename
+  keeps the old spelling so fifty documents' `03 §n` citations still resolve). `.dog` is a page's
+  source now, one page to a file, which is what somebody means by the source of a page. The file card
   names no size and no date, because the demo has not been exported and a drawing does not guess.
 -->
 <script lang="ts">

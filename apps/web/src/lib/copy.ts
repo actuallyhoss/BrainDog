@@ -1107,7 +1107,7 @@ export const copy = {
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
   yourData: 'The whole record',
-  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.dog "select …"`
+  /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.brain "select …"`
      works with no SDK and no reader of ours. The screen says it as "any database tool", because the
      format's name means nothing to most of the people reading it. */
   exportWhat: 'One file with everything in it, readable by any database tool.',

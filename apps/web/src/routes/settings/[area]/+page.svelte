@@ -721,7 +721,7 @@
   /* ── export: the record as a file, where there is a record to take it from ── */
   let exporting = $state<ExportKind | null>(null);
 
-  /** The sample keeps the sentence it always said; a record hands the browser a `.dogl` file. */
+  /** The sample keeps the sentence it always said; a record hands the browser a `.brainl` file. */
   async function takeCopy(kind: ExportKind, sampleSaid: string) {
     if (exporting) return;
     exporting = kind;
@@ -2278,22 +2278,27 @@
 
              AND ONE OF THEM DESCRIBED THE WRONG FILE. It read "written to a .dog file, LINE PER
              ROW", which welds together the two containers `03 §2.1` keeps in separate columns: a
-             `.dog` is a SQLite database you open with `sqlite3` and no SDK, and a `.dogl` is the
-             canonical logical dump — one JSON row per line — that the record streams out of a
+             `.brain` is a SQLite database you open with `sqlite3` and no SDK, and a `.brainl` is
+             the canonical logical dump — one JSON row per line — that the record streams out of a
              Durable Object in pages. Both are signed over the same manifest, which is why `verify`
-             and `import` take either; they are not the same artefact and the sentence made `.dog`
-             sound like a text format. -->
+             and `import` take either; they are not the same artefact and the sentence made the
+             database sound like a text format.
+
+             THE EXTENSIONS MOVED, AND THE REASON IS WORTH KEEPING. These two were `.dog` and
+             `.dogl` until the record gave the name up: `.dog` is a PAGE's source now, one page to
+             a file, which is what somebody means when they open the source of a page. The three
+             layers are unchanged — only the name on the container moved. -->
         <p class="hint">{copy.exportWhat}</p>
         <div class="row-actions">
           <Button
             disabled={exporting !== null}
             aria-busy={exporting === 'record'}
-            onclick={() => takeCopy('record', 'The whole record would be written to one .dog file, a SQLite database you can open with sqlite3')}
+            onclick={() => takeCopy('record', 'The whole record would be written to one .brain file, a SQLite database you can open with sqlite3')}
           >{copy.export}</Button>
           <Button
             weight="bare"
             onclick={() =>
-              toasts.push(copy.notWritten('A .dog or .dogl file would be checked against its own manifest and signature'))}
+              toasts.push(copy.notWritten('A .brain or .brainl file would be checked against its own manifest and signature'))}
           >{copy.verifyFile}</Button>
         </div>
       </Section>

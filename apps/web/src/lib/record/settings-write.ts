@@ -137,7 +137,7 @@ export async function withdrawInvite(base: string, id: string, io?: Fetch): Prom
 /* ── export ─────────────────────────────────────────────────────────────── */
 
 /**
- * The three copies the Export area offers, by the sections of a `.dogl` file each one carries.
+ * The three copies the Export area offers, by the sections of a `.brainl` file each one carries.
  *
  * `record` is every section. `pack` is the lists, pages, metrics and rules with no rows. `rows` is the data without
  * where each row came from, which is the clean handover.
@@ -155,7 +155,7 @@ export async function exportFile(base: string, kind: ExportKind, slug: string, i
   const { sections, suffix } = EXPORTS[kind];
   const out = wrote(await clientOf(base, io).export(sections ? { sections: [...sections] } : {}));
   if (!out.ok) return out;
-  return { ok: true, value: { name: `${slug || 'record'}${suffix}.dogl`, text: `${out.value.join('\n')}\n` } };
+  return { ok: true, value: { name: `${slug || 'record'}${suffix}.brainl`, text: `${out.value.join('\n')}\n` } };
 }
 
 /* ── backups, erasure and deletion ──────────────────────────────────────── */

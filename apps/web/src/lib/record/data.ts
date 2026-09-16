@@ -181,7 +181,7 @@ export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
  * made an invented absolute figure read as a derived one.
  *
  * A snapshot is a copy of the record, so its size comes from the record. `bytes` is the one estimate
- * left and it is marked as one: a `.dog` is a SQLite file, so it is rows plus pages plus the schema
+ * left and it is marked as one: a `.brain` is a SQLite file, so it is rows plus pages plus the schema
  * rather than a sum of field lengths, and this seed has no SQLite to ask.
  */
 const snapshotAt = (back: number): Snapshot => {
@@ -1058,7 +1058,7 @@ export const AUTH_METHODS = { passkey: true, magic: true } as const;
  * backup they downloaded a year ago against a key they can independently fetch"*, and what the
  * signature claims — *"this file was produced by that instance, and no row has changed since"*.
  * `53 §5.4` has the operator copy it from this screen into
- * `braindog verify latest.dogl --key <…>`, and `48 §5.6` says that without it the answer reads
+ * `braindog verify latest.brainl --key <…>`, and `48 §5.6` says that without it the answer reads
  * **`unpinned`**: the embedded key proves integrity and origin is `--key`'s job.
  *
  * A PUBLIC KEY IS THE ONE KEY THAT BELONGS ON A SCREEN, and this product's first promise makes that

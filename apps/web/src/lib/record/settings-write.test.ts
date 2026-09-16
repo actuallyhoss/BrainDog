@@ -118,12 +118,12 @@ test("a refusal is the record's sentence, a race says so, and no record is the s
   assert.deepEqual(wrote({ ok: false, conflict: {} }), { ok: false, from: 'refused', code: 'VERSION_STALE', fix: copy.writeRaced, raced: true });
 });
 
-test('an export is the record as a .dogl file, cut to the sections each copy carries', async () => {
+test('an export is the record as a .brainl file, cut to the sections each copy carries', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: ['#dogl 1', '{"t":"header"}'] }));
   const whole = await exportFile(BASE, 'record', 'studio', io);
-  assert.deepEqual(whole, { ok: true, value: { name: 'studio.dogl', text: '#dogl 1\n{"t":"header"}\n' } });
+  assert.deepEqual(whole, { ok: true, value: { name: 'studio.brainl', text: '#dogl 1\n{"t":"header"}\n' } });
   const pack = await exportFile(BASE, 'pack', 'studio', io);
-  assert.equal(pack.ok ? pack.value.name : '', 'studio-pack.dogl');
+  assert.equal(pack.ok ? pack.value.name : '', 'studio-pack.brainl');
   await exportFile(BASE, 'rows', 'studio', io);
   assert.deepEqual(
     sent.map((s) => [s.path, s.method, s.body]),
