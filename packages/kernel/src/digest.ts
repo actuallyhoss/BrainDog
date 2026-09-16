@@ -22,6 +22,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { refused } from '@braindog/ports';
 import type { Predicate, Schema } from '@braindog/where';
 
+import { moneyText } from './ingest.ts';
 import { instant } from './migrate.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { predicateOf } from './metrics.ts';
@@ -378,10 +379,21 @@ export function headline(name: string, sections: DigestPart[]): string {
     s.refusals.length
       ? `${s.heading} —`
       : s.reading
-        ? `${s.heading} ${s.reading.value === null ? '—' : s.reading.value}`
+        ? `${s.heading} ${figure(s.reading)}`
         : `${s.heading} ${s.rows.length}`,
   );
   return `${name}: ${parts.join(' · ')}`.slice(0, 280);
+}
+
+/**
+ * A reading as text. MONEY IN ITS OWN DECIMALS: the value is minor units, and it was printed raw, so
+ * GBP 10,540.00 went out as `1054000 GBP`. A unit that is not a currency code (`kg`, `h`) is a
+ * quantity and stays as it was read.
+ */
+function figure(r: Reading): string {
+  if (r.value === null) return '—';
+  if (r.unit && /^[A-Z]{3}$/u.test(r.unit) && Number.isInteger(r.value)) return moneyText(r.value, r.unit);
+  return r.unit ? `${r.value} ${r.unit}` : String(r.value);
 }
 
 /** The body, as the block dialect — so an email and a page are drawn from the same text. */
@@ -394,7 +406,7 @@ export function render(name: string, sections: DigestPart[]): string {
       continue;
     }
     if (s.reading) {
-      out.push('', '```stat', `${s.heading} | ${s.reading.value === null ? '—' : s.reading.value}${s.reading.unit ? ` ${s.reading.unit}` : ''}`, '```', '');
+      out.push('', '```stat', `${s.heading} | ${figure(s.reading)}`, '```', '');
       continue;
     }
     const columns = s.columns ?? [];
@@ -421,7 +433,7 @@ function cell(row: Entry, field: string): string {
       ? ''
       : typeof raw === 'object'
         ? 'amount' in (raw as Record<string, unknown>)
-          ? `${(raw as { currency: string }).currency} ${(raw as { amount: number }).amount}`
+          ? moneyText((raw as { amount: number }).amount, (raw as { currency: string }).currency)
           : JSON.stringify(raw)
         : String(raw);
   return text.replaceAll('\\', '\\\\').replaceAll('|', '\\|');

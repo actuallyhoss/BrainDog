@@ -883,6 +883,17 @@ export const EXPONENT: Readonly<Record<string, number>> = {
 
 export const exponentOf = (currency: string): number => EXPONENT[currency.toUpperCase()] ?? 2;
 
+/**
+ * An amount in minor units as a person reads it, `GBP 1,299.00`, `JPY 129,900`, `KWD 1.500`: code
+ * first, the currency's own decimals, and the minus `braindog-render`'s `money` draws. For text that
+ * leaves the record without passing through the renderer, a digest's email and its note.
+ */
+export function moneyText(minor: number, currency: string): string {
+  const exp = exponentOf(currency);
+  const body = (Math.abs(minor) / 10 ** exp).toLocaleString('en-u-nu-latn', { minimumFractionDigits: exp, maximumFractionDigits: exp });
+  return `${currency.toUpperCase()} ${minor < 0 ? '−' : ''}${body}`;
+}
+
 function number(text: string, sep?: string, exponent = 2): number | null {
   /* ONE NUMBER, AND A SPACE ONLY WHERE A GROUP OF THREE FOLLOWS IT. A character class that took any
      whitespace read `EGP 250 2 items` as 250,200 — the digits of the next word glued on, and a

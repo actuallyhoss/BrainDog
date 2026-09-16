@@ -518,3 +518,30 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
   );
   sql.close();
 });
+
+test('a digest writes money in its own currency and decimals, in the email and in the note', async () => {
+  const { render, headline } = await import('../src/digest.ts');
+  const reading = (value: number, unit: string | null) => ({ value, unit, rows: 1, delta: null, why: '', met: null, refusals: [] });
+  const row = (amount: number, currency: string) =>
+    ({ id: 'e_1', register: 'bills', seq: 1, fields: { what: 'Fenwick invoice', amount: { amount, currency } } }) as never;
+  const sections = [
+    { heading: 'Overdue to pay', source: 'metric.overdue', as: 'stat', rows: [], reading: reading(1_054_000, 'GBP'), refusals: [] },
+    { heading: 'Yen owed', source: 'metric.yen', as: 'stat', rows: [], reading: reading(129_900, 'JPY'), refusals: [] },
+    { heading: 'Weight', source: 'metric.kg', as: 'stat', rows: [], reading: reading(150, 'kg'), refusals: [] },
+    {
+      heading: 'Open bills',
+      source: 'register.bills',
+      as: 'table',
+      rows: [row(129_900, 'GBP'), row(1_500, 'KWD')],
+      columns: [{ field: 'what' }, { field: 'amount' }],
+      refusals: [],
+    },
+  ];
+  const text = render('Weekly', sections);
+  assert.match(text, /Overdue to pay \| GBP 10,540\.00\n/);
+  assert.match(text, /Yen owed \| JPY 129,900\n/);
+  assert.match(text, /Weight \| 150 kg\n/, 'a quantity is not money');
+  assert.match(text, /Fenwick invoice \| GBP 1,299\.00\n/);
+  assert.match(text, /Fenwick invoice \| KWD 1\.500\n/);
+  assert.equal(headline('Weekly', sections), 'Weekly: Overdue to pay GBP 10,540.00 · Yen owed JPY 129,900 · Weight 150 kg · Open bills 2');
+});
