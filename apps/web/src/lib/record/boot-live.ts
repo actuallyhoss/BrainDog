@@ -14,6 +14,7 @@
  */
 
 import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
+import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, NOW, PACKS, REGISTERS, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
@@ -109,9 +110,10 @@ function packText(e: EventLine): string | null {
   const verb = PACK_VERB[e.kind];
   if (e.target_kind !== 'pack' || !verb || !e.target) return null;
   const id = e.target.replace(/^pack:/u, '');
-  /* A USE CASE'S PACK IS NAMED AS THE USE CASE, never by its id: "Added the usecase-student add-on" reached Home. */
+  /* A USE CASE'S PACK IS NAMED AS THE USE CASE, never by its id: "Added the usecase-student add-on" reached Home, and then
+     "Added the Team use case" for Team board. */
   const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
-  if (usecase) return copy.useCaseEvent(verb, usecase.charAt(0).toUpperCase() + usecase.slice(1).replaceAll('-', ' '));
+  if (usecase) return copy.useCaseEvent(verb, useCaseName(usecase));
   const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
   if (names.length === 0) return `${verb} the ${id} add-on`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;

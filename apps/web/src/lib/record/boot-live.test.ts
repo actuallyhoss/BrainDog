@@ -127,6 +127,8 @@ test('a pack install names the list it brought, not the bare verb', () => {
   assert.equal(at({ kind: 'uninstall', target: 'pack:estate' }), 'Removed the Services list');
   assert.equal(at({ kind: 'install', target: 'pack:nobody-knows' }), 'Added the nobody-knows add-on');
   assert.equal(at({ kind: 'install', target: 'pack:usecase-student' }), 'Added the Student use case');
+  assert.equal(at({ kind: 'install', target: 'pack:usecase-team' }), 'Added the Team board use case');
+  assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-book-club' }), 'Removed the Book club use case');
   assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-new-project' }), 'Removed the New project use case');
 });
 
