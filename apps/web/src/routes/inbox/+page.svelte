@@ -324,7 +324,7 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 980px;
+    max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
   }
 
   /* The row is a `<button>`, at every width: it opens and closes. Only the TRACKS belong to the

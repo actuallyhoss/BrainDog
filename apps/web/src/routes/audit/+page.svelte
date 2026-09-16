@@ -628,7 +628,7 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1100px;
+    max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
   }
 
   /* 20ch FOR THE ACTOR AND ITS FACE, because it is a name and not a spoken id. The ledger's default first column
