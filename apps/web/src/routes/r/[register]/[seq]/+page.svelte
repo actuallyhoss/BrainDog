@@ -415,6 +415,13 @@
   );
   const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id)));
 
+  /* TWO OR MORE EMPTY FIELDS FOLD INTO ONE LINE (DESIGN-SYSTEM APPENDIX C10). A person with four unset
+     fields was a column of four "Not set" rows, each with a rule under it; the line names them, and on
+     a record you can write to each name opens its field. */
+  const unsetValue = (v: unknown) => v === null || v === undefined || v === '';
+  const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
+  const shownFields = $derived(unsetFields.length >= 2 ? listed.filter((f) => !unsetFields.includes(f)) : listed);
+
   const resolved = values();
   /* THE SAMPLE'S VALUES ARE NOT THIS RECORD'S, so on a live row every value is a hole until pages read them. */
   const resolve = (path: string) => (live ? null : (resolved[path] ?? null));
@@ -590,7 +597,7 @@
           </section>
         {/if}
         <dl class="field-list">
-          {#each listed as f}
+          {#each shownFields as f}
             {@const value = row.fields[f.id]}
             <div class="fact">
               <dt class="field-label">{labelOf(f)}</dt>
@@ -674,6 +681,12 @@
             </div>
           {/each}
         </dl>
+        {#if unsetFields.length >= 2}
+          <p class="unset">
+            <span class="unset-lead">{copy.editNotSet}</span>
+            <span class="unset-names">{#each unsetFields as f, i (f.id)}{#if live && editable(f)}<button type="button" class="unset-name tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>{labelOf(f)}</button>{:else}<span class="unset-name">{labelOf(f)}</span>{/if}{#if i < unsetFields.length - 1}<span class="unset-sep" aria-hidden="true">·</span>{/if}{/each}</span>
+          </p>
+        {/if}
 
         <!-- A `document` field is the dialect, drawn by the same interpreter a declared page uses.
              The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
@@ -786,7 +799,7 @@
           <form class="note-form" onsubmit={addNote}>
             <label class="note-label" for="row-note">{copy.noteLabel}</label>
             <div class="note-line">
-              <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" bind:value={noteText} />
+              <input id="row-note" class="note-input" type="text" maxlength="280" autocomplete="off" placeholder={copy.notePlaceholder} bind:value={noteText} />
               {#if noteText.trim()}<Button type="submit">{copy.noteAdd}</Button>{/if}
             </div>
           </form>
@@ -1046,6 +1059,46 @@
   .missing {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* The same two tracks a fact has, so "Not set" sits in the label column. */
+  .unset {
+    display: grid;
+    grid-template-columns: minmax(0, 16ch) minmax(0, 1fr);
+    gap: var(--sp-4);
+    align-items: baseline;
+    margin: 0;
+    padding-block: var(--sp-3);
+    border-block-start: 1px solid var(--line);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .unset-lead {
+    font-weight: 600;
+  }
+
+  .unset-names {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-2);
+  }
+
+  .unset-name {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink2);
+    font: inherit;
+  }
+
+  button.unset-name {
+    cursor: pointer;
+  }
+
+  button.unset-name:hover {
+    color: var(--ink);
+    text-decoration: underline;
   }
 
   .document-slot {

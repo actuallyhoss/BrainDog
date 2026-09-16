@@ -1608,6 +1608,7 @@ export const copy = {
   writeBulk: (landed: number, total: number, state: string) =>
     landed === total ? `${total} ${total === 1 ? 'row' : 'rows'} set to ${state}.` : `${landed} of ${total} rows set to ${state}.`,
   noteLabel: 'Add a note',
+  notePlaceholder: 'Write a note…',
   noteAdd: 'Add note',
   noteWouldBeAdded: "The note would be added to this row's history",
   /* Settings, vault and packs writes (lane C) */
