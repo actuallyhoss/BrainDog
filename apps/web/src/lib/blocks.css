@@ -1183,10 +1183,14 @@
 
   /* ── proportional: bar, gauge ───────────────────────────────────────────── */
 
+  /* THE ROWS HANG THEIR PADDING INTO THE GUTTER, so a bar's label starts where the section title
+     over it starts. The 8px is there for the hole's dashed box and the hover wash, and inside the
+     column it pushed every label in by 8px from every heading on the page. */
   .prop {
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
+    margin-inline: calc(-1 * var(--sp-2));
   }
 
   .prop-row {
@@ -1843,8 +1847,12 @@
      IT REPLACES A BAR. A toned row wore two pixels of `--tone-fill` down its leading edge, which on
      a list with no box round it read as an alert strip and said nothing the glyph did not. The last
      row keeps its hairline too: with no border round the list, it is the line the list ends on. */
+  /* AND THEN THE WORD WENT BACK TO INK. An overdue list is mostly overdue rows, and `Open` in the
+     danger role down the whole column read as an alarm on every line; the dot in the same cell is
+     the colour channel, it carries the tone's name for a screen reader, and one mark per row is
+     calmer than two saying the same thing. */
   .tr[data-intent] .td[data-tone] {
-    color: var(--tone);
+    color: var(--ink2);
   }
 
   .missing {

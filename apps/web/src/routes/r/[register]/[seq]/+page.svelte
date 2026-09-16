@@ -1213,13 +1213,14 @@
     color: var(--ink2);
   }
 
-  /* The state in its tone as TEXT on the page's own ground, never over a tint of itself. */
+  /* The state as a word in ink beside its dot: the dot carries the tone, as it does in the list this
+     row came from, so a red `Open` is not the loudest thing under the figure. */
   .lead-state {
     display: inline-flex;
-    align-items: baseline;
-    gap: var(--sp-1);
-    color: var(--tone, var(--ink));
-    font-weight: 600;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink);
+    font-weight: 500;
   }
 
   /* Sentence case in the stylesheet, so the text stays the record's own word. */

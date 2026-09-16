@@ -2045,7 +2045,13 @@
       A drawer earns its place when there are more fields than fit. At six there is nothing to fit.
     -->
     {#snippet actions()}
-      <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
+      <!-- ON A PHONE THE FIELD IS THE WAY IN, AND THIS GOES. The capture field and this button both
+           started a row, one under the other, and on a phone the button took a line of its own over
+           the field that does the same thing in fewer presses. It stays while the field is hidden
+           (`?first`), and on a laptop, where it opens the whole form and sits beside the title. -->
+      <span class="new-row" data-alone={arriving ? '' : undefined}>
+        <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{copy.newRow} {decl.one}</Button>
+      </span>
     {/snippet}
   </PageHead>
 
@@ -3422,6 +3428,16 @@
      turns one line into three. */
   .capture {
     margin: 0;
+  }
+
+  .new-row {
+    display: contents;
+  }
+
+  @media (width < 640px) {
+    .new-row:not([data-alone]) {
+      display: none;
+    }
   }
 
   .capture-label {
