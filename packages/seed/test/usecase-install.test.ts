@@ -166,6 +166,9 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   assert.equal(board[0]!.rows?.length, 2, 'two tickets are in flight');
   assert.equal(board[1]!.rows?.length, 1, 'one ticket is blocked');
   assert.equal(board[2]!.rows?.length, 2, 'two tickets are due this week');
+  const agentWork = value<{ blocks: Drawn[] }>(team.k.page('agent-work')).blocks;
+  assert.deepEqual(agentWork.map((b) => b.kind), ['table', 'agents', 'cards', 'table']);
+  for (const b of agentWork) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   team.sql.close();
 
   const guide = await made('guide');

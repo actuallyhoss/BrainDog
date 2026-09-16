@@ -4,8 +4,8 @@
  *
  * IT BUILDS ON PROJECTS AND PEOPLE AND CARRIES ITS OWN TICKETS. Work's tasks have no owner, no cycle and no agent, and
  * a use case cannot add fields to a list another pack declares, so the board is a list of its own that
- * points at People for owners. Agent runs are the kernel's `session` list, which every record has, so the
- * "what agents did" page reads them without installing anything.
+ * points at People for owners. What agents did is read from the record's own log, one group per agent, and their runs
+ * from the kernel's `session` list, which every record has, so the Agent work page needs nothing installed.
  */
 
 export const TEAM = {
@@ -241,8 +241,17 @@ export const TEAM = {
             empty: 'No agent holds a ticket.',
           },
           {
-            kind: 'cards',
+            /* WHAT EACH AGENT DID, from the record's own log, one group per agent: the changes, not only the runs. */
+            kind: 'agents',
             heading: 'What agents did',
+            span: 12,
+            source: 'activity',
+            first: 5,
+            empty: 'No agent has changed anything here yet.',
+          },
+          {
+            kind: 'cards',
+            heading: 'Agent runs',
             span: 12,
             source: 'register.session',
             columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
