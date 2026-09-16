@@ -21,7 +21,7 @@
   import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
-  import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
+  import type { PageBlock } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
   import { dogName, dogText, saveDog, type DogPage } from '$lib/dog/source.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -36,7 +36,7 @@
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { untrack } from 'svelte';
-  import { pageReader, resolverOf, type LiveBlock, type Opened } from '$lib/record/page-live.ts';
+  import { pageReader, resolverOf, type LiveBlock, type LivePageDecl, type Opened } from '$lib/record/page-live.ts';
   import ActionRows from './ActionRows.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -108,7 +108,7 @@
     void writeRow(row.ref, (m, ref) => m.tickPatch(ref, done), title);
   }
   /* A LIVE PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; the sample is read only when there is no record. */
-  const result = $derived<{ page: PageDecl; blocks: LiveBlock[] } | undefined>(
+  const result = $derived<{ page: LivePageDecl; blocks: LiveBlock[] } | undefined>(
     got?.from === 'live' ? got.page : got?.from === 'sample' ? (readPage(slug) ?? undefined) : undefined,
   );
   const sampleValues = $derived<Record<string, string>>(got?.from === 'sample' ? values() : {});
@@ -459,11 +459,11 @@
     live && live.page.blocks.length ? ({ ...live.page.page, blocks: live.page.blocks } as unknown as DogPage) : undefined,
   );
   const source = $derived<DogPage | undefined>(
-    recorded ?? (result ? ((result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? result.page) : undefined),
+    recorded ?? (result ? ((result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? { ...result.page, blocks: result.blocks }) : undefined),
   );
 
   /** Which declaration a resolved page came from: the one template whose expansion produced it. */
-  function templateOf(page: PageDecl): string {
+  function templateOf(page: LivePageDecl): string {
     for (const [key, decl] of Object.entries(PAGES))
       if (decl.for && decl.for.register === page.param?.register) return key;
     return page.page;

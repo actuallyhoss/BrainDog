@@ -147,6 +147,36 @@ test('no record here reads the sample, and does not ask again in this tab', asyn
   assert.deepEqual(await pageReader(BASE, host(null).io).read('desk'), { from: 'sample' });
 });
 
+test('nothing is put on a live page that the record did not send', async () => {
+  const { io } = host(record);
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+
+  /* `requires` NAMES THE REGISTERS A DECLARATION READS (`06 §1.1`), and it is the declaration's to
+     say. A `[]` written here to satisfy the app's own type is this app declaring, on the record's
+     behalf, that the page reads no register at all, and it travels: the page object is what the
+     source view prints and what `<page>.dog` is saved from. An answer with no `requires` has none. */
+  assert.equal(Object.hasOwn(out.page.page, 'requires'), false);
+  /* AND NO ROW IS CLAIMED FOR A PAGE THAT IS NOT ABOUT ONE. */
+  assert.equal(out.page.page.identity, undefined);
+});
+
+test("a page's own keys are the record's, and an expanded page wears the colour of the row it is about", async () => {
+  const answered = { ...ANSWER, requires: ['register.obligations'], param: { register: 'projects', seq: 4, title: 'Kiln' } };
+  const { io } = host((method) => (method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const out = await pageReader(BASE, io, () => AT).read('kiln');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+
+  assert.deepEqual(out.page.page.requires, ['register.obligations']);
+  /* `identity` IS THE ROW THE PAGE IS ABOUT, which is what a project page's hue is read from. The
+     record does not send that key, and it sends the row: `param` is the register, the number and the
+     title the template expanded from. The sample builds both from one pair (`pages.ts`), so a live
+     project page that dropped it was the same page in a different colour. */
+  assert.deepEqual(out.page.page.identity, { register: 'projects', seq: 4 });
+});
+
 test('a page the record lacks says so, with the pages it has', async () => {
   const { io } = host(record);
   assert.deepEqual(await pageReader(BASE, io).read('nowhere'), { from: 'missing', titles: ['Desk', 'Money'] });

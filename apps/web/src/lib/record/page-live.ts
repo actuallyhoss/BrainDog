@@ -62,7 +62,23 @@ type Answered = {
   [key: string]: unknown;
 };
 
-type AnsweredPage = { page: string; title: string; blocks?: Answered[]; [key: string]: unknown };
+/**
+ * A PAGE AS THE RECORD ANSWERS ONE, which is not the same object as a page this app declares.
+ *
+ * `schema.ts`'s `PageDecl` is a DECLARATION: it carries `blocks`, and it marks `requires` required
+ * because a page this app writes names the registers it reads (`rows-write.ts`, and `06 §1.1`, where
+ * `requires` is what takes a page out of the nav with the pack that owned its rows). An ANSWER is
+ * neither of those things. Its blocks come back beside the declaration and are drawn separately, and
+ * `requires` is a key the record sends only when the declaration behind it has one.
+ *
+ * NAMING THAT DIFFERENCE IS THE POINT. This was one `as unknown as PageDecl` with a `requires: []`
+ * in front of it: the app declaring, on the record's behalf, that the page reads no register at all.
+ * The cast is what let it through, and a cast that bridges two types silences every other difference
+ * between them at the same time.
+ */
+export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[] };
+
+type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown };
 
 /** A block the page draws: the app's `BlockResult`, with what only a live answer carries. */
 export type LiveBlock = BlockResult & {
@@ -74,7 +90,7 @@ export type LiveBlock = BlockResult & {
   cannot?: string;
 };
 
-export type LivePage = { page: PageDecl; blocks: LiveBlock[] };
+export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
 
 export type Opened =
   | { from: 'live'; page: LivePage; now: number }
@@ -293,10 +309,17 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const map = await mapOf(target);
         if (map) refs.set(target, map);
       }
+      /* THE PAGE IS THE ANSWER, AND THE ONE DERIVED KEY IS DERIVED FROM THE ANSWER. `identity` names
+         the row a page is ABOUT, and it is what the page and its rail row wear a project's colour
+         from; the record does not send it, but an expanded page sends `param`: the register, the
+         number and the title of the row it was expanded from, which is the same row. So a live
+         project page carries its own hue for the reason the sample's does (`pages.ts` sets both from
+         one pair), rather than losing it to a key nobody carried across. What the record sent wins. */
+      const identity = page.identity ?? (page.param ? { register: page.param.register, seq: page.param.seq } : undefined);
       return {
         from: 'live',
         now,
-        page: { page: { requires: [], ...page } as unknown as PageDecl, blocks: blocks.map((b) => blockOf(b, refs, now)) },
+        page: { page: identity ? { ...page, identity } : page, blocks: blocks.map((b) => blockOf(b, refs, now)) },
       };
     },
   };
