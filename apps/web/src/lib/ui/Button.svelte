@@ -128,4 +128,12 @@
     color: var(--dim);
     cursor: not-allowed;
   }
+
+  /* A DISABLED GHOST STAYS A GHOST. The rule above gave it a box, so on People the one Remove you
+     cannot press (your own) was the only one drawn as a button, and the loudest control in its
+     row. It keeps the dim label and nothing else. */
+  .btn[data-weight='bare']:disabled {
+    background: none;
+    border-color: transparent;
+  }
 </style>

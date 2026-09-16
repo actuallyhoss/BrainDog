@@ -580,11 +580,16 @@ export function toneOf(register: string, e: Entry, now: number = NOW): TableRow[
 }
 
 export function toRows(register: string, entries: Entry[], columns: Column[], now: number = NOW, names?: Names): TableRow[] {
+  /* AN ENUM IN SENTENCE CASE, as the register's own grid draws it. The list says "Owed by me" through
+     a first-letter rule on its own markup; a page block or a backlink table drawing the same row said
+     "owed by me", so one row read two ways a click apart. */
+  const enums = new Set(columns.filter((c) => decl(register, c.field)?.type === 'enum').map((c) => c.field));
+  const cased = (field: string, text: string | null): string | null => (enums.has(field) && text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
   return entries.map((e) => ({
     key: `${register}#${e.seq}`,
     href: `/r/${register}/${e.seq}`,
     tone: toneOf(register, e, now),
-    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field], now, names))),
+    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : cased(c.field, display(register, c.field, e.fields[c.field], now, names)))),
   }));
 }
 
