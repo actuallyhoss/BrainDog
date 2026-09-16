@@ -103,8 +103,12 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
      reach this line; what is left here is the honest case, a cycle the leg's table does not name. */
   if (!months) return start <= until ? [{ day: first, at: start }] : [];
 
+  /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and every
+     past cycle was clamped to today as overdue, so a monthly service anchored three months back
+     charged four times on day one. Skipped cycles do not count toward the 64, as in the kernel. */
+  const today = iso(NOW);
   const out: { day: string; at: number }[] = [];
-  for (let n = 0; n < 64; n++) {
+  for (let n = 0; out.length < 64 && n < 64 + 1_200; n++) {
     /* `resolveDay` RATHER THAN `setUTCMonth`, because `setUTCMonth` OVERFLOWS. A monthly charge on
        the 29th stepped 29 Jan → 1 Mar → 29 Mar: nothing in February and two charges in March, and
        every balance between the two was one charge too high on a screen somebody reads to decide
@@ -117,6 +121,7 @@ function occurrences(row: Entry, leg: Leg, first: string, until: number): { day:
     if (!day) break;
     const at = noon(day);
     if (!Number.isFinite(at) || at > until) break;
+    if (day < today) continue;
     out.push({ day, at });
   }
   return out;

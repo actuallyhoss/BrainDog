@@ -424,3 +424,19 @@ test('A CYCLE IS A WHOLE NUMBER OF MONTHS, and a fortnight written as 0.5 is ref
   assert.deepEqual(honest.refusals, []);
   assert.ok(honest.steps.length > walk.steps.length, 'the whole-month walk lost movements');
 });
+
+test('A RECURRING ROW DOES NOT CHARGE ITS PAST CYCLES AGAIN TODAY, because they already left the account', () => {
+  /* `renews` is an anchor nobody moves on. The walk started at it and clamped every cycle before
+     today to today as overdue, so a monthly service anchored three months back charged four times on
+     day one. The kernel's walk has the same rule. */
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const monthly: Leg = { register: 'services', on: 'renews', amount: 'cost', every: { field: 'cycle', months: { monthly: 1 } } };
+  const past = (ROWS.services ?? []).filter((s) => s.fields.cycle === 'monthly' && String(s.fields.renews).slice(0, 10) < today);
+  assert.ok(past.length > 0, 'the seed needs a monthly service anchored in the past for this to mean anything');
+  const steps = runway(1_000_000, [monthly], 60).steps;
+  for (const row of past) {
+    const own = steps.filter((s) => s.href === `/r/services/${row.seq}`);
+    assert.deepEqual(own.filter((s) => s.label.includes('overdue')).map((s) => s.day), [], `a past cycle of ${row.fields.name} was charged again`);
+    assert.ok(own.length > 0 && own.length <= 3, `${row.fields.name} charged ${own.length} times in 60 days`);
+  }
+});

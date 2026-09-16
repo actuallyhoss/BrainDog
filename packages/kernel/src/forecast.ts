@@ -108,6 +108,8 @@ const CAP = 2000;
  * answer to that is a sentence rather than a shorter walk.
  */
 const EVERY_CAP = 64;
+/** How many cycles a walk steps through at most, past ones included: a monthly anchor a century back. */
+const SKIP_CAP = EVERY_CAP + 1_200;
 
 /**
  * The furthest ahead a walk may be asked to look, in days.
@@ -219,7 +221,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       const label = String(entry.fields[title] ?? entry.id);
       const spoken = entry.seq === null ? entry.id : `${leg.register}#${entry.seq}`;
 
-      const recurs = occurrences(deps, entry, leg, dayOf(first), until);
+      const recurs = occurrences(deps, entry, leg, dayOf(first), until, iso(deps.ctx.nowMs));
       if (recurs.capped) truncated++;
       for (const { day, at } of recurs.of) {
         /* CLAMPED TO TODAY, not dropped. The walk stays in order and a balance that is already gone
@@ -329,24 +331,32 @@ function occurrences(
   leg: Leg,
   first: string,
   until: number,
+  today: string,
 ): { of: { day: string; at: number }[]; capped: boolean } {
   const start = noon(first);
   if (!Number.isFinite(start)) return { of: [], capped: false };
   const months = leg.every ? (leg.every.months[String(entry.fields[leg.every.field] ?? '')] ?? 0) : 0;
   if (!months) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false };
 
+  /* A CYCLE BEFORE TODAY HAS ALREADY BEEN CHARGED. `renews` is an anchor nobody moves on, and the
+     walk started at it and clamped every past cycle to today as overdue: a monthly service anchored
+     three months back charged four times on day one, and one anchored in 2020 hit the cap on a
+     30-day horizon. The reminder engine skips past occurrences for the same reason (`expandRepeat`'s
+     `skipPast`). Skipped cycles are not counted against the cap. */
   const out: { day: string; at: number }[] = [];
-  for (let n = 0; n < EVERY_CAP; n++) {
+  let n = 0;
+  for (; out.length < EVERY_CAP && n < SKIP_CAP; n++) {
     const day = n === 0 ? first : resolveDay(`+${Math.round(months * n)}m`, start);
     if (!day) break;
     const at = noon(day);
     if (at > until) break;
+    if (day < today) continue;
     out.push({ day, at });
   }
   /* AND THE CAP IS REPORTED RATHER THAN TAKEN. Running out of occurrences while the horizon still
      has room is money missing from the answer, and the caller has to be able to tell that from a
      leg that simply ends. */
-  return { of: out, capped: out.length === EVERY_CAP };
+  return { of: out, capped: out.length === EVERY_CAP || n === SKIP_CAP };
 }
 
 /**

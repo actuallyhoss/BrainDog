@@ -364,3 +364,25 @@ test('and a row with no amount at all is simply not a movement', async () => {
   assert.deepEqual(walk.refusals, []);
   sql.close();
 });
+
+test('A RECURRING ROW DOES NOT CHARGE ITS PAST CYCLES AGAIN TODAY, because they already left the account', async () => {
+  /* `renews` is an anchor nobody moves on. The walk started at it and clamped every cycle before now
+     to today as overdue, so a monthly GBP 41.00 service anchored three months back charged GBP 164.00
+     on day one, and one anchored in 2020 charged 64 times and hit the cap. */
+  const sql = openSqlite();
+  const now = Date.UTC(2026, 8, 16, 12);
+  const k = await openRecord(sql, fixedClock(now));
+  assert.ok((await k.install([OBLIGATIONS, SERVICES])).ok);
+  assert.ok(k.create('services', { name: 'Hosting', cost: gbp(4_100), cycle: 'monthly', renews: '2026-06-10', state: 'live' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('services', { name: 'Domain', cost: gbp(1_000), cycle: 'monthly', renews: '2020-01-01', state: 'live' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('services', { name: 'Today', cost: gbp(500), cycle: 'monthly', renews: '2026-08-16', state: 'live' }, { actor: 'p_1' }).ok);
+
+  const walk = value<Runway>(k.runway(50_000, [LEGS[1]!], 30));
+  assert.deepEqual(
+    walk.steps.map((s) => `${s.day} ${s.label}`),
+    ['2026-09-16 Today', '2026-10-01 Domain', '2026-10-10 Hosting', '2026-10-16 Today'],
+  );
+  assert.deepEqual(walk.refusals, []);
+  assert.equal(walk.crossed, null);
+  sql.close();
+});
