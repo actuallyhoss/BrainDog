@@ -312,34 +312,40 @@
   {#if actors.length > 1 || kinds.length > 1 || days.length > 1}
     <div class="bar">
       {#if actors.length > 1}
-        <div class="segmented" role="group" aria-label={copy.auditWho}>
+        <div class="filter" role="group" aria-labelledby="f-who">
+          <span class="filter-label" id="f-who">{copy.auditWho}</span>
+          <span class="toggles">
           {#each actors as a}
             <button
               type="button"
-              class="segment"
+              class="toggle"
               data-on={who === a ? '' : undefined}
               aria-pressed={who === a ? 'true' : 'false'}
               onclick={() => setParam('by', who === a ? '' : a)}
             >
-              {actorOf(a)}
+              {#if who === a}<Icon name="check" size="s" />{/if}{actorOf(a)}
             </button>
           {/each}
+          </span>
         </div>
       {/if}
 
       {#if kinds.length > 1}
-        <div class="segmented" role="group" aria-label={copy.auditWhat}>
+        <div class="filter" role="group" aria-labelledby="f-what">
+          <span class="filter-label" id="f-what">{copy.auditWhat}</span>
+          <span class="toggles">
           {#each kinds as k}
             <button
               type="button"
-              class="segment"
+              class="toggle"
               data-on={what === k ? '' : undefined}
               aria-pressed={what === k ? 'true' : 'false'}
               onclick={() => setParam('kind', what === k ? '' : k)}
             >
-              {kindOf(k).word}
+              {#if what === k}<Icon name="check" size="s" />{/if}{kindOf(k).word}
             </button>
           {/each}
+          </span>
         </div>
       {/if}
 
@@ -348,8 +354,8 @@
            more than four values. The label is visible: a placeholder disappears exactly when
            somebody needs it (06 §8). -->
       {#if days.length > 1}
-        <label class="on">
-          <span class="on-label">{copy.auditWhen}</span>
+        <label class="filter on">
+          <span class="filter-label">{copy.auditWhen}</span>
           <select class="on-select" value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
             <option value="">{copy.auditAnyDay}</option>
             {#each days as d}<option value={d}>{fmtDay(d)}</option>{/each}
@@ -482,25 +488,109 @@
     white-space: nowrap;
   }
 
-  /* The same shape the register's toolbar has, because it is the same act: narrowing a list. */
+  /* ONE LINE PER QUESTION, EACH WITH ITS NAME. The filters were two unlabelled bordered tracks, so a
+     row of names and a row of verbs had to be told apart by reading them, and a track with nothing
+     chosen looked like a control with a broken state. Now a label leads each line and a choice is a
+     quiet toggle that takes a surface when it is on. */
   .bar {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+    margin-block-end: var(--sp-4);
+  }
+
+  .filter {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+
+  .filter-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .toggles {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
-    margin-block-end: var(--sp-4);
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .on-select {
+    justify-self: start;
+  }
+
+  /* On a phone the label sits over its line rather than beside it. */
+  @media (width < 640px) {
+    .bar {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-1);
+    }
+
+    .filter + .filter,
+    .filter + :global(.btn) {
+      margin-block-start: var(--sp-2);
+    }
+
+    /* ONE STRIP PER QUESTION, scrolled sideways, the way the settings areas are: fourteen wrapped
+       pills took half a phone before the first entry of the log it filters. */
+    .toggles {
+      flex-wrap: nowrap;
+      margin-inline: calc(var(--gutter) * -1);
+      padding-inline: var(--gutter);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .toggle {
+      flex: none;
+      white-space: nowrap;
+    }
+  }
+
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .toggle:hover:not([data-on]) {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  .toggle[data-on] {
+    padding-inline-start: var(--sp-2);
+    background: var(--s2);
+    border-color: var(--edge);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  @media (pointer: coarse) {
+    .toggle {
+      min-block-size: var(--tap);
+    }
   }
 
   /* THE LABEL IS VISIBLE AND IT IS BESIDE THE CONTROL, not inside it: a placeholder disappears
      exactly when a person needs it and fails contrast in most themes (06 §8). */
-  .on {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-  }
-
   .on-select {
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-2);
@@ -512,12 +602,15 @@
     font-size: var(--t-sm);
   }
 
-  /* THE TRACK WRAPS HERE AND NOWHERE ELSE. A register's segmented groups hold two to four short
-     enum values and fit on any phone; this one holds every actor the log has ever carried, and
-     "renewal rule" is not "open". Five of those in one unwrapping track reached 335px inside a
-     320px screen — the layout gate caught it. Two rows of track still read as one control. */
-  .bar :global(.segmented) {
-    flex-wrap: wrap;
+  .bar > :global(.btn) {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  @media (width < 640px) {
+    .bar > :global(.btn) {
+      grid-column: 1;
+    }
   }
 
   .page {
@@ -631,9 +724,8 @@
      ids, in the dim ink, so the eye reads the name first and finds the id when it wants it. */
   .target-id {
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
-    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   .foot {
