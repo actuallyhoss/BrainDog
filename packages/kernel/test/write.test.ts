@@ -535,3 +535,39 @@ test('A RETRY IS ONE ROW, because an agent whose answer was lost sends it again'
   assert.equal(k.count('obligations'), 2);
   sql.close();
 });
+
+test('A USED op_id REPLAYS ONLY THE WRITE IT WAS MINTED FOR, and never hands back another register\'s row', async () => {
+  /* The key alone used to decide: a create in one register carrying an id first used in another answered with
+     that other register's row, past a guard that had checked only the register it was asked about, and an update
+     reusing a create's id applied nothing and answered with the created row. */
+  const PAYROLL: RegisterDecl = { id: 'payroll', name: 'Payroll', title: 'who', fields: [{ id: 'who', type: 'text', required: true }, { id: 'salary', type: 'money' }] };
+  const { k, sql } = await record([OBLIGATIONS, PAYROLL]);
+  value<Entry>(k.create('payroll', { who: 'Ada', salary: { amount: 9_000_000, currency: 'GBP' } }, { actor: 'p_1', opId: 'shared' }));
+
+  const across = k.create('obligations', { what: 'mine' }, { actor: 'p_2', opId: 'shared' });
+  assert.equal(codeOf(across), 'VALUE_MALFORMED', 'a used key answered with a row from another register');
+  assert.equal(k.count('obligations'), 0);
+
+  const made = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1', opId: 'op-c' }));
+  value<Entry>(k.create('obligations', { what: 'Invoice 42', state: 'open' }, { actor: 'p_1' }));
+  const elsewhere = k.update('obligations', 'obligations#2', { party: 'Acme' }, { actor: 'p_1', opId: 'op-c' });
+  assert.equal(codeOf(elsewhere), 'VALUE_MALFORMED', 'an update reusing a key on another row was answered as a replay');
+  assert.equal(k.get('obligations#2')?.fields.party, undefined);
+
+  // The same write sent again is still a replay.
+  assert.equal(value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1', opId: 'op-c' })).id, made.id);
+  sql.close();
+});
+
+test('A WRITE WITH NO OBJECT OF VALUES, OR A VERSION THAT IS NOT A NUMBER, IS REFUSED RATHER THAN THROWN', async () => {
+  const { k, sql } = await record();
+  for (const fields of [undefined, null, [1], 'what'])
+    assert.equal(codeOf(k.create('obligations', fields as never, { actor: 'p_1' })), 'VALUE_MALFORMED', `create with ${JSON.stringify(fields)}`);
+  value<Entry>(k.create('obligations', { what: 'a', state: 'open' }, { actor: 'p_1' }));
+  assert.equal(codeOf(k.update('obligations', 'obligations#1', null as never, { actor: 'p_1' })), 'VALUE_MALFORMED');
+  for (const version of ['1', null, 1.5])
+    assert.equal(codeOf(k.update('obligations', 'obligations#1', { party: 'x' }, { actor: 'p_1', version: version as never })), 'VALUE_MALFORMED', `version ${JSON.stringify(version)}`);
+  assert.equal(k.get('obligations#1')?.version, 1, 'a refused write moved the version');
+  assert.equal(k.get({ register: undefined, seq: undefined } as never), null);
+  sql.close();
+});

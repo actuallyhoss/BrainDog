@@ -98,3 +98,21 @@ test('A CURSOR BELONGS TO ITS ORDER: one from the record order, another order or
   assert.equal(code(k.list({ register: 'things', limit: 2, cursor: '~not-a-cursor', order: [{ field: 'rank' }] }))?.at, 'cursor');
   sql.close();
 });
+
+test('A CURSOR THE RECORD DID NOT MINT IS REFUSED IN THE RECORD\'S OWN ORDER TOO, rather than answered with the first page', async () => {
+  const { k, sql } = await record();
+  for (const cursor of ['junk', '5', 'a|b', '2026-09-16T12:00:00.000Z', '2026-09-16T12:00:00.000Z|'])
+    assert.equal((k.list({ register: 'things', limit: 2, cursor }) as { refusal?: { code: string } }).refusal?.code, 'VALUE_MALFORMED', cursor);
+
+  // And the cursors it does mint still walk the whole list, once each.
+  const seen: string[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 20; i++) {
+    const p: Page = page(k.list({ register: 'things', limit: 3, cursor }));
+    seen.push(...p.rows.map((r) => String(r.fields.name)));
+    cursor = p.cursor;
+    if (cursor === null) break;
+  }
+  assert.deepEqual([...seen].sort(), ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+  sql.close();
+});

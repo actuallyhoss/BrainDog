@@ -725,7 +725,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
   /** A row, addressed the way the caller happens to have it. */
   function get(ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean } = {}): Entry | null {
-    if (typeof ref !== 'string') return bySeq(ref.register, ref.seq, opts.includeDeleted);
+    /* AN ADDRESS WITH NO REGISTER OR NO NUMBER NAMES NO ROW. `GET /api/get` with neither bound `undefined`
+       into SQLite and answered 500 INTERNAL; there is no row at no address, which is the answer. */
+    if (typeof ref !== 'string')
+      return ref !== null && typeof ref === 'object' && typeof ref.register === 'string' && Number.isSafeInteger(ref.seq)
+        ? bySeq(ref.register, ref.seq, opts.includeDeleted)
+        : null;
     const said = parseSpoken(ref) ?? prefixed(ref);
     return said ? bySeq(said.register, said.seq, opts.includeDeleted) : byId(ref, opts.includeDeleted);
   }
@@ -1372,6 +1377,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     }
 
     const [at, afterId] = (sortedCursor ? '' : cursorText).split('|');
+    /* A CURSOR THIS RECORD DID NOT MINT IS REFUSED, AS THE SORTED ONE ALREADY WAS. `cursor=junk` compared
+       `updated_at < 'junk'`, which every ISO instant is, so the answer was the first page again with a
+       cursor of its own: a client paging on it walked the list twice and could not tell. */
+    if (!sortedCursor && cursorText !== '' && !(afterId !== undefined && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at ?? '') && afterId !== ''))
+      return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with. Start from the first page.', { at: 'cursor' });
     const page = sortedCursor
       ? sql.all<Record<string, unknown>>(
           `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql})${after} ${sort} LIMIT ?`,
@@ -1673,8 +1683,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (w.opId !== undefined) {
         const already = sql.one<{ target: string }>('SELECT target FROM event WHERE op_id = ?', w.opId);
         if (already) {
+          /* A REPLAY IS THE SAME WRITE, AND THE KEY ALONE DID NOT SAY SO. This returned whatever row the id
+             had first touched, from any register and for any write: a `create` in `tasks` carrying an id
+             somebody had used in `payroll` answered with the payroll row, past a guard that had only checked
+             `tasks`, and an `update` reusing a `create`'s id answered with the created row and applied
+             nothing. The key replays only the write it was minted for: the same register, and for an update
+             the same row. Anything else is a different write wearing a used key, which is refused rather
+             than answered with somebody else's row or silently dropped. */
           const was = byId(already.target.replace(/^entry:/, ''), true);
-          if (was) return ok(was);
+          const aimed = ref === null ? null : get(ref, { includeDeleted: true });
+          if (was && was.register === register && (ref === null || aimed?.id === was.id)) return ok(was);
+          return no<Entry>(
+            'VALUE_MALFORMED',
+            `op_id ${w.opId} was already used for a different write. A retry sends the same write again; a new write needs a new op_id.`,
+            { at: 'op_id' },
+          );
         }
       }
       const decl = registers.get(register);
@@ -1682,6 +1705,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         return no<Entry>('REGISTER_UNKNOWN', `There is no register called ${register}.`, {
           allowed: [...registers.keys()],
         });
+
+      /* THE PATCH IS AN OBJECT, and nothing said so. `create` with no `fields`, or `update` with `patch: null`,
+         reached `patch.deleted_at` below and answered 500 INTERNAL, "Cannot read properties of null". An array
+         was read key by key, so `fields: [1]` was refused as a field called `0`. */
+      if (patch === null || typeof patch !== 'object' || Array.isArray(patch))
+        return no<Entry>(
+          'VALUE_MALFORMED',
+          `A write takes its values as an object of field names, and this one is ${JSON.stringify(patch) ?? 'missing'}.`,
+          { at: ref === null ? 'fields' : 'patch' },
+        );
+      /* AND A VERSION IS A WHOLE NUMBER. `version: "4"` never equals 4, so a client that sent its version as
+         text was told its row had moved on every attempt, and re-reading could never cure it. */
+      if (w.version !== undefined && !Number.isSafeInteger(w.version))
+        return no<Entry>(
+          'VALUE_MALFORMED',
+          `version is the whole number the row was read at, and this one is ${JSON.stringify(w.version)}. Leave it out to write without comparing.`,
+          { at: 'version' },
+        );
 
       const current = ref === null ? null : get(ref, { includeDeleted: true });
       if (ref !== null && !current)
