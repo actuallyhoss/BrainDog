@@ -74,9 +74,17 @@
      ring around a borderless box lands in the wrong place by a pixel on every platform. This does
      not replace the a11y layer's focus ring, which the input still gets and which is not
      removable — it is what makes the FIELD look focused rather than only the caret inside it. */
+  /* ONE RING, ON THE WRAPPER. The input inside also took the a11y ring, so a focused field drew the
+     wrapper's accent halo and a second ring 2px inside it. The wrapper's ring is the same 2px
+     `--accent-text` the a11y layer uses, on the wrapper's own edge, so the indicator keeps its 3:1. */
   .field:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    outline: 2px solid var(--accent-text);
+    outline-offset: -1px;
+  }
+
+  .field .field-input:focus-visible {
+    /* focus-ok: `.field:focus-within` above draws the same 2px accent ring on the wrapper's edge. */
+    outline: none;
   }
 
   .field-lg {

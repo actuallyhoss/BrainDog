@@ -77,3 +77,10 @@ test('THE SAMPLE PROPOSAL CHANGES A DOCUMENT AND A STATUS, on an open question t
   assert.ok(kinds.includes(false), 'no field is drawn before and after');
   for (const u of updates) for (const c of u.changes) if (c.long) assert.ok(c.block.rows.some((r) => /^[-+] /u.test(r.cells[0] ?? '')), `${u.at} ${c.field} diffs to no change`);
 });
+
+test('an instant the formatter left alone reads as a day', async () => {
+  const { dated } = await import('./changes.ts');
+  assert.equal(dated('2026-09-16T15:23:18.843Z'), '16 Sep 2026');
+  assert.equal(dated('people#2'), 'people#2');
+  assert.equal(dated(null), null);
+});

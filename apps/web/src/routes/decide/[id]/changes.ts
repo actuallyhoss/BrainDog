@@ -8,7 +8,15 @@
  * PURE: the declarations, the rows and the formatter are handed in, so `node --test` reads it.
  */
 
-import { diffRows, type Block } from 'braindog-render';
+import { day, diffRows, type Block } from 'braindog-render';
+
+/**
+ * AN INSTANT THE FORMATTER HANDED BACK UNTOUCHED IS DRAWN AS A DAY, the way every other date in the
+ * product reads. A field the declaration does not type as a date (a merge's `deleted_at`) came
+ * through as `2026-09-16T15:23:18.843Z` beside a person's name.
+ */
+const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/u;
+export const dated = (shown: string | null): string | null => (shown !== null && INSTANT.test(shown) ? day(shown.slice(0, 10)) : shown);
 
 /** Past this many characters, or across a line, a text field is read as prose and diffed. */
 export const LONG = 120;
@@ -82,7 +90,7 @@ export function updatesOf(
       changes.push(
         isLong(f?.type ?? 'text', before, after)
           ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
-          : { field, label, long: false, before: show(body.register, field, before), after: show(body.register, field, after) },
+          : { field, label, long: false, before: dated(show(body.register, field, before)), after: dated(show(body.register, field, after)) },
       );
     }
     if (changes.length === 0) continue;
