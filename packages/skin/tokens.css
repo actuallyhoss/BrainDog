@@ -309,6 +309,9 @@
      * element appears it gets a token beside this one, not a tenth percentage.
      */
     --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
+    /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its accent edge (a11y.css, controls.css). One
+       value, so every field in the product focuses the same way. */
+    --focus-halo: color-mix(in srgb, var(--accent) 26%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
     --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
     /* A divider between rows of one list, softer than a boundary. */

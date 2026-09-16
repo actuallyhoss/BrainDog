@@ -370,13 +370,13 @@
                 (e.currentTarget.parentElement?.children[(i + step + values.length) % values.length] as HTMLElement | undefined)?.focus();
               }}
             >
-              {value.replace(/_/g, ' ')}
+              {copy.valueWord(value)}
             </button>
           {/each}
         </div>
       {:else if f.type === 'enum'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
-          {#each f.values ?? [] as value}<option value={value}>{value.replace(/_/g, ' ')}</option>{/each}
+          {#each f.values ?? [] as value}<option value={value}>{copy.valueWord(value)}</option>{/each}
         </select>
       {:else if f.type === 'ref'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>

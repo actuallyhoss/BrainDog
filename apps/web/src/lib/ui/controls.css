@@ -90,21 +90,36 @@
     transition: border-color var(--d-state) var(--ease-out);
   }
 
-  /* The ring is drawn on the WRAPPER, because the input inside it has no border of its own and a
-     ring around a borderless box lands in the wrong place by a pixel on every platform. This does
-     not replace the a11y layer's focus ring, which the input still gets and which is not
-     removable — it is what makes the FIELD look focused rather than only the caret inside it. */
-  /* ONE RING, ON THE WRAPPER. The input inside also took the a11y ring, so a focused field drew the
-     wrapper's accent halo and a second ring 2px inside it. The wrapper's ring is the same 2px
-     `--accent-text` the a11y layer uses, on the wrapper's own edge, so the indicator keeps its 3:1. */
-  .field:focus-within {
-    outline: 2px solid var(--accent-text);
+  /* ONE FOCUS, ON THE WRAPPER, AND THE SAME ONE EVERY BARE FIELD GETS IN `a11y.css`: an accent
+     edge where the border is and the soft `--focus-halo` outside it. The input inside has no border
+     of its own, so it draws nothing, or a focused field is two boxes. */
+  .field:focus-within,
+  .capture-field:focus-within {
+    outline: 1px solid var(--accent-text);
     outline-offset: -1px;
+    box-shadow: 0 0 0 3px var(--focus-halo);
   }
 
   .field .field-input:focus-visible {
-    /* focus-ok: `.field:focus-within` above draws the same 2px accent ring on the wrapper's edge. */
+    /* focus-ok: `.field:focus-within` above draws the accent edge and ring on the wrapper. */
     outline: none;
+    box-shadow: none;
+  }
+
+  /* A DATE READS AS THE FIELD IT IS IN. The picker glyph is the browser's; it follows `color-scheme`
+     and sits at the dim ink of a field's other furniture until it is pointed at. */
+  .field-input[type='date'] {
+    color-scheme: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .field-input::-webkit-calendar-picker-indicator {
+    opacity: 0.6;
+    cursor: pointer;
+  }
+
+  .field-input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
   }
 
   .field-lg {
@@ -173,14 +188,16 @@
    * looks like a strip that ends. Every state a register can be filtered by is on screen or the
    * control is lying about the register.
    */
+  /* A QUIET TRACK: the field's own surface and hairline, so a segmented control sits in a form as
+     one more field and not as a dark well with a tile in it. */
   .segmented {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
     padding: 2px;
-    background: var(--sunk);
+    background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
   }
 
   /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, and each is 44 wide as well as
@@ -231,10 +248,21 @@
     color: var(--ink2);
   }
 
-  /* The chosen option is a shape in the track, not only a shade: a surface step and a hairline. */
+  /* THE SAME HEIGHT AS THE FIELD BESIDE IT under a mouse: the track's 2px padding and 1px border
+     come off the segment, so the whole control is `--ctl-h`. Under a thumb the segment keeps 44. */
+  @media (pointer: fine) {
+    .segment {
+      min-block-size: calc(var(--ctl-h) - 6px);
+    }
+  }
+
+  /* The chosen option is a shape in the track, not only a shade: a surface step and a hairline,
+     ink text, and no shadow or weight change, so choosing does not make it the loudest thing on
+     the form. */
   .segment[data-on] {
     background: var(--s2);
     border-color: var(--line);
+    box-shadow: none;
     color: var(--ink);
   }
 

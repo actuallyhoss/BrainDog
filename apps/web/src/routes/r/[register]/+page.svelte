@@ -3483,9 +3483,7 @@
   /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
      ring around the text alone would draw a line between the field and its own button. It is the
      same move `/search` makes for the same reason. */
-  .capture-field:focus-within {
-    border-color: var(--accent);
-  }
+  /* The ring itself is `controls.css`'s, shared with every field. */
 
   .capture-input {
     flex: 1;
@@ -3502,6 +3500,7 @@
     /* focus-ok: the caret indicates focus, and `.capture-field:focus-within` above carries the
        state change for the box the reader actually sees. */
     outline: none;
+    box-shadow: none;
   }
 
   .capture-go {

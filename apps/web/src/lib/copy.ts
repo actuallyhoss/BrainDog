@@ -642,6 +642,21 @@ export const copy = {
   requestAccess: 'Request access',
   tryAgain: 'Load it again',
   addOne: 'Add the first row',
+  /**
+   * A declared value as a person reads it on a control: `saas` is SaaS, `two_yearly` is Two yearly.
+   *
+   * THE RECORD STORES THE SPELLING THE DECLARATION USES, and a form showed it raw, lowercase and
+   * underscored, on a first-run screen the owner called out. Only the label changes; the value a
+   * control writes is still the stored one. Words that are initialisms are listed, because no rule
+   * on the letters can tell `saas` from `seas`.
+   */
+  valueWord: (value: string): string => {
+    const word = value.replace(/_/g, ' ');
+    const known: Record<string, string> = { saas: 'SaaS', api: 'API', vat: 'VAT', url: 'URL', dns: 'DNS', ssl: 'SSL', tls: 'TLS', seo: 'SEO', ai: 'AI', mcp: 'MCP', paye: 'PAYE', cis: 'CIS' };
+    const lower = word.toLowerCase();
+    if (known[lower]) return known[lower];
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  },
   /* The one word a screen reader hears while a screen waits on the record (`Waiting.svelte`). */
   waiting: 'Loading',
   addTheRow: 'Add the row',

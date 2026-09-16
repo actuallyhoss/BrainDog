@@ -21,11 +21,15 @@
     border-radius: var(--r-sm);
   }
 
-  /* A TEXT FIELD TAKES THE RING ON ITS OWN EDGE. Offset 2px, a field's 1px border and the ring read as
-     two outlines with a stripe of ground between them. At -1px the ring covers the border, so the
-     field has one edge, 2px and accent, exactly where its edge already was. */
+  /* A TEXT FIELD FOCUSES AS ONE BOX: its own edge turns accent, and a soft ring sits outside it.
+     The 2px offset ring read as two outlines with a stripe of ground between them, and the owner
+     called it out. The 1px outline at -1px lies exactly over the field's border, so nothing moves;
+     `--accent-text` keeps the edge at 3:1 or better on every surface, and `--focus-halo` is the
+     soft part. */
   :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']), textarea, select):focus-visible {
+    outline: 1px solid var(--accent-text);
     outline-offset: -1px;
+    box-shadow: 0 0 0 3px var(--focus-halo);
   }
 
   /* An invisible hit box, so a 20px chevron inside a 44px control is a 44px target. Both axes: a

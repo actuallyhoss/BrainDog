@@ -281,11 +281,10 @@
     /* focus-ok: the caret indicates focus, and `.field:focus-within` carries the state change for
        the box the reader actually sees. */
     outline: none;
+    box-shadow: none;
   }
 
-  .field:focus-within {
-    border-color: var(--accent);
-  }
+  /* `.field:focus-within` is `controls.css`'s, shared with every field. */
 
   /* The same shape a capped backlink list uses on a row page: a count and an arrow, at the end of
      the heading it belongs to. */
