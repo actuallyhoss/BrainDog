@@ -331,7 +331,9 @@ test('THE SEED FILES THE SAMPLE’S QUESTIONS, so /decide on the gates’ record
       assert.deepEqual(unversioned(rowsetOf(row)), unversioned(ROWSETS[q.id]), `${q.id}'s rows differ`);
     }
   }
-  assert.equal(open.value.length, QUESTIONS.length, 'the record holds an open question the sample does not show');
+  /* LESS WHAT MONEY'S RULES ASKED, which the record asks of its own rows as they go late and the sample does not draw. */
+  const filed = open.value.filter((row) => !String(row.opened_by ?? '').startsWith('rule:'));
+  assert.equal(filed.length, QUESTIONS.length, 'the record holds an open question the sample does not show');
 
   for (const q of DECIDED) {
     const row: Record<string, unknown> | undefined = decided.value.find((d) => d.question === q.title);

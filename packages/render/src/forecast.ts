@@ -37,7 +37,7 @@ export type ForecastModel = {
   steps: ForecastStep[];
   horizon: number;
   knobs: ForecastKnob[];
-  /** How many days late clients have paid on average, which the late knob marks, or `null` when the host sent none. */
+  /** How many days late money has come in on average, which the late knob marks, or `null` when the host sent none. */
   late: number | null;
   /** How near a crossing is said under the chart, in days, or `null` when it is never said. */
   under: number | null;
@@ -313,7 +313,7 @@ export const FORECAST_MOVE = 'In and out';
 export const FORECAST_BALANCE = 'Balance';
 export const FORECAST_TODAY = 'today';
 export const FORECAST_HORIZON = 'Horizon';
-export const FORECAST_LATE = 'Clients pay late by';
+export const FORECAST_LATE = 'Money in arrives late by';
 export const FORECAST_SPEND = "Spending the record doesn't know";
 export const FORECAST_SPEND_NOTE = "the record only knows bills you've entered";
 export const FORECAST_LEAVE = 'Leave out';
@@ -331,5 +331,5 @@ export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'da
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
 export const forecastRecorded = (day: string, figure: string): string => `recorded from ${day}, when it was ${figure}`;
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
-export const forecastAverage = (n: number): string => (n <= 0 ? "your clients' average: on time" : `your clients' average: ${n} ${n === 1 ? 'day' : 'days'}`);
+export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastLowest = (figure: string, day: string): string => `Lowest ${figure} on ${day}`;

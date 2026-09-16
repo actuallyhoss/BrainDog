@@ -1549,7 +1549,7 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A forecast's `recorded:` series over the ninety days before today, oldest first. */
   past?: readonly { at: string; value: number }[];
-  /** A forecast's `late:` figure, read: how many days late clients have paid on average, or `null` when nothing was paid. */
+  /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
 };
 

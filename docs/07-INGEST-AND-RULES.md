@@ -425,6 +425,12 @@ act is a reminder you filter to a folder. The record is a `schedule` row of kind
 table's `(kind, key)` unique index — one table, one uniqueness, one insertion path
 ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.7; [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1).
 
+**A rule about time is read again as time passes.** A rule fires when a row is written, and `due before -7d`
+becomes true of an invoice nobody touches. So the hourly sweep reads every rule whose `when:` names a day
+relative to today (`today`, `yesterday`, `tomorrow`, `-7d`, `+30d`) and declares `once_per` over its rows, as a
+bulk apply: the marker keeps each firing to once, and a bulk apply queues no calls. A rule that names no
+such day is never swept, because rows that were already there are not news to it.
+
 **2 · Rules are ordered, and evaluation is bounded.** They run in the order stated above — priority,
 longest literal, id — one pass, max one `set` per field per pass. **No rule can trigger another rule's re-evaluation in the same
 pass** — a cascade is how a rules engine becomes non-deterministic, and a non-deterministic rules

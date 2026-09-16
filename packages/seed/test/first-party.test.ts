@@ -52,7 +52,7 @@ async function put(k: Kernel, doc: unknown): Promise<unknown> {
 }
 
 type Body = Record<string, unknown>;
-const idOf = (d: Body): string => (d.register ? `register.${d.register}` : d.page ? `page.${d.page}` : `metric.${d.metric}`);
+const idOf = (d: Body): string => (d.rule ? `rule.${d.rule}` : d.register ? `register.${d.register}` : d.page ? `page.${d.page}` : `metric.${d.metric}`);
 const byId = (list: readonly Body[]): [string, string][] => list.map((d) => [idOf(d), JSON.stringify(d)] as [string, string]).sort((a, b) => a[0].localeCompare(b[0]));
 
 /* ── each one ───────────────────────────────────────────────────────────── */

@@ -5,7 +5,7 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
+import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
 /* ── obligations ─────────────────────────────────────────────────────────── */
 
@@ -328,11 +328,11 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* HOW LATE CLIENTS PAY, ON AVERAGE: the day money came in less the day it was due, over the last year's
-     paid invoices. A fact about what happened, which the forecast's late knob marks, never a prediction. */
+  /* HOW LATE MONEY COMES IN, ON AVERAGE: the day it arrived less the day it was due, over the last year's
+     paid rows. A fact about what happened, which the forecast's late knob marks, never a prediction. */
   'days-late-in': {
     metric: 'days-late-in',
-    name: 'Clients pay late by',
+    name: 'Money in arrives late by',
     source: 'register.obligations',
     where: 'state is paid, direction is owed to me, settled is set, settled after -12m',
     value: { diff: { of: { avg: 'settled' }, per: { avg: 'due' } } },
@@ -448,6 +448,34 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
   },
 };
 
+/**
+ * The two rules Money ships with, and each one asks rather than acts.
+ *
+ * A QUESTION IN DECIDE, NOT A ROW OR A NOTE. An invoice more than a week late is a thing somebody chooses to
+ * chase or not, and a balance a week old is a thing only a person can update; both are put in front of the
+ * owner once, by the row and the day that made them true (`once_per`), and nothing else is written.
+ * The record re-reads a rule about time as time passes, so an invoice that goes late while nobody touches
+ * it is asked about too.
+ */
+export const MONEY_RULES: Record<string, SeedRule> = {
+  'invoice-late': {
+    rule: 'invoice-late',
+    pack: 'money-core',
+    register: 'obligations',
+    when: 'direction is owed to me, state is open or part, due before -7d',
+    then: [{ suggest: { question: '{{what}} was due {{ago:due}}, {{money:amount}}. Chase it?', options: ['Chase it', 'Not yet'] } }],
+    once_per: ['entry', 'due'],
+  },
+  'cash-stale': {
+    rule: 'cash-stale',
+    pack: 'money-core',
+    register: 'accounts',
+    when: 'as_of before -7d',
+    then: [{ suggest: { question: 'The balance of {{name}} was last set {{ago:as_of}}. Update it?', options: ['Update it', 'It has not changed'] } }],
+    once_per: ['entry', 'as_of'],
+  },
+};
+
 export const MONEY_PAGES: Record<string, SeedPage> = {
   /**
    * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM (`loop/DIRECTION.md` §2, `research-modules.md`
@@ -511,7 +539,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         ],
         horizon: 365,
         knobs: ['horizon', 'late', 'spend', 'leave'],
-        /* THE LATE KNOB MARKS HOW LATE CLIENTS HAVE PAID, and the chart says how many days are left when the
+        /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, and the chart says how many days are left when the
            walk goes under inside a month. */
         late: 'days-late-in',
         under: 30,

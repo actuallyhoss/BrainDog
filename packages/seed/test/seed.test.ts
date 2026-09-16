@@ -264,7 +264,13 @@ test('THE SAMPLE’S QUESTIONS ARE FILED THROUGH propose AND decide, in the orde
 
   const open = k.governance('suggestion', { status: 'open' });
   assert.ok(open.ok, fixOf(open));
-  assert.deepEqual(open.value.map((r) => r.id).sort(), ['SG2', 'SG3', 'SG4', 'SG5', 'SG7']);
+  const byRule = (r: { opened_by?: unknown }) => String(r.opened_by ?? '').startsWith('rule:');
+  assert.deepEqual(open.value.filter((r) => !byRule(r)).map((r) => r.id).sort(), ['SG2', 'SG3', 'SG4', 'SG5', 'SG7']);
+  /* AND MONEY'S RULES ASK AFTER THEM: the two invoices more than a week late, and the balance nine days old. */
+  const asked = open.value.filter(byRule);
+  assert.deepEqual(asked.map((r) => String(r.opened_by)).sort(), ['rule:cash-stale', 'rule:invoice-late', 'rule:invoice-late']);
+  assert.ok(asked.every((r) => Number(String(r.id).slice(2)) > 7), 'a rule question took a number in the middle of the sample');
+  assert.equal(k.question(String(asked.find((r) => r.opened_by === 'rule:cash-stale')!.id)), 'The balance of Tax reserve was last set 9 days ago. Update it?');
 
   const kiln = k.governanceRow('suggestion', 'SG5');
   assert.equal(k.question('SG5'), 'Does Kiln licence per-seat, per-product, or one flat studio price?');

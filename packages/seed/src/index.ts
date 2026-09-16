@@ -33,8 +33,8 @@ export { THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES } from './modules/work.ts';
 
-import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './modules/base.ts';
-import { ACCOUNTS, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, OBLIGATIONS } from './modules/money.ts';
+import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
+import { ACCOUNTS, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
@@ -176,6 +176,12 @@ export const projectWithRunsOn = (): SeedPage => ({
   blocks: [...((PAGES.project!.blocks as unknown[] | undefined) ?? []), ...RUNS_ON.blocks],
 });
 
+/** The rules the modules ship with. */
+export const RULES: Record<string, SeedRule> = { ...MONEY_RULES };
+
+export const ruleDeclarations = (): Declaration[] =>
+  Object.values(RULES).map((body) => ({ id: `rule.${body.rule}`, kind: 'rule' as const, body: body as never }));
+
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
 
@@ -242,6 +248,7 @@ export function packDocument(): Record<string, unknown> {
       }),
       ...Object.values(PAGES),
       ...Object.values(METRICS),
+      ...Object.values(RULES),
     ],
     /* A REGISTER WHOSE REQUIRED FIELD IS A REF CANNOT BE SEEDED BY A PACK. A pack's seeds are one
        row per register with no order between them, so a `ref` in one would resolve against whatever
@@ -359,6 +366,15 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     const decided = kernel.decide(opened.value.id, { decide: q.decided }, actor);
     if (!decided.ok) return decided as unknown as Result<Seeded>;
     decisions++;
+  }
+
+  /* THE RULES GO IN AFTER THE QUESTIONS, and are read once over the rows already there, so what they ask
+     is numbered after the sample's own questions rather than in the middle of the rows being written. */
+  const ruled = await kernel.install(ruleDeclarations());
+  if (!ruled.ok) return ruled as Result<Seeded>;
+  for (const rule of Object.values(RULES)) {
+    const applied = kernel.applyRule(rule.rule);
+    if (!applied.ok) return applied as unknown as Result<Seeded>;
   }
 
   return {

@@ -282,7 +282,8 @@ test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that d
   const lists: [string, string][] = [];
   for (const id of FIRST_PARTY) {
     const doc = firstPartyDocument(id) as { declarations: Record<string, unknown>[] };
-    for (const d of doc.declarations) if (typeof d.register === 'string') lists.push([d.register, id]);
+    /* A RULE NAMES THE LIST IT WATCHES WITH `register:` TOO, and declares none. */
+    for (const d of doc.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, id]);
   }
   assert.deepEqual([...FIRST_PARTY_LISTS].sort(), lists.sort());
 });

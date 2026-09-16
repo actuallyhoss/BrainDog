@@ -1049,3 +1049,28 @@ test('a rule writes an amount in its currency\'s own decimals', () => {
   const row = { id: 'e_1', register: 'bills', seq: 1, fields: { yen: { amount: 129_900, currency: 'JPY' }, dinar: { amount: 1_500, currency: 'KWD' }, pounds: { amount: 129_900, currency: 'GBP' } } } as unknown as Entry;
   assert.equal(fillTemplate('{{money:yen}} {{dinar}} {{pounds}}', row), 'JPY 129900 KWD 1.500 GBP 1299.00');
 });
+
+test('A RULE ABOUT TIME IS READ AGAIN EACH HOUR, so a row that goes late untouched is asked about once', async () => {
+  const late = rule({
+    rule: 'late',
+    register: 'obligations',
+    when: 'state is open, due before -7d',
+    once_per: ['entry', 'due'],
+    then: [{ suggest: { question: 'Chase {{what}}?', options: ['Chase it', 'Not yet'] } }],
+  });
+  const { k, sql, clock } = await record(late);
+  value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open', due: day(1) }, { actor: 'p_1' }));
+  const asked = () => value<Record<string, unknown>[]>(k.governance('suggestion')).filter((s) => s.opened_by === 'rule:late').length;
+  assert.equal(asked(), 0, 'not late yet');
+
+  k.purge();
+  assert.equal(asked(), 0, 'the sweep does not make it late early');
+
+  clock.advance(10 * DAY);
+  k.purge();
+  assert.equal(asked(), 1, 'eight days past its date, nobody touched it, and the sweep asked');
+  k.purge();
+  assert.equal(asked(), 1, 'once');
+
+  sql.close();
+});

@@ -998,7 +998,7 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '365']);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave']);
-  /* THE LATE KNOB MARKS HOW LATE CLIENTS HAVE PAID, the sample's paid invoices averaged, and a crossing inside a month is said. */
+  /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, the sample's paid invoices averaged, and a crossing inside a month is said. */
   assert.ok(typeof forecast.lateness === 'number' && forecast.lateness > 0, `clients paid ${forecast.lateness} days late`);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'late')?.cells.slice(0, 2), ['late', String(Math.round(forecast.lateness!))]);
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'under')?.cells.slice(0, 2), ['under', '30']);

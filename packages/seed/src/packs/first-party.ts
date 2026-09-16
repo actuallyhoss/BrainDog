@@ -43,7 +43,9 @@ type Body = Record<string, unknown>;
 
 /** The id a declaration in a document is filed under: its kind's key. */
 const idOf = (d: Body): string =>
-  typeof d.register === 'string'
+  typeof d.rule === 'string'
+    ? `rule.${d.rule}`
+    : typeof d.register === 'string'
     ? `register.${d.register}`
     : typeof d.page === 'string'
       ? `page.${d.page}`

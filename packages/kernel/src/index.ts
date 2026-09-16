@@ -2778,7 +2778,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     );
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
+    rulesAboutTime();
     return { ...out, sessions };
+  }
+
+  /**
+   * A RULE ABOUT TIME IS READ AGAIN AS TIME PASSES. `due before -7d` becomes true of an invoice nobody has
+   * touched, and a rule that runs only when a row is written would never see it. So each hour every rule whose
+   * `when:` names a day relative to today, and which fires once per what it is about (`once_per`), is read
+   * over its rows as a bulk apply: its marker keeps it to once, and a bulk apply queues no calls.
+   */
+  function rulesAboutTime() {
+    const RELATIVE = /\b(?:today|yesterday|tomorrow)\b|[+-]\d+[dwmy]\b/u;
+    const rules = sql
+      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'rule' AND superseded_at IS NULL AND retired = 0")
+      .map((r) => JSON.parse(r.body) as RuleDecl)
+      .filter((r) => Array.isArray(r.once_per) && r.once_per.length > 0 && RELATIVE.test(JSON.stringify(r.when ?? '')));
+    for (const rule of rules) transaction(() => applyRule(rulesDeps(), rule, { limit: 1000 }));
   }
 
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {

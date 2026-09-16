@@ -18,7 +18,7 @@ import { install, normalise, plan, type Diff, type Host, type Installed, type Pa
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { AGENTS_REGISTERS, METRICS, PAGES, REGISTERS, declarations, installSeed, metricDeclarations, packDocument, pageDeclarations } from '../src/index.ts';
+import { AGENTS_REGISTERS, METRICS, PAGES, REGISTERS, RULES, declarations, installSeed, metricDeclarations, packDocument, pageDeclarations, ruleDeclarations } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
 
@@ -59,7 +59,7 @@ const stateOf = (k: Kernel): Installed => ({
 test('THE PRODUCT’S OWN SHAPE IS A LEGAL PACK, which is the test the format most needs', async () => {
   const pack = value<Pack>(await normalise(packDocument(), { kind: 'local' }));
 
-  assert.equal(pack.declarations.length, Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length);
+  assert.equal(pack.declarations.length, Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length);
   assert.equal(pack.manifest.provides.length, pack.declarations.length, 'two declarations share an id');
 
   // Hyphens survive where they belong and nowhere else: a metric is an address, a register is SQL.
@@ -75,7 +75,7 @@ test('THE PRODUCT’S OWN SHAPE IS A LEGAL PACK, which is the test the format mo
 test('AND INSTALLING IT PRODUCES THE RECORD THE SEED DOES', async () => {
   /* Two ways to install one set of declarations is one way too many unless they agree. */
   const direct = await record();
-  value(await direct.k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]));
+  value(await direct.k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations(), ...ruleDeclarations()]));
 
   const viaPack = await record();
   const pack = value<Pack>(await normalise(packDocument()));
@@ -104,7 +104,7 @@ test('and its plan says what it would do before anybody has to read the file', a
   const diff = await plan(value<Pack>(await normalise(packDocument())), stateOf(k));
 
   assert.equal(diff.direction, 'install');
-  assert.equal(diff.adds.length, Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length);
+  assert.equal(diff.adds.length, Object.keys(REGISTERS).length + Object.keys(PAGES).length + Object.keys(METRICS).length + Object.keys(RULES).length);
   assert.deepEqual(diff.conflicts, []);
   assert.equal(diff.orphans, 0);
   assert.deepEqual(diff.touches, { rows_read: 0, rows_written: 0 });

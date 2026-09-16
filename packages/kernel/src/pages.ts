@@ -92,7 +92,7 @@ export type PageBlock = {
   recorded?: string;
   /** A `forecast`'s: which of its knobs a reader may move. */
   knobs?: string[];
-  /** A `forecast`'s: the figure the late knob marks, how many days late clients have paid on average. */
+  /** A `forecast`'s: the figure the late knob marks, how many days late money has come in on average. */
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
   under?: number;
@@ -168,7 +168,7 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
-  /** A forecast's `late:` figure, read: how many days late clients have paid on average, or `null` when nothing was paid. */
+  /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
@@ -677,7 +677,7 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
 /**
  * A forecast's late mark, read from the figure it names, and its warning reach checked.
  *
- * THE MARK IS A FACT ABOUT WHAT HAPPENED: how late clients have paid, from the paid rows. The knob itself
+ * THE MARK IS A FACT ABOUT WHAT HAPPENED: how late money has come in, from the paid rows. The knob itself
  * stays arithmetic over the walk, and the mark only says where the record puts a reader's guess.
  */
 function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | null } | { refusal: Refusal } {

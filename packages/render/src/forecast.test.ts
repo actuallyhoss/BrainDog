@@ -121,8 +121,8 @@ test('the late mark and the under note come from their rows, and the note waits 
   const far = forecastModel([...ROWS, ['under', '30', '', '']])!;
   assert.equal(underNote(far, scenario(far, baseKnobs(far))), '', 'thirty-three days is further than thirty');
   assert.equal(forecastModel([...ROWS, ['under', '0', '', '']])!.under, null, 'a reach of nothing is no reach');
-  assert.equal(forecastAverage(12), "your clients' average: 12 days");
-  assert.equal(forecastAverage(-3), "your clients' average: on time");
+  assert.equal(forecastAverage(12), 'on average so far: 12 days');
+  assert.equal(forecastAverage(-3), 'on average so far: on time');
   const src = ['```forecast', ...[...ROWS, ['under', '40', '', '']].map((r) => r.join(' | ')), '```'].join('\n');
   assert.match(toHTML(parse(src, { page: true })), /class="forecast-soon">Cash goes under in 33 days</u);
 });

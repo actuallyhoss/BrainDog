@@ -178,3 +178,6 @@ export const OPEN = 'state is open or part';
  * a page the record could not carry.
  */
 export type SeedPage = Record<string, unknown> & { page: string };
+
+/** A rule as a pack writes it: the register it watches, when it fires, what it does, and once per what. */
+export type SeedRule = { rule: string; pack?: string; register: string; when: string; then: Record<string, unknown>[]; once_per: string[] };
