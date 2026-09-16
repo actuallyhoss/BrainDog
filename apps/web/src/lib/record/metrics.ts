@@ -166,7 +166,7 @@ function operand(e: Entry, op: Operand): number | null {
      and no way to tell that from "no rows matched". */
   if (typeof op === 'string') {
     /* A DAY IS READ AS THE WHOLE DAYS SINCE 1970 THAT NAME IT, as the record reads a day's minimum. Only
-       `min` and `max` reach here with one: a sum or an average of days is refused before this. */
+       `min`, `max` and `avg` reach here with one: a sum of days is refused before this. */
     const v = e.fields[op];
     if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v)) return Math.round(Date.parse(`${v}T00:00:00Z`) / DAY_MS);
     return amountOf(v);
@@ -533,7 +533,7 @@ function unaggregatable(decl: MetricDecl): string[] {
       const field = typeof op === 'string' ? op : op?.product?.[0];
       if (typeof field !== 'string' || field === 'id') continue;
       const type = fields.find((f) => f.id === field)?.type;
-      if (type === 'day' && (kind === 'min' || kind === 'max')) continue;
+      if (type === 'day' && (kind === 'min' || kind === 'max' || kind === 'avg')) continue;
       if (type !== undefined && !NUMERIC.has(type))
         out.push(`value: ${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field`);
     }

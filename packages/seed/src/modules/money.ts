@@ -328,6 +328,20 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HOW LATE CLIENTS PAY, ON AVERAGE: the day money came in less the day it was due, over the last year's
+     paid invoices. A fact about what happened, which the forecast's late knob marks, never a prediction. */
+  'days-late-in': {
+    metric: 'days-late-in',
+    name: 'Clients pay late by',
+    source: 'register.obligations',
+    where: 'state is paid, direction is owed to me, settled is set, settled after -12m',
+    value: { diff: { of: { avg: 'settled' }, per: { avg: 'due' } } },
+    format: 'days',
+    target: { lte: 14 },
+    window: '365d',
+    compare: 'none',
+  },
+
   /* MONEY THAT MOVED, MONTH BY MONTH, by the day it was paid rather than the day it was due; and money still
      to move, by the day it is due. The series on the Money page draws the first for the months behind
      and the second for the months ahead. */
@@ -497,6 +511,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         ],
         horizon: 365,
         knobs: ['horizon', 'late', 'spend', 'leave'],
+        /* THE LATE KNOB MARKS HOW LATE CLIENTS HAVE PAID, and the chart says how many days are left when the
+           walk goes under inside a month. */
+        late: 'days-late-in',
+        under: 30,
         empty: 'Nothing dated in the next twelve months.',
       },
       {

@@ -318,6 +318,8 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `recorded` | series `Id`, with or without `series.`; on a `forecast`, the opening metric's own series (`DECLARATION_INVALID` otherwise) | no | — | — |
 | `stale` | `{ field: Id of a day or instant field, after: window }` (`DECLARATION_INVALID`); on `cards` | no | — | — |
 | `knobs` | list of `horizon late spend leave` (`DECLARATION_INVALID`) | no | none | the four |
+| `late` | metric `Id`; on a `forecast`, the figure the late knob marks (`METRIC_UNKNOWN`) | no | — | — |
+| `under` | int 1–365 days; on a `forecast`, how near a crossing is said (`OUT_OF_BOUNDS`) | no | — | — |
 | `tone` | intent | no | — | the four |
 | `body` | the dialect, ≤ 64 KB | `note` | — | — |
 | `icon` | `Glyph`, beside a `section`'s heading | no | — | — |

@@ -127,7 +127,7 @@ function bridgeRows(block: BlockResult): string[] {
 
 /**
  * A forecast as the dialect writes it: the opening, the balance remembered before today, every movement
- * of the walk, the horizon, and the knobs a reader may move.
+ * of the walk, the horizon, the knobs a reader may move, how late clients pay, and how near a crossing is said.
  *
  * THE WALK IS THE ONE THE TABLE AND THE BRIDGE READ, so the line, the bars of the next thirty days and
  * the figures beside them cannot disagree about where the money goes.
@@ -145,6 +145,9 @@ function forecastRows(block: BlockResult): string[] {
     ...walk.steps.map((s) => `step | ${s.day} | ${escapeCell(s.label)} | ${said(s.delta)}`),
     `horizon | ${block.horizon ?? 180} |  | `,
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
+    /* HOW LATE CLIENTS HAVE PAID, in whole days, which the late knob marks; and how near a crossing is said. */
+    ...(typeof block.lateness === 'number' && Number.isFinite(block.lateness) ? [`late | ${Math.round(block.lateness)} |  | `] : []),
+    ...(typeof block.under === 'number' ? [`under | ${block.under} |  | `] : []),
   ];
 }
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { against, baseKnobs, forecastModel, forecastPlan, horizonChoices, knobsMoved, largest, readoutAt, scenario, type ForecastModel } from './forecast.ts';
+import { against, baseKnobs, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsMoved, largest, readoutAt, scenario, underNote, type ForecastModel } from './forecast.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -109,4 +109,20 @@ test('toHTML draws the static walk, no controls, and a sentence without an openi
   assert.match(html, /Every movement/u);
   assert.match(toHTML(parse('```forecast\nstep | 2026-09-18 | Rent | 1\n```', { page: true })), /forecast-empty/u);
   assert.equal(parse(src)[0]!.type, 'degraded', 'a forecast is page-only');
+});
+
+test('the late mark and the under note come from their rows, and the note waits until the crossing is near', () => {
+  assert.equal(model().late, null);
+  assert.equal(model().under, null);
+  assert.equal(underNote(model(), scenario(model(), baseKnobs(model()))), '', 'no under: row, no note');
+  const near = forecastModel([...ROWS, ['late', '12', '', ''], ['under', '40', '', '']])!;
+  assert.equal(near.late, 12);
+  assert.equal(underNote(near, scenario(near, baseKnobs(near))), 'Cash goes under in 33 days');
+  const far = forecastModel([...ROWS, ['under', '30', '', '']])!;
+  assert.equal(underNote(far, scenario(far, baseKnobs(far))), '', 'thirty-three days is further than thirty');
+  assert.equal(forecastModel([...ROWS, ['under', '0', '', '']])!.under, null, 'a reach of nothing is no reach');
+  assert.equal(forecastAverage(12), "your clients' average: 12 days");
+  assert.equal(forecastAverage(-3), "your clients' average: on time");
+  const src = ['```forecast', ...[...ROWS, ['under', '40', '', '']].map((r) => r.join(' | ')), '```'].join('\n');
+  assert.match(toHTML(parse(src, { page: true })), /class="forecast-soon">Cash goes under in 33 days</u);
 });

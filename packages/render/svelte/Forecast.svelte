@@ -26,6 +26,7 @@
     FORECAST_WHEN,
     against,
     baseKnobs,
+    forecastAverage,
     forecastDays,
     forecastModel,
     forecastMonths,
@@ -36,6 +37,7 @@
     largest,
     readoutAt,
     scenario,
+    underNote,
   } from '../src/forecast.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -56,6 +58,7 @@
   const knobbed = $derived(Boolean(opts.scenario) && (model?.knobs.length ?? 0) > 0);
   const choices = $derived(model ? horizonChoices(model) : []);
   const heavy = $derived(model ? largest(model) : []);
+  const soon = $derived(model && shown ? underNote(model, shown) : '');
   const readout = $derived(model && shown && plan && scrub !== null ? readoutAt(model, shown, plan, scrub) : null);
 
   const reset = () => {
@@ -119,6 +122,9 @@
     <ol class="forecast-ticks" aria-hidden="true">
       {#each plan.ticks as t}<li class="forecast-tick" style="--at:{t.at}">{t.label}</li>{/each}
     </ol>
+    {#if soon}
+      <p class="forecast-soon">{soon}</p>
+    {/if}
     <!-- THE KNOBS COME AFTER THE CHART, so the answer is read before the questions a reader may ask of it. -->
     {#if knobbed}
       <div class="forecast-knobs">
@@ -137,6 +143,7 @@
             <span class="forecast-knob-name">{FORECAST_LATE}</span>
             <input class="forecast-range" type="range" min="0" max="60" step="5" bind:value={late} />
             <span class="forecast-knob-value num">{forecastDays(late)}</span>
+            {#if model.late !== null}<span class="forecast-knob-note">{forecastAverage(model.late)}</span>{/if}
           </label>
         {/if}
         {#if model.knobs.includes('spend')}

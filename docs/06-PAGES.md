@@ -139,6 +139,8 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `recorded` | a series id, `cash-now` or `series.cash-now`. On a `forecast` over `forecast.runway`, the series its `opening` figure is remembered in, drawn solid over the ninety days before today; any other series is refused, because the line would join two measures at today | nothing before today | no |
 | `stale` | `{ field, after }`: a day field and a window. On a `cards` block, a row whose day is older than the window says it is out of date beside that day, with the watch glyph | never | no |
 | `knobs` | a list of `horizon · late · spend · leave`. On a `forecast`, the what-ifs a reader may move: the horizon, clients paying later, spending the record does not know, and leaving out a large movement. They are arithmetic over the walk on the page, in memory, never in the address and never written | no knobs | no |
+| `late` | a metric id. On a `forecast`, the figure its late knob marks as "your clients' average: N days", read from paid rows as a fact rather than a guess | no mark | no |
+| `under` | int, 1–365. On a `forecast`, say under the chart "Cash goes under in N days" when the walk goes under within this many days | never said | no |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |
 | `icon` | a glyph name, drawn beside a `section`'s heading | — | no |

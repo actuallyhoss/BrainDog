@@ -304,6 +304,10 @@ export type PageBlock = {
   stale?: { field: string; after: string };
   /** A `forecast`'s: which knobs a reader may move. */
   knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
+  /** A `forecast`'s: the figure its late knob marks, how late clients have paid on average. */
+  late?: string;
+  /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
+  under?: number;
 };
 
 export type PageDecl = {

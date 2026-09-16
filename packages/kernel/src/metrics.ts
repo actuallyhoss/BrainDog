@@ -745,6 +745,8 @@ function one(
   /* MONEY AND QUANTITY CARRY THEIR UNIT INTO THE GROUP BY. The rule is one line — two currencies are
      never added — and this is the line that would have added them: one SUM over a column of amounts
      is a figure of the right size in whatever unit happened to be commonest. */
+  /* AN AVERAGE DAY IS AVERAGED AS DAYS SINCE 1970, never as text: SQLite reads `2026-07-28` as 2026. */
+  if (type === 'day' && kind === 'avg') return aggregate(sql, field, 'decimal', `(julianday(${expr}) - 2440587.5)`, where, params, kind, fn, rows);
   return aggregate(sql, field, type, expr, where, params, kind, fn, rows);
 }
 
@@ -827,8 +829,10 @@ function unaggregatable(kind: string, field: string, schema: Schema): string | n
   if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
   const type = Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
   if (type === undefined || NUMERIC.has(type)) return null;
-  /* THE EARLIEST OR THE LATEST DAY IS A DAY, and it is read as whole days since 1970 (`aggregate`). */
-  if (type === 'day' && (kind === 'min' || kind === 'max')) return null;
+  /* THE EARLIEST OR THE LATEST DAY IS A DAY, and it is read as whole days since 1970 (`aggregate`). AN
+     AVERAGE DAY IS READ THE SAME WAY, so the average of two paid days less the average of their due days is
+     how late the money came, in days. A sum of days is still nothing. */
+  if (type === 'day' && (kind === 'min' || kind === 'max' || kind === 'avg')) return null;
   return `${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field.`;
 }
 

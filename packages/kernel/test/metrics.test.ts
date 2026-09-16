@@ -132,11 +132,11 @@ test('the six aggregations this build reads', async () => {
   sql.close();
 });
 
-test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, not answered as a number', async () => {
+test('A SUM OF A DAY, OR A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A WORD, IS REFUSED, not answered as a number', async () => {
   const { k, sql } = await record();
   /* SQLite reads the text `2026-07-28` as 2026 inside sum() and avg(), and `Number('2026-07-28')` is
      NaN after min() and max(), which went out as null beside `met: false` and two rows counted. */
-  for (const v of [{ sum: 'due' }, { avg: 'due' }, { sum: 'party' }, { max: 'state' }] as MetricDecl['value'][]) {
+  for (const v of [{ sum: 'due' }, { avg: 'party' }, { sum: 'party' }, { max: 'state' }] as MetricDecl['value'][]) {
     const said = refusal(k.metric({ ...OVERDUE, value: v, where: undefined, target: { gte: 0 }, format: 'int' }));
     assert.equal(said.code, 'VALUE_MALFORMED', JSON.stringify(v));
     assert.equal(said.at, 'value');
@@ -150,11 +150,19 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, not answ
   const latest = value<Reading>(k.metric({ ...OVERDUE, value: { max: 'due' }, where: undefined, target: { gte: 0 }, format: 'day' }));
   assert.equal(latest.value, Date.parse(`${day(4)}T00:00:00Z`) / DAY);
 
+  /* AND THE AVERAGE DAY IS A DAY TOO, as whole days since 1970 averaged, so two averages of days subtract into days. */
+  const dues = sql.all<{ d: string }>("SELECT json_extract(fields, '$.due') AS d FROM entry WHERE register = 'obligations' AND deleted_at IS NULL AND json_extract(fields, '$.due') IS NOT NULL");
+  const mean = dues.reduce((n, r) => n + Date.parse(`${r.d}T00:00:00Z`) / DAY, 0) / dues.length;
+  const average = value<Reading>(k.metric({ ...OVERDUE, value: { avg: 'due' }, where: undefined, target: { gte: 0 }, format: 'day' }));
+  assert.ok(Math.abs((average.value ?? 0) - mean) < 1e-6, `${average.value} is not ${mean}`);
+  const none = value<Reading>(k.metric({ ...OVERDUE, value: { diff: { of: { avg: 'due' }, per: { avg: 'due' } } }, where: undefined, target: { lte: 0 }, format: 'days' }));
+  assert.equal(none.value, 0);
+
   /* AND AT INSTALL, so the tile never reaches a page. */
   const installed = await k.install([
-    { id: 'metric.oldest', kind: 'metric', body: { metric: 'oldest', name: 'Oldest', source: 'register.obligations', value: { avg: 'due' }, format: 'int', target: { gte: 0 }, window: '30d' } } as never,
+    { id: 'metric.oldest', kind: 'metric', body: { metric: 'oldest', name: 'Oldest', source: 'register.obligations', value: { sum: 'due' }, format: 'int', target: { gte: 0 }, window: '30d' } } as never,
   ]);
-  assert.equal(installed.ok, false, 'an average of a day installed');
+  assert.equal(installed.ok, false, 'a sum of a day installed');
   assert.equal(refusal(installed).code, 'VALUE_MALFORMED');
   sql.close();
 });

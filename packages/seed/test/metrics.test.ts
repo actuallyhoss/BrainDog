@@ -102,6 +102,13 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   const rows = held.filter((e) => evaluate(said.predicate, e.fields, schema));
 
   const v = decl.value as Record<string, unknown>;
+  /* A DIFF IS ITS TWO HALVES READ OVER THE SAME ROWS, one less the other. */
+  if ('diff' in v) {
+    const pair = v.diff as { of: unknown; per: unknown };
+    const of = byHand(k, { ...decl, value: pair.of } as SeedMetric);
+    const per = byHand(k, { ...decl, value: pair.per } as SeedMetric);
+    return { value: of.value === null || per.value === null ? null : of.value - per.value, unit: of.unit ?? per.unit };
+  }
   if ('count' in v) {
     const field = v.count as string;
     return { value: field === 'id' ? rows.length : rows.filter((e) => e.fields[field] !== undefined).length, unit: null };

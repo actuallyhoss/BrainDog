@@ -189,6 +189,27 @@ test('A FORECAST DRAWS THE OPENING FIGURE AS IT WAS REMEMBERED, and only that fi
   assert.equal(k.block({ ...forecast, knobs: ['weather'] }).refusals[0]?.at, 'knobs');
 });
 
+test('THE LATE KNOB MARKS A FIGURE, and how near a crossing is said is a number of days', async () => {
+  const k = await record();
+  value(
+    await k.install([
+      {
+        id: 'metric.bills-late',
+        kind: 'metric',
+        body: { metric: 'bills-late', name: 'Late', source: 'register.bills', value: { diff: { of: { avg: 'due' }, per: { avg: 'due' } } }, format: 'days', target: { lte: 14 }, window: '365d', compare: 'none' },
+      } as Declaration,
+    ]),
+  );
+  const forecast = { ...walk({ metric: 'cash-now' }), kind: 'forecast', knobs: ['late'], late: 'bills-late', under: 30 };
+  const out = k.block(forecast);
+  assert.deepEqual(out.refusals, []);
+  assert.equal(out.lateness, 0);
+  assert.equal(out.under, 30);
+  assert.equal(k.block({ ...forecast, late: 'weather' }).refusals[0]?.code, 'METRIC_UNKNOWN');
+  assert.equal(k.block({ ...forecast, under: 0 }).refusals[0]?.at, 'under');
+  assert.equal(k.block({ ...walk({ metric: 'cash-now' }), kind: 'forecast' }).lateness, undefined, 'no figure named, no mark');
+});
+
 test('OUT OF DATE NAMES A DAY AND A WINDOW, or the card grid says what it needs', async () => {
   const k = await record();
   const cards = { kind: 'cards', source: 'register.bills', columns: [{ field: 'what' }, { field: 'due', as: 'when' }], empty: 'None.' };

@@ -23,7 +23,7 @@ import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSent
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
 import { figureLike } from './figure.ts';
-import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario } from './forecast.ts';
+import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
@@ -691,7 +691,9 @@ function forecast(b: Block, o: RenderOptions): string {
     .join('')}</tr></thead><tbody>${row(day(model.today), model.label, '', model.template)}${shown.steps
     .map((s) => row(day(s.day), s.label, figureLike(model.template, s.delta), figureLike(model.template, s.balance)))
     .join('')}</tbody></table></details>`;
-  return `<div class="prop forecast">${said}${chart}${ticks}${numbers}</div>`;
+  const note = underNote(model, shown);
+  const soon = note ? `<p class="forecast-soon">${escape(note)}</p>` : '';
+  return `<div class="prop forecast">${said}${chart}${ticks}${soon}${numbers}</div>`;
 }
 
 const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

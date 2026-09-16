@@ -92,6 +92,10 @@ export type PageBlock = {
   recorded?: string;
   /** A `forecast`'s: which of its knobs a reader may move. */
   knobs?: string[];
+  /** A `forecast`'s: the figure the late knob marks, how many days late clients have paid on average. */
+  late?: string;
+  /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
+  under?: number;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
   stale?: { field: string; after: string };
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
@@ -122,6 +126,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net', 'bars',
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
+  /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
+  'late', 'under', 'lateness',
   /* A card grid's out-of-date rule. */
   'stale',
 ]);
@@ -162,6 +168,8 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
+  /** A forecast's `late:` figure, read: how many days late clients have paid on average, or `null` when nothing was paid. */
+  lateness?: number | null;
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
@@ -502,7 +510,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       };
     const recorded = recordedOf(deps, block);
     if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
-    return { ...base, walk, ...recorded, matched: walk.steps.length, refusals: also(...walk.refusals) };
+    const late = latenessOf(deps, block);
+    if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
+    return { ...base, walk, ...recorded, ...late, matched: walk.steps.length, refusals: also(...walk.refusals) };
   }
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
@@ -662,6 +672,24 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
   const DAY = 86_400_000;
   const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   return { past: deps.points(id, at(deps.ctx.nowMs - RECORDED_DAYS * DAY), at(deps.ctx.nowMs - DAY)) };
+}
+
+/**
+ * A forecast's late mark, read from the figure it names, and its warning reach checked.
+ *
+ * THE MARK IS A FACT ABOUT WHAT HAPPENED: how late clients have paid, from the paid rows. The knob itself
+ * stays arithmetic over the walk, and the mark only says where the record puts a reader's guess.
+ */
+function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | null } | { refusal: Refusal } {
+  if (block.under !== undefined && (!Number.isInteger(block.under) || block.under < 1 || block.under > 365))
+    return { refusal: { code: 'OUT_OF_BOUNDS', fix: 'under: is a whole number of days between 1 and 365.', at: 'under' } };
+  if (block.late === undefined) return {};
+  const decl = typeof block.late === 'string' ? deps.metric(block.late) : null;
+  if (!decl) return { refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${String(block.late)} for the late knob to mark.`, at: 'late' } };
+  const read = deps.read(decl);
+  if (!read.ok) return refused(read) ? { refusal: read.refusal } : {};
+  if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };
+  return { lateness: read.value.value };
 }
 
 /**

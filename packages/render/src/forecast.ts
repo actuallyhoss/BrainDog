@@ -37,6 +37,10 @@ export type ForecastModel = {
   steps: ForecastStep[];
   horizon: number;
   knobs: ForecastKnob[];
+  /** How many days late clients have paid on average, which the late knob marks, or `null` when the host sent none. */
+  late: number | null;
+  /** How near a crossing is said under the chart, in days, or `null` when it is never said. */
+  under: number | null;
 };
 
 export type Knobs = { horizon: number; late: number; spend: number; leave: readonly string[] };
@@ -59,6 +63,12 @@ export const shortDay = (day: string): string => {
   if (!ISO.test(day)) return day;
   const d = new Date(ms(day));
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+};
+
+/** A whole number written in a cell, at least `least`, or `null`. */
+const whole = (cell: string | undefined, least = Number.MIN_SAFE_INTEGER): number | null => {
+  const n = cell === undefined || cell.trim() === '' ? NaN : Number(cell.trim());
+  return Number.isInteger(n) && n >= least ? n : null;
 };
 
 /** The model, from the rows as plain text, or `null` when there is no `opening` row to walk from. */
@@ -86,6 +96,8 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     }),
     horizon: Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180,
     knobs: FORECAST_KNOBS.filter((k) => knobWords.includes(k)),
+    late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
+    under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
   };
 }
 
@@ -268,6 +280,16 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   };
 }
 
+/**
+ * The sentence under the chart when the walk goes under soon: `Cash goes under in 24 days`, or '' when it
+ * does not go under within the block's `under:` reach, or the block set none.
+ */
+export function underNote(model: ForecastModel, shown: Scenario): string {
+  if (model.under === null || !shown.crossed) return '';
+  const n = daysBetween(model.today, shown.crossed.day);
+  return n <= model.under ? forecastUnderIn(n) : '';
+}
+
 /** What the scrub reads at a fraction across the chart: the day, its balance and what moved on it. */
 export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastPlan, fraction: number) {
   const f = Math.max(0, Math.min(1, fraction));
@@ -308,4 +330,6 @@ export const forecastMonths = (n: number): string => `${n} months`;
 export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
 export const forecastRecorded = (day: string, figure: string): string => `recorded from ${day}, when it was ${figure}`;
+export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
+export const forecastAverage = (n: number): string => (n <= 0 ? "your clients' average: on time" : `your clients' average: ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastLowest = (figure: string, day: string): string => `Lowest ${figure} on ${day}`;

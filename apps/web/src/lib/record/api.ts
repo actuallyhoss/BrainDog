@@ -1549,6 +1549,8 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A forecast's `recorded:` series over the ninety days before today, oldest first. */
   past?: readonly { at: string; value: number }[];
+  /** A forecast's `late:` figure, read: how many days late clients have paid on average, or `null` when nothing was paid. */
+  lateness?: number | null;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1598,9 +1600,11 @@ function runwayBlock(b: PageBlock): BlockResult {
      sentence instead. "Nothing is coming" and "this walk could not be made" are different facts and
      one of them is the reason for the other. */
   const recorded = recordedOf(b);
+  const late = latenessOf(b);
   const refusals = [
     ...(opened.refusal ? [opened.refusal] : []),
     ...(typeof recorded === 'string' ? [recorded] : []),
+    ...(typeof late === 'string' ? [late] : []),
     ...walk.refusals,
     ...(walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : []),
     ...(opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency
@@ -1615,6 +1619,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     refusals,
     ...(refusals.length ? {} : { walk }),
     ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: recorded }),
+    ...(refusals.length || typeof late === 'string' || late === undefined ? {} : { lateness: late }),
     /* A BRIDGE ADDS UP THE WHOLE WALK, and a forecast draws it, so each shows every movement it read rather than a slice of them. */
     ...walkTable(walk, b.kind === 'bridge' || b.kind === 'forecast' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
     drawn: b.drawn ?? drawnWhen(b),
@@ -1683,6 +1688,20 @@ function recordedOf(b: PageBlock): readonly { at: string; value: number }[] | st
   const from = at(NOW - 90 * DAY);
   const to = at(NOW - DAY);
   return (SERIES[id] ?? []).filter((p) => p.at >= from && p.at <= to);
+}
+
+/**
+ * A forecast's late mark, as the record's `latenessOf` reads it, or the sentence that stops it.
+ *
+ * `undefined` when the block names no figure; the reading, `null` when nothing was paid, when it does.
+ */
+function latenessOf(b: PageBlock): number | null | string | undefined {
+  if (b.under !== undefined && (!Number.isInteger(b.under) || b.under < 1 || b.under > 365)) return 'under: is a whole number of days between 1 and 365.';
+  if (b.late === undefined) return undefined;
+  const decl = typeof b.late === 'string' ? METRICS[b.late] : undefined;
+  if (!decl) return `There is no metric called ${String(b.late)} for the late knob to mark.`;
+  const reading = read(decl);
+  return reading.refusals.length ? reading.refusals[0]! : reading.value;
 }
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
@@ -1813,8 +1832,8 @@ const READS = new Set([
   'lead',
   /* A series's lines and its reach. */
   'series', 'back', 'ahead', 'net',
-  /* A forecast's remembered figure and its knobs. */
-  'recorded', 'knobs',
+  /* A forecast's remembered figure and its knobs, its late mark and its warning reach. */
+  'recorded', 'knobs', 'late', 'under',
   /* A card grid's out-of-date rule. */
   'stale',
 ]);

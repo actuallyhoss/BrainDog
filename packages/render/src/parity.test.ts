@@ -112,6 +112,8 @@ const SHAPES: Record<string, string> = {
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',
+  'a forecast that goes under soon, with a late mark':
+    '```forecast\nopening | 2026-09-17 | Cash now | £1,000.00\nstep | 2026-09-27 | Rent | −£2,000.00\nhorizon | 90 |  | \nknobs | late |  | \nlate | 12 |  | \nunder | 30 |  | \n```',
   'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
   'sparklines of two lengths, one with a gap': '```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\n```',

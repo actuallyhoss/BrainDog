@@ -1978,6 +1978,7 @@
   }
 
   .forecast-said,
+  .forecast-soon,
   .forecast-against,
   .forecast-empty {
     display: flex;

@@ -741,7 +741,7 @@ test('every shipped metric declares a window this can say', () => {
     assert.match(decl.window, /^\d{1,4}[dwmy]$/, `${decl.metric}: window "${decl.window}" is not one this can put in a sentence`);
 });
 
-test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, as the record refuses it', () => {
+test('A SUM OF A DAY, OR A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A WORD, IS REFUSED, as the record refuses it', () => {
   /* The kernel refuses these at install and at run (`VALUE_MALFORMED`): SQLite reads `2026-07-28` as
      2026 inside sum() and avg(), and min() and max() hand back text. This build read them through
      `amountOf`, which skips text, so the figure came back as a sum of nothing with no refusal. */
@@ -749,14 +749,17 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, as the r
   const day = fields.find((f) => f.type === 'day')!.id;
   const word = fields.find((f) => f.type === 'text' || f.type === 'enum')!.id;
   const number = fields.find((f) => f.type === 'money' || f.type === 'int' || f.type === 'decimal')!.id;
-  for (const value of [{ sum: day }, { avg: day }, { sum: word }, { max: word }] as MetricDecl['value'][]) {
+  for (const value of [{ sum: day }, { avg: word }, { sum: word }, { max: word }] as MetricDecl['value'][]) {
     const r = read({ ...METRICS.overdue!, value });
     assert.equal(r.value, null, JSON.stringify(value));
     assert.match(r.refusals[0] ?? '', /reads a number/, JSON.stringify(value));
     assert.match(unreadable({ ...METRICS.overdue!, value }).join(), /reads a number/, `${JSON.stringify(value)} would install`);
   }
   /* Inside a ratio, on either side, and through a product. */
-  assert.match(read({ ...METRICS.overdue!, value: { ratio: { of: { count: 'id' }, per: { avg: day } } } }).refusals[0] ?? '', /reads a number/);
+  assert.match(read({ ...METRICS.overdue!, value: { ratio: { of: { count: 'id' }, per: { sum: day } } } }).refusals[0] ?? '', /reads a number/);
+  /* AN AVERAGE DAY IS A DAY, as the record reads it, so two of them subtract into days. */
+  assert.deepEqual(read({ ...METRICS.overdue!, value: { diff: { of: { avg: day }, per: { avg: day } } } }).refusals, []);
+  assert.equal(read({ ...METRICS.overdue!, value: { diff: { of: { avg: day }, per: { avg: day } } } }).value, 0);
   assert.match(read({ ...METRICS.overdue!, value: { sum: { product: [day, { lookup: 'x', by: word }] } } }).refusals[0] ?? '', /reads a number/);
 
   /* A COUNT OR A DISTINCT OF ANY FIELD IS STILL A NUMBER, and so is a sum of a number field. */
