@@ -87,7 +87,7 @@ test('A CARRIED PACK WITHOUT ITS MODULES IS REFUSED, naming what to install', as
 
 test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   assert.deepEqual(pagesOf(useCase('student')!), [{ page: 'studies', title: 'Studies', section: 'Studies' }]);
-  assert.deepEqual(pagesOf(useCase('founder')!), [{ page: 'overview', title: 'Overview', section: 'Overview' }]);
+  assert.deepEqual(pagesOf(useCase('founder')!), [{ page: 'dashboard', title: 'Dashboard', section: 'Dashboard' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);

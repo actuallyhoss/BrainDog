@@ -90,9 +90,10 @@ export const FOUNDER = {
         ],
       },
       {
-        page: 'overview',
-        title: 'Overview',
-        nav: { section: 'Overview', order: 10 },
+        /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name. */
+        page: 'dashboard',
+        title: 'Dashboard',
+        nav: { section: 'Dashboard', order: 10 },
         icon: 'observe',
         requires: ['register.datapoints', 'register.organisations'],
         blocks: [
