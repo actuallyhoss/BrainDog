@@ -345,3 +345,22 @@ export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page', id: st
     planHash: d.planHash,
   };
 }
+
+/* ── reconnecting a paused action's key ──────────────────────────────── */
+
+/** What `/vault?reconnect=<label>&then=<action>` opens: the row to replace, or a new key under that name, and the action to resume. */
+export type Reconnect = { then: string | null } & ({ mode: 'replace'; row: KeyRow } | { mode: 'add'; label: string });
+
+/**
+ * The sheet a paused action's "Reconnect key" opens, or `null` when the address asks for none.
+ *
+ * THE KEY IS FOUND BY ITS LABEL, case-blind, because that is how a declaration names it and how the row that paused says
+ * it. A label the vault does not hold opens Add with the name filled in, which is the "not in the vault" pause.
+ */
+export function reconnectOf(params: URLSearchParams, keys: readonly KeyRow[]): Reconnect | null {
+  const label = params.get('reconnect')?.trim() ?? '';
+  if (label === '') return null;
+  const then = params.get('then')?.trim() || null;
+  const row = keys.find((k) => k.label.trim().toLowerCase() === label.toLowerCase());
+  return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
+}

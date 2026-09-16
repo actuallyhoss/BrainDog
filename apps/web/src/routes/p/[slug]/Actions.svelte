@@ -31,6 +31,8 @@
   let rows = $state<ActionRow[]>([]);
   let fix = $state('');
   let source: Source | null = null;
+  /** Whether the rows are the sample's, where there is no vault to reconnect a key in. */
+  let sample = $state(false);
   let busy = $state(false);
   /** The last refused resume: which action, the record's sentence, and whether signing in again answers it. */
   let failed = $state<{ ingest: string; fix: string; signin: boolean } | null>(null);
@@ -44,6 +46,7 @@
     const out = await openActions((url, init) => fetch(url, init), '', () => NOW);
     closed(out.first.ok || out.absent, at);
     source = out.source;
+    sample = Boolean(source?.sample);
     if (out.absent) from = 'absent';
     else if (out.first.ok) {
       rows = out.first.value;
@@ -110,6 +113,7 @@
     </p>
     {#if said.resume || said.usage || failed?.ingest === row.ingest}
       <div class="action-do">
+        {#if said.reconnect && !sample}<Button weight="quiet" href={said.reconnect.href}>{said.reconnect.label}</Button>{/if}
         {#if said.resume}
           <Button weight="quiet" disabled={busy} aria-label="{words.resume} {row.ingest}" onclick={() => void resume(row)}>{words.resume}</Button>
         {/if}

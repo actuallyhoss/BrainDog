@@ -27,6 +27,7 @@ import {
   sample,
   stateOf,
   usageFromLedger,
+  reconnectHref,
   weeksOf,
   whatOf,
   words,
@@ -89,8 +90,16 @@ test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, a
   assert.equal(refused.resume, true);
   assert.match(refused.line, /api\.stripe\.com did not accept the key "Stripe read"/);
 
+  assert.deepEqual(refused.reconnect, { href: reconnectHref('Stripe read', 'stripe-balance'), label: 'Reconnect key' });
+  const asked = new URL(refused.reconnect?.href ?? '', 'https://x.example');
+  assert.deepEqual([asked.pathname, asked.searchParams.get('reconnect'), asked.searchParams.get('then')], ['/vault', 'Stripe read', 'stripe-balance']);
+
   const gone = stateOf(row({ state: 'paused', last: { at: '2026-09-15T06:11:00.000Z', outcome: 'paused', status: null, note: '' } }), NOW_MS);
   assert.match(gone.line, /not in the vault/);
+  assert.equal(gone.reconnect?.label, 'Add the key');
+
+  const plain = stateOf(row({ state: 'paused', last: null }), NOW_MS);
+  assert.equal(plain.reconnect, undefined, 'a pause with no key to blame offered to reconnect one');
 
   const live = stateOf(row({}), NOW_MS);
   assert.deepEqual([live.tone, live.resume, live.usage], [undefined, false, false]);

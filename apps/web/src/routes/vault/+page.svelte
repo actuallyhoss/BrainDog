@@ -24,9 +24,10 @@
   import { VAULT_GRANTS, VAULT_OPENED } from '$lib/record/data.ts';
   import { CODE_DIGITS, noRecord, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reprove, revoke, sampleGrants, sampleKeys, sampleNames,
+    answerLine, approve, asks, daysFor, holders, keysOf, namesOf, reconnectOf, reprove, revoke, sampleGrants, sampleKeys, sampleNames,
     scopeName, words, type GrantState, type KeyRow,
   } from '$lib/record/vault.ts';
+  import { words as actionWords } from '$lib/record/actions.ts';
   import { read } from '$lib/data/record.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -79,6 +80,7 @@
       keys = credentials.ok ? keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names) : [];
       machines = listed.value;
       from = 'live';
+      reconnect();
       return true;
     });
   });
@@ -204,6 +206,7 @@
 
   const shut = () => {
     sheet = null;
+    resumeAfter = null;
   };
 
   function openAdd() {
@@ -214,6 +217,21 @@
     sheetSaid = '';
     form = blank();
     sheet = { mode: 'add' };
+  }
+
+  /**
+   * A PAUSED ACTION'S "Reconnect key" LANDS HERE, on the sheet for the key it named: Replace when the vault holds it, Add with
+   * the name filled in when it does not. The action it came from is resumed once the key is saved, so the row that said
+   * "Reconnect the key and it runs again" is true after one save rather than a save and a trip back to press Resume.
+   */
+  let resumeAfter: string | null = null;
+  function reconnect() {
+    const asked = reconnectOf(new URL(location.href).searchParams, keys);
+    if (!asked) return;
+    resumeAfter = asked.then;
+    if (asked.mode === 'replace') return openReplace(asked.row);
+    openAdd();
+    form = { ...blank(), label: asked.label };
   }
 
   function openReplace(row: KeyRow) {
@@ -258,6 +276,13 @@
     form = blank();
     sheet = null;
     await reread();
+    if (resumeAfter !== null) {
+      const ingest = resumeAfter;
+      resumeAfter = null;
+      const back = await client.call('resumeAction', { ingest });
+      if (back.ok) toasts.push(actionWords.resumed(ingest), { intent: 'good' });
+      else toasts.push('refusal' in back ? back.refusal.fix : copy.writeRaced, { intent: 'warn' });
+    }
   }
 
   /**

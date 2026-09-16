@@ -175,8 +175,10 @@ export const words = {
   retrying: (host: string, next: string | null) =>
     next ? `${host} did not answer the last run. It tries again ${next}, and there is nothing to do.` : `${host} did not answer the last run. It tries again on its own.`,
   notWritten: 'Nothing was saved from the last run. The next run asks again.',
-  refusedKey: (host: string, key: string) => `Paused. ${host} did not accept the key "${key}". Resume it once the key is right.`,
-  missingKey: (key: string) => `Paused. The key "${key}" is not in the vault. Add it, then resume.`,
+  refusedKey: (host: string, key: string) => `Paused. ${host} did not accept the key "${key}". Reconnect the key and it runs again.`,
+  missingKey: (key: string) => `Paused. The key "${key}" is not in the vault. Add it and it runs again.`,
+  reconnect: 'Reconnect key',
+  addTheKey: 'Add the key',
   paused: 'Paused. It runs again when you resume it.',
   waitingFallback: 'Waiting for next month. This record has used its allowance for this month.',
   /* The usage page. */
@@ -217,7 +219,16 @@ export function often(every: string): string {
 export type Tone = 'warn' | undefined;
 
 /** What one row says about where it stands, whether it offers Resume, and whether it points at usage. */
-export type Said = { line: string; tone: Tone; resume: boolean; usage: boolean };
+/** `reconnect` is where the key an action was paused on is put right, when that is why it paused. */
+export type Said = { line: string; tone: Tone; resume: boolean; usage: boolean; reconnect?: { href: string; label: string } };
+
+/**
+ * The Vault, opened on the key a paused action needs, with the action to resume once the key is in.
+ *
+ * A LABEL AND AN ACTION'S NAME IN THE ADDRESS, and never a value: the value is typed into the sheet the Vault opens.
+ */
+export const reconnectHref = (key: string, ingest: string): string =>
+  `/vault?${new URLSearchParams({ reconnect: key, then: ingest }).toString()}`;
 
 /**
  * One action's state, in one sentence.
@@ -231,13 +242,11 @@ export function stateOf(row: ActionRow, now: number): Said {
   const next = row.next ? since(row.next, now) : null;
   const last = row.last;
   if (row.state === 'paused') {
-    const why =
-      last && (last.status === 401 || last.status === 403) && row.key
-        ? words.refusedKey(host, row.key)
-        : last?.outcome === 'paused' && last.status === null && row.key
-          ? words.missingKey(row.key)
-          : words.paused;
-    return { line: why, tone: 'warn', resume: true, usage: false };
+    const refused = Boolean(last && (last.status === 401 || last.status === 403) && row.key);
+    const missing = !refused && last?.outcome === 'paused' && last.status === null && Boolean(row.key);
+    const why = refused ? words.refusedKey(host, row.key!) : missing ? words.missingKey(row.key!) : words.paused;
+    const reconnect = refused || missing ? { href: reconnectHref(row.key!, row.ingest), label: refused ? words.reconnect : words.addTheKey } : undefined;
+    return { line: why, tone: 'warn', resume: true, usage: false, ...(reconnect ? { reconnect } : {}) };
   }
   if (!last) return { line: words.never(next), tone: undefined, resume: false, usage: false };
   if (last.outcome === 'held') return { line: last.note || words.waitingFallback, tone: undefined, resume: false, usage: true };

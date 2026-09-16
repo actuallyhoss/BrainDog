@@ -15,7 +15,7 @@ import { copy } from '../copy.ts';
 import { VAULT, VAULT_GRANTS, VAULT_OPENED } from './data.ts';
 import {
   GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, planOf, reprove, revoke,
-  sampleGrants, sampleKeys, sampleNames, scopeName, words,
+  reconnectOf, sampleGrants, sampleKeys, sampleNames, scopeName, words,
 } from './vault.ts';
 
 const row = (over: Partial<DeviceRow>): DeviceRow => ({
@@ -210,4 +210,13 @@ test('a plan from the record reads in the Packs screen words, and keeps its hash
 test('an answer with no plan hash is no plan, so nothing can be installed from it', () => {
   assert.equal(planOf(null, (_, id) => id), null);
   assert.equal(planOf({ adds: [] }, (_, id) => id), null);
+});
+
+test('RECONNECT OPENS THE KEY A PAUSED ACTION NAMED: its row to replace, or Add under that name, and the action to resume', () => {
+  const row = { id: 'cred_1', label: 'Stripe read', opens: 'api.stripe.com', project: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
+  const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
+  assert.deepEqual(reconnectOf(asked('/vault?reconnect=stripe%20READ&then=stripe-balance'), [row]), { mode: 'replace', row, then: 'stripe-balance' });
+  assert.deepEqual(reconnectOf(asked('/vault?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });
+  assert.equal(reconnectOf(asked('/vault'), [row]), null);
+  assert.equal(reconnectOf(asked('/vault?reconnect=%20&then=x'), [row]), null);
 });
