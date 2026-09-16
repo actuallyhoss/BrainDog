@@ -72,6 +72,15 @@
   let pending: ReturnType<typeof setTimeout> | undefined;
   onDestroy(() => clearTimeout(pending));
 
+  let box = $state<HTMLInputElement | null>(null);
+
+  /* Empties the box and the address, and leaves the caret in the box for the next try. */
+  function clearSearch() {
+    if (box) box.value = '';
+    typed('');
+    box?.focus();
+  }
+
   function typed(value: string) {
     clearTimeout(pending);
     pending = setTimeout(() => {
@@ -107,6 +116,7 @@
     <!-- A NAME, NOT A PLACEHOLDER: the placeholder disappears the moment somebody types, taking the
          accessible name with it. Every search box in the product has the same shape. -->
     <input
+      bind:this={box}
       class="field-input"
       type="search"
       aria-label={copy.searchRecord}
@@ -129,8 +139,11 @@
       {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if found.total === 0}
-    <Empty kind="no-results" title={copy.searchNone} query={q}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    <Empty kind="no-results" title={copy.searchNone(q)} body={copy.searchNoneNext}>
+      {#snippet actions()}
+        <Button weight="primary" onclick={clearSearch}>{copy.searchClear}</Button>
+        <Button weight="bare" href="/audit">{copy.searchInHistory}</Button>
+      {/snippet}
     </Empty>
   {:else}
     {#each found.groups as group}

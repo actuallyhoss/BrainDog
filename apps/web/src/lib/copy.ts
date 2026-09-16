@@ -400,10 +400,15 @@ export const copy = {
   /* `/search?q=` — `19 §2`'s spine screen, which the route directory did not have. `search` is
      already declared above, as the nav's own word for the same place. */
   searchRecord: 'Search the record',
-  searchWaiting: 'Type to search the record.',
+  searchWaiting: 'Find anything in the record',
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */
-  searchNone: 'Nothing in the record matches:',
+  searchNone: (q: string) => `Nothing matches “${q}”`,
+  /* THE NEXT STEP, NOT A WAY OUT (DESIGN-SYSTEM APPENDIX C15): what to change about the words, and the one
+     other place a thing that is not in a list may have been. */
+  searchNoneNext: 'Check the spelling or try fewer words. A row that was archived or changed still shows in History.',
+  searchClear: 'Clear the search',
+  searchInHistory: 'Open History',
   searchWhere: 'Every list, every decision, and every page, by the words in them.',
   allIn: (n: number, list: string) => `All ${n.toLocaleString('en')} in ${list}`,
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
