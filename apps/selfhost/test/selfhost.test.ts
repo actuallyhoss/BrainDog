@@ -214,7 +214,11 @@ test('with a token set, a request without it is refused before it reaches the re
        for both left a client unable to tell which of the two to do something about. */
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
     assert.equal(res.status, 401);
-    assert.equal(((await res.json()) as Answer).refusal?.code, 'UNAUTHORIZED');
+    const none = ((await res.json()) as Answer).refusal;
+    assert.equal(none?.code, 'UNAUTHORIZED');
+    /* Nothing sent is not a credential the record failed to know, and the sentence does not say it was. */
+    assert.doesNotMatch(String(none?.fix), /does not know that credential/);
+    assert.match(String(none?.fix), /Bearer/);
 
     /* AND AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A deployment that
        recognised only one shared string is one where an agent cannot be given less than everything,

@@ -94,8 +94,11 @@ export function openSqlite(path: string): Sql & { close(): void } {
  * is. Whichever way they arrive, the answer is the same `CallContext` the hosted product builds, so every
  * permission check below this line is the same code. `contextFor`, further down, is the order.
  */
-/** A credential this record does not know, or none where one is needed. 401 — `49 §5.4` step 1. */
+/** A credential this record does not know. 401, `49 §5.4` step 1. */
 const UNKNOWN: Refusal = { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' };
+
+/** None at all, where one is needed. The same 401, saying what to send rather than that it was not known. */
+const NONE: Refusal = { code: 'UNAUTHORIZED', fix: 'This record takes a bearer token. Send it as Authorization: Bearer <token>.', at: 'authorization' };
 
 /** A credential it knows, belonging to somebody it does not. 403, and the Worker says the same. */
 const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this record.', at: 'principal' };
@@ -309,7 +312,7 @@ async function contextFor(request: Request, host: string, site: Site): Promise<S
   }
 
   /* AND NOTHING AT ALL, WHERE A CREDENTIAL IS NEEDED, IS 401. */
-  return { refused: UNKNOWN };
+  return { refused: NONE };
 }
 
 /**
