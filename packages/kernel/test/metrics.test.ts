@@ -136,7 +136,7 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, not answ
   const { k, sql } = await record();
   /* SQLite reads the text `2026-07-28` as 2026 inside sum() and avg(), and `Number('2026-07-28')` is
      NaN after min() and max(), which went out as null beside `met: false` and two rows counted. */
-  for (const v of [{ sum: 'due' }, { avg: 'due' }, { min: 'due' }, { max: 'due' }, { sum: 'party' }, { max: 'state' }] as MetricDecl['value'][]) {
+  for (const v of [{ sum: 'due' }, { avg: 'due' }, { sum: 'party' }, { max: 'state' }] as MetricDecl['value'][]) {
     const said = refusal(k.metric({ ...OVERDUE, value: v, where: undefined, target: { gte: 0 }, format: 'int' }));
     assert.equal(said.code, 'VALUE_MALFORMED', JSON.stringify(v));
     assert.equal(said.at, 'value');
@@ -144,11 +144,17 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, not answ
   /* A COUNT OR A DISTINCT OF ANY FIELD IS STILL A NUMBER. */
   assert.equal(value<Reading>(k.metric({ ...OVERDUE, value: { distinct: 'due' }, where: undefined, target: { gte: 0 }, format: 'int' })).value, 5);
 
+  /* THE EARLIEST AND THE LATEST DAY ARE DAYS, kept as whole days since 1970: the oldest due date here is day(-71). */
+  const earliest = value<Reading>(k.metric({ ...OVERDUE, value: { min: 'due' }, where: undefined, target: { gte: 0 }, format: 'day' }));
+  assert.equal(earliest.value, Date.parse(`${day(-71)}T00:00:00Z`) / DAY);
+  const latest = value<Reading>(k.metric({ ...OVERDUE, value: { max: 'due' }, where: undefined, target: { gte: 0 }, format: 'day' }));
+  assert.equal(latest.value, Date.parse(`${day(4)}T00:00:00Z`) / DAY);
+
   /* AND AT INSTALL, so the tile never reaches a page. */
   const installed = await k.install([
-    { id: 'metric.oldest', kind: 'metric', body: { metric: 'oldest', name: 'Oldest', source: 'register.obligations', value: { min: 'due' }, format: 'int', target: { gte: 0 }, window: '30d' } } as never,
+    { id: 'metric.oldest', kind: 'metric', body: { metric: 'oldest', name: 'Oldest', source: 'register.obligations', value: { avg: 'due' }, format: 'int', target: { gte: 0 }, window: '30d' } } as never,
   ]);
-  assert.equal(installed.ok, false, 'a minimum of a day installed');
+  assert.equal(installed.ok, false, 'an average of a day installed');
   assert.equal(refusal(installed).code, 'VALUE_MALFORMED');
   sql.close();
 });

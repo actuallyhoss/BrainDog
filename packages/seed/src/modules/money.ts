@@ -247,6 +247,32 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     snapshot: { grain: 'day', into: 'series.cash-now' },
   },
 
+  /* HOW MANY ACCOUNTS CASH NOW ADDS UP, AND THE OLDEST DAY ONE OF THEM WAS TRUE: the line under the
+     hero figure, so a reader knows what it is a sum of and how old the weakest part of it is. */
+  'cash-accounts': {
+    metric: 'cash-accounts',
+    name: 'Accounts counted as cash',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 1 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'cash-as-of': {
+    metric: 'cash-as-of',
+    name: 'Oldest balance',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: { min: 'as_of' },
+    format: 'day',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* THE NEXT THIRTY DAYS, AND LATE MONEY IS STILL COMING. A calendar month shrinks to nothing on the
      29th, and `before` is exclusive, so the month's last day could not be said anyway. */
   'in-30d': {
@@ -434,7 +460,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         heading: 'Right now',
         span: 12,
         cells: [
-          { metric: 'cash-now', label: 'Cash now', trend: '12w' },
+          { metric: 'cash-now', label: 'Cash now', trend: '12w', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
           { metric: 'in-30d', label: 'Coming in, 30 days' },
           { metric: 'out-30d', label: 'Going out, 30 days' },
           { metric: 'every-month-out', label: 'Every month' },

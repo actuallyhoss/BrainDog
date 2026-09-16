@@ -749,19 +749,24 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, as the r
   const day = fields.find((f) => f.type === 'day')!.id;
   const word = fields.find((f) => f.type === 'text' || f.type === 'enum')!.id;
   const number = fields.find((f) => f.type === 'money' || f.type === 'int' || f.type === 'decimal')!.id;
-  for (const value of [{ sum: day }, { avg: day }, { min: day }, { max: day }, { sum: word }, { max: word }] as MetricDecl['value'][]) {
+  for (const value of [{ sum: day }, { avg: day }, { sum: word }, { max: word }] as MetricDecl['value'][]) {
     const r = read({ ...METRICS.overdue!, value });
     assert.equal(r.value, null, JSON.stringify(value));
     assert.match(r.refusals[0] ?? '', /reads a number/, JSON.stringify(value));
     assert.match(unreadable({ ...METRICS.overdue!, value }).join(), /reads a number/, `${JSON.stringify(value)} would install`);
   }
   /* Inside a ratio, on either side, and through a product. */
-  assert.match(read({ ...METRICS.overdue!, value: { ratio: { of: { count: 'id' }, per: { max: day } } } }).refusals[0] ?? '', /reads a number/);
+  assert.match(read({ ...METRICS.overdue!, value: { ratio: { of: { count: 'id' }, per: { avg: day } } } }).refusals[0] ?? '', /reads a number/);
   assert.match(read({ ...METRICS.overdue!, value: { sum: { product: [day, { lookup: 'x', by: word }] } } }).refusals[0] ?? '', /reads a number/);
 
   /* A COUNT OR A DISTINCT OF ANY FIELD IS STILL A NUMBER, and so is a sum of a number field. */
   for (const value of [{ count: day }, { distinct: word }, { sum: number }, { min: number }] as MetricDecl['value'][])
     assert.deepEqual(read({ ...METRICS.overdue!, value }).refusals, [], JSON.stringify(value));
+
+  /* AND THE EARLIEST OR THE LATEST DAY IS A DAY, as the record keeps it: whole days since 1970, drawn as one. */
+  const earliest = read({ ...METRICS.overdue!, value: { min: day }, format: 'day' });
+  assert.deepEqual(earliest.refusals, []);
+  assert.match(earliest.shown, /^\d{1,2} [A-Z][a-z]{2}$/u);
 });
 
 test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, so the two engines agree to the penny', () => {

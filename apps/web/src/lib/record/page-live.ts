@@ -37,7 +37,7 @@ import {
 } from './api.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
-import { format, hrefFor, targetLine, withParam } from './metrics.ts';
+import { format, hrefFor, noteOf, targetLine, withParam } from './metrics.ts';
 import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 
@@ -79,7 +79,7 @@ type Answered = {
   fold?: boolean;
   icon?: string;
   columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string }[];
-  cells?: { metric: string; label?: unknown; trend?: unknown }[];
+  cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
      `heading`, `empty`, `body`, `target`, `authored`, and every `label` a column, cell or reading
@@ -100,7 +100,7 @@ type Answered = {
   authored?: unknown;
   rows?: Row[];
   matched?: number;
-  readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said; trend?: unknown }[];
+  readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said; trend?: unknown; note?: unknown }[];
   scopes?: (string | null)[];
   inherited?: number;
   refusals?: Said[];
@@ -209,7 +209,7 @@ const columnsOf = (b: Answered) => {
  * THE VERDICT IS THE RECORD'S (`met`), and a figure over no rows carries none, because a tick over an
  * empty list is a verdict on nothing. The label, the format and the target line are the declaration's.
  */
-function tileOf(cell: NonNullable<Answered['readings']>[number]): Metric {
+function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
   const decl = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
@@ -231,7 +231,17 @@ function tileOf(cell: NonNullable<Answered['readings']>[number]): Metric {
       : /^[A-Z]{3}$/u.test(r.unit)
         ? money(Math.round(r.value), r.unit)
         : quantity(r.value, r.unit),
-    note: decl ? targetLine(decl) : '',
+    /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared. */
+    note:
+      typeof cell.note === 'string'
+        ? noteOf(cell.note, (id) => {
+            const v = values?.[id];
+            if (typeof v === 'number') return format(METRICS[id]?.format, v);
+            return resolverOf(values)(id);
+          })
+        : decl
+          ? targetLine(decl)
+          : '',
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };
@@ -392,7 +402,12 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const authored = authoredOf(b.authored);
   /* A FIGURE'S LABEL IS THE RECORD'S OR ITS OWN NAME. The record checks that a cell names a metric
      and does not check that it carries a label, and the app's type says every cell has one. */
-  const cells = b.cells?.map((c) => ({ metric: c.metric, label: str(c.label) ?? c.metric, ...(typeof c.trend === 'string' ? { trend: c.trend } : {}) }));
+  const cells = b.cells?.map((c) => ({
+    metric: c.metric,
+    label: str(c.label) ?? c.metric,
+    ...(typeof c.trend === 'string' ? { trend: c.trend } : {}),
+    ...(typeof c.note === 'string' ? { note: c.note } : {}),
+  }));
 
   /* THE DECLARATION'S COLUMNS ARE REPLACED BY DRAWN ONES, and everything the record sent that this
      file does not name rides through untouched, so a key a later kernel adds is carried rather than
@@ -429,7 +444,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
-  if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map(tileOf) };
+  if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
   if (kind === 'series') {
     const bars = barsOf(barred);
     return bars ? { ...shell, bars, shown: bars.keys.length, total: bars.keys.length } : cannot;

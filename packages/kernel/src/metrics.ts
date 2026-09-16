@@ -805,6 +805,11 @@ function aggregate(
   );
   /* AN AVERAGE, A MINIMUM AND A MAXIMUM OF NOTHING IS NOT ZERO. A sum of nothing is. */
   if (Number(out?.n ?? 0) === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: null, rows, refusals: [] });
+  /* A DAY'S MINIMUM IS TEXT, `2026-09-11`, and it is kept as the whole days since 1970 that name it. */
+  if (type === 'day' && typeof out?.v === 'string') {
+    const at = Date.parse(`${String(out.v).slice(0, 10)}T00:00:00Z`);
+    return ok({ value: Number.isFinite(at) ? Math.round(at / 86_400_000) : null, unit: null, rows, refusals: [] });
+  }
   return ok({ value: out?.v === null || out?.v === undefined ? null : Number(out.v), unit: null, rows, refusals: [] });
 }
 
@@ -822,6 +827,8 @@ function unaggregatable(kind: string, field: string, schema: Schema): string | n
   if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
   const type = Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
   if (type === undefined || NUMERIC.has(type)) return null;
+  /* THE EARLIEST OR THE LATEST DAY IS A DAY, and it is read as whole days since 1970 (`aggregate`). */
+  if (type === 'day' && (kind === 'min' || kind === 'max')) return null;
   return `${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field.`;
 }
 

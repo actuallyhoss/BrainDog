@@ -310,7 +310,7 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `order` | `[{ field: Id, dir: asc \| desc }]` ≤ 3 | no | 29 §5's rule | — |
 | `limit` | int 1–500 | no | `50` | — |
 | `empty` | text ≤ 200, interpolatable | **yes on every block with a `source`** | — | — |
-| `cells` | 1–6 of `{ metric: Id, label: text ≤ 40 }` | `stat` | — | — |
+| `cells` | 1–6 of `{ metric: Id, label: text ≤ 40, trend?: window, note?: text ≤ 200 }`; `note` replaces the target line under the figure and may carry `{{id}}` | `stat` | — | — |
 | `series` | 1–4 of `{ metric: Id, then?: Id, label?: text ≤ 40, dir?: in \| out }`; every metric grouped by a date with a `bucket`, all the same bucket (`DECLARATION_INVALID`), one currency (`MIXED_CURRENCY`) | `series` | — | `dir ∈ in out` |
 | `back` | int 1–24 buckets, the current one included (`OUT_OF_BOUNDS`) | no | `6` | — |
 | `ahead` | int 0–12 buckets after the current one (`OUT_OF_BOUNDS`) | no | `0` | — |

@@ -1000,3 +1000,10 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave']);
   assert.equal(forecast.shown, forecast.total, 'a forecast is never a slice');
 });
+
+test('CASH NOW SAYS WHAT IT ADDS UP AND HOW OLD ITS OLDEST BALANCE IS, not its target', () => {
+  const stat = page('money')!.blocks.find((b) => b.kind === 'stat')!;
+  const cash = stat.metrics!.find((m) => m.label === 'Cash now')!;
+  assert.match(cash.note, /^in 2 accounts, as of \d{1,2} [A-Z][a-z]{2}$/u);
+  assert.equal(metric('cash-as-of').value, cash.note.split('as of ')[1], 'the day is the oldest liquid balance');
+});

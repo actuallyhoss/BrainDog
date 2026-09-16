@@ -199,7 +199,7 @@ export type PageBlock = {
   field?: string;
   versions?: number;
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
-  cells?: readonly { metric: string; label: string; trend?: string }[];
+  cells?: readonly { metric: string; label: string; trend?: string; note?: string }[];
   /** A `stat`'s: its first figure is the screen's one hero figure. */
   lead?: boolean;
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];

@@ -421,3 +421,34 @@ test('A LEAD FIGURE AND ITS TREND COME THROUGH FROM THE RECORD, and reach the di
   assert.equal(block.rows[0]?.cells[3], '5000 4500 - 4000 3500 3000', 'whole pounds, a gap as a dash');
   assert.equal(block.rows[1]?.cells.length, 3);
 });
+
+test('A FIGURE’S OWN NOTE IS SAID UNDER IT, each figure it names written as that figure is declared', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const tile = blockOf(
+    {
+      kind: 'stat', rows: [], matched: 0, refusals: [],
+      cells: [{ metric: 'cash-now', label: 'Cash now', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' }],
+      readings: [
+        {
+          metric: 'cash-now', label: 'Cash now', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}',
+          reading: { value: 3_385_000, unit: 'GBP', rows: 2, met: true, refusals: [] },
+        },
+      ],
+      /* Two accounts, and the oldest balance on 11 September 2026, as whole days since 1970. */
+      values: { 'cash-accounts': 2, 'cash-as-of': Date.UTC(2026, 8, 11) / 86_400_000 },
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(tile.metrics?.[0]?.note, 'in 2 accounts, as of 11 Sep');
+  const one = blockOf(
+    {
+      kind: 'stat', rows: [], matched: 0, refusals: [],
+      readings: [{ metric: 'cash-now', note: 'in {{cash-accounts}} account(s)', reading: { value: 1, unit: 'GBP', rows: 1, met: true, refusals: [] } }],
+      values: { 'cash-accounts': 1 },
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(one.metrics?.[0]?.note, 'in 1 account');
+});

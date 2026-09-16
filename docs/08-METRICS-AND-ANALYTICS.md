@@ -42,7 +42,7 @@ compare: previous            # the same window, immediately before
 | `source` | a register, **or `series.<id>`** — a time series written by a connector, [25-CONNECTORS](25-CONNECTORS.md) §8 | yes |
 | `where` | the one grammar | no (defaults to everything) |
 | `value` | an aggregation, or a **ratio** — see below. Over a `series.<id>` the legal set is `last · sum · avg · delta · min · max · trend` *(an earlier draft omitted `trend`, the one aggregation that is series-only)* | yes |
-| `format` | `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` | yes |
+| `format` | `money.<CUR>` · `int` · `decimal` · `pct` · `days` · `duration` · `day` (a figure that is a day: the `min` or `max` of a `day` field, kept as whole days since 1970 and drawn as `11 Sep`) | yes |
 | `target` | what good looks like | **yes** |
 | `window` | over what period. For a register source it is the **comparison shift** — `compare` re-evaluates with `asOf = now − W`; for a `series.<id>` source it is the `at` filter ([45-SPEC-RECORD](45-SPEC-RECORD.md) §13 #3) | **yes** |
 | `compare` | `previous` · `year_ago` · `none` | no (default `previous`) |

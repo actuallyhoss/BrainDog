@@ -269,7 +269,8 @@ function digestBody(decl: Declaration): Refusal | null {
 }
 
 /** `08 §2`'s table, closed. A `format` outside these is a figure nothing knows how to draw. */
-const FORMATS = ['int', 'decimal', 'pct', 'days', 'duration'] as const;
+/* `day` is a figure that IS a day, the earliest or latest of a day field, held as whole days since 1970. */
+const FORMATS = ['int', 'decimal', 'pct', 'days', 'duration', 'day'] as const;
 
 /** `08 §2`: `previous` · `year_ago` · `none`, and the default is `previous`. */
 const COMPARE = ['previous', 'year_ago', 'none'] as const;
@@ -826,6 +827,12 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
            without one is drawn under the metric's own name, which is a word the reader can still
            act on, so there is nothing to refuse an author for. What is refused is a label that is
            not text at all. */
+        /* A NOTE IS THE LINE UNDER A FIGURE, in place of its target, and may name other figures as {{id}}. */
+        const note = (cell as { note?: unknown }).note;
+        if (note !== undefined) {
+          const said = textFault(note, EMPTY_BYTES, at, `${id}.${at}'s note for ${String(cell.metric)}`, 'A note is the line drawn under a figure.');
+          if (said) return said;
+        }
         if (cell.label === undefined) continue;
         const fault = textFault(cell.label, LABEL_BYTES, at, `${id}.${at}'s label for ${String(cell.metric)}`, 'A label is what a figure is called on the screen.');
         if (fault) return fault;

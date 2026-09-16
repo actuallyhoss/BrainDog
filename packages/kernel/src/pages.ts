@@ -38,7 +38,7 @@ export type PageBlock = {
   /** `as: 'scope'` draws where the row applies: its project, or everywhere. */
   columns?: { field: string; label?: string; as?: string }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
-  cells?: { metric: string; label?: string; trend?: string }[];
+  cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /** A `stat`'s: its first figure is the screen's one hero figure. */
   lead?: boolean;
   /** A `section`'s: whether it starts shut, and the glyph beside its heading. */
@@ -1089,7 +1089,9 @@ export function pathsOf(block: PageBlock): string[] {
     ? authored.flatMap((r) => (r !== null && typeof r === 'object' && Array.isArray((r as { cells?: unknown }).cells) ? (r as { cells: unknown[] }).cells : []))
     : [];
   const out = new Set<string>();
-  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells]) {
+  /* A FIGURE'S OWN NOTE NAMES FIGURES TOO: `in {{cash-accounts}} account(s)` under Cash now. */
+  const notes = (block.cells ?? []).map((c) => (c as { note?: unknown }).note);
+  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes]) {
     if (typeof text !== 'string') continue;
     /* CODE SPANS FIRST, as the renderer lifts them: a `{{…}}` in backticks is text, not a question. */
     for (const m of text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}]*)\}\}/g)) {

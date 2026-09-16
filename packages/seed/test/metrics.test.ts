@@ -116,7 +116,9 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   for (const e of rows) {
     const raw = e.fields[field];
     if (raw === null || raw === undefined) continue;
-    const amount = typeof raw === 'object' ? (raw as { amount: number }).amount : Number(raw);
+    /* A DAY IS THE WHOLE DAYS SINCE 1970 THAT NAME IT, which is how the record keeps a day's minimum. */
+    const day = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(raw) ? Date.parse(`${raw}T00:00:00Z`) / 86_400_000 : null;
+    const amount = day ?? (typeof raw === 'object' ? (raw as { amount: number }).amount : Number(raw));
     if (typeof raw === 'object') units.add((raw as { currency: string }).currency);
     const factor = product ? LOOKUPS[product[1].lookup]?.[String(e.fields[product[1].by] ?? '')] : 1;
     if (factor === undefined) continue;

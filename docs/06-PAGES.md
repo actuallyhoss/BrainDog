@@ -131,7 +131,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
-| `cells` | `[{ metric, label }]` | — | `stat` |
+| `cells` | `[{ metric, label, trend?, note? }]`. `note` is the line under the figure in place of its target, and may name other figures as `{{id}}`; `N thing(s)` after a figure is said `1 thing` or `2 things` | — | `stat` |
 | `series` | 1–4 of `{ metric, then?, label?, dir?: in \| out }`. On a `series`, each line is a metric grouped by a date and a bucket, every line the same bucket and one currency; `then` names the metric that answers the buckets after the current one (money due, where `metric` is money paid). `in` stands on the zero rule, `out` hangs under it | — | `series` |
 | `back` | int, 1–24. On a `series`, how many buckets it draws up to and including the current one; leading buckets no line has a value in are trimmed | `6` | no |
 | `ahead` | int, 0–12. On a `series`, how many buckets after the current one it draws | `0` | no |

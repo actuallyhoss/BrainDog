@@ -54,7 +54,7 @@ import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type SeriesLine } from '@braindog/kernel';
-import { meetsTarget, read, targetLine, windowMs, withParam } from './metrics.ts';
+import { meetsTarget, noteOf, read, targetLine, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -1973,7 +1973,8 @@ export function readBlock(b: PageBlock): BlockResult {
       stale_at: new Date(NOW).toISOString(),
       metrics: b.cells?.map((c) => {
         const trend = c.trend === undefined ? undefined : trendOf(c.metric, c.trend);
-        return { ...metric(c.metric), label: c.label, ...(trend ? { trend } : {}) };
+        const note = c.note === undefined ? {} : { note: noteOf(c.note, (id) => (METRICS[id] ? metric(id).value : null)) };
+        return { ...metric(c.metric), label: c.label, ...(trend ? { trend } : {}), ...note };
       }),
     };
   }

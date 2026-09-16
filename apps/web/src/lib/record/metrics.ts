@@ -28,7 +28,7 @@
  */
 
 import { GROUP_CAP, bucketOf, bucketRun, isBucket, largestFirst, type Bucket, type Group } from '@braindog/kernel';
-import { integer, money } from 'braindog-render';
+import { integer, money, shortDay } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
@@ -164,7 +164,13 @@ function operand(e: Entry, op: Operand): number | null {
   /* `amountOf` RATHER THAN `Number`, because money is `{ amount, currency }` and `Number({…})` is
      `NaN` — which this used to turn into `null`, so every money metric read as "—" with no refusal
      and no way to tell that from "no rows matched". */
-  if (typeof op === 'string') return amountOf(e.fields[op]);
+  if (typeof op === 'string') {
+    /* A DAY IS READ AS THE WHOLE DAYS SINCE 1970 THAT NAME IT, as the record reads a day's minimum. Only
+       `min` and `max` reach here with one: a sum or an average of days is refused before this. */
+    const v = e.fields[op];
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v)) return Math.round(Date.parse(`${v}T00:00:00Z`) / DAY_MS);
+    return amountOf(v);
+  }
   const [field, { lookup, by }] = op.product;
   const base = operand(e, field);
   const factor = LOOKUPS[lookup]?.[String(e.fields[by] ?? '')];
@@ -342,6 +348,9 @@ export function format(shape: string | undefined, n: number | null): string {
       return `${Math.round(n)} days`;
     case 'decimal':
       return n.toLocaleString('en', { maximumFractionDigits: 2 });
+    /* A FIGURE THAT IS A DAY, held as whole days since 1970: `11 Sep`. */
+    case 'day':
+      return shortDay(new Date(Math.round(n) * DAY_MS).toISOString().slice(0, 10));
     default:
       return String(n);
   }
@@ -459,7 +468,7 @@ const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket']);
 
 /** The formats this build writes. A format it does not know printed the bare number. */
-const READS_FORMAT = ['int', 'pct', 'days', 'decimal'];
+const READS_FORMAT = ['int', 'pct', 'days', 'decimal', 'day'];
 
 /**
  * What the declaration asked for that this build cannot do — named, never ignored.
@@ -524,6 +533,7 @@ function unaggregatable(decl: MetricDecl): string[] {
       const field = typeof op === 'string' ? op : op?.product?.[0];
       if (typeof field !== 'string' || field === 'id') continue;
       const type = fields.find((f) => f.id === field)?.type;
+      if (type === 'day' && (kind === 'min' || kind === 'max')) continue;
       if (type !== undefined && !NUMERIC.has(type))
         out.push(`value: ${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field`);
     }
@@ -764,6 +774,20 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, '
   }
   const groups = [...byValue.entries()].map(([key, of]) => part(key, of)).sort(largestFirst);
   return { groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) };
+}
+
+/**
+ * A figure's own note, with each `{{id}}` it names written as that figure, and `N thing(s)` said properly.
+ *
+ * `in {{cash-accounts}} account(s), as of {{cash-as-of}}` is the line under Cash now. A figure the note
+ * names that cannot be read is the em dash, as it is everywhere else, and `(s)` after a number is the
+ * one plural the sentence needs: `1 account`, `2 accounts`.
+ */
+export function noteOf(template: string, said: (id: string) => string | null): string {
+  return template
+    .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => said(id) ?? '—')
+    .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : `${word}s`}`)
+    .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
 }
 
 /**
