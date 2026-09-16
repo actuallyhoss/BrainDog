@@ -36,7 +36,11 @@ export type CatalogueEntry = {
   summary: string;
   /** The packs installed before it, in order. */
   modules: readonly string[];
-  doc: () => Record<string, unknown> | null;
+  /**
+   * The document to install, for a record that holds `holds` once the packs before it are in, so a link to a list
+   * the record will not hold can be left out.
+   */
+  doc: (options: { holds: readonly string[] }) => Record<string, unknown> | null;
 };
 
 type Body = Record<string, unknown>;
@@ -166,7 +170,7 @@ export function arranger(d: ArrangeDeps) {
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
     const out: Planned = { plan: [], approve: [], batch: [], config: new Map() };
     for (const id of ids) {
-      const read = await packOf(id, docs);
+      const read = await packOf(id, docs, heldBy(state));
       if (!read.ok) return read;
       const pack = read.value;
       const diff = await plan(pack, state);
@@ -197,8 +201,12 @@ export function arranger(d: ArrangeDeps) {
     return ok(out);
   }
 
-  async function packOf(id: string, docs: ReadonlyMap<string, Body>): Promise<Result<Pack>> {
-    const doc = docs.get(id) ?? entryOf(id)?.doc() ?? null;
+  /** The lists a declaration state holds. */
+  const heldBy = (state: Installed): string[] =>
+    state.declarations.filter((decl) => decl.kind === 'register').map((decl) => decl.id.slice('register.'.length));
+
+  async function packOf(id: string, docs: ReadonlyMap<string, Body>, holds: readonly string[]): Promise<Result<Pack>> {
+    const doc = docs.get(id) ?? entryOf(id)?.doc({ holds }) ?? null;
     if (!doc) return notOffered(id, 'body.packs');
     const pack = await normalise(doc, { kind: 'local' });
     if (!pack.ok) return pack;
@@ -405,9 +413,10 @@ export function arranger(d: ArrangeDeps) {
         done.enabled.push(id);
         continue;
       }
-      const pack = await packOf(id, docs);
+      const state = d.installed();
+      const pack = await packOf(id, docs, heldBy(state));
       if (!pack.ok) return stopped(pack);
-      const diff = await plan(pack.value, d.installed());
+      const diff = await plan(pack.value, state);
       const unshown = diff.approve.filter((line) => !approved.includes(line));
       if (unshown.length > 0)
         return stopped(refuse('PLAN_STALE', `${id} now calls out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));

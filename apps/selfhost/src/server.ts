@@ -41,6 +41,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
+import { seedCatalogue } from './catalogue.ts';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
@@ -683,6 +684,8 @@ export async function start(options: {
     delivers: options.actions ? [...delivers, 'pull.fetch'] : delivers,
     sign,
     invitations: () => invitesOff,
+    /* WHAT AN AGENT MAY PROPOSE INSTALLING: the first-party packs and the starter use cases (`catalogue.ts`). */
+    catalogue: seedCatalogue(),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.

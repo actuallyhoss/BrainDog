@@ -1,0 +1,63 @@
+/**
+ * What this self-host offers to install by proposal: the first-party packs and the starter use cases
+ * (`loop/research-spark.md` S12).
+ *
+ * THE HOST'S, BECAUSE THE RECORD NAMES NO USE CASE. The record reads this list to tell an agent what is on offer
+ * and to plan what a `pack` or `arrange` proposal would install; it never installs from it until the owner accepts.
+ *
+ * NO EXAMPLE ROWS FROM A BARE MODULE. A first-party pack asked for by itself carries none, because its own
+ * examples are the sample studio's and would land in somebody else's record. A use case carries its own.
+ */
+
+import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
+import type { CatalogueEntry } from '@braindog/record';
+import { AGENTS_PACK, FIRST_PARTY, agentsPackDocument, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
+import { MODULE_ORDER, USE_CASES, modulesFor, useCaseDocument } from '@braindog/seed/usecases';
+
+const today = (): string => new Date().toISOString().slice(0, 10);
+
+/** The first-party packs that must be in before a pack needing `requires`, every one they need too, in install order. */
+function before(requires: readonly string[]): string[] {
+  const wanted = new Set<string>();
+  const visit = (register: string) => {
+    const pack = FIRST_PARTY_LISTS.get(register.replace(/^register\./u, ''));
+    if (!pack || wanted.has(pack)) return;
+    wanted.add(pack);
+    for (const r of firstPartyManifest(pack as FirstPartyId).requires) visit(r);
+  };
+  for (const r of requires) visit(r);
+  return MODULE_ORDER.filter((id) => wanted.has(id));
+}
+
+/** The first-party packs, each with no example rows, and the use cases that carry a pack of their own. */
+export function seedCatalogue(): CatalogueEntry[] {
+  const modules: CatalogueEntry[] = FIRST_PARTY.map((id) => {
+    const bare = firstPartyDocument(id, { seeds: [] });
+    return {
+      id,
+      kind: 'pack',
+      title: id,
+      summary: typeof bare?.summary === 'string' ? bare.summary : '',
+      modules: before(firstPartyManifest(id).requires).filter((m) => m !== id),
+      doc: ({ holds }) => {
+        const doc = firstPartyDocument(id, { holds, seeds: [] });
+        if (doc && Array.isArray(doc.seeds) && doc.seeds.length === 0) delete doc.seeds;
+        return doc;
+      },
+    };
+  });
+  const agents = agentsPackDocument();
+  const useCases: CatalogueEntry[] = USE_CASES.filter((u) => useCaseDocument(u.usecase) !== null).map((u) => ({
+    id: packIdOf(u.usecase),
+    kind: 'usecase',
+    title: u.title,
+    summary: u.summary,
+    modules: modulesFor(u),
+    doc: () => useCaseDocument(u.usecase, today()),
+  }));
+  return [
+    ...modules,
+    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), doc: () => agentsPackDocument() },
+    ...useCases,
+  ];
+}

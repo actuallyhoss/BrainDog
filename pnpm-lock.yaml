@@ -45,6 +45,9 @@ importers:
 
   apps/selfhost:
     dependencies:
+      '@braindog/declare':
+        specifier: workspace:*
+        version: link:../../packages/declare
       '@braindog/host':
         specifier: workspace:*
         version: link:../../packages/host
@@ -60,6 +63,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../../packages/record
+      '@braindog/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
     devDependencies:
       '@braindog/client':
         specifier: workspace:*

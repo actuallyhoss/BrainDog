@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@braindog/declare": "workspace:*",
     "@braindog/host": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
-    "@braindog/record": "workspace:*"
+    "@braindog/record": "workspace:*",
+    "@braindog/seed": "workspace:*"
   },
   "scripts": {
     "start": "node src/main.ts",
