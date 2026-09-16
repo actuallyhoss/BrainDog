@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { copy } from '../copy.ts';
 import { answer, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
+import type { Question } from './schema.ts';
 
 type Calls = { name: string; args: unknown }[];
 
@@ -239,7 +240,7 @@ test('A DECISION IS PAIRED BY THE SUGGESTION IT NAMES, not guessed from its opti
     },
   });
 
-  const label = (q: { options: { key: string; title: string }[]; decided?: { option: string } } | null | undefined) =>
+  const label = (q: Question | null | undefined) =>
     q?.options.find((o) => o.key === q.decided?.option)?.title;
 
   const queue = await readQueue(linked);
