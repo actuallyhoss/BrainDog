@@ -35,7 +35,7 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * surface. The ground is now a barely warm grey (hue 75, chroma capped at 0.004 in the profile).
  *
  * FIVE · THE ACCENT IS THE BRAND'S FAMILY AGAIN, BUT NOT ITS ALARM. Production is BrainDog, and
- * BrainDog is red, so the accent is a berry rose at hue 5: 22 degrees cooler than `danger` at 27 and
+ * BrainDog is red, so the accent is a rose red at hue 10: 17 degrees cooler than `danger` at 27 and
  * lower in chroma than the mark, which is the distance between a brand colour and a warning. It is
  * spent sparingly: focus, selection, links, checked controls, the record's tile and the place you
  * are. Primary actions are drawn in ink. Alpha derives its own accent from this one, so the two
@@ -52,7 +52,7 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * `info` is only ever a glyphed word, and the accent is a control.
  */
 export const HOUSE_SEED: Seed = {
-  accent: 'oklch(0.55 0.14 5)',
+  accent: 'oklch(0.55 0.15 10)',
   neutralHue: 75,
   space: 4,
   radius: { sm: 6, md: 8, lg: 12 },
