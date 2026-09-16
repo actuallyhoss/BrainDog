@@ -29,6 +29,13 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * cream in light, warm olive-black in dark. On a screen it read as khaki, the colour of a form.
  * Hue 165 at the same capped chroma is near-black glass in dark and a clean pale grey in light.
  *
+ * FOUR · 2026-09-16, THE LAVENDER AND THE MINT GO (loop/DESIGN-BRIEF.md 4.1). An indigo accent and a
+ * tinted ground were the two things that made the app read as a theme rather than a product: indigo
+ * is the colour every generated dashboard reaches for, and hue 165 put a mint cast on every
+ * surface. The ground is now a barely warm grey (hue 75, chroma capped at 0.004 in the profile) and
+ * the accent is a calm blue spent on focus, selection, links in prose and checked controls. Primary
+ * actions are drawn in ink, not in the accent.
+ *
  * THREE · THE ACCENT'S POINT IS STILL A WINDOW. A white label on the fill needs 4.5:1, which caps
  * its luminance, and the fill needs 3:1 against the lightest surface and the darkest. At
  * `oklch(0.565 0.18 278)` it is #6164DC with a white label at 4.81:1. It is 14 degrees from
@@ -36,10 +43,10 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * `info` is only ever a glyphed word, and the accent is a control.
  */
 export const HOUSE_SEED: Seed = {
-  accent: 'oklch(0.565 0.18 278)',
-  neutralHue: 165,
+  accent: 'oklch(0.56 0.13 255)',
+  neutralHue: 75,
   space: 4,
-  radius: { sm: 6, md: 9, lg: 14 },
+  radius: { sm: 6, md: 8, lg: 12 },
   density: 'comfortable',
 };
 

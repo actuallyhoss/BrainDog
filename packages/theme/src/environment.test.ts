@@ -38,12 +38,12 @@ const BRAND_HUE = rgbToLch(fromHex(BRAND_RED)).H;
 
 /* -- the hue is derived, not chosen ---------------------------------------- */
 
-test('the environment hue is the farthest legal point from the accent and the brand, and it is 334', () => {
+test('the environment hue is the farthest legal point from the accent and the brand, and it is 115', () => {
   /* PINNED IN THE TEST AND COMPUTED IN THE SOURCE. `nextAccentHue` is the derivation; this number
      is the answer it gives today. If somebody improves the scorer, this line goes red naming the
      degree it moved to - which is a review, not a silent repaint of a deployed environment. */
-  assert.equal(environmentHue(HOUSE_SEED), 334);
-  assert.equal(ALPHA_SEED.accent, 'oklch(0.565 0.179 334)');
+  assert.equal(environmentHue(HOUSE_SEED), 115);
+  assert.equal(ALPHA_SEED.accent, 'oklch(0.559 0.131 115)');
 });
 
 test('the environment seed changes the hue and nothing else', () => {
@@ -63,7 +63,7 @@ test('it is at least the intent floor away from every intent anchor', () => {
   const gaps = intentGaps(environmentHue(HOUSE_SEED));
   for (const [name, gap] of Object.entries(gaps))
     assert.ok(gap >= 20, `the environment accent is ${gap.toFixed(1)} degrees from ${name}, and 20 is the floor`);
-  assert.deepEqual(gaps, { earn: 171, warn: 101, danger: 53, info: 70 });
+  assert.deepEqual(gaps, { earn: 30, warn: 40, danger: 88, info: 149 });
 });
 
 /* -- what it costs the rest of the palette: nothing ------------------------- */

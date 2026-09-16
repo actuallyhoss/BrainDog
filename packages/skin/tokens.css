@@ -92,20 +92,22 @@
 
     --t-xs: 12px;
     --t-sm: 13px;
-    --t-base: 15px;
-    --t-md: 17px;
+    /* 2026-09-16, one notch down (loop/DESIGN-BRIEF.md 4.2). Every reference for a dense record sets
+       its chrome at 13 to 14 and ranks with weight and ink; 15 made a ledger read like a landing
+       page. Long prose still reaches 16 through `--t-md`. */
+    --t-base: 14px;
+    --t-md: 16px;
     --t-lg: 20px;
     --t-xl: 24px;
-    --t-2xl: 28px;
-    --t-3xl: 34px;
+    --t-2xl: 32px;
+    --t-3xl: 40px;
     --text: var(--t-base);
 
     --lh-tight: 1.22;
     --lh-body: 1.5;
 
-    /* The chrome reads at the body size, not below it. Running labels, rows and controls at 13
-       bought density nobody asked for and cost comfort everybody notices: a record is read for an
-       hour at a time. 15 is the body step, and the chrome is body.
+    /* The chrome reads at the body size, not below it. 14 is the body step, and the chrome is body;
+       the reader who wants more sets Text to Large.
 
        AND `--text` IS THE BODY STEP, WHICH IS THE WHOLE POINT OF IT. This read `var(--t-base)` — a
        constant — so the Settings → Text control set `data-text`, lit its segment, wrote the cookie,
@@ -140,8 +142,8 @@
     /* Softer than they were (4 / 6 / 8), which read as a spreadsheet's cells. A control or a card
        is a thing you can pick up, and a pill is the shape of a choice or a single action. */
     --r-sm: 6px;
-    --r-md: 9px;
-    --r-lg: 14px;
+    --r-md: 8px;
+    --r-lg: 12px;
     --r-pill: 999px;
 
     /**
@@ -176,9 +178,18 @@
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
-    --row-h: 34px;
-    --ctl-h: 36px;
+    --row-h: 36px;
+    --ctl-h: 32px;
     --tap: 44px;
+    /* Header and row actions, a two-line row, a table row, a rail row (DESIGN-BRIEF 4.3). */
+    --ctl-h-sm: 28px;
+    --row-h-2: 56px;
+    --table-row-h: 40px;
+    --rail-item-h: 30px;
+    /* The widest a dashboard page's content runs, left aligned in the panel. */
+    --page-max: 1280px;
+    /* The one intent mark a row may carry. */
+    --dot: 6px;
     /**
      * THE TAB BAR'S HEIGHT, IN ONE PLACE, because three files were each doing the arithmetic and
      * two of them got a different answer.
@@ -193,7 +204,7 @@
     --tabbar: calc(var(--tab-h) + env(safe-area-inset-bottom));
     --measure: 72ch;
     --sticky: 52px;
-    --rail: 244px;
+    --rail: 240px;
     --kb: 0px;
 
     --icon-s: 12px;
@@ -296,6 +307,10 @@
     --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
     --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
+    /* A divider between rows of one list, softer than a boundary. */
+    --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
+    /* Primary actions are drawn in ink, not in the accent (DESIGN-BRIEF 4.1). */
+    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
     --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
 
     /* A GROUND TINTED TOWARDS THE ACCENT, which is the accent as a SURFACE rather than as a
@@ -340,13 +355,13 @@
      * others is worse than one that never answers, because the ones it ignores cannot tell that
      * from a tap the product missed.
      */
-    --press-scale: 0.97;
+    --press-scale: 0.98;
     --press-dim: 0.62;
     --ease-push: cubic-bezier(0.4, 0, 1, 1);
 
     --d-press: 90ms;
     --d-release: 180ms;
-    --d-state: 180ms;
+    --d-state: 120ms;
     --d-move: 240ms;
     --d-enter: 280ms;
     --d-exit: 160ms;
@@ -399,9 +414,9 @@
     :root { --ctl-h: 44px; }
   }
 
-  html[data-density='compact'] { --row-h: 30px; }
-  html[data-density='comfortable'] { --row-h: 34px; }
-  html[data-density='roomy'] { --row-h: 40px; }
+  html[data-density='compact'] { --row-h: 32px; }
+  html[data-density='comfortable'] { --row-h: 36px; }
+  html[data-density='roomy'] { --row-h: 44px; }
 
   html[data-scheme='dark'] { color-scheme: dark; }
   html[data-scheme='light'] { color-scheme: light; }

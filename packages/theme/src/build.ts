@@ -140,10 +140,11 @@ export const HOUSE_PROFILE: Profile = {
    * mint.
    */
   ladder: {
-    dark: { sunk: 0.15, bg: 0.168, s1: 0.2, s2: 0.23, s3: 0.262 },
-    light: { sunk: 0.938, bg: 0.962, s1: 0.988, s2: 0.994, s3: 0.999 },
+    dark: { sunk: 0.155, bg: 0.185, s1: 0.215, s2: 0.245, s3: 0.275 },
+    light: { sunk: 0.955, bg: 0.99, s1: 0.994, s2: 0.997, s3: 1 },
   },
-  groundC: { dark: 0.01, light: 0.006 },
+  /* 2026-09-16: a grey that is not cold, not a tint anyone can name. At 0.004 no hue is visible. */
+  groundC: { dark: 0.004, light: 0.004 },
   prefer: {
     dark: { earn: 7, warn: 8.5, danger: 5, info: 6 },
     light: { earn: 4.5, warn: 7, danger: 5.5, info: 5.5 },
@@ -430,7 +431,8 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
 
   /* 2 · ink ramp. Tinted toward the GROUND, not toward the accent: warm paper wants warm ink, and
      ink that leans toward a red accent comes out pink. */
-  const Cink = 0.012;
+  /* No more chroma than the ground plus a hair: a warm ink on a grey ground reads as brown. */
+  const Cink = Math.min(0.012, (profile.groundC?.[scheme] ?? 0.012) + 0.002);
   const [ink, ink2, dim, faint] = profile.ink.map((t) => hex(solveL(t, Cink, nHue, worst, dir))) as [
     string, string, string, string,
   ];
@@ -445,7 +447,9 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   /* 1.55, not 1.35. With no shadow anywhere in the system a border IS the boundary, so it has to be
      seen rather than merely found — a thin olive hairline that says "this is a card", not a
      suggestion of one. Flat and confident beats soft and vague. */
-  const line = hex(solveL(1.55, Cink, nHue, rgb(g.bg), dir));
+  /* 2026-09-16, back to a hairline (loop/DESIGN-BRIEF.md 4.1): space separates groups now, so a
+     line only has to be findable, and 1.55 drew a box around everything. */
+  const line = hex(solveL(1.35, Cink, nHue, rgb(g.bg), dir));
 
   /* 4 · the accent FILL. The text role waits until after the intents, and step 6 says why. */
   const accent = hex(gamutMap(acc));
