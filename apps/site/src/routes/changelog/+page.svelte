@@ -28,15 +28,226 @@
   const STATUS = {
     title: 'The app is live. Nothing is for sale yet.',
     body:
-      'The record app is deployed from this repository on every push, and you can open it and use ' +
-      'it. It draws a synthetic record rather than yours: the kernel behind it is about a third ' +
-      'built, and there is no sign-up, no billing and no release to install. The design is ' +
-      'fifty-four documents, written before the code and still the only thing it is built from, ' +
-      'and they open with the source. This page is what there is to read until then, and it is ' +
-      'written the same way: what is built, what is not, and what is wrong with what is.',
+      'The record app deploys itself from this repository on every green build, and you can open ' +
+      'it. It still draws a synthetic record rather than yours, because there is no hosted record ' +
+      'to draw: signing in began working today, and the key that makes a record is not set, so ' +
+      'there is nothing behind the door yet. There is no sign-up, no billing and no release to ' +
+      'install, and a record is made by the operator rather than by a visitor. The kernel behind ' +
+      'the app is about three fifths built. The design is fifty-four documents, written before ' +
+      'the code and still the only thing it is built from, and they open with the source. This ' +
+      'page is what there is to read until then, and it is written the same way: what is built, ' +
+      'what is not, and what is wrong with what is.',
   };
 
   const ENTRIES: Entry[] = [
+    {
+      date: '2026-09-16',
+      kind: 'shipped',
+      title: 'Signing in works, and there is still nothing to sign in to',
+      body:
+        'The hosted app answered every question about signing in with the word off until this ' +
+        'morning, because the one secret its sessions are built on had never been set on the ' +
+        'production server. It is set, and the app now offers a passkey and a first-run path. ' +
+        'That is one half of a door. The other half is a record to open, and none can be made ' +
+        'yet, because the key the making of a record needs is still unset. There is no ' +
+        'self-service sign-up either: a record is made by the operator, not by a visitor. So ' +
+        'signing in works and has nothing behind it, which is a smaller thing than it sounds and ' +
+        'the only honest way to say it.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'changed',
+      title: 'The status report said the writing had not started, and six modules of it had landed',
+      body:
+        'The report kept a table of how far along each part of the product is, and the row for ' +
+        'the app writing anything down read nothing started. Six write modules and their tests ' +
+        'were already in the tree, for rows, the decision queue, the inbox, declared pages, ' +
+        'settings and packs, and both list screens were writing through them. The row above it ' +
+        'had been revised every time a screen learned to read, so the table was current ' +
+        'everywhere except the line somebody would most want to trust. The figure is a count now ' +
+        'rather than an estimate: of fifty-two gestures that tell you nothing was saved, ' +
+        'thirty-seven are the demo being honest about being a demo, and fifteen are reachable on ' +
+        'a real record and each want a write path that does not exist yet.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'shipped',
+      title: 'A page is a file you can pull, edit and push back',
+      body:
+        'The name was on the wrong thing. A .dog file is a page\'s source now, one page to one ' +
+        'file, which is what somebody means when they open the source of a page; the file holding ' +
+        'a whole record is a .brain, and its readable dump a .brainl. The app could already print ' +
+        'that source and could do nothing else with it, so the text was a box to look at: it ' +
+        'could not be saved, sent to anybody, or edited and applied. It is a file you can keep ' +
+        'now, and the command line pulls one, checks it against the grammar without sending ' +
+        'anything, and pushes it back. Pushing needed a reader, because the old code only ever ' +
+        'wrote. A file carrying rows somebody typed is refused rather than pushed, because the ' +
+        'printed form keeps only how many there were, and the alternative is a push that quietly ' +
+        'replaces real rows with nothing. One part does not work yet. The earlier answer here was ' +
+        'that pushing needed a new door built beside the one the key store got, and that was ' +
+        'wrong: that door is safe precisely because it admits only a credential the record ' +
+        'already accepts, and a command line holds exactly the kind the record refuses, so there ' +
+        'is no narrow version of it. What stands in the way is a written decision, and changing ' +
+        'it belongs to the owner rather than to the code.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'changed',
+      title: 'The rail collapses to its glyphs instead of being taken away',
+      body:
+        'Collapsing the sidebar removed every row of navigation and left one button in an empty ' +
+        'gutter. The setting survives a reload, so a keyboard shortcut pressed by accident stayed ' +
+        'pressed, and one screen swept in that state offered six controls of which all six were ' +
+        'the same Reveal button. Nobody means that by collapsed. They mean the rail that keeps ' +
+        'its glyphs, so the same setting narrows it now, every row survives, and each glyph hands ' +
+        'its name back on hover and on focus. The design documents said flatly not a top nav, and ' +
+        'the argument under it is good about the default: the navigation is a query over the ' +
+        'pages a record holds, so it varies in length from one business to the next, and a ' +
+        'horizontal strip hides the part that varies the moment it overflows. It is not a good ' +
+        'argument about somebody with four entries and a wide screen, so the sentence says not by ' +
+        'default now, and a top bar and a menu are shapes a person can ask for, with the top bar ' +
+        'stating how many pages sit behind More rather than swallowing them. A design agent reads ' +
+        'the record and recommends one of the shapes with the numbers it counted, and never ' +
+        'applies one.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'shipped',
+      title: 'The record switcher lists every record you can reach',
+      body:
+        'It held the one record you were already inside, under a sentence explaining that it ' +
+        'could not do better, because nothing anywhere answered the question of which records an ' +
+        'account holds. A record cannot answer that about itself without reaching across every ' +
+        'other customer record, which is the one shape the boundary between customers forbids, so ' +
+        'it is a read at the level of the account instead. The directory is asked which records ' +
+        'are open to a person, and then every one of those records is asked about itself, and a ' +
+        'row is kept only where the record itself answers with a level. That second half is the ' +
+        'whole security of it: the two lists of who belongs cannot be written in one transaction, ' +
+        'so they drift, and somebody removed from a record can still be sitting in the directory. ' +
+        'A read that is refused keeps the record you are standing in and says why the rest are ' +
+        'missing, in the words the server used.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'shipped',
+      title: 'A row is edited a field at a time, and what points at it is read from the record',
+      body:
+        'A row\'s page takes one field at a time and writes each change through, rather than ' +
+        'offering the whole row or nothing. What points at that row is read from the record as ' +
+        'well, so following a reference back arrives at real rows rather than at the demo\'s copy ' +
+        'of them. A key can be put into the vault from the browser now, through the key doors ' +
+        'both the self-hosted server and the hosted one serve, which leaves the rule about ' +
+        'credentials where it was: the host seals the key and the record only ever says what it ' +
+        'opens.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'changed',
+      title: 'A saved view is a row the record holds, not a URL',
+      body:
+        'A view was page state: a filter sitting in an address, lost when the tab closed and ' +
+        'impossible for a colleague to open. It is a row on a list now, carrying its filter, its ' +
+        'search, its order and its columns, and who first saved it and when. It lives in the part ' +
+        'of the record that does not travel in an export, because a view is how this record looks ' +
+        'at its own rows rather than a fact about the business. Saving one and retiring one are ' +
+        'owner-level acts rather than bookmarks, because a saved view goes onto the list everyone ' +
+        'sees, which makes it a change to what the record offers.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'fixed',
+      title: 'The first row you type is written down, instead of being told it went nowhere',
+      body:
+        'The button that commits the first row somebody types had no live path at all. It put the ' +
+        'row aside and printed that nothing had been saved, whatever it was looking at, so a ' +
+        'person with a record of their own pressed the most consequential button in the product ' +
+        'and was told the one true fact they had typed had gone nowhere. It had, and they had to ' +
+        'type it again somewhere else. On a record the row is written now, and the outcome names ' +
+        'it and the list it is at the top of; pressing a second time corrects the row it wrote ' +
+        'rather than leaving another one behind, because the form stays on screen and fixing a ' +
+        'typo is the ordinary next thing to do. On the demo nothing changes, and the row still ' +
+        'waits, which is the truth about a tab with no record behind it. Rows that are waiting ' +
+        'are counted above every screen now rather than only on the one list the person has ' +
+        'already walked away from.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'shipped',
+      title: 'The app deploys itself, and a gate checks that the deploy landed',
+      body:
+        'The operations document has said since it was written that a forward deploy comes from ' +
+        'the pipeline and never from somebody\'s laptop, and there was no pipeline, so the ' +
+        'procedure written down was not the procedure being followed, which is the one thing a ' +
+        'written procedure is for. There is one now. It runs after the checks finish rather than ' +
+        'on the push, because only that can say the main branch is green; it builds the commit ' +
+        'the checks measured rather than the newest one, so it never ships something nothing has ' +
+        'looked at; and it queues rather than cancels, because a cancelled deploy is one killed ' +
+        'between uploading a version and turning it on. The deploy tool reports success while the ' +
+        'host is still serving the previous version, which is recorded three times, so a gate ' +
+        'compares the live app against the bytes just built and asks the running server which ' +
+        'version it believes it is. The app deploys to app.brain.dog this way. This site is meant ' +
+        'to follow in the same run and does not today: its step sits after that gate, and the ' +
+        'gate has been stopping first, which is why this page can be a day behind the app it ' +
+        'describes.',
+    },
+    {
+      date: '2026-09-16',
+      kind: 'fixed',
+      title: 'Three screens drew invented rows under your own heading',
+      body:
+        'Three screens could be reached on a real record and all three drew the built-in demo ' +
+        'whatever record was open, so somebody signed into their own business was shown made-up ' +
+        'rows under their own heading with nothing saying which they were. The thread view simply ' +
+        'never asked the record, and it asks now, through the same working-out the demo goes ' +
+        'through, so one piece of code serves both and the two cannot drift apart. The other two ' +
+        'have no way to read at all: nothing answers with what an agent run called, and a share ' +
+        'link resolves against a list written into the page, so both drew the same rows for every ' +
+        'reader. Neither invents one now. Each says what it is instead, once, where the demo ' +
+        'already says so.',
+    },
+    {
+      date: '2026-09-15',
+      kind: 'shipped',
+      title: 'The app writes to a real record, and most of its screens read one',
+      body:
+        'Until this week every screen drew a made-up business. The list, search, a row\'s page, ' +
+        'the decision queue, declared pages, the layout, home, history and the inbox read the ' +
+        'record now, and each says so where a block cannot be drawn live rather than quietly ' +
+        'showing the demo instead. Then they began writing to it: rows added, cells edited, a ' +
+        'state set on one row or on a selection, a decision answered or put off, an arrival filed ' +
+        'into a list or archived, cards moved and tasks ticked on a declared page, levels ' +
+        'changed, tokens made and revoked, packs installed and removed. Rows archive and restore ' +
+        'with an undo rather than a confirmation. A self-hosted record can be copied, put back ' +
+        'and deleted; the hosted one says plainly that it cannot and points at the export.',
+    },
+    {
+      date: '2026-09-14',
+      kind: 'changed',
+      title: 'Everything is a module, and the first question is who are you',
+      body:
+        'The direction changed on the owner\'s instruction. Every module can be turned off and on ' +
+        'again, People included, and the first thing setting up a record asks is who you are, ' +
+        'filling the first person in People with the answer. The record is the data and ' +
+        'visualisation layer for AI agents, and when a choice trades that against something else, ' +
+        'that wins. The documents the next pass had to revisit are listed beside the decision, ' +
+        'because a change of direction that does not say what it invalidates is one nobody can ' +
+        'act on.',
+    },
+    {
+      date: '2026-09-11',
+      kind: 'shipped',
+      title: 'Agents reach the record, and a session can ask where it stands',
+      body:
+        'An agent gets the same typed surface a person does, over the protocol agent tools ' +
+        'already speak, offered both by the command line and over the network by both hosts, with ' +
+        'the caller\'s token checked before the body is read. Every agent gets a run, a run ' +
+        'carries the project it belongs to, and a session can ask the record where it stands in ' +
+        'one call: its run, its project, the last handoff, who else is working, what is waiting ' +
+        'on the owner and the question each of those asks, with keys shown only as sealed. ' +
+        'Signing in works end to end on a self-hosted record from the same week, with passkeys, ' +
+        'sessions, and a lockout reserved before the comparison rather than after it. The hosted ' +
+        'half shipped switched off, waiting on a secret nobody had set.',
+    },
     {
       date: '2026-09-10',
       kind: 'changed',
