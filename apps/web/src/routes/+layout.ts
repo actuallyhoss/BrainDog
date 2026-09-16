@@ -24,12 +24,16 @@ export const prerender = false;
 let reach: Promise<Answer<SwitcherRow[]>> | null = null;
 
 export async function load({ url, fetch }): Promise<Shell> {
-  const [{ boot, INBOX }, live, { readRecordsForSwitcher }] = await Promise.all([
+  const [{ boot, INBOX }, live, { readRecordsForSwitcher }, voice] = await Promise.all([
     import('$lib/record/api.ts'),
     import('$lib/record/boot-live.ts'),
     import('$lib/record/switcher.ts'),
+    import('$lib/voice.svelte.ts'),
   ]);
   const booted = await live.readBoot(url.origin);
+  /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings (`loop/research-spark.md` §2.2). Asked once per
+     `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
+  await voice.listen(booted.from === 'live' ? booted.boot : null, url.origin).catch(() => undefined);
 
   /* NO RECORD HERE, AND THE SAMPLE IS DRAWN EXACTLY AS BEFORE. A refusal of any other kind is the
      record's answer, so the shell draws nothing of the sample and the screen says what it said. */

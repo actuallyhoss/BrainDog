@@ -31,6 +31,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
+  import { said } from '../voice.svelte.ts';
   import { arrange } from '../nav.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
@@ -394,13 +395,13 @@
        different product, so no pack may add to it, reorder it or badge it. -->
   <ul class="group spine">
     <li>
-      <a class="item tap" href="/" data-label={copy.home} aria-current={here('/') ? 'page' : undefined}>
-        <Icon name="home" size="m" /><span class="item-name">{copy.home}</span>
+      <a class="item tap" href="/" data-label={said('home')} aria-current={here('/') ? 'page' : undefined}>
+        <Icon name="home" size="m" /><span class="item-name">{said('home')}</span>
       </a>
     </li>
     <li>
-      <a class="item tap" href="/decide" data-label={copy.decide} aria-current={under('/decide') ? 'page' : undefined}>
-        <Icon name="decide" size="m" /><span class="item-name">{copy.decide}</span>
+      <a class="item tap" href="/decide" data-label={said('decide')} aria-current={under('/decide') ? 'page' : undefined}>
+        <Icon name="decide" size="m" /><span class="item-name">{said('decide')}</span>
         <!-- ONE TREATMENT FOR EVERY NUMBER IN THIS RAIL. These two were bordered pills and the
              registers' were bare tabular figures, so the same fact — how many rows are behind this
              row — was drawn two ways in one column, and the pill read as an alert rather than a
@@ -415,8 +416,8 @@
       </a>
     </li>
     <li>
-      <a class="item tap" href="/inbox" data-label={copy.inbox} aria-current={under('/inbox') ? 'page' : undefined}>
-        <Icon name="inbox" size="m" /><span class="item-name">{copy.inbox}</span>
+      <a class="item tap" href="/inbox" data-label={said('inbox')} aria-current={under('/inbox') ? 'page' : undefined}>
+        <Icon name="inbox" size="m" /><span class="item-name">{said('inbox')}</span>
         {#if inbox}<span class="tally num">{inbox}</span>{/if}
       </a>
     </li>
@@ -519,7 +520,7 @@
         <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
           <Icon name="chevronDown" size="s" />
         </span>
-        {copy.lists}
+        {said('lists')}
       </button>
     </h2>
     {/if}

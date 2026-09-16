@@ -15,6 +15,7 @@
   import { titleOf } from '$lib/title.ts';
   import { MISSING, relative, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import * as pref from '$lib/pref.ts';
   import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
@@ -148,7 +149,7 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(copy.home)}</title></svelte:head>
+<svelte:head><title>{titleOf(said('home'))}</title></svelte:head>
 
 <!-- `display: contents`, so the sticky head still sticks to the panel and Home can set its title
      at the page-title size without changing every other screen's head. -->
@@ -174,7 +175,7 @@
       no figure is louder than another, and state lives in the qualifier line under each.
     -->
     {#if cells.length > 0}
-      <Section title={copy.rightNow}>
+      <Section title={said('right_now')}>
         <!-- Up to four across; three figures take thirds rather than leaving a fourth track empty. -->
         <div class="stats" style="--cols:{Math.min(4, Math.max(3, cells.length))}">
           {#each cells as m (m.id)}
@@ -199,7 +200,7 @@
       </Section>
     {/if}
 
-    <Section title={copy.needsYou} count={needCount}>
+    <Section title={said('needs_you')} count={needCount}>
       {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
         {@const anything =
           (data.live
@@ -209,7 +210,7 @@
              an action, because on the second there is nothing to do and that is the message. -->
         <Empty
           kind={anything === 0 ? 'no-data-yet' : 'cleared'}
-          title={anything === 0 ? copy.recordEmpty : copy.nothingNeedsYou}
+          title={anything === 0 ? copy.recordEmpty : said('nothing_needs_you')}
           body={anything === 0 ? copy.recordEmptyBody : undefined}
         >
           {#snippet actions()}
@@ -286,14 +287,14 @@
   </div>
 
   <aside class="secondary">
-    <Section title={copy.sinceAway} count={fresh.length}>
+    <Section title={said('since_away')} count={fresh.length}>
       {#snippet aside()}
         {#if fresh.length > 0}
           <button type="button" class="mark" onclick={markRead}>{copy.markAllRead}</button>
         {/if}
       {/snippet}
       {#if fresh.length === 0}
-        <Empty kind="cleared" title={copy.nothingNew} />
+        <Empty kind="cleared" title={said('nothing_new')} />
       {:else}
         <ul class="feed">
           {#each fresh.slice(0, NEWS_CAP) as item}

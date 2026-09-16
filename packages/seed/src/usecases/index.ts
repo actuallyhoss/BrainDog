@@ -17,6 +17,7 @@ import { FOUNDER } from './founder.ts';
 import { STUDENT } from './student.ts';
 
 export type { UseCase } from '@braindog/declare';
+export { VOICE_KEYS, voiceOf } from '@braindog/declare';
 
 function checked(doc: unknown): UseCase {
   const out = normaliseUseCase(doc);

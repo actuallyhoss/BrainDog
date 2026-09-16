@@ -21,6 +21,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
+  import { said } from '../voice.svelte.ts';
   import type { NavEntry } from '../record/api.ts';
   import Icon from './Icon.svelte';
 
@@ -63,7 +64,7 @@
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
        different product, so they are first and no pack may add to them, reorder them or badge them. -->
   <a class="bar-item spine tap" href="/" aria-current={here('/') ? 'page' : undefined}>
-    <Icon name="home" size="m" /><span class="bar-name">{copy.home}</span>
+    <Icon name="home" size="m" /><span class="bar-name">{said('home')}</span>
   </a>
   <a class="bar-item spine tap" href="/decide" aria-current={under('/decide') ? 'page' : undefined}>
     <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
