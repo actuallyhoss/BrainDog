@@ -32,6 +32,13 @@ export const TEAM = {
     since_away: 'What the team and its agents did',
     lists: 'Boards',
   },
+  /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues", or a teammate a "Member", at /packs/usecase-team. */
+  labels: {
+    tickets: 'Tickets',
+    cycles: 'Cycles',
+    people: 'Teammates',
+    'people.role.collaborator': 'Teammate',
+  },
   skills: [
     { name: 'task-triage', trigger: 'when a ticket is opened, to set its priority, suggest an owner and say whether an agent can take it' },
     { name: 'standup-digest', trigger: 'each morning, to say what moved yesterday, what is blocked and what agents finished' },

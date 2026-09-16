@@ -41,6 +41,7 @@ import { noRecord } from './device.ts';
 import { format, hrefFor, noteOf, targetLine, withParam } from './metrics.ts';
 import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
+import { labels, relabel } from '../voice.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -624,7 +625,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         if (!register || REGISTERS[register]) continue;
         const schema = await client.schema(register);
         const body = schema.ok ? (schema.value as { id?: unknown; fields?: unknown }) : null;
-        if (body && Array.isArray(body.fields)) REGISTERS[register] = { ...body, id: register } as (typeof REGISTERS)[string];
+        if (body && Array.isArray(body.fields)) REGISTERS[register] = relabel({ ...body, id: register } as (typeof REGISTERS)[string], labels());
       }
       const wanted = new Set<string>();
       for (const b of blocks) {

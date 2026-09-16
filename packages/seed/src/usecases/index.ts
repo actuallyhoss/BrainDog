@@ -19,7 +19,7 @@ import { STUDENT } from './student.ts';
 import { TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
-export { VOICE_KEYS, voiceOf } from '@braindog/declare';
+export { VOICE_KEYS, labelsOf, voiceOf } from '@braindog/declare';
 
 function checked(doc: unknown): UseCase {
   const out = normaliseUseCase(doc);

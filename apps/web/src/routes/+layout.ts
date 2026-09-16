@@ -43,6 +43,12 @@ export async function load({ url, fetch }): Promise<Shell> {
       : booted.from === 'sample'
         ? live.sampleShell(boot(), INBOX.length)
         : live.refusedShell();
+  /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one (`loop/research-spark.md` S8). */
+  if (booted.from === 'live') {
+    const words = voice.labels();
+    shell.index.registers = shell.index.registers.map((r) => ({ ...r, name: voice.listNamed(words, r.id, r.name) }));
+    shell.lists = shell.lists.map((l) => ({ ...l, name: voice.listNamed(words, l.id, l.name) }));
+  }
 
   /* A RECORD WITH ZERO REGISTERS HAS NO LEGAL SCREEN — 19 §6, which is also why screen one has no
      skip. Every other route would draw a nav with nothing in it, an empty state for a register that

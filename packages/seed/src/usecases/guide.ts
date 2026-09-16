@@ -34,6 +34,13 @@ export const GUIDE = {
     since_away: 'What you have done so far',
     lists: 'Your notes',
   },
+  /* SETTINGS A PERSON CAN CHANGE (S8): a writer may call Milestones "Drafts", a band may call Steps "Rehearsals". */
+  labels: {
+    milestones: 'Milestones',
+    steps: 'Steps',
+    choices: 'Choices',
+    resources: 'Resources',
+  },
   skills: [
     { name: 'project-coach', trigger: 'when a milestone is reached or a step has sat still for a week, to suggest the next small step' },
   ],

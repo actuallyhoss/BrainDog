@@ -1,5 +1,6 @@
 /**
- * The voice this tab's record speaks in, read once per `boot` and drawn by the rail, the tab bar and Home.
+ * The voice this tab's record speaks in, and the labels it gives its lists, read once per `boot` and drawn by the
+ * rail, the tab bar, Home and the list screen.
  *
  * READ AGAIN WHEN `boot` IS. The layout hands over the answer it drew the shell from, and a write that
  * drops that answer (an install at `/start`, a pack switched off) is a new object here, so the voice is
@@ -7,7 +8,9 @@
  * house voice.
  */
 
-import { lineOf, speaking, voiceOf, type Voice, type VoiceKey } from './voice.ts';
+import { heardLabels, labelsOf, lineOf, speaking, voiceOf, type Voice, type VoiceKey } from './voice.ts';
+
+export { labels, listNamed } from './voice.ts';
 
 const state = $state<{ voice: Voice }>({ voice: {} });
 let heardFor: unknown = null;
@@ -21,6 +24,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   heardFor = boot;
   if (boot === null) {
     state.voice = {};
+    heardLabels({});
     return;
   }
   /* LOADED HERE AND NOT AT THE TOP: the rail imports this module, and the client does not belong in the entry chunk. */
@@ -30,9 +34,13 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   const id = packs.ok ? speaking(packs.value as { id: string; disabled_at: string | null }[]) : null;
   if (id === null) {
     state.voice = {};
+    heardLabels({});
     return;
   }
   const settings = await client.packConfig({ id });
   const values = settings.ok ? ((settings.value as { values?: Record<string, unknown> }).values ?? {}) : {};
-  if (heardFor === boot) state.voice = voiceOf(values);
+  if (heardFor !== boot) return;
+  state.voice = voiceOf(values);
+  /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES (S8), read by the list reader and the rail. */
+  heardLabels(labelsOf(values));
 }

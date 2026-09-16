@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { VOICE_KEYS, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
+import { VOICE_KEYS, labelSetting, labelsOf, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
 
 const DOC = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   usecase: 'reading',
@@ -62,6 +62,13 @@ test('EACH WRONG PART IS REFUSED AT ITS OWN PATH', () => {
     [{ pack: null }, 'PACK_MALFORMED', 'voice'],
     [{ skills: [{ name: 'Notes', trigger: 'x' }] }, 'VALUE_MALFORMED', 'skills'],
     [{ colour: 'red' }, 'FIELD_UNKNOWN', 'colour'],
+    [{ labels: { 'Books': 'Shelf' } }, 'VALUE_MALFORMED', 'labels.Books'],
+    [{ labels: { 'books.state.read.twice': 'x' } }, 'VALUE_MALFORMED', 'labels.books.state.read.twice'],
+    [{ labels: { 'books.reading_status.finished_reading': 'Done' } }, 'VALUE_MALFORMED', 'labels.books.reading_status.finished_reading'],
+    [{ labels: { books: '' } }, 'VALUE_MALFORMED', 'labels.books'],
+    [{ labels: 'Shelf' }, 'PACK_MALFORMED', 'labels'],
+    [{ voice: undefined, pack: null, labels: { books: 'Shelf' } }, 'PACK_MALFORMED', 'labels'],
+    [{ labels: Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`list${i}`, 'x'])) }, 'VALUE_MALFORMED', 'labels'],
   ];
   for (const [over, code, at] of cases) {
     const r = refused(normaliseUseCase(DOC(over)));
@@ -89,4 +96,21 @@ test('THE VOICE IS KEPT AS THE PACK\'S SETTINGS, AND READ BACK FROM THEM', async
 
 test('EVERY VOICE KEY FITS A SETTING NAME', () => {
   for (const key of VOICE_KEYS) assert.match(`voice_${key}`, /^[a-z][a-z0-9_]{0,31}$/);
+});
+
+test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY KEY (S8)', async () => {
+  const labels = { books: 'Shelf', 'books.state': 'Where it is', 'books.state.to_read': 'Up next', people: 'Readers' };
+  const u = value<UseCase>(normaliseUseCase(DOC({ labels })));
+  assert.deepEqual(u.labels, labels);
+  const doc = useCasePack(u)!;
+  const pack = value<{ manifest: { config?: Record<string, { type: string; default?: unknown; label?: string }> } }>(await normalise(doc));
+  const config = pack.manifest.config ?? {};
+  assert.deepEqual(Object.keys(config).sort(), ['label_books', 'label_books__state', 'label_books__state__to_read', 'label_people', 'voice_home', 'voice_needs_you']);
+  assert.equal(config.label_books__state__to_read?.label, 'Label: books, state, to read');
+  const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
+  assert.deepEqual(labelsOf(defaults), labels);
+  assert.deepEqual(voiceOf(defaults), u.voice);
+  assert.equal(labelSetting('people.role.collaborator'), 'label_people__role__collaborator');
+  assert.deepEqual(labelsOf({ label_books: ' ', label_people: 3, voice_home: 'x', label_: 'y' }), {});
+  assert.deepEqual(value<UseCase>(normaliseUseCase(DOC())).labels, {});
 });

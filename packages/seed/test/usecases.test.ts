@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { MODULES, install, normalise, plan, voiceOf, type Host, type Installed, type Pack } from '@braindog/declare';
+import { MODULES, install, labelsOf, normalise, plan, voiceOf, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
@@ -71,6 +71,7 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     for (const list of listsOf(u)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
     const settings = value<{ values: Record<string, unknown> }>(k.packConfig(`usecase-${u.usecase}`));
     assert.deepEqual(voiceOf(settings.values), u.voice, `${u.usecase}: the record holds the voice`);
+    assert.deepEqual(labelsOf(settings.values), u.labels, `${u.usecase}: the record holds the labels`);
     sql.close();
   }
 });
@@ -176,4 +177,24 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
     mixed.ranked.map((r) => [r.usecase.usecase, r.score]),
     [['student', 1], ['business', 1], ['founder', 0], ['team', 0], ['guide', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
   );
+});
+
+test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS (S8)', () => {
+  let some = 0;
+  for (const u of USE_CASES) {
+    const declared = [...modulesFor(u).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase)]
+      .flatMap((doc) => ((doc?.declarations ?? []) as Record<string, unknown>[]))
+      .filter((d) => typeof d.register === 'string' && Array.isArray(d.fields));
+    for (const key of Object.keys(u.labels)) {
+      some++;
+      const [list, field, val] = key.split('.');
+      const decl = declared.find((d) => d.register === list);
+      assert.ok(decl, `${u.usecase}: ${key} names a list it installs`);
+      if (field === undefined) continue;
+      const f = (decl.fields as { id: string; values?: string[] }[]).find((x) => x.id === field);
+      assert.ok(f, `${u.usecase}: ${key} names a field of ${list}`);
+      if (val !== undefined) assert.ok(f.values?.includes(val), `${u.usecase}: ${key} names a value of ${list}.${field}`);
+    }
+  }
+  assert.ok(some > 0);
 });

@@ -18,6 +18,7 @@ import { readBoot, type Booted } from '../record/boot-live.ts';
 import { declOf, entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
+import { labels, relabel } from '../voice.ts';
 
 export type { Boot };
 
@@ -155,14 +156,16 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   return {
     sample: false,
     boot: async () => ({ ok: true, value: booted }),
+    /* THE RECORD'S OWN WORDS OVER THE DECLARATION'S (`loop/research-spark.md` S8): a use case's labels for this list,
+       its fields and its states, drawn at every read so a label changed at `/packs` shows on the next boot. */
     async schema(register) {
       const kept = declared.get(register);
-      if (kept) return { ok: true, value: kept };
+      if (kept) return { ok: true, value: relabel(kept, labels()) };
       const out = said(await client.schema(register));
       if (!out.ok) return out;
       const decl = declOf(out.value as RegisterDecl);
       declared.set(register, decl);
-      return { ok: true, value: decl };
+      return { ok: true, value: relabel(decl, labels()) };
     },
     page: (register, a, cursor) => ask(register, a, cursor, PAGE),
     async count(register, a) {
