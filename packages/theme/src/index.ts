@@ -41,6 +41,10 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * are. Primary actions are drawn in ink. Alpha derives its own accent from this one, so the two
  * deployments stay apart at a glance.
  *
+ * SIX · THE LOGO WEARS THE ACCENT. The owner asked for the mark to match this tone, so `--brand` and
+ * both favicons are the house accent, as alpha's already were its own. `BRAND_RED` remains the hue
+ * the alpha accent is steered away from.
+ *
  * THREE · THE ACCENT'S POINT IS STILL A WINDOW. A white label on the fill needs 4.5:1, which caps
  * its luminance, and the fill needs 3:1 against the lightest surface and the darkest. At
  * `oklch(0.565 0.18 278)` it is #6164DC with a white label at 4.81:1. It is 14 degrees from

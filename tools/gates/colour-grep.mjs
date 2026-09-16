@@ -61,7 +61,7 @@ const EXEMPT = [
    *
    * Which is exactly why they are GENERATED rather than written: they were the one copy of the mark
    * that no token change touched, and so the one copy that drifted. `packages/skin/scripts/theme.mjs`
-   * writes both from `MARK` and `BRAND_RED`, and the theme gate byte-compares them.
+   * writes both from `MARK` and the house accent, and the theme gate byte-compares them.
    */
   /^apps\/(web|site)\/static\/mark\.svg$/,
   /**

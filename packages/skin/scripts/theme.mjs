@@ -26,7 +26,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
-  BRAND_RED,
   HOUSE,
   HIGH_CONTRAST,
   ALPHA,
@@ -85,13 +84,13 @@ const favicon = (hex) =>
  * write it, so `recordTheme`'s adopted block cannot carry it, and only this script can.
  */
 const ARTEFACTS = [
-  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(BRAND_RED) },
+  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(HOUSE.schemes.light.accent) },
   {
     path: join(skin, 'alpha.css'),
     text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + brand(ALPHA.schemes.light.accent),
   },
-  { path: join(root, 'apps/web/static/mark.svg'), text: favicon(BRAND_RED) },
-  { path: join(root, 'apps/site/static/mark.svg'), text: favicon(BRAND_RED) },
+  { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
+  { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
   { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.schemes.light.accent) },
 ];
 
