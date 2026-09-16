@@ -149,3 +149,16 @@ export function inward(request: Request, ctx: CallContext): Request {
   inner.headers.delete('authorization');
   return inner;
 }
+
+/**
+ * The answer, once whatever the caller sent has been read to its end.
+ *
+ * A DURABLE OBJECT THAT ANSWERS BEFORE IT READS THE BODY BREAKS. The router streams the body in, and an answer that
+ * leaves first makes the runtime throw "Can't read from request stream after response has been sent" out of the
+ * request, after which the next call to that record answers 500 "Network connection lost". `serveApi`'s 404 and 405
+ * and the object's own early refusals all answer without reading, so `POST /api/<a typo>` with a body was enough.
+ */
+export async function drained(request: Request, out: Response): Promise<Response> {
+  if (request.body !== null && !request.bodyUsed) await request.body.pipeTo(new WritableStream()).catch(() => undefined);
+  return out;
+}

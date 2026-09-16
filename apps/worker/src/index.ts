@@ -35,7 +35,7 @@ import { alarmScheduler } from './alarm.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
+import { drained, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
@@ -434,6 +434,16 @@ export class Record$ extends DurableObject<Env> {
    * rule stated 130 lines down, broken in the two places the sentence did not reach.
    */
   override async fetch(request: Request): Promise<Response> {
+    const out = await this.#answer(request);
+    /* A BODY NOBODY READ IS READ TO ITS END BEFORE THE ANSWER GOES. Every early answer here, and `serveApi`'s 404
+       and 405, returned without touching the body the router was still streaming in, and the runtime then threw
+       "Can't read from request stream after response has been sent" out of the request: `POST /api/<a typo>` with
+       a body, or a `PUT` to a write, broke the object and the next request to the record answered 500
+       "Network connection lost". */
+    return drained(request, out);
+  }
+
+  async #answer(request: Request): Promise<Response> {
     if (this.#gone) return json({ ok: false, refusal: DELETED }, 503);
     const api = await this.#record();
 
