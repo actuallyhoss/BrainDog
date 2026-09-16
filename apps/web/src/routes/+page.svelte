@@ -16,7 +16,7 @@
   import { MISSING, relative, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
-  import { HOME_CURRENCY, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
+  import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
   import { amountOf, currencyOf, drawn, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -129,7 +129,7 @@
    */
   const STATE = /\b(?:up|down) [\d.,]+%|\boverdue\b|\blapsing\b/iu;
   function qualifier(note: string) {
-    const text = symbolText(note, HOME_CURRENCY).replaceAll(' · ', ', ');
+    const text = symbolText(note, homeCurrency()).replaceAll(' · ', ', ');
     const m = STATE.exec(text);
     return m
       ? { before: text.slice(0, m.index), phrase: m[0], after: text.slice(m.index + m[0].length) }
@@ -178,7 +178,7 @@
         <!-- Up to four across; three figures take thirds rather than leaving a fourth track empty. -->
         <div class="stats" style="--cols:{Math.min(4, Math.max(3, cells.length))}">
           {#each cells as m (m.id)}
-            {@const parts = drawn(m.value, HOME_CURRENCY)}
+            {@const parts = drawn(m.value, homeCurrency())}
             {@const q = qualifier(m.note)}
             {@const toned = m.tone === 'bad' || m.tone === 'warn' || m.tone === 'good'}
             <svelte:element this={m.href ? 'a' : 'div'} class="stat" href={m.href} data-intent={m.tone}>
@@ -232,7 +232,7 @@
                 <span class="need-amount"></span>
                 <span class="need-when num">{since(q.opened, data.now)}</span>
                 <span class="need-detail">
-                  {symbolText(q.cost ?? '', HOME_CURRENCY)}{#if pick}{q.cost ? ' ' : ''}{copy.suggestedAnswer} <span class="need-pick">{pick.title}</span>{/if}
+                  {symbolText(q.cost ?? '', homeCurrency())}{#if pick}{q.cost ? ' ' : ''}{copy.suggestedAnswer} <span class="need-pick">{pick.title}</span>{/if}
                 </span>
               </a>
             </li>

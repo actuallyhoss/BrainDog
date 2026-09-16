@@ -77,8 +77,14 @@ export function currencyFor(register: string, field: string): string | null {
   return [...seen][0] ?? null;
 }
 
-/** The currency most of this record's money is in, which a screen writes with its symbol alone. */
-export const HOME_CURRENCY = homeOf(Object.values(ROWS).flatMap((rows) => rows.flatMap((e) => Object.values(e.fields))));
+/**
+ * The currency most of this record's money is in, which a screen writes with its symbol alone.
+ * A function, not a constant: `ROWS` is declared later in this module and read through an import
+ * cycle, so computing it at load threw before `ROWS` existed and took sixteen test files with it.
+ */
+let home: string | null | undefined;
+export const homeCurrency = (): string | null =>
+  (home ??= homeOf(Object.values(ROWS).flatMap((rows) => rows.flatMap((e) => Object.values(e.fields)))));
 
 /**
  * The cash the walk starts from, in minor units.

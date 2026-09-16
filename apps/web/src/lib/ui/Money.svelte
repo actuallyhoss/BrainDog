@@ -11,14 +11,14 @@
 -->
 <script lang="ts">
   import { integer, money } from 'braindog-render';
-  import { HOME_CURRENCY } from '$lib/record/api.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
   import { drawn } from '$lib/record/money.ts';
 
   let {
     minor,
     currency,
     weight = 'normal',
-    home = HOME_CURRENCY,
+    home = homeCurrency(),
   }: { minor: number; currency: string; weight?: 'normal' | 'strong'; home?: string | null } = $props();
 
   /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE, which is the honest state of a money field
