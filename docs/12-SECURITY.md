@@ -15,8 +15,8 @@ than promised.
 | A compromised agent token | to read or write the record | **yes.** Tokens live on developer machines |
 | Another BrainDog customer | to read this record | no cross-record code path exists |
 | Us (the operator) | — | **we can read a Cloud record.** Stated plainly in §7 |
-| Someone with a stolen `.dog` backup | credentials | gets ciphertext. §6 |
-| A stolen R2 bucket | everything | gets `.dogl.age` ciphertext |
+| Someone with a stolen `.brain` backup | credentials | gets ciphertext. §6 |
+| A stolen R2 bucket | everything | gets `.brainl.age` ciphertext |
 | A model provider | the contents of prompts | payload retention off at the gateway (`cf-aig-collect-log-payload: false`); self-host has no provider at all |
 
 The two that deserve the most engineering are the first and the third, because they are the two
@@ -427,7 +427,7 @@ removes our access going forward, and removes it from the backups thirty days la
 | Dependency surface | **a stated goal of near-zero runtime dependencies**, and the few are enumerated in [ADR-046](16-DECISIONS.md): `valibot` in `declare`, and one YAML parser, `yaml`, on the CLI and self-host paths only ([ADR-063](16-DECISIONS.md)). The prior system's Worker had no `package.json` at all, which is why it ran unmodified on plain Node — a supply-chain posture and a portability win from one decision |
 | Secrets in CI | Cloudflare API tokens scoped to deploy only; no token in the repo, ever |
 | Migrations | forward-only, checksummed, `--dry-run` first, `transferred_classes` never `deleted_classes`. A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record and recovery is fix-forward ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.3) |
-| Backups | nightly `.dogl.age` to R2 under the record's own prefix, 30 days, ≤ 40 MiB per record, plus platform PITR at any point in 30 days. The age identity lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`. Drilled: restore monthly, KEK rotation quarterly for real, erasure quarterly on the ops record, self-host upgrade every release, parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, §9) |
+| Backups | nightly `.brainl.age` to R2 under the record's own prefix, 30 days, ≤ 40 MiB per record, plus platform PITR at any point in 30 days. The age identity lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT`. Drilled: restore monthly, KEK rotation quarterly for real, erasure quarterly on the ops record, self-host upgrade every release, parity every deploy ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.4, §9) |
 
 
 ### Refusals that do not leak

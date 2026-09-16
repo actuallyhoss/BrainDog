@@ -1,5 +1,18 @@
 /**
- * `.dog` — Data, Origin, Governance. The file a customer can take with them.
+ * `.brain` — the whole record as one file, the file a customer can take with them, and `.brainl` its
+ * canonical dump.
+ *
+ * THE THREE SECTIONS ARE NAMED FOR WHAT THEY HOLD: Data, Origin and Governance. They spelled the old
+ * extension, `.dog`, and that is the one thing they could not keep — `.dog` now names a PAGE's
+ * source, one page to one file (`apps/web/src/lib/dog/source.ts`), so the record took the name it had
+ * always been describing. Nothing else about the design moved: the sections, what travels, the
+ * manifest and the signature are what they were.
+ *
+ * THE BYTES KEEP THE OLD SPELLING, DELIBERATELY. The dump's magic line is `#dogl <n>`, the header
+ * tables are `dog_meta`, `dog_section`, `dog_manifest` and `dog_sig`, and `application_id` is `DOG!`.
+ * Those are inside files that already exist and are checked by readers that already ship, so
+ * renaming them is a format revision (`03 §7`) bought for nothing. What a file is CALLED and how a
+ * reader RECOGNISES it are two different facts, and only the first one changed.
  *
  * THIS IS THE PRODUCT'S STRONGEST PROMISE and the reason it is a format rather than an export
  * button: a record is a thing you have, not a thing you rent. So the file has to be readable by
@@ -188,7 +201,7 @@ async function sha256(text: string): Promise<string> {
  * of `diff`. When the file is signed, the time lives in the signature, which is where a time that is
  * about the ACT rather than the CONTENT belongs.
  */
-export async function exportDogl(
+export async function exportBrainl(
   sql: Sql,
   transaction: <T>(fn: () => T) => T,
   opts: { sections?: readonly Section[]; redactGrants?: boolean } = {},
@@ -233,7 +246,7 @@ export async function exportDogl(
 /**
  * The lines of a file, grouped by the table they belong to.
  *
- * IT IS A SECOND READER, and deliberately so: `importDogl`'s walk decides what to WRITE and this one
+ * IT IS A SECOND READER, and deliberately so: `importBrainl`'s walk decides what to WRITE and this one
  * decides what the file SAYS ABOUT ITSELF. A checksum computed by the same pass that skips rows,
  * drops columns and takes defaults would hash what the reader made of the file rather than the file,
  * which is the one thing a checksum must not do.
@@ -305,7 +318,7 @@ const UNHASHED: ReadonlySet<string> = new Set(['dog_manifest', 'dog_sig']);
  *
  * `03 §4`: the canonical projection of `dog_manifest`, ordered by `table_name`. It is the manifest
  * and nothing else because the manifest already covers every row in the file — a hash per table,
- * checked by `checkDogl` — so signing 64 bytes per table proves the whole file without the signer
+ * checked by `checkBrainl` — so signing 64 bytes per table proves the whole file without the signer
  * reading it twice.
  *
  * READ OUT OF THE FILE, NOT OUT OF A DATABASE. A verifier has the lines and nothing else, and a
@@ -337,7 +350,7 @@ function owned(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
  *
  * `signedAt` COMES FROM THE SIGNER because it is a fact about the ACT and not about the content, and
  * the signer is the one with a clock. It is also the one line of a file that differs between two
- * exports of an unchanged record — which `exportDogl`'s own header anticipates, and is the price of
+ * exports of an unchanged record — which `exportBrainl`'s own header anticipates, and is the price of
  * `dog_sig.signed_at` being `NOT NULL`.
  */
 export type Signature = { keyId: string; publicKey: string; sig: string; signedAt: string };
@@ -349,14 +362,14 @@ export type Signer = (bytes: Uint8Array) => Promise<Signature | null>;
  * Put the signature on the end of a file.
  *
  * IT IS A FUNCTION OVER LINES, WHICH IS WHY IT CAN LIVE HERE. The kernel must never hold a private
- * key — `12 §6` puts the key hierarchy in the host, and `exportDogl`'s own comment says the kernel
+ * key — `12 §6` puts the key hierarchy in the host, and `exportBrainl`'s own comment says the kernel
  * writes no row under `dog_sig` for exactly that reason. So the shape is: the kernel makes the
  * bytes, the host signs them, and this joins the two. Nothing here can sign anything.
  *
- * `dog_sig` IS ALREADY LAST. `exportDogl` orders it that way whatever section it sits in, so this
+ * `dog_sig` IS ALREADY LAST. `exportBrainl` orders it that way whatever section it sits in, so this
  * appends one line rather than splicing into the middle of a file whose hashes are already fixed.
  */
-export async function signDogl(lines: readonly string[], sign: Signer): Promise<string[]> {
+export async function signBrainl(lines: readonly string[], sign: Signer): Promise<string[]> {
   const at = lines.findIndex((l) => l.startsWith('#table dog_sig '));
   if (at < 0) return [...lines];
 
@@ -456,7 +469,7 @@ async function signatureOf(
  * IT ANSWERS BEFORE ANYTHING IS WRITTEN. A half-imported record is worse than a refused one, and the
  * refusal has to be able to name the table so somebody knows what they are looking at.
  */
-export async function checkDogl(
+export async function checkBrainl(
   lines: readonly string[],
 ): Promise<{ ok: true } | { ok: false; refusal: { code: string; fix: string } }> {
   /* THE FORMAT, FROM LINE ONE. `03 §11`: a file from a newer build is refused rather than read,
@@ -469,7 +482,7 @@ export async function checkDogl(
    * The import row of `33 §9` enumerates three refusals — `SIGNATURE_INVALID` for a manifest that
    * does not verify, `CHECKSUM_MISMATCH` for rows that do not match it, `FORMAT_NEWER_THAN_READER`
    * for a `user_version` above this reader's — and has no name at all for the commonest way a file
-   * arrives wrong: it is not a `.dogl`. Neither of the first two can be said honestly here. Nothing
+   * arrives wrong: it is not a `.brainl`. Neither of the first two can be said honestly here. Nothing
    * has been checksummed when there is no header to say what the file claims to be, and a person
    * told `CHECKSUM_MISMATCH` goes looking for a manifest that was never read.
    *
@@ -484,7 +497,7 @@ export async function checkDogl(
       ok: false,
       refusal: {
         code: 'FILE_MALFORMED',
-        fix: 'A .dog file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
+        fix: 'A .brainl file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
       },
     };
   const format = Number(first.slice('#dogl '.length).trim());
@@ -581,7 +594,7 @@ export type ImportReport = { tables: number; rows: number };
  * The rows are copied, not replayed: the events keep their original actors and ids, because a copy
  * of a record that says every fact was written by whoever imported it is not a copy.
  */
-export function importDogl(
+export function importBrainl(
   sql: Sql,
   transaction: <T>(fn: () => T) => T,
   lines: Iterable<string>,

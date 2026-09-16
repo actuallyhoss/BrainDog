@@ -2,7 +2,7 @@
  * Who is on this record, and what each of them may reach.
  *
  * THE ROWS HERE ARE A MIRROR. The Directory holds who somebody is across every record they touch;
- * this holds what they may do inside THIS one, so a `.dog` file resolves its own actors offline and
+ * this holds what they may do inside THIS one, so a `.brain` file resolves its own actors offline and
  * a record restored on a laptop still knows whose name is on every event. Two places, one of which
  * is authoritative and one of which travels — and the one that travels is this.
  *
@@ -82,7 +82,7 @@ export function access(
      it did not count the ghost: `suspend` answered `OUT_OF_BOUNDS`, `remove` answered
      `LEVEL_REQUIRED`, and demoting the real owner was refused because the ghost was invisible to the
      count and visible to the ladder. That is the state `owners()`'s own comment says there is *"no
-     way back in short of raw SQL on the file"* from, reached from a `.dog` import.
+     way back in short of raw SQL on the file"* from, reached from a `.brain` import.
 
      An `INNER JOIN` is the fix and it is the shape the sentence above always described: a level
      belongs to a person, so no person is no level. */

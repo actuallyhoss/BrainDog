@@ -156,7 +156,7 @@ interface Snapshots {
   prune(keep: number): Promise<void>;
 }
 ```
-PITR bookmarks plus the nightly `.dogl.age` on Cloud; `VACUUM INTO`, sign, keep 30 on the self-host (33 §1, §6).
+PITR bookmarks plus the nightly `.brainl.age` on Cloud; `VACUUM INTO`, sign, keep 30 on the self-host (33 §1, §6).
 
 ```ts
 interface Ingress {
@@ -338,7 +338,7 @@ named `c_<id with _>` and begins with `DROP TABLE IF EXISTS`. No case traces `ca
    `bootProbe` throws `SqlError('NO_SUCH_MODULE', text)` when `fts5` or `json` is false. The text, exactly:
 
 ```
-This SQLite build cannot host a .dog file:
+This SQLite build cannot host a .brain file:
   fts5: required, not available
   driver: node:sqlite · SQLite 3.50.4
 On macOS, Bun loads Apple's libsqlite3.dylib and is unsupported. Use Node 24.13+, which bundles its own SQLite.
@@ -580,7 +580,7 @@ matters:
 
 What never travels: a bound value into a `SqlError`, a log line, or a trace (`rows` traces hold the corpus's own
 literals only); key material — `ports` declares `KeyStore` and touches no key; the record has no `KeyStore` port
-(12 §6). The `.dog` path is the self-host's to choose; the adapter opens one file and no second (`ATTACH` is not
+(12 §6). The `.brain` path is the self-host's to choose; the adapter opens one file and no second (`ATTACH` is not
 in the interface, 30 §13). The one `node:*` import under `packages/**` is `src/node-sqlite.ts`, behind a
 subpath; lint layer 4 (31 §3) exempts that file and nothing else, so the main entry provably runs in workerd.
 

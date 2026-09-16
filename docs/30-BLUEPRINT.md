@@ -22,7 +22,7 @@ stops.
 > `#7` from being reissued after a purge. The count is now the enumeration below, and a test counts the enumeration.
 > The DIRECTORY — email → person, passkeys, browser sessions, magic links, slug → record, the login lockout — is
 > deliberately **not** here: it lives in the third Durable Object class, `Directory` (ADR-061), and on the self-host in
-> `directory.sqlite` beside the records. The record keeps only what a `.dog` must resolve offline.*
+> `directory.sqlite` beside the records. The record keeps only what a `.brain` must resolve offline.*
 
 ```sql
 -- ─── IDENTITY AND SHAPE ────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ CREATE TABLE migration (
 -- The DIRECTORY lives OUTSIDE the record (ADR-061): email → person, credential_id → passkey, person → records,
 -- slug → rec_id, browser sessions, magic links, the login lockout. It is the third Durable Object class,
 -- `Directory`, one instance; on the self-host it is `directory.sqlite` in the same process, same schema, same
--- Sql port. The record keeps what a .dog must resolve offline and what is scoped to one record.
+-- Sql port. The record keeps what a .brain must resolve offline and what is scoped to one record.
 CREATE TABLE person (                       -- a MIRROR of the Directory row: actors and member.person_id resolve here
   id TEXT PRIMARY KEY,                      -- 'p_' + 26-char ULID, minted by the Directory
   email TEXT, name TEXT, suspended_at TEXT
@@ -371,7 +371,7 @@ CREATE TABLE outbox (
 );
 CREATE INDEX outbox_ready ON outbox(state, created);
 
--- ─── THE .dog HEADER — four tables migration 0001 creates in EVERY live record, DO and file alike (03 §3) ──
+-- ─── THE .brain HEADER — four tables migration 0001 creates in EVERY live record, DO and file alike (03 §3) ──
 CREATE TABLE dog_meta     (key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- format, created_at, producer, record_slug, tz, locale
 CREATE TABLE dog_section  (table_name TEXT PRIMARY KEY,
                            section TEXT NOT NULL CHECK (section IN ('data','origin','governance','local','header')));
@@ -391,7 +391,7 @@ Five things worth naming, because they are decisions rather than transcription:
 
 | | |
 |---|---|
-| **`CHECK` constraints carry every closed list** | the corpus's closed lists are its security argument. A list enforced only by a validator is a list one code path forgets. **Twenty-three of them are `CHECK (… IN (…))`** — the eight pack kinds, the three token scopes, the forty event kinds, `inbox_raw`'s five channels and seven states, the three confidences, the nine observation signals, the four suggestion bodies, the two `on_miss` verbs, the five member levels, the five grant kinds, `vault_key`'s three purposes and two wrappings, the six device-grant statuses and seven reaches (the seventh, `vault`, from kernel migration 4), the four job kinds, nine job statuses and nine job-event kinds, the ten schedule kinds and five schedule states, the nine outbox kinds and five outbox states, and the five `.dog` sections — so the *database* refuses a ninth pack kind, not merely the validator. Two more `CHECK`s are equalities, not lists: `record.singleton = 1` and `dog_sig.alg = 'ed25519'`. *An earlier draft said four and a fifth over a DDL that already had seven; fourteen more arrived with the seven new tables and this review's constraints; two more with iteration 2 — `device_grant.reach`, and `schedule.state`, a list the comment beside it had used without enforcing. The `event.kind` list is still the largest, at forty* |
+| **`CHECK` constraints carry every closed list** | the corpus's closed lists are its security argument. A list enforced only by a validator is a list one code path forgets. **Twenty-three of them are `CHECK (… IN (…))`** — the eight pack kinds, the three token scopes, the forty event kinds, `inbox_raw`'s five channels and seven states, the three confidences, the nine observation signals, the four suggestion bodies, the two `on_miss` verbs, the five member levels, the five grant kinds, `vault_key`'s three purposes and two wrappings, the six device-grant statuses and seven reaches (the seventh, `vault`, from kernel migration 4), the four job kinds, nine job statuses and nine job-event kinds, the ten schedule kinds and five schedule states, the nine outbox kinds and five outbox states, and the five `.brain` sections — so the *database* refuses a ninth pack kind, not merely the validator. Two more `CHECK`s are equalities, not lists: `record.singleton = 1` and `dog_sig.alg = 'ed25519'`. *An earlier draft said four and a fifth over a DDL that already had seven; fourteen more arrived with the seven new tables and this review's constraints; two more with iteration 2 — `device_grant.reach`, and `schedule.state`, a list the comment beside it had used without enforcing. The `event.kind` list is still the largest, at forty* |
 | **`event.batch`** | the ULID of the *triggering* write, shared by everything it caused — rule `set`s and generated rows alike — which is what makes *"undo this expansion"* one query rather than a heuristic. [07-INGEST](07-INGEST-AND-RULES.md) §6.1 promised it and nothing carried it. It is a `batch`, never a shared event *id*: `event.id` is the primary key and cannot be shared |
 | **One sentinel rule, three values** | a value withheld at write by the redaction list is the literal `--redacted--` (20 §8); a value removed later by an erasure is the literal `--erased--` (02 §10); `NULL` means only *"there was no prior value"*. Hence **`decision.reason` is `NOT NULL`**, never empty at write, and erasure writes `--erased--`: the invariant *"a decision always has a reason field"* survives erasure, and a reader can still tell **that** it was erased — [02-DATA-MODEL](02-DATA-MODEL.md) §10. *An earlier draft made `''` the sentinel, which is indistinguishable from an empty reason, and made `from_v` NULL for both cases* |
 | **`counter`, not `MAX(seq) + 1`** | `MAX(seq) + 1` reissues a spoken id the first time the highest-numbered row is purged, and `D41`/`SG23` had no counter at all. One table, three name families, one `UPDATE … RETURNING` inside the write transaction (§4) |
@@ -824,7 +824,7 @@ any row is written".*
 | `IMPORT_NOT_EMPTY` | `import` into a record that has rows, §5 — a refusal, 422 | `import-not-empty` |
 | `SCHEMA_MISMATCH` | a migration checksum the code does not recognise — module-level, every RPC 503 | `schema-mismatch` |
 | `SCHEMA_NEWER` | a database migrated past the code — module-level, every RPC 503 | `schema-newer` |
-| `FILE_MALFORMED` | a `.dogl` that is not one: no `#dogl` first line, a version that is not a number, a line that is not a row, a row the record cannot hold. **Nothing has been checksummed**, so `CHECKSUM_MISMATCH` would send a person looking for a manifest that was never read, and `33 §9`'s import row names three refusals and had no word for the commonest way a file arrives wrong. Spelled artefact-then-fault like `PACK_MALFORMED` and `VALUE_MALFORMED` (53) | `file-malformed` |
+| `FILE_MALFORMED` | a `.brainl` that is not one: no `#dogl` first line, a version that is not a number, a line that is not a row, a row the record cannot hold. **Nothing has been checksummed**, so `CHECKSUM_MISMATCH` would send a person looking for a manifest that was never read, and `33 §9`'s import row names three refusals and had no word for the commonest way a file arrives wrong. Spelled artefact-then-fault like `PACK_MALFORMED` and `VALUE_MALFORMED` (53) | `file-malformed` |
 | `NOT_IN_THIS_BUILD` | a declaration that is correct against a document and ahead of the code: one of `08 §2.2`'s eleven aggregations this build does not compute, a `group_by` or `bucket`, a computed page source, an outbox kind this deployment wired no sender for. **The repair is a deploy, not an edit** — which is what `FORMAT_NEWER_THAN_READER` and `SCHEMA_NEWER` already say about a version integer, and why it is filed beside them. It is not `VALUE_MALFORMED`: `median` is a published word, and telling its author it is malformed sends them to check a spelling that is right (53) | `not-in-this-build` |
 
 **Dialect** — render-time degradation, never a write refusal ([34-GRAMMARS](34-GRAMMARS.md) §2):
@@ -1023,7 +1023,7 @@ token scope, `admin`, mapped to `owner`. No such scope exists; §12 #4 records t
 
 ---
 
-## 11 · `.dog` versioning
+## 11 · `.brain` versioning
 
 `user_version` was already at 3 with no migration list, and three documents gave it three meanings. The rule —
 **three version numbers, one home each**:
@@ -1031,7 +1031,7 @@ token scope, `admin`, mapped to `owner`. No such scope exists; §12 #4 records t
 | | |
 |---|---|
 | `PRAGMA application_id` | `0x444F4721` — **never changes** |
-| `PRAGMA user_version` | the **`.dog` format revision** — bumped only when an older reader would *misread* the file. **1 at v1.** An additive migration — a new table, a new column — does not bump it; a migration is a `.ts` module under `src/migrations/`, and the one that must bump carries `-- format-bump <n>` (41; [33-CONTRACTS](33-CONTRACTS.md) §9) |
+| `PRAGMA user_version` | the **`.brain` format revision** — bumped only when an older reader would *misread* the file. **1 at v1.** An additive migration — a new table, a new column — does not bump it; a migration is a `.ts` module under `src/migrations/`, and the one that must bump carries `-- format-bump <n>` (41; [33-CONTRACTS](33-CONTRACTS.md) §9) |
 | The kernel migration number | `MAX(migration.version)` — every applied migration, 1 at v1. Not a PRAGMA, not a column |
 | `record.format_ver INTEGER` | mirrors `user_version`, for a reader without PRAGMA access |
 | What a pack requires | `requires: { format: <int>, primitives: <int>, packs: { <id>: <semver-range> } }` — the format revision, `PRIMITIVES_VERSION`, other packs. Never an app version: **the app has no semver** (`FORMAT_OUT_OF_RANGE`, `PRIMITIVES_OUT_OF_RANGE`) |
@@ -1061,7 +1061,7 @@ reader walking the document expects it — 02 and others cite §13 and §14 by n
 |---|---|---|
 | 1 | The block dialect's formal grammar — column counts per kind, escaping a literal `\|`, where the tone token sits, how `{{path}}` interacts with the parser | [34-GRAMMARS](34-GRAMMARS.md) §2: the info string, `\|` and `\\` unescaped before the split, the tone as a trailing cell, a row shape per kind, `{{path}}` substituted per cell *after* splitting and never re-parsed, over-arity degrading to the fence with `DIALECT_ARITY` |
 | 2 | Billing lifecycle — what happens on lapse. Does the record go read-only? Do connectors pause? Is export still guaranteed? | ADR-059: the record goes read-only; connectors and digests pause; export and MCP reads stay available for 90 days; then the erasure ladder. **Export is always guaranteed** — which is the load-bearing half for the no-lock-in argument |
-| 3 | The seed data for the first-party packs | the packs are **six** — `agents` · `work` · `portfolio` · `money-core` · `estate` · `people` — and their seeds are the first task of B2, not a day-one dependency. Fixtures are text; the `.dog` is materialised through the real write path at test time with an injected `Clock` and a seeded RNG ([33-CONTRACTS](33-CONTRACTS.md) §3): the instant is `2031-01-05T09:00:00.000Z`, one second per row; the RNG is `sfc32` seeded `[1, 2, 3, 4]` with fifteen outputs discarded, injected through `openRecord`'s `random` (40, 41). *An earlier draft said four* |
+| 3 | The seed data for the first-party packs | the packs are **six** — `agents` · `work` · `portfolio` · `money-core` · `estate` · `people` — and their seeds are the first task of B2, not a day-one dependency. Fixtures are text; the `.brain` is materialised through the real write path at test time with an injected `Clock` and a seeded RNG ([33-CONTRACTS](33-CONTRACTS.md) §3): the instant is `2031-01-05T09:00:00.000Z`, one second per row; the RNG is `sfc32` seeded `[1, 2, 3, 4]` with fifteen outputs discarded, injected through `openRecord`'s `random` (40, 41). *An earlier draft said four* |
 | 4 | Whether `admin` may ever be granted to an agent token | ADR-060: **no** standing grant — there is no `admin` scope, and VAULT is a browser session only. Iteration 2 met ADR-060's own reversal clause instead: an **operation grant**, the owner's single-use ten-minute approval of one named ADMIN operation, reaches that one method once (§5, §10) |
 
 | # | Open | Blocks |
@@ -1215,7 +1215,7 @@ CI cannot have run on the machine a self-hoster is using. Ten lines at startup, 
 `measureCaps`:
 
 ```
-This SQLite build cannot host a .dog file:
+This SQLite build cannot host a .brain file:
   driver: node:sqlite 24.13.0 · SQLite 3.50.4
   fts5: required, not available
   json: required, available

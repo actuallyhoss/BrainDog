@@ -13,6 +13,12 @@
  * `node:fs` — a string is the only way a package under `packages/**` can carry SQL at all. The
  * backticks inside the SQL comments are escaped and nothing else is: the DDL holds no backslash and
  * no `${`, so the escape is the whole of the difference.
+ *
+ * THE SQL BELOW STILL SAYS `.dog`, AND THAT IS NOT AN OVERSIGHT. An applied migration is never
+ * edited: its checksum is pinned and `migrate.test.ts` holds the pin. So when the whole-record file
+ * gave the name `.dog` to a page's source and became a `.brain` (`03 §1`), three SQL comments in
+ * here could not follow it, and `30 §1` carries the same frozen words because a test compares the
+ * two verbatim. The `dog_` header tables below keep their names for the same reason.
  */
 
 export default `

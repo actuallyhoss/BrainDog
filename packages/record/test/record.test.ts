@@ -796,7 +796,7 @@ test('A DECLARATION SET FROM THE APP GETS THE LINT A PACK GETS', async () => {
 });
 
 test('TAKE YOUR RECORD AND GO, and it comes back in', async () => {
-  /* A `.dog` file IS the record. A product whose export is a dump nobody can re-import has an
+  /* A `.brain` file IS the record. A product whose export is a dump nobody can re-import has an
      export button and not an exit. */
   const { api, sql } = await record();
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', amount: { amount: 41_00, currency: 'GBP' }, state: 'open' } }, owner));
@@ -1051,7 +1051,7 @@ test('AND OWNER OF ONE REGISTER IS NOT OWNER OF THE RECORD', async () => {
 
 test('AND AN EXPORT OF NOTHING IS NOT AN EXPORT', async () => {
   /* `sections: "data"` — the easy JSON mistake — and `sections: []` both came back `ok` with a
-     structurally valid `.dog` file containing every table header and no rows: a backup of nothing
+     structurally valid `.brain` file containing every table header and no rows: a backup of nothing
      that looks like a backup. */
   const { api, sql } = await record();
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41', state: 'open' } }, owner));

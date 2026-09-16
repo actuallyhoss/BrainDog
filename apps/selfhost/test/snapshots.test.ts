@@ -48,7 +48,7 @@ test('A SNAPSHOT IS A SQLITE FILE BESIDE THE RECORD, downloadable, and putting i
     const snap = took.body.value as { id: string; at: string; bytes: number };
     assert.match(snap.id, /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-now$/);
     assert.ok(snap.bytes > 0);
-    assert.ok(existsSync(join(s.dir, 'snapshots', `${snap.id}.dog`)), 'the copy is not beside the record');
+    assert.ok(existsSync(join(s.dir, 'snapshots', `${snap.id}.brain`)), 'the copy is not beside the record');
 
     assert.equal((await s.call('create', { register: 'obligations', fields: { what: 'After the copy' } })).status, 200);
     assert.deepEqual((await titles(s.call)).sort(), ['After the copy', 'Before the copy']);
@@ -59,7 +59,7 @@ test('A SNAPSHOT IS A SQLITE FILE BESIDE THE RECORD, downloadable, and putting i
     /* The file, as it sits on disk. */
     const got = await fetch(`http://127.0.0.1:${s.port}/api/snapshots/${snap.id}`);
     assert.equal(got.status, 200);
-    assert.match(got.headers.get('content-disposition') ?? '', /^attachment; filename="the-studio-.+\.dog"$/);
+    assert.match(got.headers.get('content-disposition') ?? '', /^attachment; filename="the-studio-.+\.brain"$/);
     assert.equal(got.headers.get('cache-control'), 'no-store');
     assert.equal(Buffer.from(await got.arrayBuffer()).subarray(0, 15).toString('latin1'), 'SQLite format 3');
     const missing = await fetch(`http://127.0.0.1:${s.port}/api/snapshots/2020-01-01T00-00-00Z-now`);

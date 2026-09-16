@@ -99,7 +99,7 @@ export type RecordApi = {
   invite(args: InviteArgs, ctx: CallContext): Promise<Result<MemberRow[] | Invited>>;   // an address in place of a person mints a link
   invitations(ctx: CallContext): Promise<Result<Invitation[]>>;                         // added September 16th 2026 — never a link
   revokeInvite(args: { id: string }, ctx: CallContext): Promise<Result<{ id: string; revoked_at: string }>>;   // added September 16th 2026
-  export(args: ExportArgs, ctx: CallContext): Promise<Result<DoglPage>>;
+  export(args: ExportArgs, ctx: CallContext): Promise<Result<BrainlPage>>;
   import(args: { lines: string[] }, ctx: CallContext): Promise<Result<ImportReport>>;
   erase(args: EraseRequest, ctx: CallContext): Promise<Result<EraseReport>>;
   restore(args: { bookmark: string; at?: string }, ctx: CallContext): Promise<Result<Restored>>;                      // one method, 30 §5
@@ -335,7 +335,7 @@ type ArriveArgs  = { channel: 'email' | 'webhook' | 'pull' | 'paste' | 'api'; in
 type Arrived     = { raw: string; state: string; wrote: number };
 type SetDeclarationArgs = { mode: 'set'; body: unknown } | { mode: 'retire'; id: string } | { mode: 'test'; body: unknown } | { mode: 'apply'; id: string; dry: boolean };   // §13 #16
 type InviteArgs  = { person: { id: string; email: string | null; name: string | null }; levels: { register: string; level: Level }[]; why: string };
-type ExportArgs  = { cursor?: string | null; sections?: ('data' | 'origin' | 'governance')[]; redactGrants?: boolean };   // → kernel.exportDogl
+type ExportArgs  = { cursor?: string | null; sections?: ('data' | 'origin' | 'governance')[]; redactGrants?: boolean };   // → kernel.exportBrainl
 type CreateRecordArgs = { id: string; slug: string; name: string; tz: string; locale: string; owner: { id: string; email: string | null; name: string | null };
                      keys: Record<'record' | 'connector' | 'signing', { wrapped: Uint8Array; nonce: Uint8Array; kek_id: string }> };
 type Drained     = { claimed: number; done: number; failed: number; outbox: number };
@@ -347,7 +347,7 @@ type EvalCtx     = { now: number; tz: string; scope: CompileScope; asOf?: number
 ```
 
 `Job JobRow JobStatus CreateJobArgs Claim Idle JobEventIn Ack EndBody` are 46 §4.7's, verbatim; `PullPage PullFinish`
-are 47 §4.x's; `PackSource Diff Applied Retired Installed Host` are 42 §2's; `EraseRequest EraseReport DoglPage ImportReport
+are 47 §4.x's; `PackSource Diff Applied Retired Installed Host` are 42 §2's; `EraseRequest EraseReport BrainlPage ImportReport
 EntryRef Entry` are 41 §2's.
 
 ### 4.6 · `MetricResult`
@@ -376,7 +376,7 @@ The audit's interface lens (35 §5) checks each against its owner; two items are
 
 | Package | Symbols this package calls |
 |---|---|
-| `@braindog/kernel` (41 §2) | `openRecord(sql, clock)`; `Kernel.transaction · write(register, id, patch, { ctx, opId, version, cascade, batch, mechanism, rules }) · get(ref) · list(q) · search(q) · count · declarations · register · installDeclarations · retireDeclarations · allocate · appendEvent · replay · observe · version · schedule · outbox · pendingWork · rebuildFts · purge · erase · exportDogl · importDogl · applyMigrations · refused`; `RulesHook`; `FORMAT_VERSION`. **Requested:** `actor(ctx: CallContext): string` — the ladder `write.ts` already runs (41 §3), exported so `log`, `propose`, `grant.*` and `access.*` events carry the same actor a row write would (§13 #4) |
+| `@braindog/kernel` (41 §2) | `openRecord(sql, clock)`; `Kernel.transaction · write(register, id, patch, { ctx, opId, version, cascade, batch, mechanism, rules }) · get(ref) · list(q) · search(q) · count · declarations · register · installDeclarations · retireDeclarations · allocate · appendEvent · replay · observe · version · schedule · outbox · pendingWork · rebuildFts · purge · erase · exportBrainl · importBrainl · applyMigrations · refused`; `RulesHook`; `FORMAT_VERSION`. **Requested:** `actor(ctx: CallContext): string` — the ladder `write.ts` already runs (41 §3), exported so `log`, `propose`, `grant.*` and `access.*` events carry the same actor a row write would (§13 #4) |
 | `@braindog/declare` (42 §2) | `normalise · lint · plan(pack, installed) · install(diff, host, approved) · uninstall(packId, host) · checksum`; `Installed` (built here, §5.6) and `Host` (four kernel methods with `ctx` bound) |
 | `@braindog/where` (38 §2) | `validate(pred, schema, schemas) · jcs · searchText`; `./sql`: `compile(pred, { subject, register, schemas, now, tz, scope }) → { sql, params, uses }` — `sql` **begins `WHERE register = ? AND deleted_at IS NULL AND (…)`** (38 §5.7), so every SELECT here writes `FROM entry <compiled.sql>` and never a second `WHERE`; `jsonPath(field, key?)` |
 | `@braindog/extract` (43 §2) | `matches(decl, raw, ctx) · extract(decl, raw, ctx) · isDuplicate(a, b, dedupe)`; `ExtractCtx` built here with `lookup` over `kernel.list` |
@@ -680,15 +680,15 @@ RETURNING *
 
 **`acceptInvite({ token, person? })`** (INTERNAL, §5.11) — the host calls it at `POST /auth/invite` with the Directory's verified person. The token is split at the dot, the record id compared and the secret hashed; a row that is not live is `OUT_OF_BOUNDS` with the one sentence every dead link gets, which never says which of used, withdrawn or run out it was. With no `person` it only looks, spending nothing. With one, in one transaction: `invite` as `system`, `note = 'Accepted invitation <id>.'`, then `UPDATE invitation SET accepted_at = ?, accepted_by = ?`. The events are `invite`'s own `access.grant` rows, so acceptance adds no event kind.
 
-**`export({ cursor, sections, redactGrants })`** — `owner`, `op: 'export'`, or `system` (the nightly backup): `cursor === null` → `appendEvent({ kind: 'export', actor, note: JCS { sections, redactGrants } })` in its own statement; then `kernel.exportDogl(cursor, { sections, redactGrants })` — page 0 refreshes `dog_meta` and `dog_manifest`, then ≤ 1,000 row lines per page, `dog_sig` last for the signer (41 §5.10). The host signs and streams; the record never sees the signing key's plaintext.
+**`export({ cursor, sections, redactGrants })`** — `owner`, `op: 'export'`, or `system` (the nightly backup): `cursor === null` → `appendEvent({ kind: 'export', actor, note: JCS { sections, redactGrants } })` in its own statement; then `kernel.exportBrainl(cursor, { sections, redactGrants })` — page 0 refreshes `dog_meta` and `dog_manifest`, then ≤ 1,000 row lines per page, `dog_sig` last for the signer (41 §5.10). The host signs and streams; the record never sees the signing key's plaintext.
 
-**`import({ lines })`** — `owner` or `op: 'import'`: `kernel.importDogl(lines, ctx)` — `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, the copy in one transaction, `rebuildFts`, one `import` event (41 §5.11). Then `tail()` — imported schedule rows need an alarm.
+**`import({ lines })`** — `owner` or `op: 'import'`: `kernel.importBrainl(lines, ctx)` — `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, the copy in one transaction, `rebuildFts`, one `import` event (41 §5.11). Then `tail()` — imported schedule rows need an alarm.
 
 **`erase({ subjects, personId, basis })`** — `report = await kernel.erase(req, ctx)` (the stores of 02 §10 in one transaction, one `erase` event, an `erase.r2` outbox row — 41 §2); `tail()`. Refused before anything is written: a subject under three characters or a non-list `subjects` (`VALUE_MALFORMED`), no basis (`REQUIRED_MISSING`), a basis that names a subject (`VALUE_MALFORMED`), a `personId` not on the record (`OUT_OF_BOUNDS`), and any matched person holding `owner` on `*` (`LEVEL_REQUIRED`). `to_v` is the SHA-256 of each subject, never the subject.
 
 **`restore({ bookmark, at? })`** (amended September 16th 2026, one method as 30 §5 has it) — `admin(ctx)`; no `Snapshots` port → `NOT_IN_THIS_BUILD` (the Worker, until its `pitr(at)` is wired); a sign-in older than 15 minutes where the host knows one → `NEEDS_BROWSER_SESSION`; a `bookmark` that is not a kept copy → `OUT_OF_BOUNDS` with `allowed` the kept ids. Then `Snapshots.take('before-restore')`, `Snapshots.restore(bookmark)` (a copy it cannot put back throws a sentence, returned as `OUT_OF_BOUNDS`), `reload()`, `rebuildFts()`, and one `restore.pitr` event written after, into the restored record, `to_v` the bookmark; `tail()`. Returns `{ bookmark, at, kept }`. The self-host's bookmark is a copy's id; `import` into a fresh directory stays its path for anything else.
 
-**`snapshot({ label? })`** (amended September 16th 2026) — `admin(ctx)`; no `Snapshots` port → `NOT_IN_THIS_BUILD` with a sentence pointing at Export (the Worker: its copy is a `.dogl.age` sealed to the operator's age recipient and delivered by `export.r2`, neither wired); `label` one lower-case word, default `now`. `Snapshots.take(label)`, one `export` event with `note = 'snapshot ' + id + ' ' + bytes + ' bytes'`; `tail()`. Returns `{ id, at, bytes }`. "Snapshot now" — 12 §8.
+**`snapshot({ label? })`** (amended September 16th 2026) — `admin(ctx)`; no `Snapshots` port → `NOT_IN_THIS_BUILD` with a sentence pointing at Export (the Worker: its copy is a `.brainl.age` sealed to the operator's age recipient and delivered by `export.r2`, neither wired); `label` one lower-case word, default `now`. `Snapshots.take(label)`, one `export` event with `note = 'snapshot ' + id + ' ' + bytes + ' bytes'`; `tail()`. Returns `{ id, at, bytes }`. "Snapshot now" — 12 §8.
 
 **`snapshots()`** — `admin(ctx)`; no port → `NOT_IN_THIS_BUILD`; else `Snapshots.list()`, newest first.
 
@@ -1083,11 +1083,11 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 
 **`test/jobs.test.ts`** — two runners `claimJob` on one queued job → one `Claim` with a `bearer` whose hash is in `token` with `scope 'propose'` and `expires_at = job.expires`, the other `Idle`; a claimed job past `lease_until` → `listJobs` shows `lost: true` and a new claim takes it; a repeated `seq` → one `job_event` row; `cancelJob` → the next `Ack.cancel = 1`; another runner's job → `FORBIDDEN`.
 
-**`test/admin.test.ts`** — `planPack` then `setDeclaration` then `installPack` with the old hash → `PLAN_STALE`; `installPack` → `pack`, declarations, `sqlite_master` has `entry_i_invoices__due`, seeds tagged `example`, one `install` event, `digest`/`pull`/`snapshot` schedule rows; `uninstallPack` → `retired = 1`, rows kept, indexes gone, its schedule rows gone; `invite` → `member` rows and one `access.grant` per register, `access.revoke` on removal, last owner → `LEVEL_REQUIRED`; `invite` as `system` ok; `export` → the kernel's pages plus one `export` event on page 0; `dog-roundtrip` (33 §8): export → import into a fresh record → export yields identical row lines apart from `dog_sig`; `erase` → the kernel's report, one `erase.r2` outbox row, `wake` called; `restore(request)` writes nothing, `restore(done)` writes `restore.pitr`; `snapshot` → one `export.r2` row; devices: `deviceStart` → six digits, a pending row with `code_hash ≠ user_code`; `deviceApprove` with a wrong code four times → `FORBIDDEN`, the fifth → `DEVICE_CODE_TRIES` and every pending row `denied`; a right code → `approved`; `devicePoll` → `{ token, expires: +90 d, reach }` and the row `active`; after 11 min pending → `DEVICE_CODE_EXPIRED`; `arrive`: a duplicate `(channel, sha256)` → one row; `verified: false` → `untriaged`, no match; an exact match → a row with actor `ingest:<id>`, `matched`, a receipt; `needs-review` → `review` and a `rowset` suggestion; the third unmatched arrival of one shape → one `infer.draft` row; `ingestVerify` → a `grant.read` event by `system`; `applyPull` on an unleased outbox row → `OUT_OF_BOUNDS`.
+**`test/admin.test.ts`** — `planPack` then `setDeclaration` then `installPack` with the old hash → `PLAN_STALE`; `installPack` → `pack`, declarations, `sqlite_master` has `entry_i_invoices__due`, seeds tagged `example`, one `install` event, `digest`/`pull`/`snapshot` schedule rows; `uninstallPack` → `retired = 1`, rows kept, indexes gone, its schedule rows gone; `invite` → `member` rows and one `access.grant` per register, `access.revoke` on removal, last owner → `LEVEL_REQUIRED`; `invite` as `system` ok; `export` → the kernel's pages plus one `export` event on page 0; `brain-roundtrip` (33 §8): export → import into a fresh record → export yields identical row lines apart from `dog_sig`; `erase` → the kernel's report, one `erase.r2` outbox row, `wake` called; `restore(request)` writes nothing, `restore(done)` writes `restore.pitr`; `snapshot` → one `export.r2` row; devices: `deviceStart` → six digits, a pending row with `code_hash ≠ user_code`; `deviceApprove` with a wrong code four times → `FORBIDDEN`, the fifth → `DEVICE_CODE_TRIES` and every pending row `denied`; a right code → `approved`; `devicePoll` → `{ token, expires: +90 d, reach }` and the row `active`; after 11 min pending → `DEVICE_CODE_EXPIRED`; `arrive`: a duplicate `(channel, sha256)` → one row; `verified: false` → `untriaged`, no match; an exact match → a row with actor `ingest:<id>`, `matched`, a receipt; `needs-review` → `review` and a `rowset` suggestion; the third unmatched arrival of one shape → one `infer.draft` row; `ingestVerify` → a `grant.read` event by `system`; `applyPull` on an unleased outbox row → `OUT_OF_BOUNDS`.
 
 **`test/perf.test.ts`** — §7's table, p50 of 20, asserting `≤ 3 ×`.
 
-**CI rows** (33 §8): `ci.yml` runs this suite; `router-groups` reads `GROUPS`; `refusal-fixtures` maps §6's codes to fixtures the cases produce; `spark-actor` runs over the fixture record after `test/data.test.ts`; `dog-roundtrip` is `test/admin.test.ts`'s case; `closed-lists` diffs `DIALECT` against `packages/render/kinds/*.json`; `secret-grep` includes `packages/record/src`.
+**CI rows** (33 §8): `ci.yml` runs this suite; `router-groups` reads `GROUPS`; `refusal-fixtures` maps §6's codes to fixtures the cases produce; `spark-actor` runs over the fixture record after `test/data.test.ts`; `brain-roundtrip` is `test/admin.test.ts`'s case; `closed-lists` diffs `DIALECT` against `packages/render/kinds/*.json`; `secret-grep` includes `packages/record/src`.
 
 ---
 
@@ -1115,7 +1115,7 @@ Twenty-one, each a `ponytail:` line in the file named.
 18. `read.ts` — `ponytail: DIALECT is a sixteen-line constant kept equal to render's kinds by the closed-lists gate, not by an import — record ⇏ render.`
 19. `read.ts` — `ponytail: whatsNew filters entry events by scope and passes every other kind; values were redacted at write.`
 20. `metrics.ts` — `ponytail: trend is one log-linear fit; no seasonality, no changepoints. Six points cannot carry more.`
-21. `index.ts` — `ponytail: a saved view is a local table and does not travel in a .dog export; a travelling table is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record and asks where their views went.`
+21. `index.ts` — `ponytail: a saved view is a local table and does not travel in a .brain export; a travelling table is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record and asks where their views went.`
 
 ---
 
@@ -1148,7 +1148,7 @@ carries `budget` inside `args`, `ackOutbox` takes one object with `state` (§13 
 **This unblocks:** `apps/selfhost` (49) and `apps/worker` (51), which host `RecordApi` one line per method;
 `packages/spark` (46), whose reads are `project()` and whose runner protocol is the JOBS group; `packages/connect`
 (47), which writes back through `applyPull` and `ackOutbox`; `packages/mcp`'s integration tests over a real
-`RecordApi` on `:memory:`; the `router-groups`, `spark-actor` and `dog-roundtrip` gates (52).
+`RecordApi` on `:memory:`; the `router-groups`, `spark-actor` and `brain-roundtrip` gates (52).
 
 ---
 

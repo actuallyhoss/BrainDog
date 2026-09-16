@@ -5,7 +5,7 @@
  * a customer exist — there is no control-plane call, no id to store, no half-created tenant left
  * behind by a signup that failed at the wrong moment. What is left for this file is the four rows
  * that say WHICH record the object is: its own name, the owner as a person, the owner's membership,
- * and the header a `.dog` file carries so the file knows what it is a copy of.
+ * and the header a `.brain` file carries so the file knows what it is a copy of.
  *
  * IT IS ONE TRANSACTION, and it has to be. A record with a `record` row and no owner is a record
  * nobody can open; a record with an owner and no `record` row cannot say its own timezone, so every
@@ -154,7 +154,7 @@ export function createRecord(
       );
     }
 
-    /* THE HEADER A FILE CARRIES. `dog_meta` is what makes an exported `.dog` say which record it is a
+    /* THE HEADER A FILE CARRIES. `dog_meta` is what makes an exported `.brain` say which record it is a
        copy of, and when. Written here rather than at export, because a fact about the record that is
        computed at export time is a fact the file cannot be checked against. */
     for (const [key, value] of [

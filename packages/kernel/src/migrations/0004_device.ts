@@ -6,7 +6,7 @@
  *
  * A REBUILD AND NOT AN ALTER, because SQLite cannot change a CHECK in place, and the list of reaches
  * is a CHECK so that the database refuses an eighth. The table is `local`: it never travels, no
- * `.dog` carries it, and the format stays 1. Every row is copied across unchanged.
+ * `.brain` carries it, and the format stays 1. Every row is copied across unchanged.
  */
 export default `
 CREATE TABLE device_grant_next (

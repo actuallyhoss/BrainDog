@@ -972,7 +972,7 @@ export const METRICS: Record<string, SeedMetric> = {
  * heading.
  *
  * They live in the SEED for the reason the registers and the metrics do: a page is a document the
- * RECORD holds — it travels in a `.dog` file, it versions when it changes, and a person can point at
+ * RECORD holds — it travels in a `.brain` file, it versions when it changes, and a person can point at
  * the version that was live when a figure was screenshotted. A page only the browser could read was
  * a page the record could not carry.
  */
@@ -1667,7 +1667,7 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
              one of six codes `refusals.mjs` counts as drift and holds as a budget that may only go
              down, and it was recorded as blocked on nothing in particular. It is not: the kernel's
              own importer already emits `IMPORT_NOT_EMPTY` for the identical fact at
-             `dogl.ts:613`, both map to 422, and nothing in this repository asserts on the old
+             `brainl.ts:613`, both map to 422, and nothing in this repository asserts on the old
              spelling. Two codes for one sentence, one of them unpublished. */
           code: 'IMPORT_NOT_EMPTY',
           fix: `This record already holds ${kernel.count(register)} rows in ${register}. The seed opens an empty record.`,

@@ -618,14 +618,14 @@ on mismatch; the same gate reads the `app` tuple back and requires it to equal t
 
 1. Assets served from disk with the same immutable headers — the same `build/`, from the same
    `adapter-static` build; there is no adapter split and nothing renders on the server (§2).
-2. The storage adapter binds `node:sqlite`'s `DatabaseSync` against the `.dog` file — **the
+2. The storage adapter binds `node:sqlite`'s `DatabaseSync` against the `.brain` file — **the
    self-host default** ([ADR-038](16-DECISIONS.md), [33-CONTRACTS](33-CONTRACTS.md) §6). `better-sqlite3`
    implements the same `Sql` port and is the alternative for an older Node; `bun:sqlite` is
    unsupported.
 
 **Verified on Node 24.13.0** (the official win32-x64 build, re-measured 2026-09-02): SQLite
 **3.50.4**, compile options include **`ENABLE_FTS5`**. An FTS5 virtual table was created, inserted
-into and matched successfully. `PRAGMA application_id` works. **The `.dog` plan in
+into and matched successfully. `PRAGMA application_id` works. **The `.brain` plan in
 [03-DOG-FORMAT](03-DOG-FORMAT.md) is sound.** Earlier drafts of [01-ARCHITECTURE](01-ARCHITECTURE.md)
 §4 and [30-BLUEPRINT](30-BLUEPRINT.md) §13 said official builds lacked FTS5; this measurement stands —
 nodejs/node#56476 was closed because FTS5 was *enabled* — and both now agree. Node bundles its own
@@ -729,11 +729,11 @@ screen.** The assertion: **header cell widths === body cell widths, exactly.** T
 pass is one declared track list in a custom property, shared.
 
 **Nine fixture records** — one per reference page, eight, plus `corpus`, the whole-corpus record the
-`dog-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
+`brain-roundtrip` and `spark-actor` gates read — checked in as text: pack YAML, row JSON
 per register, a `seed.json` manifest. Rows are committed for ≤ 60 and generated beyond that by
 `rows/gen.mjs` from the seed's RNG, output committed and `--check`ed in CI; the data is synthetic by
 rule — generated names, `.example` hosts, 2030–2031 dates, refs as `register#seq`, no ULID or hash on
-disk. The `.dog` is materialised at test time through the real write path with an injected `Clock`
+disk. The `.brain` is materialised at test time through the real write path with an injected `Clock`
 and seeded RNG, never committed as bytes ([40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §5). The pages: an
 empty register · 12 rows · 500 rows · 5,000 rows · mixed currencies · a long write-up with inline
 blocks · **a third-party pack kind** · **a deliberately unknown primitive**. The 500-row page reads

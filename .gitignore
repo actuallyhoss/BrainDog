@@ -4,9 +4,9 @@ build/
 .svelte-kit/
 .wrangler/
 *.tsbuildinfo
-*.dog
-*.dogl
-*.dogl.age
+*.brain
+*.brainl
+*.brainl.age
 *.sqlite
 _*
 __*

@@ -298,7 +298,7 @@ test('and each combinator says HOW it read, because 43 §5.1 files a choice at `
 });
 
 test('a form nested past three deep yields nothing, and never a walk that does not end', () => {
-  /* `declare` refuses it at install, and a `.dog` import or a pack reaches `arrive` without passing
+  /* `declare` refuses it at install, and a `.brain` import or a pack reaches `arrive` without passing
      the linter. A payload produces an outcome, never a throw. */
   const deep = { first: [{ first: [{ first: [{ first: [{ int: {} }] }] }] }] } as never;
   assert.equal(extractField(deps, deep, 'there are 41'), null);
@@ -588,7 +588,7 @@ test('THE CEILING ONLY EVER BRINGS IT DOWN: an unreadable field beats an `exact`
 
   /* AND A CONFIDENCE OUTSIDE THE THREE KEEPS THE BYTES. This used to refuse before `store` had run,
      and the whole call sits in a savepoint — so a declaration carrying `confidence: probably`, which
-     nothing validates at install and which a `.dog` import or a pack installs cleanly, threw the
+     nothing validates at install and which a `.brain` import or a pack installs cleanly, threw the
      arrival away entirely: `inbox_raw` got no row, against 07 §2's "nothing is ever dropped". The
      sender did nothing wrong; the pattern did, and the payload is the evidence for fixing it. */
   const bad = await record(HSBC({ writes: { register: 'transactions', confidence: 'probably' } }));

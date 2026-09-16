@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
-import { b64url, checkDogl, keyIdOf, openRecord, signDogl, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
+import { b64url, checkBrainl, keyIdOf, openRecord, signBrainl, TRAVELS, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 import { testSigner } from './signer.ts';
 
@@ -59,7 +59,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
 /**
  * Recompute a file's own manifest so that an edited file is INTERNALLY CONSISTENT again.
  *
- * IT EXISTS TO KEEP THE OLD TESTS HONEST. `checkDogl` now refuses a file whose rows do not match its
+ * IT EXISTS TO KEEP THE OLD TESTS HONEST. `checkBrainl` now refuses a file whose rows do not match its
  * manifest, which means every test that damaged a row line was, after that change, testing the
  * checksum and not the thing it was written for. Re-sealing puts the parser back under test: this is
  * a file that passes every integrity check and still carries a line that is not a row.
@@ -104,8 +104,8 @@ function reseal(lines: readonly string[]): string[] {
     }
     if (table === 'dog_manifest' && !line.startsWith('#')) continue;
     /* THE OLD SIGNATURE GOES WITH THE OLD MANIFEST. It signed bytes that no longer exist, and
-       leaving it beside a new one gives a file two signatures — which `checkDogl` refuses for its
-       own reason and would hide the one this is testing. `exportDogl` clears `dog_sig` for the same
+       leaving it beside a new one gives a file two signatures — which `checkBrainl` refuses for its
+       own reason and would hide the one this is testing. `exportBrainl` clears `dog_sig` for the same
        reason. */
     if (table === 'dog_sig' && !line.startsWith('#')) continue;
     out.push(raw);
@@ -274,8 +274,8 @@ test('the header travels, the local section does not', async () => {
   // `dog_sig` IS LAST, whatever section it sits in, so a signer appends one line to the end of a
   // file whose hashes are already fixed rather than splicing into the middle of it.
   assert.equal(named.at(-1), 'dog_sig');
-  // AND THE KERNEL WROTE NO ROW UNDER IT. `exportDogl` cannot: signing needs a private key `12 §6`
-  // keeps in the host. The row on the end came from `signDogl`, which takes bytes and a callback.
+  // AND THE KERNEL WROTE NO ROW UNDER IT. `exportBrainl` cannot: signing needs a private key `12 §6`
+  // keeps in the host. The row on the end came from `signBrainl`, which takes bytes and a callback.
   assert.equal(value<string[]>(await (await openRecord(openSqlite(), fixedClock(NOW))).export()).at(-1)?.startsWith('#table dog_sig '), true, 'an unsigned export wrote a signature row');
   assert.ok(lines.at(-1)?.startsWith('["ed25519",'), 'the signed file carries no signature row');
   sql.close();
@@ -464,14 +464,14 @@ test('a damaged file is a refusal and not an exception, and it writes nothing', 
        file, and both make every assertion below about a check other than the one this test is named
        for. What is left is the case that gets through everything: a file that is internally
        consistent, signed by the key that wrote it, and carrying a line that is not a row. */
-    const broken = await signDogl(reseal([...lines.slice(0, at), damage, ...lines.slice(at + 1)]), SIGNER);
+    const broken = await signBrainl(reseal([...lines.slice(0, at), damage, ...lines.slice(at + 1)]), SIGNER);
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
     const out = (await k.import(broken)) as { ok: boolean; refusal?: { code: string; fix: string } };
     assert.equal(out.ok, false, `\`${damage.slice(0, 24)}…\` was imported as if it were a row`);
     /* `FILE_MALFORMED` — `30 §6`'s new format-and-lifecycle code for the hole `33 §9`'s import row
        left: it names `SIGNATURE_INVALID`, `CHECKSUM_MISMATCH` and `FORMAT_NEWER_THAN_READER` and has
-       no word for a file that is simply not a `.dogl`. Both arms of the old ternary here —
+       no word for a file that is simply not a `.brainl`. Both arms of the old ternary here —
        `MALFORMED_FILE` and `IMPORT_FAILED` — are this one code now, and `IMPORT_FAILED` was invisible
        to the refusals gate because its pattern could not see past a `?`. */
     assert.equal(out.refusal?.code, 'FILE_MALFORMED');
@@ -613,7 +613,7 @@ test('A FILE THAT HAS BEEN EDITED SINCE IT WAS WRITTEN DOES NOT OPEN', async () 
   // checks reads exactly like a claim that works.
   const { k, sql } = await filled();
   const lines = value<string[]>(await k.export());
-  assert.ok((await checkDogl(lines)).ok, 'a file straight out of export does not match its own manifest');
+  assert.ok((await checkBrainl(lines)).ok, 'a file straight out of export does not match its own manifest');
 
   const at = rowIn(lines, 'entry', 'Halden');
 
@@ -621,18 +621,18 @@ test('A FILE THAT HAS BEEN EDITED SINCE IT WAS WRITTEN DOES NOT OPEN', async () 
   const edited = [...lines];
   edited[at] = edited[at]!.replace('48000', '4800');
   assert.notEqual(edited[at], lines[at], 'the amount was not where the test thought it was');
-  const bent = await checkDogl(edited);
+  const bent = await checkBrainl(edited);
   assert.equal(bent.ok, false, 'an edited amount passed the manifest');
   assert.equal(bent.ok === false ? bent.refusal.code : '', 'CHECKSUM_MISMATCH');
   assert.match(bent.ok === false ? bent.refusal.fix : '', /entry/, 'the refusal does not name the table');
 
   // A ROW REMOVED. The count and the hash both move, and either is enough.
   const short = [...lines.slice(0, at), ...lines.slice(at + 1)];
-  assert.equal((await checkDogl(short)).ok, false, 'a deleted row passed the manifest');
+  assert.equal((await checkBrainl(short)).ok, false, 'a deleted row passed the manifest');
 
   // A ROW ADDED, which is the one that matters: somebody appending an invoice they are owed.
   const long = [...lines.slice(0, at + 1), lines[at]!.replace('Halden', 'Nobody'), ...lines.slice(at + 1)];
-  assert.equal((await checkDogl(long)).ok, false, 'an appended row passed the manifest');
+  assert.equal((await checkBrainl(long)).ok, false, 'an appended row passed the manifest');
 
   sql.close();
 });
@@ -645,20 +645,20 @@ test('AND NEITHER DOES A FILE WITH A TABLE MISSING, which is the case a per-tabl
 
   const [from, to] = span(lines, 'entry');
   const gone = [...lines.slice(0, from), ...lines.slice(to)];
-  const out = await checkDogl(gone);
+  const out = await checkBrainl(gone);
   assert.equal(out.ok, false, 'a file with every entry removed passed');
   assert.equal(out.ok === false ? out.refusal.code : '', 'CHECKSUM_MISMATCH');
   assert.match(out.ok === false ? out.refusal.fix : '', /entry/);
 
   // A TABLE THE MANIFEST DOES NOT LIST is the same fault from the other side.
   const extra = [...lines, '#table nowhere id,name', '["x","y"]'];
-  assert.equal((await checkDogl(extra)).ok, false, 'a table nothing vouches for passed');
+  assert.equal((await checkBrainl(extra)).ok, false, 'a table nothing vouches for passed');
 
   // AND THE MANIFEST ITSELF CANNOT BE DROPPED. Without this, deleting one header disables every
   // check in this file and the import proceeds.
   const [mfrom, mto] = span(lines, 'dog_manifest');
   const unvouched = [...lines.slice(0, mfrom), ...lines.slice(mto)];
-  const bare = await checkDogl(unvouched);
+  const bare = await checkBrainl(unvouched);
   assert.equal(bare.ok, false, 'a file with no manifest passed');
   assert.equal(bare.ok === false ? bare.refusal.code : '', 'CHECKSUM_MISMATCH');
 
@@ -674,7 +674,7 @@ test('THE COUNT BESIDE THE HASH IS CHECKED TOO', async () => {
   assert.equal(name, 'entry', 'the manifest row found was not entry’s');
   const lying = [...lines];
   lying[at] = JSON.stringify([name, rows + 1, sha]);
-  const out = await checkDogl(lying);
+  const out = await checkBrainl(lying);
   assert.equal(out.ok, false, 'a manifest whose two halves disagree passed');
   assert.match(out.ok === false ? out.refusal.fix : '', /rows/);
   sql.close();
@@ -684,16 +684,16 @@ test('A FILE FROM A NEWER BUILD IS REFUSED ON LINE ONE, before anything is parse
   const { k, sql } = await filled();
   const lines = value<string[]>(await k.export());
 
-  const future = await checkDogl(['#dogl 9', ...lines.slice(1)]);
+  const future = await checkBrainl(['#dogl 9', ...lines.slice(1)]);
   assert.equal(future.ok, false);
   assert.equal(future.ok === false ? future.refusal.code : '', 'FORMAT_NEWER_THAN_READER');
   assert.match(future.ok === false ? future.refusal.fix : '', /format 9/);
 
-  // AND SOMETHING THAT IS NOT A .dog FILE AT ALL says so, rather than reporting a checksum.
+  // AND SOMETHING THAT IS NOT A .brain FILE AT ALL says so, rather than reporting a checksum.
   for (const first of ['<!doctype html>', '#dogl', '#dogl nine', ''])
-    assert.equal((await checkDogl([first, ...lines.slice(1)])).ok, false, `\`${first}\` was read as a file`);
+    assert.equal((await checkBrainl([first, ...lines.slice(1)])).ok, false, `\`${first}\` was read as a file`);
   assert.equal(
-    ((await checkDogl(['<!doctype html>'])) as { refusal: { code: string } }).refusal.code,
+    ((await checkBrainl(['<!doctype html>'])) as { refusal: { code: string } }).refusal.code,
     'FILE_MALFORMED',
   );
   sql.close();
@@ -707,7 +707,7 @@ test('AN EMPTY TABLE IS STILL A TABLE, and a file that grew one does not open', 
 
   const [from, to] = span(lines, 'entry');
   const emptied = [...lines.slice(0, from + 1), ...lines.slice(to)];
-  assert.equal((await checkDogl(emptied)).ok, false, 'emptying a table left the manifest satisfied');
+  assert.equal((await checkBrainl(emptied)).ok, false, 'emptying a table left the manifest satisfied');
 
   // And a real export DOES carry empty tables, which is what makes the case above reachable.
   const bodiless = lines.filter((l, i) => l.startsWith('#table ') && (lines[i + 1] ?? '#').startsWith('#'));
@@ -729,7 +729,7 @@ test('AND THE CHECK RUNS BEFORE ONE ROW IS WRITTEN', async () => {
   assert.equal(out.refusal?.code, 'CHECKSUM_MISMATCH');
   assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a refused import wrote rows');
   /* AND THE DECLARATIONS ARE UNTOUCHED, which is the half a per-table check could still have got
-     wrong: `importDogl` clears a table on its first line, so a refusal that arrived one table in
+     wrong: `importBrainl` clears a table on its first line, so a refusal that arrived one table in
      would leave the record emptier than it started. */
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE pack_id IS NOT 'kernel'")?.n ?? 0, 0);
   sql.close();
@@ -762,7 +762,7 @@ test('A SIGNED FILE NAMES ITS KEY, AND THE ID IS THE KEY', async () => {
   const bytes = new TextEncoder().encode(manifest.join('\n'));
   assert.ok(await crypto.subtle.verify('Ed25519', key, unb64(sig), bytes), 'the signature is not over the manifest');
 
-  assert.ok((await checkDogl(lines)).ok, 'a file straight out of a signing export does not verify');
+  assert.ok((await checkBrainl(lines)).ok, 'a file straight out of a signing export does not verify');
   sql.close();
 });
 
@@ -776,14 +776,14 @@ test('AN EDIT THAT RECOMPUTES THE MANIFEST STILL DOES NOT OPEN', async () => {
   const at = rowIn(lines, 'entry', 'Halden');
   const forged = reseal([...lines.slice(0, at), lines[at]!.replace('48000', '4800'), ...lines.slice(at + 1)]);
 
-  assert.equal((await checkDogl(forged)).ok, false, 'a re-sealed forgery opened');
-  const out = (await checkDogl(forged)) as { refusal: { code: string; fix: string } };
+  assert.equal((await checkBrainl(forged)).ok, false, 'a re-sealed forgery opened');
+  const out = (await checkBrainl(forged)) as { refusal: { code: string; fix: string } };
   assert.equal(out.refusal.code, 'SIGNATURE_INVALID');
 
   // AND SIGNING IT WITH ANOTHER KEY DOES NOT HELP, which is what makes the claim "produced by that
   // instance" rather than "produced by somebody".
-  const elsewhere = await signDogl(forged, testSigner());
-  const other = (await checkDogl(elsewhere)) as { ok: boolean };
+  const elsewhere = await signBrainl(forged, testSigner());
+  const other = (await checkBrainl(elsewhere)) as { ok: boolean };
   assert.equal(other.ok, true, 'a file signed by a key it carries should verify — origin is --key’s job');
   sql.close();
 });
@@ -796,7 +796,7 @@ test('AND A FILE WITH NO SIGNATURE IS NOT IMPORTED', async () => {
   assert.ok((await unsigned.install([OBLIGATIONS])).ok);
   const lines = value<string[]>(await unsigned.export());
 
-  const out = await checkDogl(lines);
+  const out = await checkBrainl(lines);
   assert.equal(out.ok, false, 'a file from a record with no signing key imported anyway');
   assert.equal(out.ok === false ? out.refusal.code : '', 'SIGNATURE_INVALID');
   assert.match(out.ok === false ? out.refusal.fix : '', /no signature/);
@@ -814,7 +814,7 @@ test('THE HEADER OF A SIGNATURE IS CHECKED, not taken', async () => {
     JSON.stringify(next),
     ...lines.slice(at + 1),
   ];
-  const code = async (ls: string[]) => ((await checkDogl(ls)) as { ok: boolean; refusal?: { code: string } }).refusal?.code;
+  const code = async (ls: string[]) => ((await checkBrainl(ls)) as { ok: boolean; refusal?: { code: string } }).refusal?.code;
 
   // A KEY ID THAT IS NOT THE ID OF THE KEY BESIDE IT. Without recomputing it, the field is a claim
   // about a key nobody checked — and `braindog verify --key` compares against exactly that field.

@@ -138,7 +138,7 @@ interface Snapshots {
   prune(keep: number): Promise<void>;
 }
 // Cloud: PITR bookmarks, plus the nightly walk — scheduled() → snapshot (ADMIN, as system) → an export.r2 outbox row →
-// Snapshots.take writes the .dogl.age under the record's R2 prefix (51 §13 D8; 53 §13 #8). Self-host: VACUUM INTO,
+// Snapshots.take writes the .brainl.age under the record's R2 prefix (51 §13 D8; 53 §13 #8). Self-host: VACUUM INTO,
 // nightly, keep 30 — a full copy that keeps the six local tables and never leaves the host (§6).
 // Wired September 16th 2026: the self-host also takes one on demand from `snapshot` and serves `snapshots` and `restore`
 // over them; the Worker passes no store, so those three refuse NOT_IN_THIS_BUILD with a sentence pointing at Export.
@@ -266,8 +266,8 @@ them. `ROUTES` in `@braindog/host` routes 68 of the ninety at `/api/<method>`, 3
 | ADMIN | `invite` | `{ person, level?, registers? }` moves somebody already known; `{ email, level?, registers? }` mints an invitation — one address, 24 h | the member rows, or `{ invitation, token }`: the link's token, answered once and stored only as `sha256`. A host where nobody can sign in refuses `NOT_IN_THIS_BUILD` with its own sentence, an address already on the record is `ALREADY_KNOWN`, and a token is `NEEDS_BROWSER_SESSION`. Nothing is mailed; acceptance is `acceptInvite` |
 | ADMIN | `invitations` | `{}` | every invitation still waiting, newest first, each `{ id, email, level, registers, invited_by, created_at, expires_at }`. Never a link and never a hash |
 | ADMIN | `revokeInvite` | `{ id }` | `{ id, revoked_at }`; the link stops working at once. One already used, withdrawn or run out is `OUT_OF_BOUNDS` |
-| ADMIN | `export` | `{ cursor?, sections?, redactGrants? }` | one page of `.dogl` lines (≤ 1,000 rows) + the next cursor; `system` for the nightly backup (§9) |
-| ADMIN | `import` | `{ lines }` — the whole `.dogl` | the `ImportReport`; into an empty record only (§9) |
+| ADMIN | `export` | `{ cursor?, sections?, redactGrants? }` | one page of `.brainl` lines (≤ 1,000 rows) + the next cursor; `system` for the nightly backup (§9) |
+| ADMIN | `import` | `{ lines }` — the whole `.brainl` | the `ImportReport`; into an empty record only (§9) |
 | ADMIN | `erase` | `{ subjects, personId?, basis }` — a subject is three characters or more | the report; the stores of 02 §10 in one transaction, R2 through the outbox; an owner is not erasable (`LEVEL_REQUIRED`), and a basis naming the subject is `VALUE_MALFORMED` |
 | ADMIN | `restore` | `{ bookmark, at? }` | writes `restore.pitr`; on Cloud the Worker runs `pitr(at)` first (§9). A self-host puts back one of its kept copies, the record kept first as `before-restore`, from a sign-in in the last 15 minutes where the host knows one; the Worker refuses `NOT_IN_THIS_BUILD` until `pitr(at)` is wired |
 | ADMIN | `snapshot` | `{ label? }` | `{ id, at, bytes }` from the host's `Snapshots.take` (§9), and one `export` event; a host with no store refuses `NOT_IN_THIS_BUILD`, the Worker today, whose copy is sealed to a key only the operator holds |
@@ -396,8 +396,8 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/api/<method>` | POST | **cookie only** | VAULT, and the browser four of JOBS (`createJob cancelJob listJobs jobEvents`) — a bearer gets **403 `NEEDS_BROWSER_SESSION`**; every MCP token is refused the job surface |
 | `/api/<method>` | POST | cookie, **or a bearer carrying an operation grant** for exactly this method | ADMIN — `ctx.op` is the grant: single-use, ten minutes, the operation named at approval (§10; ADR-060 as amended) |
 | `/api/claimJob` · `/api/postJobEvent` · `/api/readCancel` | POST | the runner's grant | the runner three of JOBS; `claimJob { wait }` long-polls in the host, never inside the object (§11) |
-| `/api/export` | POST | cookie, or an operation grant `export <scope>` | answers `200 text/plain; charset=utf-8` — the `.dogl` itself, streamed; the host emits the `dog_sig` line last (§9) |
-| `/api/import` | POST | cookie, or an operation grant `import <file sha256>` | takes the `.dogl` as its `text/plain` body; an empty record only (§9) |
+| `/api/export` | POST | cookie, or an operation grant `export <scope>` | answers `200 text/plain; charset=utf-8` — the `.brainl` itself, streamed; the host emits the `dog_sig` line last (§9) |
+| `/api/import` | POST | cookie, or an operation grant `import <file sha256>` | takes the `.brainl` as its `text/plain` body; an empty record only (§9) |
 | `/api/deleteRecord` | POST | cookie, re-authenticated | ADMIN; the slug typed to confirm (§10) |
 | `/api/snapshot` · `/api/snapshots[/:id]` | POST · GET | cookie | ADMIN; the list reads R2 (Cloud) or `<slug>/snapshots/` (self-host) |
 | `/api/vault/deposit` · `/api/vault/open` | POST | **a vault grant's bearer**, checked by `vaultGrant`, which never accepts a login token; any `Origin` is refused | an agent's keys from a terminal (12 §6 rule 9). The host seals and opens with its `KeyStore` and the record binds sealed bytes only. Not record methods, so not in `ROUTES` |
@@ -477,9 +477,9 @@ One bundled file (`esbuild`), the `braindog-cli` package (Apache-2.0); `yaml` an
 | Command | Does |
 |---|---|
 | `braindog login <host>` | the RFC 8628 device flow of [12-SECURITY](12-SECURITY.md) §6.1 with `reach = login`: prints a six-digit code, the owner approves in the browser, the CLI receives a **`read`+`write` agent token** and stores it in `hosts.json` (0600) — under `$XDG_CONFIG_HOME/braindog/`, `~/.config/braindog/` when unset, `%APPDATA%\braindog\` on Windows unless `XDG_CONFIG_HOME` is set. `BRAINDOG_HOST` / `BRAINDOG_TOKEN` override. That token never reaches ADMIN |
-| `braindog init <slug> [--owner]` · `braindog dev [--port]` | self-host only; both spawn the self-host entry with `process.execPath` (`BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` in a checkout) — the CLI never imports `apps/selfhost` and never links `packages/record`. `init` creates `<data>/<slug>/record.dog`, runs migration 0001, writes the owner into the Directory and mints `<slug>/inbound.token` (0600). `dev` runs against a scratch data dir with real ports over `:memory:` and prints its mail and a throwaway `BRAINDOG_TOKEN` to stderr |
-| `braindog export [--with-attachments] [--redact-grants] [--sections data,origin,governance] [--mirror] [-o file]` | streams the `.dogl` (41 §5.10's line format) from the record and materialises a signed `.dog`; `--mirror` also writes rendered markdown in the layout of 32 §2 |
-| `braindog import <file.dog \| file.dogl>` | one `text/plain` body into an empty record only (`IMPORT_NOT_EMPTY`), §9 |
+| `braindog init <slug> [--owner]` · `braindog dev [--port]` | self-host only; both spawn the self-host entry with `process.execPath` (`BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` in a checkout) — the CLI never imports `apps/selfhost` and never links `packages/record`. `init` creates `<data>/<slug>/record.brain`, runs migration 0001, writes the owner into the Directory and mints `<slug>/inbound.token` (0600). `dev` runs against a scratch data dir with real ports over `:memory:` and prints its mail and a throwaway `BRAINDOG_TOKEN` to stderr |
+| `braindog export [--with-attachments] [--redact-grants] [--sections data,origin,governance] [--mirror] [-o file]` | streams the `.brainl` (41 §5.10's line format) from the record and materialises a signed `.brain`; `--mirror` also writes rendered markdown in the layout of 32 §2 |
+| `braindog import <file.brain \| file.brainl>` | one `text/plain` body into an empty record only (`IMPORT_NOT_EMPTY`), §9 |
 | `braindog verify <file> [--key <pubkey \| url>]` | offline: `application_id`, format, manifest hashes, signature; without `--key` the output says `unpinned`, with it the key must match `dog_sig.key_id` |
 | `braindog pack lint <dir>` · `pack plan <dir>` · `pack install <dir \| url \| git ref> [--with-deps]` · `pack uninstall <id>` | lint is offline, through `declare`'s `parsePack(files) → Pack \| Refusal[]`, `lint(pack, installed)` and `checksum(pack)` (42 §2 — the CLI uses those names); plan prints the diff; install applies it under `PLAN_STALE` |
 | `braindog rule test <id> --against <raw \| register>` · `rule apply <id> [--dry]` | `ruleTest` (READ+) and `ruleApply` (ADMIN, §2); the dry run reports `won / lost / takenBy` and is also the undo |
@@ -511,7 +511,7 @@ polling in place of `/ws`, and inbound email through a forwarding webhook; passk
 |---|---|
 | Runtime | Node **24.13.0**, pinned to the minor; `node:sqlite` is the only driver (FTS5 and JSON measured present) — no `better-sqlite3`, which is not built under the pin |
 | Entry | `BRAINDOG_SELFHOST`, or `apps/selfhost/src/main.ts` relative to a checkout — what `braindog init` and `dev` spawn (§5) |
-| Data | `BRAINDOG_DATA=/data` — `<slug>/record.dog` per record, plus `directory.sqlite` (§10); a request names its record by its session row, the bearer's hash, or its own path (§4) |
+| Data | `BRAINDOG_DATA=/data` — `<slug>/record.brain` per record, plus `directory.sqlite` (§10); a request names its record by its session row, the bearer's hash, or its own path (§4) |
 | Root key | `BRAINDOG_KEK_FILE=/data/kek` — 32 random bytes, 0600, created on first run; `BRAINDOG_KEK_PREV_FILE` is the second slot of the rotation ladder (§1) |
 | Secrets | `BRAINDOG_SESSION_SECRET`, optional: what the Directory's session key is derived from by HKDF instead of the key file (§10); `BRAINDOG_ORIGIN`: the origin the app is served from, which names the cookie and the passkeys' relying party; `BRAINDOG_TRUST_PROXY=1`: count the lockout against the last `X-Forwarded-For` entry; `BRAINDOG_TOKENS_VALID_FROM` — the fleet lever that invalidates every bearer minted before an instant |
 | Origin | `BRAINDOG_ORIGIN` — the public origin for magic-link URLs, the CSRF origin check and (phase 3) the WebAuthn `rpId`; default `http://localhost:<PORT>` |
@@ -520,13 +520,13 @@ polling in place of `/ws`, and inbound email through a forwarding webhook; passk
 | Port | `PORT=8080`; TLS is the reverse proxy's job |
 | Per open | the adapter applies `journal_mode=WAL` · `synchronous=NORMAL` · `busy_timeout=5000` · `foreign_keys=OFF`, asserts `foreign_keys = 0`, and runs `measureCaps` and the boot probe (37 §13 D10) |
 | Scheduler | one `setTimeout` over `MIN(due_at)` per record; one outbox poller per record, which `wake()` kicks (`setImmediate`); one nightly timer per process |
-| Snapshots | nightly `VACUUM INTO` (permitted here) → keep 30, under `<slug>/snapshots/`. **A snapshot is a full copy that keeps the six `local` tables and never leaves the host** — disaster recovery, restored offline by putting the file back; **an export is the portable `.dog` without them** (§9) |
+| Snapshots | nightly `VACUUM INTO` (permitted here) → keep 30, under `<slug>/snapshots/`. **A snapshot is a full copy that keeps the six `local` tables and never leaves the host** — disaster recovery, restored offline by putting the file back; **an export is the portable `.brain` without them** (§9) |
 | Live channel | no `/ws` in phase 2 — 404, and the client polls `/api/version` |
 | Web | the same static `build/` the Worker serves, from disk |
 | Boot | `measureCaps` per record file; a build without FTS5 refuses to start, naming the driver. One sick record does not stop the host: `SCHEMA_MISMATCH` / `SCHEMA_NEWER` is per record, 503 on its routes only |
 | Limits | the adapter enforces `DO_LIMITS` (§1) so a self-host never out-runs the Cloud |
 
-The self-host is where a `.dog` is a *file*: the live database is a `.dog` with its `local` tables in it, a snapshot is
+The self-host is where a `.brain` is a *file*: the live database is a `.brain` with its `local` tables in it, a snapshot is
 a byte-for-byte copy of that, and an export is the same content with `local` stripped, manifested and signed — the four
 `dog_*` header tables are present in all three because migration 0001 created them.
 
@@ -619,7 +619,7 @@ the one home; a count is never a budget — it is read from the owning enumerati
 | `deploy-parity` | script | after `wrangler deploy`, fetch `/` and `/_app/version.json` from the live host; SHA-256 must equal the `build/` output; `/api/version` answers the deployed `app` |
 | `where-property` | test | the compiler and the evaluator agree on **1,000** random predicates in CI and **10,000** nightly; failing seeds committed |
 | `boot-probe` | test | a build without FTS5 refuses with the exact message, naming the driver |
-| `dog-roundtrip` | test | export → import → export over the `corpus` record differs by exactly one appended `import` event |
+| `brain-roundtrip` | test | export → import → export over the `corpus` record differs by exactly one appended `import` event |
 | `targets` · `row-centre` · `field-height` · `contrast` · `focus` · `screenshot-mode` · `motion` · `bundle` · `a11y-tree` · `shell` · `grid-contract` · `page-render` · `draft-survives-load` · `no-model` · `job-view` · `keys-sheet` · `vault-screen` | Playwright | **seventeen specs** — the rows of [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 and 50 §9, over the 8 fixture pages × 4 widths (390 · 768 · 1024 · 1440) × 2 schemes × 2 directions — 128 configurations; the ninth fixture record, `corpus`, is the whole-corpus gates' |
 
 **Output and workflows.** One JSON line per gate — `gate ok ms` or `gate skip`, and on red `what expected found where` —
@@ -634,19 +634,19 @@ restore monthly, KEK rotation quarterly, erasure quarterly, upgrade every releas
 
 ## 9 · Export, import, restore, migrations
 
-**Two containers, one content.** The `.dog` is a SQLite file. The `.dogl` is the canonical logical dump — header
+**Two containers, one content.** The `.brain` is a SQLite file. The `.brainl` is the canonical logical dump — header
 lines, then one JCS array per row, tables in `dog_section` order, in the line format **41 §5.10** states once and every
 other document cites — whose bytes are exactly what `dog_manifest` hashes ([34-GRAMMARS](34-GRAMMARS.md) §5). They
 verify with the same key and import to the same rows.
 
 | Operation | Procedure |
 |---|---|
-| **Export from Cloud** | the record pages the `.dogl` through `export({ cursor, sections?, redactGrants? })` (ADMIN, or `system` for the backup), ≤ 1,000 rows a page; `POST /api/export` answers one streamed `text/plain` body and the host — never the record — signs: one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK, and the `dog_sig` line emitted last. A Worker cannot build a SQLite file — no engine, no filesystem, 128 MB — so the `.dog` is materialised by the CLI or a self-host from the `.dogl`. The nightly R2 backup is `.dogl.age` |
+| **Export from Cloud** | the record pages the `.brainl` through `export({ cursor, sections?, redactGrants? })` (ADMIN, or `system` for the backup), ≤ 1,000 rows a page; `POST /api/export` answers one streamed `text/plain` body and the host — never the record — signs: one `sign()` over the record's `vault_key(purpose = 'signing')`, unwrapped with the KEK, and the `dog_sig` line emitted last. A Worker cannot build a SQLite file — no engine, no filesystem, 128 MB — so the `.brain` is materialised by the CLI or a self-host from the `.brainl`. The nightly R2 backup is `.brainl.age` |
 | **Export from a self-host** | `VACUUM INTO`, strip the six `local` tables, vacuum again, write the manifest and signature into the copy — that is the export; the untouched `VACUUM INTO` copy is the snapshot (§6) |
 | **What travels** | every table except `dog_section = 'local'` — six: `token device_grant auth_fail observation job job_event`; the other twenty-five travel. `grant` rows travel with `ciphertext` sealed, and `vault_key` travels — a KEK-wrapped key is nothing without the KEK, and a restored record must open its own vault; `--redact-grants` drops them; `--sections` narrows to `data`, `origin`, `governance` |
-| **Import** | `POST /api/import` takes the whole `.dogl` as one `text/plain` body — there is no page protocol over HTTP; the record's batching (≤ 30 rows × ≤ 3 parameters) is internal to `importDogl`. Only into an empty record (`IMPORT_NOT_EMPTY`); verify signature and manifest (`SIGNATURE_INVALID`, `CHECKSUM_MISMATCH`); refuse a `user_version` above the reader's (`FORMAT_NEWER_THAN_READER`); run kernel migrations on the imported rows; rebuild `entry_fts` from `entry`; write one `import` event — so export → import → export differs by exactly that one appended event. It is not the write path — `event` rows keep their actors — but nothing bypasses validation |
+| **Import** | `POST /api/import` takes the whole `.brainl` as one `text/plain` body — there is no page protocol over HTTP; the record's batching (≤ 30 rows × ≤ 3 parameters) is internal to `importBrainl`. Only into an empty record (`IMPORT_NOT_EMPTY`); verify signature and manifest (`SIGNATURE_INVALID`, `CHECKSUM_MISMATCH`); refuse a `user_version` above the reader's (`FORMAT_NEWER_THAN_READER`); run kernel migrations on the imported rows; rebuild `entry_fts` from `entry`; write one `import` event — so export → import → export differs by exactly that one appended event. It is not the write path — `event` rows keep their actors — but nothing bypasses validation |
 | **Restore** | `restore({ bookmark, at? })` is one ADMIN method: on Cloud the Worker performs `pitr(at)` first and then calls it, and it writes `restore.pitr` into the restored storage. A self-host has no PITR; it serves `restore` over its kept `VACUUM INTO` copies, a bookmark being a copy's id, and `braindog import` into a fresh record stays the path for anything else (§6). The Worker refuses `restore` with `NOT_IN_THIS_BUILD` until `pitr(at)` is wired (amended September 16th 2026) |
-| **Migrations** | `packages/kernel/src/migrations/NNNN_<slug>.ts`, each exporting its SQL string; applied in numeric order by `applyMigrations` (INTERNAL) from the DO constructor under `blockConcurrencyWhile`, before any cache load — a fresh database never throws on open; each in one `transactionSync` that inserts its `migration` row; a module carrying `-- format-bump` sets `PRAGMA user_version` — best effort inside the record (a conformance case measures whether the DO permits it, and the refusal is swallowed explicitly), and set by the CLI or the self-host when a `.dog` is materialised; a checksum mismatch or a database newer than the code sets a module-level refusal (`SCHEMA_MISMATCH` \| `SCHEMA_NEWER`) that every RPC returns as 503 until a deploy fixes it — per record on a self-host. Never rolled back, never percentage-rolled: fix-forward |
+| **Migrations** | `packages/kernel/src/migrations/NNNN_<slug>.ts`, each exporting its SQL string; applied in numeric order by `applyMigrations` (INTERNAL) from the DO constructor under `blockConcurrencyWhile`, before any cache load — a fresh database never throws on open; each in one `transactionSync` that inserts its `migration` row; a module carrying `-- format-bump` sets `PRAGMA user_version` — best effort inside the record (a conformance case measures whether the DO permits it, and the refusal is swallowed explicitly), and set by the CLI or the self-host when a `.brain` is materialised; a checksum mismatch or a database newer than the code sets a module-level refusal (`SCHEMA_MISMATCH` \| `SCHEMA_NEWER`) that every RPC returns as 503 until a deploy fixes it — per record on a self-host. Never rolled back, never percentage-rolled: fix-forward |
 
 Three numbers, one home each: `PRAGMA user_version` = the format revision (1 at v1); `MAX(migration.version)` = the
 kernel migration number; `record.format_ver` mirrors `user_version` for readers without PRAGMA access.
@@ -671,7 +671,7 @@ Durable Object class (Cloud) or `directory.sqlite` (self-host), same schema, sam
 | `person_record` | `person_id`, `rec_id` |
 | `fail` | `key`, `n`, `first`, `until`: the login lockout, reserve-before-compare, sticky, fail closed, and forgetting a first strike fifteen minutes old |
 
-The record keeps `person` as a mirror (`id email name suspended_at`) so a `.dog` resolves its actors offline, plus
+The record keeps `person` as a mirror (`id email name suspended_at`) so a `.brain` resolves its actors offline, plus
 `member`, `token`, `device_grant` (with its `reach`) and its own `auth_fail` for device codes and share tokens. A browser
 request's record is on its session row, set at sign-in to a record the person owns (else the first they joined),
 and the host asks that record's own `member` table what the person may do, as it does for a bearer. In code the

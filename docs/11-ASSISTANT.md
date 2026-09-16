@@ -239,7 +239,7 @@ corrupt, no index to keep in sync, and no per-tenant namespace to get wrong.**
 | Isolation | one shared index, per-tenant namespaces. A metadata-filter bug crosses tenants | **the file is the boundary** |
 | Self-host | no equivalent exists | works offline |
 | Sync | a second store to keep consistent with the first | one transaction |
-| Export | vectors not in the `.dog` | in the file, portable |
+| Export | vectors not in the `.brain` | in the file, portable |
 | Scale ceiling | very high | ~50k rows per record before it needs thought |
 
 The scale ceiling is the honest trade, and it is the right one: a personal business record with

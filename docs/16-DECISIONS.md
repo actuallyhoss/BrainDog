@@ -66,7 +66,7 @@ work on a shared table: 64 registers × 8 indexed fields is up to 512 columns ag
 **Rejected:** a real table per register. It is faster and it is typed by the database — and
 uninstalling a pack would then mean dropping tables, which destroys the customer's rows. The pack
 contract is *declarations belong to the pack, rows belong to you*, and that contract is only
-keepable this way. It also keeps the `.dog` schema stable across every pack combination, which is
+keepable this way. It also keeps the `.brain` schema stable across every pack combination, which is
 what makes the file openable by plain `sqlite3`.
 
 **Cost:** queries go through `json_extract`. Recovered by expression indexes for declared fields;
@@ -77,7 +77,7 @@ promoted to a real table with a documented migration.
 
 ---
 
-## ADR-004 · `.dog` is a SQLite database, typed by `application_id`
+## ADR-004 · `.brain` is a SQLite database, typed by `application_id`
 
 **Decided.** `PRAGMA application_id = 0x444F4721` (`DOG!`), `PRAGMA user_version` as the format
 revision. Acronym: **Data, Origin, Governance** — the file's three real sections.
@@ -91,8 +91,8 @@ revision. Acronym: **Data, Origin, Governance** — the file's three real sectio
 | A custom binary format | a reader nobody has, for a product whose pitch is that you can check what we hold |
 | Whole-file encryption by default | destroys the property that makes the format worth having |
 
-**Bought:** the export is a **canonical logical dump** (`.dogl`) streamed from the record in pages;
-the `.dog` SQLite file is materialised by the CLI or the self-host, never inside the Worker —
+**Bought:** the export is a **canonical logical dump** (`.brainl`) streamed from the record in pages;
+the `.brain` SQLite file is materialised by the CLI or the self-host, never inside the Worker —
 `VACUUM INTO` and `ATTACH` are unavailable in workerd ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3,
 [ADR-034](16-DECISIONS.md)). There is still no bespoke serialiser to have a bug in: the dump is rows
 by primary key in declared column order, and the round-trip gate is that logical dump, not byte
@@ -834,12 +834,12 @@ that must go.
 
 ---
 
-## ADR-034 · The export is a canonical logical dump streamed from the record; `.dog` is materialised outside it
+## ADR-034 · The export is a canonical logical dump streamed from the record; `.brain` is materialised outside it
 
-**Decided.** The record streams **`.dogl`** — header lines, then one JSON row per line, tables in
+**Decided.** The record streams **`.brainl`** — header lines, then one JSON row per line, tables in
 `dog_section` order — in pages of ≤ 1,000 rows via `export(cursor)`. `braindog export` and the
-self-host materialise the `.dog` SQLite file with a real SQLite and sign it; Cloud's nightly R2 backup
-is `.dogl.age`; `braindog verify` and `import` accept both containers. `VACUUM INTO` and `ATTACH`
+self-host materialise the `.brain` SQLite file with a real SQLite and sign it; Cloud's nightly R2 backup
+is `.brainl.age`; `braindog verify` and `import` accept both containers. `VACUUM INTO` and `ATTACH`
 are unavailable in workerd. The round-trip gate is the logical dump, never byte equality; `import`
 goes only into an empty record and through validation ([33-CONTRACTS](33-CONTRACTS.md) §9).
 
@@ -847,7 +847,7 @@ goes only into an empty record and through validation ([33-CONTRACTS](33-CONTRAC
 Durable Object, no filesystem and a 128 MB ceiling — there is nothing to write the file with.
 
 **Would reverse it:** a SQLite-in-Worker primitive that can write a file without a filesystem — at
-which point the `.dog` could be produced at the edge and `.dogl` would become an internal format.
+which point the `.brain` could be produced at the edge and `.brainl` would become an internal format.
 
 ---
 
@@ -999,7 +999,7 @@ renderer to its own repository, where the routing problem does not exist.
 `braindog-mcp` and `@braindog` reserved and never published under this design. Publishing is OIDC
 trusted publishing per package, `0.0.1` by hand first. The version surface is the tuple
 `app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` —
-`format 1 · kernel 1 · primitives 1` at v1, where `user_version` is the `.dog` format revision
+`format 1 · kernel 1 · primitives 1` at v1, where `user_version` is the `.brain` format revision
 (bumped only when an older reader would misread), the kernel number is `MAX(migration.version)`,
 and `record.format_ver INTEGER` mirrors `user_version`. A pack's `requires:` is
 `{ format: <int>, primitives: <int>, packs: { id: semver-range } }` — never an app version, never
@@ -1015,11 +1015,11 @@ in; or a self-host release cadence that needs a user-facing app version.
 
 ## ADR-043 · `.gitattributes` in commit one: LF everywhere, binaries marked
 
-**Decided.** `* text=auto eol=lf`; `*.dog *.dog.age *.sqlite *.woff2 binary`; `*.sh eol=lf`;
+**Decided.** `* text=auto eol=lf`; `*.brain *.brain.age *.sqlite *.woff2 binary`; `*.sh eol=lf`;
 `*.ps1 eol=crlf`. It is the first commit, because it is not retroactive.
 
 **Rejected:** relying on each developer's `core.autocrlf`. It is `true` at the system level on the
-development machine, and `declaration.checksum` and the `.dog` manifest hash checked-in files — the
+development machine, and `declaration.checksum` and the `.brain` manifest hash checked-in files — the
 round-trip test would pass on one OS and fail on the other with a diff that shows nothing.
 
 **Would reverse it:** nothing foreseeable; the migration checksum already normalises CRLF for SQL,
@@ -1076,7 +1076,7 @@ renderers cost more than one framework dependency.
 **Decided.** The record object has **zero** runtime dependencies; the Worker ideally zero (WebCrypto
 for signing). The permitted runtime packages are four: `@pushforge/builder@2.0.5` (Web Push, in the
 Worker and the self-host alike); `age-encryption@0.3.1` with its five `@noble`/`@scure` transitive
-packages (`.dogl.age`); `valibot` 1.4.2 (`declare`'s schemas — chosen by [ADR-040](16-DECISIONS.md)
+packages (`.brainl.age`); `valibot` 1.4.2 (`declare`'s schemas — chosen by [ADR-040](16-DECISIONS.md)
 and, until iteration 2, missing from this list); and `yaml` 2.9.0, reachable only through
 `@braindog/declare/yaml` and only on the CLI and self-host paths ([ADR-063](16-DECISIONS.md)).
 Anything else is a new ADR.
@@ -1357,7 +1357,7 @@ be a grant per operation, approved somewhere a person is, never a scope.
 
 **Decided.** `Record`, `Spark`, `Directory`. The Directory is one instance holding email → person,
 credential → passkey, person → records, slug → `rec_id`, browser sessions, magic links and the login
-lockout; the record keeps what a `.dog` must resolve offline and what is scoped to one record —
+lockout; the record keeps what a `.brain` must resolve offline and what is scoped to one record —
 `person` (a mirror), `token`, `auth_fail`, `counter`, `vault_key`, `job`, `job_event` — for
 **twenty-seven kernel tables**, plus the four `dog_*` header tables in every live record. On the
 self-host the Directory is `directory.sqlite` in the same process, same schema, same `Sql` port.
@@ -1498,7 +1498,7 @@ be a rendered export of that one page through `toHTML`, not SSR of the app.
 
 **Decided.** A self-host **snapshot** is a full `VACUUM INTO` copy that keeps the six `local` tables
 and never leaves the host — disaster recovery for *this* instance, with its tokens, device grants,
-observations and jobs intact. An **export** is the portable `.dog` without them, as
+observations and jobs intact. An **export** is the portable `.brain` without them, as
 [03-DOG-FORMAT](03-DOG-FORMAT.md) §5 defines it. Two artefacts, two jobs
 ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §13; [53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §13 #10).
 

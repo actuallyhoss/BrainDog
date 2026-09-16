@@ -61,7 +61,7 @@ async function stack(o: { token?: string | null } = {}) {
   let now = Date.UTC(2026, 8, 5, 12);
   const logs = listen();
   const running = await start({
-    file: join(dir, 'record.dog'),
+    file: join(dir, 'record.brain'),
     directory: join(dir, 'directory.sqlite'),
     port: 0,
     host: '127.0.0.1',

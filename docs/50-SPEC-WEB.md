@@ -748,7 +748,7 @@ they are measured in a browser.
 | resolver | `/D41` → exactly one `get({ spoken: 'D41' })`, then `replaceState('/decide/D41')`; `/#125` → the `error` state and no call (34 §4: `#` never resolves bare) |
 
 **Rendered box — Playwright 1.62.1 + axe-core 4.13.0, `test/e2e/*.spec.ts`, against `braindog dev` (33 §5) with the
-fixture `.dog` materialised through the write path.** Every gate runs the matrix of 22 §10: the 8 fixtures — empty
+fixture `.brain` materialised through the write path.** Every gate runs the matrix of 22 §10: the 8 fixtures — empty
 register · 12 rows · 500 rows · 5,000 rows · mixed currencies · a long write-up with inline blocks · a third-party
 pack kind · a deliberately unknown primitive — × widths 390 · 768 · 1024 · 1440 × schemes light · dark × directions
 `ltr` · `rtl` = **128 configurations**. Host and port come from `test/env.ts` only.

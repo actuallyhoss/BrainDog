@@ -5,7 +5,7 @@
  * stored as `sha256(secret)` in `hash` and nowhere else, as a token's is, so a copy of the database lets
  * nobody in. It dies 24 hours after it is minted, on its first use, or when the owner withdraws it.
  *
- * `local`, like `token` and `device_grant`: an invitation is a fact about this installation, and a `.dog`
+ * `local`, like `token` and `device_grant`: an invitation is a fact about this installation, and a `.brain`
  * file never carries one, so the format stays 1. No CHECK: `level` is one of `member`'s five, and
  * `registers` a JSON object of them, and the kernel checks both before a row is written.
  */

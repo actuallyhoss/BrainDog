@@ -566,7 +566,7 @@ test('`contains` IS `instr` AND NEVER `LIKE`, because a LIKE pattern has two dif
 
 test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries what it carries', () => {
   /* A write stores none of them — null, '' and [] all remove the key — but a row that arrived in a
-     `.dog` file, or was written by an older build, may hold an empty string. `IS NULL` alone read
+     `.brain` file, or was written by an older build, may hold an empty string. `IS NULL` alone read
      those as PRESENT, so `note is empty` missed exactly the rows somebody was looking for. */
   const rows = [
     { id: 'x', fields: { what: 'a', tags: [] } },
@@ -596,7 +596,7 @@ test('AND `empty` IS THE THREE WAYS A VALUE IS ABSENT, because an import carries
 /* AND IT CARRIES NO COLUMNS, because none of the questions asked of it is about one: this set is
    about a scalar arriving where a list belongs, which is entirely a fact about `fields`. */
 const ODD: Fielded[] = [
-  /* A SCALAR WHERE A LIST BELONGS. This is what an import leaves behind: the `.dog` reader writes
+  /* A SCALAR WHERE A LIST BELONGS. This is what an import leaves behind: the `.brain` reader writes
      `fields` without coercing them, so a record that held `tags` as a string arrives holding one. */
   { id: 'imported', fields: { what: 'Imported', tags: 'urgent', open: true } },
   { id: 'listed', fields: { what: 'Listed', tags: ['urgent'], open: false } },

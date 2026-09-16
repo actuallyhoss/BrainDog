@@ -9,7 +9,7 @@ that BrainDog owns and every record has, and **registers** that packs declare.
 
 Twenty-seven tables, and four header tables the format adds to every live record — thirty-one in
 the file. Nothing a pack declares can alter them, and nothing in them is optional. *(An earlier draft
-said twenty. The review proved seven missing: the people, tokens, lockouts and counters a `.dog` must
+said twenty. The review proved seven missing: the people, tokens, lockouts and counters a `.brain` must
 resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
 
 ```sql
@@ -23,7 +23,7 @@ migration     -- applied kernel migrations: version, applied_at, checksum
 -- The DIRECTORY (email → person, credential_id → passkey, person → records, slug → rec_id, browser
 -- sessions, magic links, the login lockout) lives OUTSIDE the record in the third Durable Object class,
 -- `Directory`, one instance; on the self-host it is `directory.sqlite` in the same process, same schema, same Sql
--- port. The record keeps what a .dog must resolve offline and what is scoped to one record.
+-- port. The record keeps what a .brain must resolve offline and what is scoped to one record.
 person        -- id ('p_' + ULID, minted by the Directory), email, name, suspended_at. Mirror; actors and members resolve here
               -- CORE, not a pack: "who are you" is answered here at sign-in, independent of whether
               -- the `people` pack is installed or enabled, per `loop/research-modular.md` §2.3
@@ -70,7 +70,7 @@ job_event     -- (job_id, seq) PK, kind CHECK (start|say|think|tool|out|limit|no
 
 **And four header tables, which are not the kernel's but are in every live record.** Migration 0001
 creates `dog_meta` · `dog_section` · `dog_manifest` · `dog_sig` in every live database, DO and file
-alike, because on the self-host the live file *is* the `.dog` ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3).
+alike, because on the self-host the live file *is* the `.brain` ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3).
 `dog_manifest` and `dog_sig` are refreshed by an export and sit empty in a live DO. Six of the
 twenty-seven carry `dog_section = 'local'` and **never travel**: `token`, `device_grant`, `auth_fail`,
 `observation`, `job`, `job_event`. `counter` travels, because `seq` allocation must survive a move.
@@ -100,7 +100,7 @@ about why, because an earlier draft said generated columns here and was wrong.
 Why: a pack that creates real tables can only be uninstalled by dropping them, which destroys
 the customer's rows — and the pack contract in [04-PACKS](04-PACKS.md) is that *declarations
 belong to the pack, rows belong to you*. One table makes uninstall a metadata operation, and it
-makes the `.dog` file's schema stable across every possible pack combination, which is what makes
+makes the `.brain` file's schema stable across every possible pack combination, which is what makes
 the format [readable by plain `sqlite3`](03-DOG-FORMAT.md).
 
 ### How an indexed field is actually indexed — and why it is NOT a generated column
@@ -178,7 +178,7 @@ Three reasons it earns its exception, in a model that is otherwise uniform:
 
 1. It is the most-filtered field in every register anybody has written, so it gets a **native
    index** instead of an expression index — the one place that is worth a special case.
-2. It keeps the README's promise literally true. `sqlite3 portfolio.dog "select seq … where
+2. It keeps the README's promise literally true. `sqlite3 portfolio.brain "select seq … where
    register='obligations' and state='open'"` is the product's opening argument, and it only works
    if `state` is a column.
 3. `move` — one of the nine rule actions — is defined as changing a state. An action that
@@ -468,7 +468,7 @@ Four of them are special:
   `IMMUTABLE_FIELD`. So a secret is never `required`, never given a `default`, never searched and
   never a row's title.
 - **`file`** never stores bytes in `fields` either — same pattern, one indirection. It stores the
-  digest, and the bytes are in R2 under the record's prefix. So a `.dog` stays a text database,
+  digest, and the bytes are in R2 under the record's prefix. So a `.brain` stays a text database,
   the 2 MB row ceiling is never in play, and an export's manifest can report a missing attachment
   rather than silently shipping a broken reference.
 - **`ref`** is a soft reference to an `entry.id` in a named register. Deleting the target does
@@ -944,7 +944,7 @@ decision in §1.
 ## 8 · Provenance: every row knows where it came from
 
 `event` is not a log we keep for support. It is a first-class part of the record and it is why
-the `.dog` format has a whole section named for it.
+the `.brain` format has a whole section named for it.
 
 Every write carries:
 

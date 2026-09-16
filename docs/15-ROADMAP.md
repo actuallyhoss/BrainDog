@@ -119,7 +119,7 @@ authoring tier, no assistant.
 |---|---|
 | The kernel: 27 tables, ids, money, time, provenance, the outbox, the `where:` grammar, FTS5, per-field audit redaction, the `file` type and store (no viewer) | 26–32 |
 | Foundations: repo, CI, the four token gates, the storage adapter + conformance suite | 9–12 |
-| The record object, the Worker, magic-link auth, agent tokens, the CLI, `.dog` export | 20–26 |
+| The record object, the Worker, magic-link auth, agent tokens, the CLI, `.brain` export | 20–26 |
 | `@braindog/host` — the route table, `httpStatus`, the request context and `serveApi`, written once for the Worker and the self-host ([ADR-064](16-DECISIONS.md)) | 2 |
 | MCP: fourteen tools, resources, the token budget in CI | 8–12 |
 | Native screens per register + the spine + the vault + the decide queue | 20–26 |
@@ -168,7 +168,7 @@ The cut list, split into what is already gone and what can still go:
 |---|---|---|
 | **The vector index** (`entry_vec`, `near`, RRF) | **6–10** | semantic search — **and it removes the `where:` planner's second execution mode**, the single biggest simplification available |
 | **MRTR.** Ship the gate as `propose` → suggestion → human decides in the app or CLI. The write still stays refused until decided, so the gate still holds server-side | **5–8** | the *"protocol-native"* claim. Add it when a client supports it |
-| Virtualisation above 2,000 rows, `.dog.age` sealed backups, `.dog` signing — the three parts of the miscellany that the base actually contains | **8–12** | small individually |
+| Virtualisation above 2,000 rows, `.brain.age` sealed backups, `.brain` signing — the three parts of the miscellany that the base actually contains | **8–12** | small individually |
 | **Total genuinely available** | **19–30** | |
 
 *(Passkeys, offline, the RTL mirroring matrix, `day` precision and the Kennel are in neither
@@ -234,7 +234,7 @@ the re-costed total for every described stage is §1's 248–317.*
 
 | # | Stage | Days | Contents |
 |---|---|---|---|
-| A1 | Foundations | 5 | repo, CI, the token system and its four guards, the nine port interfaces, `.dog` header, migration runner |
+| A1 | Foundations | 5 | repo, CI, the token system and its four guards, the nine port interfaces, `.brain` header, migration runner |
 | A2 | The kernel | 12 | the 27 kernel tables, ids, money, time, provenance, **the `where:` compiler**, FTS5 wiring |
 | A3 | Record object + API + auth | 10 | the Durable Object, `@braindog/host` — the route table and request context both hosts share — then the Worker and the self-host, passkeys, agent tokens, the CLI |
 | A4 | MCP | 5 | the fourteen tools, resources, prompts, the token budget in CI, **MRTR decision gate** |

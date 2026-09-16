@@ -41,7 +41,7 @@ import {
   type PackToggle,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
-import { checkDogl, exportDogl, importDogl, signDogl, type Section, type Signer } from './dogl.ts';
+import { checkBrainl, exportBrainl, importBrainl, signBrainl, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
   due,
@@ -175,7 +175,7 @@ import {
 } from './scope.ts';
 
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
-export { checkDogl, keyIdOf, b64url, manifestBytes, signDogl, type Signature, type Signer } from './dogl.ts';
+export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
 export { KERNEL_WRITTEN, STALE_MS, isStale, sessionDeclaration } from './session.ts';
 export { REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Reach, type VaultGrant, type Waiting } from './device.ts';
@@ -186,10 +186,10 @@ export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
-export { TRAVELS, decode, encode, projection, tables } from './dogl.ts';
+export { TRAVELS, decode, encode, projection, tables } from './brainl.ts';
 export { atMs, expandRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
-export type { ImportReport, Section, TableShape } from './dogl.ts';
+export type { ImportReport, Section, TableShape } from './brainl.ts';
 export { EVENT_KINDS, isEventKind } from './events.ts';
 export type { EventKind } from './events.ts';
 export { OUTBOX_KINDS, backoffMs, summary } from './outbox.ts';
@@ -569,7 +569,7 @@ export type RecordOptions = {
    *
    * IT IS A CALLBACK AND NOT A KEY. `12 §6` puts the key hierarchy in the host and the kernel holds
    * sealed bytes it cannot open, so the shape is: the kernel makes the bytes, something outside
-   * signs them, and `signDogl` joins the two. Nothing in this package can sign anything, and
+   * signs them, and `signBrainl` joins the two. Nothing in this package can sign anything, and
    * nothing in it can be made to by passing it the wrong argument.
    *
    * ABSENT MEANS THE FILE IS UNSIGNED, and `41 §5.11` step 3 will not import it — which is the
@@ -3397,7 +3397,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      *
      * THE ONE THING A HOST ASKS BEFORE IT LETS ANYBODY IN. It is the record's own table rather than
      * the Directory's, because that is the table `invite` writes and the one that travels in a
-     * `.dog` file — and reading the level from anywhere else made removing somebody a change that
+     * `.brain` file — and reading the level from anywhere else made removing somebody a change that
      * did not stop them writing.
      */
     /**
@@ -3685,7 +3685,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     tail,
 
     /**
-     * The record as a file: `.dogl` lines, header first, `local` left behind.
+     * The record as a file: `.brainl` lines, header first, `local` left behind.
      *
      * Gated on the schema refusal like every other method, which it was not: a record whose schema
      * disagrees with the code was still exportable, and the export rewrote its manifest — putting a
@@ -3718,8 +3718,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         opts.actor ?? 'system',
         `sections ${(opts.sections ?? ['all']).join(', ')}${opts.redactGrants === true ? ', grants redacted' : ''}`,
       );
-      return exportDogl(sql, transaction, opts)
-        .then((lines) => (signer ? signDogl(lines, signer) : lines))
+      return exportBrainl(sql, transaction, opts)
+        .then((lines) => (signer ? signBrainl(lines, signer) : lines))
         .then((lines) => ok(lines));
     },
 
@@ -3742,10 +3742,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          generator read twice is empty the second time, so it is materialised here — once, for both
          readers. */
       const all = [...lines];
-      const sound = await checkDogl(all);
+      const sound = await checkBrainl(all);
       if (!sound.ok) return sound;
 
-      const out = importDogl(sql, transaction, all);
+      const out = importBrainl(sql, transaction, all);
       if (out.ok) {
         reload();
         rebuildFts();

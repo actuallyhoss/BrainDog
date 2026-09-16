@@ -10,14 +10,14 @@ way down.
 ## 1 · Purpose and boundary
 
 **What it does.** Logs a machine into one record through the RFC 8628 device flow; moves a record in and out
-of the two containers of [03-DOG-FORMAT](03-DOG-FORMAT.md) §2 (`.dogl` ↔ `.dog`); verifies either offline;
+of the two containers of [03-DOG-FORMAT](03-DOG-FORMAT.md) §2 (`.brainl` ↔ `.brain`); verifies either offline;
 lints, plans, installs and uninstalls packs ([04-PACKS](04-PACKS.md) §3–§4); dry-runs rules
 ([07-INGEST-AND-RULES](07-INGEST-AND-RULES.md) §6); mints, lists and revokes agent tokens; enrols and runs the
 tier-C runner ([33-CONTRACTS](33-CONTRACTS.md) §11, [46-SPEC-SPARK](46-SPEC-SPARK.md) §4.7); starts a self-host
 for development.
 
 **What it refuses to do.** It never holds the record: every row read or written goes over HTTP to a record
-that validates it. It never signs a `.dog` — the signature travels from the host that holds the key. It never
+that validates it. It never signs a `.brain` — the signature travels from the host that holds the key. It never
 decrypts a grant. It never prints a stored token. It never imports `apps/selfhost` or `apps/worker` — apps
 import packages, never each other ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §2) — so `init` and `dev` *spawn*
 the self-host (§13 D5). It never runs `claude` with `--dangerously-skip-permissions`.
@@ -50,8 +50,8 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
 | `dev` | self-host only; `--port <n>` (default 8080) | spawns the self-host entry: `dev` | the child's output | the child's |
-| `export` | `--sections data,origin,governance` · `--redact-grants` · `--with-attachments` · `--mirror` · `-o <file.dog>` · `--key <pubkey \| url>` | `POST /api/export` — one streamed body, under an operation grant (§5.2) · `GET /a/<sha256>` for attachments | the verify block of §5.6, then the paths written | 0 · 1 · 3 |
-| `import <file.dog \| file.dogl>` | `--key <pubkey \| url>` | offline verify, then `POST /api/import` — one streamed body (operation grant) | `imported <tables> tables, <rows> rows · event <id>` | 0 · 1 · 3 |
+| `export` | `--sections data,origin,governance` · `--redact-grants` · `--with-attachments` · `--mirror` · `-o <file.brain>` · `--key <pubkey \| url>` | `POST /api/export` — one streamed body, under an operation grant (§5.2) · `GET /a/<sha256>` for attachments | the verify block of §5.6, then the paths written | 0 · 1 · 3 |
+| `import <file.brain \| file.brainl>` | `--key <pubkey \| url>` | offline verify, then `POST /api/import` — one streamed body (operation grant) | `imported <tables> tables, <rows> rows · event <id>` | 0 · 1 · 3 |
 | `verify <file>` | `--key <pubkey \| url>` (optional: unpinned without it) | nothing — offline; the URL form of `--key` is the one network call | the verify block | 0 · 1 |
 | `pack lint <dir \| file>` | — | nothing — offline, `@braindog/declare` | `ok <pack> <version> · <n> declarations · <checksum[0..16]>`, or one sentence per refusal | 0 · 1 |
 | `pack plan <src>` | `<src>` = path · `https://…` · `git:owner/repo@ref` · Kennel id | `POST /api/planPack` (operation grant) | the diff screen of 04 §3 | 0 · 1 · 3 |
@@ -195,13 +195,13 @@ apps/cli/
 ├── src/
 │   ├── main.ts           ~200 lines  parseArgs, the command table, dispatch, exit codes, --version, the four error classes
 │   ├── http.ts           ~220 lines  host resolution, hosts.json (0600, atomic), call() and stream(), the device flow, admin()
-│   ├── dog.ts            ~360 lines  the .dogl reader, the canonical projection, hashing, verify, materialise, toDogl, mirror
+│   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl, mirror
 │   ├── pack.ts           ~180 lines  source resolution (path · url · git · Kennel), lint, plan, install (--with-deps), uninstall, the diff screen
 │   ├── runner.ts         ~240 lines  enrol, the claim loop, the claude spawn, distil(), PROMPTS from @braindog/spark/prompts
 │   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block, the --json envelope
 └── test/
-    ├── mock-host.ts      a node:http server answering canned Result envelopes and a .dogl body
-    ├── make-dogl.ts      materialises the fixture record (40 §5.3), exportDogl() to lines, appends a dog_sig row with a test key
+    ├── mock-host.ts      a node:http server answering canned Result envelopes and a .brainl body
+    ├── make-brainl.ts    materialises the fixture record (40 §5.3), exportBrainl() to lines, appends a dog_sig row with a test key
     ├── fixtures/         stream-json.ndjson · refusals → sentences · the golden --json per command
     └── *.test.ts         §9
 ```
@@ -253,9 +253,9 @@ type Reach         = 'login' | 'runner' | 'export' | 'import' | 'pack' | 'token'
 type DeviceCode    = { device_code: string; user_code: string; verification_uri: string; expires_in: 600; expires: string; interval: 5 };
 type DevicePoll    = { pending: true; interval: number } | { pending: false; bearer: string; reach: Reach; scope: string | null; expires: string };
 
-// export — POST /api/export answers 200 text/plain; charset=utf-8: the .dogl of 41 §5.10, streamed (§13 D3)
+// export — POST /api/export answers 200 text/plain; charset=utf-8: the .brainl of 41 §5.10, streamed (§13 D3)
 type ExportArgs  = { sections?: ('data' | 'origin' | 'governance')[]; redact_grants?: boolean };
-// import — POST /api/import takes the .dogl as its body; the host hands the lines to importDogl (41 §5.11)
+// import — POST /api/import takes the .brainl as its body; the host hands the lines to importBrainl (41 §5.11)
 type ImportReply = { imported: { tables: number; rows: number; event: string } };
 
 // packs — the Diff of 04 §3; the type is 42's, these are the fields the CLI prints
@@ -285,7 +285,7 @@ type EndBody   = { status: 'ok' | 'needs_decision' | 'refused' | 'limit' | 'erro
                    result?: object; error?: string; claude_session?: string; turns?: number; ms?: number };
 ```
 
-### 4.3 · The `.dogl`, as the CLI reads and writes it
+### 4.3 · The `.brainl`, as the CLI reads and writes it
 
 The grammar is [41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.10's, restated only to the extent the reader and the
 writer here need it. Text, UTF-8, LF, no BOM.
@@ -305,10 +305,10 @@ row       = json-array NL ;                                 (* the JCS array of 
 | Hash | `dog_manifest.sha256` = SHA-256 hex over the table's row lines joined by LF, no trailing LF; an empty table hashes the empty string |
 | Manifest | one row per exported table except `dog_manifest` and `dog_sig` — 23 rows for a full export of a 31-table record; 25 tables travel (03 §3) |
 | Signature | Ed25519 over the row lines of `dog_manifest` ordered by `table_name`, LF-joined; keys and `sig` base64url raw bytes; `key_id` = the first 16 hex of SHA-256(public key) |
-| Schema | **not in the stream**. A `.dog` gets its tables from `applyMigrations` (41 §5.2), the same DDL the record has; the stream's headers are checked against it (§5.5) |
-| `.dog` header | `PRAGMA application_id = 1145193761` · `PRAGMA user_version = <format>` (03 §2) |
+| Schema | **not in the stream**. A `.brain` gets its tables from `applyMigrations` (41 §5.2), the same DDL the record has; the stream's headers are checked against it (§5.5) |
+| `.brain` header | `PRAGMA application_id = 1145193761` · `PRAGMA user_version = <format>` (03 §2) |
 
-A `.dog` and its `.dogl` carry the same rows, manifest and signature; `toDogl(.dog)` reproduces the stream byte
+A `.brain` and its `.brainl` carry the same rows, manifest and signature; `toBrainl(.brain)` reproduces the stream byte
 for byte (§9 T13–T14).
 
 ### 4.4 · Exit codes
@@ -316,7 +316,7 @@ for byte (§9 T13–T14).
 | Code | Means | Raised when |
 |---|---|---|
 | 0 | ok | the command's `Result` was `ok`, or the offline check passed |
-| 1 | refused | a `refusals` envelope; an offline refusal (`FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, `SCHEMA_NEWER`, `INT_OUT_OF_RANGE`); a CLI-local error (bad arguments, a file that is not a `.dog`, no self-host entry, `claude` too old) |
+| 1 | refused | a `refusals` envelope; an offline refusal (`FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, `SCHEMA_NEWER`, `INT_OUT_OF_RANGE`); a CLI-local error (bad arguments, a file that is not a `.brain`, no self-host entry, `claude` too old) |
 | 2 | conflict | a `conflict` envelope — HTTP 409 |
 | 3 | unreachable | DNS, TCP, TLS, a timeout, any 5xx, a body that is not JSON, an export stream cut before `#table dog_sig` |
 
@@ -389,18 +389,18 @@ parses the `Result` that comes back.
 
 ### 5.4 · `export`
 
-1. Resolve host and bearer. `args = { sections, redact_grants }`; `-o` defaults to `./<slug>.dog`; the `.dogl` is written beside it with the same base name.
-2. `admin(host, 'export', args, 'export', `export ${slug}${sections ? ' ' + sections.join(',') : ''}`)` as a stream; `pipeline(Readable.fromWeb(body), createWriteStream(`${base}.dogl.part`, { mode: 0o600 }))`.
+1. Resolve host and bearer. `args = { sections, redact_grants }`; `-o` defaults to `./<slug>.brain`; the `.brainl` is written beside it with the same base name.
+2. `admin(host, 'export', args, 'export', `export ${slug}${sections ? ' ' + sections.join(',') : ''}`)` as a stream; `pipeline(Readable.fromWeb(body), createWriteStream(`${base}.brainl.part`, { mode: 0o600 }))`.
 3. The file must end with a `#table dog_sig …` header and one row; otherwise `Unreachable('export stream ended before dog_sig — export again')` — the record cut the stream because it changed mid-export (41 §5.10, `CHECKSUM_MISMATCH` at the host) or the network did. The `.part` is kept.
-4. Rename to `${base}.dogl`; `verify()` it (§5.6). A refusal exits 1 and leaves the `.dogl` in place.
-5. `materialise(`${base}.dogl`, `${base}.dog`)` (§5.5).
+4. Rename to `${base}.brainl`; `verify()` it (§5.6). A refusal exits 1 and leaves the `.brainl` in place.
+5. `materialise(`${base}.brainl`, `${base}.brain`)` (§5.5).
 6. `--with-attachments`: `SELECT fields FROM entry WHERE deleted_at IS NULL`; every JSON object shaped `{ sha256: /^[0-9a-f]{64}$/, mime, bytes, name }` is a `file` value ([34-GRAMMARS](34-GRAMMARS.md) §3). `GET ${origin}/a/${sha256}`, four at a time, into `${base}.files/${sha256}` after the bytes hash to their name; a 404 goes to `missing`. The route is unauthenticated — the URL is the capability (12 §8).
 7. `--mirror`: `mirror(dog, `${base}.mirror/`)` (§5.9).
-8. Print the verify block, then `wrote <base>.dogl · <base>.dog[ · n files (m missing)][ · mirror n rows]`.
+8. Print the verify block, then `wrote <base>.brainl · <base>.brain[ · n files (m missing)][ · mirror n rows]`.
 
 On a self-host the same route serves the same stream (33 §6); the CLI cannot tell which it spoke to.
 
-### 5.5 · Materialise `.dogl` → `.dog` (`dog.ts`)
+### 5.5 · Materialise `.brainl` → `.brain` (`brain.ts`)
 
 1. `rm -f ${dog}.part`; `sql = open(`${dog}.part`)` — the `node:sqlite` adapter of `@braindog/ports`; `applyMigrations(sql)` from `@braindog/kernel` — the thirty-one tables, the kernel's indexes, `register.session`, the `dog_section` rows (41 §5.2). `sql.exec('PRAGMA application_id = 1145193761')`.
 2. Read lines with `readline.createInterface({ input: createReadStream(dogl), crlfDelay: Infinity })` — never `readFileSync`.
@@ -410,25 +410,25 @@ On a self-host the same route serves the same stream (33 §6); the CLI cannot te
 6. After the last line: `sql.exec('PRAGMA user_version = <n>')`; close; `renameSync` to `${dog}`, mode `0600`.
 7. Return `{ tables, rows }`.
 
-Declaration indexes (`entry_i_*`, `entry_u_*`, `entry_k_*`) are not recreated: a `.dog` is a file a person
+Declaration indexes (`entry_i_*`, `entry_u_*`, `entry_k_*`) are not recreated: a `.brain` is a file a person
 queries, and a restore is an `import` that rebuilds them (`ponytail:` §10). One pass, O(rows), O(1) memory in rows.
 
-### 5.6 · `verify <file>` (`dog.ts`)
+### 5.6 · `verify <file>` (`brain.ts`)
 
 Offline. `--key` is a base64url raw public key, or a URL answering JSON `{ key_id, public_key }` (the well-known
 key of 03 §4 — §13 D10); absent, the key inside the file is used and the result says `unpinned`. The embedded
 key proves integrity; origin is `--key`'s job (41 §5.11 step 3).
 
-**On a `.dog`:**
+**On a `.brain`:**
 
-1. `sql = open(path)`; nothing is written. `PRAGMA application_id` ≠ 1145193761 → local error `not a .dog file` (exit 1, no code). `PRAGMA user_version` > `FORMAT_VERSION` → `FORMAT_NEWER_THAN_READER`.
+1. `sql = open(path)`; nothing is written. `PRAGMA application_id` ≠ 1145193761 → local error `not a .brain file` (exit 1, no code). `PRAGMA user_version` > `FORMAT_VERSION` → `FORMAT_NEWER_THAN_READER`.
 2. Read `dog_meta`, `dog_section`, `dog_manifest`, `dog_sig`, and `record.id`. `dog_sig` must hold exactly one row, else `SIGNATURE_INVALID`.
 3. For every `dog_manifest` row: `project(sql, table)` (§5.7) into an incremental `createHash('sha256')`, counting rows; a differing hash or count → `CHECKSUM_MISMATCH at <table>`. Every table is checked; every mismatch is reported.
 4. Signed bytes = `project(sql, 'dog_manifest')` joined by LF. Key = `--key` or `dog_sig.public_key`; recompute `key_id`; a mismatch with `dog_sig.key_id` → `SIGNATURE_INVALID`. `crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify'])`; `crypto.subtle.verify('Ed25519', k, sig, bytes)` false → `SIGNATURE_INVALID`.
 5. Every `dog_section` row with `section ≠ 'local'` and no manifest row marks the file `partial`; the sections present are reported.
 6. Print, or throw `Refused` with every refusal collected.
 
-**On a `.dogl`:** one streaming pass. Line 1 is the format; the `dog_manifest` block arrives third, so every later
+**On a `.brainl`:** one streaming pass. Line 1 is the format; the `dog_manifest` block arrives third, so every later
 `#table` block is hashed and counted against a manifest row already in hand; `dog_sig` arrives last; then steps
 3–5 run. Memory is O(tables).
 
@@ -442,23 +442,23 @@ The first cell reads `✓ dogl` for the text container; `signature valid (key fr
 pin)` when unpinned; `partial: governance` on a sectioned export. `25 tables` is the manifest's row count plus
 the two it cannot hold; `3,118 rows` is the manifest's sum; `produced` is `dog_sig.signed_at` and `record.id`.
 
-### 5.7 · The canonical projection (`project`, `toDogl`)
+### 5.7 · The canonical projection (`project`, `toBrainl`)
 
 1. `cols = PRAGMA table_info(<t>)` ordered by `cid`; `order = cols where pk > 0 ordered by pk`, else `id` for `entry_fts`, `key_id` for `dog_sig` (41 §5.10).
 2. `sql.exec(`SELECT <cols> FROM <t> ORDER BY <order>`)` — the adapter refuses an INTEGER beyond 2⁵³ − 1 (`INT_OUT_OF_RANGE`, 30 §13).
 3. Per row: a `Uint8Array` → `{ b64: Buffer.from(v).toString('base64') }`; then `JSON.stringify(values)` — for an array of scalars and one-key objects this *is* the RFC 8785 form, so no JCS code exists here.
 4. Yield the line. `hashLines` updates SHA-256 with each line and a LF between lines.
 
-`toDogl(dog)` yields `#dogl <user_version>`, then one block per travelling table in the order of §4.3
+`toBrainl(dog)` yields `#dogl <user_version>`, then one block per travelling table in the order of §4.3
 (`dog_section` rank, then `sqlite_master.rowid`, which is DDL order), each with its `#table <name> <cols>`
-header from `table_info` and its rows from `project`. The record's `exportDogl` (41 §5.10) emits the same
+header from `table_info` and its rows from `project`. The record's `exportBrainl` (41 §5.10) emits the same
 bytes; T13 is the proof, and the interface-agreement audit reconciles any drift between the two.
 
 ### 5.8 · `import <file>`
 
 1. `verify(file, key)` — a refusal stops here. Nothing has left the machine.
-2. `lines = file.endsWith('.dog') ? toDogl(file) : readLines(file)`, as a `ReadableStream`.
-3. `admin(host, 'import', lines, 'import', `import ${record_slug} (${rows} rows)`)` through `send()` — one body, `text/plain`. The host reads it whole and calls `importDogl(lines, ctx)` (41 §5.11): `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, `SCHEMA_NEWER` come back as refusals, and a refused or cut import writes nothing (41 §5.11 step 6).
+2. `lines = file.endsWith('.brain') ? toBrainl(file) : readLines(file)`, as a `ReadableStream`.
+3. `admin(host, 'import', lines, 'import', `import ${record_slug} (${rows} rows)`)` through `send()` — one body, `text/plain`. The host reads it whole and calls `importBrainl(lines, ctx)` (41 §5.11): `IMPORT_NOT_EMPTY`, `FORMAT_NEWER_THAN_READER`, `CHECKSUM_MISMATCH`, `SIGNATURE_INVALID`, `SCHEMA_NEWER` come back as refusals, and a refused or cut import writes nothing (41 §5.11 step 6).
 4. Print `imported <tables> tables, <rows> rows · event <id>`. The record rebuilds `entry_fts` and writes the one `import` event; the CLI does neither.
 
 ### 5.9 · `--mirror` (`mirror`)
@@ -549,7 +549,7 @@ Nine kinds, the `job_event.kind` CHECK. The raw stream is never relayed (26 §5)
 2. `spawn(process.execPath, [entry, 'init', slug], { stdio: 'inherit', env: process.env })` — or `[entry, 'dev', '--port', port]`.
 3. Forward `SIGINT` and `SIGTERM` to the child; exit with its code.
 
-The self-host's `init <slug>` creates `<data>/<slug>/record.dog`, runs migration 0001 and writes the owner
+The self-host's `init <slug>` creates `<data>/<slug>/record.brain`, runs migration 0001 and writes the owner
 into the Directory; its `dev` runs the process against a scratch data dir with the memory ports (33 §5). Both
 are [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md)'s to implement (§13 D5).
 
@@ -591,7 +591,7 @@ found: 'currency', fix: "Did you mean 'money'?" }` prints as
 
 Five, counted — four of 30 §6's format and lifecycle codes, one auth code, raised here only when the host never
 answered within `expires_in`. `INT_OUT_OF_RANGE` is the adapter's and passes through. Everything else the CLI
-refuses locally — a file that is not a `.dog`, a malformed `.dogl` line, an unreadable `hosts.json`, no
+refuses locally — a file that is not a `.brain`, a malformed `.brainl` line, an unreadable `hosts.json`, no
 self-host entry, `git` or `claude` missing or old, `--yes` needed, an unknown flag — is an **error**, not a
 refusal: a sentence, exit 1, no code, because the only codes are the corpus's.
 
@@ -603,8 +603,8 @@ refusal: a sentence, exit 1, no code, because the only codes are the corpus's.
 |---|---|---|
 | `braindog --version` wall time | ≤ 120 ms p95 | T22 spawns `dist/braindog.mjs` 10× on the CI runner |
 | `dist/braindog.mjs` size | ≤ 400 KB | `stat` after build, in `ci.yml` |
-| `.dogl` → `.dog`, 100 MB / 300,000 rows | ≤ 30 s | T17, nightly, a generated `.dogl` |
-| `verify` of that `.dog` · that `.dogl` | ≤ 15 s · ≤ 10 s | T17 |
+| `.brainl` → `.brain`, 100 MB / 300,000 rows | ≤ 30 s | T17, nightly, a generated `.brainl` |
+| `verify` of that `.brain` · that `.brainl` | ≤ 15 s · ≤ 10 s | T17 |
 | Peak RSS during export or verify | ≤ 300 MB | T17 reads `process.memoryUsage().rss` of the child — streaming only, never a whole file in memory |
 | HTTP call timeout | 30 s; export and import bodies 600 s | `AbortSignal.timeout` |
 | Import body | one request, ≤ 100 MB — the Worker's request ceiling; the record reads it whole (41 §5.11) | `ponytail:` §10 |
@@ -625,7 +625,7 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | Operation grants | ten minutes, one command, held in memory, never written; approved by the owner in a browser for the named subject (§13 D1). A stolen `hosts.json` can read and write rows at the token's scope; it cannot export, import, install or mint |
 | The approval page | the CLI prints `verification_uri` only when its origin equals the host's |
 | `verify` | no network: the file, the key, WebCrypto. `--key <url>` is the one explicit fetch |
-| `export` · `import` | the `.dogl` is verified after it arrives and before it is sent; the `.dog` and `.dogl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
+| `export` · `import` | the `.brainl` is verified after it arrives and before it is sent; the `.brain` and `.brainl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
 | The runner | `--restricted`, `--permission-mode dontAsk`, `--strict-mcp-config`, an empty working directory it owns, the closed kind list and the 64-byte no-whitespace arg rule, the `mcp__braindog__` tool filter, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
 | `keys` | the value is read from stdin, never an argument, and no command prints a key: `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
@@ -636,15 +636,15 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `tools scan` | both configs are read only; a key-named (`…KEY`, `…TOKEN`, `…SECRET`, `…PASSWORD`, `…PAT`, `Authorization`) or key-shaped env or header value goes only to `keys put`, and the row keeps `NAME=credentials#N`; with no vault grant it keeps the name, drops the value, and says so in one sentence, once per host from the start hook; a key in a command, an argument or an address keeps the server out of the record; a config it cannot parse is named, never quoted; no line, row, proposal or lock holds a value |
 | `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
-| Input | `parseArgs` in strict mode; a `.dogl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.dog` build runs is the kernel's own |
+| Input | `parseArgs` in strict mode; a `.brainl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.brain` build runs is the kernel's own |
 
 ---
 
 ## 9 · Tests and gates
 
 `test/**/*.test.ts`, `node --test`, `node:assert/strict`; the mock host is an in-process `node:http` server
-answering canned `Result` envelopes (35 §2). No `.dogl` is committed (40 §1): `make-dogl.ts` materialises the
-fixture record through 40 §5.3's materialiser, runs `exportDogl` to lines, and appends the `dog_sig` row with a
+answering canned `Result` envelopes (35 §2). No `.brainl` is committed (40 §1): `make-brainl.ts` materialises the
+fixture record through 40 §5.3's materialiser, runs `exportBrainl` to lines, and appends the `dog_sig` row with a
 test Ed25519 key held in `test/`. Golden files are compared as parsed JSON.
 
 | # | Case | Input → expected |
@@ -658,20 +658,20 @@ test Ed25519 key held in `test/`. Golden files are compared as parsed JSON.
 | T7 | `login` expired · denied · foreign URI | `DEVICE_CODE_EXPIRED` → exit 1 · `DEVICE_CODE_TRIES` → exit 1 · `verification_uri` on another origin → refused before printing |
 | T8 | env precedence | `--host` beats `BRAINDOG_HOST` beats `default`; `BRAINDOG_TOKEN` beats the file and is never written |
 | T9 | `admin()` | first call `403 NEEDS_BROWSER_SESSION` → device flow → retry succeeds; second `403` → printed, exit 1; owner bearer → no device flow |
-| T10 | `verify` accepts | the generated `seed.dogl` and its `.dog` with `--key` → the block, exit 0; without `--key` → `pinned: false` |
-| T11 | `verify` refuses | one byte appended to the first `entry` line (40 §6's `tamper: row`) → `CHECKSUM_MISMATCH at entry`; a flipped `sig` byte → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READER`; a header naming an unknown column → `SCHEMA_NEWER`; a plain SQLite file → `error: not a .dog file`; each exit 1 |
+| T10 | `verify` accepts | the generated `seed.brainl` and its `.brain` with `--key` → the block, exit 0; without `--key` → `pinned: false` |
+| T11 | `verify` refuses | one byte appended to the first `entry` line (40 §6's `tamper: row`) → `CHECKSUM_MISMATCH at entry`; a flipped `sig` byte → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READER`; a header naming an unknown column → `SCHEMA_NEWER`; a plain SQLite file → `error: not a .brain file`; each exit 1 |
 | T12 | `verify` partial | a `--sections governance` export → `partial: ['governance']`, exit 0 |
-| T13 | round trip | `seed.dogl` → `materialise` → `toDogl` → bytes equal the input |
-| T14 | round trip, property | fast-check 4.9.0: random `Param` values (text with `|`, quotes, unicode, CR/LF; blobs; nulls; integers to ±2⁵³ − 1) written into `entry.fields`, `event.note`, `entry_vec.vec` and `grant.ciphertext` of a materialised record → `exportDogl` → `materialise` → `toDogl` identical; 200 runs; failing `{ seed, path }` committed under `test/seeds/` |
-| T15 | export | mock streams `seed.dogl` → `.dogl` and `.dog` written, verify block printed; stream cut before `dog_sig` → exit 3, `.part` kept |
-| T16 | import | `seed.dog` → one `text/plain` body whose bytes equal `seed.dogl`; the mock's `IMPORT_NOT_EMPTY` → exit 1; a tampered file → refused locally, no request made |
-| T17 | 100 MB, nightly | generated `.dogl` → the numbers of §7 |
+| T13 | round trip | `seed.brainl` → `materialise` → `toBrainl` → bytes equal the input |
+| T14 | round trip, property | fast-check 4.9.0: random `Param` values (text with `|`, quotes, unicode, CR/LF; blobs; nulls; integers to ±2⁵³ − 1) written into `entry.fields`, `event.note`, `entry_vec.vec` and `grant.ciphertext` of a materialised record → `exportBrainl` → `materialise` → `toBrainl` identical; 200 runs; failing `{ seed, path }` committed under `test/seeds/` |
+| T15 | export | mock streams `seed.brainl` → `.brainl` and `.brain` written, verify block printed; stream cut before `dog_sig` → exit 3, `.part` kept |
+| T16 | import | `seed.brain` → one `text/plain` body whose bytes equal `seed.brainl`; the mock's `IMPORT_NOT_EMPTY` → exit 1; a tampered file → refused locally, no request made |
+| T17 | 100 MB, nightly | generated `.brainl` → the numbers of §7 |
 | T18 | `pack lint` | every fixture under `fixtures/refusals/` of the 33 pack codes → the expected sentence; a clean pack → `ok`, checksum matches `packChecksum` |
 | T19 | `pack install` | diff printed; `n` → `not applied`, exit 0; `--yes` → `installPack` called with the diff's `plan_hash`; `PLAN_STALE` once → re-planned; `--with-deps` → `people` planned and installed before the parent; non-TTY without `--yes` → exit 1 |
 | T20 | runner distil | `stream-json.ndjson` (nine line types) → the nine expected events, `seq` 1..n, `out.len` = the untruncated length |
 | T21 | runner loop | mock claim → job → a stub `claude` on PATH → events posted in order, `end` carries `claude_session`; `cancel: 1` on an ack → SIGTERM sent, `end { cancelled }`; stub exits 143 → `end { interrupted }`; kind `frob`, an arg with a space, or `Bash` in `mcp.tools` → `error`, `end { refused }`, `claude` never spawned; `--version` 2.1.200 → local error |
 | T22 | startup | 10 spawns of `dist/braindog.mjs --version` → p95 ≤ 120 ms |
-| T23 | `--mirror` | `seed.dog` → `README.md`, one directory per register, one file per live row, deleted rows absent, a `money` value rendered `EGP 1,299.00`-style |
+| T23 | `--mirror` | `seed.brain` → `README.md`, one directory per register, one file per live row, deleted rows absent, a `money` value rendered `EGP 1,299.00`-style |
 | T24 | attachments | two `file` values, one served, one 404 → one file written under its hash, `missing: [sha]` |
 
 Twenty-four, counted. CI rows ([33-CONTRACTS](33-CONTRACTS.md) §8): `ci.yml` runs T1–T16, T18–T24 on every
@@ -710,15 +710,15 @@ cover `mcp`. `brief.test.ts` covers the briefing with no host:
 
 - `ponytail:` the runner long-polls `claimJob { wait: 20 }` only; the `GET /ws/runner` socket and the frames of 46 §4.7 attach when the Worker exposes the route (Cloud only, 46 §13 #8) — the loop does not change.
 - `ponytail:` one browser approval per ADMIN command on Cloud; unattended Cloud export or install is ADR-060's signed single-use plan hash, not a stored scope — add when a customer scripts it.
-- `ponytail:` `import` is one request body, so a record above the host's request ceiling (100 MB on the Worker) cannot move through the CLI until 41 pages `importDogl`; a self-host has no such ceiling.
-- `ponytail:` a CLI-built `.dog` carries the kernel's indexes, not the declarations' (`entry_i_*`); `import` recreates them. Add `kernel.rebuildIndexes` here when someone opens such a file live.
+- `ponytail:` `import` is one request body, so a record above the host's request ceiling (100 MB on the Worker) cannot move through the CLI until 41 pages `importBrainl`; a self-host has no such ceiling.
+- `ponytail:` a CLI-built `.brain` carries the kernel's indexes, not the declarations' (`entry_i_*`); `import` recreates them. Add `kernel.rebuildIndexes` here when someone opens such a file live.
 - `ponytail:` no HTTP retries outside the runner loop; add a bounded retry on `Unreachable` if flaky networks show up in bug reports.
 - `ponytail:` `export --with-grants` (03 §5) is not a v1 flag — a passphrase re-wrap is a Worker act; add when the vault passphrase ships.
 - `ponytail:` `pack install --force` for a downgrade that orphans rows (04 §5) is not a v1 flag; the record refuses the downgrade until the code exists.
 - `ponytail:` the paste source of 04 §3 is the app's; the CLI takes a path, a URL, a `git:` ref or a Kennel id.
 - `ponytail:` `git:` means GitHub over `git clone --depth 1` with `git` on PATH; other forges when asked.
 - `ponytail:` the Kennel is one fixed URL pattern, `https://kennel.brain.dog/p/<id>`; no search, no index cache.
-- `ponytail:` the `.dogl` stays beside the `.dog` after export; add `--dogl-only` when disk matters.
+- `ponytail:` the `.brainl` stays beside the `.brain` after export; add `--dogl-only` when disk matters.
 - `ponytail:` attachments fetch four at a time with no resume; a re-run skips files whose hash matches.
 - `ponytail:` the mirror writes markdown with plain values and verbatim `document` fields; no HTML, no `braindog-render`; add `--mirror-html` through `toHTML` when a browser-readable mirror is asked for.
 - `ponytail:` `--json` is one document at exit; no streaming progress protocol.
@@ -759,7 +759,7 @@ Position 12 of [31-STACK](31-STACK.md) §2, after `record` ([35-SPEC-OVERVIEW](3
 |---|---|
 | 36 `render` | `PRIMITIVES_VERSION` |
 | 37 `ports` | the envelope types; the `node:sqlite` adapter; the `Result` shape the mock host speaks |
-| 40 `fixtures` · 41 `kernel` | the materialiser of 40 §5.3 and `exportDogl` produce the test `.dogl`; `applyMigrations` builds the `.dog`; 41 §5.10 owns the grammar |
+| 40 `fixtures` · 41 `kernel` | the materialiser of 40 §5.3 and `exportBrainl` produce the test `.brainl`; `applyMigrations` builds the `.brain`; 41 §5.10 owns the grammar |
 | 42 `declare` | `parsePack`, `lintPack`, `packChecksum` |
 | 45 `record` | the methods of §2; `export` and `import` as the routes carry them |
 | 46 `spark` | `PROMPTS`; the `Claim` · `Ack` · `EndBody` protocol the runner speaks |
@@ -768,7 +768,7 @@ Position 12 of [31-STACK](31-STACK.md) §2, after `record` ([35-SPEC-OVERVIEW](3
 |---|---|
 | 49 `selfhost` | the `init <slug>` and `dev` subcommand contract of §5.14; the `/api/export` and `/api/import` bodies it serves |
 | 51 `worker` | the routes of §13 D1, D3, D9 the Worker must answer |
-| 52 testing | `dog-roundtrip` runs through `materialise` and `toDogl`; the `licence-closure` row for `braindog-cli` |
+| 52 testing | `brain-roundtrip` runs through `materialise` and `toBrainl`; the `licence-closure` row for `braindog-cli` |
 | 53 operations | restore = `braindog import` into a fresh record; key rotation = `verify --key <url>` |
 
 ---
@@ -796,8 +796,8 @@ self-host's `BRAINDOG_TOKEN` is the owner bearer and needs no approval (30 §10)
 30 §1 (`device_grant.reach`), 30 §5 and §10 (one row: operation grant → the approver, one command, ten
 minutes), 12 §6.1, ADR-060 (an addendum, not a reversal).
 
-**D2 · The `.dogl` is 41 §5.10's, and the CLI adds only what a file needs.** The grammar (`#dogl`, `#table
-name cols`, manifest before data, `dog_sig` last) is the kernel's; the CLI's own decisions are: the `.dog`'s
+**D2 · The `.brainl` is 41 §5.10's, and the CLI adds only what a file needs.** The grammar (`#dogl`, `#table
+name cols`, manifest before data, `dog_sig` last) is the kernel's; the CLI's own decisions are: the `.brain`'s
 schema comes from `applyMigrations`, never from the stream; rows land with `INSERT OR REPLACE` so the
 migration's seed rows yield to the file's; a header naming a column the DDL lacks is `SCHEMA_NEWER`;
 declaration indexes are not recreated; `entry_fts` rows are re-keyed by rowid lookup. *Amend:* 03 §2–§3 and
@@ -806,12 +806,12 @@ declaration indexes are not recreated; `entry_fts` rows are re-keyed by rowid lo
 and that `vault_key` travels sealed — fix the former two.
 
 **D3 · `export` and `import` are each one streamed body.** `POST /api/export` answers `200 text/plain;
-charset=utf-8` with the `.dogl` itself — the host pages `exportDogl(cursor)` internally and appends the signed
+charset=utf-8` with the `.brainl` itself — the host pages `exportBrainl(cursor)` internally and appends the signed
 `dog_sig` row; a refusal is a `422` before the first byte; a mid-export `CHECKSUM_MISMATCH` (41 §5.10) cuts the
-stream and the CLI reports exit 3. `POST /api/import` takes the `.dogl` as its `text/plain` body; the host
-collects the lines and calls `importDogl(lines, ctx)`, which writes nothing unless everything verifies. The
+stream and the CLI reports exit 3. `POST /api/import` takes the `.brainl` as its `text/plain` body; the host
+collects the lines and calls `importBrainl(lines, ctx)`, which writes nothing unless everything verifies. The
 request ceiling is the host's (§10). *Amend:* 33 §4 (the two routes' bodies), 33 §9 (no page protocol over
-HTTP; the record's ≤ 30 × ≤ 3 batching is internal to `importDogl`).
+HTTP; the record's ≤ 30 × ≤ 3 batching is internal to `importBrainl`).
 
 **D4 · Bundling.** Type stripping is refused under `node_modules`, so the published artefact is JavaScript:
 `esbuild` (dev only, per 31 §8) bundles `src/main.ts` into `dist/braindog.mjs` with `--platform=node
@@ -876,7 +876,7 @@ address is the check").
 - [ ] `braindog --version` prints the tuple in ≤ 120 ms p95 (T22)
 - [ ] T1–T24 green under `node --test`; T17 green nightly at the numbers of §7
 - [ ] `login` against the mock stores a `0600` `hosts.json` and never prints the token (T6)
-- [ ] `export` → `verify` → `import` round-trips the generated `seed.dogl` against the mock, and `toDogl(materialise(x)) ≡ x` byte for byte (T13, T14)
+- [ ] `export` → `verify` → `import` round-trips the generated `seed.brainl` against the mock, and `toBrainl(materialise(x)) ≡ x` byte for byte (T13, T14)
 - [ ] every pack refusal fixture renders as its sentence (T18); `pack install` shows the diff, asks, applies with the `plan_hash`, and survives one `PLAN_STALE` (T19)
 - [ ] the runner refuses an unknown kind, a prose argument, a foreign tool and an old `claude`; distils the fixture to nine events; honours cancel; reports `interrupted` on 143 (T20, T21)
 - [ ] every `ponytail:` line of §10 appears as a comment at the place it describes

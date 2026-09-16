@@ -78,7 +78,7 @@ test('A RECORD SAYS WHAT IT IS, WHO OWNS IT AND WHAT TIME IT IS IN, in one trans
   assert.equal(sql.one<{ name: string }>("SELECT name FROM person WHERE id = 'p_1'")?.name, 'Sam');
   assert.equal(sql.one<{ level: string }>("SELECT level FROM member WHERE person_id = 'p_1' AND register = '*'")?.level, 'owner');
 
-  // And the header a `.dog` file carries, so the file says which record it is a copy of.
+  // And the header a `.brain` file carries, so the file says which record it is a copy of.
   assert.equal(meta(sql, 'record_slug'), 'the-studio');
   assert.equal(meta(sql, 'tz'), 'Europe/London');
   assert.equal(meta(sql, 'format'), '1', 'the format the migration wrote was overwritten');

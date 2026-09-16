@@ -11,7 +11,7 @@ They answer different questions, with different retention and different privacy 
 | Who reads | the customer, their agents | us |
 | Contains | their figures | counts and durations, never their content |
 | Declared by | a pack | code |
-| Exportable | yes, in the `.dog` | no — it is not theirs, it is about us |
+| Exportable | yes, in the `.brain` | no — it is not theirs, it is about us |
 
 Confusing these is how a "record" becomes a surveillance product. The wall is architectural: the
 record object cannot write to Analytics Engine because **the record object makes no outbound

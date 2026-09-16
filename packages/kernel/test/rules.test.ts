@@ -337,7 +337,7 @@ test('A RULE WHOSE PREDICATE THE REGISTER CANNOT ANSWER IS REFUSED AT INSTALL', 
 });
 
 test('and one that got in behind the linter still fires on nothing rather than on everything', async () => {
-  // A `.dog` import writes declarations straight into the table, so the pass keeps its own guard.
+  // A `.brain` import writes declarations straight into the table, so the pass keeps its own guard.
   const { k, sql } = await record();
   sql.exec(
     `INSERT INTO declaration (id, version, kind, pack_id, body, checksum, retired, superseded_at, created_at)

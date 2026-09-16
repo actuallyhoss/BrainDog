@@ -7,7 +7,7 @@
  *
  * A REBUILD AND NOT AN ALTER, because SQLite cannot change a CHECK in place, and the list of kinds is
  * a CHECK so that the database refuses a thirteenth. Every row is copied across unchanged, and the
- * index the claim reads is made again. The format stays 1: no `.dog` carries a schedule row.
+ * index the claim reads is made again. The format stays 1: no `.brain` carries a schedule row.
  */
 export default `
 CREATE TABLE schedule_next (

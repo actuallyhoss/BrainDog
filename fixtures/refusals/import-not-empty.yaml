@@ -1,5 +1,5 @@
 code:   IMPORT_NOT_EMPTY
 via:    import
-raises: packages/kernel/src/dogl.ts
+raises: packages/kernel/src/brainl.ts
 at:     record
 fix:    Import into a record that holds no rows.

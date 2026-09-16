@@ -57,8 +57,8 @@ one of those has a *Clear revision history* button whose result "cannot be retri
 
 | | |
 |---|---|
-| **`.dog`** | one SQLite file per record. `sqlite3 portfolio.dog "select …"` works with no library and no permission |
-| **`.dogl`** | the same content as a canonical dump, one JSON row per line, signed |
+| **`.brain`** | one SQLite file per record. `sqlite3 portfolio.brain "select …"` works with no library and no permission |
+| **`.brainl`** | the same content as a canonical dump, one JSON row per line, signed |
 | **a pack** | registers, pages, metrics and rules as readable text. A way of working you can share, with no code in it |
 
 Export is never withheld, on any plan, in any state. That is the point of the file formats being

@@ -1,5 +1,5 @@
 code:   FORMAT_NEWER_THAN_READER
 via:    import
-raises: packages/kernel/src/dogl.ts
+raises: packages/kernel/src/brainl.ts
 at:     dog_meta.format
 fix:    Upgrade BrainDog, and it will open.

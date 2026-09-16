@@ -76,7 +76,7 @@ export type Extractor =
   | { decimal: { sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
   | { enum: { map: Record<string, string>; after?: string; before?: string; between?: readonly [string, string] } }
   | { lookup: { register: string; by: string; after?: string; before?: string; between?: readonly [string, string] } }
-  /* READONLY, because a declaration is data a pack or a `.dog` file handed over, and `as const` is
+  /* READONLY, because a declaration is data a pack or a `.brain` file handed over, and `as const` is
      how every fixture in this repository writes one. */
   | { first: readonly Extractor[] }
   | { nth: { n: number; of: Extractor } }
@@ -102,7 +102,7 @@ const COMBINATORS = ['first', 'nth', 'default'] as const;
  * `43 §4.3`'s nesting ceiling, enforced HERE as well as at install.
  *
  * `declare.ts` refuses a form nested more than three deep, and that is where a person finds out. It
- * is not where a declaration necessarily arrives: a `.dog` import and a pack both reach `arrive`,
+ * is not where a declaration necessarily arrives: a `.brain` import and a pack both reach `arrive`,
  * and this walk is over a structure a stranger wrote. Past the ceiling a form yields nothing, which
  * is the same answer as a form that read nothing — a payload produces an outcome, never a throw.
  */
@@ -349,12 +349,12 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
     /* THE CEILING IS PART OF THE DECLARATION AND THE OUTCOME IS PART OF THE PAYLOAD, and the lower of
        the two is what happens. Checked here rather than only at install, because a declaration can
-       arrive through a `.dog` import as well as through the linter. */
+       arrive through a `.brain` import as well as through the linter. */
     const ceiling = matched.writes.confidence ?? 'exact';
     if (!(CONFIDENCES as readonly string[]).includes(ceiling)) {
       /* THE BYTES STAY. This returned before `store` had run, and the whole call sits in a savepoint
          — so a declaration carrying `confidence: high`, which nothing validates at install and which
-         a `.dog` import or a pack installs cleanly, threw the arrival away entirely. `inbox_raw` got
+         a `.brain` import or a pack installs cleanly, threw the arrival away entirely. `inbox_raw` got
          no row at all, against 07 §2's "nothing is ever dropped" and this file's own first line.
 
          A BAD DECLARATION IS A `review`, NOT A DISCARD. The sender did nothing wrong; the pattern

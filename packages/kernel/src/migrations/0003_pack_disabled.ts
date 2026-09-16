@@ -6,7 +6,7 @@
  * way to say: the pack is still here, and it is off (`loop/research-modular.md` §1.2).
  *
  * A COLUMN AND NOT A TABLE, and NULL on every existing row, because every pack installed before
- * this migration was enabled. An older `.dog` file has no such column and imports as enabled, which
+ * this migration was enabled. An older `.brain` file has no such column and imports as enabled, which
  * is what it was when it was written.
  */
 export default `

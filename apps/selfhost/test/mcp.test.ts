@@ -71,7 +71,7 @@ async function stack(o: { open?: boolean } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-mcp-'));
   const serverKey = o.open ? undefined : randomBytes(32).toString('base64url');
   const running = await start({
-    file: join(dir, 'record.dog'),
+    file: join(dir, 'record.brain'),
     directory: join(dir, 'directory.sqlite'),
     port: 0,
     host: '127.0.0.1',

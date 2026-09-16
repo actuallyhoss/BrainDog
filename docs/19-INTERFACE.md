@@ -727,7 +727,7 @@ surface in the UI. Renamed:
 
 | Was | Is |
 |---|---|
-| `grant` (credential vault row) | **`credential`** — and *"credential opened"* for the event. **Not `key`**, which this same table bans because it means a JSON key. And it is a *display* rename only: `grant` and `grant.read` stay in the schema, the API and the `.dog`, because renaming a column to improve a label is how a spoken id stops resolving |
+| `grant` (credential vault row) | **`credential`** — and *"credential opened"* for the event. **Not `key`**, which this same table bans because it means a JSON key. And it is a *display* rename only: `grant` and `grant.read` stay in the schema, the API and the `.brain`, because renaming a column to improve a label is how a spoken id stops resolving |
 | `member` (person × register × level) | **`access`** — and `access.grant` / `access.revoke` for the events ([30-BLUEPRINT](30-BLUEPRINT.md) §2); an earlier draft wrote `access.changed`, which is not among the forty kinds |
 
 ---

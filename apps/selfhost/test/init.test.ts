@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createDirectory } from '@braindog/record/directory';
 
-import { checkDogl } from '@braindog/kernel';
+import { checkBrainl } from '@braindog/kernel';
 import { createRecordApi } from '@braindog/record';
 
 import { openKeyStore, unwrap } from '../src/keys.ts';
@@ -57,9 +57,9 @@ test('A RECORD COMES INTO BEING, and both halves say the same thing', async () =
     assert.match(out.said, /^record the-studio created · owner ada@example\.com · inbound email token at /m);
     assert.equal(out.out, '', 'stdout belongs to the CLI’s --json envelope');
 
-    /* THE FILE IS `record.dog`. Migration 0001 makes it one — 49 §4.3, and `record.sqlite` appears
+    /* THE FILE IS `record.brain`. Migration 0001 makes it one — 49 §4.3, and `record.sqlite` appears
        in none of the fifty-four documents. */
-    const file = join(data, 'the-studio', 'record.dog');
+    const file = join(data, 'the-studio', 'record.brain');
     assert.ok(existsSync(file), 'the record was not created where the docs say it lives');
     assert.ok(existsSync(join(data, 'the-studio', 'blobs')), 'no blobs directory');
     assert.ok(existsSync(join(data, 'the-studio', 'snapshots')), 'no snapshots directory');
@@ -266,7 +266,7 @@ test('MINTING A BEARER NEEDS A CREDENTIAL, and the one it mints then works', asy
 
     /* FIRST WITH NO SHARED SECRET, which is how a self-host is started by default and the shape the
        hole lived in: every request is the owner, and every request could therefore mint. */
-    const open = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0 });
+    const open = await start({ file: join(data, 'the-studio', 'record.brain'), port: 0, pollMs: 0 });
     const openAt = (open.server.address() as { port: number }).port;
     const bare = await fetch(`http://127.0.0.1:${openAt}/api/createToken`, {
       method: 'POST',
@@ -281,7 +281,7 @@ test('MINTING A BEARER NEEDS A CREDENTIAL, and the one it mints then works', asy
 
     /* AND THEN WITH ONE. Reading and writing without a credential stays what it was; minting is the
        one call that needed the operator to have said something. */
-    running = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0, token: SECRET, host: '127.0.0.1' });
+    running = await start({ file: join(data, 'the-studio', 'record.brain'), port: 0, pollMs: 0, token: SECRET, host: '127.0.0.1' });
     const at = (running.server.address() as { port: number }).port;
     const mint = (headers: Record<string, string> = {}) =>
       fetch(`http://127.0.0.1:${at}/api/createToken`, {
@@ -330,7 +330,7 @@ test('A RECORD FILE THAT ALREADY HOLDS A RECORD IS NEVER ADOPTED', async () => {
     assert.equal(taken.code, 1, 'a live record was handed to whoever ran init next');
     assert.match(taken.said, /already holds the record the-studio/);
 
-    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const sql = openSqlite(join(data, 'the-studio', 'record.brain'));
     assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a second owner was added');
     assert.equal(
       sql.one<{ email: string }>("SELECT p.email FROM member m JOIN person p ON p.id = m.person_id WHERE m.register = '*'")?.email,
@@ -395,7 +395,7 @@ test('A HEADER WITH NOTHING IN IT IS NOT A CREDENTIAL', async () => {
   let running: Awaited<ReturnType<typeof start>> | null = null;
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
-    running = await start({ file: join(data, 'the-studio', 'record.dog'), port: 0, pollMs: 0 });
+    running = await start({ file: join(data, 'the-studio', 'record.brain'), port: 0, pollMs: 0 });
     const at = (running.server.address() as { port: number }).port;
 
     for (const authorization of ['', ' ', 'Bearer', 'Bearer ', 'Bearer   ', 'x', 'Basic abc']) {
@@ -436,7 +436,7 @@ test('AND A DATA DIRECTORY THAT DOES NOT EXIST YET IS CREATED, which is every fi
   try {
     const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
     assert.equal(out.code, 0, out.said);
-    assert.ok(existsSync(join(data, 'the-studio', 'record.dog')));
+    assert.ok(existsSync(join(data, 'the-studio', 'record.brain')));
     if (process.platform !== 'win32') {
       assert.equal(statSync(data).mode & 0o777, 0o700, 'the installation root is readable by anybody');
       assert.equal(statSync(join(data, 'the-studio')).mode & 0o777, 0o700, "the record's own directory is readable by anybody");
@@ -465,7 +465,7 @@ test('AND A RELEASED NAME IS NEVER REISSUED, which is the whole tenant boundary'
     /* AND THE RECORD THE NAME USED TO MEAN IS UNTOUCHED. Its directory is still there — a rename
        moves a row and never a file — so the refusal has to come from the Directory rather than from
        anything on disk, and bo must not appear anywhere in it. */
-    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const sql = openSqlite(join(data, 'the-studio', 'record.brain'));
     assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a released name added an owner');
     assert.equal(sql.one<{ slug: string }>('SELECT slug FROM record WHERE singleton = 1')?.slug, 'the-studio');
     assert.equal(sql.all("SELECT 1 FROM person WHERE email = 'bo@example.com'").length, 0);
@@ -511,20 +511,20 @@ function loseTheDirectory(data: string): void {
 }
 
 test('A RUN KILLED BEFORE THE MIGRATION FINISHED IS FINISHED BY THE NEXT ONE', async () => {
-  /* `init` creates `record.dog` and migrates it as two steps. Killed between them, the file exists
+  /* `init` creates `record.brain` and migrates it as two steps. Killed between them, the file exists
      with no tables — and the branch written to make that recoverable was the branch that made it
      permanent: `SELECT id FROM record` threw `no such table: record` out of the command, printed
      SQLite's sentence with no path in it, and did the same on every retry for ever. */
   const data = scratch();
   try {
     mkdirSync(join(data, 'the-studio'), { recursive: true });
-    writeFileSync(join(data, 'the-studio', 'record.dog'), '');
+    writeFileSync(join(data, 'the-studio', 'record.brain'), '');
 
     const out = run(data, 'init', 'the-studio', '--owner', 'ada@example.com');
     assert.equal(out.code, 0, out.said);
     assert.match(out.said, /^record the-studio created/m);
 
-    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const sql = openSqlite(join(data, 'the-studio', 'record.brain'));
     assert.equal(sql.one<{ slug: string }>('SELECT slug FROM record WHERE singleton = 1')?.slug, 'the-studio');
     sql.close();
   } finally {
@@ -540,7 +540,7 @@ test('AND A RECORD THE DIRECTORY NEVER HEARD OF IS FINISHED FOR THE PERSON WHOSE
   const data = scratch();
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
-    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const sql = openSqlite(join(data, 'the-studio', 'record.brain'));
     const was = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;
     sql.close();
 
@@ -564,7 +564,7 @@ test('AND A RECORD THE DIRECTORY NEVER HEARD OF IS FINISHED FOR THE PERSON WHOSE
     after.close();
 
     /* AND THE RECORD WAS NOT REMADE. One owner, one id, one create. */
-    const check = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const check = openSqlite(join(data, 'the-studio', 'record.brain'));
     assert.equal(check.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id, was);
     assert.equal(check.all("SELECT 1 FROM member WHERE register = '*'").length, 1);
     check.close();
@@ -594,7 +594,7 @@ test('BUT NOT FOR SOMEBODY ELSE, which is the hole the whole check exists to clo
     assert.equal(wrongDir.code, 1, 'a record was re-provisioned against a directory that never held its owner');
     assert.match(wrongDir.said, /a person this directory does not know/);
 
-    const sql = openSqlite(join(data, 'the-studio', 'record.dog'));
+    const sql = openSqlite(join(data, 'the-studio', 'record.brain'));
     assert.equal(sql.all("SELECT 1 FROM member WHERE register = '*'").length, 1, 'a second owner was added');
     sql.close();
   } finally {
@@ -610,7 +610,7 @@ test('THE RECORD FILE IS NOT WORLD-READABLE, and neither is its write-ahead log'
   const data = scratch();
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
-    assert.equal(statSync(join(data, 'the-studio', 'record.dog')).mode & 0o777, 0o600);
+    assert.equal(statSync(join(data, 'the-studio', 'record.brain')).mode & 0o777, 0o600);
     assert.equal(statSync(join(data, 'directory.sqlite')).mode & 0o777, 0o600);
   } finally {
     rmSync(data, { recursive: true, force: true });
@@ -648,12 +648,12 @@ test('A KEY FILE THAT IS NOT A KEY COSTS NOBODY THE NAME THEY WANTED', () => {
 test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHER ONE', async () => {
   /* THE WHOLE CHAIN, END TO END, and every link of it was missing a week ago: `init` wrote no keys,
      no process opened the KEK, nothing signed, and nothing checked. `41 §5.11` steps 2 and 3 are
-     what make a `.dog` a thing somebody can be handed rather than a thing they have to trust. */
+     what make a `.brain` a thing somebody can be handed rather than a thing they have to trust. */
   const data = scratch();
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
 
-    const file = join(data, 'the-studio', 'record.dog');
+    const file = join(data, 'the-studio', 'record.brain');
     const sql = openSqlite(file);
     const store = await openKeyStore(join(data, 'kek'));
     const id = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;
@@ -666,9 +666,9 @@ test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHE
     assert.ok(out.ok, 'export refused');
     const lines = (out as { value: string[] }).value;
 
-    /* IT VERIFIES, against nothing but the file. `checkDogl` recomputes every table's hash and the
+    /* IT VERIFIES, against nothing but the file. `checkBrainl` recomputes every table's hash and the
        key id, and checks the signature against the key the file carries. */
-    const checked = await checkDogl(lines);
+    const checked = await checkBrainl(lines);
     assert.ok(checked.ok, checked.ok ? '' : `${checked.refusal.code}: ${checked.refusal.fix}`);
 
     /* AND ONE CHANGED DIGIT DOES NOT, even with the manifest recomputed — which is the difference
@@ -680,7 +680,7 @@ test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHE
        every few dozen edits nothing and the file still verifies. */
     const last = id.slice(-1) === 'X' ? 'Y' : 'X';
     bent[at] = bent[at]!.replace(id, `${id.slice(0, -1)}${last}`);
-    assert.equal((await checkDogl(bent)).ok, false, 'an edited record id verified');
+    assert.equal((await checkBrainl(bent)).ok, false, 'an edited record id verified');
 
     sql.close();
   } finally {
@@ -690,13 +690,13 @@ test('A RECORD `init` MADE EXPORTS A FILE THAT VERIFIES, AND IMPORTS INTO ANOTHE
 
 test('AND A RECORD WITH NO SIGNING KEY SAYS SO BY MAKING NO SIGNER', async () => {
   /* `signerFor` answers `null` rather than throwing, because "no signing key" is an ordinary state:
-     a record restored from a redacted export has no `vault_key` rows at all — `dogl.ts` drops them,
+     a record restored from a redacted export has no `vault_key` rows at all — `brainl.ts` drops them,
      since the row is nothing but wrapped bytes and a salt. Its exports are unsigned, and nothing
      will import them, which is true and worth saying at export rather than at import. */
   const data = scratch();
   try {
     assert.equal(run(data, 'init', 'the-studio', '--owner', 'ada@example.com').code, 0);
-    const file = join(data, 'the-studio', 'record.dog');
+    const file = join(data, 'the-studio', 'record.brain');
     const sql = openSqlite(file);
     const store = await openKeyStore(join(data, 'kek'));
     const id = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')!.id;

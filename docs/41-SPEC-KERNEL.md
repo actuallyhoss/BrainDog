@@ -2,7 +2,7 @@
 
 The record's core: the one migration that creates the twenty-seven tables and the four header tables, the write
 path of [30-BLUEPRINT](30-BLUEPRINT.md) §4 with the exact SQL of every step, counters, events, `entry_fts`, the
-schedule rows a date field derives, purge, erase, and the `.dogl` export and import. Everything the record owns
+schedule rows a date field derives, purge, erase, and the `.brainl` export and import. Everything the record owns
 and nothing it says: no RPC, no auth, no rules evaluation, no outbound call.
 
 Derives from [30-BLUEPRINT](30-BLUEPRINT.md) §1–§4, §6, §8, §11, §13 · [02-DATA-MODEL](02-DATA-MODEL.md) ·
@@ -19,7 +19,7 @@ Clean room: nothing here is ported.
 synchronously inside one `transactionSync`, allocates spoken numbers from `counter`, appends events with the
 redaction list applied, keeps `entry_fts` in step with `entry`, derives `schedule` rows from `remind:` and
 `repeat:`, inserts the outbox rows a hook queues, counts refusals into `observation`, purges soft-deleted rows,
-erases a subject across every store, streams the record as `.dogl` pages and imports one into an empty record.
+erases a subject across every store, streams the record as `.brainl` pages and imports one into an empty record.
 
 **Refuses to do.** Auth, scopes and the six RPC groups (`record`, spec 45). Rule evaluation — the kernel exposes
 the step-9 hook and the `cascade = false` re-entry; the engine is `record`'s. YAML, lint, the install plan
@@ -100,8 +100,8 @@ export interface Kernel {
   erase(req: EraseRequest, ctx: CallContext): Promise<Result<EraseReport>>;   // async: hashes the subject first
 
   // ── format ──────────────────────────────────────────────────────────────────────────────────
-  exportDogl(cursor: string | null, opts?: ExportOptions): Promise<Result<DoglPage>>;
-  importDogl(lines: Iterable<string> | AsyncIterable<string>, ctx: CallContext): Promise<Result<ImportReport>>;
+  exportBrainl(cursor: string | null, opts?: ExportOptions): Promise<Result<BrainlPage>>;
+  importBrainl(lines: Iterable<string> | AsyncIterable<string>, ctx: CallContext): Promise<Result<ImportReport>>;
 }
 ```
 
@@ -128,8 +128,8 @@ export interface Kernel {
 | `schedule` · `outbox` | insert a queue row inside the open transaction | `TypeError` outside a transaction |
 | `purge` | deletes ≤ `limit` (default 100) rows soft-deleted before `cutoff`, each from three stores, one event | none |
 | `erase` | tombstones a subject in nineteen stores in one transaction and queues `erase.r2` | `VALUE_MALFORMED` on a subject under three characters |
-| `exportDogl` | page 0 refreshes `dog_meta` and `dog_manifest`, then ≤ 1,000 row lines per page | `CHECKSUM_MISMATCH` when the record moved mid-export |
-| `importDogl` | verifies format, manifest and signature, then copies every table in one transaction | `IMPORT_NOT_EMPTY` · `FORMAT_NEWER_THAN_READER` · `CHECKSUM_MISMATCH` · `SIGNATURE_INVALID` · `SCHEMA_NEWER` |
+| `exportBrainl` | page 0 refreshes `dog_meta` and `dog_manifest`, then ≤ 1,000 row lines per page | `CHECKSUM_MISMATCH` when the record moved mid-export |
+| `importBrainl` | verifies format, manifest and signature, then copies every table in one transaction | `IMPORT_NOT_EMPTY` · `FORMAT_NEWER_THAN_READER` · `CHECKSUM_MISMATCH` · `SIGNATURE_INVALID` · `SCHEMA_NEWER` |
 
 **The rule for exceptions.** A refusal is a value, always. The kernel throws only a `TypeError` for a programming
 error (an in-transaction helper called outside one; an internal event with a wrong shape), and rethrows a
@@ -219,7 +219,7 @@ export type OutboxRow   = { kind: OutboxKind; payload: Json };
 export type EraseRequest = { subjects: string[]; personId?: string; basis: string };
 export type EraseReport  = { values: number; stores: Record<string, number>; attachments: number };
 export type ExportOptions = { sections?: ('data' | 'origin' | 'governance')[]; redactGrants?: boolean };
-export type DoglPage     = { lines: string[]; next: string | null };
+export type BrainlPage     = { lines: string[]; next: string | null };
 export type ImportReport = { tables: number; rows: number; skippedTables: string[]; skippedColumns: string[] };
 export type ObservationKind = (typeof OBSERVATION_KINDS)[number];   // nine — 30 §1
 export type ScheduleKind    = (typeof SCHEDULE_KINDS)[number];      // ten
@@ -264,7 +264,7 @@ packages/kernel/
 │   ├── fts.ts                      the projected-text rule; delete + insert by rowid; rebuild
 │   ├── schedule.ts                 remind: and repeat: → schedule rows; the range cancel; the queue inserts; the session sweep
 │   ├── session.ts                  the session register's envelope, the ladder's reading rungs, staleness
-│   ├── dogl.ts                     the canonical projection, manifest refresh, export pages, import
+│   ├── brainl.ts                     the canonical projection, manifest refresh, export pages, import
 │   ├── erase.ts                    purge and erase
 │   └── index.ts                    openRecord, the Kernel object, get/list/search, the declaration cache, the types
 └── test/                           §9
@@ -286,7 +286,7 @@ holds what the kernel knows about the one register it declares (§5.4 step 1.4).
 | `schedule.ts` | `reminderRows(decl, entry, now)`, `expandRepeat()`, `cancelRange()`, `schedule()`, `outbox()`, `sweepSessions()` (§5.8) | ~200 |
 | `actions.ts` | `fireAction`, `prepareAction`, `finishAction`, `meter`, `runActions`, `resumeAction`, `originsOf`, `actionJitterMs`: the scheduled actions of [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1, with no network in them; the host passes the executor | ~550 |
 | `session.ts` | `sessionDeclaration()`, read from migration 0002's bytes and never retyped; `findSession()`, rungs 1 to 4 of the ladder; `opening()`; `KERNEL_WRITTEN`; `isStale()` at 45 minutes; the `SessionHints` type | ~120 |
-| `dogl.ts` | `TABLES` (31 rows: name · section · columns · pk), `projection()`, `refreshManifest()`, `exportDogl()`, `importDogl()`, `verifySig()` | ~300 |
+| `brainl.ts` | `TABLES` (31 rows: name · section · columns · pk), `projection()`, `refreshManifest()`, `exportBrainl()`, `importBrainl()`, `verifySig()` | ~300 |
 | `erase.ts` | `purge()`, `erase()` — the store list of §5.9 as data | ~150 |
 | `index.ts` | `openRecord`, the `Kernel` object literal, `get`/`list`/`search`/`count`, the declaration cache and compiled-lock cache, `transaction()`, the types and closed lists | ~220 |
 
@@ -358,7 +358,7 @@ Conventions: `now` is `clock.now()` read once per call and formatted `instant(no
    `SELECT id, version, kind, pack_id, body, checksum, created_at FROM declaration WHERE superseded_at IS NULL AND retired = 0`.
    Bodies are parsed once; registers are indexed by register id and by `seq_prefix`.
 2. A compiled lock is cached per `(declaration id, version)` on first use: `compile(body.immutable_when, { subject: 'entry', register, now, tz, scope: { registers: '*' } })`. Temporal literals in a lock resolve at compile time ([34-GRAMMARS](34-GRAMMARS.md) §1.4), so a lock naming `today` is recompiled when the UTC day changes — the cache key carries the day.
-3. The cache is rebuilt after `applyMigrations`, `installDeclarations`, `retireDeclarations` and `importDogl`. Nothing else changes declarations.
+3. The cache is rebuilt after `applyMigrations`, `installDeclarations`, `retireDeclarations` and `importBrainl`. Nothing else changes declarations.
 4. `transaction(fn)`: a depth counter on the object. Depth 0 → `sql.transactionSync(() => { depth++; try { return fn() } finally { depth-- } })`; depth > 0 → `fn()` directly. Every kernel method that writes goes through it, which is what lets the rules hook call `write` again without nesting the driver ([33-CONTRACTS](33-CONTRACTS.md) §1: `nestedTransactions: false`).
 
 ### 5.2 · `applyMigrations`
@@ -404,7 +404,7 @@ Three details are deliberate. The `UPDATE` and the `coalesce(max(version), 0) + 
 where a plain insert would collide on the primary key and the record would not open. No `seq:session` counter is
 seeded: `allocate` creates a register's counter at its first row, and a seeded one would make every new record
 look non-empty to an import. And an import replaces the `declaration` table with the file's, so when the file
-carries no kernel row, because it was written before migration 2, `importDogl` runs the same two statements;
+carries no kernel row, because it was written before migration 2, `importBrainl` runs the same two statements;
 `notEmpty` does not count the kernel's row as content. `dog_meta`'s other keys (`created_at`, `producer`,
 `record_slug`, `tz`, `locale`) are written by export's refresh from the `record` row, not by a migration.
 
@@ -765,7 +765,7 @@ and one `erase` event by the caller's actor whose note is
 `erased <values> values in <stores> stores; subject sha256:<first 16 hex of SHA-256(subject)>; basis: <basis>` —
 the subject itself is never written again (§13 #15). Returns `{ values, stores, attachments }`.
 
-### 5.10 · `exportDogl(cursor, opts)` — the `.dogl` stream
+### 5.10 · `exportBrainl(cursor, opts)` — the `.brainl` stream
 
 **The line format** (§13 #4). LF-terminated lines, UTF-8, no BOM:
 
@@ -807,7 +807,7 @@ SELECT <cols> FROM <T> WHERE (<pk>) > (?, …) ORDER BY <pk> LIMIT 1000        -
 
 `after` is the last row's pk values. When a table is exhausted, `t + 1`; after `dog_sig`'s header, `next = null`.
 
-### 5.11 · `importDogl(lines, ctx)` — into an empty record only
+### 5.11 · `importBrainl(lines, ctx)` — into an empty record only
 
 1. **Empty?** `SELECT count(*) FROM entry` · `event` · `pack` · `decision` · `suggestion` · `grant`, and `SELECT count(*) FROM declaration WHERE pack_id IS NOT 'kernel'` — any non-zero → `IMPORT_NOT_EMPTY`. A `record` row, the owner's `person`/`member` rows and `register.session` may exist: import replaces them.
 2. **Read everything into memory** — header, then per table its row lines — verifying as it goes: line 1 must be `#dogl <n>`; `n > FORMAT_VERSION` → `FORMAT_NEWER_THAN_READER`; `n < FORMAT_VERSION` → upgrade on import (none exists at v1). An unknown table name is skipped and reported; a column the reader lacks is dropped and reported; a column the file lacks takes the DDL default — the additive rule of [03-DOG-FORMAT](03-DOG-FORMAT.md) §7. Each table's `sha256(lines.join('\n'))` (awaited) must equal its `dog_manifest` row → `CHECKSUM_MISMATCH` naming the table; a table in the file with no manifest row, or a manifest row for a table missing from the file whose `dog_section` is not `local`, is the same refusal.
@@ -820,7 +820,7 @@ SELECT <cols> FROM <T> WHERE (<pk>) > (?, …) ORDER BY <pk> LIMIT 1000        -
    A BLOB arrives as `{"b64"}` and is bound as `Uint8Array`; `null` as `NULL`. Then `rebuildFts()` — `DELETE FROM entry_fts` and one INSERT per live non-series row with non-empty projected text — and one `import` event: actor from `ctx`, `note = 'imported <rows> rows in <tables> tables from <file record id>'`. `event` rows keep their original actors and ids: this is a copy, not a replay.
 6. Rebuild the declaration cache; return the report. A refused import writes nothing (steps 1–4 read only), so the record is still empty and the fix is to retry with a good file.
 
-`.dog` files are not read here: the CLI and the self-host turn a `.dog` into `.dogl` lines with their real SQLite
+`.brain` files are not read here: the CLI and the self-host turn a `.brain` into `.brainl` lines with their real SQLite
 and hand the lines over ([03-DOG-FORMAT](03-DOG-FORMAT.md) §2, ADR-034).
 
 ---
@@ -881,9 +881,9 @@ indexes, one `day` with `remind: [-30d, -7d, -1d]`, 10,000 live rows, no rules h
 | `write` refused at step 4 | p95 ≤ 1 ms | ≤ 3 ms | bench |
 | `get` by spoken id | p95 ≤ 0.3 ms | ≤ 1 ms | bench |
 | `search`, one phrase, 10k rows | p95 ≤ 5 ms | ≤ 15 ms | bench |
-| `exportDogl` throughput | ≥ 20,000 row lines/s | ≥ 7,000 | 100k-row fixture, all pages |
+| `exportBrainl` throughput | ≥ 20,000 row lines/s | ≥ 7,000 | 100k-row fixture, all pages |
 | manifest refresh | ≤ 1.5 s per 100k rows | ≤ 4.5 s | same run, page 0 alone |
-| `importDogl` | ≥ 10,000 rows/s | ≥ 3,500 | the exported fixture |
+| `importBrainl` | ≥ 10,000 rows/s | ≥ 3,500 | the exported fixture |
 | `erase`, one subject | ≤ 1 s per 1M `event` rows | informational | 1M-row synthetic |
 | page size | 1,000 row lines | — | [33-CONTRACTS](33-CONTRACTS.md) §9 |
 | import statement | rows × columns ≤ 90, rows ≤ 30 | asserted per statement | `entry` 10 rows · `event` 7 · `grant` 3 · 3-column tables 30 |
@@ -990,8 +990,8 @@ an observation subject, a pending reminder payload and a `grant.label`; `erase({
 `entry_vec` has no row for the task, one `erase.r2` outbox row lists the task's `file` sha256, one `erase` event
 whose note contains `sha256:` and not the name, `member` rows gone with one `access.revoke` each. `erase({ subjects: ['am'] })` → `VALUE_MALFORMED`.
 
-**Format** — `test/dogl.test.ts`: export → import into a fresh record → export: the two `.dogl` streams are
-byte-identical ignoring the `dog_sig` block (the `dog-roundtrip` gate); `sha256` of each table's row lines equals
+**Format** — `test/dogl.test.ts`: export → import into a fresh record → export: the two `.brainl` streams are
+byte-identical ignoring the `dog_sig` block (the `brain-roundtrip` gate); `sha256` of each table's row lines equals
 its manifest row; `--redact-grants` verifies; a flipped byte in a row → `CHECKSUM_MISMATCH` naming the table; a
 missing `dog_sig` → `SIGNATURE_INVALID`; `#dogl 2` → `FORMAT_NEWER_THAN_READER`; import into a record with one
 entry → `IMPORT_NOT_EMPTY`; a write between two pages → `CHECKSUM_MISMATCH` on the second; a `migration` row in
@@ -1036,7 +1036,7 @@ ULIDs monotonic within one millisecond; spoken ids round-trip.
 ## 10 · Deliberate ceilings
 
 - `ponytail:` **manifest refresh reads every travelling table in one pass** — a request's CPU budget is exceeded somewhere past ~500 MB of rows. Upgrade: a `snapshot`-kind schedule row that refreshes the manifest one table per firing and stores it, so page 0 only reads `dog_manifest`.
-- `ponytail:` **import buffers the whole file in memory** so a refused import writes nothing; 128 MB in a Durable Object caps it near 50 MB of `.dogl`. Upgrade: a two-pass streaming import (verify pass, then write pass) when a Cloud customer's file outgrows it; the self-host has no such ceiling.
+- `ponytail:` **import buffers the whole file in memory** so a refused import writes nothing; 128 MB in a Durable Object caps it near 50 MB of `.brainl`. Upgrade: a two-pass streaming import (verify pass, then write pass) when a Cloud customer's file outgrows it; the self-host has no such ceiling.
 - `ponytail:` **`repeat:` occurrences are materialised at write, 400 days ahead, ≤ 100 rows per field** — a monthly rule for a decade lands its later years only when the row is written again. Upgrade: a nightly `purge`-kind sweep that re-runs step 10 over rows with `repeat:`.
 - `ponytail:` **`instant` repeats keep the anchor's UTC time of day**; a weekly 09:00 Cairo appointment drifts an hour across a DST change. Upgrade: expand in `record.tz` with `Intl` when a customer notices.
 - `ponytail:` **erase is a full scan of nine text columns with `instr`** — a second per million events. Upgrade: none planned; erasure is rare and a one-month clock is generous.
@@ -1046,7 +1046,7 @@ ULIDs monotonic within one millisecond; spoken ids round-trip.
 - `ponytail:` **`lower()` is ASCII** in SQLite without ICU; erase and `contains` fold ASCII case only. Arabic has no case; other scripts match exactly. Upgrade: none.
 - `ponytail:` **compiled locks are cached per UTC day**, so a lock with `today` recompiles at most once a day and may be stale by up to a day's `tz` offset around midnight. Upgrade: key the cache on the record's local day if a lock ever hinges on it.
 - `ponytail:` **done reminder rows are never pruned** — they are the once_per memory. Upgrade: purge `done` rows older than a year when the table is measured to matter.
-- `ponytail:` **one hash function, four async methods**: WebCrypto's `digest` is one-shot and async, so `applyMigrations`, `installDeclarations`, `exportDogl`, `importDogl` and `erase` are `async` and hash before their transaction; the write path stays synchronous. Upgrade: a pure-JS SHA-256 (~40 lines) would make them synchronous; not worth owning until an `await` between hash and transaction is shown to bite.
+- `ponytail:` **one hash function, four async methods**: WebCrypto's `digest` is one-shot and async, so `applyMigrations`, `installDeclarations`, `exportBrainl`, `importBrainl` and `erase` are `async` and hash before their transaction; the write path stays synchronous. Upgrade: a pure-JS SHA-256 (~40 lines) would make them synchronous; not worth owning until an `await` between hash and transaction is shown to bite.
 
 ---
 
@@ -1075,12 +1075,12 @@ whose SQL names bare columns and `json_extract(fields, …)` so it runs over the
 (RFC 8785). If spec 38 names any of these differently, its name wins and this spec is amended in the same round.
 
 **Unblocks.** `packages/record` (spec 45 — the six groups over `write`/`get`/`list`/`search`, the outbox drain,
-`arm()` from `pendingWork()`); `apps/cli` (spec 48 — `init`, `export`, `import`, `verify` materialise `.dogl`
+`arm()` from `pendingWork()`); `apps/cli` (spec 48 — `init`, `export`, `import`, `verify` materialise `.brainl`
 through this kernel and a real SQLite); `apps/selfhost` (spec 49). `declare` (spec 42) does not depend on the
 kernel and may be written in parallel; `record` marries the two.
 
 **Order within the package.** `coerce.ts` → `migrate.ts` + `0001_kernel.ts` → `events.ts` → `fts.ts` →
-`schedule.ts` → `write.ts` → `index.ts` → `erase.ts` → `dogl.ts`. The write path is testable at step six of nine.
+`schedule.ts` → `write.ts` → `index.ts` → `erase.ts` → `brainl.ts`. The write path is testable at step six of nine.
 
 ---
 
@@ -1093,7 +1093,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 | 1 | **The envelopes live in the kernel.** `CallContext`, `Result<T>`, `Refusal`, `Level` are declared in `@braindog/kernel` exactly as 33 §2 writes them; `record` re-exports them. A package below `record` cannot import them from it | 33 §2 (owner note) · 35 §4 rows 41, 45 |
 | 2 | **Migrations are `.ts` modules exporting the SQL string**, `src/migrations/NNNN_<slug>.ts`; the checksum is over the exported text after CRLF → LF and trailing-whitespace strip; `-- format-bump <n>` carries the new revision. A package with no build step and no `node:fs` cannot load a `.sql` file. The `migration` table is created by the runner, not the file | 02 §7 · 33 §9 · 30 §11 |
 | 3 | **`unique:` is a pre-check with the index as backstop.** One indexed SELECT names the existing row (`ALREADY_KNOWN` with its spoken id; `UNIQUE_VIOLATION` on a series or from the index). Driver messages are never parsed — three SQLite builds phrase them three ways | 30 §6 (the two rows) |
-| 4 | **The `.dogl` line format**: `#dogl <n>`, `#table <name> <cols>`, JCS row arrays, header first, `dog_sig` last, `local` omitted; the manifest covers every exported table except itself and `dog_sig`; `dog_meta` carries no `exported_at`. The `dog_section` assignment of all 31 tables is §5.2's INSERT | 03 §2–§3 · 33 §9 · 34 §5 |
+| 4 | **The `.brainl` line format**: `#dogl <n>`, `#table <name> <cols>`, JCS row arrays, header first, `dog_sig` last, `local` omitted; the manifest covers every exported table except itself and `dog_sig`; `dog_meta` carries no `exported_at`. The `dog_section` assignment of all 31 tables is §5.2's INSERT | 03 §2–§3 · 33 §9 · 34 §5 |
 | 5 | **PINNED applies to mechanism actors only** — `rule:` and `ingest:`. Sessions, `agent:` tokens and `system` are exempt: a person's instruction to an agent is a person's write, and an exempt `system` is what lets the twelve-hour sweep move a state a person once set. The literal reading would forbid an agent editing any field a person ever created | 30 §4 step 2b · 30 §6 `HUMAN_ONLY` · 07 §6 |
 | 6 | **The session heartbeat is not a write**: `last_seen` is `json_set` in place, no `version` bump, no `updated_at`, no event — otherwise every agent write would spuriously conflict the next edit of its session row and flood `whatsNew` | 02 §1 · 32 §2.1 · 30 §4 step 6 |
 | 7 | **The redaction list is by type and by option**: `secret` and `money` always; `redact: true` on any other field. Inside a `create` row's `to_v`, a redacted field's value is the string `--redacted--` | 20 §8 · 02 §5 (`redact:`) |
@@ -1101,7 +1101,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 | 9 | **`op_id` sits on the first event row of a write only** (the unique index admits one); the replay returns the current row with the original rowid as `version` | 33 §2 (idempotency) · 30 §1 `event_op` |
 | 10 | **`pairs:` semantics**: `mark` names a `bool` field set `true` on both rows; the kernel writes `_pair` (the partner's id) on both; the window runs over `pairs.date`, defaulting to the register's sole `day` field; `on:` entries beyond the money field are equality leaves; the candidate predicate is compiled by `where`; a person-pinned `mark` skips the pairing | 02 §5 · 32 §3 |
 | 11 | **The identity accent is `round(seq × 137.508) mod 360`** — the kernel guarantees distinct, well-spread hues with no query and no theme dependency; the theme's generator owns contrast and the dichromat check at render | ADR-028 · 32 §4.4 · 13 §2.1b |
-| 12 | **`PRAGMA user_version` and `application_id` are best effort inside the record**; `record.format_ver`, `dog_meta.format` and the `#dogl` header are authoritative there, and the CLI/self-host set both pragmas when they materialise a `.dog`. An adapter that refuses `PRAGMA` (the Durable Object allow-list) does not fail the migration | 30 §11 · 33 §9 · 03 §2 |
+| 12 | **`PRAGMA user_version` and `application_id` are best effort inside the record**; `record.format_ver`, `dog_meta.format` and the `#dogl` header are authoritative there, and the CLI/self-host set both pragmas when they materialise a `.brain`. An adapter that refuses `PRAGMA` (the Durable Object allow-list) does not fail the migration | 30 §11 · 33 §9 · 03 §2 |
 | 13 | **One new code, `VALUE_MALFORMED`**: a value outside its type's shape that cannot be coerced, an unresolvable id or spoken reference, a non-grant `secret`, an erase subject under three characters. 34 §3 says a 16-digit decimal "is refused" and named no code; the write path had none for a malformed instant. Write path becomes eighteen, the total seventy-six; fixture `value-malformed` | 30 §6 · 34 §3 |
 | 14 | **Default caps**: `text` 16 KB, `json` 64 KB, `url`/`email` 2 KB, `list` 1,000 elements, `fields` 1 MB — the 2 MB row ceiling with headroom, all `OUT_OF_BOUNDS` | 02 §5 (caps table) |
 | 15 | **Erase**: subjects match as ASCII-folded substrings; nineteen stores — the sixteen plus `person`, `job`, `job_event`; a cancelled `schedule`/`outbox` row is `state = 'done'` with payload `--erased--` (there is no `cancelled` state); the `erase` event carries `sha256:<16 hex>` of the subject, never the subject; `entry.fields` values are tombstoned in place so every row keeps its existence and sequence | 02 §10 · 30 §1 |
@@ -1119,7 +1119,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 - [ ] The twenty-seven refusal fixtures pass and the `refusal-fixtures` gate is green for `KERNEL_REFUSAL_CODES`.
 - [ ] Every row of the §9 write-path table passes; K1–K26 each have a test that fails when the invariant is broken.
 - [ ] `event-kinds` (40), `closed-lists`, `no-declarations-in-kernel`, `spark-actor`, `secret-grep` gates are green.
-- [ ] `dog-roundtrip`: export → import → export is byte-identical apart from `dog_sig`; every manifest hash re-computes with `sha256sum` over the row lines.
+- [ ] `brain-roundtrip`: export → import → export is byte-identical apart from `dog_sig`; every manifest hash re-computes with `sha256sum` over the row lines.
 - [ ] A checksum-mismatched ledger makes every `Result`-returning method return `SCHEMA_MISMATCH`.
 - [ ] `test/bench.test.ts` passes its CI column and prints the budget column's numbers for the log.
 - [ ] `tsc --noEmit` clean under `strict`, `verbatimModuleSyntax`, `erasableSyntaxOnly`; no `node:*`, `cloudflare:*`, `fetch`, `Buffer` under `src/` (the path-scoped lint).

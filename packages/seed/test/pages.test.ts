@@ -1,7 +1,7 @@
 /**
  * The pages, as documents the record holds.
  *
- * A PAGE IS A DECLARATION, so it travels in a `.dog` file, it versions when it changes, and a person
+ * A PAGE IS A DECLARATION, so it travels in a `.brain` file, it versions when it changes, and a person
  * can point at the version that was live when a figure was screenshotted. Nothing here is a
  * component: a block names a kind, a source, a predicate and some columns, and what draws it has
  * never heard of money or of projects.

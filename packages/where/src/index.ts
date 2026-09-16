@@ -990,7 +990,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
         /* GUARDED, because `json_each` RAISES on a bare string. `json_each(NULL)` is fine, so an
            absent row was never the problem — a row holding a scalar where a list belongs was, and
            one of them made the whole query throw and lost every other row's answer. An import
-           carries whatever the other record held, and the `.dog` reader writes `fields` without
+           carries whatever the other record held, and the `.brain` reader writes `fields` without
            coercing it, which is exactly the case the `empty`/`present` branch above is written for.
            A scalar is not a list, so it holds nothing: `'[]'` is the honest substitute. */
         const list = `CASE WHEN json_valid(json_extract(fields, '${jsonPath(field)}')) AND json_type(json_extract(fields, '${jsonPath(field)}')) = 'array' THEN json_extract(fields, '${jsonPath(field)}') ELSE '[]' END`;

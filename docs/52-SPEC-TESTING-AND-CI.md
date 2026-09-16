@@ -52,7 +52,7 @@ The commands a developer runs. Six root scripts; the first three exist in commit
 
 | Command | Runs | Where |
 |---|---|---|
-| `pnpm test` | unit, property (1,000 runs), the Node conformance host, the fixture tests (materialise the nine seed records, the seventy-five refusal fixtures through their seven runners, determinism), `dog-roundtrip`, `boot-probe`, `theme-sixteen` | `ci.yml` |
+| `pnpm test` | unit, property (1,000 runs), the Node conformance host, the fixture tests (materialise the nine seed records, the seventy-five refusal fixtures through their seven runners, determinism), `brain-roundtrip`, `boot-probe`, `theme-sixteen` | `ci.yml` |
 | `pnpm typecheck` | `tsc -b` over every package and app; `references` mirror the graph so a cycle fails here first ([31-STACK](31-STACK.md) §3) | `ci.yml` |
 | `pnpm gates [-- --only a,b] [-- --allow-skip a,b] [-- --negative]` | the scripts of §3. A gate whose `needs` are unmet prints a skip; under `CI=true` a skip not named in `--allow-skip` is red. `--negative` runs §9 | `gates.yml`, `ci.yml`, `deploy.yml` |
 | `pnpm test:browser [-- --shard=i/n]` | the Playwright specs over 8 fixtures × 4 widths × 2 schemes × 2 directions | `ci.yml` |
@@ -226,7 +226,7 @@ fixed counter-example never regresses.
 
 **The fixture manifest** — owned by [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md) §2 and §4.1; cited, not restated. One
 `seed.json` at the package root holds the clock, the `sfc32` RNG state, the owner and nine `records`; `pages/*.json`
-hold the eight `Page`s; the `.dog` is materialised through the real write path by `packages/kernel/test/materialise.ts`
+hold the eight `Page`s; the `.brain` is materialised through the real write path by `packages/kernel/test/materialise.ts`
 (40 §5.3), never committed as bytes ([22-FRONTEND](22-FRONTEND.md) §10). What the gates and specs here read:
 
 ```ts
@@ -235,7 +235,7 @@ PAGES[i].id        // 'empty' | 'twelve' | 'five-hundred' | 'five-thousand' | 'c
                    // | 'third-party-kind' | 'unknown-primitive' — 22 §10's order; FIXTURES in matrix.ts is PAGES.map(p => p.id)
 PAGES[i].record    // a key of SEED.records — the record a page is rendered from
 PAGES[i].expect    // { blocks, rows, cap, degraded, empty[] } — the non-vacuous assertions of §5.4
-SEED.records.corpus   // every pack, two seeded grants — the record spark-actor, grant-note and dog-roundtrip run over (40 §9)
+SEED.records.corpus   // every pack, two seeded grants — the record spark-actor, grant-note and brain-roundtrip run over (40 §9)
 REFUSALS           // kebab code → path; seventy-five files
 ```
 
@@ -491,10 +491,10 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
    §5.1's four-line text exactly — `assert.equal`, the text held once in the test (37 §9.4).
 3. Phase 5: `apps/worker/test/boot-probe.test.ts` runs step 1 against the real Durable Object adapter.
 
-**`dog-roundtrip`** — `packages/kernel/test/roundtrip.test.ts` (18 §6; 33 §9; 34 §5; 41 §5.10–5.11)
+**`brain-roundtrip`** — `packages/kernel/test/roundtrip.test.ts` (18 §6; 33 §9; 34 §5; 41 §5.10–5.11)
 
-1. Materialise `corpus` (40 §9); page through `exportDogl(cursor)` and concatenate → A.
-2. `importDogl(A, ctx)` into an empty record; export it the same way → B.
+1. Materialise `corpus` (40 §9); page through `exportBrainl(cursor)` and concatenate → A.
+2. `importBrainl(A, ctx)` into an empty record; export it the same way → B.
 3. Split each into header lines, `dog_sig` lines, body lines. Assert A.body and B.body are identical except that
    B holds exactly one more `event` line, of kind `import` — asserted as *exactly one*. Assert the `dog_manifest`
    rows are identical for every table but `event`.
@@ -506,7 +506,7 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
 
 1. For each `REFUSALS` entry with this runner's `via`: build the input its keys describe (40 §6's table), run the
    surface (`lint(pack, null)`; `plan`; `where/sql`'s `compile`; the kernel's `write` on a fresh materialised record;
-   an RPC call; export → tamper → `importDogl`; `toHTML`).
+   an RPC call; export → tamper → `importBrainl`; `toHTML`).
 2. Assert the refusal list is exactly one long, its `code` and `at` equal the fixture's, `found` when the fixture
    carries it, and `fix` is a non-empty sentence (40 §6 rule two).
 3. The runners' case counts sum to seventy-five, so a code with no fixture fails here as well as in the script.
@@ -781,7 +781,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 2 | **The gate output format.** One JSON line per gate — `gate ok ms` or `gate skip`, and on red `what expected found where`; a summary line last; exit codes `0 1 2 3` | 33 §8 |
 | 3 | **`pnpm` scripts.** Six root scripts: `test typecheck gates test:browser test:do release`; per-package `test` is `node --test "test/**/*.test.ts"`; `gates` takes `--only`, `--allow-skip`, `--negative` | 31 §8 (the tree's root); BUILD.md |
 | 4 | **The negative-fixture rule.** Every script gate has one seeded violation under `tools/gates/negative/<gate>/`, run by `self-test.mjs` in `gates.yml`; every Playwright spec runs once against `negative/web/` | 33 §8; 18 §6 |
-| 5 | **`node --test` for `where-property`, `boot-probe`, `dog-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (BUILD.md already records the deviation) |
+| 5 | **`node --test` for `where-property`, `boot-probe`, `brain-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (BUILD.md already records the deviation) |
 | 6 | **1,000 property runs, not 10,000.** `budgets.property.runs = 1000`, every committed seed replayed first | 33 §8; 30 §7 (add the number) |
 | 7 | **The four widths are 390 / 768 / 1024 / 1440.** 22 §10 said *four widths* and named none; 390 is 22 §4's phone, 1440 is 13 §4.2's column ceiling | 22 §10 |
 | 8 | **Seventeen Playwright specs, not ten.** [50-SPEC-WEB](50-SPEC-WEB.md) §9's sixteen names are adopted as written (they fold 22 §10's layout assertions into `grid-contract` and 18 §6's `page-render`, `shell`, `no-model`, `keys-sheet` rows in); `vault-screen` is added because 50 covers only one of 12 §8's three vault invariants; `bundle` stays a spec — it reads the build, needs no browser, and runs in `ci.yml` step 8 | 33 §8; 50 §9 (add `vault-screen`) |

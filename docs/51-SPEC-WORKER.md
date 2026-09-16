@@ -19,7 +19,7 @@ implementation of the nine ports, and the `wrangler.jsonc` that binds them. Deri
 `/s/*`, `/ws`, `/auth/*`, `PUT /a` — builds the pre-context the record turns into a `CallContext`, and forwards
 one RPC to the right Durable Object. Hosts the three classes of 33 §7 as thin shells over `packages/record`,
 `packages/spark` and the Directory flows. Implements the DO `Sql` adapter over `ctx.storage.sql` and the Cloud
-side of the other eight ports. Drains the outbox from a queue, fires the alarm, takes the nightly `.dogl.age`,
+side of the other eight ports. Drains the outbox from a queue, fires the alarm, takes the nightly `.brainl.age`,
 deletes a customer, restores a bookmark.
 
 **Refuses.**
@@ -189,7 +189,7 @@ request's record; a `bearer` auth carries a hash, never the secret; `system` is 
 | Runner push | `{ "t": "job", "id": "<job id>" }` | a doorbell; the claim is `claimJob()` over HTTP — 33 §11 |
 | Queue message | `{ "record": "rec_…" }` | the id and nothing else — 01 §2; a redelivery is a no-op |
 | R2 attachment key | `rec_<id>/<sha256>` via `blobKey(recordId, sha256)` — the only constructor | 12 §2, 03 §8 |
-| R2 snapshot key | `rec_<id>/snapshots/<label>-<YYYY-MM-DD>.dogl.age` and `…/snapshots/latest.dogl.age` | written through the binding, not `Blobs`; `customMetadata { bookmark, rows, bytes, at }` — 12 §8 |
+| R2 snapshot key | `rec_<id>/snapshots/<label>-<YYYY-MM-DD>.brainl.age` and `…/snapshots/latest.brainl.age` | written through the binding, not `Blobs`; `customMetadata { bookmark, rows, bytes, at }` — 12 §8 |
 | Runner attachment | `{ runner_id, record_id }` ≤ 16,384 bytes | 26 §2.3; job bodies stay in `job` |
 | Telemetry point | blobs `[kind, surface, tool, outcome, sha256(rec ‖ month-salt)[:16]]`, doubles `[ms, rows, neurons, bytes]` | 08 §5; never a field value — the `telemetry-allowlist` gate |
 
@@ -544,7 +544,7 @@ queue(batch):
    `secretsKeyStore.byId(kek_id)`; `crypto.subtle.sign('Ed25519', …)`; the `dog_sig` header line is filled in.
 5. `ct = await new age.Encrypter().addRecipient(env.AGE_RECIPIENT).encrypt(bytes)` — `age-encryption@0.3.1`.
 6. `BLOBS.put(key, ct, { customMetadata: { bookmark, rows, bytes, at } })` for the dated key and again for
-   `latest.dogl.age`. Then list `rec_<id>/snapshots/`, keep the 30 newest dated keys, delete the rest.
+   `latest.brainl.age`. Then list `rec_<id>/snapshots/`, keep the 30 newest dated keys, delete the rest.
 7. Return `{ key, bytes, rows, bookmark }`; the record's ack writes the `export` event with the counts. A failure acks
    `failed` with the sentence; the ladder ends in a `dead` row and a `suggestion` — the visible item 12 §8 requires.
 8. `GET /api/snapshots` (cookie, ADMIN) lists the prefix with `customMetadata` — *what is kept, with counts*.
@@ -753,7 +753,7 @@ used (31 §3). Files `apps/worker/test/*.test.ts`. Input → expected:
 | 16 | lockout | eleven wrong magic-link redemptions from one IP | the eleventh is 429 with `Retry-After`; a reservation whose `RETURNING` is empty → 503 |
 | 17 | asset store | upload a PNG, an SVG, a 2,097,153-byte file | 200 with the SHA-256 key; 415; 413 before the body is read |
 | 18 | share link | a valid token → page; the same token after `share.close`; a token with one flipped MAC byte | 200; 404; 404 |
-| 19 | snapshot | `export.r2` row on a 2,000-row record | one dated key and `latest.dogl.age` in R2 with `customMetadata.rows === 2000`; decrypting with the test identity yields a `.dogl` whose manifest verifies |
+| 19 | snapshot | `export.r2` row on a 2,000-row record | one dated key and `latest.brainl.age` in R2 with `customMetadata.rows === 2000`; decrypting with the test identity yields a `.brainl` whose manifest verifies |
 | 20 | snapshot ceiling | a dump over 40 MiB | `ackOutbox(…, 'failed', 'snapshot over 40 MiB…')` |
 | 21 | DO size | `wc -l src/do/*.ts` | `record.ts`, `spark.ts` ≤ 100; `directory.ts` ≤ 60 |
 
@@ -797,7 +797,7 @@ with `deploy-parity`.
 | Kind | Package | Version | Why |
 |---|---|---|---|
 | runtime | `@pushforge/builder` | 2.0.5 | VAPID for Web Push; zero dependencies (ADR-046, 09 §3) |
-| runtime | `age-encryption` | 0.3.1 (+ five `@noble`/`@scure` transitive) | `.dogl.age` (ADR-046, 03 §5) |
+| runtime | `age-encryption` | 0.3.1 (+ five `@noble`/`@scure` transitive) | `.brainl.age` (ADR-046, 03 §5) |
 | workspace | `@braindog/ports` `where` `theme` `render` `declare` `mcp` `record` `spark` `connect` | `workspace:*` | 31 §2 row 14 |
 | dev | `wrangler` | 4.128.0 | 31 §3 |
 | dev | `vitest` | 4.1.11 | 31 §3 |
@@ -816,7 +816,7 @@ with `createRecord`, `Method`/`GROUPS` and the methods of §13 D11 (45); `packag
 `apps/web/build` (50) for `ASSETS`; the Directory flows (§13 D10). Phases 0–4 of BUILD.md.
 
 **This unblocks:** the DO half of Q12 and the committed `reference.json` (30 §14 #1); every Cloud-only feature — PITR,
-inbound email, the hibernatable socket, the nightly `.dogl.age`; phase 6's MCP over the live host; 52's `deploy.yml`
+inbound email, the hibernatable socket, the nightly `.brainl.age`; phase 6's MCP over the live host; 52's `deploy.yml`
 and 53's runbooks (restore, key rotation, erasure, deletion).
 
 ---

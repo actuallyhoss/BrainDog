@@ -1,7 +1,7 @@
 # 40 · `packages/fixtures` — specification
 
 The text corpus every gate reads: eight reference pages, their row corpora, a pack corpus, seventy-five refusal
-fixtures and one seed manifest. Text only — the `.dog` is never committed; it is materialised at test time through
+fixtures and one seed manifest. Text only — the `.brain` is never committed; it is materialised at test time through
 the real write path with an injected `Clock` and a seeded RNG ([22-FRONTEND](22-FRONTEND.md) §10,
 [33-CONTRACTS](33-CONTRACTS.md) §9, [30-BLUEPRINT](30-BLUEPRINT.md) §12 row 3). Fifth in the build order, dependent
 on nothing, a devDependency everywhere ([31-STACK](31-STACK.md) §2).
@@ -17,7 +17,7 @@ on nothing, a devDependency everywhere ([31-STACK](31-STACK.md) §2).
 | | |
 |---|---|
 | **Does** | holds text fixtures and exposes their paths; parses JSON with `JSON.parse`; nothing else |
-| **Refuses** | to hold a `.dog`, `.dogl` or `.sqlite` (the root `.gitignore` already refuses them); to parse YAML (that is `declare`'s); to validate a row (that is the write path's, at materialisation); to ship in any bundle |
+| **Refuses** | to hold a `.brain`, `.brainl` or `.sqlite` (the root `.gitignore` already refuses them); to parse YAML (that is `declare`'s); to validate a row (that is the write path's, at materialisation); to ship in any bundle |
 | **Imports** | nothing. `node:fs` and `node:path` only |
 | **Imported by** | `kernel` and everything above it, as a devDependency. `render`, `ports`, `where` and `theme` sit below it in the total order and keep their own in-package corpora ([31-STACK](31-STACK.md) §2, §4 row 8) |
 
@@ -416,7 +416,7 @@ code: CHECKSUM_MISMATCH
 via: import
 at: dog_manifest.entry
 record: twelve
-tamper: row            # append one byte to the first `entry` line of the exported .dogl; the signature still verifies the manifest
+tamper: row            # append one byte to the first `entry` line of the exported .brainl; the signature still verifies the manifest
 ```
 
 ---
@@ -489,7 +489,7 @@ everywhere, and the `licence-closure` gate asserts neither published tarball con
 | `apps/web/test` (Playwright) | the eight pages | each page × 4 widths × 2 schemes × 2 directions → declared blocks appear once in order; DOM rows = `min(rows, cap)`; `aria-rowcount` = rows; `expect.empty` strings appear iff zero rows; degraded blocks = `expect.degraded` (22 §10) |
 
 **Gate rows this corpus feeds** ([33-CONTRACTS](33-CONTRACTS.md) §8): `refusal-fixtures` — the script compares
-the `refusals/` file names with the *Fixture* column of 30 §6 by regex, both directions; `dog-roundtrip`,
+the `refusals/` file names with the *Fixture* column of 30 §6 by regex, both directions; `brain-roundtrip`,
 `mcp-budget`, `spark-actor` and the `grant.*` note grep of [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6 run over the
 `corpus` record; the ten Playwright gates run over the eight pages.
 
@@ -550,7 +550,7 @@ No `fast-check`: there is no property here to test. No YAML library: the package
 | D1 | **Committed for ≤ 60 rows, generated for the rest.** Hand-written JSON up to sixty rows; `rows/gen.mjs` with the seed's RNG for the 5,000-row, 60-row-fx and 20-person corpora, run once, output committed, `--check` in CI | 22 §10 — add the sentence; 31 §8 — the `fixtures/` tree line |
 | D2 | **The synthetic-data rule** of §5.4: generated names, `.example` hosts, 2030–2031 dates, amounts under 10^7 minor, no ULID or hash on disk, refs as `register#seq` | 22 §10; 12 §8 — one line under *Refusals that do not leak* |
 | D3 | **The fixed instant and RNG.** `2031-01-05T09:00:00.000Z`, one second per row, rendered at `12:00:00.000Z`; `sfc32` seeded `[1, 2, 3, 4]`, fifteen outputs discarded; ULID = Clock ms + ten RNG bytes | 33 §3 — the paragraph 30 §12 row 3 cites and that says nothing yet; 30 §12 row 3 |
-| D4 | **One record per page, plus `corpus`.** Nine records; the whole-corpus gates name `corpus`; page 4 opens the register view (cap 2,000), not a page block (limit ≤ 500) | 22 §10; 33 §8 — the `mcp-budget`, `dog-roundtrip`, `spark-actor` rows name the record |
+| D4 | **One record per page, plus `corpus`.** Nine records; the whole-corpus gates name `corpus`; page 4 opens the register view (cap 2,000), not a page block (limit ≤ 500) | 22 §10; 33 §8 — the `mcp-budget`, `brain-roundtrip`, `spark-actor` rows name the record |
 | D5 | **The unknown-primitive pack is installed raw** and lints `PRIMITIVES_OUT_OF_RANGE` — the one pack that may not lint clean, by design; no new refusal code | 22 §10 — the *deliberately unknown primitive* item |
 | D6 | **The refusal fixture format**: `code` `via` `at` `found?` plus per-`via` inputs; seven `via` values with the 22 · 10 · 10 · 17 · 8 · 6 · 2 split; the `refusal-fixtures` script checks names, the runners check production | 30 §6 — the sentence after *Every fixture lives at…*; 33 §8 — the `refusal-fixtures` row |
 | D7 | **`take` and `$file`.** The 500-row page reads the head of the 5,000 file; a `document` value may name a file | 22 §10 |

@@ -414,7 +414,7 @@ bad changes."*
 | **F · The brake** | feed 20 predictions of which 12 miss and **assert the loop suspends and says so.** Without this test the brake is untested and therefore not a brake |
 | **G · Budget** | under $0.05 a month on the fixture record |
 
-**Offline**, a replay harness: a `.dog` fixture plus a recorded observation stream, replayed day by
+**Offline**, a replay harness: a `.brain` fixture plus a recorded observation stream, replayed day by
 day against a **hand-labelled** set of real problems. Targets — precision ≥70%, recall ≥50%, median
 time-to-detect ≤30 days, ≤1 proposal per record-month, **zero on null records**. The labelling is
 the expensive part and it is unavoidable. And the fixture is one person's record, so precision

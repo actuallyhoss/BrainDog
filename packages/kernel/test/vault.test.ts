@@ -334,7 +334,7 @@ test('a span is a span, and anything else is a refusal', async () => {
 
 /* ── the file it travels in ──────────────────────────────────────────────── */
 
-test('A GRANT TRAVELS IN A `.dog` FILE, SEALED, and comes back as itself', async () => {
+test('A GRANT TRAVELS IN A `.brain` FILE, SEALED, and comes back as itself', async () => {
   // Sealed material travels because a record you can take with you that leaves the credentials index
   // behind is not the record. It travels SEALED, which is what makes that safe.
   const source = await vault();

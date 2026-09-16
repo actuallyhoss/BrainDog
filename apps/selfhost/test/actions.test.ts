@@ -354,7 +354,7 @@ test('A HELD RUN SENDS NOTHING: no name resolved, no key opened, no request, and
 
 test('A SELF-HOST IS NEVER HELD: its record goes on the selfhost plan at the first pass, whatever the Directory had', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-plan-'));
-  const running = await start({ file: join(dir, 'record.dog'), directory: join(dir, 'directory.sqlite'), port: 0, host: '127.0.0.1', pollMs: 0, actions: {} });
+  const running = await start({ file: join(dir, 'record.brain'), directory: join(dir, 'directory.sqlite'), port: 0, host: '127.0.0.1', pollMs: 0, actions: {} });
   try {
     const person = running.directory.person$('ada@example.com', 'Ada');
     assert.ok(person.ok);

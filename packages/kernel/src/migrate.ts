@@ -36,9 +36,9 @@ export const MIGRATIONS: readonly Migration[] = [
 ];
 
 /**
- * `PRAGMA user_version`, the `.dog` format revision of `30-BLUEPRINT` §11. Migration 2 adds a row and
+ * `PRAGMA user_version`, the `.brain` format revision of `30-BLUEPRINT` §11. Migration 2 adds a row and
  * its indexes and no table or column. Migration 3 adds one nullable column, which an older file
- * imports without (the positional read in `dogl.ts` takes fewer columns), so the format is still 1.
+ * imports without (the positional read in `brainl.ts` takes fewer columns), so the format is still 1.
  * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1. Migration 5
  * rebuilds `schedule` with two more kinds, and no file carries a schedule row either.
  * Migration 6 adds `invitation`, a `local` table no file carries, so it is still 1.
@@ -47,7 +47,7 @@ export const MIGRATIONS: readonly Migration[] = [
  */
 export const FORMAT_VERSION = 1 as const;
 
-/** `DOG!` — the four bytes at offset 68 of every `.dog` file, and what `file(1)` reads. */
+/** `DOG!` — the four bytes at offset 68 of every `.brain` file, and what `file(1)` reads. */
 export const APPLICATION_ID = 0x444f4721;
 export const KERNEL_MIGRATION = MIGRATIONS.length;
 

@@ -284,7 +284,7 @@ export class Record$ extends DurableObject<Env> {
    * What this person may do inside this record, or `null` if they are not on it.
    *
    * THE RECORD'S OWN `member` TABLE, which is the table `invite` writes and the one that travels in
-   * a `.dog` file. `registers` is the ceiling and `null` is all of them.
+   * a `.brain` file. `registers` is the ceiling and `null` is all of them.
    */
   async access(
     person: string,

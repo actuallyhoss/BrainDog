@@ -570,7 +570,7 @@ export function createClient(options: ClientOptions) {
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
     revokeToken: (args: { id: string }) => call<TokenRow>('revokeToken', args as Record<string, unknown>),
-    /** The record as the lines of a `.dogl` file. Sealed bytes stay out unless the wrapping key is named. */
+    /** The record as the lines of a `.brainl` file. Sealed bytes stay out unless the wrapping key is named. */
     export: (args: { sections?: ('header' | 'data' | 'origin' | 'governance')[]; redactGrants?: boolean; kek_id?: string } = {}) =>
       call<string[]>('export', args as Record<string, unknown>),
 

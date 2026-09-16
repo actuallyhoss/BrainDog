@@ -27,7 +27,7 @@ app <YYYY.MM.DD>+<sha7> · format <user_version> · kernel <migration> · primit
 | **Self-host, an older checkout** | no | tell us anyway if the defect still reproduces on `master` |
 | **`braindog-render`** (npm, MIT) | latest published minor | the renderer is a separate MIT package with no BrainDog dependency |
 | **`braindog-cli`** (npm, Apache-2.0) | latest published minor | |
-| **`.dog` format** | `format 1` | the format revision bumps only when an older reader would *misread* a newer file ([`docs/03-DOG-FORMAT.md`](docs/03-DOG-FORMAT.md) §7) |
+| **`.brain` format** | `format 1` | the format revision bumps only when an older reader would *misread* a newer file ([`docs/03-DOG-FORMAT.md`](docs/03-DOG-FORMAT.md) §7) |
 
 A fork is not supported. If you have changed the write path, the vault or either host, reproduce it
 on unmodified `master` before reporting.
@@ -65,7 +65,7 @@ The more of this you have, the faster it moves:
 - The **refusal code** if the record produced one. Codes are `UPPER_SNAKE` and enumerated
   ([ADR-057](docs/16-DECISIONS.md)); *which* code was raised, or which one should have been raised
   and was not, is often the whole finding.
-- A **reproduction**: the call, the declaration, the pack, or the `.dogl` that triggers it. Please
+- A **reproduction**: the call, the declaration, the pack, or the `.brainl` that triggers it. Please
   use synthetic data — the fixture rule is invented names, `.example` hosts, dates in 2030–2031, and
   no real credential.
 - What you think the **impact** is, and what an attacker would need to already have.
@@ -181,7 +181,7 @@ dies in ten minutes and reaches exactly one method once. In scope:
 
 ### 3 · Export, import and signing integrity — `12 §8`, `03 §4–§5`, `33 §9`
 
-- A `.dogl` or `.dog` that **round-trips wrong**: a row, a counter or a `seq` that changes across
+- A `.brainl` or `.brain` that **round-trips wrong**: a row, a counter or a `seq` that changes across
   export and import.
 - The **signature**. What it covers, whether `verify` can be made to pass over altered content, and
   whether an import will accept an unsigned or mismatched manifest.
@@ -274,7 +274,7 @@ or a discussion — but it is not a vulnerability report.
 | **A compromised host can read the root KEK.** Named as not defended, with the alternative and why it was refused | `12 §6` |
 | **Guessing a six-digit device code.** The code is not the security — it proves the approver is looking at the device that asked. A *bypass of approval* is in scope; a brute-force argument against the code is not | `12 §6.1` |
 | **A pack that misleads** — a plausibly named metric aggregating the wrong field. A semantics problem, not a sandbox problem | `04 §7` |
-| **The `.dog` file is readable.** That is the point of the format; the grants inside it are what is encrypted | `03 §2`, `03 §5` |
+| **The `.brain` file is readable.** That is the point of the format; the grants inside it are what is encrypted | `03 §2`, `03 §5` |
 | **No SOC 2, no bug bounty, no bring-your-own-KMS, no SMS 2FA** | `12 §9` |
 | A self-host's own **TLS, reverse proxy, SMTP or filesystem permissions**. The host does not terminate TLS or receive SMTP by design | `49 §1` |
 | **Volumetric denial of service**, or any finding whose impact is "enough traffic breaks it" | — |

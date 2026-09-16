@@ -23,6 +23,11 @@ export const KEEP = 30;
 
 const ID = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})Z-[a-z][a-z0-9-]*$/;
 
+/* THE EXTENSION IS A CONSTANT BECAUSE THE ID IS THE NAME WITHOUT IT. A copy is a whole-record file,
+   so it is a `.brain`; the id is read back by cutting the extension off, and a literal `-4` left over
+   from `.dog` would have cut two characters off the middle of every id instead. */
+const EXT = '.brain';
+
 export type FileSnapshots = Snapshots & {
   /** The file behind one kept copy, or `null` when the id is not one. */
   path(id: string): string | null;
@@ -38,20 +43,20 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
 
   const path = (id: string): string | null => {
     if (!ID.test(id)) return null;
-    const p = join(dir, `${id}.dog`);
+    const p = join(dir, `${id}.brain`);
     return existsSync(p) ? p : null;
   };
 
   const list = async (): Promise<Snapshot[]> => {
     if (!existsSync(dir)) return [];
     return readdirSync(dir)
-      .filter((name) => name.endsWith('.dog') && ID.test(name.slice(0, -4)))
-      .map((name) => ({ id: name.slice(0, -4), at: atOf(name.slice(0, -4)), bytes: statSync(join(dir, name)).size }))
+      .filter((name) => name.endsWith(EXT) && ID.test(name.slice(0, -EXT.length)))
+      .map((name) => ({ id: name.slice(0, -EXT.length), at: atOf(name.slice(0, -EXT.length)), bytes: statSync(join(dir, name)).size }))
       .sort((a, b) => (a.at === b.at ? (a.id < b.id ? 1 : -1) : a.at < b.at ? 1 : -1));
   };
 
   const prune = async (keep: number): Promise<void> => {
-    for (const old of (await list()).slice(keep)) rmSync(join(dir, `${old.id}.dog`), { force: true });
+    for (const old of (await list()).slice(keep)) rmSync(join(dir, `${old.id}.brain`), { force: true });
   };
 
   return {
@@ -63,8 +68,8 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       const stamp = `${new Date(now()).toISOString().slice(0, 19).replace(/:/g, '-')}Z`;
       let id = `${stamp}-${label}`;
-      for (let n = 2; existsSync(join(dir, `${id}.dog`)); n++) id = `${stamp}-${label}-${n}`;
-      const target = join(dir, `${id}.dog`);
+      for (let n = 2; existsSync(join(dir, `${id}.brain`)); n++) id = `${stamp}-${label}-${n}`;
+      const target = join(dir, `${id}.brain`);
       sql.exec('VACUUM INTO ?', target);
       /* 0600, like the record it copies: every token hash and every sealed grant is in it. */
       try {

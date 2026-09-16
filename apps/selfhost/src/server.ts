@@ -518,7 +518,7 @@ export async function start(options: {
    * Directory releases the name. A final snapshot is not taken: on a self-host it would sit in the directory being
    * removed, which is exactly what `53 §5.9` step 4 removes on Cloud too.
    *
-   * THE DIRECTORY IS REMOVED WHOLE ONLY WHEN IT IS THE RECORD'S OWN, `<data>/<slug>/record.dog` with no installation
+   * THE DIRECTORY IS REMOVED WHOLE ONLY WHEN IT IS THE RECORD'S OWN, `<data>/<slug>/record.brain` with no installation
    * files beside it. A record served from a file elsewhere loses that file and its copies, and nothing else.
    */
   const destroy = async (): Promise<void> => {
@@ -529,7 +529,14 @@ export async function start(options: {
     sql.close();
     if (record && ledger) ledger.close(record);
     const at = dirOf(options.file);
-    const own = baseOf(options.file) === 'record.dog' && !present(joinPath(at, 'directory.sqlite')) && !present(joinPath(at, 'kek'));
+    /* EITHER NAME IS THE RECORD'S OWN. `record.dog` is what an installation made before the
+       whole-record file was called `record.brain` still holds, and its directory is as much its own
+       as a new one's — so removing the record removes the directory in both cases, or a self-host
+       that predates the rename leaks a directory nothing will ever open again. */
+    const own =
+      ['record.brain', 'record.dog'].includes(baseOf(options.file)) &&
+      !present(joinPath(at, 'directory.sqlite')) &&
+      !present(joinPath(at, 'kek'));
     if (own) removeTree(at, { recursive: true, force: true });
     else for (const p of [options.file, `${options.file}-wal`, `${options.file}-shm`, joinPath(at, 'snapshots')]) removeTree(p, { recursive: true, force: true });
   };
@@ -967,7 +974,7 @@ async function copyOf(id: string, ctx: CallContext, site: Site): Promise<Respons
     status: 200,
     headers: {
       'content-type': 'application/vnd.sqlite3',
-      'content-disposition': `attachment; filename="${slug}-${id}.dog"`,
+      'content-disposition': `attachment; filename="${slug}-${id}.brain"`,
       'cache-control': 'no-store',
     },
   });

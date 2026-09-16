@@ -173,7 +173,7 @@ test('A `member` ROW WITH NO PERSON IS NOT A LEVEL', async () => {
    * And the record could not be got out of it. `owners()` DOES join `person`, so it did not count
    * the ghost — `suspend` answered `OUT_OF_BOUNDS`, `remove` answered `LEVEL_REQUIRED`, and demoting
    * the real owner was refused because the ghost was invisible to the count and visible to the
-   * ladder. Reachable from a `.dog` import carrying `member` without `person`.
+   * ladder. Reachable from a `.brain` import carrying `member` without `person`.
    */
   const { sql, deps } = await withSpare();
   sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_ghost', '*', 'owner')");

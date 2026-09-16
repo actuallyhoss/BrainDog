@@ -131,7 +131,7 @@ was *tested rather than estimated*, with all 27 migrations applied and 12 of 12 
 | The record object | **zero** runtime dependencies | it is SQL and JSON |
 | The Worker | zero, ideally | signing and crypto come from WebCrypto |
 | Web Push | one, zero-dep | **`@pushforge/builder@2.0.5`** — MIT, genuinely zero dependencies. *(An earlier draft called it `pushforge`, which **does not exist on npm**. A dependency named from memory is a dependency nobody checked.)* |
-| Age encryption (`.dog.age`) | **six** | `age-encryption@0.3.1` is one direct dependency and **five transitive `@noble`/`@scure` packages**. Counting it as one was the kind of arithmetic this table exists to prevent |
+| Age encryption (`.brain.age`) | **six** | `age-encryption@0.3.1` is one direct dependency and **five transitive `@noble`/`@scure` packages**. Counting it as one was the kind of arithmetic this table exists to prevent |
 | Pack schemas | one | **`valibot` 1.4.2** — `declare`'s closed schemas, chosen by [ADR-040](16-DECISIONS.md) and, until iteration 2, missing from this table |
 | YAML | one | **`yaml` 2.9.0**, reachable only through `@braindog/declare/yaml` and only on the CLI and self-host paths — the record never imports it ([ADR-063](16-DECISIONS.md)) |
 | The app | Svelte 5 + SvelteKit 2, and as little else as possible | settled in [22-FRONTEND](22-FRONTEND.md) §2 and [ADR-045](16-DECISIONS.md) |
@@ -167,7 +167,7 @@ D1, D4).
 | Telemetry blob allowlist — and its twin, the **screenshot-mode allowlist** (`shot-allowlist`): the committed `allow.json` equals exactly the literals the source declares | a field value reaching Analytics Engine; a runtime string legible under `data-shot` (52 §13 D9; [50-SPEC-WEB](50-SPEC-WEB.md) §13 D4) |
 | **Clean room**: `clean-room.txt` is the owner's file, and the gate asserts only that it is non-empty | a repository whose first rule ([00-README](00-README.md) §1) has no artefact at all (52 §13 D20) |
 | Secret-in-log grep | a credential in a log, a push payload, or a prompt |
-| `.dog` round-trip | export → import → export must produce a **canonical logical dump** identical but for exactly one row — the `import` event the second export carries, asserted as exactly one (52 §13 D12) — rows by primary key, columns in declared order, NULLs normalised ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3, [33-CONTRACTS](33-CONTRACTS.md) §9); never raw bytes, because three runtimes run three SQLite versions and page layout is not portable. An earlier draft said byte-identical |
+| `.brain` round-trip | export → import → export must produce a **canonical logical dump** identical but for exactly one row — the `import` event the second export carries, asserted as exactly one (52 §13 D12) — rows by primary key, columns in declared order, NULLs normalised ([03-DOG-FORMAT](03-DOG-FORMAT.md) §3, [33-CONTRACTS](33-CONTRACTS.md) §9); never raw bytes, because three runtimes run three SQLite versions and page layout is not portable. An earlier draft said byte-identical |
 | Kernel contains no declarations — except `register.session` ([02-DATA-MODEL](02-DATA-MODEL.md) §1), the one named exception | the core silently stopping being packs |
 | Pack install/uninstall leaves rows intact | the contract in [04-PACKS](04-PACKS.md) §4 |
 | Deployed shell matches the build, byte for byte — after `wrangler deploy`, fetch `/` and `/_app/version.json` from the live host and compare their SHA-256 to `build/` | a green deploy serving a stale asset. This has happened before, three times in a row, with a fresh version id each time |

@@ -100,6 +100,22 @@ function bootLine(s: SignIn): string {
 /** One clock for the whole command, so the record and the Directory agree about when it happened. */
 const clock = { now: () => Date.now() };
 
+/** The whole-record file: one SQLite database per record, `03-DOG-FORMAT`. */
+const RECORD_FILE = 'record.brain';
+
+/**
+ * The record file inside one record's directory, or `null` when there is none.
+ *
+ * A RECORD WRITTEN BEFORE THE FILE TOOK THIS NAME IS STILL A RECORD. The whole-record format was
+ * called `.dog` until `.dog` became a page's source, and an installation made then holds
+ * `record.dog` on disk. A host that looked only for the new name would answer "there is no record"
+ * on a machine holding one, which is a rename costing somebody their data rather than a rename.
+ */
+const recordIn = (dir: string): string | null => {
+  for (const name of [RECORD_FILE, 'record.dog']) if (existsSync(join(dir, name))) return join(dir, name);
+  return null;
+};
+
 /**
  * `init <slug> [--owner <email>]`, and `BRAINDOG_OWNER` when the flag is absent.
  *
@@ -127,7 +143,7 @@ async function init(args: readonly string[]): Promise<void> {
 
   const data = dataDir();
   const dir = join(data, slug);
-  const file = join(dir, 'record.dog');
+  const file = join(dir, RECORD_FILE);
 
   /* ── EVERY REFUSAL THIS COMMAND CAN MAKE, BEFORE IT WRITES ANYTHING ──────────────────────────
      Not tidiness: a refusal that costs somebody the name they wanted is not a refusal. Three of
@@ -322,13 +338,13 @@ async function init(args: readonly string[]): Promise<void> {
  *
  * A FILE THAT IS NOT YET A DATABASE IS THE RECOVERABLE CASE, and reading it used to be the
  * unrecoverable one. `init` creates the file and migrates it as two steps, so a process killed
- * between them leaves `record.dog` with no tables — and `SELECT id FROM record` against it threw
+ * between them leaves `record.brain` with no tables — and `SELECT id FROM record` against it threw
  * `no such table: record` out of the command, printed SQLite's sentence with no path in it, and did
  * the same thing on every retry for ever. The branch written to make the state recoverable was the
  * branch that made it permanent.
  *
  * `file is not a database` IS STILL A REFUSAL, because that is not this command's crash window — it
- * is somebody's `.dog` half-downloaded, or the wrong path — and it says which file.
+ * is somebody's `.brain` half-downloaded, or the wrong path — and it says which file.
  */
 function inhabitant(file: string): { id: string; slug: string; ownerId: string; ownerEmail: string } | null {
   let open: ReturnType<typeof openSqlite>;
@@ -389,20 +405,21 @@ async function serve(): Promise<void> {
        start it. */
     const slugs = dirSql
       .all<{ slug: string }>('SELECT slug FROM dir_slug WHERE released_at IS NULL ORDER BY claimed_at')
-      .filter((row: { slug: string }) => existsSync(join(data, row.slug, 'record.dog')));
+      .filter((row: { slug: string }) => recordIn(join(data, row.slug)) !== null);
     dirSql.close();
     if (slugs.length === 0)
       return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
     if (slugs.length > 1)
       return refuse(
-        `${data} holds ${slugs.length} records (${slugs.map((row: { slug: string }) => row.slug).join(', ')}) and this host serves one. Name it: braindog serve <data>/<slug>/record.dog`,
+        `${data} holds ${slugs.length} records (${slugs.map((row: { slug: string }) => row.slug).join(', ')}) and this host serves one. Name it: braindog serve <data>/<slug>/${RECORD_FILE}`,
       );
-    file = join(data, slugs[0]!.slug, 'record.dog');
+    /* The filter above kept only the slugs that have one, so this is never null. */
+    file = recordIn(join(data, slugs[0]!.slug))!;
   }
 
   /* AND THE KEY STORE, WHICH NO RUNNING PROCESS HELD. `init` wrote three `vault_key` rows from the
      first commit that made them and `serve` never opened the KEK — so the rows existed, nothing
-     could open them, and an exported `.dog` went out unsigned. `33 §1` port 8 is a host port, and
+     could open them, and an exported `.brain` went out unsigned. `33 §1` port 8 is a host port, and
      this is the host.
 
      A KEK THAT WILL NOT OPEN STOPS THE SERVER, rather than starting one that cannot sign, cannot

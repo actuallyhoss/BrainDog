@@ -79,7 +79,7 @@ function listen() {
 
 async function stack() {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-vault-'));
-  const file = join(dir, 'record.dog');
+  const file = join(dir, 'record.brain');
   const serverKey = randomBytes(32).toString('base64url');
   let now = Date.UTC(2026, 8, 15, 12);
   const logs = listen();

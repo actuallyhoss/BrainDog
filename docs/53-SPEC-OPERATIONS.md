@@ -43,10 +43,10 @@ The operator's surface: two command sets, one log stream with its dashboards, an
 | Command | Used in | Note |
 |---|---|---|
 | `braindog login <host>` | every Cloud procedure the CLI runs | RFC 8628; a `read`+`write` token in `hosts.json`. An ADMIN command answered `NEEDS_BROWSER_SESSION` asks for an **operation grant** — ten minutes, one command, approved by the owner in the browser for the named subject, held in memory, never written (48 §5.2, D1) |
-| `braindog export [--redact-grants] [--sections …] [-o file]` | backup verification, handover | streams the `.dogl`, materialises a signed `.dog`; operation grant |
-| `braindog import <file.dog \| file.dogl>` | restore | empty record only; operation grant |
+| `braindog export [--redact-grants] [--sections …] [-o file]` | backup verification, handover | streams the `.brainl`, materialises a signed `.brain`; operation grant |
+| `braindog import <file.brain \| file.brainl>` | restore | empty record only; operation grant |
 | `braindog verify <file> --key <pubkey \| url>` | every backup check | offline: `application_id`, format, manifest, signature |
-| `braindog init <slug>` | self-host restore | `<data>/<slug>/record.dog`, migration 0001 |
+| `braindog init <slug>` | self-host restore | `<data>/<slug>/record.brain`, migration 0001 |
 | `braindog token list` · `token revoke <id>` | incident response | operation grant; the owner's browser may do the same |
 | `braindog runner enroll` · `runner run` | runner lifecycle | 26 §2.3 |
 | `braindog --version` | every support call | the tuple, 31 §6 |
@@ -144,8 +144,8 @@ The artefacts an operator handles, each with invariants a test can check.
 
 | Artefact | Shape | Invariants |
 |---|---|---|
-| **`.dogl.age`** | an age-sealed `.dogl`. R2 keys `rec_<id>/snapshots/nightly-<YYYY-MM-DD>.dogl.age` and `rec_<id>/snapshots/latest.dogl.age`; `customMetadata { bookmark, rows, bytes, at }` (51 §5.12) | 25 tables — 31 less the six `local` (03 §3); `grant.ciphertext` sealed; `vault_key` present and wrapped; never a KEK, token, device grant, lockout, observation or job row; the 30 newest dated keys plus `latest`; ≤ 40 MiB (51 §5.12); sealed to exactly one recipient, `AGE_RECIPIENT` |
-| **`.dog` / `.dogl`** | 03 §2–§3 | `application_id` 1145193761; `user_version` 1; `dog_manifest` hashes the canonical projection (34 §5); `dog_sig` is Ed25519 by the producing record; `braindog verify` passes offline |
+| **`.brainl.age`** | an age-sealed `.brainl`. R2 keys `rec_<id>/snapshots/nightly-<YYYY-MM-DD>.brainl.age` and `rec_<id>/snapshots/latest.brainl.age`; `customMetadata { bookmark, rows, bytes, at }` (51 §5.12) | 25 tables — 31 less the six `local` (03 §3); `grant.ciphertext` sealed; `vault_key` present and wrapped; never a KEK, token, device grant, lockout, observation or job row; the 30 newest dated keys plus `latest`; ≤ 40 MiB (51 §5.12); sealed to exactly one recipient, `AGE_RECIPIENT` |
+| **`.brain` / `.brainl`** | 03 §2–§3 | `application_id` 1145193761; `user_version` 1; `dog_manifest` hashes the canonical projection (34 §5); `dog_sig` is Ed25519 by the producing record; `braindog verify` passes offline |
 | **PITR bookmark** | the string `getBookmarkForTime(ts)` or `getCurrentBookmark()` returns | valid ≤ 30 days; the `restore.pitr` event names the bookmark and the instant (51 D15); every snapshot's metadata carries the bookmark it pairs with |
 | **The KEK** | two Secrets Store secrets — `braindog-kek` (binding `KEK`) and `braindog-kek-prev` (`KEK_PREV`), each 32 random bytes, base64 (51 §13 D18); self-host `/data/kek` and `/data/kek.prev`, 0600 | `kek_id` = first 18 hex of SHA-256(raw key) (34 §5); every `vault_key` row `wrapped_by = 'kek'` carries a `kek_id` ∈ {`KEK`, `KEK_PREV`}; rotations ≥ 30 days apart; `KEK_PREV` holds the previous key, or equals `KEK` once that key is retired; an id is never reused |
 | **The wrapped DEKs** | `vault_key` rows `record` · `connector` · `signing` (30 §1) | exactly one wrapping per row; `connector` is always `kek` (ADR-052); a `passphrase` row has `salt` and `kek_id NULL`; `grant.kek_id` = `vault_key('record').kek_id` while `wrapped_by = 'kek'` |
@@ -179,7 +179,7 @@ own records.
    - b. **Re-wrap** if any `wrapped_by = 'kek'` row has `kek_id ≠ current` — §5.6 step 5. On the first failure stop
      the walk, log `walk.done`, let the alert fire.
    - c. **Snapshot**: `stub.call('snapshot', { label: 'nightly' }, SYSTEM)` — one `export.r2` outbox row; the queue
-     consumer pages `export(cursor)`, signs, seals to `AGE_RECIPIENT`, puts the dated key and `latest.dogl.age`, keeps
+     consumer pages `export(cursor)`, signs, seals to `AGE_RECIPIENT`, puts the dated key and `latest.brainl.age`, keeps
      the 30 newest (51 §5.12). A failure walks the one retry ladder to `dead`, and the record writes the `export` event
      `note: 'failed: <reason>'` and the suggestion (12 §8); the walk logs `backup=failed` from the ack.
    - d. **Reconcile**: for every `erase.r2` row `done` in the last 30 days, `BLOBS.get(key) === null` for each key; a
@@ -235,7 +235,7 @@ A kernel migration is forward-only and checksummed, applied per record in the DO
 `blockConcurrencyWhile` on that record's first request after the deploy (02 §7; 33 §9). The fleet migrates lazily, one
 record at a time, as records wake — which is what makes the ops record a real canary.
 
-Precondition: the file is `NNNN_<slug>.sql`, numbered next; kernel tests and `dog-roundtrip` pass against it in CI; a
+Precondition: the file is `NNNN_<slug>.sql`, numbered next; kernel tests and `brain-roundtrip` pass against it in CI; a
 `-- format-bump` line only if an older reader would *misread* the file (30 §11); no `deleted_classes` in
 `wrangler.jsonc`; last night's snapshots clean (§5.4) — they are the rollback.
 
@@ -264,41 +264,41 @@ Three mechanisms, one contract: nightly, sealed, thirty kept, restorable.
 
 | Where | Mechanism | Trigger | Keeps |
 |---|---|---|---|
-| Cloud | `.dogl.age` to R2 under `rec_<id>/snapshots/` (03 §5; 51 §5.12) | the walk, `17 3 * * *` UTC (§5.1) | the 30 newest + `latest` |
+| Cloud | `.brainl.age` to R2 under `rec_<id>/snapshots/` (03 §5; 51 §5.12) | the walk, `17 3 * * *` UTC (§5.1) | the 30 newest + `latest` |
 | Cloud | PITR bookmarks | the platform, continuous (01 §2) | any point in 30 days |
-| Self-host | `VACUUM INTO` → sign → `<slug>/snapshots/<date>.dog` (33 §6) | the process's timer, 03:00 local | 30 |
+| Self-host | `VACUUM INTO` → sign → `<slug>/snapshots/<date>.brain` (33 §6) | the process's timer, 03:00 local | 30 |
 
 The owner's two routes (12 §8) are `POST /api/snapshot` — *snapshot now* — and `GET /api/snapshots` — *what is kept,
 with counts* — both cookie, ADMIN (51 D8); Settings → backups draws them. A self-host snapshot is the whole live file —
 31 tables, the six `local` ones included, because it is a backup of the instance and not an export — signed over the 25
 the manifest covers; `verify` reports 25 (§13 #10).
 
-*Amended September 16th 2026.* A self-host takes one on demand as well as nightly: `snapshot` runs `VACUUM INTO <slug>/snapshots/<time>Z-<label>.dog` (0600, thirty kept, a `before-restore` copy never the one that prunes), writes one `export` event, and `GET /api/snapshots/<id>` streams the file to whoever `snapshots` answers. Settings → backups → *Restore this copy* calls `restore({ bookmark: <id> })`: the owner, from a sign-in in the last 15 minutes where the host knows one; the record is kept as a `before-restore` copy first, the copy's tables are put back in one transaction, the search index is rebuilt, and one `restore.pitr` event is written into the restored record. A copy written by other migrations is refused `OUT_OF_BOUNDS` and changes nothing. Cloud serves none of the three yet: the `.dogl.age` needs the operator's age recipient and the `export.r2` delivery, and (a)'s bookmark dance is not wired, so `snapshot`, `snapshots` and `restore` refuse `NOT_IN_THIS_BUILD` with a sentence, and nothing is written.
+*Amended September 16th 2026.* A self-host takes one on demand as well as nightly: `snapshot` runs `VACUUM INTO <slug>/snapshots/<time>Z-<label>.brain` (0600, thirty kept, a `before-restore` copy never the one that prunes), writes one `export` event, and `GET /api/snapshots/<id>` streams the file to whoever `snapshots` answers. Settings → backups → *Restore this copy* calls `restore({ bookmark: <id> })`: the owner, from a sign-in in the last 15 minutes where the host knows one; the record is kept as a `before-restore` copy first, the copy's tables are put back in one transaction, the search index is rebuilt, and one `restore.pitr` event is written into the restored record. A copy written by other migrations is refused `OUT_OF_BOUNDS` and changes nothing. Cloud serves none of the three yet: the `.brainl.age` needs the operator's age recipient and the `export.r2` delivery, and (a)'s bookmark dance is not wired, so `snapshot`, `snapshots` and `restore` refuse `NOT_IN_THIS_BUILD` with a sentence, and nothing is written.
 
 **Verifying a backup is restorable** — the operator, monthly, one random record plus the ops record (§9).
 
 Precondition: the age identity on the operator's machine (§8); `braindog` and `docker` installed; a `log` note naming the
 record and `drill`.
 
-1. `wrangler r2 object get braindog-blobs/rec_<id>/snapshots/latest.dogl.age --file latest.dogl.age`
-2. `age -d -i ~/.config/braindog/backup.key latest.dogl.age > latest.dogl`
-3. `braindog verify latest.dogl --key <the record's public key, Settings → export>` → four `✓` lines; 25 tables.
+1. `wrangler r2 object get braindog-blobs/rec_<id>/snapshots/latest.brainl.age --file latest.brainl.age`
+2. `age -d -i ~/.config/braindog/backup.key latest.brainl.age > latest.brainl`
+3. `braindog verify latest.brainl --key <the record's public key, Settings → export>` → four `✓` lines; 25 tables.
 4. The restore drill: a scratch self-host (`docker run … -v "$(mktemp -d)":/data`); `braindog init drill`;
-   `braindog import latest.dogl`; `braindog export -o roundtrip.dog`; `braindog verify roundtrip.dog --key <same>`;
-   the `dog_manifest` rows of both containers equal — `sqlite3 roundtrip.dog 'select * from dog_manifest order by 1'`
-   against the `.dogl` header lines. Equal manifests are `dog-roundtrip` (33 §8) by hand, on a real backup.
+   `braindog import latest.brainl`; `braindog export -o roundtrip.brain`; `braindog verify roundtrip.brain --key <same>`;
+   the `dog_manifest` rows of both containers equal — `sqlite3 roundtrip.brain 'select * from dog_manifest order by 1'`
+   against the `.brainl` header lines. Equal manifests are `brain-roundtrip` (33 §8) by hand, on a real backup.
 5. Time steps 1–4; `log`: `drill rec_<id> — <rows> rows · <bytes> · restore <mm:ss>`.
-6. `shred -u latest.dogl roundtrip.dog`; remove the scratch container and directory.
+6. `shred -u latest.brainl roundtrip.brain`; remove the scratch container and directory.
 
 Verify: `✓` at step 3 and at step 4. Rollback: none — a drill touches no live record. On a self-host the same drill
-starts at step 3 with `<slug>/snapshots/<date>.dog`.
+starts at step 3 with `<slug>/snapshots/<date>.brain`.
 
 ### 5.5 · Restore
 
 | Situation | Path |
 |---|---|
 | a bad write, rule, import or corruption inside 30 days, Cloud | **(a) PITR** |
-| older than 30 days, or the object is gone, Cloud | **(b) from `.dogl.age`** |
+| older than 30 days, or the object is gone, Cloud | **(b) from `.brainl.age`** |
 | self-host | **(c) `restore` from a kept copy (§5.4), or `import` into a fresh directory** |
 
 **(a) PITR.** The owner, Settings → backups → *restore to a time* — `POST /api/restore { at }`, cookie, ADMIN
@@ -316,13 +316,13 @@ reason.
 Verify: the `restore.pitr` event exists; `record_version` is what the owner expects; `/ws` announced the new version.
 Rollback: restore to the instant just before step 2. It is itself a point in time, valid for 30 days.
 
-**(b) From `.dogl.age`, Cloud.** `import` needs an empty record.
+**(b) From `.brainl.age`, Cloud.** `import` needs an empty record.
 
 Precondition: §5.4 steps 1–3 done for the chosen night; the owner reachable; the reason logged.
 
 1. If a live record exists and is unrecoverable, the owner deletes it (§5.9) and signs in again — `createRecord`
    mints an empty record with a new `rec_id` under the same slug (33 §10).
-2. The operator runs `braindog import latest.dogl` against the host. `import` answers `NEEDS_BROWSER_SESSION`; the CLI
+2. The operator runs `braindog import latest.brainl` against the host. `import` answers `NEEDS_BROWSER_SESSION`; the CLI
    asks for an operation grant and the owner approves *import* from their browser (48 §5.2) — ten minutes, this
    command, never written.
 3. The import: 25 tables in batches of ≤ 30 rows × ≤ 3 params, `entry_fts` rebuilt, one `import` event (33 §9).
@@ -336,7 +336,7 @@ Rollback: the record is new — delete it (§5.9) and repeat.
 
 **(c) Self-host.**
 
-Precondition: the process stopped; a verified `<date>.dog` or a decrypted `.dogl`; `/data/kek` intact — without it no
+Precondition: the process stopped; a verified `<date>.brain` or a decrypted `.brainl`; `/data/kek` intact — without it no
 vault opens.
 
 1. `mv /data/<slug> /data/<slug>.broken.<date>` — the pre-restore file is kept beside (03 §7 rule 3).
@@ -376,7 +376,7 @@ working directory.
    <> :current`; the fleet count is `walk.done.stragglers`. Two consecutive nights above zero is the alert. The usual
    cause is a record in the 503 state (§5.3): fix that and the next walk catches it.
 7. **Retire the old key** 30 days after the first night with `stragglers = 0`: `secret update` `braindog-kek-prev` with
-   the *current* key's value, so the retired key exists nowhere. Not a day sooner — a PITR restore or a `.dogl.age`
+   the *current* key's value, so the retired key exists nowhere. Not a day sooner — a PITR restore or a `.brainl.age`
    import from inside the window carries `vault_key` rows under the old `kek_id`, and `KeyStore.byId` must still answer.
    Share links minted under the retired key answer 404 from then on (51 D5); owners re-share.
 8. Self-host: the same two files, `/data/kek` and `/data/kek.prev`; steps 5–7 run from the process's timer.
@@ -446,7 +446,7 @@ Precondition: the owner asked — Settings → billing → *delete record*, `POS
 typed to confirm (§13 #17) — or the lapse ladder reached day 90 (§5.10); a `log` note; for the ladder, the owner has
 been told three times that export is available.
 
-1. `snapshot({ label: 'final' })` → `rec_<id>/snapshots/final-<date>.dogl.age` — inside the prefix, so step 4 removes
+1. `snapshot({ label: 'final' })` → `rec_<id>/snapshots/final-<date>.brainl.age` — inside the prefix, so step 4 removes
    it with everything else. It exists so a same-day "wait" is answerable, and for nothing longer.
 2. `destroy()` on the `Record` object: `deleteAlarm()` first — belt and braces; at `compatibility_date ≥ 2026-02-24`
    `deleteAll()` deletes the alarm too, and the `compat-date` gate holds the date (09 §1) — then `deleteAll()`. Alarm
@@ -536,10 +536,10 @@ Containment, then rotation, then honesty.
    on or off (ADR-052). Prompts: not stored (12 §7). Vaults with the passphrase on: not exposed through the Worker.
 6. The post-mortem is a `log` note within 7 days.
 
-**(d) A leaked export.** Precision is the whole job here. A `.dog` or `.dogl` is a plaintext SQLite database: every row
+**(d) A leaked export.** Precision is the whole job here. A `.brain` or `.brainl` is a plaintext SQLite database: every row
 in `data`, `origin` and `governance` is readable by whoever holds the file. Not readable: `grant.ciphertext` —
 AES-256-GCM under a key derived from a DEK the file does not carry — and `vault_key.wrapped`, which opens nothing
-without the KEK, and the KEK is never in any file (12 §8). A leaked `.dogl.age` is ciphertext to anyone without the
+without the KEK, and the KEK is never in any file (12 §8). A leaked `.brainl.age` is ciphertext to anyone without the
 age identity. The message: *the rows are exposed; the credentials are not; the connector credentials are not.* Nothing
 is rotated at an issuer for an export alone. If `--with-grants` was used (03 §5), the grants are under the export
 passphrase and stand or fall with it.
@@ -581,7 +581,7 @@ Verify: the `device_grant` row's status; `last_used` moves on the first claim. R
 
 ### 5.14 · Self-host upgrade
 
-Precondition: `<slug>/snapshots/<today>.dog` exists — Settings → backups → *snapshot now*, or wait for 03:00;
+Precondition: `<slug>/snapshots/<today>.brain` exists — Settings → backups → *snapshot now*, or wait for 03:00;
 `/data/kek` and `/data/kek.prev` backed up offline; the release note read for a `-- format-bump`.
 
 1. `docker pull ghcr.io/<org>/braindog:<new>`
@@ -596,7 +596,7 @@ Rollback: **downgrade is not supported.** The old image answers a migrated file 
 instead: stop, §5.5(c) from the pre-upgrade snapshot into a fresh directory, start the *old* image against it. The
 file the new image wrote stays beside as `<slug>.broken.<date>` (03 §7).
 
-If the container exits at boot with the text of 30 §13 — *This SQLite build cannot host a .dog file* — the host's
+If the container exits at boot with the text of 30 §13 — *This SQLite build cannot host a .brain file* — the host's
 SQLite lacks FTS5 (`NO_SUCH_MODULE`): Node 24.13+ or the official image, and nothing else. There is no degraded mode.
 
 ### 5.15 · Support diagnosis
@@ -626,9 +626,9 @@ Codes an operator meets, every one from 30 §6 or the adapter's list in 30 §13.
 | `SCHEMA_NEWER` | 503 | the record's `MAX(migration.version)` exceeds the code's | a rollback or a stale image met a migrated record | *Deploy the newer build; the data is intact.* |
 | `SCHEMA_MISMATCH` | 503 | a migration file's checksum differs from the stored one | someone edited a shipped migration | *Restore the file's original bytes and redeploy; a change is a new numbered file.* |
 | `NO_SUCH_MODULE` | — (boot) | the SQLite build lacks FTS5 | the wrong runtime — Bun, an old Node | *Use Node 24.13+ or the official image.* |
-| `FORMAT_NEWER_THAN_READER` | 422 | a file's `user_version` above the reader's | a `.dog` from a newer build | *Upgrade this instance, then import.* |
+| `FORMAT_NEWER_THAN_READER` | 422 | a file's `user_version` above the reader's | a `.brain` from a newer build | *Upgrade this instance, then import.* |
 | `SIGNATURE_INVALID` | 422 | `dog_sig` does not verify | the wrong `--key`, or a tampered or truncated file | *Verify with the record's current public key; if it still fails, use another night's backup.* |
-| `CHECKSUM_MISMATCH` | 422 | `dog_manifest` disagrees with the rows; or a migration file with its row | a corrupt or edited file | *Use another backup; never edit a `.dog` by hand.* |
+| `CHECKSUM_MISMATCH` | 422 | `dog_manifest` disagrees with the rows; or a migration file with its row | a corrupt or edited file | *Use another backup; never edit a `.brain` by hand.* |
 | `IMPORT_NOT_EMPTY` | 422 | `import` into a record with rows | the target is not fresh | *Import into a new record or a fresh directory.* |
 | `WRONG_KEY` | 409 | a `kek_id` in neither `KEK` nor `KEK_PREV` | a retired KEK, or a restore from before two rotations — never *corrupt* (12 §6.1) | *Put the key back in `KEK_PREV` if you still hold it; else reset the vault.* |
 | `NEEDS_BROWSER_SESSION` | 403 | a bearer at VAULT, ADMIN or the JOBS session half | a token where the owner's browser is required; the CLI turns it into an operation grant request (48 §5.2) | *Do this from the owner's browser.* |
@@ -642,10 +642,10 @@ Twelve, counted. A `500` is bare and a `401` says one word; the operator reads r
 
 | Objective | Cloud | Self-host | Measured how |
 |---|---|---|---|
-| RPO — recovery point | PITR: any point in 30 days (01 §2) · `.dogl.age`: ≤ 24 h + the walk's duration | ≤ 24 h | `walk.done.ms`; the snapshot's `at` |
+| RPO — recovery point | PITR: any point in 30 days (01 §2) · `.brainl.age`: ≤ 24 h + the walk's duration | ≤ 24 h | `walk.done.ms`; the snapshot's `at` |
 | RTO — PITR, §5.5(a) | ≤ 15 min by the runbook; the platform restore completes on restart | — | timed, in the ops record |
-| RTO — from `.dogl.age`, §5.5(b), ≤ 100,000 rows | ≤ 1 h end to end; the import itself ≤ 5 min (100 pages of ≤ 1,000 rows) | ≤ 30 min | the monthly drill, §5.4 step 5 |
-| Backup size per record | `.dogl` ≈ 300–600 B per row — the 03 §4 record, 3,118 rows, ≈ 1–2 MB; age adds ≈ 200 B plus 16 B per 64 KiB; the consumer throws above 40 MiB (51 §5.12) | as a `.dog`, page-padded, ≈ 1.5× | `customMetadata.bytes`; `walk.backup.bytes` |
+| RTO — from `.brainl.age`, §5.5(b), ≤ 100,000 rows | ≤ 1 h end to end; the import itself ≤ 5 min (100 pages of ≤ 1,000 rows) | ≤ 30 min | the monthly drill, §5.4 step 5 |
+| Backup size per record | `.brainl` ≈ 300–600 B per row — the 03 §4 record, 3,118 rows, ≈ 1–2 MB; age adds ≈ 200 B plus 16 B per 64 KiB; the consumer throws above 40 MiB (51 §5.12) | as a `.brain`, page-padded, ≈ 1.5× | `customMetadata.bytes`; `walk.backup.bytes` |
 | The walk | ≤ 10 min end to end; ≤ 450 records per invocation at two subrequests each; ≤ 2 s per record at 10,000 rows | — | `walk.done.ms`; alert above 10 min |
 | Re-wrap per record | 3 rows, one transaction, ≤ 50 ms | same | `walk.ms` on a rotation night |
 | Erase cascade | one transaction ≤ 2 s at 100,000 events; `erase.r2` inside one 300 s lease | same | the `erase` event's `ts` against the ack |
@@ -669,9 +669,9 @@ justifies automating it.
 
 **What a backup contains, and does not.** Twenty-five tables: `data`, `origin`, `governance`, plus `counter` and
 `vault_key` (03 §3; 33 §9). Not `token`, `device_grant`, `auth_fail`, `observation`, `job`, `job_event`.
-`grant.ciphertext` is sealed; `vault_key.wrapped` is wrapped. **The KEK is never in a backup, never in a `.dog`, never
+`grant.ciphertext` is sealed; `vault_key.wrapped` is wrapped. **The KEK is never in a backup, never in a `.brain`, never
 in a log**: it lives in Secrets Store (Cloud) or `/data/kek` (self-host) and nowhere else (12 §6), and the Worker
-imports it as a non-extractable `CryptoKey` (51 §8). The age identity that opens `.dogl.age` lives outside Cloudflare —
+imports it as a non-extractable `CryptoKey` (51 §8). The age identity that opens `.brainl.age` lives outside Cloudflare —
 two copies, the operator's password manager — and the Worker holds only the recipient, `AGE_RECIPIENT`; a Worker
 compromise yields sealed snapshots (§13 #13). A self-hoster backs up `/data/kek` and `/data/kek.prev` *separately* from
 the snapshots: a snapshot without them opens no vault.
@@ -691,7 +691,7 @@ by a named reason (12 §7). Ours: the ops record, one `note` per procedure (§4)
 | `deploy-parity` | script, `deploy.yml` | every deploy | `/` and `/_app/version.json` SHA-256 = `build/` (33 §8) |
 | `boot-probe` | vitest | CI | a build without FTS5 refuses with the exact text (30 §13) |
 | `compat-date` | script | CI | `compatibility_date ≥ 2026-02-24` |
-| `dog-roundtrip` | vitest | CI | export → import → export: identical canonical dump |
+| `brain-roundtrip` | vitest | CI | export → import → export: identical canonical dump |
 | `secret-grep` | script | CI | no KEK, token or passphrase in a log line, push payload or prompt |
 | `refusal-fixtures` | script | CI | every code in §6 has a fixture |
 | `ops-walk` | vitest, 51 | CI | memory `KeyStore` with `KEK` and `KEK_PREV`: `stragglers` counts rows with `kek_id ≠ current`; the re-wrap is a CAS; a row under neither key is `WRONG_KEY` |
@@ -728,7 +728,7 @@ Fourteen, counted. Every drill ends in a `log` note carrying its numbers. A dril
   the lapsed population's alarm wakes show in the bill.
 - `ponytail:` the operator audit is `note` events in the ops record; a dedicated store when a second operator exists.
 - `ponytail:` a self-host restore is `import` and loses the `local` tables — tokens and device grants are re-minted; a
-  `cp` of a verified snapshot over `record.dog` keeps them in one line. Add it to §5.5(c) when the re-mint cost bites.
+  `cp` of a verified snapshot over `record.brain` keeps them in one line. Add it to §5.5(c) when the re-mint cost bites.
 - `ponytail:` backups are verified by a monthly manual drill, not nightly by machine — the Worker holds no age identity,
   so a nightly check needs a second runtime. Add a scheduled self-host that decrypts and imports `latest` past ~200
   records.
@@ -742,7 +742,7 @@ Runtime: none — this is a document. The procedures use:
 | Tool | Version | For |
 |---|---|---|
 | `wrangler` | 4.128.0 (31 §3) | deploy, rollback, tail, secrets, R2 |
-| `age` | ≥ 1.2 | `age -d` on `.dogl.age`; the Worker seals with `age-encryption@0.3.1` (33 §7) |
+| `age` | ≥ 1.2 | `age -d` on `.brainl.age`; the Worker seals with `age-encryption@0.3.1` (33 §7) |
 | Node | 24.13.0, pinned minor | `braindog-cli`; the scratch self-host |
 | Docker | current | the self-host image |
 | `sqlite3` | 3.50.x | reading `dog_manifest` in a drill; optional |
@@ -774,12 +774,12 @@ that answer.
 | 5 | Billing lives in the Directory: `record_dir.billing ∈ active lapsed`, `lapsed_at`. The ladder is day 0 · 60 · 83 · 90; the five messages of §5.10 verbatim | ADR-059; 33 §10 `record_dir` |
 | 6 | Lapse is enforced in the Worker: every principal capped at `read`, `export` admitted for the owner's session, `FORBIDDEN` with the fix sentence; the drain acks `pull.fetch`, `infer.*` and `because: digest.*` notifications `done` unsent; reminders deliver; the record package stays billing-agnostic | ADR-059 (a *Mechanism* paragraph) |
 | 7 | Support diagnosis order: tuple → refusal state → `observation` → `event` → `system` suggestions. `observation` first because it holds no values | 30 §13 (after the boot probe); 12 §7 (the named-reason rule points at §5.15) |
-| 8 | The nightly walk is 51's `scheduled()` at `17 3 * * *` extended by `ops.ts` with re-wrap, reconcile and the ladder; the ops record leads the first `listRecords` page; snapshot keys and metadata are 51 §5.12's; the `.dogl.age` sits under the record prefix so deletion is one prefix | 33 §1 `Snapshots`; 33 §7 (`triggers.crons`); 03 §6 *Back up*; 12 §8 |
+| 8 | The nightly walk is 51's `scheduled()` at `17 3 * * *` extended by `ops.ts` with re-wrap, reconcile and the ladder; the ops record leads the first `listRecords` page; snapshot keys and metadata are 51 §5.12's; the `.brainl.age` sits under the record prefix so deletion is one prefix | 33 §1 `Snapshots`; 33 §7 (`triggers.crons`); 03 §6 *Back up*; 12 §8 |
 | 9 | `GET /healthz`, unauthenticated: 200 `{ app, format, kernel, primitives }` once the boot probe passed, 503 `{ code }` under a module-level refusal, never a slug. It is the self-host `HEALTHCHECK`. `/api/version` stays the authenticated record-version cursor (33 §4; 51 D22) | 33 §4 (a `/healthz` row) |
 | 10 | `vault_key` travels, sealed — 03 §3, 12 §6/§8 and 33 §9 are the reading: six `local` tables, twenty-five travel. A self-host snapshot keeps the six `local` tables (a backup of the instance); an export strips them | 02 §1 ("Seven … `vault_key`" → six, without it); 30 §1 `vault_key` comment (`local: never exported` → travels; `HKDF` → PBKDF2); 32 §2.3; 33 §6 Snapshots |
 | 11 | The `person` mirror joins the erase cascade — `email`, `name` → `--erased--`, row kept — sixteen stores in one transaction, R2 the seventeenth. The `erase` event stores the subject as SHA-256, never the value | 02 §10 (cascade table; the event row); ADR-033 |
 | 12 | Fleet levers: `session.id_hash`, `magic_link.hash` and `device_grant.code_hash` are HMAC-SHA-256 under the Worker secret `SESSION_SECRET`; `token.hash` and `device_grant.token_hash` are plain SHA-256, and `TOKENS_VALID_FROM` refuses anything created before it. The `session` register carries `token_id`, so a token's writes are one query | 12 §3, §6.1; 33 §7, §10; 02 §1 `session`; 32 §2.1 |
-| 13 | The age identity for `.dogl.age` lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT` | 12 §6 (hierarchy), §8 Backups; 33 §7 |
+| 13 | The age identity for `.brainl.age` lives outside Cloudflare — two copies in the operator's password manager; the Worker holds only `AGE_RECIPIENT` | 12 §6 (hierarchy), §8 Backups; 33 §7 |
 | 14 | No staging environment: the ops record (slug `ops`) in production is canary, drill target and the operator's audit ledger — the "staging record" 51 §14 already restores | 33 §7; 31 §8 |
 | 15 | A deploy carrying a kernel migration is never rolled back and never percentage-rolled; the canary is the ops record; recovery is fix-forward | 33 §9 Migrations; 12 §8 Migrations |
 | 16 | `schedule.state` has five values — `pending firing done failed paused`; 25 §9 and 30 §1 already use `paused` | 09 §1 (DDL comment and *four states*) |
@@ -798,7 +798,7 @@ Seventeen, counted. Each amendment lands in the same revision-loop iteration (35
 - [ ] `ops-walk`, `ops-ladder`, `ops-erase`, `ops-revoke` green in CI; `deploy-parity` is the last step of `deploy.yml`.
 - [ ] `SESSION_SECRET`, `TOKENS_VALID_FROM` (unset = the epoch) and `AGE_RECIPIENT` exist; `braindog-kek` and
       `braindog-kek-prev` exist and their `kek_id`s are known.
-- [ ] The age identity is in the password manager twice and nowhere else, and has decrypted one `.dogl.age`.
+- [ ] The age identity is in the password manager twice and nowhere else, and has decrypted one `.brainl.age`.
 - [ ] `/healthz` answers unauthenticated on Cloud and on a self-host container whose `HEALTHCHECK` reads `healthy`.
 - [ ] The five lapse messages and the two passphrase sentences are in the UI copy, verbatim from §5.10 and §5.7.
 - [ ] Every §13 amendment is applied in its document.

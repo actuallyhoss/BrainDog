@@ -290,7 +290,7 @@ test('and an index name says which register it belongs to, by its separator', ()
 test('A RETIRED REGISTER TAKES ITS INDEXES WITH IT, and reinstalling brings it and them back', async () => {
   /* Two failures in one place. `retire` left the unique index behind, so a register nobody can look
      up went on refusing duplicates. And the `active` lookup filtered `retired = 0`, so the retired
-     row was never stamped `superseded_at` — leaving two rows claiming to be current, which a `.dog`
+     row was never stamped `superseded_at` — leaving two rows claiming to be current, which a `.brain`
      replay reads to decide what shape a two-year-old event was written under. */
   const { k, sql } = await record();
   const notes = reg('notes', [{ id: 'code', type: 'text', unique: true }]);

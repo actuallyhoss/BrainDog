@@ -113,7 +113,7 @@ put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064]
 | **`mcp` imports the `RecordApi` *type* only** | the MCP server reaching into internals. It is testable with a stub `RecordApi`, no Durable Object needed — and because a type import is still an edge, it sits *above* `record` in the order, not below it |
 | **`host` is platform-neutral** — standard `Request`/`Response`, no `cloudflare:*`, no `node:*` | the route table, `httpStatus`, `resolveContext` and `serveApi` drifting between the Worker and the self-host: ~300 lines written once ([ADR-064](16-DECISIONS.md)) |
 | **The Directory is `@braindog/record/directory`** | a fourteenth package for tables that share `record`'s port, schema discipline and tests ([51-SPEC-WORKER](51-SPEC-WORKER.md) §13 D10) |
-| **`record` ⇏ `render`** | markup in the record, and therefore markup in the `.dog` |
+| **`record` ⇏ `render`** | markup in the record, and therefore markup in the `.brain` |
 | **`fixtures` is a devDependency everywhere** | 402 lines of one person's seed data shipping in a bundle — the exact defect the clean room exists to avoid |
 
 **Two of those absences are not absent.** The order above permits both, because both point down
@@ -126,7 +126,7 @@ it, so `graph` is green on them and the table is where the disagreement lives:
   happens to export rather than on a boundary — and the day somebody adds a database call behind
   one of those three names, nothing says so.
 - **`record` → `render`** — `packages/record/src/index.ts` imports `PRIMITIVES_VERSION`. The row
-  says the absence prevents *"markup in the record, and therefore markup in the `.dog`"*, and a
+  says the absence prevents *"markup in the record, and therefore markup in the `.brain`"*, and a
   version constant is not markup. It is also the edge into the **MIT** package, the one package
   published to strangers, and it points the safe way (`render` has in-degree 0 still, because this
   is an edge OUT of it, not in).
@@ -289,7 +289,7 @@ interface** (it is which `apps/*` you deploy), and **three were missing.**
 | 6 | `Dispatch` | Email Service · VAPID · fetch | SMTP · VAPID · undici |
 | 7 | **`Http`** *(new)* | `fetch`, `redirect: 'manual'` | undici with an agent refusing private IPs |
 | 8 | **`KeyStore`** *(new)* | Secrets Store | env var or an `0600` file |
-| 9 | `Snapshots` | bookmarks + nightly `.dog.age` | scheduled snapshot with retention |
+| 9 | `Snapshots` | bookmarks + nightly `.brain.age` | scheduled snapshot with retention |
 
 Plus **`Ingress`**, which is an entrypoint contract rather than an interface.
 
@@ -355,7 +355,7 @@ after gates 1a–1d start breaks every dependent link they are measured on.
 |---|---|
 | `braindog-render` semver | any API change |
 | **`PRIMITIVES_VERSION`** (integer) | the eight primitives change. A bump implies a renderer major; not conversely. **1 at stage 0** |
-| **`.dog` `user_version`** — the format revision | a reader below it would **misread** the file. An additive migration does not bump it. **1 at v1**; `record.format_ver INTEGER` mirrors it for readers without PRAGMA access |
+| **`.brain` `user_version`** — the format revision | a reader below it would **misread** the file. An additive migration does not bump it. **1 at v1**; `record.format_ver INTEGER` mirrors it for readers without PRAGMA access |
 | kernel migration number — `MAX(migration.version)` | every applied migration. 1 at v1 |
 
 **The app has no semver.** It is a hosted service. `braindog --version` prints the tuple —
@@ -394,15 +394,15 @@ Git-for-Windows installer default. Without `.gitattributes`, every text file che
 
 That is not cosmetic in *this* product:
 
-- `declaration.checksum` and the `.dog` manifest's canonical projection are **content hashes over
+- `declaration.checksum` and the `.brain` manifest's canonical projection are **content hashes over
   checked-in files**. A `.pack.yaml` fixture hashes differently on Windows than on Linux CI, so the
   round-trip test **passes in one place and fails in the other with a diff that shows nothing.**
 - Shell scripts get `bad interpreter: /bin/sh^M` inside the self-host Docker build.
 
 ```gitattributes
 * text=auto eol=lf
-*.dog binary
-*.dog.age binary
+*.brain binary
+*.brainl.age binary
 *.sqlite binary
 *.woff2 binary
 *.sh  text eol=lf

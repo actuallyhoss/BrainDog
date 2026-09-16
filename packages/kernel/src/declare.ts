@@ -2,7 +2,7 @@
  * Installing a declaration, which is how a record learns what it holds.
  *
  * A DECLARATION ROW IS NEVER EDITED. A new version is a NEW ROW, and the previous one is stamped
- * `superseded_at` in the same transaction. That is not bookkeeping: a `.dog` export replays the
+ * `superseded_at` in the same transaction. That is not bookkeeping: a `.brain` export replays the
  * declarations to rebuild the schema, and a row that was edited in place cannot say what the record
  * looked like when a two-year-old event was written. The history of the shape is as load-bearing as
  * the history of the rows.
@@ -2726,7 +2726,7 @@ function applyDeclarations(
       const checksum = sums[i]!;
       /* EVERY LIVE ROW, retired or not. Filtering `retired = 0` here meant a retired declaration was
          never stamped `superseded_at` when its successor arrived, so a register retired and then
-         reinstalled had TWO rows claiming to be current — and a `.dog` replay, which rebuilds the
+         reinstalled had TWO rows claiming to be current — and a `.brain` replay, which rebuilds the
          schema by reading them, could not say which shape a two-year-old event was written under. */
       const active = sql.one<{ version: number; checksum: string; retired: number }>(
         'SELECT version, checksum, retired FROM declaration WHERE id = ? AND superseded_at IS NULL ORDER BY version DESC LIMIT 1',

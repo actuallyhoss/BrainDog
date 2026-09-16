@@ -44,6 +44,23 @@ blocks:
     body: "{{unpaid-90d}} has been outstanding over 90 days. UK statutory interest is 8% above base."
 ```
 
+**That block is the authoring grammar, and there are two forms of this document.** The one above is
+what the kernel accepts and what a pack ships. `columns:`, `cells:` and `order:` are lists of objects
+and have to be: a column carries `label`, `width`, `align`, `link`, `tone_when` and `as`, and
+`declare.ts` refuses a bare name with *"a column names a field"*. `where:` is the one key with two
+legal spellings — the tree above, **and** the sentence `state is sent or part` — because `predicateOf`
+(`kernel/src/metrics.ts`) takes `Predicate | string` and hands a string to `parseWhere`
+([38-SPEC-WHERE](38-SPEC-WHERE.md)); every page the seed ships is written in the sentence form.
+
+**The other form is the source view, and it is a summary rather than a round trip.** What a person
+opens as *"how this is built"* — and downloads as `<page>.dog`, one page to one file — is printed by
+`apps/web/src/lib/dog/source.ts`, which is the reference for that form. It flattens a column list to
+bare field names, `cells:` to metric ids, `order:` to `due asc`, and prints `where:` as the sentence
+the record holds. **`label`, `width`, `align`, `link`, `tone_when` and `as` are not in it**, so it is
+text to read, diff and send, not text to feed back in as a declaration: everything it prints is true,
+and it does not print everything. A page is the `.dog`; the whole record is a `.brain`
+([03-DOG-FORMAT](03-DOG-FORMAT.md) §1).
+
 Four properties worth naming:
 
 **`requires` names registers, so a page cannot appear without its data.** A nav entry that opens

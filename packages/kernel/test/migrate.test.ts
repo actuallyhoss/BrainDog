@@ -182,7 +182,7 @@ test('every table is placed in a section, and every section holds tables', async
   const { sql } = await open();
   const rows = sql.all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section');
   assert.equal(rows.length, 33);
-  /* FIVE, not four: `origin` is its own section because a `.dog` can be exported without the raw
+  /* FIVE, not four: `origin` is its own section because a `.brain` can be exported without the raw
      inbound material an ingest kept — an email body is a customer's mail, not their record. */
   assert.deepEqual(
     [...new Set(rows.map((r) => r.section))].sort(),

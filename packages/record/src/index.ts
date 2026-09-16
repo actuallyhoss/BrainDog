@@ -549,7 +549,7 @@ export type Context = {
 export type Version = {
   /** `MAX(event.rowid)`: what changed since is a range scan from here. */
   version: number;
-  /** The `.dog` format revision this build reads (`03 §11`). */
+  /** The `.brain` format revision this build reads (`03 §11`). */
   format: number;
   /** How many kernel migrations this build carries. */
   kernel: number;
@@ -587,7 +587,7 @@ export type RecordDeps = {
   /** The outbox kinds this deployment can deliver. The doorbell rings for those and no others. */
   delivers?: readonly OutboxKind[] | undefined;
   /**
-   * What signs an exported `.dog`, when this host holds the record's signing key.
+   * What signs an exported `.brain`, when this host holds the record's signing key.
    *
    * IT IS A CALLBACK AND NOT A KEY, all the way down. `12 §6` puts the key hierarchy in the host;
    * this package and the kernel below it hold sealed bytes they cannot open, and a signer that
@@ -2164,7 +2164,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * and a little of its contents. A register out of reach is LEFT OUT rather than refused, for the
      * reason `boot` leaves one out: which registers exist is itself something a caller may not know.
      *
-     * ponytail: a saved view is a local table and does not travel in a .dog export; a travelling table
+     * ponytail: a saved view is a local table and does not travel in a .brain export; a travelling table
      * is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record
      * and asks where their views went.
      */
@@ -2589,7 +2589,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Take your record and go.
      *
-     * THE WHOLE PROMISE, IN ONE METHOD. A `.dog` file is the record: line per row, checkable with
+     * THE WHOLE PROMISE, IN ONE METHOD. A `.brain` file is the record: line per row, checkable with
      * `sed` and `sha256sum`, and it imports into a fresh record and comes back out identical. A
      * product whose export is a JSON dump nobody can re-import has an export button and not an exit.
      *
@@ -2602,14 +2602,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
 
       /* A SECTION NOBODY HAS IS NOT AN EMPTY EXPORT. `sections: "data"` — the easy JSON mistake —
-         and `sections: []` both used to come back `ok` with a structurally valid `.dog` file
+         and `sections: []` both used to come back `ok` with a structurally valid `.brain` file
          containing every table header and no rows: a backup of nothing that looks like a backup. */
       if (args?.sections !== undefined) {
         if (!Array.isArray(args.sections) || args.sections.length === 0)
           return no('VALUE_MALFORMED', `Sections are a list, and one of ${TRAVELS.join(', ')}.`, { at: 'sections' });
         const wrong = args.sections.find((x) => !(TRAVELS as readonly unknown[]).includes(x));
         if (wrong !== undefined)
-          return no('ENUM_VALUE_UNKNOWN', `${String(wrong)} is not a section of a .dog file.`, {
+          return no('ENUM_VALUE_UNKNOWN', `${String(wrong)} is not a section of a .brain file.`, {
             at: 'sections',
             allowed: TRAVELS,
           });
@@ -2657,11 +2657,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async import(args: { lines?: readonly string[] }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      if (!Array.isArray(args?.lines)) return no('REQUIRED_MISSING', 'An import is the lines of a .dog file.', { at: 'lines' });
+      if (!Array.isArray(args?.lines)) return no('REQUIRED_MISSING', 'An import is the lines of a .brain file.', { at: 'lines' });
       /* AND EVERY ONE OF THEM IS A LINE. `[null]` cleared the array check and then threw out of the
          reader — across the boundary this package promises nothing throws over. */
       if (!args.lines.every((line) => typeof line === 'string'))
-        return no('VALUE_MALFORMED', 'A .dog file is lines of text, and one of these is not.', { at: 'lines' });
+        return no('VALUE_MALFORMED', 'A .brain file is lines of text, and one of these is not.', { at: 'lines' });
       return tail(await kernel.import(args.lines));
     },
 

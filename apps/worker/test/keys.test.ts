@@ -91,5 +91,5 @@ test('A RECORD IS MADE WITH THREE KEYS, and the signing one is an Ed25519 privat
   const pkcs8 = await unwrap(store, REC, 'signing', keys.signing);
   assert.ok(pkcs8);
   const key = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, false, ['sign']);
-  assert.equal((await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode('a .dog file'))).byteLength, 64);
+  assert.equal((await crypto.subtle.sign('Ed25519', key, new TextEncoder().encode('a .brain file'))).byteLength, 64);
 });

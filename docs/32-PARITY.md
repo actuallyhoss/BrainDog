@@ -71,7 +71,7 @@ has it. **Pack** means a first-party pack declares it and a new user does not se
 | For You / read mark | — | **`member.seen_at` (the read mark), monotonic** — §2.1 | kernel |
 | Write-up (`doc`) with blocks and `{{path}}` | — | `document` field + the dialect — §4 | kernel ✓ |
 | Evidence tags | — | **added** — §4.3 | kernel dialect |
-| Mirror (git-diffable snapshot) | — | `braindog export --mirror` → a directory of markdown beside the `.dog`: a README per register, one file per live row, `document` fields verbatim, no renderer involved ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D7) | CLI |
+| Mirror (git-diffable snapshot) | — | `braindog export --mirror` → a directory of markdown beside the `.brain`: a README per register, one file per live row, `document` fields verbatim, no renderer involved ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D7) | CLI |
 | Job (remote Claude run) | — | tier C — §6 | kernel `job` and `job_event` tables ([30-BLUEPRINT](30-BLUEPRINT.md) §1), native runner |
 
 ### 2.1 · Kernel changes this forced

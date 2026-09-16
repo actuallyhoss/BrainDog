@@ -235,7 +235,7 @@ const AUTH = [
 const LIFECYCLE = [
   'FORMAT_NEWER_THAN_READER', 'CHECKSUM_MISMATCH', 'SIGNATURE_INVALID', 'IMPORT_NOT_EMPTY',
   'SCHEMA_MISMATCH', 'SCHEMA_NEWER',
-  /* Two facts the family already implied and had no word for: a file that is not a `.dogl` at all
+  /* Two facts the family already implied and had no word for: a file that is not a `.brainl` at all
      (nothing has been checksummed, so `CHECKSUM_MISMATCH` would be a lie), and a declaration that is
      correct against its document and ahead of this code — the same sentence the three `*_NEWER*`
      codes say about a version integer, which is why it is filed beside them. */

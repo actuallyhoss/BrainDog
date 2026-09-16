@@ -31,7 +31,7 @@ Object.** Everything else in this document is a consequence of it.
         ▼                 ▼              ▼                ▼
    R2 (exports,      Queues          Workers AI      Analytics Engine
    attachments,      (ingest; no     via AI Gateway  (OUR telemetry,
-   nightly .dogl.age Workflow in v1) (inference)      never theirs)
+   nightly .brainl.age Workflow in v1) (inference)      never theirs)
    backups)
 ```
 
@@ -100,7 +100,7 @@ its consequence rather than listed.
 | **Alarms per object** | **1** | The entire schedule is one alarm plus a table. [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) is about this |
 | Throughput per object | **soft limit** ~1,000 req/s | Documented as a *soft* limit, and the Rules page says 500–1,000 for simple operations. Irrelevant for one customer; it is also a natural per-tenant rate limit |
 | Memory per object | 128 MB | Embeddings are streamed and scored in batches, never all loaded |
-| CPU per request | 30 s default, 300 s max | A long import is paged — the host streams the body and the record's `importDogl` batches internally ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D3). No Workflow in v1 |
+| CPU per request | 30 s default, 300 s max | A long import is paged — the host streams the body and the record's `importBrainl` batches internally ([48-SPEC-CLI](48-SPEC-CLI.md) §13 D3). No Workflow in v1 |
 | DO classes | 500 | We use **three** — `Record`, `Spark`, `Directory` ([ADR-061](16-DECISIONS.md)). Never a class per customer. *An earlier draft said two* |
 | JS number precision | 53-bit | Any id that could exceed 2^53 is stored as `TEXT` |
 | **Compound `SELECT` terms** | **5** | **undocumented by Cloudflare** — read from workerd's source. A `UNION ALL` chain of six fails |
@@ -210,7 +210,7 @@ Why separate rather than a method on the record:
 
 Identity lives **outside** the record, in one `Directory` instance for the whole deployment
 ([ADR-061](16-DECISIONS.md)): email → person, passkeys, browser sessions, magic links, slug → `rec_id`,
-and the login lockout. The record keeps what a `.dog` must resolve offline and what is scoped to one
+and the login lockout. The record keeps what a `.brain` must resolve offline and what is scoped to one
 record — a `person` mirror, its own agent `token` rows, and `auth_fail` for device codes and share
 tokens ([02-DATA-MODEL](02-DATA-MODEL.md) §1). On the self-host the Directory is `directory.sqlite`
 in the same process, same schema, same `Sql` port ([33-CONTRACTS](33-CONTRACTS.md) §6). The Worker
@@ -238,14 +238,14 @@ The portability surface is therefore deliberately tiny:
 
 | Capability | Cloud | Self-hosted |
 |---|---|---|
-| Record storage | SQLite in a Durable Object | a `.dog` SQLite file on disk |
+| Record storage | SQLite in a Durable Object | a `.brain` SQLite file on disk |
 | Compute | Worker | Node 24.13, pinned to the minor ([33-CONTRACTS](33-CONTRACTS.md) §6) — **the FTS5 finding below decides the driver.** Bun is unsupported |
 | Scheduling | DO alarm | one `setTimeout` loop over the same `schedule` table |
 | Search | FTS5 | FTS5 — **measured at boot; a build without it is refused** (below) |
 | Inference | Workers AI via AI Gateway | **bring your own key**: any OpenAI-compatible endpoint, Ollama included |
 | Inbound email / webhook | Cloudflare Email + a public URL | paste, or your own reverse proxy. **This is what Cloud sells** |
 | Object storage | R2 | the filesystem |
-| PITR | platform, 30 days | scheduled `.dog` snapshots |
+| PITR | platform, 30 days | scheduled `.brain` snapshots |
 
 **Nine ports**, one interface each — and the count in an earlier draft was wrong twice over. It said
 *"six"* above an eight-row table; **search is not a seam** (FTS5 is a feature of `Sql`), **compute is

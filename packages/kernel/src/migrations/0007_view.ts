@@ -16,7 +16,7 @@
  * shows the whole register, and a view whose filter is an empty predicate shows nothing; writing
  * `'{}'` for the first would make the two the same row.
  *
- * `local`, like `token`, `device_grant` and `invitation`: the format stays 1, because a `.dog` file
+ * `local`, like `token`, `device_grant` and `invitation`: the format stays 1, because a `.brain` file
  * written by this build carries no line an older reader cannot place. A view therefore does not
  * survive an export and an import today, which is a real gap and is named as one in `45 §10` rather
  * than hidden here — carrying it means a travelling table and a format revision, which is a change

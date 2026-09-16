@@ -68,7 +68,7 @@ the loop's log is [BUILD.md](../BUILD.md).
 | 38 | [Spec · where](38-SPEC-WHERE.md) | `packages/where`: the predicate tree, JCS print, validate, compile, the reference evaluator, the property test |
 | 39 | [Spec · theme](39-SPEC-THEME.md) | `packages/theme`: the DTCG wire format, the YAML dialect, the contrast-driven generator, the sixteen checks |
 | 40 | [Spec · fixtures](40-SPEC-FIXTURES.md) | `packages/fixtures`: the eight reference pages, row corpora, the pack corpus, the seed |
-| 41 | [Spec · kernel](41-SPEC-KERNEL.md) | `packages/kernel`: migrations, the write path, counters, events, `entry_fts`, refusals, `.dogl` |
+| 41 | [Spec · kernel](41-SPEC-KERNEL.md) | `packages/kernel`: migrations, the write path, counters, events, `entry_fts`, refusals, `.brainl` |
 | 42 | [Spec · declare](42-SPEC-DECLARE.md) | `packages/declare`: the eight kinds' schemas, YAML → JSON, lint, plan, install |
 | 43 | [Spec · extract](43-SPEC-EXTRACT.md) | `packages/extract`: the ten extractors, three combinators, money and date parsing |
 | 44 | [Spec · mcp](44-SPEC-MCP.md) | `packages/mcp`: the fourteen tools, resources, `instructions`, one JSON-RPC core over stdio and streamable HTTP, budgets |

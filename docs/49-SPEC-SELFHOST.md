@@ -1,7 +1,7 @@
 # 49 · apps/selfhost — specification
 
 One Node process that is the whole product for a self-hoster: the nine ports wired on Node, the Directory in
-`directory.sqlite`, every `<slug>/record.dog` open behind the same `RecordApi` the Worker exposes, and the HTTP
+`directory.sqlite`, every `<slug>/record.brain` open behind the same `RecordApi` the Worker exposes, and the HTTP
 surface of [33-CONTRACTS](33-CONTRACTS.md) §4 served by `node:http`. Derives from 33 §1, §4, §6, §9, §10;
 [12-SECURITY](12-SECURITY.md) §3, §6, §8; [30-BLUEPRINT](30-BLUEPRINT.md) §5, §8, §13; [22-FRONTEND](22-FRONTEND.md)
 §5, §9; [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2, §5; [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1. Built
@@ -166,12 +166,12 @@ $BRAINDOG_DATA/
   vapid.json                  { publicKey, privateKey } P-256 JWK for Web Push, 0600, created on first run
   directory.sqlite            (+ -wal, -shm)
   <slug>/
-    record.dog                the live record (+ -wal, -shm) — a .dog because migration 0001 made it one
+    record.brain                the live record (+ -wal, -shm) — a .brain because migration 0001 made it one
     blobs/<sha256>            attachment bytes, content-addressed; mime is sniffed at read, bytes is stat.size
-    snapshots/<YYYYMMDDTHHMMSSZ>-<label>.dog    signed exports: 25 travelling tables, six local tables empty
+    snapshots/<YYYYMMDDTHHMMSSZ>-<label>.brain    signed exports: 25 travelling tables, six local tables empty
 ```
 
-A directory under `data` is a record iff it contains `record.dog` and its name is a `record_dir.slug`; anything
+A directory under `data` is a record iff it contains `record.brain` and its name is a `record_dir.slug`; anything
 else is ignored with one log line.
 
 ### 4.4 · The KEK file and what is derived from it
@@ -273,8 +273,8 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 2. KEK: `readFile(kekFile)`; `ENOENT` → `writeFile(kekFile, randomBytes(32), { mode: 0o600, flag: 'wx' })` and read again; check length and mode (§4.4); derive `k_code`, `k_share`; import the AES-GCM key.
 3. `vapid.json`: read or generate (`subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' })`, export JWK, 0600).
 4. `openDirectory(`${data}/directory.sqlite`)`: `sql = openNodeSqlite(path)` — the adapter sets the four PRAGMAs of 33 §6, measures `caps` and runs `bootProbe` itself (37 §5.1), throwing `SqlError('NO_SUCH_MODULE')` with the probe text on a build without FTS5, which `startServer` rethrows as `BootRefused`; `user_version` 0 → run the DDL of §4.1 and set 1; > 1 → `SCHEMA_NEWER`.
-5. For each `record_dir` row whose `<slug>/record.dog` exists: `openRecordFile` —
-   1. `sql = openNodeSqlite(`${dir}/record.dog`)` — the same probe, the same `BootRefused`. `config.sqlite === 'better-sqlite3'` asks `ports` for its alternative adapter behind the same `Sql` (33 §1); 37 §1 leaves that adapter to a later ADR, so the flag is refused with `ConfigError` until it exists.
+5. For each `record_dir` row whose `<slug>/record.brain` exists: `openRecordFile` —
+   1. `sql = openNodeSqlite(`${dir}/record.brain`)` — the same probe, the same `BootRefused`. `config.sqlite === 'better-sqlite3'` asks `ports` for its alternative adapter behind the same `Sql` (33 §1); 37 §1 leaves that adapter to a later ADR, so the flag is refused with `ConfigError` until it exists.
    2. `api = createRecordApi({ sql, scheduler, clock })` with `scheduler = new NodeScheduler(…)` whose `fire` is `api.drainSchedule({}, systemCtx)` and whose `kick` is `poller.kick`. There is no MCP handler per record: `/mcp` calls `serveMcp(request, api, ctx)` on each request (§5.2).
    3. `await api.kernel.applyMigrations()` (41 §2); `api.kernel.refused()` non-null → `rec.sick = its code`, log, continue — one bad record does not stop the host.
    4. `{ nextDueMs, outboxPending } = api.kernel.pendingWork()` (41 §2); `nextDueMs !== null && await scheduler.set(nextDueMs)`; `outboxPending && poller.kick()`.
@@ -293,7 +293,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
 6. Cookie principal on a non-GET: `Origin` must equal `config.origin`, or `Sec-Fetch-Site` must be `same-origin`; else 403 `FORBIDDEN` (12 §8's origin check).
 7. Group gate for `/api/<method>`: VAULT, ADMIN, JOBS-session with a `token` principal → 403 `NEEDS_BROWSER_SESSION`; ADMIN admits a `person` principal that came from a cookie, from `config.token`, or from an operation grant whose `ctx.op` names the method — `export` → `export`; `import` → `import`; `pack` → `planPack installPack uninstallPack`; `token` → `createToken listTokens revokeToken` (48 §13 D1) — any other `op` → 403 `FORBIDDEN`; VAULT with `now − authed_at > 15 min`, or with an `op` set, → 403 `NEEDS_BROWSER_SESSION`, `fix: "Sign in again to open the vault"`; runner methods with anything but the `runner` flag → 403 `FORBIDDEN`; a `runner` principal anywhere else → 403 `FORBIDDEN`.
 8. Token bucket for `token` principals: 600/min, burst 60 (10 §8) → 429 with `Retry-After`.
-9. Parse the JSON body (invalid → 400 bare); `result = api[method](body, ctx)`; write per §6. `openGrant` and `bindGrant` pass through the host's vault step: unwrap the DEK with `KeyStore`, derive the grant key by HKDF, decrypt or encrypt with the AAD of 12 §6, return plaintext once — the record only ever sees sealed bytes. `export` answers `200 text/plain; charset=utf-8` and streams the `.dogl` (48 §13 D3): page after page of `api.export` (`exportDogl`), the host signing the manifest after page 0 with §5.13's `sign()` and emitting the one `dog_sig` row line in the last block (48 §13 D2's order).
+9. Parse the JSON body (invalid → 400 bare); `result = api[method](body, ctx)`; write per §6. `openGrant` and `bindGrant` pass through the host's vault step: unwrap the DEK with `KeyStore`, derive the grant key by HKDF, decrypt or encrypt with the AAD of 12 §6, return plaintext once — the record only ever sees sealed bytes. `export` answers `200 text/plain; charset=utf-8` and streams the `.brainl` (48 §13 D3): page after page of `api.export` (`exportBrainl`), the host signing the manifest after page 0 with §5.13's `sign()` and emitting the one `dog_sig` row line in the last block (48 §13 D2's order).
 10. GET aliases: `/api/boot` → `boot({})`; `/api/pages/:slug` → `page(slug)`; `/api/schema/:register` → `schema(register)`; `/api/version` → §5.14.
 11. Every path is wrapped once: a thrown error is logged as `{ code | name, route, recId }` — never a body — and answered 500 bare.
 
@@ -481,18 +481,18 @@ class Poller {
 ### 5.13 · Snapshots — nightly, signed, thirty kept
 
 ```ts
-take(label): 1. id = `${compactUtc(now)}-${label}`; tmp = `${dir}/snapshots/${id}.dog.part`
+take(label): 1. id = `${compactUtc(now)}-${label}`; tmp = `${dir}/snapshots/${id}.brain.part`
              2. sql.exec('VACUUM INTO ?', tmp)                       // not inside a transaction; permitted on a file
              3. copy = openNodeSqlite(tmp); k = openRecord(copy, clock)            // 37 §2.5, 41 §2 — the copy, never the live file
                 copy.transactionSync(() => for t of copy.exec("SELECT table_name FROM dog_section WHERE section = 'local'") → `DELETE FROM ${t}`)
-                await k.exportDogl(null)                                          // page 0 refreshes dog_meta and dog_manifest (41 §2); lines discarded
+                await k.exportBrainl(null)                                          // page 0 refreshes dog_meta and dog_manifest (41 §2); lines discarded
                 bytes = signedBytes(copy)                                         // SELECT table_name, rows, sha256 FROM dog_manifest ORDER BY table_name
                                                                                   //   → one JCS array per row, LF-joined, UTF-8 (34 §5) — ten lines here
                 sig = await sign(copy, bytes)                                     // below
                 copy.transactionSync(() => { DELETE FROM dog_sig; INSERT INTO dog_sig (alg, key_id, public_key, sig, signed_at) VALUES ('ed25519', …) })
-             4. copy.exec('VACUUM'); copy.close(); rename(tmp, `${dir}/snapshots/${id}.dog`)
+             4. copy.exec('VACUUM'); copy.close(); rename(tmp, `${dir}/snapshots/${id}.brain`)
              5. return { id, at, bytes: stat.size }
-list():      readdir → *.dog, newest first, with size
+list():      readdir → *.brain, newest first, with size
 prune(keep): unlink every file after the first `keep` of list()
 restore(id): throws — a self-host restore is `braindog import` into a fresh directory (33 §9; §13 #10)
 ```
@@ -552,7 +552,7 @@ reaches it because the router matched first. The image ships the built directory
 
 1. Config, KEK and Directory as §5.1 steps 1–4.
 2. `slug` must match `^[a-z][a-z0-9-]{1,31}$` (§13 #21); a `record_dir` row or a directory already there → one sentence on stderr, exit 1.
-3. `mkdir <slug>/blobs <slug>/snapshots`; `sql = openNodeSqlite(<slug>/record.dog)`; `api = createRecordApi(…)`; `await api.kernel.applyMigrations()` — migration 0001, the thirty-one tables.
+3. `mkdir <slug>/blobs <slug>/snapshots`; `sql = openNodeSqlite(<slug>/record.brain)`; `api = createRecordApi(…)`; `await api.kernel.applyMigrations()` — migration 0001, the thirty-one tables.
 4. Keys: `dek_record`, `dek_connector` = `randomBytes(32)`; the signing pair = `subtle.generateKey('Ed25519', true, ['sign'])`, private half exported `pkcs8`; each wrapped AES-GCM under `KeyStore.current()` with a fresh 12-byte nonce → `{ wrapped, nonce, wrapped_by: 'kek', kek_id }` — the three `vault_key` rows of 30 §1 (12 §6, 03 §4: generated on first run).
 5. Owner: `email = trim(lower(owner))`; `person` row or `INSERT` one (`p_` + ULID).
 6. `api.createRecord({ id: 'rec_' + ULID, slug, name: slug, tz: 'UTC', locale: 'en', owner: { id, email, name: null }, keys }, systemCtx)` — 45's INTERNAL method writes `record`, the `person` mirror, `member('*', 'owner')` and the three `vault_key` rows (§12).
@@ -596,7 +596,7 @@ reaches it because the router matched first. The image ships the built directory
 | lockout reservation returned no row | 503 | bare |
 | `/auth/device/*` — a pending code past ten minutes; the fifth wrong code, or a poll of a `denied` row | 422 | `DEVICE_CODE_EXPIRED` · `DEVICE_CODE_TRIES` as `{ refusals }` |
 | `/auth/device/token` on a row already exchanged or revoked | 401 | `{ code: 'UNAUTHORIZED' }` |
-| `POST /api/export` | 200 | `text/plain; charset=utf-8` — the `.dogl`, streamed (48 §13 D3); a refusal before the first byte is the 422 above |
+| `POST /api/export` | 200 | `text/plain; charset=utf-8` — the `.brainl`, streamed (48 §13 D3); a refusal before the first byte is the 422 above |
 | `openGrant` with a `kek_id` the `KeyStore` cannot answer | 409 | `{ code: 'WRONG_KEY' }` |
 | body over 1 MB; attachment over 2 MB | 413 | bare |
 | attachment not one of the five image types | 415 | bare |
@@ -608,7 +608,7 @@ reaches it because the router matched first. The image ships the built directory
 which is 30 §13's block with the driver named:
 
 ```
-This SQLite build cannot host a .dog file:
+This SQLite build cannot host a .brain file:
   fts5: required, not available
 On macOS, Bun loads Apple's libsqlite3.dylib and is unsupported. Use Node 24.13+, which bundles its own SQLite.
 driver: node:sqlite · sqlite 3.50.4
@@ -679,7 +679,7 @@ and captures `DATA`).
 | `kek` of 31 bytes | `BootRefused` |
 | `directory.sqlite` with `user_version = 2` | `BootRefused` `SCHEMA_NEWER` |
 | ten fixture records | `listen` within 1,000 ms; RSS ≤ 80 MB + 4 MB × 10 |
-| `main.ts init demo --owner a@b.c` on an empty data dir | exit 0; `demo/record.dog` with 31 tables and three `vault_key` rows; `record_dir`, `person`, `person_record` rows; `demo/inbound.token` mode 0600; a second `init demo` → exit 1, one sentence |
+| `main.ts init demo --owner a@b.c` on an empty data dir | exit 0; `demo/record.brain` with 31 tables and three `vault_key` rows; `record_dir`, `person`, `person_record` rows; `demo/inbound.token` mode 0600; a second `init demo` → exit 1, one sentence |
 | `main.ts init Demo!` | exit 1 — the slug grammar |
 | `main.ts dev --port 0` | stderr carries `BRAINDOG_TOKEN=`; `POST /auth/token` with it → a session; a magic link mint appears on stderr, not on any socket |
 
@@ -841,7 +841,7 @@ so its row is what this spec needs from it:
 | From | Symbol | Where it is stated |
 |---|---|---|
 | 37 | `openNodeSqlite(path): NodeSql` at `./node-sqlite` (`:memory:` is the memory adapter; runs `measureCaps` and `bootProbe`, throws `SqlError('NO_SUCH_MODULE')`) · `bootProbe(caps, driver)` · `blobKey(recId, sha256)` · `SqlError` | 37 §2.4–§2.5, §5.1 |
-| 41 | `openRecord(sql, clock): Kernel`; `Kernel.applyMigrations() · refused() · pendingWork() · version() · declarations() · exportDogl(cursor)`; the `CallContext` and `Result` types; `dog_manifest` excludes itself and `dog_sig` (K25) | 41 §2, §13 #1 |
+| 41 | `openRecord(sql, clock): Kernel`; `Kernel.applyMigrations() · refused() · pendingWork() · version() · declarations() · exportBrainl(cursor)`; the `CallContext` and `Result` types; `dog_manifest` excludes itself and `dog_sig` (K25) | 41 §2, §13 #1 |
 | 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | `loop/research-agent-path.md` §1.7 |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
 | 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |

@@ -1,5 +1,5 @@
 code:   CHECKSUM_MISMATCH
 via:    import
-raises: packages/kernel/src/dogl.ts
+raises: packages/kernel/src/brainl.ts
 at:     dog_manifest.entry
 fix:    Re-export it from the record it came from.

@@ -2,9 +2,9 @@
  * The record's own signing key, opened. `03 §4`, `12 §6`, `49 §5.22` step 4.
  *
  * THE KERNEL MAKES THE BYTES AND SOMETHING OUT HERE SIGNS THEM. That is the whole shape, and it is
- * why this file exists rather than a `sign()` inside `dogl.ts`: reading the signing key needs the
+ * why this file exists rather than a `sign()` inside `brainl.ts`: reading the signing key needs the
  * KEK, `12 §6` puts the KEK in the host, and a kernel that could sign would be a kernel holding a
- * private key. `signDogl` takes a callback; this is the callback.
+ * private key. `signBrainl` takes a callback; this is the callback.
  *
  * THE PUBLIC HALF IS DERIVED, NOT STORED. `vault_key` holds one wrapped blob per purpose and the
  * signing row is the PKCS#8 private half — which carries the public key inside it, so the record has
@@ -33,7 +33,7 @@ type Row = { wrapped: Uint8Array; nonce: Uint8Array; kek_id: string; wrapped_by:
  * A signer for the record in this database, or `null` when it has no signing key.
  *
  * `null` RATHER THAN A THROW, AND RATHER THAN A SIGNER THAT FAILS LATER. A record restored from a
- * redacted export has no `vault_key` rows at all — `dogl.ts` drops them deliberately, because the
+ * redacted export has no `vault_key` rows at all — `brainl.ts` drops them deliberately, because the
  * row is nothing but wrapped bytes and a salt — so "no signing key" is an ordinary state and not an
  * error. What it means is that this record's exports are unsigned and nothing will import them,
  * which is true, and is better said at export than at import.

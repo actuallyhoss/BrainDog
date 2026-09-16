@@ -384,7 +384,7 @@ because the object is single-writer. A purged row's number is never reissued —
 | `dog_sig.sig` | the manifest | Ed25519 over the canonical projection of `dog_manifest` ordered by `table_name`; keys are raw 32 bytes, base64url; `key_id` = the first 16 hex of SHA-256(public key) |
 | `kek_id` | the KEK | the first 18 hex of SHA-256(raw KEK) |
 
-The `.dogl` is the canonical projection written out — 41 §5.10's line format, one table after another in
+The `.brainl` is the canonical projection written out — 41 §5.10's line format, one table after another in
 `dog_section` order — so `dog_manifest.sha256` is checkable with `sed` and `sha256sum`. The vault's bytes — the AAD
 and the sealed shape `{ ciphertext, nonce, aad, kek_id, wrapped_dek }` — are defined once, in
 [12-SECURITY](12-SECURITY.md) §6, and `‖` in this corpus means byte concatenation.
@@ -441,7 +441,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Connector `auth.kind` | 8 | 25 §3 | 25 §3 |
 | Connector placeholders | 5 | 25 §3 | 25 §3 |
 | `fetch.read.format` | 5 | `json csv xml html_table text` | 25 §3.2 |
-| `.dog` sections | 5 | `data origin governance local header` | 03 §3 |
+| `.brain` sections | 5 | `data origin governance local header` | 03 §3 |
 | Kernel tables | 27 + 4 header | 30 §1 | 30 §1 |
 | `local` tables | 6 | `token device_grant auth_fail observation job job_event` — the other 25 travel | 02 §1 |
 | Erase stores | 19 + R2 | 02 §10, in one transaction; R2 through the outbox is the twentieth | 02 §10 |
