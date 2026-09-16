@@ -17,7 +17,7 @@
 </script>
 
 <span class="thing" data-size={size} data-retired={identity.retired ? '' : undefined}>
-  <span class="glyph" style="--hue:{identity.hue}" aria-hidden="true">{identity.mark}</span>
+  <span class="glyph thing-glyph" data-shape={identity.mark} style="--hue:{identity.hue}" aria-hidden="true"></span>
   <span class="name">{identity.name}</span>
 </span>
 
@@ -31,12 +31,9 @@
 
   .glyph {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    /* SIZED FROM THE MARK FAMILY, not from the type scale. This was a bare 9px, and the reason no
-       token fitted is that it is not type: it is a mark, drawn beside the name so it reads as a
-       mark and not as a second word, and `aria-hidden` so nothing reads it. The scale floors at
-       `--t-xs` on purpose, and rounding up to it would have grown this glyph by a third. */
-    font-size: var(--mark-t);
-    line-height: 1;
+    /* Drawn by `.thing-glyph` in `rows.css`, one 8px shape, so the name beside it starts on one edge. */
+    margin-inline-end: 0;
+    align-self: center;
     flex: none;
   }
 
@@ -62,6 +59,7 @@
   }
 
   .thing[data-size='md'] .glyph {
-    font-size: var(--t-xs);
+    inline-size: 10px;
+    block-size: 10px;
   }
 </style>

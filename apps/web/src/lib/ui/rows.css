@@ -330,4 +330,46 @@
       align-self: center;
     }
   }
+
+  /**
+   * A THING'S MARK, DRAWN AND NOT TYPESET (DESIGN-SYSTEM APPENDIX C3).
+   *
+   * The marks are the characters a project was given (a circle, a triangle, a diamond, a square), and
+   * set as text each one came out of a different font at a different optical size: the circle as a
+   * 4px bullet, the triangle as a 9px glyph, so every title in a list started at its own x. Drawn as
+   * one 8px shape in one 16px slot, a marked title and its neighbour share an edge, and a row with
+   * no project keeps the slot empty so it does too. The shape is still the first channel and the
+   * hue the second; the name stays on the element for a screen reader.
+   */
+  .thing-glyph {
+    display: inline-block;
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    margin-inline-end: var(--sp-2);
+    overflow: hidden;
+    background: currentColor;
+    border-radius: 50%;
+    vertical-align: 0.06em;
+  }
+
+  .thing-glyph[data-shape="▲"] {
+    border-radius: 0;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+
+  .thing-glyph[data-shape="◆"] {
+    border-radius: 1px;
+    transform: rotate(45deg) scale(0.8);
+  }
+
+  .thing-glyph[data-shape="■"],
+  .thing-glyph[data-shape="◼"] {
+    border-radius: 1px;
+    transform: scale(0.85);
+  }
+
+  .thing-glyph[data-shape=""] {
+    background: none;
+  }
 }

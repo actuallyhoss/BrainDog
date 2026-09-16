@@ -129,11 +129,12 @@
             {#if markFor(e)}
               {@const it = markFor(e)!}
               <span
-                class="card-mark"
+                class="card-mark thing-glyph"
+                data-shape={it.mark}
                 style={it.retired ? undefined : `--hue:${it.hue}`}
                 data-retired={it.retired ? '' : undefined}
                 role="img"
-                aria-label={it.name}>{it.mark}</span>
+                aria-label={it.name}></span>
             {/if}
             <!-- A TITLE NOBODY SET SAYS SO, in the dim ink the grid gives a missing value. An empty
                  first line would read as a card that failed to draw. -->
@@ -176,8 +177,6 @@
      would not. */
   .card-mark {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    font-size: var(--t-xs);
-    line-height: 1;
   }
 
   .card-mark[data-retired] {
@@ -288,8 +287,7 @@
       font-weight: 500;
     }
 
-    .card-title .glyph,
-    .card-title .card-mark {
+    .card-title .glyph {
       margin-inline-end: var(--sp-1);
     }
 

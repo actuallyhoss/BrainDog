@@ -1986,6 +1986,12 @@
    * `empty` or `refused` for the states it draws, and this is the claim for the rest.
    */
   $effect(() => drew('ready'));
+
+  /* WHETHER ANY ROW IN HAND HAS A PROJECT'S MARK. When one does, every title keeps the mark's slot,
+     so a row with no project starts where its marked neighbours do (DESIGN-SYSTEM appendix C3). */
+  const anyMark = $derived(
+    bySeq.size > 0 && [...bySeq.values()].some((e) => identityFor(id, e.fields, result.names ?? undefined) !== null),
+  );
 </script>
 
 <svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
@@ -2373,11 +2379,12 @@
                finds the row by this attribute, so what is scrolled to and what is marked cannot disagree. -->
           {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
           {#if own}<span
-              class="row-mark"
+              class="row-mark thing-glyph"
+              data-shape={own.mark}
               style={own.retired ? undefined : `--hue:${own.hue}`}
               data-retired={own.retired ? '' : undefined}
               role="img"
-              aria-label={own.name}>{own.mark}</span>{/if}
+              aria-label={own.name}></span>{:else if anyMark}<span class="thing-glyph" data-shape="" aria-hidden="true"></span>{/if}
         {/snippet}
         <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
              without it, so eight header buttons over a single row — each announcing
@@ -3318,9 +3325,7 @@
      `--hue` is withheld AND `--dim` is set: an unset `--hue` makes the `oklch()` invalid, and an
      invalid declaration is a dropped one, which would leave the mark the same ink as the id. */
   .row-mark {
-    margin-inline-end: var(--sp-1);
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    font-size: var(--t-xs);
   }
 
   .row-mark[data-retired] {
