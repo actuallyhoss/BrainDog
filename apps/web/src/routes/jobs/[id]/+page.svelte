@@ -317,11 +317,11 @@
     }
   }
 
-  .seq :global(svg) {
+  .step-n :global(svg) {
     transition: transform var(--d-state) var(--ease-out);
   }
 
-  .seq[data-open] :global(svg) {
+  .step-n[data-open] :global(svg) {
     transform: rotate(180deg);
   }
 
