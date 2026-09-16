@@ -38,9 +38,10 @@ export type CatalogueEntry = {
   modules: readonly string[];
   /**
    * The document to install, for a record that holds `holds` once the packs before it are in, so a link to a list
-   * the record will not hold can be left out.
+   * the record will not hold can be left out, and whose use case is `usecase` (its id, `team`), so a module carries
+   * that use case's example rows as onboarding gives them, or none.
    */
-  doc: (options: { holds: readonly string[] }) => Record<string, unknown> | null;
+  doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
 };
 
 type Body = Record<string, unknown>;
@@ -177,7 +178,7 @@ export function arranger(d: ArrangeDeps) {
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
     const out: Planned = { plan: [], approve: [], batch: [], config: new Map() };
     for (const id of ids) {
-      const read = await packOf(id, docs, heldBy(state));
+      const read = await packOf(id, docs, heldBy(state), useCaseFor(ids));
       if (!read.ok) return read;
       const pack = read.value;
       const diff = await plan(pack, state);
@@ -212,8 +213,15 @@ export function arranger(d: ArrangeDeps) {
   const heldBy = (state: Installed): string[] =>
     state.declarations.filter((decl) => decl.kind === 'register').map((decl) => decl.id.slice('register.'.length));
 
-  async function packOf(id: string, docs: ReadonlyMap<string, Body>, holds: readonly string[]): Promise<Result<Pack>> {
-    const doc = docs.get(id) ?? entryOf(id)?.doc({ holds }) ?? null;
+  /**
+   * THE USE CASE A MODULE IS INSTALLED FOR: the one this proposal installs, else the one already on. A module added by a
+   * proposal carried no examples where onboarding gives it the use case's, so the two paths made different records.
+   */
+  const useCaseFor = (installing: readonly string[]): string | null =>
+    ([...installing].reverse().find((id) => id.startsWith(USE_CASE)) ?? useCaseOn())?.slice(USE_CASE.length) ?? null;
+
+  async function packOf(id: string, docs: ReadonlyMap<string, Body>, holds: readonly string[], usecase: string | null): Promise<Result<Pack>> {
+    const doc = docs.get(id) ?? entryOf(id)?.doc({ holds, usecase }) ?? null;
     if (!doc) return notOffered(id, 'body.packs');
     const pack = await normalise(doc, { kind: 'local' });
     if (!pack.ok) return pack;
@@ -421,7 +429,7 @@ export function arranger(d: ArrangeDeps) {
         continue;
       }
       const state = d.installed();
-      const pack = await packOf(id, docs, heldBy(state));
+      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? []));
       if (!pack.ok) return stopped(pack);
       const diff = await plan(pack.value, state);
       const unshown = diff.approve.filter((line) => !approved.includes(line));

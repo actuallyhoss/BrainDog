@@ -6,13 +6,15 @@
  * and to plan what a `pack` or `arrange` proposal would install; it never installs from it until the owner accepts.
  *
  * NO EXAMPLE ROWS FROM A BARE MODULE. A first-party pack asked for by itself carries none, because its own
- * examples are the sample studio's and would land in somebody else's record. A use case carries its own.
+ * examples are the sample studio's and would land in somebody else's record. A use case carries its own, and a module
+ * installed for a use case carries that use case's examples, exactly as onboarding installs it (`install.ts`).
  */
 
 import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 import type { CatalogueEntry } from '@braindog/record';
 import { AGENTS_PACK, FIRST_PARTY, agentsPackDocument, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
-import { MODULE_ORDER, USE_CASES, modulesFor, useCaseDocument } from '@braindog/seed/usecases';
+import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from '@braindog/seed/usecases';
+import { moduleDocument } from '@braindog/seed/usecases/install';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -39,8 +41,9 @@ export function seedCatalogue(): CatalogueEntry[] {
       title: id,
       summary: typeof bare?.summary === 'string' ? bare.summary : '',
       modules: before(firstPartyManifest(id).requires).filter((m) => m !== id),
-      doc: ({ holds }) => {
-        const doc = firstPartyDocument(id, { holds, seeds: [] });
+      doc: ({ holds, usecase }) => {
+        const u = usecase ? useCase(usecase) : undefined;
+        const doc = u ? moduleDocument(u, id, { today: today(), holds }) : firstPartyDocument(id, { holds, seeds: [] });
         if (doc && Array.isArray(doc.seeds) && doc.seeds.length === 0) delete doc.seeds;
         return doc;
       },
