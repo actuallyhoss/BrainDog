@@ -355,3 +355,49 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     }
   };
 }
+
+/* ── a retry that is not a second call ──────────────────────────────────── */
+
+/**
+ * The header a `call` carries so that a retry of it is not a second call.
+ *
+ * ONE COPY, HERE, beside the loop it wraps. It was written twice, once in each host, with a note in both saying
+ * the two must not drift: a call that is safe to retry on one host and not on the other is the worst of both.
+ * Both hosts now import it from here, and `actionExecutor` on either side wraps the same function. Moving it
+ * changed no behaviour.
+ */
+export const IDEMPOTENCY_KEY = 'idempotency-key';
+
+/**
+ * The sentence a call adds when nothing came back, so the record says what it does not know.
+ *
+ * A TIMEOUT OR A DROPPED CONNECTION ON A POST IS THE ONE CASE WHERE THE RECORD CANNOT TELL whether the request
+ * landed. The ladder will try it again, which is right, and the run event should not pretend that trying again is
+ * free. It says what was done about it instead.
+ */
+export const MAY_HAVE_LANDED = 'It carried an idempotency key, so a retry is not a second call unless the provider ignores that header.';
+
+/**
+ * Every `call` carries the outbox id as its idempotency key, and says so when the answer never came.
+ *
+ * THE OUTBOX ID IS THE RIGHT VALUE because it is stable across exactly the events that would otherwise double
+ * write: a rung of the retry ladder re-leases the same row, and so does a lease abandoned by a process or an alarm
+ * that stopped mid-run. Both come back with the same `job`, so the provider sees one key for one intended call,
+ * however many times it is sent. A new interval is a new row and a new key, which is a new call and should be.
+ *
+ * THE HEADER IS A REQUEST AND NOT A GUARANTEE. Delivery is at least once: a provider that ignores the header can
+ * be called twice for one intended call, and nothing here can tell that it was. `25-CONNECTORS` §3.3 says so in
+ * the same words.
+ *
+ * ONLY A `call`. A `poll` and a `pull` are GETs with nothing to duplicate, and a header a provider did not expect
+ * is a header that can be rejected.
+ */
+export function idempotentCalls(execute: Execute): Execute {
+  return async (request) => {
+    if (request.channel !== 'call') return execute(request);
+    const answer = await execute({ ...request, headers: { ...request.headers, [IDEMPOTENCY_KEY]: request.job } });
+    if ('refused' in answer && answer.refused.code === 'PULL_PROVIDER_UNAVAILABLE')
+      return { ...answer, refused: { ...answer.refused, fix: `${answer.refused.fix} ${MAY_HAVE_LANDED}` } };
+    return answer;
+  };
+}

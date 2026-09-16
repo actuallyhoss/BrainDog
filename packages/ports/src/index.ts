@@ -193,6 +193,10 @@ const PACK = [
      belongs here rather than under a family whose first line is "refused before any row is written". */
   'DECLARATION_UNKNOWN', 'PAGE_UNKNOWN', 'METRIC_UNKNOWN', 'SOURCE_UNKNOWN', 'LOOKUP_UNKNOWN',
   'LOOKUP_MISSING',
+  /* A seventh of the same kind, 2026-09-16: a caller naming a saved view the register has not got.
+     It is filed here rather than under the write path for the reason the six above were: the family
+     is named for what its codes are ABOUT, and a view is a thing the record was told to hold. */
+  'VIEW_UNKNOWN',
   /* Turning a pack off and on, 2026-09-15: an upgrade of a disabled pack, and the two guards on disabling. */
   'PACK_DISABLED', 'PACK_REQUIRED', 'SCOPES_IN_USE',
   /* A pack's settings and what it points at, 2026-09-15: a setting of a type a setting does not take,

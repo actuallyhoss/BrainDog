@@ -258,6 +258,102 @@ export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from '
  */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
 
+/**
+ * One saved view: a register's way of looking at itself, as `views()` and `view()` read it.
+ *
+ * `02 §5` calls a saved view a named predicate on the register, and this is that predicate with the
+ * three other things a person adjusted beside it. It belongs to a register — that is the first half
+ * of its key — so a view can never be read against a register it was not saved on, which is what
+ * made the page declaration it replaced ambiguous.
+ *
+ * `filter` IS `null` FOR NO FILTER AND NEVER `{}`. A view with no filter shows the whole register; a
+ * view whose predicate is an empty group shows nothing, and the two must not be one value.
+ */
+export type ViewRow = {
+  register: string;
+  id: string;
+  name: string;
+  filter: Predicate | null;
+  search: string | null;
+  /** The sort the person was looking at, as `list` takes it. Stored as `sort`: `order` is reserved in SQLite. */
+  order: { field: string; dir: 'asc' | 'desc' }[];
+  /** The columns kept, in the order they were kept. Empty means the register's own default. */
+  columns: string[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The columns a view is read back from, in one place, because three statements select them. */
+const VIEW_SELECT = 'SELECT register, id, name, filter, search, sort, columns, created_by, created_at, updated_at';
+
+/** A view as the row it is: the four adjustable parts are text in the database and shapes above it. */
+type ViewStored = {
+  register: string;
+  id: string;
+  name: string;
+  filter: string | null;
+  search: string | null;
+  sort: string;
+  columns: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * A view's name, and the grammar is the register's own: lower-case, and readable in a URL.
+ *
+ * A PERSON CHOOSES IT, which is why it is checked rather than minted. `views.overdue` is a name
+ * somebody types into a link and says out loud, and a minted id would make every saved view a string
+ * nobody can remember and every link unreadable.
+ */
+const VIEW_ID = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** What one register may hold, so a list of views stays a list rather than a second register. */
+const VIEWS_PER_REGISTER = 50;
+const VIEW_COLUMNS_CAP = 40;
+
+/**
+ * A stored list, or an empty one.
+ *
+ * IT DOES NOT THROW ON DAMAGE, and that is the whole reason it exists. A view whose stored order is
+ * not JSON is one broken row, and parsing it inline would take the entire `views` read down with it —
+ * so the one thing a person needs to do about a broken view, which is see it and take it off, would be
+ * the one thing they could not do.
+ */
+const parsedList = <T>(text: string): T[] => {
+  try {
+    const out: unknown = JSON.parse(text);
+    return Array.isArray(out) ? (out as T[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** A stored view, as the shape a caller was handed. A filter that will not parse reads as no filter. */
+const viewOf = (r: ViewStored): ViewRow => {
+  let filter: Predicate | null = null;
+  if (r.filter !== null)
+    try {
+      filter = JSON.parse(r.filter) as Predicate;
+    } catch {
+      filter = null;
+    }
+  return {
+    register: r.register,
+    id: r.id,
+    name: r.name,
+    filter,
+    search: r.search,
+    order: parsedList<{ field: string; dir: 'asc' | 'desc' }>(r.sort),
+    columns: parsedList<string>(r.columns),
+    created_by: r.created_by,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+};
+
 /* ── what a register says about itself ───────────────────────────────────── */
 
 export type RegisterDecl = {
@@ -2438,6 +2534,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     nowMs: clock.now(),
+    /* FOR THE RETRY LADDER'S JITTER, which is arithmetic over the record, the kind and the job. */
+    recordId: recordIdentity(sql)?.id ?? 'self',
     /* THE GATE, HANDED IN. An `infer.draft` that came back with a question files it through the same
        `propose` a person or a rule uses — one place that decides what a body must contain, one place
        that writes the `suggest` event, and `spark` as the actor because that is who drafted it. */
@@ -3910,6 +4008,160 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         out.push({ id, version: row?.version ?? null, disabled_at: offAt, registers: registersOf(offAt === null ? on : wentOff(id)) });
       }
       return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    },
+
+    /**
+     * The saved views, one register's or every one of them, by name.
+     *
+     * `02 §5` MAKES A SAVED VIEW A NAMED PREDICATE ON ITS REGISTER, and this is where the record keeps
+     * one. It is a read of a small table and nothing else: no declaration is parsed and no predicate is
+     * compiled, so a view whose register was retired under it is still listed, which is what lets a
+     * person see the thing they saved and take it off.
+     */
+    views: (register?: string): ViewRow[] =>
+      (register === undefined
+        ? sql.all<ViewStored>(`${VIEW_SELECT} FROM view ORDER BY register, name`)
+        : sql.all<ViewStored>(`${VIEW_SELECT} FROM view WHERE register = ? ORDER BY name`, register)
+      ).map(viewOf),
+
+    /** One saved view, or `null` where that register has no view by that name. */
+    view: (register: string, id: string): ViewRow | null => {
+      const row = sql.one<ViewStored>(`${VIEW_SELECT} FROM view WHERE register = ? AND id = ?`, register, id);
+      return row ? viewOf(row) : null;
+    },
+
+    /**
+     * Save one view on a register, or replace the one already saved under that name.
+     *
+     * THE FILTER IS COMPILED BEFORE IT IS STORED, against the register it names, so a view that cannot
+     * be run is refused at the moment somebody saves it rather than at the moment somebody else opens
+     * it. That is the same check `list` makes of the same predicate through the same function, which is
+     * what stops the two disagreeing about what a filter means.
+     *
+     * AND THE ORDER AND THE COLUMNS ARE HELD TO THE REGISTER'S FIELDS, for the same reason and with the
+     * same test `list` uses for its own order: a column naming a field that is not there draws an empty
+     * column for ever, and nothing about the view says why.
+     *
+     * REPLACING KEEPS WHO FIRST SAVED IT AND WHEN. A person refining a view is refining one question,
+     * not asking a second, and re-dating it would lose the only fact the row carries about its age.
+     */
+    saveView(
+      v: {
+        register: string;
+        id: string;
+        name: string;
+        filter?: Predicate | null;
+        search?: string | null;
+        order?: readonly { field: string; dir?: 'asc' | 'desc' }[];
+        columns?: readonly string[];
+      },
+      opts: { actor: string },
+    ): Result<ViewRow> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+
+      const register = v?.register ?? '';
+      if (!registers.has(register))
+        return no('REGISTER_UNKNOWN', `There is no list called ${register}.`, {
+          at: 'register',
+          allowed: [...registers.keys()],
+        });
+
+      const id = v?.id ?? '';
+      if (!VIEW_ID.test(id))
+        return no('VALUE_MALFORMED', `A view is named in lower case, ${VIEW_ID.source}, and this one is ${JSON.stringify(v?.id) ?? 'nothing'}.`, { at: 'id' });
+
+      const name = String(v?.name ?? '').trim();
+      if (!name) return no('REQUIRED_MISSING', 'A view is called something a person would recognise.', { at: 'name' });
+      if (name.length > 80) return no('OUT_OF_BOUNDS', `A view's name is at most 80 characters, and this one is ${name.length}.`, { at: 'name' });
+
+      const schema = schemaOf(register);
+      const filter = v?.filter ?? null;
+      if (filter !== null) {
+        const compiled = compile(filter, schema);
+        const first = compiled.bad[0];
+        if (first) return { ok: false as const, refusal: first };
+      }
+
+      const search = typeof v?.search === 'string' && v.search !== '' ? v.search : null;
+      if (search !== null && search.length > 200)
+        return no('OUT_OF_BOUNDS', `A view remembers at most 200 characters of what was searched for, and this is ${search.length}.`, { at: 'search' });
+
+      const order: { field: string; dir: 'asc' | 'desc' }[] = [];
+      for (const o of v?.order ?? []) {
+        if (!Object.hasOwn(schema.fields, o.field) && !isColumn(o.field))
+          return no('FIELD_UNKNOWN', `${register} has no field called ${o.field}.`, { at: 'order', allowed: addressable(schema) });
+        if (o.dir !== undefined && o.dir !== 'asc' && o.dir !== 'desc')
+          return no('ENUM_VALUE_UNKNOWN', `An order is asc or desc, and this one is ${JSON.stringify(o.dir)}.`, { at: 'order', allowed: ['asc', 'desc'] });
+        order.push({ field: o.field, dir: o.dir === 'asc' ? 'asc' : 'desc' });
+      }
+
+      const columns = [...(v?.columns ?? [])];
+      if (columns.length > VIEW_COLUMNS_CAP)
+        return no('OUT_OF_BOUNDS', `A view keeps at most ${VIEW_COLUMNS_CAP} columns, and this one keeps ${columns.length}.`, { at: 'columns' });
+      for (const column of columns)
+        if (!Object.hasOwn(schema.fields, column) && !isColumn(column))
+          return no('FIELD_UNKNOWN', `${register} has no field called ${column}.`, { at: 'columns', allowed: addressable(schema) });
+
+      const now = instant(clock.now());
+      return transaction(() => {
+        const was = sql.one<{ created_by: string; created_at: string }>(
+          'SELECT created_by, created_at FROM view WHERE register = ? AND id = ?',
+          register,
+          id,
+        );
+        /* THE CAP IS COUNTED ONLY WHEN THIS IS A NEW NAME, so somebody who has reached it can still
+           edit the views they have — a limit that locks the way out of itself is a trap. */
+        if (!was) {
+          const held = sql.one<{ n: number }>('SELECT count(*) AS n FROM view WHERE register = ?', register)?.n ?? 0;
+          if (held >= VIEWS_PER_REGISTER)
+            return no<ViewRow>('OUT_OF_BOUNDS', `${register} already holds ${VIEWS_PER_REGISTER} views. Take one off first.`, { at: 'id' });
+        }
+        sql.exec(
+          `INSERT INTO view (register, id, name, filter, search, sort, columns, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (register, id) DO UPDATE SET name = excluded.name, filter = excluded.filter,
+             search = excluded.search, sort = excluded.sort, columns = excluded.columns, updated_at = excluded.updated_at`,
+          register,
+          id,
+          name,
+          /* `JSON.stringify` AND NOT `jcs`. Nothing checksums this row and nothing compares two of
+             them; canonical form buys a guarantee that is not being asked for here. */
+          filter === null ? null : JSON.stringify(filter),
+          search,
+          JSON.stringify(order),
+          JSON.stringify(columns),
+          was?.created_by ?? opts.actor,
+          was?.created_at ?? now,
+          now,
+        );
+        const row = sql.one<ViewStored>(`${VIEW_SELECT} FROM view WHERE register = ? AND id = ?`, register, id);
+        return row ? ok(viewOf(row)) : no<ViewRow>('VIEW_UNKNOWN', `${register} has no view called ${id}.`, { at: 'id' });
+      });
+    },
+
+    /**
+     * Take one saved view off a register.
+     *
+     * NOT A ROW AND NOT A RETIREMENT. A declaration is retired because rows were written under it and
+     * the shape has to stay readable; a view is a question nobody wrote anything under, so it is
+     * deleted and there is nothing left to keep. A name this register has no view for is `VIEW_UNKNOWN`
+     * with the names it does have, which ends the search rather than starting one.
+     */
+    retireView(register: string, id: string): Result<{ register: string; id: string; retired: true }> {
+      const refused = schemaRefusal(state);
+      if (refused) return refused;
+      const gone = transaction(() => {
+        if (!sql.one<{ id: string }>('SELECT id FROM view WHERE register = ? AND id = ?', register, id)) return false;
+        sql.exec('DELETE FROM view WHERE register = ? AND id = ?', register, id);
+        return true;
+      });
+      return gone
+        ? ok({ register, id, retired: true as const })
+        : no('VIEW_UNKNOWN', `${register} has no view called ${id}.`, {
+            at: 'id',
+            allowed: sql.all<{ id: string }>('SELECT id FROM view WHERE register = ? ORDER BY id', register).map((r) => r.id),
+          });
     },
 
     /** Live rows per register, which is what makes an orphan countable before it is one. */

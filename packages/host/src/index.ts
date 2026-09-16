@@ -184,6 +184,15 @@ export const ROUTES: readonly Route[] = [
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
   { name: 'meet', group: 'DATA', writes: true, what: 'Someone met in the work: matched by email or handle, or added, and linked to your project.' },
+  /* THE SAVED VIEWS. Reading one is READ+ and held to the list it belongs to, because a view names
+     that list's fields and the values somebody filtered on; saving and retiring one change what the
+     list offers everybody who opens it, which is the ADMIN argument `setDeclaration` already makes. */
+  { name: 'views', group: 'READ+', writes: false, what: 'The saved ways of looking at one list, or at every list you can read.',
+    takes: { register: 'text' } },
+  { name: 'view', group: 'READ+', writes: false, what: 'One saved view: its filter, what it searched for, its order and its columns.',
+    takes: { register: 'text', id: 'text' } },
+  { name: 'saveView', group: 'ADMIN', writes: true, what: 'Save the way this list is being looked at, under a name. Saving over one replaces it.' },
+  { name: 'retireView', group: 'ADMIN', writes: true, what: 'Take a saved view off a list. Its rows are untouched: a view is a question, not a row.' },
 ];
 
 /**
@@ -388,6 +397,10 @@ export type RecordSurface = {
   sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
   context(args: never, ctx: never): Promise<Result<unknown>>;
   meet(args: never, ctx: never): Promise<Result<unknown>>;
+  views(args: never, ctx: never): Promise<Result<unknown>>;
+  view(args: never, ctx: never): Promise<Result<unknown>>;
+  saveView(args: never, ctx: never): Promise<Result<unknown>>;
+  retireView(args: never, ctx: never): Promise<Result<unknown>>;
 };
 
 export function handlersFor(api: RecordSurface): Record<string, Handler> {
@@ -456,6 +469,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),
     context: (a, ctx) => api.context(a as never, ctx as never),
     meet: (a, ctx) => api.meet(a as never, ctx as never),
+    views: (a, ctx) => api.views(a as never, ctx as never),
+    view: (a, ctx) => api.view(a as never, ctx as never),
+    saveView: (a, ctx) => api.saveView(a as never, ctx as never),
+    retireView: (a, ctx) => api.retireView(a as never, ctx as never),
   };
   /* The table and the wiring, checked against each other where they are both in scope — so adding a
      route to one without the other throws at start rather than 404ing in production. */

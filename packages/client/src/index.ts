@@ -243,6 +243,28 @@ export type ActionRow = {
 export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
 
 /**
+ * One saved view, as `views` and `view` send it. See `ViewRow` in `@braindog/kernel`.
+ *
+ * `filter` IS `null` FOR NO FILTER, which is not the same as a filter that matches nothing, and
+ * `order` is the same shape `list` takes, so a screen can hand one straight back to `list`.
+ */
+export type SavedView = {
+  register: string;
+  id: string;
+  name: string;
+  filter: unknown | null;
+  search: string | null;
+  order: { field: string; dir: 'asc' | 'desc' }[];
+  columns: string[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** `retireView`: the view that is no longer on the list. */
+export type ViewRetired = { register: string; id: string; retired: true };
+
+/**
  * `backlinks`: one relation pointing at the row that was asked about.
  *
  * One group per FIELD and not per register, because two fields of one register can name the same row
@@ -602,6 +624,26 @@ export function createClient(options: ClientOptions) {
        thing that starts a paused action again. */
     actions: () => call<ActionRow[]>('actions'),
     resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
+
+    /* THE SAVED VIEWS. `views` and `view` are READ+, held to the list they belong to; `saveView` and
+       `retireView` are ADMIN, so a browser session, because a saved view goes on the list for
+       everybody who opens it rather than into one person's bookmarks. */
+    /** Every saved view on one list, or on every list this caller can read. */
+    views: (args: { register?: string } = {}) => call<SavedView[]>('views', args as Record<string, unknown>),
+    /** One saved view, whole. A name the list has no view for is `VIEW_UNKNOWN` with the names it has. */
+    view: (args: { register: string; id: string }) => call<SavedView>('view', args as Record<string, unknown>),
+    /** Save how this list is being looked at. Saving over a name replaces it and keeps who first saved it. */
+    saveView: (args: {
+      register: string;
+      id: string;
+      name: string;
+      filter?: unknown;
+      search?: string | null;
+      order?: { field: string; dir?: 'asc' | 'desc' }[];
+      columns?: string[];
+    }) => call<SavedView>('saveView', args as Record<string, unknown>),
+    /** Take one saved view off a list. The rows are untouched: a view is a question, not a row. */
+    retireView: (args: { register: string; id: string }) => call<ViewRetired>('retireView', args as Record<string, unknown>),
   };
 }
 

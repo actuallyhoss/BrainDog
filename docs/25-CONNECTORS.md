@@ -242,6 +242,16 @@ The install diff prints one line for each, the same line a `pull` prints:
 CALLS OUT api.example.test · every 1h · grant "example read"
 ```
 
+**Every scheduled `call` carries `Idempotency-Key: <outbox id>`.** The value is the id of the outbox row the run
+was leased from, so it is the same on every rung of the retry ladder and the same again when a lease is reclaimed
+from a process that stopped mid-run: one intended call has one key, however many times it is sent. A new interval
+is a new row, so it is a new key, which is a new call and should be. Only a `call` carries the header; a `poll` and
+a `pull` are GETs with nothing to duplicate. **Delivery is at least once, and the header is a request rather than a
+guarantee: a provider that ignores it can be called twice for one intended call, and the record cannot tell that it
+was.** A call whose answer never arrives is the one case where the record does not know whether the request landed,
+so its run event says exactly that instead of claiming the retry is free. The wrapper is `idempotentCalls` in
+`@braindog/host/actions`, which both hosts run.
+
 Five refusals, raised at install by the kernel's declaration check and counted in
 [30-BLUEPRINT](30-BLUEPRINT.md) §6's connector family:
 

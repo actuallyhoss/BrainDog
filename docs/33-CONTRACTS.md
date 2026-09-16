@@ -201,12 +201,12 @@ the alarm and the queue build a `system` context. The record derives `actor` and
 reach check itself, and never trusts a caller-supplied actor. There is no 412: a stale `version` is a 409 whose body
 names who changed the row.
 
-**The eighty-six methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
+**The ninety methods.** The groups and their reach are [30-BLUEPRINT](30-BLUEPRINT.md) §5's — DATA
 any token in scope (`markRead` person principals only) · READ+ any token, and the MCP resources, except `inbox`, an
 owner's in a browser · VAULT a browser session only · JOBS the browser four by session and the runner three by the
 runner's grant, every MCP token refused · ADMIN a browser session, or a bearer carrying an operation grant for that one
-operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 17 · 4 · 7 · 27 · 19, as 30 §5 counts
-them. `ROUTES` in `@braindog/host` routes 64 of the eighty-six at `/api/<method>`, 30 of them ADMIN (recounted September 16th 2026 from the table itself, which the `router-groups` gate prints).
+operation · INTERNAL the host only, no route. The shapes are decided here. 12 · 19 · 4 · 7 · 29 · 19, as 30 §5 counts
+them. `ROUTES` in `@braindog/host` routes 68 of the ninety at `/api/<method>`, 32 of them ADMIN (recounted September 16th 2026 from the table itself, which the `router-groups` gate prints).
 
 | Group | Method | Args | Returns / notes |
 |---|---|---|---|
@@ -239,6 +239,8 @@ them. `ROUTES` in `@braindog/host` routes 64 of the eighty-six at `/api/<method>
 | READ+ | `ruleTest` | `{ id, against }` — raw ids, a register, or a file's rows | the dry run's `Report` (23 §4): `won / lost / takenBy`; writes nothing |
 | READ+ | `packConfig` | `{ id }`; any other key is `FIELD_UNKNOWN` | `{ id, version, config, values }`: what the pack's manifest declares under `config:`, and the value each setting holds now. A pack the seed owns by its bodies has `version: null` and empty maps; a pack this record does not have is `DECLARATION_UNKNOWN` |
 | READ+ | `actions` | `{}` | one row per active `pull`, `call` or `poll`: `{ ingest, channel, project, host, every, key, state, next, last, month, days }`. `project` is `null` for every project; `key` is the vault label and never a value; `state` is its schedule row's, `pending firing paused done`, and `next` its `due_at` while pending or firing. `last` is the latest run's `{ at, outcome, status, note }` from its `pull` event; `month` is this UTC month's `{ runs, requests, bytes, failures, held }`, where a held run counts no run; `days` holds the same four counts for each day from the 1st. A pack that is off lists none |
+| READ+ | `views` | `{ register? }`; any other key is `FIELD_UNKNOWN` | the saved views of that list, or of every list the caller may read when no register is named, each `{ register, id, name, filter, search, order, columns, created_by, created_at, updated_at }`. A named register the caller may not read is refused rather than answered empty; an unnamed call answers only what they read, so a view is never how somebody learns a list exists |
+| READ+ | `view` | `{ register, id }` | the one saved view, whole: its filter, what it searched for, its order and its columns. A name the register has no view for is `VIEW_UNKNOWN`, carrying the names it does have in `allowed` |
 | VAULT | `listGrants` | `{}` | grants with labels; never a value |
 | VAULT | `openGrant` | `{ id, kek_id }` | the **sealed** material `{ ciphertext, nonce, aad, kek_id, wrapped_dek }`; the host unwraps and decrypts, the record never does (ADR-062) |
 | VAULT | `bindGrant` | `{ id?, label, opens, kind, sealed }` — the mirror of `openGrant`: sealed material in | the grant row; a present `id` rotates it and keeps exactly two versions |
@@ -277,6 +279,8 @@ them. `ROUTES` in `@braindog/host` routes 64 of the eighty-six at `/api/<method>
 | ADMIN | `listDevices` | `{}` | every device grant by its handle, with its status, reach, label and last use; never a poll id, a code or a bearer |
 | ADMIN | `revokeDevice` | `{ handle }` | the row, now `revoked`, and a login's token revoked with it; an unknown handle is `OUT_OF_BOUNDS` |
 | ADMIN | `deleteRecord` | `{ slug }` — typed to confirm; a browser session, re-authenticated | the record is gone: the Worker `destroy()`s the object and removes the R2 prefix (§10). A self-host removes the record file, its copies and its Directory name, and answers 503 after; the Worker refuses `NOT_IN_THIS_BUILD` until the sealed final snapshot is wired |
+| ADMIN | `saveView` | `{ register, id, name, filter?, search?, order?, columns? }`; any other key is `FIELD_UNKNOWN` | the saved view. `id` is lower case and at most 40 characters, `name` at most 80, `filter` is 34 §3's `where` grammar compiled against that register's schema, and a field named in `order` or `columns` the register does not have is `FIELD_UNKNOWN` with the ones it has in `allowed`. Saving over a name replaces it and keeps who first saved it and when; fifty views to a register, and the rows are not touched |
+| ADMIN | `retireView` | `{ register, id }` | `{ register, id, retired: true }`. The rows are untouched, because a view is a question and not a row; a name the register has no view for is `VIEW_UNKNOWN` with the names it does have |
 | INTERNAL | `drainSchedule` | `{}` | the alarm handler: the due rows fired, the next `due_at` |
 | INTERNAL | `leaseOutbox` | `{ kinds, n }` | the leased rows; one statement, so a double drain finds nothing |
 | INTERNAL | `ackOutbox` | `{ id, state, result?, error? }` — object form, the one shape | nothing; `infer.*` write-backs ride `result` inside the ack's transaction |

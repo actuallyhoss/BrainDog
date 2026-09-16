@@ -1,0 +1,7 @@
+code:   VIEW_UNKNOWN
+via:    rpc
+raises: packages/kernel/src/index.ts
+at:     id
+found:  overdue
+wanted: a view this list holds
+fix:    Name a view this list has, or save it first.

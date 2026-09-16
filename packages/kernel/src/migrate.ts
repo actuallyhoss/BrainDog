@@ -20,6 +20,7 @@ import packDisabled0003 from './migrations/0003_pack_disabled.ts';
 import device0004 from './migrations/0004_device.ts';
 import scheduleActions0005 from './migrations/0005_schedule_actions.ts';
 import invitation0006 from './migrations/0006_invitation.ts';
+import view0007 from './migrations/0007_view.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -31,6 +32,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 4, slug: 'device', sql: device0004 },
   { version: 5, slug: 'schedule_actions', sql: scheduleActions0005 },
   { version: 6, slug: 'invitation', sql: invitation0006 },
+  { version: 7, slug: 'view', sql: view0007 },
 ];
 
 /**
@@ -40,6 +42,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 4 rebuilds `device_grant`, a `local` table no file carries, so it is still 1. Migration 5
  * rebuilds `schedule` with two more kinds, and no file carries a schedule row either.
  * Migration 6 adds `invitation`, a `local` table no file carries, so it is still 1.
+ * Migration 7 adds `view`, `local` for the same reason and at the same price: a saved view does not
+ * travel in an export, and carrying one means a travelling table and a format revision.
  */
 export const FORMAT_VERSION = 1 as const;
 

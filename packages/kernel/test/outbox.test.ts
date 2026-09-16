@@ -166,7 +166,12 @@ test('THE RETRY IS A SCHEDULE ROW, and there is exactly one ladder', async () =>
     "SELECT due_at, key, payload, attempts FROM schedule WHERE kind = 'retry'",
   )!;
   assert.equal(retry.key, `outbox:${id}`);
-  assert.equal(Date.parse(retry.due_at) - NOW, 2 * MINUTE, 'the first retry is not two minutes out');
+  /* TWO MINUTES AND A SPREAD, not two minutes exactly. `backoffMs` is the same number for every job,
+     so a provider that goes down and fails twenty of them arms twenty retries at one instant. The
+     jitter is the record's own, deterministic over the record, the kind and the job, and its window
+     here is thirty seconds: the rung is never early and never more than a window late. */
+  const out = Date.parse(retry.due_at) - NOW;
+  assert.ok(out >= 2 * MINUTE && out < 2 * MINUTE + 30_000, `the first retry is ${out} ms out, not two minutes and a spread`);
   assert.deepEqual(JSON.parse(retry.payload), { outbox: id, attempt: 1 });
 
   // And when it fires, the job goes back where the deliverer can lease it.
@@ -191,7 +196,37 @@ test('two failures of one job arm one retry, not two', async () => {
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 1, 'a second retry row for one job');
   assert.equal(row(sql, id).attempts, 2);
   const due = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'retry'")!.due_at;
-  assert.equal(Date.parse(due) - (NOW + 3 * MINUTE), 4 * MINUTE, 'the second retry is not four minutes out');
+  const out = Date.parse(due) - (NOW + 3 * MINUTE);
+  assert.ok(out >= 4 * MINUTE && out < 4 * MINUTE + 30_000, `the second retry is ${out} ms out, not four minutes and a spread`);
+  sql.close();
+});
+
+test('TWO JOBS FAILING AT ONE INSTANT DO NOT COME BACK AT ONE INSTANT, and each rung is where it was', async () => {
+  /* THE OUTAGE, WHICH IS THE ORDINARY CASE AND NOT THE RARE ONE. A provider stops answering and every
+     job pointed at it fails in the same drain. With the backoff alone each one armed its retry at
+     exactly the same instant, so the herd came back together, hit the same struggling host, failed
+     together and did it again eight times over. */
+  const { k, sql, clock } = await record();
+  const ids = ['a', 'b', 'c'].map(() => k.outbox('notify.email', {}));
+  k.leaseOutbox(ALL, 10);
+  for (const id of ids) value(k.ackOutbox({ id, state: 'failed', error: 'the provider is down' }));
+
+  const dues = ids.map((id) => Date.parse(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE key = ?", `outbox:${id}`)!.due_at));
+  assert.equal(new Set(dues).size, 3, 'three jobs failing together came back together');
+  for (const due of dues) assert.ok(due - NOW >= 2 * MINUTE && due - NOW < 2 * MINUTE + 30_000, 'a rung moved outside its window');
+
+  /* AND IT IS ARITHMETIC, NEVER RANDOM: the same job failing again at the same instant lands on the
+     same instant, so a gap somebody asks about is a gap with a reason. */
+  const first = dues[0]!;
+  clock.set(NOW + 3 * MINUTE);
+  await k.drain();
+  k.leaseOutbox(ALL, 10);
+  value(k.ackOutbox({ id: ids[0]!, state: 'failed', error: 'again' }));
+  sql.exec("UPDATE outbox SET state = 'leased', attempts = 0, leased_until = ? WHERE id = ?", new Date(NOW + 60 * MINUTE).toISOString(), ids[0]!);
+  clock.set(NOW);
+  value(k.ackOutbox({ id: ids[0]!, state: 'failed', error: 'again' }));
+  const again = Date.parse(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE key = ?", `outbox:${ids[0]!}`)!.due_at);
+  assert.equal(again, first, 'the same job on the same rung at the same instant moved');
   sql.close();
 });
 
@@ -204,7 +239,9 @@ test('THE EIGHTH FAILURE IS VISIBLE, because a notification that silently gave u
     k.leaseOutbox(ALL, 10);
     value(k.ackOutbox({ id, state: 'failed', error: 'smtp said 550' }));
     if (n === 8) break;
-    at += backoffMs(n) + MINUTE;
+    /* THE ROW'S OWN `due_at`, and not `backoffMs` again: the rung carries a deterministic spread of
+       up to a tenth of the wait, so a walk that adds only the backoff arrives before its own retry. */
+    at = Date.parse(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'retry'")!.due_at) + MINUTE;
     clock.set(at);
     await k.drain();
   }
@@ -415,19 +452,20 @@ test('A RETRY ARMED AT THE OUTBOX CEILING SURVIVES ITS OWN FIRST BAD MINUTE', as
     k.leaseOutbox(ALL, 10);
     value(k.ackOutbox({ id, state: 'failed', error: `try ${n}` }));
     if (n === 7) break;
-    at += backoffMs(n) + MINUTE;
+    /* The row's own `due_at`, for the reason the walk above gives: a rung carries a spread. */
+    at = Date.parse(sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'retry'")!.due_at) + MINUTE;
     clock.set(at);
     await k.drain();
   }
   assert.equal(row(sql, id).attempts, 7, 'the job is not one rung below the ceiling');
   assert.equal(row(sql, id).state, 'failed');
 
-  const retry = sql.one<{ id: string; attempts: number }>("SELECT id, attempts FROM schedule WHERE kind = 'retry'")!;
+  const retry = sql.one<{ id: string; attempts: number; due_at: string }>("SELECT id, attempts, due_at FROM schedule WHERE kind = 'retry'")!;
   assert.equal(retry.attempts, 0, 'the retry row was armed already seven rungs up');
 
   /* AND THE HANDLER THROWS ONCE. Anything can: one lock, one blip, one row that came back wrong. */
   sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', 'not json', retry.id);
-  clock.set(at + backoffMs(7) + MINUTE);
+  clock.set(Date.parse(retry.due_at) + MINUTE);
   await k.drain();
 
   const after = sql.one<{ state: string; attempts: number }>('SELECT state, attempts FROM schedule WHERE id = ?', retry.id)!;

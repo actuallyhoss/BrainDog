@@ -22,6 +22,8 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { actionJitterMs } from './actions.ts';
+
 /** The nine the DDL's `CHECK` admits. A tenth is a migration, which is the point of the check. */
 export const OUTBOX_KINDS = [
   'notify.email',
@@ -192,6 +194,11 @@ export type AckDeps = {
   allocate: (name: string) => number;
   nowMs: number;
   /**
+   * This record's id, for the retry ladder's jitter. Absent is `self`, which is what a host with no
+   * identity row yet is called everywhere else in the kernel.
+   */
+  recordId?: string | undefined;
+  /**
    * File a suggestion, for the ack of a job that drafted one.
    *
    * INJECTED, because the gate is `govern.ts`'s and this file is the queue. A draft that wrote its
@@ -335,12 +342,24 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
 
        THE OUTBOX'S COUNT GOES IN THE PAYLOAD, where it is what it always was: something to read,
        and not something the ladder walks on. */
+
+    /* AND THE RUNG IS SPREAD, because `backoffMs` alone is the same number for every job in the
+       record. A provider that goes down fails every action pointed at it inside the same drain, each
+       one arms its retry at exactly `now + 2^attempts` minutes, and they all come back together: the
+       same herd, the same instant, eight times over, against a host that is already struggling. The
+       jitter is the one the interval re-arm already uses, so the offset is arithmetic over the
+       record, the pack and the action rather than a random number, and a gap somebody asks about is
+       a gap with a reason. It is stable for one row, so a rung is not re-rolled by a retry of the
+       same job; the outbox id stands in for the action here, because that is the identity the queue
+       holds and it is what differs between two jobs failing at the same moment. */
+    const wait = backoffMs(attempts);
+    const spread = actionJitterMs(deps.recordId ?? 'self', row.kind, args.id, wait);
     sql.exec(
       `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts)
        VALUES (?, ?, 'retry', ?, ?, 'pending', 0)
        ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = 'pending', attempts = 0`,
       deps.mint(),
-      iso(deps.nowMs + backoffMs(attempts)),
+      iso(deps.nowMs + wait + spread),
       `outbox:${args.id}`,
       JSON.stringify({ outbox: args.id, attempt: attempts }),
     );

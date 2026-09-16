@@ -415,11 +415,20 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
   const event = deps.mint();
   const at = instant(deps.nowMs);
   const scope = usage.project ?? 'global';
-  /* A RUN THAT NEVER STARTED IS NOT A RUN. A job whose pack was turned off, or one the plan's limit held, sent
-     nothing, so it counts nothing against the allowance. It is still an event, so it is never silent. */
+  /* A RUN THAT NEVER STARTED IS NOT A RUN, AND A RUN THAT FAILED IS NOT ONE EITHER. A job whose pack was turned
+     off, or one the plan's limit held, sent nothing, so it counts nothing against the allowance. It is still an
+     event, so it is never silent.
+
+     A FAILURE IS FREE, and rule 5 above is why: the account is metered for the work it got. A 429, a 502, a
+     timeout and a dropped connection gave it none, and the run is going to be tried again, so charging for it
+     bills somebody up to eight times for one provider's outage. `failed` is the ladder's outcome and only the
+     ladder's: a 401 pauses (`paused`), an origin the host would not call is `refused`, and both of those are
+     answers the record asked for and got. `failures` still counts, so a free run is never an invisible one, and
+     `bytes` and `ms` stay as they came, because those are what was spent rather than what is owed. */
+  const free = usage.outcome === 'dropped' || usage.outcome === 'held' || usage.outcome === 'failed';
   const counted = {
-    runs: usage.outcome === 'dropped' || usage.outcome === 'held' ? 0 : 1,
-    requests: usage.requests,
+    runs: free ? 0 : 1,
+    requests: free ? 0 : usage.requests,
     bytes: usage.bytes,
     ms: usage.ms,
     failures: usage.failures,

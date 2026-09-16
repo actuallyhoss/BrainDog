@@ -31,6 +31,7 @@ import { no, ok } from '@braindog/ports';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
+import type { ViewRow } from '@braindog/kernel';
 import {
   fill,
   GRANT_KINDS,
@@ -2146,6 +2147,115 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.actions());
+    },
+
+    /**
+     * The saved ways of looking at a list: one list's, or every one this caller can read.
+     *
+     * READ+ AND NOT DATA, AND THE TWO ARE NOT SPLIT BY WHO MAY CALL THEM. `30 §5` gives both groups the
+     * same reach — *any token, subject to scope* — so the choice is about what the method is ABOUT.
+     * DATA's twelve are verbs over ROWS, and MCP exposes them as tools an agent takes actions with. A
+     * view holds no rows: it is a saved question about a register, which puts it on the shelf beside
+     * `schema` and `page`, things a caller reads to find out HOW to read. Over MCP that makes it a
+     * resource, which is also the right shape for an agent — a stable name it can list and reuse.
+     *
+     * AND IT IS A SCOPED READ. A view names its register's fields and the values somebody filtered on,
+     * so handing over the views of a register this caller may not read would hand over the shape of it
+     * and a little of its contents. A register out of reach is LEFT OUT rather than refused, for the
+     * reason `boot` leaves one out: which registers exist is itself something a caller may not know.
+     *
+     * ponytail: a saved view is a local table and does not travel in a .dog export; a travelling table
+     * is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record
+     * and asks where their views went.
+     */
+    async views(args: { register?: string } | undefined, ctx: CallContext): Promise<Result<ViewRow[]>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['register']);
+      if (extra) return { ok: false as const, refusal: extra };
+      const register = args?.register;
+      if (register !== undefined) {
+        if (typeof register !== 'string' || register === '')
+          return no('VALUE_MALFORMED', 'A list is named by its id.', { at: 'register' });
+        const held = guard(ctx, 'read', register);
+        if (held) return { ok: false as const, refusal: held };
+      }
+      return ok(kernel.views(register).filter((v) => readable(ctx, v.register) === null));
+    },
+
+    /**
+     * One saved view, read back whole: its filter, what was searched for, its order and its columns.
+     *
+     * READ+ for the reason `views` gives, and held to the register it belongs to. A name this register
+     * has no view for answers `VIEW_UNKNOWN` carrying the names it does have, so the answer ends the
+     * search rather than starting one — the move `PAGE_UNKNOWN` makes with its slugs.
+     */
+    async view(args: { register: string; id: string }, ctx: CallContext): Promise<Result<ViewRow>> {
+      const stop = guard(ctx, 'read', args?.register);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as unknown as Record<string, unknown>, ['register', 'id']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.register !== 'string' || !args.register) return no('REQUIRED_MISSING', 'Which list?', { at: 'register' });
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which view?', { at: 'id' });
+      const found = kernel.view(args.register, args.id);
+      return found
+        ? ok(found)
+        : no('VIEW_UNKNOWN', `${args.register} has no view called ${args.id}.`, {
+            at: 'id',
+            allowed: kernel.views(args.register).map((v) => v.id),
+          });
+    },
+
+    /**
+     * Save the way a list is being looked at, under a name.
+     *
+     * ADMIN, WHICH IS THE ARGUMENT `setDeclaration` ALREADY MAKES. A saved view is not one person's
+     * bookmark: it goes on the list, and everybody who opens that list sees it. So it changes what the
+     * record OFFERS, and `30 §5` puts that behind a browser session and an owner. It is also the door
+     * the gesture already goes through — the app saved a view by calling `setDeclaration`, which is
+     * ADMIN — so nothing becomes reachable by anything that could not reach it yesterday.
+     *
+     * SAVING OVER A NAME REPLACES IT, keeping who first saved it and when.
+     *
+     * AND NO `tail`. A view arms nothing: it earns no schedule row and moves no alarm, so re-deriving
+     * the alarm after it would be a read and a write that cannot change their answer.
+     */
+    async saveView(
+      args: {
+        register: string;
+        id: string;
+        name: string;
+        filter?: unknown;
+        search?: string | null;
+        order?: { field: string; dir?: 'asc' | 'desc' }[];
+        columns?: string[];
+      },
+      ctx: CallContext,
+    ): Promise<Result<ViewRow>> {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as unknown as Record<string, unknown>, [
+        'register',
+        'id',
+        'name',
+        'filter',
+        'search',
+        'order',
+        'columns',
+      ]);
+      if (extra) return { ok: false as const, refusal: extra };
+      return kernel.saveView((args ?? {}) as never, { actor: actorOf(ctx) });
+    },
+
+    /** Take one saved view off a list. ADMIN for the reason `saveView` gives; the list's rows are untouched. */
+    async retireView(args: { register: string; id: string }, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as unknown as Record<string, unknown>, ['register', 'id']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.register !== 'string' || !args.register) return no('REQUIRED_MISSING', 'Which list?', { at: 'register' });
+      if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which view?', { at: 'id' });
+      return kernel.retireView(args.register, args.id);
     },
 
     /**

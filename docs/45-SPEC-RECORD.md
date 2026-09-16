@@ -62,7 +62,7 @@ export type RecordApi = {
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
   // PEOPLE: 1, added with the agents pack (loop/research-agent-path.md §5.6)
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
-  // READ+ — 14
+  // READ+ — 16
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
   metric(args: { id: string }, ctx: CallContext): Promise<Result<MetricResult>>;
   schema(args: { register: string }, ctx: CallContext): Promise<Result<unknown>>;
@@ -77,6 +77,8 @@ export type RecordApi = {
   project(args: ProjectArgs, ctx: CallContext): Promise<Result<Projection>>;
   boot(args: Record<string, never>, ctx: CallContext): Promise<Result<Boot>>;
   whoami(args: Record<string, never>, ctx: CallContext): Promise<Result<Whoami>>;                       // added — §13 #1
+  views(args: { register?: string }, ctx: CallContext): Promise<Result<ViewRow[]>>;                      // added September 16th 2026 — the saved views of one list, or of every list in reach
+  view(args: { register: string; id: string }, ctx: CallContext): Promise<Result<ViewRow>>;              // added September 16th 2026 — one saved view, whole
   // VAULT — 4
   listGrants(args: Record<string, never>, ctx: CallContext): Promise<Result<GrantRow[]>>;
   openGrant(args: { id: string; kek_id: string }, ctx: CallContext): Promise<Result<SealedGrant>>;
@@ -89,7 +91,7 @@ export type RecordApi = {
   claimJob(args: { runner_id?: string }, ctx: CallContext): Promise<Result<Claim | Idle>>;
   postJobEvent(args: JobEventIn, ctx: CallContext): Promise<Result<Ack>>;
   readCancel(args: { job_id: string }, ctx: CallContext): Promise<Result<{ cancel: 0 | 1; lease_until: string | null }>>;
-  // ADMIN — 22
+  // ADMIN — 24
   planPack(args: { doc: unknown; source?: PackSource }, ctx: CallContext): Promise<Result<Diff>>;
   installPack(args: { doc: unknown; source?: PackSource; planHash: string }, ctx: CallContext): Promise<Result<Applied>>;
   uninstallPack(args: { id: string }, ctx: CallContext): Promise<Result<Retired>>;
@@ -112,6 +114,8 @@ export type RecordApi = {
   revokeDevice(args: { handle: string }, ctx: CallContext): Promise<Result<DeviceRow>>;       // a login's token goes with it
   fileArrival(args: { id: string; register: string; fields?: Patch }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // a row, and the arrival `matched`
   archiveArrival(args: { id: string }, ctx: CallContext): Promise<Result<ArrivalSettled>>;   // the arrival `ignored`, its bytes kept
+  saveView(args: SaveViewArgs, ctx: CallContext): Promise<Result<ViewRow>>;                   // added September 16th 2026 — a view goes on the list for everybody who opens it
+  retireView(args: { register: string; id: string }, ctx: CallContext): Promise<Result<{ register: string; id: string; retired: true }>>;   // added September 16th 2026
   // INTERNAL — 13
   drainSchedule(args: Record<string, never>, ctx: CallContext): Promise<Result<Drained>>;
   leaseOutbox(args: { kinds: OutboxKind[]; n: number }, ctx: CallContext): Promise<Result<OutboxRow[]>>;
@@ -138,7 +142,7 @@ export const DIALECT: readonly DialectLine[];                                   
 export type { CallContext, Result, Refusal, Entry, Level, Scope, Projection, ProjectedRow, /* every args and value type above */ };
 ```
 
-Seventy methods: 12 · 13 · 4 · 6 · 22 · 13 — the forty-four of 30 §5, the eleven of §13 #1, and the fifteen added since,
+Seventy-five methods: 12 · 16 · 4 · 6 · 24 · 13 — the forty-four of 30 §5, the eleven of §13 #1, and the twenty added since,
 each noted where it is declared; DATA's twelve are its nine plus the two RUNS and the one PEOPLE method above; `test/groups.test.ts`
 counts `GROUPS`. *(An earlier draft of this spec said forty-four; the hosts' specs 47, 49 and 51 each named a method
 the record had to have. Recounted September 16th 2026, when the sentence still claimed fifty-five against seventy declarations.)*
@@ -579,6 +583,20 @@ draws: `record`, `me` (with the member's name), `pages` filtered as `pages` filt
 (`inbox` is `null` below owner) and `whatsNew` with the default cursor, each held to what the caller may read. It is
 not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
+**`views({ register? })`** — `scoped(ctx, 'read')` first, then `guard(ctx, 'read', register)` when one is named; any
+other key is `FIELD_UNKNOWN`. `SELECT register, id, name, filter, search, sort, columns, created_by, created_at,
+updated_at FROM view` for that register, or for every register when none is named, filtered by `readable` so an
+unnamed call answers only the lists the caller reads. READ+ AND NOT DATA: the twelve DATA methods are verbs over
+rows, and MCP exposes them as tools; a view holds no rows and is a saved question about a register, which is a
+resource beside `schema` and `page`. Naming a register the caller may not read is refused rather than answered
+empty, so a view is never how somebody learns which lists exist.
+
+**`view({ register, id })`** — `guard(ctx, 'read', register)`, then the one row. `filter` comes back as the
+predicate that was saved, `order` as `[{ field, dir }]` and `columns` as the field ids; the stored column is called
+`sort`, because `order` is a reserved word in SQLite, and that is the only place the two names differ. A name this
+register has no view for is `VIEW_UNKNOWN` at `id`, carrying the names it does have in `allowed`, so the answer
+ends the search rather than starting one.
+
 ---
 
 ### 5.4 · VAULT (`api.ts`) — owner, browser session, no `op`; the record never decrypts (ADR-062)
@@ -685,6 +703,22 @@ RETURNING *
 **`deviceApprove({ user_code })`**, by the owner from a sign-in proved in the last 15 minutes, which the record checks because the kernel cannot know when somebody signed in (12 §6.1: an agent may not approve its own request, and a bearer never reaches ADMIN). A code that is not six digits is `VALUE_MALFORMED` and spends no try. `pending = SELECT id, code_hash, reach FROM device_grant WHERE status = 'pending' AND expires > ?`; the row whose `code_hash === hex(sha256(id + ':' + user_code))` (constant-time compare over every pending row) → `UPDATE device_grant SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?`, `appendEvent({ kind: 'access.grant', actor, target: 'device:' + handle, target_kind: 'device_grant', to_v: reach, note: label })`, return `{ handle, reach, scope, label, ua }`, where `handle` is the first 16 hex of `sha256('device:' + id)`. No row → `UPDATE device_grant SET tries = tries + 1 WHERE status = 'pending'`; then `UPDATE device_grant SET status = 'denied' WHERE status = 'pending' AND tries >= 5 RETURNING id` — any → `DEVICE_CODE_TRIES`; else `FORBIDDEN` at `user_code`. A denied row is kept (12 §6.1).
 
 **`listDevices({})`**, the owner's: every `device_grant` row as a `DeviceRow`, named by its handle and never by its id. **`revokeDevice({ handle })`**, the owner's: the row with that handle → `revoked`, a login's token revoked with it, and one `access.revoke` event naming the handle; no row → `OUT_OF_BOUNDS` at `handle`.
+
+**`saveView({ register, id, name, filter?, search?, order?, columns? })`** — `admin(ctx)`. ADMIN AND NOT READ+, which
+is the argument `setDeclaration` already makes: a saved view is not one person's bookmark, it goes on the list and
+everybody who opens that list sees it, so it changes what the record offers. Then: the register must be one this
+record declares (`REGISTER_UNKNOWN`); `id` matches `^[a-z][a-z0-9-]{0,39}$` (`VALUE_MALFORMED`); `name` is present
+(`REQUIRED_MISSING`) and at most 80 characters (`OUT_OF_BOUNDS`); `filter` is compiled by `compile(predicate, schema)`
+and the first refusal it collects is returned as it stands, so a view's filter is held to exactly the grammar `list`
+holds a query to; `search` is at most 200 characters; every field named in `order` or `columns` is one the register
+has (`FIELD_UNKNOWN`, with the addressable fields in `allowed`), and `columns` is at most 40; a register already
+holding fifty views refuses a fifty-first (`OUT_OF_BOUNDS` at `id`). The upsert runs in one transaction and keeps
+`created_by` and `created_at` from the row it replaces, so saving over a name is an edit and not a new view by a new
+person. No `tail()`: a view arms nothing.
+
+**`retireView({ register, id })`** — `admin(ctx)`; `DELETE FROM view WHERE register = ? AND id = ?` → `{ register, id,
+retired: true }`. No row → `VIEW_UNKNOWN` at `id` with the names the register does have. The rows themselves are
+untouched, because a view is a question and not a row.
 
 ### 5.7 · The rules pass (`rules.ts`) — step 9 of the write path, run here through the kernel's hook
 
@@ -1059,7 +1093,7 @@ ok; `httpStatus` over one `Result` per row of §4.2; `kernel.refused()` set → 
 
 ## 10 · Deliberate ceilings
 
-Twenty, each a `ponytail:` line in the file named.
+Twenty-one, each a `ponytail:` line in the file named.
 
 1. `rules.ts` — `ponytail: rules recompiled on every write; cache by [id, version] of the declarations when a write with ten rules passes 5 ms.`
 2. `rules.ts` — `ponytail: hits is a COUNT over event with no actor index; add event_actor or a counter when the rules screen passes 100 ms.`
@@ -1081,6 +1115,7 @@ Twenty, each a `ponytail:` line in the file named.
 18. `read.ts` — `ponytail: DIALECT is a sixteen-line constant kept equal to render's kinds by the closed-lists gate, not by an import — record ⇏ render.`
 19. `read.ts` — `ponytail: whatsNew filters entry events by scope and passes every other kind; values were redacted at write.`
 20. `metrics.ts` — `ponytail: trend is one log-linear fit; no seasonality, no changepoints. Six points cannot carry more.`
+21. `index.ts` — `ponytail: a saved view is a local table and does not travel in a .dog export; a travelling table is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record and asks where their views went.`
 
 ---
 
