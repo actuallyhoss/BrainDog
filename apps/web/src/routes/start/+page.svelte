@@ -31,8 +31,7 @@
   import { firstRun } from '$lib/first-run.ts';
   import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
-  import { firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
-  import { carriedDocument, dayOf, moduleDocument } from '@braindog/seed/usecases/install';
+  import { carriedDocument, dayOf, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
   import { choose as recordOrSample } from '$lib/record/packs.ts';
@@ -344,12 +343,13 @@
       for (const id of modulesToTurnOn(now, Boolean(heard?.name), u)) {
         const state = installed.find((p) => p.id === id);
         if (!state) {
-          const doc = chosen.source.sample ? null : firstPartyDocument(id);
+          /* ANY OF THE SIX MODULES, the agents pack among them: a sentence that mentions agents adds it on a record. */
+          const doc = chosen.source.sample ? null : moduleManifest(id);
           if (!doc) {
             out.absent.push(packName(id));
             continue;
           }
-          const refused = await addPack(client, id as FirstPartyId, held, u);
+          const refused = await addPack(client, id, held, u);
           if (refused) {
             out.refused.push(refused);
             continue;
@@ -461,8 +461,9 @@
    * lists came from the seed has no `pack` row for them), and the record installs a list whose fields
    * point at one it does not hold.
    */
-  async function addPack(client: ReturnType<typeof createClient>, id: FirstPartyId, held: Set<string>, u: UseCase | null): Promise<string | null> {
-    const manifest = firstPartyManifest(id);
+  async function addPack(client: ReturnType<typeof createClient>, id: PackId, held: Set<string>, u: UseCase | null): Promise<string | null> {
+    const manifest = moduleManifest(id);
+    if (!manifest) return firstRun.shapeAbsent(packName(id));
     const lacking = manifest.requires.map((r) => r.slice('register.'.length)).filter((r) => !held.has(r));
     if (lacking.length > 0) return firstRun.shapeNeedsFirst(packName(id), firstRun.shapeAnd(lacking.map((r) => REGISTERS[r]?.name ?? r)));
     /* THE MODULE AS THIS USE CASE INSTALLS IT: its example rows or none, never the sample studio's, and a link to a
@@ -504,13 +505,13 @@
         for (const r of state.registers) held.add(r);
         return null;
       }
-      const doc = firstPartyDocument(id as FirstPartyId);
-      if (!doc) return firstRun.shapeAbsent(packName(id));
-      for (const need of firstPartyManifest(id as FirstPartyId).requires) {
+      const manifest = moduleManifest(id);
+      if (!manifest) return firstRun.shapeAbsent(packName(id));
+      for (const need of manifest.requires) {
         const refused = await ready(need.slice('register.'.length), depth + 1);
         if (refused) return refused;
       }
-      return addPack(client, id as FirstPartyId, held, null);
+      return addPack(client, id as PackId, held, null);
     };
     return ready(register, 0);
   }

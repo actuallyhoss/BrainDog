@@ -13,7 +13,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 
 import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
-import { carriedDocument, dayOf, homePageOf, moduleDocument, moduleExamples } from '../src/usecases/install.ts';
+import { carriedDocument, dayOf, homePageOf, moduleDocument, moduleExamples, moduleManifest } from '../src/usecases/install.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -197,4 +197,19 @@ test('HOME IS NOT ON THE RAIL: a use case declares its Home page with no nav', (
     assert.ok(home, `${id} declares no Home`);
     assert.equal(home.nav, undefined);
   }
+});
+
+test('THE AGENTS PACK IS A MODULE ONBOARDING CAN ADD, with what it needs said and no example rows', async () => {
+  const manifest = moduleManifest('agents');
+  assert.ok(manifest, 'agents is a module');
+  assert.deepEqual([...manifest.requires], ['register.things']);
+  assert.ok(manifest.provides.includes('register.skills'));
+  assert.equal(moduleManifest('usecase-team'), null);
+  const { k, sql } = await record();
+  await put(k, moduleDocument(useCase('team')!, 'portfolio', { today: TODAY }));
+  const doc = moduleDocument(useCase('team')!, 'agents', { today: TODAY });
+  assert.equal(doc?.seeds, undefined, 'the agents pack brings nobody else\'s rows');
+  await put(k, doc);
+  assert.equal(k.count('skills'), 0);
+  sql.close();
 });

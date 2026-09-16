@@ -15,7 +15,8 @@
  * it on Home in place of the house figures (`homePageOf`).
  */
 
-import { firstPartyDocument } from '../packs/first-party.ts';
+import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
+import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
@@ -42,6 +43,9 @@ export type ModuleOptions = {
  * With no use case, the module as it always was, the sample's rows included. `null` for an id that is not one.
  */
 export function moduleDocument(u: UseCase | null, id: string, options: ModuleOptions): Body | null {
+  /* THE AGENTS PACK IS A MODULE TOO, so a sentence that mentions agents adds it rather than saying it is not here. It
+     carries no example rows of anybody's. */
+  if (id === AGENTS_PACK.manifest.id) return agentsPackDocument();
   const bare = firstPartyDocument(id);
   if (!bare) return null;
   const mine = new Set(((bare.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));
@@ -51,6 +55,16 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   const out = dated(doc, options.today);
   if (Array.isArray(out.seeds) && out.seeds.length === 0) delete out.seeds;
   return out;
+}
+
+/**
+ * What a module needs already in the record and the lists it adds, by id, for any of the six a use case may name.
+ * `null` for an id that is not one.
+ */
+export function moduleManifest(id: string): { requires: readonly string[]; provides: readonly string[] } | null {
+  if (id === AGENTS_PACK.manifest.id)
+    return { requires: AGENTS_PACK.manifest.requires, provides: Object.keys(AGENTS_PACK.registers).map((r) => `register.${r}`) };
+  return (FIRST_PARTY as readonly string[]).includes(id) ? firstPartyManifest(id as FirstPartyId) : null;
 }
 
 /** The pack a use case carries, with its voice as settings and its examples' days counted from today, or `null`. */
