@@ -37,9 +37,9 @@
 import { money, parse, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { NOW, REGISTERS, ROWS, display, type BlockResult } from './api.ts';
+import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
 import { declaredValue } from './where.ts';
-import { asMoney, currencyOf, merge, mixedFix, total, type Total } from './money.ts';
+import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 
 /**
  * The rest of the groups, as one group.
@@ -566,7 +566,13 @@ export function draw(
       refusal: block.rows.length ? null : nothing(),
     };
 
-  const segments = toSegments(block);
+  /* A FIGURE IN A LABEL-AND-VALUE ROW READS AS MONEY, the way the table beside it does. The
+     primitive draws its cells as text, so a `spec` block on a project page said `GBP 14.00` under a
+     table saying `£8,530.00`. A code block keeps what was written. */
+  const home = homeCurrency();
+  const segments = toSegments(block).map((s) =>
+    s.type === 'block' && s.kind !== 'code' ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c) => symbolText(c, home)) })) } : s,
+  );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
      columns and is not a card. A section over a register that admitted nothing has nothing under
      it, and its `empty:` is the sentence for that; a section with no source is a heading, and a
