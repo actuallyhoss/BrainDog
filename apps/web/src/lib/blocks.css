@@ -1319,23 +1319,27 @@
 
   /* ── inline: chips ──────────────────────────────────────────────────────── */
 
+  /* A RUN OF COUNTS, SET AS FIGURES AND NOT AS BOXES. Each was a tinted box with 12px of padding
+     and an empty 6px glyph slot, so `22 open` began 26px in from the heading over it; in the light
+     scheme the tint all but vanished and the counts floated in blotches. Now the figure starts on
+     the heading's edge, at a size that ranks it above its word, and the space between pairs is
+     what separates them. A tone still draws its dot, before the figure. */
   .inline {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
+    align-items: baseline;
+    gap: var(--sp-2) var(--sp-6);
   }
 
   .pill {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-2);
-    padding: 5px var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-sm);
     white-space: nowrap;
   }
 
   .pill-glyph {
+    align-self: center;
     inline-size: var(--dot);
     block-size: var(--dot);
     border-radius: var(--r-pill);
@@ -1343,16 +1347,18 @@
     flex: none;
   }
 
-  /* An unknown glyph draws NO glyph rather than shifting the columns. A column that moves is worse
-     than a column an agent has to count (05 §3 invariant 2). */
+  /* An unknown glyph draws no glyph and takes no room: every pill in a run loses it alike, so the
+     figures still line up with each other and with the heading (05 §3 invariant 2). */
   .pill-glyph:not([data-glyph]),
   .pill-glyph[data-glyph=''] {
-    background: none;
+    display: none;
   }
 
   .pill-figure {
     color: var(--ink);
-    font-weight: 500;
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
   }
 

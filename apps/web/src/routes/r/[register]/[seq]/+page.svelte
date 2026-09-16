@@ -553,28 +553,31 @@
     {#if archived}
       <p class="archived-note">{copy.rowArchivedNote}</p>
     {/if}
-    {#if hasLead && row && decl}
-      <section class="lead" aria-label={decl.one}>
-        {#if figure !== null && figureField}
-          <p class="lead-figure num">
-            <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
-          </p>
-        {/if}
-        <p class="lead-line">
-          {#if stateValue}
-            <span class="lead-state" data-intent={leadTone}>
-              {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
-              <span class="lead-word">{stateValue.replace(/_/g, ' ')}</span>
-            </span>
-          {/if}
-          {#if due && dueField}
-            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock, names)} <span class="rel">{relative(String(due), clock)}</span></span>
-          {/if}
-        </p>
-      </section>
-    {/if}
+    <!-- THE FIGURE HEADS THE LEFT COLUMN, AND DETAILS STARTS BESIDE IT. The lead sat above both
+         columns, so the side column began 190px below the title it describes, beside the second
+         field, and ended short of the header's right edge. -->
     <div class="split">
       <section class="fields">
+        {#if hasLead && row && decl}
+          <section class="lead" aria-label={decl.one}>
+            {#if figure !== null && figureField}
+              <p class="lead-figure num">
+                <Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" />
+              </p>
+            {/if}
+            <p class="lead-line">
+              {#if stateValue}
+                <span class="lead-state" data-intent={leadTone}>
+                  {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
+                  <span class="lead-word">{stateValue.replace(/_/g, ' ')}</span>
+                </span>
+              {/if}
+              {#if due && dueField}
+                <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock, names)} <span class="rel">{relative(String(due), clock)}</span></span>
+              {/if}
+            </p>
+          </section>
+        {/if}
         <dl class="field-list">
           {#each listed as f}
             {@const value = row.fields[f.id]}
@@ -968,13 +971,15 @@
 
   .page {
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 1140px;
   }
 
+  /* The fields keep a reading width and the side column ends where the header's actions end, so
+     Archive and the column it acts beside share one edge. */
   .split {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: var(--sp-5);
+    grid-template-columns: minmax(0, 760px) 300px;
+    justify-content: space-between;
+    gap: var(--sp-5) var(--sp-8);
     align-items: start;
   }
 
