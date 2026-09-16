@@ -68,3 +68,15 @@ test('backups, erasure and deletion: the list is a GET, and every other one a PO
     { path: '/api/deleteRecord', method: 'POST', body: { slug: 'the-studio' } },
   ]);
 });
+
+test('a read whose arguments are too long for an address goes as a POST of the same arguments', async () => {
+  const net = recording(null);
+  const c = createClient({ base: 'https://braindog.example', fetch: net.fetch });
+  const doc = { pack: 'big', notes: 'x'.repeat(7000) };
+  await c.planPack({ doc });
+  await c.planPack({ doc: { pack: 'small' } });
+  assert.deepEqual(net.seen, [
+    { path: '/api/planPack', method: 'POST', body: { doc } },
+    { path: '/api/planPack', method: 'GET', body: undefined },
+  ]);
+});

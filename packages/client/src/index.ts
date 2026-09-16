@@ -373,6 +373,9 @@ export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
   const base = options.base.replace(/\/+$/, '');
 
+  /** Past this many encoded bytes of arguments a read is sent as a POST body, well under any server's header ceiling. */
+  const READ_URL_CEILING = 6000;
+
   async function call<T>(name: string, args: Record<string, unknown> = {}): Promise<Result<T>> {
     if (!NAMES.has(name))
       return {
@@ -380,8 +383,12 @@ export function createClient(options: ClientOptions) {
         refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${name}.`, allowed: [...NAMES] },
       };
 
-    const writes = WRITES.has(name);
     const url = new URL(`${base}/api/${name}`);
+    /* A READ TOO LONG FOR AN ADDRESS GOES AS A POST, which the host accepts for any read. `planPack` carries
+       the whole pack, and Money's is over 20 KB: as a query string it was answered 431 by Node's 16 KB header
+       ceiling before the host saw it, so onboarding could add every first-party list but Money. */
+    const long = !WRITES.has(name) && encodeURIComponent(JSON.stringify(args)).length > READ_URL_CEILING;
+    const writes = WRITES.has(name) || long;
     if (!writes)
       for (const [key, value] of Object.entries(args)) {
         /* AND `null` IS ABSENT TOO, BECAUSE A QUERY STRING HAS NO `null` TO SEND. `cursor: null` is
