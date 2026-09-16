@@ -66,12 +66,19 @@ type Answered = {
   tone?: PageBlock['tone'];
   fold?: boolean;
   icon?: string;
-  columns?: { field: string; label?: string; width?: string; align?: 'start' | 'end'; as?: string }[];
-  cells?: { metric: string; label?: string }[];
-  /* THE SIX THE RECORD NEVER CHECKED. `blocks.ts` draws the first five through `escapeCell`, which is
-     `c.replaceAll(…)`, and the last through `r.cells.map(escapeCell)`. Anything that is not the shape
-     the app's type promises is a TypeError inside the page's own render rather than a block saying it
-     cannot be drawn, and a block that throws takes the whole page with it. */
+  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string }[];
+  cells?: { metric: string; label?: unknown }[];
+  /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
+     seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
+     `heading`, `empty`, `body`, `target`, `authored`, and every `label` a column, cell or reading
+     carries. `blocks.ts` draws the text ones through `escapeCell`, which is `c.replaceAll(...)`, and
+     `authored` through `r.cells.map(escapeCell)`. Anything that is not the shape the app's type
+     promises is a TypeError inside the page's own render rather than a block saying it cannot be
+     drawn, and a block that throws takes the whole page with it.
+
+     `label` WAS THE ONE LEFT TRUSTED. The kernel now refuses a non-text label at install, so a
+     record on this build cannot send one; a record on an older kernel still can, and this is the
+     path that reads what a record actually sent rather than what it should have sent. */
   kind?: unknown;
   where?: unknown;
   heading?: unknown;
@@ -81,7 +88,7 @@ type Answered = {
   authored?: unknown;
   rows?: Row[];
   matched?: number;
-  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Said }[];
+  readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said }[];
   scopes?: (string | null)[];
   inherited?: number;
   refusals?: Said[];
@@ -175,7 +182,7 @@ const columnsOf = (b: Answered) => {
     const as = roleOf(c.as);
     return {
       field: c.field,
-      label: c.label ?? c.field,
+      label: str(c.label) ?? c.field,
       width: c.width ?? 'minmax(12ch,1fr)',
       align: c.align ?? 'start',
       truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
@@ -194,7 +201,7 @@ function tileOf(cell: NonNullable<Answered['readings']>[number]): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
   const decl = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
-  const label = cell.label ?? decl?.name ?? cell.metric;
+  const label = str(cell.label) ?? decl?.name ?? cell.metric;
   const r = cell.reading;
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
@@ -308,7 +315,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const authored = authoredOf(b.authored);
   /* A FIGURE'S LABEL IS THE RECORD'S OR ITS OWN NAME. The record checks that a cell names a metric
      and does not check that it carries a label, and the app's type says every cell has one. */
-  const cells = b.cells?.map((c) => ({ metric: c.metric, label: c.label ?? c.metric }));
+  const cells = b.cells?.map((c) => ({ metric: c.metric, label: str(c.label) ?? c.metric }));
 
   /* THE DECLARATION'S COLUMNS ARE REPLACED BY DRAWN ONES, and everything the record sent that this
      file does not name rides through untouched, so a key a later kernel adds is carried rather than

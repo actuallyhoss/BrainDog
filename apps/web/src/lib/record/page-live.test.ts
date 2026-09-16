@@ -283,3 +283,33 @@ test('a money column is one the register declares as money, not one called amoun
   assert.equal(table!.columns[0]?.truncate, 'never');
   assert.equal(table!.columns[1]?.truncate, 'end');
 });
+
+/* A LABEL THAT IS NOT TEXT IS THE SAME CRASH THE OTHER KEYS WERE NARROWED FOR, AND IT WAS LEFT
+   TRUSTED. `blocks.ts` draws a column's label and a figure's label through `escapeCell`, which is
+   `c.replaceAll(...)`, so a number there is a TypeError inside the page's own render and takes every
+   other block on the page with it. The kernel refuses a non-text label at install now, so a record
+   on this build cannot send one. A record on an older kernel still can, and this is the path that
+   reads what a record actually sent. The label falls back to the field or the metric, which is what
+   a column declared without a label already gets. */
+test('a label that is not text is left off rather than drawn, and the page still draws', async () => {
+  const answered = {
+    page: 'desk',
+    title: 'Desk',
+    blocks: [
+      { kind: 'stat', cells: [{ metric, label: 7 }], rows: [], matched: 0, refusals: [] },
+      { kind: 'table', source: 'register.things', columns: [{ field: 'revenue', label: 12 }], rows: [], matched: 0, refusals: [] },
+    ],
+  };
+  const { io } = host((method) =>
+    method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.'),
+  );
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [stat, table] = out.page.blocks;
+
+  assert.equal(table!.columns[0]?.label, 'revenue');
+  assert.equal(stat!.cells?.[0]?.label, metric);
+  assert.doesNotThrow(() => toSegments(table!));
+  assert.doesNotThrow(() => toSegments(stat!));
+});
