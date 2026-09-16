@@ -1589,11 +1589,15 @@ export function walkTable(
   today: string,
   refused: boolean,
 ): Pick<BlockResult, 'columns' | 'rows' | 'shown' | 'total'> {
+  /* FIXED TRACKS, NOT `auto`. Each row is its own grid over one declared track list, so an `auto`
+     track sized itself to each row's own date: the What column started at a different x on every
+     row whose date was a digit longer. Wide enough for "14 Sep 2026" with the tone's gutter, and
+     for "−£19,100.00". */
   const columns = [
-    { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
+    { field: 'day', label: 'When', width: '17ch', align: 'start' as const, truncate: 'end' as const },
     { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },
-    { field: 'delta', label: 'In and out', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
-    { field: 'balance', label: 'Balance', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
+    { field: 'delta', label: 'In and out', width: '15ch', align: 'end' as const, truncate: 'never' as const },
+    { field: 'balance', label: 'Balance', width: '15ch', align: 'end' as const, truncate: 'never' as const },
   ];
   const steps = walk.steps.slice(0, limit ?? 12);
   /* THE CROSSING BY WHAT IT IS, because a record's `crossed` came over the wire as its own object. */
