@@ -701,13 +701,22 @@ const json = (body: unknown, status: number, extra: [string, string][] = []): Re
  * place that is honest about which: the changelog, on the marketing site, with no credential
  * needed to read it.
  */
-const unauthorized = (): Response =>
+/* AND WHICH OF THE TWO SITUATIONS THE HOST IS IN, IT NOW KNOWS. The paragraph above was written when no
+   door existed anywhere, and it stopped being true the moment `SESSION_SECRET` was set: the block at the
+   bottom of this file wires the device grant and the invite door on exactly that condition, so sign-in is
+   on for this deployment or off for it. That is a fact about the deployment and not about any record,
+   which is why it can be said out loud. What stayed unsaid is still unsaid: neither branch admits whether
+   the record named exists, because telling those apart is the thing this one sentence exists to avoid. */
+const unauthorized = (env: Env): Response =>
   json(
     {
       ok: false,
       refusal: {
         code: 'UNAUTHORIZED',
-        fix: 'This record takes a bearer token it already knows, and there is no way to be issued one yet: sign-up is not built. https://brain.dog/changelog says what is.',
+        fix:
+          (env.SESSION_SECRET ?? '').length >= 32
+            ? 'This record takes a bearer token it already knows. If the record is yours, sign in and mint one in Settings, or run `braindog login`. https://brain.dog/changelog says what is built.'
+            : 'This record takes a bearer token it already knows, and sign-in is off on this host, so there is no way to be issued one. https://brain.dog/changelog says what is built.',
       },
     },
     401,
@@ -800,7 +809,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       );
 
     if (door.door === 'refused') {
-      if (door.status === 401 && door.refusal === undefined) return unauthorized();
+      if (door.status === 401 && door.refusal === undefined) return unauthorized(env);
       const extra: [string, string][] = door.retryAfter === undefined ? [] : [['retry-after', String(door.retryAfter)]];
       const body = door.refusal !== undefined ? { ok: false, refusal: door.refusal } : door.retryAfter === undefined ? { ok: false } : { ok: false, retryAfter: door.retryAfter };
       return withCookie(json(body, door.status, extra), door.cookie);
@@ -812,7 +821,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
     const found = await bearerOf(request, 'api', bearerDeps(env));
-    if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unauthorized();
+    if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unauthorized(env);
 
     /* THE WORKER AUTHENTICATES AND THE RECORD AUTHORISES, and neither does the other's half. Every check about
        what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
