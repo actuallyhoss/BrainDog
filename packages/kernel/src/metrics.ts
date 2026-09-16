@@ -345,6 +345,8 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
         at('NOT_IN_THIS_BUILD', `${f.kind} is not an aggregation this build reads`, 'value');
       if (f.lookup && !ctx.lookups?.[f.lookup]) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
       if (f.lookup && f.kind !== 'sum') at('NOT_IN_THIS_BUILD', `a product is summed, and ${f.kind} is not a sum`, 'value');
+      const said = unaggregatable(f.kind, f.field, schema);
+      if (said) at('VALUE_MALFORMED', said, 'value');
     }
 
   const said = schema ? predicateOf(decl.where, schema, ctx) : { predicate: undefined, bad: [] };
@@ -686,6 +688,32 @@ function aggregate(
   /* AN AVERAGE, A MINIMUM AND A MAXIMUM OF NOTHING IS NOT ZERO. A sum of nothing is. */
   if (Number(out?.n ?? 0) === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: null, rows, refusals: [] });
   return ok({ value: out?.v === null || out?.v === undefined ? null : Number(out.v), unit: null, rows, refusals: [] });
+}
+
+/** The field types `sum`, `avg`, `min` and `max` read as numbers. A `bool` is one or zero. */
+const NUMERIC = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'bool']);
+
+/**
+ * Why one aggregation cannot be read as a number, or `null` when it can.
+ *
+ * A DAY IS TEXT TO SQLITE. `sum` and `avg` read `2026-07-28` as 2026, so a sum of two due dates was
+ * 4052, and `min` and `max` hand back the text, which became NaN on the way out and went to a screen
+ * as a blank beside `met: false`. `count` and `distinct` read any field, so they are never refused.
+ */
+function unaggregatable(kind: string, field: string, schema: Schema): string | null {
+  if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
+  const type = Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
+  if (type === undefined || NUMERIC.has(type)) return null;
+  return `${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field.`;
+}
+
+/** Every value expression's aggregations that cannot be read as a number, as install refuses them. */
+export function unaggregatableIn(value: Value, schema: Schema): string | null {
+  for (const f of aggregationsOf(value)) {
+    const said = unaggregatable(f.kind, f.field, schema);
+    if (said) return said;
+  }
+  return null;
 }
 
 /** Every key anywhere in a value expression. A field NAME is a value and never appears here. */

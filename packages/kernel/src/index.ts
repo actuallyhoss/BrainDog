@@ -96,7 +96,7 @@ import {
   type Verdict,
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
-import { evaluateMetric, predicateOf, scorePrediction, snapshot, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import {
   carryingOf,
@@ -1015,6 +1015,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (where !== undefined) {
         const bad = unreadWhere(decl.id, where, schema);
         if (bad) return bad;
+      }
+
+      /* A METRIC THAT SUMS A DAY INSTALLED, and then answered 4052 or a blank on every page it sat on. */
+      if (decl.kind === 'metric' && body.value !== null && typeof body.value === 'object') {
+        const said = unaggregatableIn(body.value as MetricDecl['value'], schema);
+        if (said) return { code: 'VALUE_MALFORMED', fix: `${decl.id}: ${said}`, at: 'value' };
       }
 
       if (decl.kind === 'rule') {
