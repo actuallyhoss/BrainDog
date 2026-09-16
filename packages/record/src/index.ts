@@ -762,11 +762,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * scope to issue for that. The refusal names the thing that IS missing rather than a bigger token
    * somebody would then go looking for.
    */
-  const admin = (ctx: CallContext): Refusal | null => {
+  /* `reads` IS WHAT A READING METHOD SAYS INSTEAD. Listing the copies a record keeps changes nothing,
+     and telling a token it "cannot change what this record is" named a problem the caller did not have. */
+  const admin = (ctx: CallContext, reads?: string): Refusal | null => {
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
-        fix: 'Open this from the app; a token cannot change what this record is.',
+        fix: reads === undefined ? 'Open this from the app; a token cannot change what this record is.' : `Open this from the app; a token cannot ${reads}.`,
         at: 'principal',
       };
     return allows(ctx, 'owner');
@@ -1321,6 +1323,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** A key this call does not take, named with the ones it does, so a value is never dropped unsaid. */
+  /**
+   * A REGISTER NAMED AT ALL, and a row number that is one, before anything is looked up.
+   *
+   * Without it a call with no register was told "There is no register called undefined", and an
+   * update with no `seq` "There is no row contacts#undefined", both of which name a value nobody sent.
+   */
+  const named = (args: unknown, seq = false): Refusal | null => {
+    const a = (args ?? {}) as Record<string, unknown>;
+    if (typeof a.register !== 'string' || !a.register)
+      return { code: 'REQUIRED_MISSING', fix: 'Name the register, such as register: "tasks".', at: 'register' };
+    if (seq && (a.seq === undefined || a.seq === null || a.seq === ''))
+      return { code: 'REQUIRED_MISSING', fix: `Name the row in ${a.register} by its number, such as seq: 3.`, at: 'seq' };
+    if (seq && !(Number.isInteger(Number(a.seq)) && Number(a.seq) >= 1))
+      return { code: 'VALUE_MALFORMED', fix: `A row number is a whole number from 1, and ${JSON.stringify(a.seq)} is not one.`, at: 'seq' };
+    return null;
+  };
+
   const stray = (args: Record<string, unknown>, takes: readonly string[]): Refusal | null => {
     const key = Object.keys(args).find((k) => !takes.includes(k));
     return key === undefined
@@ -1415,6 +1434,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * governance's, which the sentence says, because they are the ones an agent reaches for.
      */
     async get(args: { register?: string; seq?: number; spoken?: string }, ctx: CallContext): Promise<Result<Entry | null>> {
+      /* NOTHING ASKED IS NOT A ROW THAT IS NOT THERE. `get({})` answered 200 null, and `get()` threw. */
+      if (args?.spoken === undefined && args?.register === undefined && args?.seq === undefined)
+        return no('REQUIRED_MISSING', 'Name the row, spoken as S1 or tasks#3, or as a register and a seq.', { at: 'spoken' });
       if (typeof args?.spoken === 'string') {
         const stop = scoped(ctx, 'read');
         if (stop) return { ok: false, refusal: stop };
@@ -1434,6 +1456,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const row = kernel.get(said);
         return ok(row && !readable(ctx, row.register) ? row : null);
       }
+      const missing = named(args, true);
+      if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
       return ok(kernel.get({ register: args.register as string, seq: args.seq as number }));
@@ -1453,8 +1477,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       },
       ctx: CallContext,
     ): Promise<Result<Page<Entry>>> {
+      const missing = named(args);
+      if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
+      /* A LIMIT BELOW ONE IS REFUSED, NOT READ AS FIFTY OR AS ONE. The kernel coerces what a query
+         string cannot parse, and `limit: 0` came back as fifty rows while `limit: -3` came back as
+         one. A number that parses and is out of range is a question with an answer, which is
+         `02 §5`'s bounds. Above 500 is still capped, which is what the ceiling says. */
+      if (args.limit !== undefined && args.limit !== null && Number.isFinite(Number(args.limit)) && Number(args.limit) < 1)
+        return no('OUT_OF_BOUNDS', `A list shows from 1 to 500 rows at a time, and ${args.limit} is below 1.`, { at: 'limit' });
 
       /* A FILTER ON A FIELD WITH NO INDEX IS A SCAN, AND THE RECORD COUNTS IT. `query.scan` is one
          of the four detectors the observe loop ships with — the one with the most carefully derived
@@ -1495,8 +1527,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * old one is not.
      */
     async create(args: { register: string; fields: Patch; note?: string; op_id?: string }, ctx: CallContext): Promise<Result<Entry>> {
+      const missing = named(args);
+      if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
+      /* `deleted_at` IS THE RECORD'S, and a row does not arrive deleted. No register declares it, and
+         dropping it quietly would be a write that did less than it was asked. `delete` is how a row goes. */
+      if (args.fields && typeof args.fields === 'object' && Object.hasOwn(args.fields, 'deleted_at'))
+        return no('FIELD_UNKNOWN', 'deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it.', { at: 'deleted_at' });
       return tail(
         offRegister(
           args.register,
@@ -1516,6 +1554,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args: { register: string; seq: number; patch: Patch; version?: number; note?: string; op_id?: string },
       ctx: CallContext,
     ): Promise<Result<Entry>> {
+      const missing = named(args, true);
+      if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
       return tail(
@@ -2441,7 +2481,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** Every invitation still waiting to be used, newest first. Never a link: those exist once, when minted. */
     async invitations(ctx: CallContext): Promise<Result<InvitationRow[]>> {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'see the invitations waiting');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.listInvitations());
     },
@@ -2540,7 +2580,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** Every token, with a revoke button's worth of information and never the hash. */
     async listTokens(ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'list the tokens this record has issued');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.listTokens());
     },
@@ -2587,7 +2627,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** Every device grant, named by its handle and never by the id the device polls with. */
     async listDevices(ctx: CallContext): Promise<Result<DeviceRow[]>> {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'list the devices signed in to this record');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(await kernel.deviceList());
     },
@@ -2614,7 +2654,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * credentials to a machine they did not authorise.
      */
     async export(args: { sections?: readonly string[]; redactGrants?: boolean; kek_id?: string }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'export this record');
       if (stop) return { ok: false as const, refusal: stop };
 
       /* A SECTION NOBODY HAS IS NOT AN EMPTY EXPORT. `sections: "data"` — the easy JSON mistake —
@@ -2705,7 +2745,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** The copies this host keeps, newest first, each with when it was taken and how large it is. */
     async snapshots(ctx: CallContext): Promise<Result<Snapshot[]>> {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'list the copies this record keeps');
       if (stop) return { ok: false as const, refusal: stop };
       if (!snapshots) return { ok: false as const, refusal: NO_SNAPSHOTS };
       return ok(await snapshots.list());
@@ -2732,8 +2772,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['bookmark', 'at']);
       if (extra) return { ok: false as const, refusal: extra };
-      if (typeof args?.bookmark !== 'string' || !args.bookmark)
+      if (args?.bookmark === undefined || args.bookmark === null || (args.bookmark as unknown) === '')
         return no('REQUIRED_MISSING', 'Which copy? Name it as the list of backups does.', { at: 'bookmark' });
+      /* A BOOKMARK THAT IS THERE AND IS NOT A STRING WAS SENT, so "which copy?" answered a question nobody asked. */
+      if (typeof args.bookmark !== 'string')
+        return no('VALUE_MALFORMED', `A bookmark is the id of a copy, as a string, the way snapshots lists them, and this one is not a string.`, { at: 'bookmark' });
       const kept = await snapshots.list();
       const chosen = kept.find((s) => s.id === args.bookmark);
       if (!chosen)
