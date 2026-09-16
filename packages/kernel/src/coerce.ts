@@ -49,6 +49,11 @@ export type FieldDecl = {
   /** `list<T>`'s element type. */
   of?: Exclude<FieldType, 'list'>;
   values?: readonly string[];
+  /**
+   * `enum` only: the words a person reads for some of its values, `{ owed_to_me: 'Money in' }`. The
+   * column still holds the id; the screen says the label, and a predicate may say either.
+   */
+  labels?: Readonly<Record<string, string>>;
   to?: string;
   /**
    * The name a person reads. Absent means the id with `_` as a space.

@@ -81,8 +81,11 @@ test('a day is spelled, so no reader has to know the local order', () => {
 });
 
 test('an enum reads as words, not as an identifier', () => {
-  assert.equal(display('obligations', 'direction', 'owed_to_me'), 'owed to me');
   assert.equal(display('tasks', 'state', 'done'), 'done');
+  assert.equal(display('obligations', 'state', 'written_off'), 'written off');
+  /* AND A DECLARED LABEL WINS, where the value has one: money in and money out, not who owes whom. */
+  assert.equal(display('obligations', 'direction', 'owed_to_me'), 'Money in');
+  assert.equal(display('obligations', 'direction', 'owed_by_me'), 'Money out');
 });
 
 test('an int is grouped', () => {

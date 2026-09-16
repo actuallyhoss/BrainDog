@@ -705,3 +705,11 @@ test('and the widenings that were built against a measured failure are still the
      field cannot hold, on a money field as much as on a text one. */
   assert.match(compile('obligations', 'amount is at least 10000').bad[0] ?? '', /"at least" is not an operator/);
 });
+
+test('A LABELLED VALUE IS FOUND BY ITS LABEL, as the record finds it, and by its id and words as before', () => {
+  const byLabel = keep('obligations', 'direction is money in').length;
+  const byWords = keep('obligations', 'direction is owed to me').length;
+  assert.deepEqual(compile('obligations', 'direction is money in').bad, []);
+  assert.ok(byLabel > 0);
+  assert.equal(byLabel, byWords);
+});

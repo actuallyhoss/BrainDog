@@ -367,7 +367,8 @@ export function display(
     case 'bool':
       return value ? 'yes' : 'no';
     case 'enum':
-      return String(value).replace(/_/g, ' ');
+      /* THE DECLARED LABEL, where the value has one: `owed_to_me` reads Money in. */
+      return f.labels?.[String(value)] ?? String(value).replace(/_/g, ' ');
     case 'ref': {
       /**
        * A LIVE ROW IS NEVER NAMED FROM THE SAMPLE.
@@ -762,7 +763,8 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
      * as any other text, for the same reason.
      */
     const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
-    if (decl?.type === 'ref') {
+    /* AND AN ENUM WITH LABELS SORTS BY THEM, for the same reason: `owed_by_me` is Money out on screen. */
+    if (decl?.type === 'ref' || (decl?.type === 'enum' && decl.labels)) {
       const sx = display(register, field, x, NOW, names) ?? '';
       const sy = display(register, field, y, NOW, names) ?? '';
       return sx.localeCompare(sy, LOCALE) * sign;

@@ -30,6 +30,8 @@ export type FieldDecl = {
   label?: string;
   /** `enum` only. An unknown value at install is ENUM_VALUE_UNKNOWN. */
   values?: readonly string[];
+  /** `enum` only: the words a person reads for some of its values. The column holds the id. */
+  labels?: Readonly<Record<string, string>>;
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
   index?: boolean;
   /**

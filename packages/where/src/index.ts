@@ -56,7 +56,7 @@ export type Schema = {
    * THE SENTENCE FORM IS FOR PEOPLE AND THE STRUCTURED FORM IS FOR MACHINES, which is `38 §1`'s own
    * division: a sentence somebody can be shown and cannot type back is not a sentence.
    */
-  fields: Record<string, { type: string; values?: readonly string[]; label?: string }>;
+  fields: Record<string, { type: string; values?: readonly string[]; label?: string; labels?: Readonly<Record<string, string>> }>;
   /**
    * WHICH FIELD THE RECORD MIRRORS ONTO THE `state` COLUMN, AND WHY IT IS NOT JUST THE WORD.
    *

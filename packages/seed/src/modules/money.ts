@@ -160,7 +160,17 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
       { id: 'party', label: 'Who', type: 'ref', to: 'people', index: true },
       /* `Which way`, AND IT WAS `Direction`. The values already read as English: "owed by me" and
          "owed to me". The header above them was the only abstract word in the pair. */
-      { id: 'direction', label: 'Which way', type: 'enum', values: ['owed_by_me', 'owed_to_me'], index: true, required: true },
+      /* MONEY IN AND MONEY OUT, and the ids stay: direction is a property of an amount, never the frame,
+         and a person reads which way it goes rather than who owes whom. */
+      {
+        id: 'direction',
+        label: 'Which way',
+        type: 'enum',
+        values: ['owed_by_me', 'owed_to_me'],
+        labels: { owed_by_me: 'Money out', owed_to_me: 'Money in' },
+        index: true,
+        required: true,
+      },
       { id: 'amount', type: 'money', required: true },
       { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
       /* `Status`, AND IT WAS `State` — here and on services, sessions, threads and tasks.

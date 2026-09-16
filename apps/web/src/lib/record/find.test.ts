@@ -367,7 +367,7 @@ test('display() is what is searched, so an enum reads as the words it shows', ()
      identifier underneath — nobody has ever read `owed_to_me` off this screen. It is moot on the
      shipped seed, where every searchable field is text, and it is one declaration away from not
      being moot. */
-  assert.equal(display('obligations', 'direction', 'owed_to_me'), 'owed to me');
+  assert.equal(display('obligations', 'direction', 'owed_to_me'), 'Money in');
   const some = rows({ what: 'Kiln retainer' });
   assert.equal(projected('obligations', some[0]!), 'Kiln retainer');
 });

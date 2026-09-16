@@ -826,6 +826,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             ...(f.values ? { values: f.values } : {}),
             ...(f.to ? { to: f.to } : {}),
             ...(f.label ? { label: f.label } : {}),
+            /* AND AN ENUM'S VALUE LABELS, so `direction is money in` reads as the screen says it. */
+            ...(f.labels ? { labels: f.labels } : {}),
           },
         ]),
     ),

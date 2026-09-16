@@ -1996,7 +1996,7 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
-  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived',
+  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels',
 ] as const;
 
 /**
@@ -2011,6 +2011,38 @@ const FIELD_KEYS = [
  *   `note`           a field's own comment, carried nowhere.
  */
 const FIELD_UNBUILT = ['register', 'derive', 'note'] as const;
+
+/** How long a value's label may be, in UTF-8 bytes: a word or two in a column, never a sentence. */
+const VALUE_LABEL_BYTES = 64;
+
+/**
+ * What is wrong with an enum field's `labels:`, or null.
+ *
+ * A label is text, names a declared value, and does not read as any OTHER value or its label once
+ * case and underscores are folded, because the query grammar accepts all three spellings and one word
+ * must mean one value.
+ */
+function labelsFault(id: string, f: FieldLike, labels: unknown): Refusal | null {
+  if (f.type !== 'enum')
+    return bad('DECLARATION_INVALID', `${id}.${f.id} is a ${f.type}, and labels: names the values of an enum.`, f.id);
+  if (labels === null || typeof labels !== 'object' || Array.isArray(labels))
+    return bad('DECLARATION_INVALID', `${id}.${f.id}'s labels are each value and the words a person reads for it, like { owed_to_me: Money in }.`, f.id);
+  const values = Array.isArray(f.values) ? f.values.filter((v): v is string => typeof v === 'string') : [];
+  const fold = (s: string) => s.replace(/_/g, ' ').trim().toLowerCase();
+  const said = new Map<string, string>();
+  for (const v of values) said.set(fold(v), v);
+  for (const [value, label] of Object.entries(labels as Record<string, unknown>)) {
+    if (!values.includes(value))
+      return bad('ENUM_VALUE_UNKNOWN', `${id}.${f.id} labels ${value}, which is not one of its values: ${values.join(', ')}.`, f.id, [...values]);
+    if (typeof label !== 'string' || label.trim() === '' || new TextEncoder().encode(label).length > VALUE_LABEL_BYTES)
+      return bad('DECLARATION_INVALID', `${id}.${f.id}'s label for ${value} is a word or two of text, at most ${VALUE_LABEL_BYTES} bytes.`, f.id);
+    const taken = said.get(fold(label));
+    if (taken !== undefined && taken !== value)
+      return bad('DECLARATION_INVALID', `${id}.${f.id}'s label for ${value} reads as ${taken}, so a filter saying it could mean either.`, f.id);
+    said.set(fold(label), value);
+  }
+  return null;
+}
 
 /**
  * A transition's: where it goes, the fields a move out needs filled, and `by: decide` for a move
@@ -2574,6 +2606,15 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
        which are the two that read most like a rule and are kept by nothing at all. */
     for (const key of Object.keys(raw as object)) {
       const fault = keyFault(`${id}.${f.id}`, key, FIELD_KEYS, FIELD_UNBUILT, f.id);
+      if (fault) return fault;
+    }
+
+    /* `labels:` NAMES VALUES THE ENUM DECLARES, and nothing else. A label for a value the enum does not
+       hold is a word the screen never shows, and a label that reads as another value would make
+       `direction is paid` mean two rows' worth of things. */
+    const labels = (raw as { labels?: unknown }).labels;
+    if (labels !== undefined) {
+      const fault = labelsFault(id, f, labels);
       if (fault) return fault;
     }
 

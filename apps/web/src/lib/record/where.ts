@@ -289,7 +289,7 @@ const formsOf = (register: string, field: string, value: unknown): string[] =>
 function allowed(register: string, field: string): string[] | null {
   const f = REGISTERS[register]?.fields.find((x) => x.id === field);
   if (!f) return null;
-  if (f.type === 'enum') return (f.values ?? []).map(norm);
+  if (f.type === 'enum') return [...(f.values ?? []), ...Object.values(f.labels ?? {})].map(norm);
   if (f.type === 'ref' && f.to) {
     const title = REGISTERS[f.to]?.title;
     if (!title) return null;

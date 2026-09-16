@@ -440,11 +440,15 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
 function resolve(
   schema: Schema,
   field: string,
-  decl: { type: string; values?: readonly string[]; to?: string },
+  decl: { type: string; values?: readonly string[]; to?: string; labels?: Readonly<Record<string, string>> },
   said: string,
   deps: SentenceDeps,
 ): string | number | null {
   if (decl.type === 'enum') {
+    /* AND IN THE LABEL THE SCREEN SHOWS, where a value has one: `direction is money in`. */
+    const folded = said.replace(/[\s_]+/g, ' ').trim().toLowerCase();
+    const labelled = Object.entries(decl.labels ?? {}).find(([, label]) => label.replace(/[\s_]+/g, ' ').trim().toLowerCase() === folded);
+    if (labelled && (decl.values ?? []).includes(labelled[0])) return labelled[0];
     /* IN THE WORDS A SCREEN SHOWS. `owed to me` is what a person reads and `owed_to_me` is what the
        column holds; both are accepted, and a word the enum does not declare is refused — which is
        the clause that used to be true of every row in the register. */
@@ -511,7 +515,7 @@ function refuseValue(
       code: 'ENUM_VALUE_UNKNOWN',
       fix: `${sentence}: ${schema.register}.${field} has no value ${said}.`,
       at: field,
-      allowed: (decl.values ?? []).map((v) => v.replace(/_/g, ' ')),
+      allowed: (decl.values ?? []).map((v) => (decl as { labels?: Readonly<Record<string, string>> }).labels?.[v] ?? v.replace(/_/g, ' ')),
     };
   /**
    * `REF_UNKNOWN` STAYS, AND IT IS NOW IN `30 §6` RATHER THAN INVENTED HERE.

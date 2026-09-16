@@ -291,7 +291,7 @@ test('a typed line becomes a row the record accepts, and says what it filled in'
     state: 'open',
   });
   /* SAID IN THE READER'S SPELLING, never the record's: `owed_by_me` is "owed by me". */
-  assert.deepEqual(out.filled, ['which way owed by me', 'amount GBP 0.00', 'due 3 Sep 2026', 'status open']);
+  assert.deepEqual(out.filled, ['which way Money out', 'amount GBP 0.00', 'due 3 Sep 2026', 'status open']);
 });
 
 test('the address answers what it already says, and is never guessed at from a set', () => {

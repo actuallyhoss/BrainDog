@@ -241,6 +241,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `type` | one of sixteen, or `list` (`FIELD_TYPE_UNKNOWN`, with the nearest by §5.3) | yes | — | `text document int decimal money quantity day instant duration bool enum ref file url email secret list json` |
 | `of` | `{ type: a value type, register?, values? }` | iff `type: list` | — | — |
 | `values` | 1–50 unique strings | iff `type: enum` | — | — |
+| `labels` | `{ <value>: text ≤ 64 bytes }`, keys ⊆ `values` (`ENUM_VALUE_UNKNOWN`); a label may not read as another value or its label once case and `_` are folded (`DECLARATION_INVALID`). The screen shows the label, the column holds the value, and a predicate may say either | `enum` only | the value with `_` as a space | — |
 | `register` | `Id` — declared in this pack, installed, or provided by a required pack | iff `type: ref` | — | — |
 | `required` | bool; never with `derive` or `retired` | no | `false` | — |
 | `index` | bool; never with `derive` or `retired`; with `unique`, ≤ 8 per register (`INDEXES_OVER_CAP`) | no | `false` | — |
