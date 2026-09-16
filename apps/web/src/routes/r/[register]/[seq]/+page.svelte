@@ -414,6 +414,7 @@
     path
       ? `${holeLabel(path)} would be opened for whoever can supply it`
       : 'The unknown would be opened for whoever can supply it';
+  const pressHole = (path: string | null) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' });
 
   const link = (spoken: string) => {
     const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
@@ -689,10 +690,14 @@
                 <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked
                      span rather than a `<button>` nobody wrote a handler for; with it, this screen
                      owns what pressing one does. No `dayHref`: there is no calendar in this build,
-                     and a date that links to one is an anchor to the error page. -->
+                     and a date that links to one is an anchor to the error page.
+                     On a live record a value the record cannot answer is not pressable: nobody can
+                     supply a declared figure from this screen, so it is marked and left alone. That
+                     is the rule the page screen states beside its own `opts`, and a hole in a row's
+                     prose is the same hole in the same dialect. -->
                 <Document
                   src={String(row.fields[f.id])}
-                  opts={{ resolve, link, now: clock, hole: (path) => toasts.push(copy.notWritten(holeFix(path)), { intent: 'warn' }) }}
+                  opts={{ resolve, link, now: clock, ...(live ? {} : { hole: pressHole }) }}
                 />
               {:else}
                 <p class="missing">{copy.editNotSet}</p>

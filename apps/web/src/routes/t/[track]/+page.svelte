@@ -32,6 +32,7 @@
     healthTone,
     healthOf,
     jobOf,
+    labelOf,
     runsIn,
     updatesIn,
     workingAt,
@@ -39,6 +40,7 @@
   import type { Entry } from '$lib/record/schema.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Opened } from '$lib/record/track-live.ts';
+  import type { RowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -125,6 +127,81 @@
       })
       .finally(() => closed(ok, at));
   });
+
+  /**
+   * POSTING AN UPDATE, THE ONE WRITE THIS SCREEN HAS.
+   *
+   * ON A RECORD IT WRITES, AND ON THE SAMPLE IT SAYS SO. The branch is `fromRecord`, the same one
+   * the rows and the clock above are chosen by: the built-in thread belongs to a studio nobody
+   * signed into, so the button there keeps the sentence it has always shown.
+   *
+   * THE READER STAYS READ-ONLY. `track-live.ts` is a `TrackReader` by design, so this goes through
+   * `rows-write.ts`, the module the list and the row already write through, rather than widening a
+   * reader to carry a verb one screen needs.
+   *
+   * THE BOX ASKS FOR TWO OF THE FOUR PARTS. `updates` declares prose, a health, an author and a
+   * date, and only the first two are anybody's to say: the author is whoever is signed in and the
+   * date is now. A health is asked for rather than chosen on somebody's behalf, because the
+   * declaration's own rule is that prose without a health is not an update.
+   */
+  const bodyField = REGISTERS.updates?.fields.find((f) => f.id === 'body');
+  const healthField = REGISTERS.updates?.fields.find((f) => f.id === 'health');
+  let composing = $state(false);
+  let draft = $state('');
+  let draftHealth = $state(String(healthField?.values?.[0] ?? ''));
+  let posting = $state(false);
+  let writer: RowWriter | null = null;
+
+  function startPost() {
+    if (!fromRecord) {
+      toasts.push(copy.notWritten(copy.updateWouldBePosted));
+      return;
+    }
+    composing = true;
+  }
+
+  async function post(e: SubmitEvent) {
+    e.preventDefault();
+    const words = draft.trim();
+    if (!words || posting || !fromRecord) return;
+    /* The thread it is about, read before the write goes, so an update lands on the thread it was
+       typed on even if the address moves while the record is answering. */
+    const on = seq;
+    posting = true;
+    const m = await import('$lib/record/rows-write.ts');
+    writer ??= m.rowWriter(location.origin);
+    const out = await writer.create('updates', {
+      body: words,
+      health: draftHealth,
+      track: on,
+      by: 'you',
+      at: new Date().toISOString(),
+    });
+    posting = false;
+    /* THE RECORD'S OWN SENTENCE, whichever of the three readings it is, and the typed words stay
+       where they were: a refusal that empties the box costs somebody the thing they wrote. */
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    /**
+     * THE ROW THE RECORD WROTE, PUT INTO THE THREAD IT WAS WRITTEN TO, rather than reading again.
+     *
+     * `create` answers with the row AS STORED, through the same `entryOf` the reader's own rows go
+     * through, so it draws exactly like one that was read. That is the list screen's argument for
+     * landing a written row where it stands, and it holds here for one more reason: this screen's
+     * read is of the whole record, so reading again would walk five registers to learn one line
+     * this answer already carries.
+     *
+     * NOTHING SAYS SO IN A TOAST. The update appearing in the thread, with the health chip in the
+     * header moving to agree with it, is the receipt, which is why a note on a row has none either.
+     */
+    const held = got;
+    if (held?.from === 'live')
+      got = { ...held, thread: { ...held.thread, updates: [out.entry, ...held.thread.updates] } };
+    draft = '';
+    composing = false;
+  }
 </script>
 
 <!-- THE REGISTER'S OWN NAME. Both of these were the literal `Tracks`, so the rename to Threads
@@ -167,9 +244,12 @@
       <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
            what the newest update said, and the thread below it says who said so and when. -->
       <Chip label={healthLabel(health)} tone={healthTone(health.health)} />
-      <Button weight="primary" onclick={() => toasts.push(copy.notWritten('An update would be posted'))}>
+      <!-- ON A RECORD THIS OPENS THE BOX, AND ON THE SAMPLE IT SAYS WHAT WOULD HAPPEN. Both halves
+           are in `startPost`, so the branch is stated once rather than in the markup and again in
+           the handler. -->
+      <Button weight="primary" onclick={startPost}>
         <Icon name="plus" size="s" />
-        Post an update
+        {copy.postUpdate}
       </Button>
     {/snippet}
   </PageHead>
@@ -177,6 +257,25 @@
   <div class="page">
     <section class="lane">
       <Section title="What has been said" count={updates.length}>
+      {#if composing}
+        <!-- AT THE HEAD OF THE THREAD, WHERE THE UPDATE IT WRITES WILL APPEAR, so the gesture and
+             its outcome are in one place on the screen. The two labels are the declaration's own,
+             which is how the rest of this screen names things: a renamed field renames them. -->
+        <form class="composer" onsubmit={post}>
+          <label class="c-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
+          <textarea id="update-body" class="c-area" rows="4" dir="auto" bind:value={draft}></textarea>
+          <div class="c-line">
+            <label class="c-label" for="update-health">{healthField ? labelOf(healthField) : ''}</label>
+            <select id="update-health" class="c-input" bind:value={draftHealth}>
+              {#each healthField?.values ?? [] as v}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
+            </select>
+            <Button type="submit" weight="primary" disabled={posting || draft.trim() === ''}>
+              {posting ? copy.writeMarkSaving : copy.post}
+            </Button>
+            <Button weight="bare" onclick={() => (composing = false)}>{copy.editCancel}</Button>
+          </div>
+        </form>
+      {/if}
       {#if updates.length === 0}
         <!-- Not an error, and not styled as one. Nobody has written about this thread yet, which is
              the ordinary state of one somebody started this morning. -->
@@ -421,5 +520,52 @@
     margin-block-end: var(--sp-4);
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  /* Unboxed, like the updates under it: a hairline between the box and the thread rather than a
+     card floating over a list that has none. */
+  .composer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding-block: var(--sp-4);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .c-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .c-area {
+    inline-size: 100%;
+    padding: var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    line-height: var(--lh-body);
+    resize: vertical;
+  }
+
+  .c-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .c-input {
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
   }
 </style>

@@ -601,6 +601,12 @@ export const copy = {
      of the product had stopped using. They are here so the next rename reaches them. */
   threadNoUpdate: 'An update is a sentence, a health and a date. It is the only thing on a thread that says how it is actually going.',
   threadNoTasks: 'No open tasks on this thread.',
+  /* POSTING ONE. The button's own word and the sample's clause were both typed into the route, so
+     the one control in the product that writes an update kept its words where no review of this
+     file could see them, which is the whole reason this file exists. */
+  postUpdate: 'Post an update',
+  updateWouldBePosted: 'An update would be posted',
+  post: 'Post',
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
