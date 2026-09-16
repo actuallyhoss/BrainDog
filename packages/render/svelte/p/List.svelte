@@ -53,7 +53,8 @@
   /** Roving tabindex: exactly one box is reachable by Tab, every other is -1. */
   let at = $state(0);
   /* The boxes themselves, so a key can move the focus it just moved the tabindex to. A plain array
-     and not `$state`: nothing reads these during render. */
+     and not `$state`: nothing reads these during render. Filled by an attachment, because `bind:this` to
+     a plain array warns on every render in dev. */
   let boxes: (HTMLButtonElement | null)[] = [];
 
   /**
@@ -117,7 +118,12 @@
             aria-label={text(inline(row.cells[0] ?? '', opts)) || TASK}
             data-done={state.done ? 'yes' : 'no'}
             tabindex={i === at ? 0 : -1}
-            bind:this={boxes[i]}
+            {@attach (el) => {
+              boxes[i] = el;
+              return () => {
+                if (boxes[i] === el) boxes[i] = null;
+              };
+            }}
             onclick={() => tick(i, row)}
             onkeydown={(e) => key(e, i)}>{state.done ? '✓' : ''}</button
           >
