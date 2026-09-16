@@ -22,7 +22,19 @@ import { MISSING, integer, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
-import { REGISTERS, decl as fieldOf, toRows, type BlockResult, type Metric } from './api.ts';
+import {
+  REGISTERS,
+  decl as fieldOf,
+  feedTable,
+  historyTable,
+  toRows,
+  walkTable,
+  type BlockResult,
+  type FeedRow,
+  type Metric,
+  type Walk,
+  type WalkStep,
+} from './api.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { format, hrefFor, targetLine, withParam } from './metrics.ts';
@@ -265,6 +277,43 @@ function authoredOf(v: unknown): PageBlock['authored'] {
   return rows.length ? rows : undefined;
 }
 
+const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isStep = (v: unknown): v is WalkStep =>
+  isObject(v) && typeof v.day === 'string' && typeof v.label === 'string' && Number.isFinite(v.delta) && Number.isFinite(v.balance) && typeof v.source === 'string';
+
+/** A `forecast.runway` block's `walk`, when it is one. The record builds it; a record on another build may not have. */
+function walkOf(v: unknown): Walk | null {
+  if (!isObject(v) || !Array.isArray(v.steps) || !v.steps.every(isStep) || !Number.isFinite(v.from)) return null;
+  return {
+    from: v.from as number,
+    currency: typeof v.currency === 'string' ? v.currency : null,
+    steps: v.steps,
+    crossed: isStep(v.crossed) ? v.crossed : null,
+  };
+}
+
+const FEED_BY: readonly FeedRow['by'][] = ['agent', 'rule', 'you'];
+const textOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
+
+/** An `activity` block's `feed`, when every row is one the renderer can file under a group. */
+function feedOf(v: unknown): FeedRow[] | null {
+  if (!Array.isArray(v)) return null;
+  const ok = v.every(
+    (r) =>
+      isObject(r) && FEED_BY.includes(r.by as FeedRow['by']) && Number.isFinite(r.count) && typeof r.at === 'string' &&
+      textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note),
+  );
+  return ok ? (v as FeedRow[]) : null;
+}
+
+/** A `diff` block's `history`, newest first, when every version is text. */
+function historyOf(v: unknown): { at: string; by: string; text: string }[] | null {
+  if (!Array.isArray(v)) return null;
+  return v.every((h) => isObject(h) && typeof h.at === 'string' && typeof h.by === 'string' && typeof h.text === 'string')
+    ? (v as { at: string; by: string; text: string }[])
+    : null;
+}
+
 /** One answered block as the page draws it. */
 export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number): LiveBlock {
   const {
@@ -295,10 +344,10 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     refusals = [],
     values,
     drawn,
-    walk: _walk,
-    feed: _feed,
-    seen: _seen,
-    history: _history,
+    walk: walked,
+    feed: fed,
+    seen: mark,
+    history: versions,
     ...rest
   } = b;
 
@@ -359,10 +408,28 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     return { ...shell, actions, shown: actions.length, total: matched };
   }
 
+  /* A WALK, A FEED AND A DIFF ARE NOT ROWS OF A REGISTER. The kernel answers each as its own key, and each
+     is shaped by the function that shapes the sample's, so the same renderer draws both. One the record
+     did not send, or sent in a shape this cannot read, says it cannot be drawn rather than drawing empty. */
+  if (b.source === 'forecast.runway') {
+    const walk = walkOf(walked);
+    return walk ? { ...shell, ...walkTable(walk, limit, new Date(now).toISOString().slice(0, 10), false) } : cannot;
+  }
+  if (b.source === 'activity') {
+    const feed = feedOf(fed);
+    if (!feed) return cannot;
+    const seen = typeof mark === 'string' ? mark : null;
+    const marks = b.since === 'seen' || mark !== undefined;
+    return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now), total: matched };
+  }
+  if (kind === 'diff') {
+    const history = historyOf(versions);
+    return history ? { ...shell, history, ...historyTable(history, Math.max(matched, history.length)) } : cannot;
+  }
+
   const register = registerOf(b);
-  /* A WALK, A FEED AND A DIFF ARE NOT ROWS OF A REGISTER, and a register the seed does not declare has
-     no labels to draw with. Each says so rather than drawing half an answer. */
-  if (!register || kind === 'diff' || !REGISTERS[register]) return cannot;
+  /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer. */
+  if (!register || !REGISTERS[register]) return cannot;
   /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer. */
   const reduces = REDUCES.has(kind);
   if (reduces && got.length < matched) return cannot;

@@ -1538,13 +1538,6 @@ function runwayBlock(b: PageBlock): BlockResult {
      It mattered the moment the block started stating its total: "12 of 58" where 58 was movements
      inside a window derived from a row count. */
   const walk = runway(b.opening ?? 0, b.from ?? [], b.horizon);
-  const columns = [
-    { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
-    { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },
-    { field: 'delta', label: 'In and out', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
-    { field: 'balance', label: 'Balance', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
-  ];
-  const steps = walk.steps.slice(0, b.limit ?? 12);
   /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
      produces a crossing day that looks real and is invented.
 
@@ -1561,10 +1554,55 @@ function runwayBlock(b: PageBlock): BlockResult {
   return {
     ...b,
     register: undefined,
-    columns,
     entries: [],
     matched: [],
     refusals,
+    ...walkTable(walk, b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
+    drawn: b.drawn ?? drawnWhen(b),
+    stale_at: new Date(NOW).toISOString(),
+    metrics: undefined,
+  };
+}
+
+/** One step of a cash walk, as this build's walk and the record's both send it. */
+export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string };
+
+/** A cash walk, with only the keys the table reads. The record's `crossed` arrives as a copy of a step, not the step. */
+export type Walk = { from: number; currency: string | null; steps: readonly WalkStep[]; crossed: WalkStep | null };
+
+/** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */
+function stepHref(s: WalkStep): string | undefined {
+  if (s.href) return s.href;
+  const m = /^([a-z_][a-z0-9_]*)#(\d+)$/u.exec(s.spoken ?? '');
+  return m ? `/r/${m[1]}/${m[2]}` : undefined;
+}
+
+/**
+ * A cash walk as a table: the columns, the opening row, a row a step, and how many of the steps it shows.
+ *
+ * ONE SHAPE FOR BOTH WALKS, the sample's and the one a record answers on a page, so the two draw the
+ * same table. `today` is the day the opening balance is liquid on, and `refused` draws no row at all.
+ */
+export function walkTable(
+  walk: Walk,
+  limit: number | undefined,
+  today: string,
+  refused: boolean,
+): Pick<BlockResult, 'columns' | 'rows' | 'shown' | 'total'> {
+  const columns = [
+    { field: 'day', label: 'When', width: 'minmax(10ch,auto)', align: 'start' as const, truncate: 'end' as const },
+    { field: 'what', label: 'What', width: 'minmax(16ch,1fr)', align: 'start' as const, truncate: 'end' as const },
+    { field: 'delta', label: 'In and out', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
+    { field: 'balance', label: 'Balance', width: 'minmax(12ch,auto)', align: 'end' as const, truncate: 'never' as const },
+  ];
+  const steps = walk.steps.slice(0, limit ?? 12);
+  /* THE CROSSING BY WHAT IT IS, because a record's `crossed` came over the wire as its own object. */
+  const c = walk.crossed;
+  const crossed = c
+    ? walk.steps.findIndex((s) => s === c || (s.day === c.day && s.balance === c.balance && s.delta === c.delta && s.source === c.source && s.label === c.label))
+    : -1;
+  return {
+    columns,
     shown: steps.length,
     rows: [
       /* THE OPENING IS A ROW, because every balance under it is that number plus a movement. It was
@@ -1575,12 +1613,12 @@ function runwayBlock(b: PageBlock): BlockResult {
       /* AND NO OPENING ROW UNDER A REFUSAL OF ANY KIND, for the reason the mixed-currency case
          already had: a block that refuses draws nothing, and half a table under a sentence saying
          the walk could not be made is the half somebody reads. */
-      ...(refusals.length
+      ...(refused
         ? []
         : [
             {
               key: 'opening',
-              cells: [fmtDay(new Date(NOW).toISOString().slice(0, 10)), 'What is liquid today', '', moneyOr(walk.from, walk.currency)],
+              cells: [fmtDay(today), 'What is liquid today', '', moneyOr(walk.from, walk.currency)],
               href: undefined,
               tone: undefined,
             },
@@ -1588,19 +1626,16 @@ function runwayBlock(b: PageBlock): BlockResult {
       ...steps.map((s, i) => ({
       /* The key is the movement, not the index: two charges on one day from one service are
          different rows, and a keyed list that reuses an index re-renders the wrong one. */
-      key: `${s.day}-${s.source}-${s.href}-${i}`,
+      key: `${s.day}-${s.source}-${stepHref(s)}-${i}`,
       cells: [fmtDay(s.day), s.label, moneyOr(s.delta, walk.currency), moneyOr(s.balance, walk.currency)],
-      href: s.href,
+      href: stepHref(s),
       /* THE CROSSING IS ONE ROW. Painting every row after it the same colour buries the fact the
          walk exists to produce: the day you go under. Everything after it is still under, which is
          `warn` — a state, not an event. */
-      tone: s === walk.crossed ? ('bad' as const) : s.balance < 0 ? ('warn' as const) : undefined,
+      tone: i === crossed ? ('bad' as const) : s.balance < 0 ? ('warn' as const) : undefined,
       })),
     ],
     total: walk.steps.length,
-    drawn: b.drawn ?? drawnWhen(b),
-    stale_at: new Date(NOW).toISOString(),
-    metrics: undefined,
   };
 }
 
@@ -1986,23 +2021,37 @@ function activityBlock(b: PageBlock): BlockResult {
     feed.push(...rest.values());
   }
   /* A DEMO READER HAS NO READ MARK, so the seen row carries no time: the renderer's "not looked yet". */
-  const seen = b.since === 'seen' ? { key: 'seen', cells: ['seen', ''], href: undefined, tone: undefined } : null;
   return {
     ...computed(b, []),
     feed,
     ...(b.since === 'seen' ? { seen: null } : {}),
-    rows: [
-      ...feed.map((r, i) => ({
-        key: `${r.at}-${i}`,
-        cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), r.note ?? [r.kind, r.target].filter(Boolean).join(' '), relative(r.at, NOW)],
-        href: undefined,
-        tone: undefined,
-      })),
-      ...(seen ? [seen] : []),
-    ],
-    shown: feed.length,
+    ...feedTable(feed, b.since === 'seen', null, NOW),
     total: kept.length,
   };
+}
+
+/** When a feed row happened, in words: a day against today, and an instant as how long ago. */
+const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test(at) ? relative(at, now) : since(at, now));
+
+/**
+ * A feed's rows as the renderer reads them, `by | who | count | what | when`, with the `seen` row.
+ *
+ * ONE SHAPE FOR THE SAMPLE'S FEED AND A RECORD'S. On a feed that marks what is new, the `seen` row sits
+ * below the rows newer than the reader's read mark, which the renderer draws as new, and says when that
+ * was. A reader with no mark yet gets it at the end with no time, which is the renderer's "not looked yet".
+ */
+export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number): Pick<BlockResult, 'rows' | 'shown'> {
+  const rows: TableRow[] = feed.map((r, i) => ({
+    key: `${r.at}-${i}`,
+    cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), r.note ?? [r.kind, r.target].filter(Boolean).join(' '), whenOf(r.at, now)],
+    href: undefined,
+    tone: undefined,
+  }));
+  if (marks) {
+    const at = seen === null ? -1 : feed.findIndex((r) => r.at <= seen);
+    rows.splice(at === -1 ? rows.length : at, 0, { key: 'seen', cells: ['seen', seen === null ? '' : whenOf(seen, now)], href: undefined, tone: undefined });
+  }
+  return { rows, shown: feed.length };
 }
 
 /**
@@ -2025,12 +2074,22 @@ function diffBlock(b: PageBlock): BlockResult {
   return {
     ...computed(b, []),
     history,
+    ...historyTable(history, history.length),
+  };
+}
+
+/**
+ * A diff block's lines: the newest version against the one before it, as the renderer reads them. One
+ * version has nothing to compare with and draws no line. `total` is every version the row has held.
+ */
+export function historyTable(history: readonly { text: string }[], total: number): Pick<BlockResult, 'rows' | 'shown' | 'total'> {
+  return {
     rows:
       history.length > 1
         ? diffRows(history[1]!.text, history[0]!.text).map((line, i) => ({ key: String(i), cells: [line], href: undefined, tone: undefined }))
         : [],
     shown: history.length,
-    total: history.length,
+    total,
   };
 }
 

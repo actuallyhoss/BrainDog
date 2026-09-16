@@ -13,7 +13,7 @@ import { MISSING } from 'braindog-render';
 import { METRICS } from './declared.ts';
 import { ROWS } from './api.ts';
 import { toSegments } from './blocks.ts';
-import { liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
+import { blockOf, liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
 const AT = Date.UTC(2026, 8, 15, 12);
@@ -312,4 +312,67 @@ test('a label that is not text is left off rather than drawn, and the page still
   assert.equal(stat!.cells?.[0]?.label, metric);
   assert.doesNotThrow(() => toSegments(table!));
   assert.doesNotThrow(() => toSegments(stat!));
+});
+
+/* A CASH WALK, A FEED AND A DIFF ARE ANSWERED LIVE BY THE KERNEL, as `walk`, `feed` with `seen`, and
+   `history`. This build drew each as "This block cannot be drawn from the record yet". They are now
+   shaped into the rows the sample's own blocks carry, so the same renderers draw them. */
+test('a cash walk, a feed and a diff the record answered are drawn from its answer', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const step = (day: string, delta: number, balance: number, spoken: string) => ({ day, label: `Movement ${spoken}`, delta, balance, source: spoken.split('#')[0], spoken });
+  const steps = [step('2026-09-20', -3000, 2000, 'services#3'), step('2026-10-01', -4000, -2000, 'obligations#7'), step('2026-10-20', -500, -2500, 'services#3')];
+  const walk = blockOf(
+    {
+      kind: 'table', source: 'forecast.runway', horizon: 90, limit: 2, rows: [], matched: 3, refusals: [],
+      walk: { from: 5000, currency: 'GBP', mixed: [], steps, crossed: { ...steps[1] }, days: 15, horizon: 90, refusals: [] },
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(walk.cannot, undefined, 'a walk the record made was drawn as one it cannot');
+  assert.deepEqual(walk.columns.map((c) => c.label), ['When', 'What', 'In and out', 'Balance']);
+  assert.equal(walk.rows.length, 3, 'the opening row and the two steps the limit allows');
+  assert.equal(walk.rows[0]!.key, 'opening');
+  assert.equal(walk.rows[1]!.href, '/r/services/3');
+  assert.deepEqual(walk.rows.map((r) => r.tone), [undefined, undefined, 'bad'], 'the crossing is the row the record named');
+  assert.deepEqual([walk.shown, walk.total], [2, 3]);
+  assert.doesNotThrow(() => toSegments(walk));
+
+  const feed = blockOf(
+    {
+      kind: 'feed', source: 'activity', since: 'seen', rows: [], matched: 3, refusals: [], seen: '2026-09-16T09:00:00.000Z',
+      feed: [
+        { by: 'agent', who: 'S12', count: 2, kind: 'update', target: 'things#1', note: null, at: '2026-09-16T11:00:00.000Z' },
+        { by: 'you', who: 'p_1', count: 1, kind: 'create', target: 'obligations#7', note: 'Filed it', at: '2026-09-15T10:00:00.000Z' },
+      ],
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(feed.cannot, undefined, 'a feed the record read was drawn as one it cannot');
+  assert.deepEqual(feed.rows.map((r) => r.cells[0]), ['agent', 'seen', 'you'], 'the read mark sits under the rows newer than it');
+  assert.notEqual(feed.rows[1]!.cells[1], '', 'a reader with a read mark was drawn as one who has not looked');
+  assert.equal(feed.rows[0]!.cells[2], '2');
+  assert.equal(feed.rows[2]!.cells[3], 'Filed it');
+  assert.deepEqual([feed.shown, feed.total], [2, 3]);
+  assert.doesNotThrow(() => toSegments(feed));
+
+  const diff = blockOf(
+    {
+      kind: 'diff', source: 'register.obligations', row: 'obligations#7', field: 'note', rows: [], matched: 4, refusals: [],
+      history: [
+        { at: '2026-09-15T10:00:00.000Z', by: 'p_1', text: 'one\ntwo\nthree' },
+        { at: '2026-09-10T10:00:00.000Z', by: 'p_1', text: 'one\n2\nthree' },
+      ],
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(diff.cannot, undefined, 'a diff the record read was drawn as one it cannot');
+  assert.ok(diff.rows.length >= 3, 'the two versions were not compared line by line');
+  assert.deepEqual([diff.shown, diff.total], [2, 4]);
+  assert.doesNotThrow(() => toSegments(diff));
+
+  /* AND ONE THE RECORD SENT NOTHING FOR STILL SAYS SO, rather than drawing an empty walk. */
+  assert.equal(blockOf({ kind: 'diff', source: 'register.obligations', rows: [], matched: 0, refusals: [] }, new Map(), now).cannot, liveWords.cannot);
 });
