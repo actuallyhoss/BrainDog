@@ -500,13 +500,13 @@
 {#if got === null}
   <!-- Nothing until the record answers: a sample page drawn and then swapped is two pages. -->
 {:else if got.from === 'refused'}
-  <div class="page">
+  <div class="page said">
     <Empty kind="error" heading title={got.fix}>
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
   </div>
 {:else if !result}
-  <div class="page">
+  <div class="page said">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
          no filter ran, so "nothing matched" is about something that did not happen. It names the
@@ -838,6 +838,12 @@
     gap: var(--sp-7) var(--sp-6);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
+  }
+
+  /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID. In the twelve columns the refusal took
+     the first one, 90px at 1440, and wrapped a word to a line. */
+  .page.said {
+    display: block;
   }
 
   .block-slot {

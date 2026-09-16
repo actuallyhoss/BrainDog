@@ -161,12 +161,14 @@
       A LIVE RECORD CANNOT TELL THESE APART FROM THE INBOX ALONE, so it draws the sentence that is
       true in both, without the tick, and with the door to a connector.
     -->
+    <!-- THE INBOX'S OWN GLYPH. The kind's default is three rules, which on a screen with no rows reads
+         as a menu button that does nothing. -->
     {#if fromRecord}
-      <Empty kind="no-data-yet" title={copy.inboxClear} body={copy.inboxClearWhy}>
+      <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxClear} body={copy.inboxClearWhy}>
         {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
       </Empty>
     {:else if SOURCES.length === 0}
-      <Empty kind="no-data-yet" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
+      <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
         {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
       </Empty>
     {:else}

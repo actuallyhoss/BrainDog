@@ -119,7 +119,7 @@
     <!-- NOT AN ERROR AND NOT A RESULT. Arriving here with no query is the ordinary way in from the
          nav, and `19 §6`'s `no-data-yet` is the state for a surface waiting on you rather than on
          the record. -->
-    <Empty kind="no-data-yet" title={copy.searchWaiting} body={copy.searchWhere} />
+    <Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} />
   {:else if !answer}
     <!-- Nothing until the first answer, so the sample never shows over a live record. -->
   {:else if answer.from === 'refused'}
