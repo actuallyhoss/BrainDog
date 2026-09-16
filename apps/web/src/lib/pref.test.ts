@@ -168,6 +168,6 @@ test('the contrast palette has a switch, and the accent does not fight it for th
 
   /* THE CONTROL EXISTS, on the screen that owns every other palette decision. */
   const appearance = readFileSync(fileURLToPath(new URL('../routes/settings/[area]/+page.svelte', import.meta.url)), 'utf8');
-  assert.match(appearance, /pickContrast\(true\)/u, 'nothing turns the contrast palette on');
-  assert.match(appearance, /aria-pressed=\{moreContrast\}/u, 'the switch does not say which state it is in');
+  assert.match(appearance, /pickContrast\(!moreContrast\)/u, 'nothing turns the contrast palette on');
+  assert.match(appearance, /role="switch"\s+aria-checked=\{moreContrast\}/u, 'the switch does not say which state it is in');
 });
