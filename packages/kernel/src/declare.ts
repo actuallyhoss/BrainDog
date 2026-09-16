@@ -645,6 +645,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       body?: unknown;
       target?: unknown;
       authored?: unknown;
+      where?: unknown;
     };
     const at = `blocks[${i}]`;
     if (block === null || typeof block !== 'object')
@@ -727,6 +728,51 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         `${id}.${at}'s target is ${JSON.stringify(block.target ?? null)}; a target is the number a gauge draws its value against, zero or above.`,
         at,
       );
+
+    /**
+     * A `where` IS A FILTER, WRITTEN AS A SENTENCE OR AS A TREE, and it was forwarded unread.
+     *
+     * `predicateOf` reads both forms, `06 §1.1` and `42 §4.5` call it a predicate, and the tree form
+     * filters correctly at render, so both are admitted. Anything else is refused here because at
+     * render it does not fail loudly; it fails in one of two silent directions, driven on a record:
+     *
+     *     table over a register, where: null, 0 or false    every row, the excluded ones included
+     *     table over a register, where: '' or '   '          every row
+     *     feed, actions, sessions.live: null, 0, false,
+     *       12, true, [] or a tree the compiler refuses      no rows, no refusal, the empty state
+     *
+     * The first is `predicateOf` handing a falsy value back unrefused and the page's `list` wrapper
+     * dropping a falsy `where` as though none were written. The second is `evaluate` answering
+     * `false` for whatever `compile` refuses. A reader sees a filtered table that is not filtered, or
+     * "Nothing yet." over rows that exist, and nothing on the page disagrees with either.
+     *
+     * A SENTENCE THAT SAYS NOTHING IS REFUSED TOO. The grammar reads an empty sentence as no filter,
+     * which is right for a query string and wrong for a declaration: every row is what leaving the
+     * key off already says, so a key written with nothing in it is a filter somebody meant to write.
+     * Clauses are split on the comma exactly as `parseWhere` splits them, so `,,,` is refused here
+     * for the reason the grammar refuses it at render.
+     *
+     * WHAT THE FILTER SAYS IS NOT CHECKED HERE, and cannot be. Every validator `where` exports needs
+     * the register's `Schema` and a clock, this check has neither, and a template page's
+     * `thing is {{name}}` is not a sentence until its row fills it. A field the register lacks is the
+     * record's install lint to refuse, where the schema is.
+     */
+    if (block.where !== undefined) {
+      const where = block.where;
+      const tree = where !== null && typeof where === 'object' && !Array.isArray(where);
+      if (!tree && typeof where !== 'string')
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${at}'s where is ${JSON.stringify(where ?? null)}; a filter is a sentence, such as state is open, or a predicate tree. For every row, take the key off.`,
+          at,
+        );
+      if (typeof where === 'string' && where.split(',').every((clause) => clause.trim() === ''))
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${at}'s where is ${JSON.stringify(where)}, which says nothing a register can answer. Write the filter, such as state is open, or take the key off for every row.`,
+          at,
+        );
+    }
 
     /* A `section`'s two keys. The block keys are not a closed list, so nothing refuses them on another
        kind; only their shape is checked, because `fold: 'yes'` would draw a section shut by accident. */

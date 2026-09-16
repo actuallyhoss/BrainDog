@@ -1172,6 +1172,49 @@ test('AND AUTHORED ROWS ARE ROWS, each one a cells list, because a row without o
   );
 });
 
+test('A WHERE IS A FILTER, because one that is not stops filtering in silence', async () => {
+  /**
+   * `where` was forwarded unread, and at render a malformed one does not throw or refuse. Driven on
+   * a record: a table over a register with `where: null`, `0` or `false` drew every row, the
+   * excluded ones included, because `predicateOf` hands a falsy value back unrefused and the page's
+   * `list` wrapper drops it; `''` drew every row too. A feed with any of those, or `12`, `true` or
+   * `[]`, drew no rows and no refusal, because `evaluate` answers `false` to what `compile` refuses.
+   */
+  const table = (where: unknown) =>
+    page({ blocks: [{ kind: 'table', source: 'register.obligations', columns: [{ field: 'what' }], empty: 'Nothing.', where }] });
+
+  /* BOTH FORMS `predicateOf` READS. A sentence naming a field this check cannot see is admitted,
+     because what a filter says is the register's to judge, and a template's `{{name}}` is not a
+     value until its row fills it. */
+  for (const where of [
+    'state is open',
+    'direction is owed by me, due after yesterday, due before +31d',
+    'thing is {{name}}, state is open or doing',
+    'colour is red',
+    { field: 'state', is: 'open' },
+    { all: [{ field: 'state', is: 'open' }, { field: 'due', before: 'today' }] },
+  ])
+    assert.equal(refusedWith(table(where)), null, `${JSON.stringify(where)} is a filter`);
+
+  for (const where of [null, 0, false, 12, true, [], ['state is open']])
+    assert.equal(refusedWith(table(where)), 'DECLARATION_INVALID', `${JSON.stringify(where)} is not a filter`);
+
+  /* A SENTENCE THAT SAYS NOTHING, split on the comma as the grammar splits it. */
+  for (const where of ['', '   ', ',,,', ' , ,'])
+    assert.equal(refusedWith(table(where)), 'DECLARATION_INVALID', `${JSON.stringify(where)} says nothing`);
+
+  const said = validateDeclaration(table(null));
+  assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
+  assert.match(said?.fix ?? '', /take the key off/);
+
+  /* AND THROUGH THE RECORD, where the unfiltered table was drawn. */
+  const { k, sql } = await record();
+  value(await k.install([OBLIGATIONS]));
+  assert.equal(refusal(await k.install([table(null)])).code, 'DECLARATION_INVALID');
+  value(await k.install([table('state is open')]));
+  sql.close();
+});
+
 test('A BLOCK NAMES ITS KIND, and one that names none draws nothing and says nothing', () => {
   /* `42 §4.5` and `06 §1.1` both mark `kind` required and the check read it as optional, so a block
      with none installed. What it draws is the silence the closed list exists to end rather than a
