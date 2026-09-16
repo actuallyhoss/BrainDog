@@ -280,6 +280,14 @@ the manifest covers; `verify` reports 25 (§13 #10).
 Precondition: the age identity on the operator's machine (§8); `braindog` and `docker` installed; a `log` note naming the
 record and `drill`.
 
+*Amended September 16th 2026.* This drill cannot be run today, and what follows is the specification of one rather than
+a procedure on the calendar. Steps 3 and 4 call `braindog verify`, `braindog import` and `braindog export`: §2.1 above
+lists all three and 48 specifies them (`verify` in 48 §5.6), but 48 names the eleven commands built today and none of
+the three is among them. `braindog verify` answers `braindog has no command called verify`, prints the usage and exits
+1. Step 3's `--key` has no source either: Settings → export shows a public key on the sample only, because no record
+publishes its own key yet, `boot` does not carry it and `03 §4`'s well-known URL is served by none of the three apps.
+There is nothing on that screen for an operator to copy.
+
 1. `wrangler r2 object get braindog-blobs/rec_<id>/snapshots/latest.brainl.age --file latest.brainl.age`
 2. `age -d -i ~/.config/braindog/backup.key latest.brainl.age > latest.brainl`
 3. `braindog verify latest.brainl --key <the record's public key, Settings → export>` → four `✓` lines; 25 tables.

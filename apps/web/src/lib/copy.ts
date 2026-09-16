@@ -1325,6 +1325,13 @@ export const copy = {
   copyKey: 'Copy the key',
   keyCopied: 'Public key copied',
   verifyHow: 'Hand it to somebody with a copy of your record and they can prove it came from here and that no row has changed since. Without it they can prove the file is whole, but not where it came from.',
+  /* AND ON A RECORD THERE IS NO KEY TO SHOW YET. The value under this heading is the sample's, kept
+     in `data.ts` with the rest of the synthetic record, and it was drawn on every record: an
+     invented key presented as that record's own, which no reader could tell by looking. `boot` does
+     not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
+     record gets the fact that its files are signed and the absence said plainly, which is the
+     register `notWritten` uses everywhere else on this screen. */
+  theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
 
   /* deletion — `02 §9`: browser session, re-authenticated, the slug typed */
   /* `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on the screen — in the

@@ -2407,31 +2407,55 @@
         THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE, and this screen is where four documents put
         it. `53 §4`: *"the public half in Settings → export and at the well-known URL 03 §4 names"*.
         `53 §5.4` step 3 has the operator paste it into
-        `braindog verify latest.dogl --key <the record's public key, Settings → export>`, and
-        `48 §5.6` says the answer without it reads **`unpinned`** — the file's own key proves
+        `braindog verify latest.brainl --key <the record's public key, Settings → export>`, and
+        `48 §5.6` says the answer without it reads **`unpinned`**: the file's own key proves
         integrity, and origin is `--key`'s job.
 
         THE ONE KEY THAT BELONGS ON A SCREEN. This product's first promise is that the record indexes
         what a key opens and never the key, and that rule is about SECRETS; the whole mechanism here
-        is publication. It is served to anybody who asks at `GET /.well-known/braindog-key`, which is
-        the sentence beneath it.
+        is publication.
+
+        AND THE KEY BELOW IS THE SAMPLE'S, WHICH WAS BEING SHOWN TO EVERY RECORD. `SIGNING_KEY` sits
+        in `data.ts` with the rest of the synthetic record: no keypair ever produced it, and its two
+        halves were made to agree, so `key_id` really is `sha256(raw)[0:16]` of the value beside it.
+        That is the right shape for an illustration and the wrong thing to print under "How anybody
+        checks a copy is yours" on a record that has a key of its own. A reader cannot tell by
+        looking, and the only caveat near it is `mockNotice`, which is about controls that save
+        nothing rather than about the value above them: invented data, presented as a fact about
+        their data, on the one screen whose job is proving a file is theirs.
+
+        SO IT IS DRAWN WHERE IT IS TRUE AND NOWHERE ELSE. `shell.live` is the question this block
+        needs and the rest of the screen already asks: `false` is the public demo with no record
+        behind it, and a record that refused `boot` is still a record, so it is never handed the
+        sample's key by accident. `agentsFrom`, `peopleFrom` and `copiesFrom` are each one area's own
+        read of its own rows, and this block has no rows to read.
+
+        AND A RECORD IS NOT SHOWN A BLANK. What is true on a record today is that its exports and its
+        backups are signed and that this screen has nowhere to get the public half from: `boot` does
+        not carry it, and `03 §4`'s well-known URL is served by none of the three apps. The sentence
+        says that much, and the value, the copy button and `verifyHow`'s advice go with the key they
+        depend on rather than standing over nothing.
       -->
       <Section title={copy.theSignature}>
-        <p class="hint">{copy.theSignatureIs}</p>
-        <ul class="facts">
-          <li>
-            <span class="fact-key">{copy.keyFingerprint}</span>
-            <span class="fact-value mono">{SIGNING_KEY.keyId}</span>
-          </li>
-          <li>
-            <span class="fact-key">{copy.keyPublic}</span>
-            <span class="fact-value mono wrap">{SIGNING_KEY.publicKey}</span>
-          </li>
-        </ul>
-        <div class="row-actions">
-          <Button weight="bare" onclick={() => void clipboard.put(SIGNING_KEY.publicKey, copy.keyPublic, copy.keyCopied)}>{copy.copyKey}</Button>
-        </div>
-        <p class="hint">{copy.verifyHow}</p>
+        {#if shell.live}
+          <p class="hint">{copy.theSignatureNotHere}</p>
+        {:else}
+          <p class="hint">{copy.theSignatureIs}</p>
+          <ul class="facts">
+            <li>
+              <span class="fact-key">{copy.keyFingerprint}</span>
+              <span class="fact-value mono">{SIGNING_KEY.keyId}</span>
+            </li>
+            <li>
+              <span class="fact-key">{copy.keyPublic}</span>
+              <span class="fact-value mono wrap">{SIGNING_KEY.publicKey}</span>
+            </li>
+          </ul>
+          <div class="row-actions">
+            <Button weight="bare" onclick={() => void clipboard.put(SIGNING_KEY.publicKey, copy.keyPublic, copy.keyCopied)}>{copy.copyKey}</Button>
+          </div>
+          <p class="hint">{copy.verifyHow}</p>
+        {/if}
       </Section>
 
     {/if}
