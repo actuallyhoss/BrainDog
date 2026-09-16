@@ -1431,6 +1431,8 @@
       field is a promise the storage cannot keep at 5,000 rows. */
 
   const filterable = $derived(filterableOf(decl?.fields ?? []));
+  /* The fields the bar filters by: every declared enum a reader can sift on. */
+  const enums = $derived(filterable.filter((f) => f.type === 'enum'));
 
   /** The offer itself, read by the bar and by the pills' counts, so the two are one list. */
   function filterableOf(fields: RegisterDecl['fields']): RegisterDecl['fields'] {
@@ -2158,28 +2160,65 @@
            scrolling the search away. On a laptop this is `display: contents` and the bar is the
            single row it always was. -->
       <div class="bar-rest">
-      {#each filterable.filter((f) => f.type === 'enum') as f}
-        <div class="segmented" role="group" aria-label={labelOf(f)}>
-          {#each f.values ?? [] as value}
-            {@const on = isOn(f.id, value)}
-            <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
-                 "this filter is on" to whoever can see it and nothing at all to anybody else — and
-                 which filters are on is the whole of what the grid underneath is showing. `data-on`
-                 is the style hook; this is the fact. `RowForm`'s own segmented control has carried it
-                 since it was written, so the two were a pair that had drifted. -->
-            <button
-              type="button"
-              class="segment"
-              data-on={on ? '' : undefined}
-              aria-pressed={on ? 'true' : 'false'}
-              onclick={() => toggleFilter(f.id, value)}
-            >
-              <span class="segment-word">{copy.valueWord(value)}</span>
-              <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
-            </button>
-          {/each}
-        </div>
-      {/each}
+      <!--
+        THREE FIELDS OF PILLS DO NOT FIT ONE ROW. Services filters by kind, cycle and status, ten pills
+        that measured 928px beside a 242px search in a 1126px bar at 1440, so the last group and
+        Display wrapped to a second row, and on a phone the strip clipped its own last word. With
+        three or more fields each field is one control instead: its name, the values chosen in it,
+        and a menu of every value with its count. Two fields still fit, and stay pills, where every
+        choice is visible without a press.
+      -->
+      {#if enums.length >= 3}
+        {#each enums as f}
+          {@const chosen = (f.values ?? []).filter((value) => isOn(f.id, value))}
+          <Menu label={labelOf(f)}>
+            {#snippet trigger()}
+              <span class="sift" data-on={chosen.length ? '' : undefined}>
+                <span class="sift-name">{labelOf(f)}</span>
+                {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => copy.valueWord(value)).join(', ')}</span>{/if}
+                <span class="sift-open"><Icon name="chevron" size="s" /></span>
+              </span>
+            {/snippet}
+            {#each f.values ?? [] as value}
+              {@const on = isOn(f.id, value)}
+              <button
+                type="button"
+                class="mi"
+                role="menuitemcheckbox"
+                aria-checked={on ? 'true' : 'false'}
+                onclick={() => toggleFilter(f.id, value)}
+              >
+                <span class="mi-tick">{#if on}<Icon name="check" size="s" />{/if}</span>
+                <span class="mi-name">{copy.valueWord(value)}</span>
+                <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+              </button>
+            {/each}
+          </Menu>
+        {/each}
+      {:else}
+        {#each filterable.filter((f) => f.type === 'enum') as f}
+          <div class="segmented" role="group" aria-label={labelOf(f)}>
+            {#each f.values ?? [] as value}
+              {@const on = isOn(f.id, value)}
+              <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
+                   "this filter is on" to whoever can see it and nothing at all to anybody else — and
+                   which filters are on is the whole of what the grid underneath is showing. `data-on`
+                   is the style hook; this is the fact. `RowForm`'s own segmented control has carried it
+                   since it was written, so the two were a pair that had drifted. -->
+              <button
+                type="button"
+                class="segment"
+                data-on={on ? '' : undefined}
+                aria-pressed={on ? 'true' : 'false'}
+                onclick={() => toggleFilter(f.id, value)}
+              >
+                <span class="segment-word">{copy.valueWord(value)}</span>
+                <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+              </button>
+            {/each}
+          </div>
+        {/each}
+      {/if}
 
       {#if q || filters.length}
         <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
@@ -3159,6 +3198,42 @@
     color: var(--dim);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A FIELD AS ONE CONTROL, drawn as the pills' own track: the same surface, radius and height, its
+     name in the second ink, and what is chosen in it in ink after the name. */
+  .sift {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2) 0 var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  :global(.menu-trigger):hover .sift,
+  .sift[data-on] {
+    background: var(--s3);
+  }
+
+  .sift-chosen {
+    color: var(--ink);
+  }
+
+  .sift-open {
+    display: inline-flex;
+    color: var(--dim);
+    rotate: 90deg;
+  }
+
+  .mi-tick {
+    display: inline-flex;
+    inline-size: var(--sp-4);
+    color: var(--ink);
   }
 
   /* The search box is a pill too, so the bar is one family of shapes. */

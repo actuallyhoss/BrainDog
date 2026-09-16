@@ -37,7 +37,7 @@
   let button = $state<HTMLButtonElement>();
   let list = $state<HTMLElement>();
 
-  const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+  const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]') ?? [])];
 
   /**
    * The gap the panel keeps from the edge of the screen. Eight, so a clamped menu reads as sitting
