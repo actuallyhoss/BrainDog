@@ -1699,6 +1699,240 @@
     }
   }
 
+  /* ── series: bars by bucket ───────────────────────────────────────────────
+     Money in stands on the zero rule in `earn`, money out hangs under it in a quiet neutral, and the
+     net is the one accent line. The current bucket is faint; a bucket still to come is an outline.
+     The words, the two axis figures and the bucket labels are HTML, so nothing stretches. */
+  .block[data-kind='series'] {
+    container-type: inline-size;
+  }
+
+  .series {
+    gap: var(--sp-2);
+  }
+
+  .series-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-4);
+    margin-inline: var(--sp-2);
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-sm);
+  }
+
+  .series-key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+  }
+
+  .series-swatch {
+    flex: none;
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--ink2) 55%, transparent);
+  }
+
+  .series-key[data-dir='in'][data-step='0'] .series-swatch {
+    background: var(--earn-fill);
+  }
+
+  .series-key[data-dir='out'][data-step='0'] .series-swatch {
+    background: color-mix(in srgb, var(--ink2) 40%, transparent);
+  }
+
+  .series-key[data-net] .series-swatch {
+    block-size: 2px;
+    border-radius: 0;
+    background: var(--accent);
+  }
+
+  .series-plot {
+    position: relative;
+    margin-inline: var(--sp-2);
+  }
+
+  .series-chart {
+    display: block;
+    inline-size: 100%;
+    block-size: 180px;
+    overflow: visible;
+  }
+
+  .series-top,
+  .series-bottom {
+    position: absolute;
+    inset-inline-start: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .series-top {
+    inset-block-start: 0;
+  }
+
+  .series-bottom {
+    inset-block-end: 0;
+  }
+
+  .series-zero {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1px;
+  }
+
+  .series-bar {
+    fill: color-mix(in srgb, var(--ink2) 55%, transparent);
+    stroke: none;
+  }
+
+  .series-bar[data-dir='in'][data-step='0'] {
+    fill: var(--earn-fill);
+  }
+
+  .series-bar[data-dir='out'][data-step='0'] {
+    fill: color-mix(in srgb, var(--ink2) 40%, transparent);
+  }
+
+  .series-bar[data-state='partial'] {
+    fill-opacity: 0.45;
+  }
+
+  .series-bar[data-state='ahead'] {
+    fill: none;
+    stroke: var(--dim);
+    stroke-width: 1px;
+    stroke-dasharray: 3 2;
+  }
+
+  .series-net {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5px;
+    stroke-linejoin: round;
+  }
+
+  .series-dot {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 6px;
+    stroke-linecap: round;
+  }
+
+  .series-ticks {
+    display: grid;
+    grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+    margin-inline: var(--sp-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .series-tick {
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .series-tick-short {
+    display: none;
+  }
+
+  .series-empty {
+    margin-inline: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
+  .series-numbers,
+  .forecast-numbers {
+    margin-inline: var(--sp-2);
+  }
+
+  .series-toggle,
+  .forecast-toggle {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .series-toggle::-webkit-details-marker,
+  .forecast-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .series-toggle:hover,
+  .forecast-toggle:hover {
+    color: var(--ink2);
+  }
+
+  @media (pointer: coarse) {
+    .series-toggle,
+    .forecast-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .series-table,
+  .forecast-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--t-sm);
+  }
+
+  .series-table th,
+  .series-table td,
+  .forecast-table th,
+  .forecast-table td {
+    padding: var(--sp-1) var(--sp-2);
+    border-block-end: 1px solid var(--line-soft);
+    color: var(--ink);
+    font-weight: 400;
+    text-align: end;
+  }
+
+  .series-table thead th,
+  .forecast-table thead th {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .series-table th:first-child,
+  .forecast-table th:first-child,
+  .forecast-table td:nth-child(2) {
+    text-align: start;
+  }
+
+  .series-said {
+    margin-inline-start: var(--sp-2);
+    color: var(--dim);
+  }
+
+  @container (inline-size < 30rem) {
+    .series-chart {
+      block-size: 140px;
+    }
+
+    .series-tick-long {
+      display: none;
+    }
+
+    .series-tick-short {
+      display: inline;
+    }
+  }
+
   /* ── inline: chips ──────────────────────────────────────────────────────── */
 
   /* A RUN OF COUNTS, SET AS FIGURES AND NOT AS BOXES. Each was a tinted box with 12px of padding

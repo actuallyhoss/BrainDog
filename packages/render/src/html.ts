@@ -21,6 +21,7 @@ import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
+import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
@@ -236,6 +237,7 @@ function proportional(b: Block, o: RenderOptions): string {
 
   if (b.kind === 'split') return split(b, o);
   if (b.kind === 'bridge') return bridge(b, o);
+  if (b.kind === 'series') return series(b, o);
 
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
@@ -570,6 +572,49 @@ function diff(b: Block): string {
     )
     .join('');
   return `<div class="diff"><p class="diff-sum">${escape(plan.summary)}</p><div class="diff-lines">${body}</div></div>`;
+}
+
+/**
+ * `series`: bars by bucket over a zero rule, in above and out below (`src/series.ts`), a legend, the
+ * bucket labels, and the numbers as a table in a fold. `Series.svelte` is this function's twin.
+ */
+function series(b: Block, o: RenderOptions): string {
+  const plan = seriesPlan(
+    b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))),
+    b.form === 'net',
+  );
+  const net = b.form === 'net';
+  const legend = `<ul class="series-legend">${plan.series
+    .map((s) => `<li class="series-key" data-dir="${s.dir}" data-step="${s.step}"><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${escape(s.label)}</span></li>`)
+    .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}</ul>`;
+  const chart = plan.empty
+    ? `<p class="series-empty">${escape(SERIES_NONE)}</p>`
+    : `<div class="series-plot">${plan.top ? `<span class="series-top num" aria-hidden="true">${escape(plan.top)}</span>` : ''}<svg class="series-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
+        `${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`,
+      )}"><path class="series-zero" d="M0 ${plan.zero}H1000" vector-effect="non-scaling-stroke"></path>${plan.bars
+        .map(
+          (bar) =>
+            `<rect class="series-bar" data-dir="${bar.dir}" data-step="${bar.step}"${bar.state ? ` data-state="${bar.state}"` : ''} x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" vector-effect="non-scaling-stroke"></rect>`,
+        )
+        .join('')}${plan.netLine ? `<path class="series-net" d="${plan.netLine}" vector-effect="non-scaling-stroke"></path><path class="series-dot" d="${plan.netDots}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>${plan.bottom ? `<span class="series-bottom num" aria-hidden="true">${escape(plan.bottom)}</span>` : ''}</div><ol class="series-ticks" aria-hidden="true">${plan.buckets
+        .map(
+          (k) =>
+            `<li class="series-tick"${k.state ? ` data-state="${k.state}"` : ''}><span class="series-tick-long">${escape(k.label)}</span><span class="series-tick-short">${escape(k.short)}</span></li>`,
+        )
+        .join('')}</ol>`;
+  const numbers = plan.buckets.length
+    ? `<details class="series-numbers"><summary class="series-toggle">${SERIES_NUMBERS}</summary><table class="series-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.series
+        .map((s) => `<th scope="col">${escape(s.label)}</th>`)
+        .join('')}${net ? `<th scope="col">${SERIES_NET}</th>` : ''}</tr></thead><tbody>${plan.buckets
+        .map(
+          (k) =>
+            `<tr><th scope="row">${escape(k.label)}${k.said ? `<span class="series-said">${escape(k.said)}</span>` : ''}</th>${k.values
+              .map((v) => `<td class="num">${escape(v)}</td>`)
+              .join('')}${net ? `<td class="num">${escape(k.net)}</td>` : ''}</tr>`,
+        )
+        .join('')}</tbody></table></details>`
+    : '';
+  return `<div class="prop series" style="--cells:${plan.buckets.length}">${legend}${chart}${numbers}</div>`;
 }
 
 const PRIMITIVE_RENDERERS = { panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;

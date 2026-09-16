@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, twenty-three, counted:
+`KINDS`, twenty-four, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -149,6 +149,7 @@ interface KindSpec {
 | `sparkline` | proportional | label · run of numbers · figure | 3 | yes | — | |
 | `split` | proportional | label · value · note | 3 | yes | — | hole |
 | `bridge` | proportional | label · ±amount · note | 3 | no | — | |
+| `series` | proportional | the header row's count: bucket · up to four series (`in:` or `out:`) · `state` (optional) | n | no | — | header, forms `net` |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |
 | `todo` | list | title · detail | 2 | no | — | marker |

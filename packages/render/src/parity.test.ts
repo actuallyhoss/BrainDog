@@ -105,6 +105,10 @@ const SHAPES: Record<string, string> = {
   'a bridge that goes under zero': '```bridge\nStart | 100\nTax | -300 | due 5 Nov\nEnd | -200\n```',
   'a bridge with a row that has no number': '```bridge\nStart | 100\nSomething | soon\nEnd | 100\n```',
   'a bridge of one row': '```bridge\nStart | 100\n```',
+  'a series with net, a gap, a partial and an ahead bucket':
+    '```series net\nMonth | in: Money in | out: Money out | state\nApr 2026 | £4,800.00 | £2,300.00 | \nMay 2026 |  |  | \nSep 2026 | £1,000.00 | £900.00 | partial\nOct 2026 | £2,000.00 |  | ahead\n```',
+  'a series with no numbers at all': '```series | In and out\nMonth | Sales\nApr | \n```',
+  'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
