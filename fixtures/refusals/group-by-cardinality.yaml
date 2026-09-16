@@ -1,0 +1,5 @@
+code:   GROUP_BY_CARDINALITY
+via:    install
+raises: packages/kernel/src/index.ts
+at:     group_by
+fix:    Group by a field with at most fifty values, or cut a date into buckets.

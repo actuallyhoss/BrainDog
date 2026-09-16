@@ -199,9 +199,10 @@ export type { EraseReport, EraseRequest } from './erase.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
+import { GROUP_CAP } from './buckets.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export type { Bucket } from './buckets.ts';
-export { AGGREGATIONS, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
+export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export {
   CHANNELS,
@@ -1060,6 +1061,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'metric' && body.value !== null && typeof body.value === 'object') {
         const said = unaggregatableIn(body.value as MetricDecl['value'], schema);
         if (said) return { code: 'VALUE_MALFORMED', fix: `${decl.id}: ${said}`, at: 'value' };
+      }
+
+      /* A GROUPING WITH MORE PARTS THAN A CHART CAN DRAW IS REFUSED AT INSTALL (`42 §5.3` 18): an enum declaring more
+         than fifty values, or a ref to a list already holding more than fifty rows. A word is unbounded and is cut
+         when it is drawn, and a date is cut into buckets, so neither is counted here. */
+      if (decl.kind === 'metric' && typeof body.group_by === 'string' && body.bucket === undefined) {
+        const field = Object.hasOwn(schema.fields, body.group_by) ? (schema.fields[body.group_by] as { type: string; values?: readonly string[]; to?: string }) : undefined;
+        const n =
+          field?.type === 'enum'
+            ? (field.values?.length ?? 0)
+            : field?.type === 'ref' && typeof field.to === 'string'
+              ? Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', field.to)?.n ?? 0)
+              : 0;
+        if (n > GROUP_CAP)
+          return {
+            code: 'GROUP_BY_CARDINALITY',
+            fix: `${decl.id}: group_by ${body.group_by} has ${n} possible values; the ceiling is ${GROUP_CAP}.`,
+            at: 'group_by',
+          };
       }
 
       if (decl.kind === 'rule') {

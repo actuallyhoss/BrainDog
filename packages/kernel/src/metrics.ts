@@ -522,7 +522,7 @@ function groupsOf(
     for (const key of run.keys) {
       const got = part(`${day} >= ? AND ${day} < ?`, [bucketStart(key, bucket), bucketStart(nextBucket(key, bucket), bucket)]);
       if (!got.ok) return got;
-      groups.push({ key, ...got.value, state: got.value.rows === 0 ? 'empty' : key >= current ? 'partial' : 'full' });
+      groups.push({ key, ...got.value, state: bucketState(key, got.value.rows, current, key === run.keys[0] && run.more === 0) });
     }
     return ok({ groups, current, more: run.more });
   }
@@ -539,6 +539,17 @@ function groupsOf(
   groups.sort(largestFirst);
   return ok({ groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) });
 }
+
+/**
+ * A bucket's state (`08 §2.4`): `empty` when nothing fell in it, `partial` when it is not finished or the data began
+ * inside it, `full` otherwise.
+ *
+ * THE FIRST BUCKET IS WHERE THE DATA BEGAN, so it holds only the days after the first row or after the window's own
+ * edge, and a bar for it is not a month like the others. Past the cap the first bucket drawn is not where the data
+ * began, so it is full.
+ */
+export const bucketState = (key: string, rows: number, current: string, first: boolean): Group['state'] =>
+  rows === 0 ? 'empty' : key >= current || first ? 'partial' : 'full';
 
 /** Does the figure clear its target? A target is a bound, and `met` is a fact about one number. */
 export const meets = (value: number, target: { lte: number } | { gte: number }): boolean =>

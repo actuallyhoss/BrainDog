@@ -27,7 +27,7 @@
  * URL, so they cannot disagree.
  */
 
-import { GROUP_CAP, bucketOf, bucketRun, isBucket, largestFirst, type Bucket, type Group } from '@braindog/kernel';
+import { GROUP_CAP, bucketOf, bucketRun, bucketState, isBucket, largestFirst, type Bucket, type Group } from '@braindog/kernel';
 import { integer, money, shortDay } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
@@ -762,7 +762,7 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, '
     const run = bucketRun(keys[0]!, last, bucket, GROUP_CAP);
     const groups = run.keys.map((key): Group => {
       const g = part(key, byKey.get(key) ?? []);
-      return { ...g, state: g.rows === 0 ? 'empty' : key >= current ? 'partial' : 'full' };
+      return { ...g, state: bucketState(key, g.rows, current, key === run.keys[0] && run.more === 0) };
     });
     return { groups, current, more: run.more };
   }

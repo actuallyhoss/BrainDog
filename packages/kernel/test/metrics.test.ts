@@ -387,6 +387,8 @@ test('A GROUPED FIGURE KEEPS ITS WHOLE AND CARRIES ITS PARTS, a missing bucket a
   assert.equal(byMonth.current, '2026-09');
   assert.deepEqual(keys, ['2026-06', '2026-07', '2026-08', '2026-09']);
   assert.equal(byMonth.groups!.at(-1)!.state, 'partial', 'the month the clock is in is not finished');
+  assert.equal(byMonth.groups![0]!.state, 'partial', 'the month the data began in holds only the days after it began');
+  assert.ok(byMonth.groups!.slice(1, -1).every((g) => g.state !== 'partial'), 'the months between are whole');
 
   const byWeek = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, group_by: 'due', bucket: 'week' }));
   const gaps = byWeek.groups!.filter((g) => g.state === 'empty');
@@ -397,6 +399,22 @@ test('A GROUPED FIGURE KEEPS ITS WHOLE AND CARRIES ITS PARTS, a missing bucket a
   assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'due' })).at, 'bucket');
   assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'party', bucket: 'month' })).code, 'DECLARATION_INVALID');
   assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'nonesuch' })).code, 'FIELD_UNKNOWN');
+
+  /* MORE THAN FIFTY PARTS IS REFUSED AT INSTALL, by the values an enum declares. */
+  const wide = await k.install([
+    {
+      id: 'register.shades',
+      kind: 'register',
+      body: { id: 'shades', name: 'Shades', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'tone', type: 'enum', values: Array.from({ length: 51 }, (_, i) => `t${i}`) }] },
+    } as never,
+    {
+      id: 'metric.by-tone',
+      kind: 'metric',
+      body: { metric: 'by-tone', name: 'By tone', source: 'register.shades', value: { count: 'id' }, group_by: 'tone', format: 'int', target: { gte: 0 }, window: '30d' },
+    } as never,
+  ]);
+  assert.equal(refusal(wide).code, 'GROUP_BY_CARDINALITY');
+  assert.equal(refusal(wide).at, 'group_by');
   assert.equal(
     refusal(k.metric({ ...OVERDUE, group_by: 'party', value: { ratio: { of: { sum: 'amount' }, per: { count: 'id' } } } })).code,
     'NOT_IN_THIS_BUILD',
