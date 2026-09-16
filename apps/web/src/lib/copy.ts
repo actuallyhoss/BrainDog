@@ -1380,7 +1380,7 @@ export const copy = {
 
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
   keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
-  snapshotFailed: 'nothing kept',
+  snapshotFailed: 'Nothing kept',
   download: 'Download',
   restoreTo: 'Restore to a time',
   findTheMoment: 'Find the moment',

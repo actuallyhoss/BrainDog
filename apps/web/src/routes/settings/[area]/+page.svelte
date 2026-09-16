@@ -2203,7 +2203,9 @@
                 </span>
                 <span class="line-main">
                   <span class="line-title">{copyDay(snap.id)}</span>
-                  <span class="line-detail">{relative(snap.at, copiesNow())}</span>
+                  <!-- THE REASON BESIDE ITS DATE. It sat at the far end of the row, 900px from the night it
+                       explains, where it read as a note about some other line. -->
+                  <span class="line-detail">{relative(snap.at, copiesNow())}{#if snap.failed}{' · '}<span class="why-failed">{snap.failed}</span>{/if}</span>
                 </span>
                 <!-- A NIGHT THAT PRODUCED NOTHING SAYS SO, AND SAYS WHY. `12 §8`: "A backup that
                      silently gave up is worse than none" — which is the argument for these two
@@ -2213,8 +2215,7 @@
                   <span class="means">{snap.failed ? copy.snapshotFailed : snap.rows === null ? copy.sizeOnDisk(bytes(snap.bytes)) : copy.rowsAndSize(snap.rows, bytes(snap.bytes))}</span>
                 </span>
                 <span class="line-when">
-                  {#if snap.failed}<span class="why-failed">{snap.failed}</span>
-                  {:else}
+                  {#if !snap.failed}
                     <!-- `49 §5.13`: `GET /api/snapshots/:id` streams the file with
                          `Content-Disposition: attachment`. A self-host's only way back is putting a
                          copy back by hand, so the copy has to be reachable. Cloud's prefix is not
@@ -2659,6 +2660,11 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  /* What failed is read, not skimmed past, so it takes the second ink rather than the date's dim. */
+  .why-failed {
+    color: var(--ink2);
   }
 
   /* The ladder is five levels and a sixth answer, so its segments take the least padding in the
