@@ -158,8 +158,40 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
   founder.sql.close();
 });
 
+test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six milestones', async () => {
+  const team = await made('team');
+  const board = value<{ blocks: Drawn[] }>(team.k.page(homePageOf('team'))).blocks;
+  assert.deepEqual(board.map((b) => b.heading), ['In flight', 'Blocked', 'Due this week']);
+  for (const b of board) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.equal(board[0]!.rows?.length, 2, 'two tickets are in flight');
+  assert.equal(board[1]!.rows?.length, 1, 'one ticket is blocked');
+  assert.equal(board[2]!.rows?.length, 2, 'two tickets are due this week');
+  team.sql.close();
+
+  const guide = await made('guide');
+  assert.equal(guide.k.count('milestones'), 6, 'the guide opens on the six milestones a project passes');
+  assert.equal(guide.k.count('steps'), 3);
+  const home = value<{ blocks: Drawn[] }>(guide.k.page(homePageOf('guide'))).blocks;
+  assert.deepEqual(home.map((b) => b.heading), ['Where you are', 'Your next steps', 'Waiting on you']);
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.equal(home[0]!.rows?.length, 1, 'one milestone is underway');
+  guide.sql.close();
+});
+
+test('THE HOUSE HOME IS A DECLARED PAGE TOO: Money declares `home`, the figures then what is due this week', async () => {
+  const { k, sql } = await record();
+  for (const m of ['portfolio', 'people', 'money-core'] as const) await put(k, moduleDocument(null, m, { today: TODAY }));
+  const home = value<{ blocks: Drawn[] }>(k.page('home')).blocks;
+  assert.deepEqual(home.map((b) => b.heading), ['Right now', 'Due this week']);
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.deepEqual((home[0]!.readings ?? []).map((r) => r.metric), ['owed-to-you', 'due-30d', 'overdue']);
+  const doc = firstPartyDocument('money-core') as { declarations: { page?: string; nav?: unknown }[] };
+  assert.equal(doc.declarations.find((d) => d.page === 'home')?.nav, undefined, 'Home is not on the rail twice');
+  sql.close();
+});
+
 test('HOME IS NOT ON THE RAIL: a use case declares its Home page with no nav', () => {
-  for (const id of ['student', 'founder']) {
+  for (const id of ['student', 'founder', 'team', 'guide']) {
     const doc = carriedDocument(useCase(id)!, TODAY) as { declarations: { page?: string; nav?: unknown }[] };
     const home = doc.declarations.find((d) => d.page === homePageOf(id));
     assert.ok(home, `${id} declares no Home`);

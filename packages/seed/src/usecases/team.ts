@@ -32,11 +32,13 @@ export const TEAM = {
     since_away: 'What the team and its agents did',
     lists: 'Team lists',
   },
-  /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues", or a teammate a "Member", at /packs/usecase-team. */
+  /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues" (and one of them is then an issue), or a teammate a "Member", at
+     /packs/usecase-team. `people:holds` is the line People's list says it holds. */
   labels: {
     tickets: 'Tickets',
     cycles: 'Cycles',
     people: 'Teammates',
+    'people:holds': 'everyone on the team, the part each one plays and how to reach them',
     'people.role.collaborator': 'Teammate',
   },
   skills: [
@@ -114,6 +116,59 @@ export const TEAM = {
           { id: 'points', label: 'Points', type: 'int' },
           { id: 'note', label: 'Notes', type: 'document' },
           { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
+      {
+        /* HOME, AS A TEAM ANSWERS IT (S13): what is moving, what is stuck and what is due, with no place on the rail. */
+        page: 'home-team',
+        title: 'Team',
+        icon: 'home',
+        requires: ['register.tickets', 'register.cycles'],
+        blocks: [
+          {
+            kind: 'table',
+            heading: '{{config:voice_right_now}}',
+            span: 12,
+            source: 'register.tickets',
+            where: 'state is in_progress or in_review',
+            columns: [
+              { field: 'what', label: 'Ticket', width: 'minmax(20ch,1fr)' },
+              { field: 'owner', label: 'Owner', width: 'minmax(10ch,16ch)' },
+              { field: 'agent', label: 'Agent', width: '10ch' },
+              { field: 'state', label: 'Status', width: '12ch', align: 'end' },
+            ],
+            limit: 8,
+            empty: 'Nothing is in flight.',
+          },
+          {
+            kind: 'table',
+            heading: 'Blocked',
+            span: 12,
+            source: 'register.tickets',
+            where: 'state is blocked',
+            columns: [
+              { field: 'what', label: 'Ticket', width: 'minmax(20ch,1fr)' },
+              { field: 'owner', label: 'Owner', width: 'minmax(10ch,16ch)' },
+              { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+            ],
+            limit: 8,
+            empty: 'Nobody is blocked.',
+          },
+          {
+            kind: 'table',
+            heading: 'Due this week',
+            span: 12,
+            source: 'register.tickets',
+            where: 'state is not done or dropped, due before +8d',
+            columns: [
+              { field: 'what', label: 'Ticket', width: 'minmax(20ch,1fr)' },
+              { field: 'state', label: 'Status', width: '12ch' },
+              { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+            ],
+            order: [{ field: 'due', dir: 'asc' }],
+            limit: 8,
+            empty: 'Nothing is due this week.',
+          },
         ],
       },
       {
@@ -215,6 +270,10 @@ export const TEAM = {
     seeds: [
       { register: 'cycles', fields: { name: 'Cycle 1', state: 'active', goal: 'Ship the first version of the board' } },
       { register: 'tickets', fields: { what: 'Write the release notes', state: 'in_progress', priority: 'normal', agent: 'claude' } },
+      { register: 'tickets', fields: { what: 'Agree what goes in the next cycle', state: 'to_do', priority: 'high', due: '+3d' } },
+      { register: 'tickets', fields: { what: 'Fix the sign-in link that expires too soon', state: 'in_review', priority: 'urgent', agent: 'claude' } },
+      { register: 'tickets', fields: { what: 'Wait on the design for the settings screen', state: 'blocked', priority: 'normal', due: '+5d' } },
+      { register: 'tickets', fields: { what: 'Tidy the backlog labels', state: 'done', priority: 'low', agent: 'claude' } },
     ],
   },
 };

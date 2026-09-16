@@ -494,6 +494,47 @@ export const MONEY_RULES: Record<string, SeedRule> = {
 
 export const MONEY_PAGES: Record<string, SeedPage> = {
   /**
+   * THE HOUSE HOME, AS A DECLARED PAGE (`loop/research-spark.md` S13). A record with no use case draws the page called
+   * `home` on Home, the way a use case's record draws `home-<use case>`: the three figures, then what is due this week.
+   * No `nav`, because Home is already on the rail. It is Money's, because every block reads Money's lists, so a record
+   * without Money keeps the plain Home with only what needs deciding. The sample draws its own Home, unchanged.
+   */
+  home: {
+    page: 'home',
+    title: 'Home',
+    icon: 'home',
+    requires: ['register.obligations', 'register.people'],
+    pack: 'money-core',
+    blocks: [
+      {
+        kind: 'stat',
+        heading: 'Right now',
+        span: 12,
+        cells: [
+          { metric: 'owed-to-you', label: 'Owed to you' },
+          { metric: 'due-30d', label: 'Due in 30 days' },
+          { metric: 'overdue', label: 'Overdue to pay' },
+        ],
+      },
+      {
+        kind: 'table',
+        heading: 'Due this week',
+        span: 12,
+        source: 'register.obligations',
+        where: 'state is open or part, due before +8d',
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
+          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        limit: 6,
+        empty: 'Nothing is due this week.',
+      },
+    ],
+  },
+  /**
    * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM (`loop/DIRECTION.md` §2, `research-modules.md`
    * §2.1). It leads with the money there is, then how long it lasts, then what comes in and goes out;
    * which way an amount goes is a property of the row, never the frame of the page.

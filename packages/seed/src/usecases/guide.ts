@@ -5,8 +5,8 @@
  * IT NEEDS NO FIRST-PARTY MODULE. Work's tasks point at Projects and carry no order or milestone, and a
  * person starting a podcast has no portfolio yet, so the guide carries its own four lists: the milestones
  * a project passes, the steps that reach each one, the choices still to make, and what helps along the way.
- * The example rows are the first milestone, its first step, a first choice and a first resource, so the guide opens
- * already guiding. A pack seeds one row per list; the stages a project passes are the milestones' `stage` values.
+ * The example rows are the six milestones a project passes, from an idea to keeping it going, the first three steps,
+ * a first choice and a first resource, so the guide opens already guiding.
  */
 
 export const GUIDE = {
@@ -168,6 +168,54 @@ export const GUIDE = {
         ],
       },
       {
+        /* HOME, AS THE GUIDE ANSWERS IT (S13): the milestone you are on, the next steps and the choices waiting on you. */
+        page: 'home-guide',
+        title: 'Your project',
+        icon: 'home',
+        requires: ['register.milestones', 'register.steps', 'register.choices'],
+        blocks: [
+          {
+            kind: 'table',
+            heading: '{{config:voice_right_now}}',
+            span: 12,
+            source: 'register.milestones',
+            where: 'state is underway',
+            columns: [
+              { field: 'what', label: 'Milestone', width: 'minmax(20ch,1fr)' },
+              { field: 'stage', label: 'Stage', width: '10ch' },
+              { field: 'target', label: 'Aim for', width: '13ch', align: 'end' },
+            ],
+            order: [{ field: 'order', dir: 'asc' }],
+            limit: 3,
+            empty: 'No milestone is underway. Pick the next one on the Guide.',
+          },
+          {
+            kind: 'steps',
+            heading: 'Your next steps',
+            span: 12,
+            source: 'register.steps',
+            where: 'state is to_do or doing',
+            columns: [{ field: 'what' }, { field: 'by' }, { field: 'milestone' }],
+            order: [{ field: 'order', dir: 'asc' }],
+            limit: 3,
+            empty: 'No step is waiting. Add the next small thing to do.',
+          },
+          {
+            kind: 'table',
+            heading: '{{config:voice_needs_you}}',
+            span: 12,
+            source: 'register.choices',
+            where: 'state is open',
+            columns: [
+              { field: 'question', label: 'Question', width: 'minmax(20ch,1fr)' },
+              { field: 'milestone', label: 'Milestone', width: 'minmax(10ch,20ch)' },
+            ],
+            limit: 5,
+            empty: '{{config:voice_nothing_needs_you}}',
+          },
+        ],
+      },
+      {
         /* `Guide` AND NOT `Your project`, which is what this use case's voice calls Home: two rail items with one name. */
         page: 'guide',
         title: 'Guide',
@@ -229,7 +277,14 @@ export const GUIDE = {
     ],
     seeds: [
       { register: 'milestones', fields: { what: 'Say what it is and who it is for', stage: 'idea', state: 'underway', order: 1 } },
-      { register: 'steps', fields: { what: 'Write one sentence about what this is and who it is for', state: 'to_do', order: 1 } },
+      { register: 'milestones', fields: { what: 'Find the people who want it', stage: 'idea', state: 'not_started', order: 2 } },
+      { register: 'milestones', fields: { what: 'Plan the smallest first version', stage: 'plan', state: 'not_started', order: 3 } },
+      { register: 'milestones', fields: { what: 'Make the first version', stage: 'build', state: 'not_started', order: 4 } },
+      { register: 'milestones', fields: { what: 'Share it with the first people', stage: 'launch', state: 'not_started', order: 5 } },
+      { register: 'milestones', fields: { what: 'Keep it going and learn from it', stage: 'grow', state: 'not_started', order: 6 } },
+      { register: 'steps', fields: { what: 'Write one sentence about what this is and who it is for', state: 'to_do', order: 1, by: '+2d' } },
+      { register: 'steps', fields: { what: 'Name three people who would use it', state: 'to_do', order: 2, by: '+5d' } },
+      { register: 'steps', fields: { what: 'Ask one of them what they would want first', state: 'to_do', order: 3, by: '+9d' } },
       { register: 'choices', fields: { question: 'What will it be called?', state: 'open' } },
       { register: 'resources', fields: { name: 'Three projects like yours to learn from', kind: 'example' } },
     ],

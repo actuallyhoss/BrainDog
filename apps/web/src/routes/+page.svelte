@@ -71,10 +71,13 @@
   /**
    * HOME AS THE RECORD'S USE CASE DECLARES IT (`loop/research-spark.md` S13). A use case names its Home as the page
    * `home-<use case>`, and that page is drawn here in place of the house figures, which read Money and asked a
-   * student's record for three figures it refuses. `null` is the house Home: the sample, a record with no use case,
-   * or a use case that declares no Home. Nothing is drawn in its place until the record has said which.
+   * student's record for three figures it refuses. A record with no use case draws the house Home's own page, `home`,
+   * which Money declares. `null` is the sample, which draws the Home below unchanged; a record that holds neither page
+   * draws the Home below too. Nothing is drawn in its place until the record has said which.
    */
-  const declares = $derived(data.live ? homePage() : null);
+  /** The house Home's page, declared by Money (`packages/seed/src/modules/money.ts`). */
+  const HOUSE_HOME = 'home';
+  const declares = $derived(data.live ? (homePage() ?? HOUSE_HOME) : null);
   let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
   let asking = $state(false);
   const news = $derived(data.live ? (feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped }) : null);
@@ -92,13 +95,13 @@
     let ok = false;
     asking = slug !== null;
     const page = slug === null ? Promise.resolve(null) : import('$lib/record/page-live.ts').then((m) => m.pageReader(location.origin).read(slug)).catch(() => null);
-    const home = import('$lib/record/news-live.ts').then((m) => m.readHome(location.origin, me, undefined, m.homeFigures(lists, slug !== null)));
     void page
       .then((got) => {
         declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now } : null;
         asking = false;
+        /* THE FIGURES ARE ASKED FOR ONLY WHEN NO PAGE SAYS WHAT LEADS, so a record without Money's `home` is not asked twice. */
+        return import('$lib/record/news-live.ts').then((m) => m.readHome(location.origin, me, undefined, m.homeFigures(lists, declared !== null)));
       })
-      .then(() => home)
       .then((out) => {
         if (out.from !== 'live') return;
         tiles = out.tiles;
