@@ -40,6 +40,13 @@ The operator's surface: two command sets, one log stream with its dashboards, an
 
 ### 2.1 · `braindog` (33 §5; 48)
 
+*Amended September 16th 2026.* Two of the commands below exist today: `login` and `init`. 48 §2 names the eleven the
+CLI dispatches, and `export`, `import`, `verify`, `token` and `runner` are not among them, while `--version` answers
+that it is not built yet. The rows stay because they specify the operator's surface, not because a procedure can call
+them. `braindog verify` in particular answers `braindog has no command called verify`, prints the usage and exits 1, so
+the "every backup check" beside it names no check that runs today, and the procedures that call these commands say so
+where they call them (§5.4, §5.5).
+
 | Command | Used in | Note |
 |---|---|---|
 | `braindog login <host>` | every Cloud procedure the CLI runs | RFC 8628; a `read`+`write` token in `hosts.json`. An ADMIN command answered `NEEDS_BROWSER_SESSION` asks for an **operation grant** — ten minutes, one command, approved by the owner in the browser for the named subject, held in memory, never written (48 §5.2, D1) |
@@ -141,6 +148,15 @@ diagnosis.
 ## 4 · Data structures
 
 The artefacts an operator handles, each with invariants a test can check.
+
+*Amended September 16th 2026.* Two rows below name something an operator cannot reach today. In the `.brain` /
+`.brainl` row, "`braindog verify` passes offline" is the property the format is built to have and not a check anybody
+can run: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (§2.1). In the signing
+key row, "the public half in Settings → export and at the well-known URL 03 §4 names" is true of the built-in sample
+alone. The export screen draws that key on the demo only, and tells a live record that its exports and backups are
+signed and that the public half is not shown there yet; `03 §4`'s well-known URL is served by none of the three apps.
+On Cloud "generated on first run" does not hold either, because the key store is opened only when the `KEK` secret is
+bound and it is unset, so no record there has a signing key at all.
 
 | Artefact | Shape | Invariants |
 |---|---|---|
@@ -308,6 +324,12 @@ starts at step 3 with `<slug>/snapshots/<date>.brain`.
 | a bad write, rule, import or corruption inside 30 days, Cloud | **(a) PITR** |
 | older than 30 days, or the object is gone, Cloud | **(b) from `.brainl.age`** |
 | self-host | **(c) `restore` from a kept copy (§5.4), or `import` into a fresh directory** |
+
+*Amended September 16th 2026.* None of the three paths can be walked today, and what follows is the specification of a
+restore rather than steps to take now. (b) and (c) both call `braindog import`, (b)'s precondition is §5.4's drill,
+which §5.4 says cannot be run, and (b)'s Verify line calls `braindog export` and `braindog verify`; none of the three
+is among the eleven commands the CLI dispatches (§2.1). (a) calls `restore`, and §5.4 above says Cloud refuses
+`snapshot`, `snapshots` and `restore` with `NOT_IN_THIS_BUILD` and writes nothing.
 
 **(a) PITR.** The owner, Settings → backups → *restore to a time* — `POST /api/restore { at }`, cookie, ADMIN
 (51 §5.14).

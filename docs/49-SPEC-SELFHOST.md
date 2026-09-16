@@ -657,7 +657,7 @@ boot or on the wire ever prints a token, a code, a cookie value or a payload.
 | `Http` | private, loopback, link-local, CGNAT and ULA ranges refused after resolution; `redirect: 'manual'`; 2 MB cap; timeout from the caller. `ponytail:` resolve-then-connect leaves a rebinding window |
 | Scheduled actions | The send loop is `@braindog/host/actions`, the one the Worker runs: https to an origin an active declaration names, a host written as a literal private or local address refused, same-origin redirects three at most, 10 s, 2 MB, the ledger asked first, and the key's value scrubbed from the answer and from every refusal sentence. `src/actions.ts` passes in what only this host has, September 15th 2026: its key opener, a `pin` step in which the host is resolved before connecting and refused when any address it gives is unspecified (`0/8`, `::`), loopback (`127/8`, `::1`), private (`10/8`, `172.16/12`, `192.168/16`), link-local (`169.254/16`, `fe80::/10`), unique-local (`fc00::/7`), carrier-grade NAT (`100.64/10`), multicast (`224/4`, `ff00::/8`), reserved (`240/4`), or an IPv6 form carrying one of those (mapped, compatible, NAT64); the socket connects through a `lookup` that answers only the checked address, so no second lookup happens; every same-origin redirect hop resolved and checked again, three at most; 10 s; 2 MB. A refused address is `PULL_ORIGIN_REFUSED` with one sentence, a failure on the run's event that pauses nothing and is not retried. Each run asks the Directory's `mayRun` first and each pass's usage goes to `meter`; the record is put on the `selfhost` plan at its first pass (and `init` provisions it there), so a self-host is never held |
 | SMTP | credentials from env, not the vault — the vault cannot hold what sends its own recovery mail (12 §6); TLS required |
-| Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged |
+| Backups | a snapshot holds sealed `grant` rows and the KEK-wrapped `vault_key`; the six `local` tables are empty; it opens nothing without the KEK file. `braindog verify` proves it unchanged, and is **not built**: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 §2), so nothing checks a snapshot today |
 | Logs | `{ code, route, recId }` and shapes only; the `secret-grep` gate (33 §8) runs over this app's write paths and log lines |
 | Multi-user | `BRAINDOG_TOKEN` exchange refuses when the Directory holds more than one person |
 
@@ -747,6 +747,9 @@ and captures `DATA`).
 | `wake()` after a write | drain begins within 5 ms, before the 15 s tick |
 
 **Snapshots**
+
+*Amended September 16th 2026.* The two rows that call `braindog verify` cannot be written as they stand: `verify` is
+specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 §2).
 
 | Input | Expected |
 |---|---|
@@ -864,7 +867,7 @@ so its row is what this spec needs from it:
 | 7 | `BRAINDOG_ORIGIN` — the public origin, for magic-link URLs, the WebAuthn `rpId` and the CSRF origin check; default `http://localhost:<PORT>` | 33 §6 |
 | 8 | **How a request names its record on a multi-record host** (§5.3): one record is implicit; a bearer is found by hash; a session row carries the record; a share, email or webhook path carries its own; `/a/<sha256>` is content-addressed across records | 33 §4 (one sentence after the table); 33 §6 Data row |
 | 9 | `notify.push` on the self-host through `@pushforge/builder@2.0.5`, VAPID keys at `<data>/vapid.json` | ADR-046: "the Worker and the self-host" |
-| 10 | **Snapshots are exports**: the `VACUUM INTO` copy has its six `local` tables emptied, is vacuumed again, manifested and signed, so `braindog verify` prints 25 tables; `Snapshots.restore` throws and `restore` has no route — restore is `braindog import` into a fresh directory | 33 §6 Snapshots row: "→ strip `local` → manifest → sign"; 33 §9 Restore row: "self-host: offline, no route" |
+| 10 | **Snapshots are exports**: the `VACUUM INTO` copy has its six `local` tables emptied, is vacuumed again, manifested and signed, so `braindog verify` prints 25 tables; `Snapshots.restore` throws and `restore` has no route — restore is `braindog import` into a fresh directory. **Not built**: neither `verify` nor `import` is among the eleven commands the CLI dispatches today (48 §2), so nothing prints the 25 tables and no directory is restored this way yet | 33 §6 Snapshots row: "→ strip `local` → manifest → sign"; 33 §9 Restore row: "self-host: offline, no route" |
 | 11 | `POST /a` uploads (the table listed only the GET); `POST /api/snapshot`, `GET /api/snapshots[/:id]` are the two owner routes 12 §8 names | 33 §4 (three rows) |
 | 12 | `invite` is the **acceptance-time** record write, called with the owner principal from `record_dir.owner_person`; minting is a Directory write and an email by the host | 33 §10 Invite row; 30 §5 ADMIN note |
 | 13 | A share recipient is a principal: `{ kind: 'share'; id; slug }`; tokens are HMAC-signed with `HKDF(KEK, 'braindog/share')`, stateless, terminally revoked by `share.close` | 33 §2 `CallContext.principal`; 30 §10 share row |
@@ -893,12 +896,12 @@ Twenty-three, counted.
 - [ ] Device flow on 48's wire: `login` yields a `write` token once; `runner` a 90-day bearer; `export` a ten-minute operation grant that reaches `export` and nothing else; five wrong codes deny; expiry after ten minutes.
 - [ ] A write re-arms the timer; the timer drains within 250 ms of `due_at`; a 40-day row is clamped and chained.
 - [ ] The poller leases, dispatches to the mock SMTP and acks; a failure produces the `retry` row; `infer.*` is never leased.
-- [ ] A nightly snapshot verifies with `braindog verify` at 25 tables; thirty are kept.
+- [ ] A nightly snapshot verifies with `braindog verify` at 25 tables; thirty are kept. **Not tickable today**: `verify` is none of the eleven commands the CLI dispatches (48 §2), so the verifying half of this box has nothing to run.
 - [ ] `SCHEMA_NEWER` on one record gives 503 on its routes and 200 on another's.
 - [ ] `POST /a` stores a PNG and refuses an SVG; `GET /a/<sha>` carries the four headers.
 - [ ] `GET /D41` and `GET /tasks%237` redirect; the shell answers everything else from `apps/web/build`.
 - [ ] `secret-grep` finds nothing in `apps/selfhost/src`; no response ever carries `Access-Control-Allow-Origin`.
-- [ ] The phase-2 round trip of BUILD.md — `init → pack install → create → export → verify` — passes against this process over HTTP.
+- [ ] The phase-2 round trip of BUILD.md — `init → pack install → create → export → verify` — passes against this process over HTTP. **Not tickable today**: of those steps the CLI dispatches `init` alone, `pack install`, `export` and `verify` being none of its eleven commands (48 §2).
 - [ ] Every amendment in §13 is applied to its design document in the same revision.
 
 ---
