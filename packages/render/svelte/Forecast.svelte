@@ -85,6 +85,41 @@
     <p class="forecast-empty">{FORECAST_NONE}</p>
   {:else}
     <p class="forecast-said" data-intent={plan.warn ? 'warn' : undefined}>{#if plan.warn}<span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>{/if}{plan.said}</p>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="forecast-plot"
+      onpointerdown={grab}
+      onpointermove={track}
+      onpointerleave={() => (scrub = null)}
+      onpointercancel={() => (scrub = null)}
+    >
+      <span class="forecast-top num" aria-hidden="true">{plan.top}</span>
+      <span class="forecast-bottom num" aria-hidden="true">{plan.bottom}</span>
+      <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={plan.sentence}>
+        <path class="forecast-zero" d="M0 {plan.zero}H1000" vector-effect="non-scaling-stroke"></path>
+        {#if plan.base}<path class="forecast-base" d={plan.base} vector-effect="non-scaling-stroke"></path>{/if}
+        {#if plan.up}<path class="forecast-stem" data-move="up" d={plan.up} vector-effect="non-scaling-stroke"></path>{/if}
+        {#if plan.down}<path class="forecast-stem" data-move="down" d={plan.down} vector-effect="non-scaling-stroke"></path>{/if}
+        {#if plan.past}<path class="forecast-past" d={plan.past} vector-effect="non-scaling-stroke"></path>{/if}
+        <path class="forecast-future" d={plan.future} vector-effect="non-scaling-stroke"></path>
+        <path class="forecast-low" d={plan.low} vector-effect="non-scaling-stroke"></path>
+        {#if plan.cross}<path class="forecast-cross" d={plan.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
+      </svg>
+      {#if plan.cross}<span class="forecast-pin" style="--at:{plan.cross.at}" aria-hidden="true">{TONES.warn.glyph}{plan.cross.day}</span>{/if}
+      {#if readout}
+        <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
+          <span class="forecast-readout-day">{readout.day}</span>
+          <span class="forecast-readout-balance num">{readout.balance}</span>
+          {#each readout.moves as m}
+            <span class="forecast-readout-move"><span class="forecast-readout-label">{m.label}</span><span class="num">{m.amount}</span></span>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    <ol class="forecast-ticks" aria-hidden="true">
+      {#each plan.ticks as t}<li class="forecast-tick" style="--at:{t.at}">{t.label}</li>{/each}
+    </ol>
+    <!-- THE KNOBS COME AFTER THE CHART, so the answer is read before the questions a reader may ask of it. -->
     {#if knobbed}
       <div class="forecast-knobs">
         {#if model.knobs.includes('horizon') && choices.length > 1}
@@ -132,38 +167,6 @@
         <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
       {/if}
     {/if}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="forecast-plot"
-      onpointerdown={grab}
-      onpointermove={track}
-      onpointerleave={() => (scrub = null)}
-      onpointercancel={() => (scrub = null)}
-    >
-      <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={plan.sentence}>
-        <path class="forecast-zero" d="M0 {plan.zero}H1000" vector-effect="non-scaling-stroke"></path>
-        {#if plan.base}<path class="forecast-base" d={plan.base} vector-effect="non-scaling-stroke"></path>{/if}
-        {#if plan.up}<path class="forecast-stem" data-move="up" d={plan.up} vector-effect="non-scaling-stroke"></path>{/if}
-        {#if plan.down}<path class="forecast-stem" data-move="down" d={plan.down} vector-effect="non-scaling-stroke"></path>{/if}
-        {#if plan.past}<path class="forecast-past" d={plan.past} vector-effect="non-scaling-stroke"></path>{/if}
-        <path class="forecast-future" d={plan.future} vector-effect="non-scaling-stroke"></path>
-        <path class="forecast-low" d={plan.low} vector-effect="non-scaling-stroke"></path>
-        {#if plan.cross}<path class="forecast-cross" d={plan.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
-      </svg>
-      {#if plan.cross}<span class="forecast-pin" style="--at:{plan.cross.at}" aria-hidden="true">{TONES.warn.glyph}{plan.cross.day}</span>{/if}
-      {#if readout}
-        <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
-          <span class="forecast-readout-day">{readout.day}</span>
-          <span class="forecast-readout-balance num">{readout.balance}</span>
-          {#each readout.moves as m}
-            <span class="forecast-readout-move"><span class="forecast-readout-label">{m.label}</span><span class="num">{m.amount}</span></span>
-          {/each}
-        </div>
-      {/if}
-    </div>
-    <ol class="forecast-ticks" aria-hidden="true">
-      {#each plan.ticks as t}<li class="forecast-tick" style="--at:{t.at}">{t.label}</li>{/each}
-    </ol>
     <details class="forecast-numbers">
       <summary class="forecast-toggle">{FORECAST_NUMBERS}</summary>
       <table class="forecast-table">

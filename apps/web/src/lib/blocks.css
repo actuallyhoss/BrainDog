@@ -1803,8 +1803,9 @@
     fill-opacity: 0.45;
   }
 
+  /* A BUCKET STILL TO COME keeps its colour as a wash inside a dashed edge, so in and out still read apart. */
   .series-bar[data-state='ahead'] {
-    fill: none;
+    fill-opacity: 0.3;
     stroke: var(--dim);
     stroke-width: 1px;
     stroke-dasharray: 3 2;
@@ -1964,6 +1965,7 @@
 
   .forecast-plot {
     position: relative;
+    margin-block-start: var(--sp-5);
     margin-inline: var(--sp-2);
     touch-action: pan-y;
   }
@@ -2083,6 +2085,26 @@
     color: var(--ink2);
   }
 
+  /* THE TOP AND THE BOTTOM OF THE VALUE AXIS: the top above the chart's corner, the bottom inside it. */
+  .forecast-top,
+  .forecast-bottom {
+    position: absolute;
+    inset-inline-start: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .forecast-top {
+    inset-block-start: 0;
+    translate: 0 -100%;
+  }
+
+  .forecast-bottom {
+    inset-block-end: 0;
+  }
+
   .forecast-ticks {
     position: relative;
     block-size: 1.5em;
@@ -2105,6 +2127,7 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: var(--sp-3) var(--sp-5);
+    margin-block-start: var(--sp-3);
     margin-inline: var(--sp-2);
   }
 
@@ -2194,6 +2217,11 @@
   @container (inline-size < 30rem) {
     .forecast-chart {
       block-size: 160px;
+    }
+
+    /* A MONTH IN THREE, so the names do not run into each other on a phone. */
+    .forecast-tick:not(:nth-child(3n + 1)) {
+      display: none;
     }
 
     .forecast-knobs {

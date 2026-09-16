@@ -184,6 +184,9 @@ export type ForecastPlan = {
   span: number;
   lo: number;
   hi: number;
+  /** The top and the bottom of the value axis, written like the opening figure. */
+  top: string;
+  bottom: string;
   sentence: string;
 };
 
@@ -227,7 +230,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const ticks: ForecastPlan['ticks'] = [];
   for (let d = 0; d <= span; d++) {
     const day = addDays(start, d);
-    if (day.endsWith('-01')) ticks.push({ at: at(d / span), label: MONTHS[Number(day.slice(5, 7)) - 1]! });
+    /* NOT AT THE VERY EDGES, where half the word would hang outside the chart. */
+    if (day.endsWith('-01') && d / span > 0.03 && d / span < 0.97) ticks.push({ at: at(d / span), label: MONTHS[Number(day.slice(5, 7)) - 1]! });
   }
 
   const c = shown.crossed;
@@ -258,6 +262,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     span,
     lo,
     hi,
+    top: figure(hi),
+    bottom: figure(lo),
     sentence: `${sentence}.`,
   };
 }
