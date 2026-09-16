@@ -571,7 +571,7 @@
               {#if stateValue}
                 <span class="lead-state" data-intent={leadTone}>
                   {#if leadTone}<span class="glyph" role="img" aria-label={TONES[leadTone].label}>{TONES[leadTone].glyph}</span>{/if}
-                  <span class="lead-word">{stateValue.replace(/_/g, ' ')}</span>
+                  <span class="lead-word">{copy.valueWord(stateValue)}</span>
                 </span>
               {/if}
               {#if due && dueField}
@@ -651,7 +651,7 @@
                     {display(id, f.id, value, clock, names)}
                     <span class="rel">{relative(String(value), clock)}</span>
                   {:else if f.type === 'enum'}
-                    <span class="enum-word">{display(id, f.id, value, clock, names)}</span>
+                    <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
                   {:else}
                     {display(id, f.id, value, clock, names)}
                   {/if}

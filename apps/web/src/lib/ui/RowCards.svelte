@@ -102,6 +102,8 @@
 
   /* A declared value is set in sentence case by the stylesheet, as the filter pills are. */
   const isEnum = (field: string) => decl?.fields.find((f) => f.id === field)?.type === 'enum';
+  /* And spelled as a word: the stylesheet can raise a first letter, and it cannot make `saas` SaaS. */
+  const worded = (field: string, said: string) => (isEnum(field) && said ? copy.valueWord(said) : said);
 
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
@@ -152,10 +154,10 @@
             {#if e.seq >= 0}#{e.seq}{/if}
           </span>
           <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]], now, names) ?? '')}
+            {@render amount(worded(decl.mobile[1], display(register, decl.mobile[1], e.fields[decl.mobile[1]], now, names) ?? ''))}
           </span>
           <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]], now, names) ?? '')}
+            {@render amount(worded(decl.mobile[2], display(register, decl.mobile[2], e.fields[decl.mobile[2]], now, names) ?? ''))}
           </span>
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole

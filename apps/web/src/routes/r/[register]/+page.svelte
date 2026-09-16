@@ -2151,7 +2151,7 @@
               aria-pressed={on ? 'true' : 'false'}
               onclick={() => toggleFilter(f.id, value)}
             >
-              <span class="segment-word">{value.replace(/_/g, ' ')}</span>
+              <span class="segment-word">{copy.valueWord(value)}</span>
               <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
             </button>
           {/each}
@@ -2587,7 +2587,7 @@
                 control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
                 sheet has advertised since the grid was written.
               -->
-              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{symbolFigure(value) ?? value}{/if}<button
+              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}<button
                   type="button"
                   class="cell-pen"
                   tabindex="-1"
@@ -2597,7 +2597,7 @@
                     openEditor(seq, column.field);
                   }}
                 ><Icon name="edit" size="s" /></button></span>
-            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{symbolFigure(value) ?? value}{/if}{/if}
+            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{copy.valueWord(value)}</span>{:else}{symbolFigure(value) ?? value}{/if}{/if}
           {/snippet}
         </Table>
       </div>

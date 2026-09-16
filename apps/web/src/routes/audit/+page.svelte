@@ -198,6 +198,10 @@
    * `null` when nothing is known by that id any more, and the line prints the id alone, which is
    * what it did before rather than an empty name.
    */
+  /* `actorOf` words an actor for the middle of a sentence ("by the assistant"); a pill or a row's
+     lead stands alone, so it starts with a capital: Claude, The assistant, Reply rule. */
+  const named = (actor: string): string => actor.charAt(0).toUpperCase() + actor.slice(1);
+
   const nameOf = (target: string): string | null => {
     if (route.data.live) return live?.names.get(target) ?? null;
     const row = /^([a-z0-9_-]+)#(\d+)$/.exec(target);
@@ -324,7 +328,7 @@
               aria-pressed={who === a ? 'true' : 'false'}
               onclick={() => setParam('by', who === a ? '' : a)}
             >
-              {#if who === a}<Icon name="check" size="s" />{/if}{actorOf(a)}
+              {#if who === a}<Icon name="check" size="s" />{/if}{named(actorOf(a))}
             </button>
           {/each}
           </span>
@@ -416,7 +420,7 @@
                column of names. -->
           <span class="who">
             <Face name={who} you={who === 'you'} size="s" />
-            <span class="who-name">{who}</span>
+            <span class="who-name">{named(who)}</span>
           </span>
           <span class="line-main">
             <!-- The target is a LINK, and that is not decoration. This page was a list of spans:

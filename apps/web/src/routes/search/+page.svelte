@@ -197,6 +197,11 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(8ch, auto);
   }
 
+  /* A stored state is a word a person reads, so it starts as one: `Live`, beside `Open question`. */
+  .hit .line-when::first-letter {
+    text-transform: uppercase;
+  }
+
   .hit-id {
     color: var(--dim);
     font-size: var(--t-sm);

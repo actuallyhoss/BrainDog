@@ -658,7 +658,7 @@ export const copy = {
    */
   valueWord: (value: string): string => {
     const word = value.replace(/_/g, ' ');
-    const known: Record<string, string> = { saas: 'SaaS', api: 'API', vat: 'VAT', url: 'URL', dns: 'DNS', ssl: 'SSL', tls: 'TLS', seo: 'SEO', ai: 'AI', mcp: 'MCP', paye: 'PAYE', cis: 'CIS' };
+    const known: Record<string, string> = { saas: 'SaaS', api: 'API', vat: 'VAT', url: 'URL', dns: 'DNS', ssl: 'SSL', tls: 'TLS', seo: 'SEO', ai: 'AI', mcp: 'MCP', cli: 'CLI', paye: 'PAYE', cis: 'CIS' };
     const lower = word.toLowerCase();
     if (known[lower]) return known[lower];
     return word.charAt(0).toUpperCase() + word.slice(1);
