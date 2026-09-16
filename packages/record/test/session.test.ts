@@ -165,12 +165,13 @@ test('ATTACH OPENS A RUN SIGNED BY ITSELF, and attaching again resumes it and re
   sql.close();
 });
 
-test('RE-ATTACHING NEVER OVERWRITES THE HANDOFF, and brings a finished run back', async () => {
+test('RE-ATTACHING NEVER OVERWRITES THE HANDOFF, and brings an idle run back', async () => {
   const { api, sql } = await record();
   const said = agent(HERE);
   value(await api.attach({ source: 'startup', client_id: 'c-1', doing: 'Money page' }, said));
   value(await api.handoff({ next: 'Ship the chart', tried: 'Stacked bars read as totals', note: 'Lines, not bars' }, agent({ ...HERE, client_id: 'c-1' })));
-  value(await api.handoff({ state: 'done' }, agent({ ...HERE, client_id: 'c-1' })));
+  /* Idle, not done: a run marked done leaves its next step behind, which the test below holds. */
+  value(await api.handoff({ state: 'idle' }, agent({ ...HERE, client_id: 'c-1' })));
 
   const back = value<Attached>(await api.attach({ source: 'clear', client_id: 'c-1', doing: 'Money page, again' }, said));
   assert.deepEqual([back.spoken, back.resumed, back.session.state], ['S1', true, 'active']);
@@ -252,6 +253,37 @@ test('A HANDOFF FROM AN AGENT WITH NO RUN YET OPENS ONE, and lands on it', async
   sql.close();
 });
 
+
+test('A VAGUE NEXT STEP IS REFUSED, as the description says: carry on is not a step', async () => {
+  const { api, sql } = await record();
+  const said = agent({ ...HERE, client_id: 'c-1' });
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, said));
+  for (const next of ['carry on', 'Carry on.', 'continue', 'Keep going!', 'TBD', 'same as before', '...', 'next steps']) {
+    const out = refusal(await api.handoff({ next }, said));
+    assert.deepEqual([out.code, out.at], ['VALUE_MALFORMED', 'next'], next);
+  }
+  assert.equal((await run(api, 'S1')).fields.next, undefined);
+  assert.equal(value<Entry>(await api.handoff({ next: 'Carry on with the sweep test in schedule.test.ts' }, said)).fields.next, 'Carry on with the sweep test in schedule.test.ts');
+  sql.close();
+});
+
+test('A RUN MARKED DONE LEAVES ITS OLD NEXT STEP BEHIND, so the next briefing does not send anyone after it', async () => {
+  const { api, sql } = await record();
+  const said = agent({ ...HERE, client_id: 'c-1' });
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, said));
+  value(await api.handoff({ next: 'Wire the sweep into the purge row' }, said));
+  const done = value<Entry>(await api.handoff({ state: 'done', note: 'The sweep is wired.' }, said));
+  assert.deepEqual([done.state, done.fields.next], ['done', undefined]);
+
+  const later = value<{ handoff: unknown }>(await api.context({}, agent({ ...HERE, client_id: 'c-2' })));
+  assert.equal(later.handoff, null, 'a finished run handed on the step it finished');
+
+  /* A run that finishes and names a next step in the same call leaves that one. */
+  value(await api.attach({ source: 'startup', client_id: 'c-3' }, agent({ ...HERE, client_id: 'c-3' })));
+  const left = value<Entry>(await api.handoff({ state: 'done', next: 'Tag the release once CI is green' }, agent({ ...HERE, client_id: 'c-3' })));
+  assert.equal(left.fields.next, 'Tag the release once CI is green');
+  sql.close();
+});
 
 /* ── whose run it is ─────────────────────────────────────────────────────── */
 

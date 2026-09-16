@@ -246,6 +246,16 @@ const MEET = ['name', 'email', 'handle', 'where'] as const;
 const KEPT = 50;
 /** The longest line a run carries, which is a note's ceiling. */
 const LINE = 280;
+/**
+ * The next steps that name no step, lower case and with the punctuation gone. `handoff`'s description says "'carry on'
+ * is not one": the run that reads it next learns nothing it could not have guessed.
+ */
+const VAGUE: ReadonlySet<string> = new Set([
+  '', 'carry on', 'continue', 'keep going', 'go on', 'resume', 'proceed', 'more', 'more of the same', 'same', 'same as before',
+  'as before', 'next', 'next step', 'next steps', 'tbd', 'todo', 'to do', 'n a', 'na', 'none', 'nothing', 'etc', 'finish',
+  'finish up', 'finish it', 'keep working', 'continue working', 'work on it', 'pick up where i left off', 'see above', 'wip',
+]);
+const vague = (next: string): boolean => VAGUE.has(next.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
 /** The runtime's own id for a run, in the grammar its header has (`44 §4.2`). */
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
@@ -1924,6 +1934,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!value.ok) return value as Result<never>;
         if (value.value !== undefined) lines[key] = value.value;
       }
+      if (lines.next !== undefined && vague(lines.next))
+        return no(
+          'VALUE_MALFORMED',
+          `next is the one concrete step the next run takes, such as "Run the refusal gates after the build", and "${lines.next}" names none.`,
+          { at: 'next' },
+        );
       if (said.state !== undefined && typeof said.state !== 'string')
         return no('VALUE_MALFORMED', `state is one of the run's states: ${LIVE.join(', ')} or ${RUN.done.join(', ')}.`, { at: 'state' });
       if (Object.keys(lines).length === 0 && said.state === undefined)
@@ -1960,6 +1976,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (lines.tried !== undefined) patch.tried = [...listOf(now.fields.tried), lines.tried].slice(-KEPT);
           if (lines.note !== undefined) patch.notes = [...listOf(now.fields.notes), lines.note].slice(-KEPT);
           if (typeof said.state === 'string') patch.state = said.state;
+          /* A FINISHED RUN LEAVES ITS OLD NEXT STEP BEHIND. The briefing hands the newest next step here to whoever
+             starts, and a step the run has since finished sends them after work that is done. A next step named in
+             the same call is the one it leaves. */
+          if (typeof said.state === 'string' && RUN.done.includes(said.state) && lines.next === undefined && now.fields.next !== undefined)
+            patch.next = null;
           else if (token && REVIVED.includes(now.state ?? '')) patch.state = 'active';
           return kernel.update(SESSION, now.id, patch, by);
         }),

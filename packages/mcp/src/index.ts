@@ -236,7 +236,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'handoff',
     description:
-      "Keep your session's handoff true. next is the one concrete next step; 'carry on' is not one. tried adds a dead end, and note adds a line of reasoning; both append and never overwrite. state handoff asks another session to pick it up.",
+      "Keep your session's handoff true. next is the one concrete next step; 'carry on' is not one. tried adds a dead end, and note adds a line of reasoning; both append and never overwrite. state handoff asks another session to pick it up, and state done clears the old next unless you give a new one.",
     input: obj({
       next: str('The one concrete next step.'),
       tried: str('A dead end, the moment you rule it out.'),
