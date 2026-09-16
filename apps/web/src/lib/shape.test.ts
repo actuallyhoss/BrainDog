@@ -1,5 +1,5 @@
 /**
- * "What's your business?", read deterministically. Every case is a sentence a person could type
+ * "What is this BrainDog for?", read deterministically. Every case is a sentence a person could type
  * into the second field of the product, including §5's six chips on their own.
  */
 
@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AGENTS_PACK, FIRST_PARTY, firstPartyManifest } from '@braindog/seed';
+import { arrange } from '@braindog/seed/usecases';
 
 import { firstRun } from './first-run.ts';
 import { PACKS } from './record/data.ts';
@@ -144,8 +145,15 @@ test('SERVICES, AGENTS AND WORK, with a team size', () => {
   assert.deepEqual(solo.rows.map(titleOfRow), ['Invoice']);
 });
 
-test('EVERY CHIP, on its own, turns something on', () => {
-  for (const chip of firstRun.shapeChips) assert.ok(read(chip).packs.length > 0, chip);
+test('EVERY CHIP, on its own, turns something on or suggests a use case', () => {
+  for (const chip of firstRun.shapeChips) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
+});
+
+test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is (`loop/research-spark.md` §1)', () => {
+  const first = [firstRun.shapeQuestion, firstRun.shapePlaceholder, ...firstRun.shapeChips, ...firstRun.whoChips, firstRun.firstLede];
+  for (const line of first) assert.doesNotMatch(line, /business/iu, line);
+  const kinds = new Set(firstRun.shapeChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
+  assert.ok(kinds.has('student') && kinds.has('founder') && kinds.has('business'), [...kinds].join(', '));
 });
 
 const SENTENCES = [

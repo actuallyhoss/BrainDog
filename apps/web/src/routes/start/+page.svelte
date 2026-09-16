@@ -29,7 +29,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
-  import { shape, titleOfRow, toTurnOn, type Shape } from '$lib/shape.ts';
+  import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
+  import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, useCaseDocument, type UseCase } from '@braindog/seed/usecases';
   import { firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
@@ -213,6 +214,40 @@
     read = about.trim() ? shape(about, new Date().toISOString().slice(0, 10)) : null;
   }
 
+  /* ── what this BrainDog is for: the use case suggested (`loop/research-spark.md` §3, tier A) ── */
+
+  /* THE SENTENCE FIRST, AND TURN 1'S WORDS WHEN IT SAYS NOTHING. "I'm a student" in turn 1 is as much an
+     answer as the same words here, and the proposal's reasons are phrases of whichever one was read. */
+  const arranged = $derived.by(() => {
+    if (!read || read.declined === 'language') return null;
+    const own = arrange(about);
+    return own.pick || !heard?.bio ? { ...own, from: about } : { ...arrange(heard.bio), from: heard.bio };
+  });
+  /** A use case the person chose over the suggestion, by id. Kept while they keep typing. */
+  let picked_use = $state<string | null>(null);
+  const proposal = $derived<UseCase | null>(USE_CASES.find((u) => u.usecase === picked_use) ?? arranged?.pick ?? null);
+
+  const said_as = (u: UseCase): string => {
+    const lines = Object.values(u.voice).slice(0, 3).map(firstRun.useQuoted);
+    return lines.length > 0 ? firstRun.useVoice(u.tone, firstRun.shapeAnd(lines)) : firstRun.useHouseVoice;
+  };
+
+  /** The first-party packs to turn on: the use case's own, what the sentence named, and what each leans on, in order. */
+  function modulesToTurnOn(now: Shape | null, person: boolean, u: UseCase | null): PackId[] {
+    const heardPacks: string[] = now && now.declined === null ? toTurnOn(now, person) : person ? ['people'] : [];
+    const wanted = new Set<PackId>((u ? modulesFor(u, heardPacks) : heardPacks) as PackId[]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const id of [...wanted])
+        for (const needs of LEANS_ON[id] ?? [])
+          if (!wanted.has(needs)) {
+            wanted.add(needs);
+            grew = true;
+          }
+    }
+    return INSTALL_ORDER.filter((id) => wanted.has(id));
+  }
+
   /* Turn 1's 250 ms, so both answers are said back on the same beat. */
   function aboutTyped() {
     clearTimeout(reading);
@@ -238,22 +273,27 @@
     return (page ? p.titles?.[page] : undefined) ?? REGISTERS[p.registers[0] ?? '']?.name ?? p.name;
   }
 
+  /* A PHRASE THE USE CASE HEARD COUNTS AS HEARD, so "homework and exams" is two things heard and not "nothing here". */
+  const useHeard = $derived(arranged && proposal && arranged.from === about ? (arranged.ranked.find((r) => r.usecase === proposal)?.why ?? []) : []);
   const shapeSaid = $derived(
     !read || read.declined === 'empty'
       ? ''
       : read.declined === 'language'
         ? firstRun.shapeLanguage
-        : read.declined === 'unread'
-          ? firstRun.shapeUnread
-          : firstRun.shapeHeardCount(read.heard.length),
+        : read.declined === 'unread' && useHeard.length === 0
+          ? proposal
+            ? ''
+            : firstRun.shapeUnread
+          : firstRun.shapeHeardCount((read.declined === null ? read.heard.length : 0) + useHeard.filter((w) => !(read?.heard ?? []).some((h) => w.at < h.at + h.text.length && h.at < w.at + w.text.length)).length),
   );
 
   /** "Your record": each list that will be on, with the rows it gets and what a row still needs. */
   const lists = $derived.by(() => {
     const now = read;
-    if (!now || now.declined) return [];
+    if (!now || now.declined === 'empty' || now.declined === 'language' || (now.declined !== null && !proposal)) return [];
     const person = heard?.name ?? null;
-    return toTurnOn(now, person !== null).map((id) => ({
+    const own = proposal ? listsOf(proposal).map((l) => ({ id: l.id, name: l.name, rows: [] as { title: string; note: string | null }[] })) : [];
+    return [...own, ...modulesToTurnOn(now, person !== null, proposal).map((id) => ({
       id,
       name: packName(id),
       rows: [
@@ -265,7 +305,7 @@
             note: r.missing.length > 0 ? firstRun.shapeNeeds(firstRun.shapeAnd(r.missing.map((m) => firstRun.shapeMissing[m] ?? m))) : null,
           })),
       ],
-    }));
+    }))];
   });
 
   type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean };
@@ -288,7 +328,8 @@
   async function make() {
     understand();
     const now = read;
-    if (!now || now.declined !== null || making) return;
+    const u = proposal;
+    if (!now || making || (now.declined !== null && !(u && now.declined === 'unread'))) return;
     making = true;
     try {
       const client = createClient({ base: location.origin });
@@ -299,7 +340,7 @@
       /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
       const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
       const usable = new Set<string>();
-      for (const id of toTurnOn(now, Boolean(heard?.name))) {
+      for (const id of modulesToTurnOn(now, Boolean(heard?.name), u)) {
         const state = installed.find((p) => p.id === id);
         if (!state) {
           const doc = chosen.source.sample ? null : firstPartyDocument(id);
@@ -328,9 +369,32 @@
         usable.add(id);
       }
 
+      /* THE USE CASE'S OWN PACK, after the modules it builds on: its lists, its pages and its voice. A
+         pack already here that is off is turned on; one that is here and on is left as it is. */
+      const doc = u ? useCaseDocument(u.usecase) : null;
+      if (u && doc) {
+        const id = String(doc.pack);
+        const state = installed.find((p) => p.id === id);
+        const names = listsOf(u).map((l) => l.name);
+        const lacking = u.modules.filter((m) => !usable.has(m));
+        if (chosen.source.sample) out.absent.push(...names);
+        else if (lacking.length > 0) out.refused.push(firstRun.shapeNeedsFirst(u.title, firstRun.shapeAnd(lacking.map(packName))));
+        else if (state && state.disabled_at !== null) {
+          const on = await chosen.source.enable(id);
+          if (!on.ok) out.refused.push(firstRun.shapeRefused(u.title, on.refusal.fix));
+          else if (on.value.changed) out.on.push(...names);
+        } else if (!state) {
+          const planned = await client.planPack({ doc });
+          const planHash = planned.ok ? ((planned.value as { diff?: { planHash?: string } }).diff?.planHash ?? '') : '';
+          const done = planned.ok ? await client.call('installPack', { doc, planHash }) : planned;
+          if (!done.ok) out.refused.push(firstRun.shapeNotAdded(u.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
+          else out.added.push(...names);
+        }
+      }
+
       /* The sequence each row got, by its index in the shape, so an invoice can point at its client. */
       const seqs: (number | null)[] = [];
-      for (const [i, row] of now.rows.entries()) {
+      for (const [i, row] of (now.declined === null ? now.rows : []).entries()) {
         seqs[i] = null;
         const pack = PACKS.find((p) => p.registers.includes(row.register))?.id ?? '';
         if (row.missing.length > 0 || !usable.has(pack)) continue;
@@ -375,7 +439,11 @@
          list Money happened to need first. */
       const named = [...new Set([...now.packs.filter((p) => p.why.length > 0).map((p) => p.id as string), ...usable])];
       const firstOn = named.filter((id) => usable.has(id)).map((id) => packOf(id)?.registers[0]).find((r): r is string => Boolean(r));
-      out.onward = out.made[0] ?? (firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
+      /* A USE CASE'S OWN FIRST LIST BEFORE A MODULE IT BUILDS ON, so a student lands on Assignments and not on People. */
+      const ownFirst = u && (out.added.length > 0 || out.on.length > 0) ? listsOf(u).at(-1) : undefined;
+      out.onward = out.made[0] ?? (ownFirst ? { register: ownFirst.id, list: ownFirst.name } : firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
+      /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new lists and pages and speaks in the new voice. */
+      if (!chosen.source.sample) (await import('$lib/record/boot-live.ts')).forget();
       outcome = out;
       await tick();
       kept?.scrollIntoView({ block: 'nearest' });
@@ -788,15 +856,45 @@
         <!-- Always in the document, for the reason turn 1's line gives. -->
         <p class="heard-now" role="status">{shapeSaid}</p>
 
-        {#if read && read.declined === null}
+        {#if read && read.declined !== 'empty' && read.declined !== 'language'}
+          <section class="use" aria-labelledby="use-h">
+            {#if proposal}
+              <h3 class="col-h" id="use-h">{firstRun.useSuggested}</h3>
+              <p class="use-title">{proposal.title}</p>
+              <p class="use-summary">{proposal.summary}</p>
+              <ul class="use-facts">
+                {#if pagesOf(proposal).length > 0}<li>{firstRun.usePages(firstRun.shapeAnd(pagesOf(proposal).map((p) => p.title)))}</li>{/if}
+                {#if listsOf(proposal).length > 0}<li>{firstRun.useLists(firstRun.shapeAnd(listsOf(proposal).map((l) => l.name)))}</li>{/if}
+                {#if proposal.modules.length > 0}<li>{firstRun.useBuildsOn(firstRun.shapeAnd(proposal.modules.map(packName)))}</li>{/if}
+                <li>{said_as(proposal)}</li>
+              </ul>
+            {:else}
+              <h3 class="col-h" id="use-h">{firstRun.useSuggested}</h3>
+              <p class="use-summary">{firstRun.useNone}</p>
+            {/if}
+            <div class="who-chips use-chips" role="group" aria-label={firstRun.useChoose}>
+              {#each USE_CASES as u (u.usecase)}
+                <button type="button" class="who-chip" aria-pressed={proposal === u} onclick={() => (picked_use = u.usecase)}>{u.title}</button>
+              {/each}
+            </div>
+          </section>
+        {/if}
+
+        {#if read && (read.declined === null || (read.declined === 'unread' && proposal))}
           <div class="preview">
             <section class="col" aria-labelledby="heard-col">
               <h3 class="col-h" id="heard-col">{firstRun.shapeHeard}</h3>
               <ul class="col-list">
-                {#each read.heard as h}
+                {#each read.declined === null ? read.heard : [] as h}
                   <li>
                     <q class="said">{h.text}</q>
                     <span class="became"><span aria-hidden="true">→</span> {h.loose ? firstRun.shapeNoCurrency : firstRun.shapeAnd(h.packs.map(packName))}</span>
+                  </li>
+                {/each}
+                {#each useHeard.filter((w) => !(read?.declined === null ? read.heard : []).some((h) => w.at < h.at + h.text.length && h.at < w.at + w.text.length)) as w}
+                  <li>
+                    <q class="said">{w.text}</q>
+                    <span class="became"><span aria-hidden="true">→</span> {proposal?.title}</span>
                   </li>
                 {/each}
               </ul>
@@ -822,7 +920,7 @@
         {/if}
 
         <div class="actions shape-actions">
-          <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || read.declined !== null || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
+          <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || (read.declined !== null && !(read.declined === 'unread' && proposal)) || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
           <Button weight="bare" onclick={() => void goto('/start?list', { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
         </div>
 
@@ -1139,6 +1237,45 @@
 
   .shape-chips {
     margin-block-start: var(--sp-3);
+  }
+
+  /* ── the use case suggested ───────────────────────────────────────────── */
+
+  .use {
+    margin-block-start: var(--sp-5);
+  }
+
+  .use-title {
+    color: var(--ink);
+    font-size: var(--t-lg);
+    font-weight: 600;
+  }
+
+  .use-summary {
+    margin-block-start: var(--sp-1);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    max-inline-size: 60ch;
+  }
+
+  .use-facts {
+    display: grid;
+    gap: var(--sp-1);
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .use-chips {
+    margin-block-start: var(--sp-3);
+  }
+
+  .use-chips .who-chip[aria-pressed='true'] {
+    background: var(--s2);
+    border-color: var(--edge);
+    color: var(--ink);
   }
 
   /* Two columns where there is room and one on a phone, the same rule as the cards. */

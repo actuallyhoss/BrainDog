@@ -21,7 +21,9 @@ export const firstRun = {
      a person could have typed, never a choice. */
   whoQuestion: 'Who are you?',
   whoPlaceholder: 'Your name, and what you do',
-  whoChips: ['I run a studio', 'I freelance', "I'm part of a team", 'I do this for someone else'],
+  /* ONE CHIP PER KIND OF PERSON THE PRODUCT IS FOR (`loop/DIRECTION.md` §11), and they were four ways of
+     running a business. Each is still a clause a person could have typed. */
+  whoChips: ["I'm a student", 'I run a few companies', "I'm part of a team", "I'm starting something new"],
   whoChipsLabel: 'Add to your answer',
   gotYou: (name: string) => `Got it, you're ${name}.`,
   gotIt: 'Got it.',
@@ -30,11 +32,28 @@ export const firstRun = {
   youArePending: (name: string, mark: string) => `${name} is in People too, marked ${mark}.`,
   youAreKnown: (name: string) => `${name} is in People too.`,
 
-  /* TURN 2 (`loop/research-modules.md` §5). A question, a field and §5's six chips; what was heard
-     and what the record will hold are two short columns, and the screen explains neither. */
-  shapeQuestion: "What's your business?",
-  shapePlaceholder: 'What you sell, who for, and what you keep track of',
-  shapeChips: ['I send invoices', 'Domains and hosting', 'Client projects', 'A small team', 'I use Claude or Codex', 'I sell products'],
+  /* TURN 2 (`loop/research-modules.md` §5). A question, a field and six chips; what was heard and what
+     the record will hold are two short columns, and the screen explains neither.
+
+     IT ASKED "What's your business?", and a student, a team or somebody with an idea is not a business.
+     The question is what this BrainDog is for, and the chips span the people it is for
+     (`loop/research-spark.md` §1). */
+  shapeQuestion: 'What is this BrainDog for?',
+  shapePlaceholder: 'Your studies, your companies, a team, a new project, or anything you keep track of',
+  shapeChips: ['My courses and homework', 'Dashboards for my projects', 'I send invoices', 'Tasks for a small team', 'A new project', 'I use Claude or Codex'],
+
+  /* THE USE CASE IT SUGGESTS, above the two columns (`loop/research-spark.md` §3.2). Suggested and never
+     chosen for them: the other use cases are one press away, and nothing is made until Make my record.
+     Titles, summaries and tones are the use case's own words, from its package. */
+  useSuggested: 'Suggested for this BrainDog',
+  useNone: 'Nothing here points to one kind of BrainDog yet. Choose one below, or say a little more.',
+  useChoose: 'Make it for',
+  usePages: (names: string) => `Pages: ${names}.`,
+  useLists: (names: string) => `Lists: ${names}.`,
+  useBuildsOn: (names: string) => `Builds on ${names}.`,
+  useVoice: (tone: string, lines: string) => `In a voice that is ${tone}: ${lines}.`,
+  useHouseVoice: 'Speaks in the house voice.',
+  useQuoted: (line: string) => `“${line}”`,
   shapeHeard: 'What I heard',
   shapeRecord: 'Your record',
   shapeHeardCount: (n: number) => (n === 1 ? 'Heard one thing.' : `Heard ${n} things.`),
@@ -84,13 +103,13 @@ export const firstRun = {
      deploy and a bug are all things a record holds; what it is not is a place to keep the code
      itself. "Not just code" says the same thing without telling a developer their work is out of
      scope. */
-  firstLede: 'Everything about your business that is not just code.',
+  firstLede: 'Everything you keep track of, not just code.',
   /* `the services it runs on` AND IT WAS `the estate`. One area of this record answered to four
      names — this lede, the card below it, the pack, the rail's section heading — while the list
      underneath all of them was called Services. This is the first paragraph of the first screen,
      so it is where a reader learns the word, and it was teaching them the one nothing else says. */
   firstBody:
-    'Money, the services it runs on, the people, the projects, and the decisions behind ' +
+    'Money, the services you run on, the people, the projects, and the decisions behind ' +
     'them. Typed, versioned, and readable by every agent you use.',
   firstQuestion: 'Where do you want to start?',
   /* SPLIT IN TWO, so the clause defining *row* can sit against the word rather than behind the
