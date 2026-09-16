@@ -252,6 +252,82 @@ test('A HANDOFF FROM AN AGENT WITH NO RUN YET OPENS ONE, and lands on it', async
   sql.close();
 });
 
+
+/* ── whose run it is ─────────────────────────────────────────────────────── */
+
+/** Another token's call: `tok_2` of another person, or `tok_3`, the same person's narrower key. */
+const as = (id: string, person: string, scope: 'read' | 'propose' | 'write', session: CallContext['session'] = {}): CallContext => ({
+  principal: { kind: 'token', id, scope, person, level: person === 'p_1' ? 'owner' : 'write' },
+  session,
+});
+
+test('A RUN BELONGS TO THE TOKEN THAT OPENED IT: another person’s token names it and is refused', async () => {
+  const { api, sql } = await record();
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent({ ...HERE, client_id: 'c-1' })));
+  const before = await run(api, 'S1');
+
+  const stranger = as('tok_2', 'p_2', 'write', { spoken: 'S1' });
+  const write = refusal(await api.create({ register: 'tasks', fields: { what: 'Signed as S1' } }, stranger));
+  assert.deepEqual([write.code, write.at], ['FORBIDDEN', 'session']);
+  assert.equal(refusal(await api.handoff({ next: 'Rewrite the gates in Rust' }, stranger)).code, 'FORBIDDEN');
+  assert.equal(refusal(await api.attach({ source: 'startup' }, stranger)).code, 'FORBIDDEN');
+  const direct = refusal(await api.update({ register: 'session', seq: 1, patch: { next: 'Delete the record' } }, as('tok_2', 'p_2', 'write')));
+  assert.equal(direct.code, 'FORBIDDEN');
+
+  const after = await run(api, 'S1');
+  assert.deepEqual([after.version, after.fields.next], [before.version, before.fields.next]);
+  assert.deepEqual(runs(sql), [1]);
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'tasks'")!.n, 0);
+  sql.close();
+});
+
+test('A NARROWER TOKEN OF THE SAME PERSON is not the run its wider key opened, by client id or by name', async () => {
+  const { api, sql } = await record();
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent({ ...HERE, client_id: 'c-1' })));
+
+  const narrow = as('tok_3', 'p_1', 'propose', { ...HERE, client_id: 'c-1' });
+  const out = refusal(await api.handoff({ next: 'Ship it' }, narrow));
+  assert.deepEqual([out.code, out.at], ['FORBIDDEN', 'session']);
+  assert.equal(refusal(await api.attach({ source: 'resume', client_id: 'c-1' }, narrow)).code, 'FORBIDDEN');
+  assert.equal(refusal(await api.handoff({ next: 'Ship it' }, as('tok_3', 'p_1', 'propose', { spoken: 'S1' }))).code, 'FORBIDDEN');
+  assert.equal((await run(api, 'S1')).fields.next, undefined);
+  assert.deepEqual(runs(sql), [1]);
+
+  /* The briefing does not tell the narrower key that S1 is its own run. */
+  const ctx = value<{ session: { spoken: string } | null }>(await api.context({}, as('tok_3', 'p_1', 'propose', { spoken: 'S1' })));
+  assert.equal(ctx.session, null);
+  sql.close();
+});
+
+test('A NAMED RUN THAT IS FINISHED is still dropped, and the caller opens its own', async () => {
+  const { api, sql } = await record();
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent({ ...HERE, client_id: 'c-1' })));
+  value(await api.handoff({ session: 'S1', state: 'done' }, owner));
+  const out = value<Entry>(await api.handoff({ next: 'Pick up the sweep' }, as('tok_2', 'p_2', 'propose', { spoken: 'S1' })));
+  assert.equal(out.seq, 2);
+  assert.equal(out.fields.token_id, 'tok_2');
+  sql.close();
+});
+
+test('A MACHINE AND REPO COLLISION adopts no other token’s run: a propose key on the same checkout opens its own', async () => {
+  const { api, sql } = await record();
+  value(await api.create({ register: 'tasks', fields: { what: 'Mine' } }, agent(HERE)));
+  const s1 = await run(api, 'S1');
+
+  const narrow = as('tok_3', 'p_1', 'propose', HERE);
+  const handed = value<Entry>(await api.handoff({ next: 'Review the diff' }, narrow));
+  assert.equal(handed.seq, 2, 'the propose key’s handoff landed in the write key’s run');
+  assert.equal(handed.fields.token_id, 'tok_3');
+  value(await api.create({ register: 'tasks', fields: { what: 'Theirs' } }, as('tok_2', 'p_2', 'write', HERE)));
+  assert.deepEqual(runs(sql), [1, 2, 3]);
+  assert.equal((await run(api, 'S1')).version, s1.version);
+
+  /* And its own key still finds S1. */
+  value(await api.create({ register: 'tasks', fields: { what: 'Mine again' } }, agent(HERE)));
+  assert.deepEqual(runs(sql), [1, 2, 3]);
+  sql.close();
+});
+
 /* ── reading runs ────────────────────────────────────────────────────────── */
 
 test('sessionsLive DERIVES stale, age_s AND same_repo, leaves finished runs out, and opens no run', async () => {

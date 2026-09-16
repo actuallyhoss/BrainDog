@@ -148,7 +148,7 @@ import {
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
 import { PEOPLE, meet as meetPerson, type MeetArgs, type Met } from './people.ts';
-import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, type Found, type SessionHints } from './session.ts';
+import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, type Found, type SessionHints } from './session.ts';
 import {
   deviceApprove,
   deviceList,
@@ -1865,6 +1865,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          it is opened or re-attached only at persist, so a refused write still opens no run. */
       let located: Located | undefined;
       const locate = (): Located => (located ??= locateRun(w));
+      /* A RUN BELONGS TO THE TOKEN THAT OPENED IT: a key that names another key's run, or holds its
+         client id, is refused rather than signed as it, and so is a key writing that run's row. */
+      if (w.principal?.kind === 'token') {
+        const foreign = locate().found;
+        if (foreign?.foreign) return notYours<Entry>(`${registers.get(SESSION)?.seq_prefix ?? 'S'}${foreign.seq}`);
+        if (register === SESSION && current && owned(current.fields.token_id, w.principal.token ?? null))
+          return notYours<Entry>(nameOf(current.id));
+      }
       const scoped = w.principal?.kind === 'token' ? scopeFieldOf(decl.fields) : undefined;
       if (scoped) {
         const home = locate().project?.id ?? null;
@@ -1994,6 +2002,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* STAMPED AFTER VALIDATION, because these are the kernel's own fields and no declaration
          describes them — running them through the field loop would refuse every one. */
       if (w.stamp) Object.assign(merged, w.stamp);
+      /* A run a key makes by hand is that key's, as one the ladder opens is: otherwise it would be a
+         person's, and any key could name it. */
+      if (register === SESSION && !current && w.principal?.kind === 'token' && w.principal.token !== undefined)
+        merged.token_id = w.principal.token;
 
       if (!current) {
         const id = mint();
@@ -2141,7 +2153,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    */
   function locateRun(w: WriteContext): Located {
     const hints = w.session ?? {};
-    const found = findSession(sql, hints, clock.now());
+    const found = findSession(sql, hints, clock.now(), w.principal?.token ?? null);
+    if (found?.foreign) return { found, place: false, project: null };
     if (!found || (found.by === 'client' && Boolean(hints.remote || hints.repo || hints.cwd)))
       return { found, place: true, project: resolveProject(sql, registers, hints).project };
     const row = found.project ? get(found.project) : null;
@@ -2230,6 +2243,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     return transaction(() => {
       const at = locateRun(w);
+      if (at.found?.foreign) return notYours<{ run: Entry; spoken: string; opened: boolean }>(`${prefix}${String(at.found.seq)}`);
       const found = at.found ? byId(at.found.id) : null;
       if (found) return ok({ run: found, spoken: `${prefix}${String(found.seq)}`, opened: false });
       const opened = openRun(w, at.project?.spoken ?? null, instant(clock.now()), note);
@@ -2238,10 +2252,22 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     });
   }
 
-  /** The run these hints name, by the ladder's first four rungs, or `null`. It only reads. */
-  function findRun(hints: SessionHints): Entry | null {
-    const found = findSession(sql, hints, clock.now());
-    return found ? byId(found.id) : null;
+  /**
+   * The run these hints name, by the ladder's first four rungs, or `null`. It only reads. Given the
+   * caller's `token`, a run another token opened is not its run, and is `null` too.
+   */
+  function findRun(hints: SessionHints, token?: string | null): Entry | null {
+    const found = findSession(sql, hints, clock.now(), token);
+    return found && !found.foreign ? byId(found.id) : null;
+  }
+
+  /** The refusal for a key reaching a run another key opened: `FORBIDDEN` at `session`, `30 §6`. */
+  function notYours<T>(spoken: string): Result<T> {
+    return no<T>(
+      'FORBIDDEN',
+      `${spoken} is a run another key opened, and a key works only as the runs it opened. Leave the run's name and client id out to open your own.`,
+      { at: 'session' },
+    );
   }
 
   /**

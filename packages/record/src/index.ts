@@ -1224,7 +1224,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const briefing = (ctx: CallContext): Context => {
     const hints = ctx.session ?? {};
     const token = ctx.principal.kind === 'token';
-    const run = token ? kernel.findRun(hints) : null;
+    const run = ctx.principal.kind === 'token' ? kernel.findRun(hints, ctx.principal.id) : null;
     const place = hints.remote || hints.repo || hints.cwd ? hints : run ? { remote: text(run.fields.remote) ?? undefined, repo: text(run.fields.repo) ?? undefined, cwd: text(run.fields.cwd) ?? undefined } : {};
     const repo = hints.repo ?? text(run?.fields.repo) ?? undefined;
 

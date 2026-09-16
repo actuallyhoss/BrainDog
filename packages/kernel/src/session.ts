@@ -83,7 +83,15 @@ export type SessionHints = {
  * A run the ladder found, with the project it was last placed in and the rung that found it. A run
  * found by its `client_id` is being re-attached, which is when the ladder places it again.
  */
-export type Found = { id: string; seq: number; state: string | null; project: string | null; by: 'spoken' | 'client' | 'adopted' };
+export type Found = {
+  id: string;
+  seq: number;
+  state: string | null;
+  project: string | null;
+  by: 'spoken' | 'client' | 'adopted';
+  /** The run was opened by another token, so the caller may not be it. The caller is refused, never merged in. */
+  foreign: boolean;
+};
 
 /**
  * Rungs one to four of the ladder. `null` is rung five: open a run.
@@ -92,18 +100,29 @@ export type Found = { id: string; seq: number; state: string | null; project: st
  *   2. A name that matches nothing, or a finished run, is dropped and the next rung is tried. It is
  *      never recorded, so a stale `S7` in a header cannot conjure a row called `S7`.
  *   3. `client_id` matches a run in any state: that run, re-attached.
- *   4. With no `client_id`, a run on the same `host` and `repo`, active or idle and heard from in the
- *      last 45 minutes, the newest first: adopted. A caller whose `client_id` matched nothing is a
- *      different run, and adopting it would merge two agents working side by side in one checkout.
+ *   4. With no `client_id`, a run on the same `host` and `repo`, opened by the same token, active or
+ *      idle and heard from in the last 45 minutes, the newest first: adopted. A caller whose
+ *      `client_id` matched nothing is a different run, and adopting it would merge two agents working
+ *      side by side in one checkout.
+ *
+ * A RUN BELONGS TO THE TOKEN THAT OPENED IT (`token_id`). Rungs 1 and 3 name a run outright, so a run
+ * of another token found there comes back `foreign`, and the caller refuses it: a person's other key,
+ * or another person's, never writes, hands off or attaches as that run. Rung 4 only guesses, so it
+ * looks at the caller's own runs and a collision on one machine and repository opens a run instead.
+ * A run with no `token_id` was made by a person, from the app, for an agent to take up, which is how a
+ * run is shared: any key may name it. `token` is the caller's token id; `undefined` reads without an
+ * owner, as a person's view does.
  */
-export function findSession(sql: Sql, hints: SessionHints, nowMs: number): Found | null {
-  const pick = (by: Found['by'], where: string, ...params: (string | number)[]): Found | null => {
-    const row = sql.one<Omit<Found, 'by'>>(
-      `SELECT id, seq, state, json_extract(fields, '$.project') AS project FROM entry
+export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?: string | null): Found | null {
+  const pick = (by: Found['by'], where: string, ...params: (string | number | null)[]): Found | null => {
+    const row = sql.one<Omit<Found, 'by' | 'foreign'> & { token_id: string | null }>(
+      `SELECT id, seq, state, json_extract(fields, '$.project') AS project, json_extract(fields, '$.token_id') AS token_id FROM entry
        WHERE register = '${SESSION}' AND deleted_at IS NULL AND ${where}`,
       ...params,
     );
-    return row ? { id: row.id, seq: row.seq, state: row.state, project: row.project ?? null, by } : null;
+    if (!row) return null;
+    const foreign = token !== undefined && owned(row.token_id, token);
+    return { id: row.id, seq: row.seq, state: row.state, project: row.project ?? null, by, foreign };
   };
 
   const n = hints.spoken?.startsWith(PREFIX) ? hints.spoken.slice(PREFIX.length) : '';
@@ -118,13 +137,23 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number): Found
     return pick(
       'adopted',
       `json_extract(fields, '$.host') = ? AND json_extract(fields, '$.repo') = ? AND state IN ('active', 'idle')
-       AND json_extract(fields, '$.last_seen') > ? ORDER BY json_extract(fields, '$.last_seen') DESC LIMIT 1`,
+       AND json_extract(fields, '$.last_seen') > ?${token === undefined ? '' : " AND json_extract(fields, '$.token_id') IS ?"}
+       ORDER BY json_extract(fields, '$.last_seen') DESC LIMIT 1`,
       hints.host,
       hints.repo,
       new Date(nowMs - STALE_MS).toISOString(),
+      ...(token === undefined ? [] : [token ?? null]),
     );
 
   return null;
+}
+
+/**
+ * Whether a run's `token_id` keeps the caller out: it names another token. A run no token opened is a
+ * person's, shared with any key that names it.
+ */
+export function owned(owner: unknown, token: string | null): boolean {
+  return typeof owner === 'string' && owner !== token;
 }
 
 /** The fields a run opened by the ladder starts with: every hint but its name. */

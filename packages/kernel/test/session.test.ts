@@ -413,3 +413,42 @@ test('A TOKEN’S PROPOSAL IS SIGNED BY ITS RUN, a refused one opens none, and i
   assert.deepEqual(runs(sql), [1]);
   sql.close();
 });
+
+test('A RUN BELONGS TO THE TOKEN THAT OPENED IT: another key naming it, holding its client id or writing its row is refused', async () => {
+  const { k, sql, clock } = await record();
+  const where = { host: 'dev-pc', repo: 'braindog' };
+  value(k.create('tasks', { what: 'Mine' }, agent({ ...where, client_id: 'cc-1' })));
+  const other = (session: SessionHints = {}): WriteContext => ({ actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session });
+
+  for (const said of [{ spoken: 'S1' }, { client_id: 'cc-1' }]) {
+    const out = refusal(k.create('tasks', { what: 'As S1' }, other(said)));
+    assert.deepEqual([out.code, out.at], ['FORBIDDEN', 'session']);
+    assert.equal(refusal(k.runFor(other(said))).code, 'FORBIDDEN');
+    assert.equal(k.findRun(said, 't_2'), null);
+    assert.equal(k.findRun(said, 't_1')?.seq, 1);
+  }
+  assert.equal(refusal(k.update('session', 'S1', { next: 'Mine now' }, other())).code, 'FORBIDDEN');
+  assert.deepEqual(runs(sql), [1], 'a refused key opened a run');
+
+  /* One machine and one checkout is not one run: the other key opens its own. */
+  clock.advance(MIN);
+  value(k.create('tasks', { what: 'Theirs' }, other(where)));
+  assert.deepEqual(runs(sql), [1, 2]);
+  assert.equal(k.get('S2')?.fields.token_id, 't_2');
+  assert.equal(k.get('S1')?.version, 1);
+  sql.close();
+});
+
+test('A RUN A PERSON MADE IS SHARED with any key that names it, and a run a key makes by hand is that key’s', async () => {
+  const { k, sql } = await record();
+  value(k.create('session', { doing: 'For whoever picks it up' }, { actor: 'p_owner' }));
+  value(k.create('tasks', { what: 'Picked up' }, agent({ spoken: 'S1' })));
+  value(k.create('tasks', { what: 'Me too' }, { actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session: { spoken: 'S1' } }));
+  assert.deepEqual(runs(sql), [1]);
+
+  const made = value<Entry>(k.create('session', { doing: 'By hand' }, agent()));
+  assert.equal(made.fields.token_id, 't_1');
+  const other: WriteContext = { actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session: { spoken: `S${made.seq}` } };
+  assert.equal(refusal(k.create('tasks', { what: 'Not mine' }, other)).code, 'FORBIDDEN');
+  sql.close();
+});

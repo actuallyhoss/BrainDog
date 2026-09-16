@@ -807,7 +807,7 @@ any row is written".*
 | Code | Raised where | Fixture |
 |---|---|---|
 | `UNAUTHORIZED` | no credential, or a bad one — 401, and the body says only this | `unauthorized` |
-| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10; a row write from a `spark` principal (41); a runner posting out of `seq` order (46) | `forbidden` |
+| `FORBIDDEN` | a credential outside its scope, level or ceiling — 403, §10; a row write from a `spark` principal (41); a token naming, re-attaching or writing a run another token opened (41 §5.4); a runner posting out of `seq` order (46) | `forbidden` |
 | `NEEDS_BROWSER_SESSION` | a bearer at VAULT, the session half of JOBS, or ADMIN without an operation grant whose reach names the method — 403, §5 | `needs-browser-session` |
 | `WRONG_KEY` | `kek_id` mismatch on open — 409, never "corrupt", 12 §6.1 | `wrong-key` |
 | `GRANT_REVOKED` | `openGrant` on a row with `revoked_at` | `grant-revoked` |
