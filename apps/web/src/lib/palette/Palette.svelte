@@ -51,18 +51,20 @@
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { TONES, since } from 'braindog-render';
   import { copy } from '../copy.ts';
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
   import { METRICS } from '../record/declared.ts';
   import { isTemplate, unreadable } from '../record/metrics.ts';
-  import { AUDIT, NOW, QUESTIONS, REGISTERS, ROWS, VIEWS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
+  import { AUDIT, NOW, QUESTIONS, REGISTERS, ROWS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
   import { toasts } from '../ui/toast.svelte.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
   import { commands, type Act } from './admit.ts';
+  import { savedViews } from '../record/views.ts';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -317,8 +319,9 @@
       /* THE SAVED VIEWS. `/v/<key>` is a real route with two real views on it and NOTHING in the
          app produced that address: 356 lines and eight copy keys behind a door with no handle. A
          view is a named list, which is what this section of the panel is for. */
-      for (const [key, v] of Object.entries(VIEWS)) {
-        const over = REGISTERS[v.register];
+      /* A LIVE RECORD'S VIEWS ARE PAGES, and the loop over `nav` above has already listed them; the sample's are its own. */
+      for (const v of savedViews({ live: page.data.live === true, nav })) {
+        const over = v.register === null ? undefined : REGISTERS[v.register];
         /* THE STANDING RULE, ON A SAVED VIEW. A view over a register this record does not hold is a
            door onto nothing: `/v/<key>` has no list to filter and no rows to draw. It was built
            anyway, wearing the register's raw id where its name should have been, which is a row
@@ -326,10 +329,10 @@
         if (!over) continue;
         if (!starts(v.name) && !starts(over.name)) continue;
         out.push({
-          id: `v-${key}`,
+          id: `v-${v.key}`,
           title: v.name,
           detail: `${over.name} · saved view`,
-          href: `/v/${key}`,
+          href: v.href,
           group: copy.pages,
           icon: 'filter',
           complete: v.name,
