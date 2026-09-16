@@ -43,6 +43,13 @@ const GATES = [
      chosen one of them. Cheap and early, beside the other greps. */
   ['stack', ['node', [join(here, 'stack.mjs')]]],
 
+  /* BESIDE `stack` BECAUSE IT IS THE SAME KIND OF CHECK: a raw byte scan over source, cheap and
+     early. Two files in this repository picked up a stray NUL byte and nothing in the other
+     twenty-four gates noticed — one sat inside a string literal and typechecked clean, the other
+     sat inside a regex character class where `\x00` was meant. A NUL also makes git call the file
+     binary, so it silently stops diffing and stops merging. This is a scan of bytes rather than of
+     syntax, because the defect is in the byte and not in the shape of the code around it. */
+  ['nul-bytes', ['node', [join(here, 'nul-bytes.mjs')]]],
   /* THE OTHER HALF OF `31 §3`. `stack` is layer 4 — the runtime surface a package may not name.
      This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
      climbs out of its own package, which pnpm resolves happily and which nothing else can see. */

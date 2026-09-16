@@ -457,7 +457,7 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
 | 4 | no `outline: none` | `outline:\s*(none\|0)` anywhere |
 | 5 | no physical inline-axis property | `left right margin-left margin-right padding-left padding-right border-left border-right float:left\|right text-align:left\|right` |
 | 6 | every positive `z-index` is a `var(--z-*)` | `z-index:\s*[1-9]` |
-| 7 | every icon size is one of four names | an `<Icon size=…>` not in `xs sm md lg`; a literal `width`/`height` on an `<svg>` |
+| 7 | every icon size is one of four names | an `<Icon size=…>` not in `s m l xl`; a literal `width`/`height` on an `<svg>` |
 | 8 | the identifier role never meets a display size | one element's class list holds the identifier role class (13 §3.2) and any of `t-xl t-2xl t-3xl` |
 | 9 | no icon component accepts `color` | `color` in `Icon.svelte`'s `$props()` destructure |
 | 10 | a component styles only classes it emits | a `.class` selector in a component's `<style>` whose class its own markup never emits, outside `:global(...)` |

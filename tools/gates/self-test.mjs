@@ -74,6 +74,11 @@ const CASES = [
   { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
+  /* THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte
+     does not survive being typed through an editing tool — the same reason the gate's own header
+     insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
+     literal, the shape of both real defects this gate was written for. */
+  { gate: 'nul-bytes', expect: /a NUL byte at offset/, findings: 1 },
 
   /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
      gate with one check under test and two that have never been asked to fire — and this one's
