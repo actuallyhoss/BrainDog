@@ -29,8 +29,8 @@ export const GUIDE = {
   voice: {
     home: 'Your project',
     right_now: 'Where you are',
-    needs_you: 'Your next step',
-    nothing_needs_you: 'Nothing is next yet. Add the first step when you are ready.',
+    needs_you: 'Waiting on you',
+    nothing_needs_you: 'Nothing is waiting on you.',
     since_away: 'What you have done so far',
     lists: 'Your notes',
   },

@@ -27,10 +27,10 @@ export const TEAM = {
   voice: {
     home: 'Team',
     right_now: 'In flight',
-    needs_you: 'Waiting on the team',
-    nothing_needs_you: 'Nobody is blocked.',
+    needs_you: 'Waiting on a call',
+    nothing_needs_you: 'No call is waiting on you.',
     since_away: 'What the team and its agents did',
-    lists: 'Boards',
+    lists: 'Team lists',
   },
   /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues", or a teammate a "Member", at /packs/usecase-team. */
   labels: {
