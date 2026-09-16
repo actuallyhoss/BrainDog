@@ -1007,3 +1007,18 @@ test('CASH NOW SAYS WHAT IT ADDS UP AND HOW OLD ITS OLDEST BALANCE IS, not its t
   assert.match(cash.note, /^in 2 accounts, as of \d{1,2} [A-Z][a-z]{2}$/u);
   assert.equal(metric('cash-as-of').value, cash.note.split('as of ')[1], 'the day is the oldest liquid balance');
 });
+
+test('AN ACCOUNT BALANCE OLDER THAN A WEEK SAYS IT IS OUT OF DATE, beside its day, with the watch glyph', () => {
+  const cards = page('money')!.blocks.find((b) => b.kind === 'cards')!;
+  assert.deepEqual(cards.refusals, []);
+  const [segment] = toSegments(cards);
+  assert.equal(segment?.type, 'block');
+  if (segment?.type !== 'block') return;
+  const rows = segment.rows.slice(1);
+  const reserve = rows.find((r) => r.cells.some((c) => c.includes('Tax reserve')))!;
+  assert.equal(reserve.tone, 'warn');
+  assert.ok(reserve.cells.some((c) => c.endsWith(', out of date')), reserve.cells.join(' | '));
+  const current = rows.find((r) => r.cells.some((c) => c.includes('Studio current account')))!;
+  assert.equal(current.tone, undefined, 'a balance from yesterday is not out of date');
+  assert.match(readBlock({ ...cards, stale: { field: 'name', after: '7d' } } as never).refusals.join(), /stale:/);
+});

@@ -316,6 +316,7 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `ahead` | int 0–12 buckets after the current one (`OUT_OF_BOUNDS`) | no | `0` | — |
 | `net` | bool; on a `series`, in minus out as a line | no | `false` | — |
 | `recorded` | series `Id`, with or without `series.`; on a `forecast`, the opening metric's own series (`DECLARATION_INVALID` otherwise) | no | — | — |
+| `stale` | `{ field: Id of a day or instant field, after: window }` (`DECLARATION_INVALID`); on `cards` | no | — | — |
 | `knobs` | list of `horizon late spend leave` (`DECLARATION_INVALID`) | no | none | the four |
 | `tone` | intent | no | — | the four |
 | `body` | the dialect, ≤ 64 KB | `note` | — | — |

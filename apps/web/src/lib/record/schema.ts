@@ -300,6 +300,8 @@ export type PageBlock = {
   net?: boolean;
   /** A `forecast`'s: the series its opening figure is remembered in, drawn before today. */
   recorded?: string;
+  /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
+  stale?: { field: string; after: string };
   /** A `forecast`'s: which knobs a reader may move. */
   knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
 };

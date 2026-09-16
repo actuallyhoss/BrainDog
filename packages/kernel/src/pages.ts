@@ -92,6 +92,8 @@ export type PageBlock = {
   recorded?: string;
   /** A `forecast`'s: which of its knobs a reader may move. */
   knobs?: string[];
+  /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
+  stale?: { field: string; after: string };
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -120,6 +122,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net', 'bars',
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
+  /* A card grid's out-of-date rule. */
+  'stale',
 ]);
 
 export type PageDecl = {
@@ -517,6 +521,17 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A DIFF READS ONE ROW'S HISTORY, not the rows a predicate matches. */
   if (block.kind === 'diff') return diffBlock(deps, block, register, schema, base, also);
+
+  /* OUT OF DATE IS A DAY AND A WINDOW, checked here because the host draws it from both. */
+  if (block.stale !== undefined) {
+    const s = block.stale as { field?: unknown; after?: unknown } | null;
+    const type = s && typeof s.field === 'string' && Object.hasOwn(schema.fields, s.field) ? schema.fields[s.field]?.type : undefined;
+    if (!s || (type !== 'day' && type !== 'instant') || typeof s.after !== 'string' || windowMs(s.after) === null)
+      return {
+        ...base,
+        refusals: also({ code: 'DECLARATION_INVALID', fix: `stale: names a day field on ${register} and a window, such as { field: as_of, after: 7d }.`, at: 'stale' }),
+      };
+  }
 
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };

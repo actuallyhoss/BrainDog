@@ -1815,6 +1815,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net',
   /* A forecast's remembered figure and its knobs. */
   'recorded', 'knobs',
+  /* A card grid's out-of-date rule. */
+  'stale',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1911,6 +1913,12 @@ export function readBlock(b: PageBlock): BlockResult {
     }
     for (const key of Object.keys(b))
       if (!READS.has(key)) said.push(`${key}: is not a key this build reads`);
+    /* OUT OF DATE IS A DAY AND A WINDOW, as the record checks it. */
+    if (b.stale !== undefined && register) {
+      const type = decl(register, b.stale?.field ?? '')?.type;
+      if ((type !== 'day' && type !== 'instant') || typeof b.stale?.after !== 'string' || windowMs(b.stale.after) === null)
+        said.push(`stale: names a day field on ${register} and a window, such as { field: as_of, after: 7d }`);
+    }
     /* `limit:` is a READING cap, not a query cap: it says how much of the answer fits on the page.
        The kinds that reduce are handed the whole answer (see `matched`), so a sum is a sum. */
     const entries = matched.slice(0, b.limit ?? 50);

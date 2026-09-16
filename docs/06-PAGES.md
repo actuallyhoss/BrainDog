@@ -137,6 +137,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `ahead` | int, 0–12. On a `series`, how many buckets after the current one it draws | `0` | no |
 | `net` | bool. On a `series`, draw in minus out per bucket as a line | `false` | no |
 | `recorded` | a series id, `cash-now` or `series.cash-now`. On a `forecast` over `forecast.runway`, the series its `opening` figure is remembered in, drawn solid over the ninety days before today; any other series is refused, because the line would join two measures at today | nothing before today | no |
+| `stale` | `{ field, after }`: a day field and a window. On a `cards` block, a row whose day is older than the window says it is out of date beside that day, with the watch glyph | never | no |
 | `knobs` | a list of `horizon · late · spend · leave`. On a `forecast`, the what-ifs a reader may move: the horizon, clients paying later, spending the record does not know, and leaving out a large movement. They are arithmetic over the walk on the page, in memory, never in the address and never written | no knobs | no |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |

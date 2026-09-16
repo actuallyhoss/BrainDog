@@ -188,3 +188,11 @@ test('A FORECAST DRAWS THE OPENING FIGURE AS IT WAS REMEMBERED, and only that fi
   assert.equal(k.block({ ...forecast, recorded: 'overdue' }).refusals[0]?.at, 'recorded', 'another figure would join two measures at today');
   assert.equal(k.block({ ...forecast, knobs: ['weather'] }).refusals[0]?.at, 'knobs');
 });
+
+test('OUT OF DATE NAMES A DAY AND A WINDOW, or the card grid says what it needs', async () => {
+  const k = await record();
+  const cards = { kind: 'cards', source: 'register.bills', columns: [{ field: 'what' }, { field: 'due', as: 'when' }], empty: 'None.' };
+  assert.deepEqual(k.block({ ...cards, stale: { field: 'due', after: '7d' } }).refusals, []);
+  assert.equal(k.block({ ...cards, stale: { field: 'what', after: '7d' } }).refusals[0]?.at, 'stale');
+  assert.equal(k.block({ ...cards, stale: { field: 'due', after: 'a week' } }).refusals[0]?.at, 'stale');
+});

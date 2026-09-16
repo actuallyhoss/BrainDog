@@ -40,6 +40,7 @@ import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
 import { copy } from '../copy.ts';
 import { declaredValue } from './where.ts';
+import { windowMs } from './metrics.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 
 /**
@@ -407,16 +408,29 @@ function cardsRows(block: BlockResult): string[] {
     };
     const cells = columns.map((c, j) => escapeCell(said(c, j)));
     if (quiet) cells.push(quiet[i] ? 'quiet' : '');
+    /* OUT OF DATE: the day is older than the window, so the card says so beside that day, with the watch glyph. */
+    const old = staleAt(block, block.entries[i]);
+    const at = old ? columns.findIndex((c) => c.field === block.stale?.field) : -1;
+    if (at >= 0) cells[at] = escapeCell(copy.outOfDate(said(columns[at]!, at)));
     /* THE NAME OPENS THE ROW, so a card is a door the way a register row is. It is written as the
        dialect's own link, so no host callback is needed; a name holding a bracket stays text rather
        than breaking the link written around it. */
     const href = block.rows[i]?.href;
     const name = named >= 0 ? cells[named] : undefined;
     if (href && name && !/[[\]]/u.test(name)) cells[named] = `[${name}](${href})`;
-    const tone = block.rows[i]?.tone;
+    const tone = old ? 'warn' : block.rows[i]?.tone;
     return `${cells.join(' | ')}${tone ? ` | ${tone}` : ''}`;
   });
   return [head, ...rows];
+}
+
+/** Whether a row's `stale:` day is older than the window, on the clock the block was read at. */
+function staleAt(block: BlockResult, entry: BlockResult['entries'][number] | undefined): boolean {
+  const rule = block.stale;
+  const span = rule ? windowMs(rule.after) : null;
+  const v = rule && entry ? entry.fields[rule.field] : undefined;
+  if (span === null || typeof v !== 'string') return false;
+  return Date.parse(v.length === 10 ? `${v}T00:00:00Z` : v) < Date.parse(block.stale_at) - span;
 }
 
 /**

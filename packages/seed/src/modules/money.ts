@@ -113,7 +113,8 @@ export const OBLIGATIONS: Fields[] = [
  */
 export const ACCOUNTS: Fields[] = [
   { name: 'Studio current account', kind: 'bank', balance: gbp(985_000), as_of: day(-1), liquid: true },
-  { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-6), liquid: true },
+  /* NOT UPDATED FOR OVER A WEEK, so the page shows what an out-of-date balance looks like. */
+  { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true },
   { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false },
 ];
 
@@ -624,6 +625,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
           { field: 'as_of', label: 'As of', as: 'when' },
         ],
         order: [{ field: 'seq', dir: 'asc' }],
+        /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). */
+        stale: { field: 'as_of', after: '7d' },
         empty: 'No accounts yet. Add what is in the bank and this page starts from it.',
       },
     ],
