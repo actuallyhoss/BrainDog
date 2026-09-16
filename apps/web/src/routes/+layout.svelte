@@ -391,7 +391,10 @@
           </p>
           <span class="sample-acts">
             <a class="sample-go" href="/start">{copy.sampleStart}</a>
-            <button type="button" class="sample-away" onclick={putSampleAway}>{copy.samplePutAway}</button>
+            <button type="button" class="sample-away" aria-label={copy.samplePutAway} title={copy.samplePutAway} onclick={putSampleAway}>
+              <span class="sample-away-word">{copy.samplePutAway}</span>
+              <span class="sample-away-glyph"><Icon name="close" size="m" /></span>
+            </button>
           </span>
         </aside>
       {/if}
@@ -649,9 +652,11 @@
      screen gives what the record noticed, for the same reason. */
   /* A page-level banner (DESIGN-BRIEF 4.9): a full-width strip at the top of the panel, `s1` and a
      bottom hairline only. Not a floating card, and no accent wash. */
+  /* ONE LINE ON A LAPTOP (DESIGN-SYSTEM 4.9, APPENDIX C2). It wrapped to two at 1440, so the bar was
+     taller than the page head's own gap on every screen; the sentence now truncates before it wraps. */
   .sample {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: var(--sp-1) var(--sp-5);
     align-items: center;
     justify-content: space-between;
@@ -662,11 +667,19 @@
   }
 
   .sample-said {
-    flex: 1 1 32ch;
+    flex: 1 1 0;
+    min-inline-size: 0;
     margin: 0;
+    overflow: hidden;
     color: var(--ink2);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sample-away-glyph {
+    display: none;
   }
 
   .sample-said strong {
@@ -809,8 +822,20 @@
       gap: 0;
     }
 
+    /* ONE ROW OF 52, NOT TWO OF 80 (APPENDIX C2). The dismiss keeps its name for a screen reader and
+       its 44px target, and draws the close glyph instead of three words the row had no room for. */
     .sample-away {
-      padding: 0 var(--sp-2);
+      justify-content: center;
+      min-inline-size: var(--ctl-h);
+      padding: 0;
+    }
+
+    .sample-away-word {
+      display: none;
+    }
+
+    .sample-away-glyph {
+      display: inline-flex;
     }
   }
 

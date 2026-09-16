@@ -283,7 +283,7 @@ export const copy = {
   sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by your assistant.',
   sourcesAddGo: 'Browse add-ons',
   densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
-  sampleWhy: 'A whole small business, made up, so you can see what a record holds before you have one. Nothing here is yours and nothing you do to it is saved.',
+  sampleWhy: 'A small business, made up, so you can see what a record holds. Nothing you do here is saved.',
   sampleStart: 'Start your own',
   samplePutAway: 'Put this away',
 
