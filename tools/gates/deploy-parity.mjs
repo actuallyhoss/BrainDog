@@ -103,7 +103,14 @@ for (const path of PATHS) {
 try {
   const said = await (await get('/api/version')).json();
   const app = typeof said?.app === 'string' ? said.app : '';
-  if (!expected) findings.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
+  /* A REFUSAL IS NOT A FAILED DEPLOY, and printing it as one sends whoever is on call to the wrong
+     place entirely. `/api/version` is a `READ+` route, so a host that wants a bearer answers here
+     with a refusal and no build tuple at all. Read as an absent tuple, that is word for word what
+     a deploy which never landed looks like, and it is the more alarming of the two readings. The
+     gate cannot tell you the deploy is good in this case, and it must not imply the opposite. */
+  const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
+  if (refused) findings.push(`live app tuple went unread: the host refused with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
+  else if (!expected) findings.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
   else if (app !== expected) findings.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
 } catch (err) {
   findings.push(`live app tuple is unreadable: ${err instanceof Error ? err.message : String(err)}`);
