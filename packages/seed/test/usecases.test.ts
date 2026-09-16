@@ -187,7 +187,8 @@ test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS (S8)',
       .filter((d) => typeof d.register === 'string' && Array.isArray(d.fields));
     for (const key of Object.keys(u.labels)) {
       some++;
-      const [list, field, val] = key.split('.');
+      /* `people:holds` and `tickets:one` name the list before the colon. */
+      const [list, field, val] = key.split(':')[0]!.split('.');
       const decl = declared.find((d) => d.register === list);
       assert.ok(decl, `${u.usecase}: ${key} names a list it installs`);
       if (field === undefined) continue;

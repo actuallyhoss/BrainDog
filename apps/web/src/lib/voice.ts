@@ -58,31 +58,55 @@ export const speaking = (packs: readonly { id: string; disabled_at: string | nul
  */
 export type Labels = Readonly<Record<string, string>>;
 
-const LABEL_KEY = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*){0,2}$/;
+const SEGMENT = '[a-z][a-z0-9]*(?:_[a-z0-9]+)*';
+const LABEL_KEY = new RegExp(`^${SEGMENT}(?:[.]${SEGMENT}){0,2}$`);
+/** A list's singular and its description line, `tickets:one` and `tickets:holds`, kept as `one_tickets` and `holds_tickets`. */
+const LIST_WORDS = ['one', 'holds'] as const;
+const LIST_WORD_KEY = new RegExp(`^${SEGMENT}:(?:${LIST_WORDS.join('|')})$`);
 
-/** The labels held in a use-case pack's settings: each `label_<list>[__<field>[__<value>]]` that is a line of text. */
+/**
+ * The labels held in a use-case pack's settings: each `label_<list>[__<field>[__<value>]]`, `one_<list>` and
+ * `holds_<list>` that is a line of text.
+ */
 export function labelsOf(values: Readonly<Record<string, unknown>>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [setting, word] of Object.entries(values)) {
-    if (!setting.startsWith('label_') || typeof word !== 'string' || word.trim() === '') continue;
+    if (typeof word !== 'string' || word.trim() === '') continue;
+    const listWord = LIST_WORDS.find((w) => setting.startsWith(`${w}_`));
+    if (listWord) {
+      const key = `${setting.slice(listWord.length + 1)}:${listWord}`;
+      if (LIST_WORD_KEY.test(key)) out[key] = word;
+      continue;
+    }
+    if (!setting.startsWith('label_')) continue;
     const key = setting.slice('label_'.length).split('__').join('.');
     if (LABEL_KEY.test(key)) out[key] = word;
   }
   return out;
 }
 
+/** One of a list, from its name, the way `remote.ts` `declOf` says it when a declaration does not: Issues, issue. */
+export const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+
 /** A list's name: the record's label for it, or the name its declaration gives. */
 export const listNamed = (labels: Labels, list: string, declared: string): string => labels[list] ?? declared;
 
-type Relabellable = { id: string; name?: string; fields?: readonly { id: string; label?: string; labels?: Readonly<Record<string, string>>; values?: readonly string[] }[] };
+type Relabellable = { id: string; name?: string; one?: string; holds?: string; fields?: readonly { id: string; label?: string; labels?: Readonly<Record<string, string>>; values?: readonly string[] }[] };
 
 /**
- * A declaration with the record's labels drawn over its own words: the list's name, each field's label and each
- * enum value's label. The same object when no label names this list, so a record without labels costs nothing.
+ * A declaration with the record's labels drawn over its own words: the list's name, its singular, the line saying what
+ * it holds, each field's label and each enum value's label. The same object when no label names this list, so a record
+ * without labels costs nothing.
+ *
+ * A LIST RENAMED WITH NO SINGULAR GIVEN SAYS ONE OF THE NEW NAME. "Issues" over "New ticket" was two words for one list,
+ * so a name that differs from the declaration's makes the singular from itself, unless `tickets:one` says otherwise.
  */
 export function relabel<T extends Relabellable>(decl: T, labels: Labels): T {
   const prefix = `${decl.id}.`;
-  if (labels[decl.id] === undefined && !Object.keys(labels).some((k) => k.startsWith(prefix))) return decl;
+  if (labels[decl.id] === undefined && !Object.keys(labels).some((k) => k.startsWith(prefix) || k.startsWith(`${decl.id}:`))) return decl;
+  const renamed = labels[decl.id] !== undefined && labels[decl.id] !== decl.name ? labels[decl.id] : undefined;
+  const one = labels[`${decl.id}:one`] ?? (renamed === undefined ? undefined : singularOf(renamed));
+  const holds = labels[`${decl.id}:holds`];
   const fields = decl.fields?.map((f) => {
     const own = labels[`${decl.id}.${f.id}`];
     const valuePrefix = `${decl.id}.${f.id}.`;
@@ -94,7 +118,29 @@ export function relabel<T extends Relabellable>(decl: T, labels: Labels): T {
       ...(values.length === 0 ? {} : { labels: { ...f.labels, ...Object.fromEntries(values.map(([k, w]) => [k.slice(valuePrefix.length), w])) } }),
     };
   });
-  return { ...decl, ...(labels[decl.id] === undefined ? {} : { name: labels[decl.id] }), ...(fields ? { fields } : {}) };
+  return {
+    ...decl,
+    ...(labels[decl.id] === undefined ? {} : { name: labels[decl.id] }),
+    ...(one === undefined ? {} : { one }),
+    ...(holds === undefined ? {} : { holds }),
+    ...(fields ? { fields } : {}),
+  };
+}
+
+/**
+ * THE BUILD'S OWN LISTS, RELABELLED IN PLACE. A page, Home and the palette read first-party lists (People, Projects) from
+ * the declarations this build ships, which no label reached, so a team's People list was "Teammates" on the rail and
+ * "People" on its Board. Each list is drawn from the words it had before any label, so a label taken away puts the
+ * declaration's word back.
+ */
+const unlabelled = new WeakMap<object, Map<string, Relabellable>>();
+export function relabelAll<T extends Relabellable>(table: Record<string, T>, labels: Labels): void {
+  let before = unlabelled.get(table);
+  if (!before) unlabelled.set(table, (before = new Map()));
+  for (const [id, decl] of Object.entries(table)) {
+    if (!before.has(id)) before.set(id, decl);
+    table[id] = relabel(before.get(id) as T, labels);
+  }
 }
 
 /* THE LABELS THIS TAB'S RECORD HOLDS, set once per `boot` by `voice.svelte.ts` and read by the list reader and the

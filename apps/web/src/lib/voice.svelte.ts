@@ -8,7 +8,7 @@
  * house voice.
  */
 
-import { heardLabels, homePageOf, labelsOf, lineOf, speaking, voiceOf, type Voice, type VoiceKey } from './voice.ts';
+import { heardLabels, homePageOf, labelsOf, lineOf, relabelAll, speaking, voiceOf, type Labels, type Voice, type VoiceKey } from './voice.ts';
 
 export { labels, listNamed } from './voice.ts';
 
@@ -24,6 +24,16 @@ export const said = (key: VoiceKey): string => lineOf(state.voice, key);
  */
 export const homePage = (): string | null => (state.pack === null ? null : homePageOf(state.pack));
 
+/**
+ * The words a record gives its lists, heard: kept for the list reader, and drawn over the build's own lists, which a
+ * page, Home and the palette read by id (People on a team's Board).
+ */
+async function hear(labels: Labels): Promise<void> {
+  heardLabels(labels);
+  const { REGISTERS } = await import('./record/data.ts');
+  relabelAll(REGISTERS, labels);
+}
+
 /** Ask the record for its voice, once per `boot` answer. `null` for the sample or a refused boot. */
 export async function listen(boot: object | null, base: string): Promise<void> {
   if (boot === heardFor) return;
@@ -31,7 +41,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   if (boot === null) {
     state.voice = {};
     state.pack = null;
-    heardLabels({});
+    await hear({});
     return;
   }
   /* LOADED HERE AND NOT AT THE TOP: the rail imports this module, and the client does not belong in the entry chunk. */
@@ -42,7 +52,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   if (id === null) {
     state.voice = {};
     state.pack = null;
-    heardLabels({});
+    await hear({});
     return;
   }
   const settings = await client.packConfig({ id });
@@ -51,5 +61,5 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   state.voice = voiceOf(values);
   state.pack = id;
   /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES (S8), read by the list reader and the rail. */
-  heardLabels(labelsOf(values));
+  await hear(labelsOf(values));
 }

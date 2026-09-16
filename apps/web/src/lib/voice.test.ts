@@ -10,7 +10,7 @@ import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, homePageOf, labelsOf, lineOf, listNamed, relabel, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, labelsOf, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -46,11 +46,22 @@ test('THE VOICE COMES FROM THE FIRST USE-CASE PACK SWITCHED ON', () => {
 });
 
 test('LABELS ARE READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM (S8)', () => {
-  const values = { label_tickets: 'Issues', label_people__role__collaborator: 'Teammate', label_people: ' ', label_x__Y: 'no', voice_home: 'Team', label_steps__state: 4 };
+  const values = {
+    label_tickets: 'Issues',
+    label_people__role__collaborator: 'Teammate',
+    label_people: ' ',
+    label_x__Y: 'no',
+    voice_home: 'Team',
+    label_steps__state: 4,
+    one_tickets: 'issue',
+    holds_tickets: 'every issue the team has',
+    one_: 'x',
+  };
   assert.deepEqual(labelsOf(values), labelsOfPack(values));
-  assert.deepEqual(labelsOf(values), { tickets: 'Issues', 'people.role.collaborator': 'Teammate' });
+  assert.deepEqual(labelsOf(values), { tickets: 'Issues', 'people.role.collaborator': 'Teammate', 'tickets:one': 'issue', 'tickets:holds': 'every issue the team has' });
+  const settingOf = (k: string): string => (/:(one|holds)$/.test(k) ? `${k.split(':')[1]}_${k.split(':')[0]}` : `label_${k.split('.').join('__')}`);
   for (const u of USE_CASES) {
-    const settings = Object.fromEntries(Object.entries(u.labels).map(([k, v]) => [`label_${k.split('.').join('__')}`, v]));
+    const settings = Object.fromEntries(Object.entries(u.labels).map(([k, v]) => [settingOf(k), v]));
     assert.deepEqual(labelsOf(settings), u.labels, u.usecase);
   }
 });
@@ -73,6 +84,25 @@ test('A LABEL IS DRAWN OVER THE DECLARATION, AND A KEY LEFT OUT READS THE DECLAR
   assert.equal(people.name, 'People');
   assert.equal(listNamed({ people: 'Teammates' }, 'people', 'People'), 'Teammates');
   assert.equal(listNamed({ people: 'Teammates' }, 'tasks', 'Tasks'), 'Tasks');
+});
+
+test('A RENAMED LIST SAYS ONE OF ITS NEW NAME AND ITS OWN DESCRIPTION: "Issues" is not "New ticket"', () => {
+  const tickets = { id: 'tickets', name: 'Tickets', one: 'ticket', holds: 'every piece of work the team has', fields: [] };
+  assert.equal(relabel(tickets, { tickets: 'Tickets' }).one, 'ticket', 'a label that says the same name keeps the singular');
+  const issues = relabel(tickets, { tickets: 'Issues' });
+  assert.equal(issues.one, 'issue');
+  assert.equal(issues.holds, tickets.holds);
+  const said = relabel(tickets, { tickets: 'Issues', 'tickets:one': 'bug', 'tickets:holds': 'every bug we know about' });
+  assert.deepEqual([said.name, said.one, said.holds], ['Issues', 'bug', 'every bug we know about']);
+  assert.equal(relabel(tickets, { 'tickets:one': 'job' }).name, 'Tickets');
+});
+
+test("THE BUILD'S OWN LISTS ARE RELABELLED IN PLACE, and a label taken away puts the declaration's word back", () => {
+  const table: Record<string, { id: string; name: string; one: string; fields: never[] }> = { people: { id: 'people', name: 'People', one: 'person', fields: [] } };
+  relabelAll(table, { people: 'Teammates' });
+  assert.deepEqual([table.people?.name, table.people?.one], ['Teammates', 'teammate']);
+  relabelAll(table, {});
+  assert.deepEqual([table.people?.name, table.people?.one], ['People', 'person']);
 });
 
 test("A USE CASE'S HOME IS THE PAGE THE SEED DECLARES FOR IT, by its pack's id", () => {

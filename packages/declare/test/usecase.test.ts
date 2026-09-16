@@ -114,3 +114,19 @@ test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY K
   assert.deepEqual(labelsOf({ label_books: ' ', label_people: 3, voice_home: 'x', label_: 'y' }), {});
   assert.deepEqual(value<UseCase>(normaliseUseCase(DOC())).labels, {});
 });
+
+test("A LIST'S SINGULAR AND ITS DESCRIPTION LINE ARE LABELS TOO, as one_<list> and holds_<list>", async () => {
+  const labels = { books: 'Shelf', 'books:one': 'volume', 'books:holds': 'every volume on the shelf and where each one is' };
+  const u = value<UseCase>(normaliseUseCase(DOC({ labels })));
+  const pack = value<{ manifest: { config?: Record<string, { default?: unknown; label?: string }> } }>(await normalise(useCasePack(u)!));
+  const config = pack.manifest.config ?? {};
+  assert.equal(config.one_books?.default, 'volume');
+  assert.equal(config.one_books?.label, 'Label: one of books');
+  assert.equal(config.holds_books?.label, 'Label: what books holds');
+  assert.equal(labelSetting('books:holds'), 'holds_books');
+  assert.deepEqual(labelsOf(Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]))), labels);
+  const long = 'a line about what is kept here, '.repeat(6);
+  assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:one': long } }))).at, 'labels.books:one', 'a singular is a word');
+  assert.ok(normaliseUseCase(DOC({ labels: { 'books:holds': long.slice(0, 180) } })).ok, 'a description is a line');
+  assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:many': 'x' } }))).code, 'VALUE_MALFORMED');
+});

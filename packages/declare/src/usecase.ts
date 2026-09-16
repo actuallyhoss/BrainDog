@@ -13,7 +13,9 @@
  *
  * LABELS ARE SETTINGS TOO (S8). A use case may rename a list, a field or one value of a field, its own or a
  * first-party module's, and each word is a text setting, `label_<list>[__<field>[__<value>]]`, which the
- * display reads in place of the declaration's word and a person can change like a voice line.
+ * display reads in place of the declaration's word and a person can change like a voice line. A list's singular and
+ * the line saying what it holds are words too, `list:one` and `list:holds`, kept as `one_<list>` and `holds_<list>`,
+ * because a field may be called `one` and a label key names fields after the dot.
  *
  * THE KEYS ARE CLOSED. A voice key is a slot the display promises to read, so a use case cannot put a
  * sentence anywhere on screen; it can only replace one the house voice already says.
@@ -95,8 +97,21 @@ const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 /** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share. */
 const SETTINGS_CEILING = 32;
 
-/** The setting a label is stored under: `label_people__role__collaborator`. */
-export const labelSetting = (key: string): string => `${LABEL_PREFIX}${key.split('.').join('__')}`;
+/**
+ * A LIST'S OWN WORDS BESIDE ITS NAME: `tickets:one` is what one ticket is called ("New issue"), `tickets:holds` the line
+ * saying what the list holds. Stored as `one_tickets` and `holds_tickets`.
+ */
+export const LIST_WORDS = ['one', 'holds'] as const;
+export type ListWord = (typeof LIST_WORDS)[number];
+export const LIST_WORD_KEY = new RegExp(`^(${SEGMENT}):(${LIST_WORDS.join('|')})$`);
+/** A description line is a sentence's worth, where every other label is a word or a few. */
+const HOLDS_BYTES = 280;
+
+/** The setting a label is stored under: `label_people__role__collaborator`, or `one_tickets` for `tickets:one`. */
+export const labelSetting = (key: string): string => {
+  const word = LIST_WORD_KEY.exec(key);
+  return word ? `${word[2]}_${word[1]}` : `${LABEL_PREFIX}${key.split('.').join('__')}`;
+};
 
 /**
  * A use case, checked. Everything but the carried pack's declarations, which `normalise` checks when the
@@ -142,9 +157,11 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     if (!isObject(doc.labels)) return malformed('Labels are a word per list, field or value.', 'labels');
     for (const [key, word] of Object.entries(doc.labels)) {
       const at = `labels.${key}`;
-      if (!LABEL_KEY.test(key) || !SETTING_NAME.test(labelSetting(key)))
-        return no('VALUE_MALFORMED', `${key} is not a label key: a list, list.field or list.field.value, short enough to be a setting.`, { at });
-      if (!text(word, VOICE_BYTES)) return no('VALUE_MALFORMED', `${at} is a word or a few, of at most ${VOICE_BYTES} bytes.`, { at });
+      const listWord = LIST_WORD_KEY.exec(key);
+      if ((!LABEL_KEY.test(key) && !listWord) || !SETTING_NAME.test(labelSetting(key)))
+        return no('VALUE_MALFORMED', `${key} is not a label key: a list, list.field, list.field.value, list:one or list:holds, short enough to be a setting.`, { at });
+      const most = listWord?.[2] === 'holds' ? HOLDS_BYTES : VOICE_BYTES;
+      if (!text(word, most)) return no('VALUE_MALFORMED', `${at} is ${most === VOICE_BYTES ? 'a word or a few' : 'a line'}, of at most ${most} bytes.`, { at });
       labels[key] = word;
     }
   }
@@ -197,7 +214,7 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: `Voice: ${key.replace(/_/g, ' ')}`, default: line };
   }
   for (const [key, word] of Object.entries(u.labels))
-    config[labelSetting(key)] = { type: 'text', label: `Label: ${key.split('.').map((s) => s.replace(/_/g, ' ')).join(', ')}`, default: word };
+    config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
   return {
     ...u.pack,
     pack: packIdOf(u.usecase),
@@ -207,6 +224,14 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     ...(u.pack.license === undefined ? { license: u.license } : {}),
     ...(Object.keys(config).length > 0 ? { config } : {}),
   };
+}
+
+/** What a label's setting is called at `/packs/<id>`: "Label: people, role", "Label: one of tickets", "Label: what tickets holds". */
+function labelTitle(key: string): string {
+  const word = LIST_WORD_KEY.exec(key);
+  const spaced = (s: string): string => s.replace(/_/g, ' ');
+  if (word) return word[2] === 'one' ? `Label: one of ${spaced(word[1] ?? '')}` : `Label: what ${spaced(word[1] ?? '')} holds`;
+  return `Label: ${key.split('.').map(spaced).join(', ')}`;
 }
 
 /** The voice held in a use-case pack's settings: each `voice_<key>` value that is a non-empty line. */
@@ -220,14 +245,21 @@ export function voiceOf(values: Readonly<Record<string, unknown>>): Partial<Reco
 }
 
 /**
- * The labels held in a use-case pack's settings, by label key: each `label_<list>[__<field>[__<value>]]`
- * whose value is a non-empty line. The display reads a list's, a field's or a value's word from here and
+ * The labels held in a use-case pack's settings, by label key: each `label_<list>[__<field>[__<value>]]`, `one_<list>`
+ * and `holds_<list>` whose value is a non-empty line. The display reads a list's, a field's or a value's word from here and
  * falls back to the declaration's own.
  */
 export function labelsOf(values: Readonly<Record<string, unknown>>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [setting, word] of Object.entries(values)) {
-    if (!setting.startsWith(LABEL_PREFIX) || typeof word !== 'string' || word.trim() === '') continue;
+    if (typeof word !== 'string' || word.trim() === '') continue;
+    const listWord = LIST_WORDS.find((w) => setting.startsWith(`${w}_`));
+    if (listWord) {
+      const key = `${setting.slice(listWord.length + 1)}:${listWord}`;
+      if (LIST_WORD_KEY.test(key)) out[key] = word;
+      continue;
+    }
+    if (!setting.startsWith(LABEL_PREFIX)) continue;
     const key = setting.slice(LABEL_PREFIX.length).split('__').join('.');
     if (LABEL_KEY.test(key)) out[key] = word;
   }
