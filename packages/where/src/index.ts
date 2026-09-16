@@ -124,6 +124,29 @@ const quantifierOf = (g: Group): Quantifier => ('all' in g ? 'all' : 'any' in g 
 const childrenOf = (g: Group): unknown => ('all' in g ? g.all : 'any' in g ? g.any : g.none);
 
 /**
+ * A LEAF WITH SEVERAL TESTS IS ALL OF THEM, one leaf per test.
+ *
+ * `{field: 'n', gt: 1, lt: 3}` read only the first operator found and dropped the second, so a
+ * range written the obvious way answered a wider question than it asked. Both renderings split the
+ * leaf here, so both read it as `all` of its tests.
+ *
+ * AND `present: false` IS `empty`, and `empty: false` is `present`. The value used to be ignored,
+ * so `present: false` matched exactly the rows it asked to leave out.
+ */
+const splitLeaf = (leaf: Record<string, unknown>): Record<string, unknown>[] => {
+  const ops = OPERATORS.filter((o) => o in leaf);
+  if (ops.length === 0) return [leaf];
+  if (ops.length === 1 && !((ops[0] === 'present' || ops[0] === 'empty') && leaf[ops[0]] === false)) return [leaf];
+  const rest: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(leaf)) if (!(OPERATORS as readonly string[]).includes(k)) rest[k] = v;
+  return ops.map((o) => {
+    const v = leaf[o];
+    if ((o === 'present' || o === 'empty') && v === false) return { ...rest, [o === 'present' ? 'empty' : 'present']: true };
+    return { ...rest, [o]: v };
+  });
+};
+
+/**
  * The JSON path a field is stored at, and the ONE place it is spelled.
  *
  * The partial index and the predicate have to be the same string or the index is never used, and
@@ -564,6 +587,13 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 
     const leaf = node as Record<string, unknown>;
 
+    const parts = splitLeaf(leaf);
+    if (parts.length > 1) {
+      const each = parts.map((p) => walk(p as Node, level));
+      return each.every(Boolean) ? `(${each.join(' AND ')})` : '';
+    }
+    if (parts[0] !== leaf) return walk(parts[0] as Node, level);
+
     /**
      * `MATCH_OP_UNSUPPORTED`, AND NOT A CODE THIS FILE INVENTED FOR ITSELF.
      *
@@ -618,6 +648,14 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
 
     const field = leaf.field;
+    /* `{not: {...}}` WITH NO FIELD IS SOMEBODY NEGATING A PREDICATE, and `not` compares a field with
+       a value. `FIELD_UNKNOWN` about `undefined` did not say that. */
+    if (field === undefined && 'not' in leaf && isNode(leaf.not)) {
+      bad.push(
+        refuse('VALUE_MALFORMED', 'not compares a field with a value. To leave out the rows a predicate matches, write none: [predicate].', 'not'),
+      );
+      return '';
+    }
     if (typeof field !== 'string' || !IDENT.test(field)) {
       bad.push(refuse('FIELD_UNKNOWN', `A leaf needs a field, and ${JSON.stringify(field)} is not one.`, 'field'));
       return '';
@@ -1127,7 +1165,9 @@ export function evaluate(
       return !kids.some(one);
     }
 
-    const leaf = node as Record<string, unknown>;
+    const parts = splitLeaf(node as Record<string, unknown>);
+    if (parts.length > 1) return parts.every((p) => one(p as Node));
+    const leaf = parts[0]!;
     const field = typeof leaf.field === 'string' ? leaf.field : '';
     /* THE SAME LOOKUP THE COMPILER MAKES, and it has to be, or one rendering knows a name the other
        does not. See `specOf`. */

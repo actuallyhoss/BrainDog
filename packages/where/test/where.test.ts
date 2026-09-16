@@ -1100,3 +1100,23 @@ test('AND ASKING THE IN-MEMORY RENDERING ABOUT A COLUMN WITHOUT THE ROW IS A BUG
      column and into `fields` on the same statement, so the half a caller hands over is enough. */
   assert.equal(evaluate({ field: 'state', is: 'open' }, ROWS[0]!.fields, SCHEMA), true);
 });
+
+test('A LEAF WITH TWO TESTS APPLIES BOTH, and it used to read the first and drop the second', () => {
+  assert.deepEqual(both({ field: 'n', gt: 1, lt: 5 }), ['a']);
+  assert.deepEqual(both({ field: 'n', gte: 1, lte: 3 }), ['a', 'e']);
+  // A refusal in either half refuses the leaf.
+  assert.equal(compile({ field: 'state', is: 'open', not: 'nope' }, SCHEMA).bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
+});
+
+test('`present: false` IS `empty`, and `empty: false` is `present`', () => {
+  assert.deepEqual(both({ field: 'amount', present: false }), both({ field: 'amount', empty: true }));
+  assert.deepEqual(both({ field: 'amount', empty: false }), both({ field: 'amount', present: true }));
+  assert.deepEqual(both({ field: 'amount', present: false }), ['d']);
+});
+
+test('`{not: predicate}` SAYS HOW TO NEGATE, rather than that `undefined` is not a field', () => {
+  const c = compile({ not: { field: 'state', is: 'open' } } as unknown as Predicate, SCHEMA);
+  assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED');
+  assert.match(c.bad[0]!.fix, /none/);
+  assert.doesNotMatch(c.bad[0]!.fix, /undefined/);
+});
