@@ -25,7 +25,7 @@ import { noRecord } from './device.ts';
 export type Verdict = { decide: { option: string; reason: string } } | { defer: { until: string; why: string } };
 
 export type Written =
-  | { from: 'written'; decision: string | null }
+  | { from: 'written'; decision: string | null; applied?: Record<string, string[]> }
   | { from: 'gone'; fix: string }
   | { from: 'refused'; fix: string }
   | { from: 'conflict'; fix: string };
@@ -46,11 +46,13 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
   const said = missing(verdict);
   if (said !== null) return { from: 'refused', fix: said };
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call<{ decision?: unknown }>('decide', { id, ...trimmed(verdict) });
+  const out = await client.call<{ decision?: unknown; applied?: unknown }>('decide', { id, ...trimmed(verdict) });
   if (out.ok) {
     forget();
     const decision = out.value && typeof out.value.decision === 'string' ? out.value.decision : null;
-    return { from: 'written', decision };
+    /* AN ACCEPTED ARRANGEMENT SAYS WHAT IT APPLIED, and the screen says it back. */
+    const applied = out.value && typeof out.value.applied === 'object' && out.value.applied !== null ? (out.value.applied as Record<string, string[]>) : undefined;
+    return { from: 'written', decision, ...(applied ? { applied } : {}) };
   }
   if ('conflict' in out) return { from: 'conflict', fix: copy.decideConflict };
   if (noRecord(out.refusal.code)) return { from: 'gone', fix: out.refusal.fix };

@@ -50,7 +50,15 @@ export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Rec
  * `closed` is a question no longer open: a decision, or a suggestion somebody has settled. `calls` is what an open
  * `change` would call out once accepted, from the `egress` the record worked out when it was filed.
  */
-export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean; calls: CallOut[]; about?: About };
+export type One = Rows & {
+  question: Question | null;
+  rowset: RowsetBody | undefined;
+  closed: boolean;
+  calls: CallOut[];
+  about?: About;
+  /** An arrangement's changed pages as they stand now, by declaration id, so the gate can say what each shows before and after. */
+  pagesNow?: Record<string, Row>;
+};
 
 export const words = {
   /* A settled suggestion whose decision this screen could not find among the ones it reads. */
@@ -195,6 +203,20 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
   return { registers, rows };
 }
 
+/**
+ * THE PAGES AN ARRANGEMENT CHANGES, AS THEY ARE NOW, read through `arrangement` with the page's slug. A page the record
+ * will not give (a new one, or one this reader cannot open) is left out, and the gate draws only what it will show.
+ */
+export async function pagesStanding(client: Governor, pages: unknown): Promise<Record<string, Row>> {
+  const out: Record<string, Row> = {};
+  for (const p of Array.isArray(pages) ? pages.filter(isRow) : []) {
+    if (p.was === null || p.was === undefined || typeof p.id !== 'string') continue;
+    const got = await client.call('arrangement', { page: p.id.replace(/^page\./u, '') });
+    if (got.ok && isRow(got.value) && isRow(got.value.body)) out[p.id] = got.value.body;
+  }
+  return out;
+}
+
 /** A read that did not answer: no record here, or the record's own sentence. */
 function missed(out: Wire<unknown>): Read<never> {
   if ('refusal' in out) return noRecord(out.refusal.code) ? { from: 'sample' } : { from: 'refused', fix: out.refusal.fix };
@@ -254,7 +276,11 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
   if (row.status === 'open') {
     const rowset = rowsetOf(row);
     const calls = callsOutOf(isRow(row.body) ? row.body.egress : undefined);
-    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls, about: aboutOf(row) } };
+    const pagesNow = row.body_kind === 'arrange' && isRow(row.body) ? await pagesStanding(client, row.body.pages) : {};
+    return {
+      from: 'live',
+      value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls, about: aboutOf(row), pagesNow },
+    };
   }
   const by = await linkedRow(client, 'decision', row.decision);
   const decided = by ? decisionOf(by).decided : undefined;

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { answer, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
+import { answer, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import type { Question } from './schema.ts';
 
@@ -255,4 +255,28 @@ test('A DECISION IS PAIRED BY THE SUGGESTION IT NAMES, not guessed from its opti
   assert.ok(sg1.from === 'live');
   assert.equal(sg1.value.question?.decided?.reason, 'this one');
   assert.equal(label(sg1.value.question), 'Yes, the first');
+});
+
+test('an arrangement reads the pages it changes as they stand, and not the ones it adds', async () => {
+  const calls: Calls = [];
+  const got = await pagesStanding(
+    client(
+      {
+        call: async (name, args) => {
+          calls.push({ name, args });
+          return (args as { page?: string }).page === 'money'
+            ? { ok: true, value: { id: 'page.money', version: 3, body: { title: 'Money', blocks: [{ kind: 'table', heading: 'Bills due' }] } } }
+            : refused('PAGE_UNKNOWN', 'There is no page declaration page.gone that you can read.');
+        },
+      },
+      calls,
+    ),
+    [
+      { id: 'page.money', kind: 'page', body: {}, was: 3 },
+      { id: 'page.gone', kind: 'page', body: {}, was: 1 },
+      { id: 'page.dashboards', kind: 'page', body: {}, was: null },
+    ],
+  );
+  assert.deepEqual(got, { 'page.money': { title: 'Money', blocks: [{ kind: 'table', heading: 'Bills due' }] } });
+  assert.deepEqual(calls.map((c) => c.args), [{ page: 'money' }, { page: 'gone' }]);
 });

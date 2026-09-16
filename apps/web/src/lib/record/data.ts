@@ -487,6 +487,111 @@ export const ROWSETS: Record<string, RowsetBody> = {
   },
 };
 
+/* ── proposals that arrange the record ────────────────────────────────────
+   One of each body an agent or Spark files to change what this BrainDog is (`packages/record/src/arrange.ts`): a
+   pack with its plan and the calls it would make, a settings change to the voice and the labels, and a whole
+   arrangement with its reasons. Each body is as `prepare` files it, the plan and the calls worked out by the record.
+
+   DECIDE'S OWN, NOT THE GATE'S. They are not in `QUESTIONS`, because the seed files those on the gates' record
+   (`remote.test.ts` holds the two to each other) and these belong to no seeded record yet. Decide draws them after
+   the sample's questions; Home and the palette do not. */
+
+export type Proposal = { kind: 'pack' | 'settings' | 'arrange'; body: Record<string, unknown>; by: string; pagesNow?: Record<string, Record<string, unknown>> };
+
+export const ARRANGING: Question[] = [
+  {
+    id: 'SG40',
+    title: 'Add Work, and keep its tasks in step with the Kiln tracker?',
+    cost: '',
+    rank: 6,
+    opened: stamp(-5),
+    options: [
+      { key: 'accept', title: 'Accept', body: '' },
+      { key: 'reject', title: 'Reject', body: '' },
+    ],
+  },
+  {
+    id: 'SG41',
+    title: 'Call Money “Bills”, and Home “Studio”?',
+    cost: '',
+    rank: 7,
+    opened: stamp(-8),
+    options: [
+      { key: 'accept', title: 'Accept', body: '' },
+      { key: 'reject', title: 'Reject', body: '' },
+    ],
+  },
+  {
+    id: 'SG42',
+    title: 'Arrange this BrainDog around the numbers Kiln and Portage report?',
+    cost: '',
+    rank: 8,
+    opened: stamp(-2),
+    options: [
+      { key: 'accept', title: 'Accept', body: '' },
+      { key: 'reject', title: 'Reject', body: '' },
+    ],
+  },
+];
+
+export const PROPOSALS: Record<string, Proposal> = {
+  SG40: {
+    kind: 'pack',
+    by: 'spark',
+    body: {
+      install: 'work',
+      kind: 'pack',
+      title: 'work',
+      summary: 'Tasks, who is on them and when they are due.',
+      packs: { install: ['work'] },
+      plan: [{ pack: 'work', version: '1.0.0', adds: ['register.tasks', 'page.work', 'ingest.tracker-issues'] }],
+      approve: ['CALLS OUT tracker.kiln.example · every 1h · grant "Kiln tracker, read only"'],
+      doc: {
+        pack: 'work',
+        declarations: [
+          { register: 'tasks', name: 'Tasks' },
+          { page: 'work', title: 'Work', nav: { section: 'Studio', order: 20 }, blocks: [{ kind: 'table', heading: 'Open tasks' }, { kind: 'table', heading: 'Due this week' }] },
+          { ingest: 'tracker-issues', channel: 'pull', url: 'https://tracker.kiln.example/issues', every: '1h', writes: { register: 'tasks' } },
+        ],
+      },
+    },
+  },
+  SG41: {
+    kind: 'settings',
+    by: 'spark',
+    body: {
+      pack: 'usecase-founder',
+      values: { voice_home: 'Studio', voice_needs_you: 'Waiting on you', label_obligations: 'Bills', label_things__lane__earning: 'Paying' },
+      before: { voice_home: '', voice_needs_you: '', label_obligations: '', label_things__lane__earning: '' },
+    },
+  },
+  SG42: {
+    kind: 'arrange',
+    by: 'spark',
+    body: {
+      usecase: 'founder',
+      why: [
+        'Kiln and Portage now report their numbers every hour, and nothing on Home draws them.',
+        { text: 'Three of the last five questions were about Portage’s subscribers.', at: 'SG29' },
+        'Nothing has been added to Estate since March.',
+      ],
+      packs: { install: ['usecase-founder'], disable: ['estate'] },
+      plan: [{ pack: 'usecase-founder', version: '1.0.0', adds: ['register.reports', 'page.dashboards', 'metric.monthly-revenue'] }],
+      approve: ['CALLS OUT api.portage.example · every 1h · grant "Portage stats"', 'CALLS OUT kiln.example · every 1d · grant "none"'],
+      pages: [
+        {
+          id: 'page.money',
+          kind: 'page',
+          body: { title: 'Money', nav: { section: 'Studio', order: 2 }, blocks: [{ kind: 'stat', heading: 'Monthly revenue' }, { kind: 'table', heading: 'Bills due' }] },
+          was: 3,
+        },
+      ],
+      settings: [{ pack: 'usecase-founder', values: { voice_home: 'Overview', voice_right_now: 'This week' }, before: { voice_home: 'Overview', voice_right_now: 'This week' } }],
+    },
+    pagesNow: { 'page.money': { title: 'Money', blocks: [{ kind: 'table', heading: 'Bills due' }] } },
+  },
+};
+
 /* ── the vault ───────────────────────────────────────────────────────────
    The register indexes what a key OPENS, never the key. No agent tool returns a secret, reveal is
    deliberate and audited, and the backup benefit and the exfiltration path are the same object. */

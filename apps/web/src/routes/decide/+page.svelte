@@ -26,11 +26,14 @@
   import { since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
-  import { ROWSETS } from '$lib/record/data.ts';
+  import { ARRANGING, PROPOSALS, ROWSETS } from '$lib/record/data.ts';
   import Changes from './[id]/Changes.svelte';
   import Proposed from './[id]/Proposed.svelte';
+  import Arranged from './[id]/Arranged.svelte';
+  import Applied from './[id]/Applied.svelte';
   import { updatesOf } from './[id]/changes.ts';
   import { proposedOf } from './[id]/proposed.ts';
+  import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
@@ -81,7 +84,7 @@
   const now = $derived(from === 'live' ? Date.now() : NOW);
 
   const open = $derived(
-    from === 'live' ? (live?.open ?? []) : from === 'sample' ? [...data.questions].sort((a, b) => a.rank - b.rank) : [],
+    from === 'live' ? (live?.open ?? []) : from === 'sample' ? [...data.questions, ...ARRANGING].sort((a, b) => a.rank - b.rank) : [],
   );
   /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
   const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
@@ -127,10 +130,32 @@
     ),
   );
 
+  /** What a question was filed as: the record's body, or the sample's proposal. */
+  const aboutFor = (q: Question) => (from === 'live' ? live?.about?.[q.id] : from === 'sample' ? PROPOSALS[q.id] : undefined);
+  const arranging = (q: Question) => isArranging(aboutFor(q)?.kind);
+
+  /* A PACK, A SETTINGS CHANGE OR A WHOLE ARRANGEMENT, as the story `arranged.ts` tells, folded for the queue. */
+  const stories = $derived(
+    new Map(
+      open.map((q) => {
+        const about = aboutFor(q);
+        return [q.id, about ? arrangedOf(about.kind, about.body, { lists }) : null];
+      }),
+    ),
+  );
+
+  /* WHAT AN ACCEPTED ARRANGEMENT DID, on the line it leaves; and how far one got when the record stopped part way. */
+  let appliedHere = $state(new Map<string, string[]>());
+  let partHere = $state(new Map<string, Partial>());
+
   /* THE LISTS BY NAME, for the line that says what a question is about. */
   const lists = $derived(
     new Map<string, string>(((route.data.lists ?? route.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
+
+  /** The sidebar as it is drawn now, by address, so what an accepted arrangement added can be named. */
+  const sidebarNow = (): Map<string, string> =>
+    new Map(((route.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
   const listName = (register: string) => lists.get(register) ?? copy.valueWord(register);
 
   /** What a question is about: its entity, or the list its rows are in. Empty when it is about neither. */
@@ -173,10 +198,25 @@
   async function commit(q: Question, a: Answer) {
     if (!client || sending !== null) return;
     sending = q.id;
+    const about = aboutFor(q);
+    const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind);
+    const had = accepting ? sidebarNow() : null;
     const out = await answerQuestion(location.origin, q.id, a.option, a.reason);
     sending = null;
     const next = new Map(fixes);
     if (out.from !== 'written') {
+      /* AN ARRANGEMENT THAT DID NOT ALL LAND: what was done and kept, what was not, and why, on its card, which
+         stays open because the record reopened the question. What did land is in the rail, so the shell reads again. */
+      if (accepting && about && out.from === 'refused') {
+        const got = partialOf(about.kind, about.body, out.fix) ?? { why: out.fix, done: [], left: [] };
+        partHere = new Map(partHere).set(q.id, got);
+        answers = withdraw(answers, q.id);
+        next.delete(q.id);
+        fixes = next;
+        toasts.push(got.done.length ? copy.arrangePartial : copy.arrangeNotApplied, { intent: 'warn' });
+        await invalidateAll();
+        return;
+      }
       fixes = next.set(q.id, out.fix);
       toasts.push(out.fix, { intent: 'warn' });
       if (out.from === 'conflict') await readLive();
@@ -187,6 +227,18 @@
     answers = withdraw(answers, q.id);
     settledHere = new Map(settledHere).set(q.id, a.title);
     toasts.push(copy.decisionRecorded(a.title, q.id), { intent: 'good' });
+    if (accepting && about && had) {
+      /* WHAT IT APPLIED, said back, with the sidebar entries it added once the shell has read the record again. */
+      appliedHere = new Map(appliedHere).set(q.id, appliedLines(out.applied ?? {}, about.body));
+      const p = new Map(partHere);
+      p.delete(q.id);
+      partHere = p;
+      await advanceFrom(q);
+      await invalidateAll();
+      const added = [...sidebarNow()].filter(([href]) => !had.has(href)).map(([, title]) => title);
+      if (added.length) appliedHere = new Map(appliedHere).set(q.id, appliedLines(out.applied ?? {}, about.body, added));
+      return;
+    }
     void invalidateAll();
     await advanceFrom(q);
   }
@@ -371,7 +423,12 @@
   }
 
   const chosen = $derived(order.filter((q) => picked.has(q.id) && !settledHere.has(q.id)));
-  const approvable = $derived(chosen.filter((q) => approveKey(q) !== null && !answers.has(q.id)));
+  /* AN ARRANGEMENT IS NEVER ACCEPTED IN A BATCH: it installs, renames and calls out, and each is read on its own. */
+  const approvable = $derived(chosen.filter((q) => approveKey(q) !== null && !answers.has(q.id) && !arranging(q)));
+  const heldBack = $derived(chosen.some((q) => arranging(q)));
+
+  /* A PHONE SELECTS TOO. There is no pointer to hover, so `Select` shows every box at a thumb's size until `Done`. */
+  let selecting = $state(false);
 
   /**
    * EVERY SELECTED QUESTION WITH A SUGGESTED ANSWER, ANSWERED WITH IT, AND ONE REASON FOR ALL.
@@ -443,6 +500,8 @@
   {@const about = aboutOf(q)}
   {@const set = rowsetOf(q)}
   {@const decidedHere = settledHere.get(q.id)}
+  {@const story = stories.get(q.id)}
+  {@const part = partHere.get(q.id)}
   <li
     class="q"
     id="q-{q.id}"
@@ -455,9 +514,10 @@
       <!-- DECIDED HERE: one line in the question's place, and the way to the decision it became. -->
       <a class="q-receipt" href="/decide/{q.id}">
         <span class="q-tick"><Icon name="check" size="s" /></span>
-        <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-        <span class="q-said">{copy.decideDecided(decidedHere)}</span>
+        <span class="q-receipt-text"><span class="q-title" id="q-{q.id}-title">{q.title}</span> <span class="q-said">{copy.decideDecided(decidedHere)}</span></span>
       </a>
+      {@const did = appliedHere.get(q.id)}
+      {#if did}<div class="q-applied"><Applied lines={did} /></div>{/if}
     {:else}
       <div class="q-top">
         <a class="q-open" href="/decide/{q.id}">
@@ -471,7 +531,7 @@
               {:else if about && grouping === 'none'}
                 <span class="q-entity">{about}</span>
               {/if}
-              {#if live?.about?.[q.id]?.by === 'spark'}<span class="q-entity">{copy.fromSpark}</span>{/if}
+              {#if aboutFor(q)?.by === 'spark'}<span class="q-entity">{copy.fromSpark}</span>{/if}
               <span class="q-age">opened {since(q.opened, now)}</span>
               <span class="q-id">{q.id}</span>
             </span>
@@ -488,11 +548,15 @@
         >{#if picked.has(q.id)}<Icon name="check" size="s" />{/if}</button>
       </div>
 
-      {#if preview}
+      {#if story}
+        <div class="q-changes"><Arranged arranged={story} compact /></div>
+      {:else if preview}
         <section class="q-changes" aria-label={copy.proposalWillAppear}><Proposed proposed={preview} /></section>
       {:else if updates.length}
         <div class="q-changes"><Changes {updates} compact /></div>
       {/if}
+
+      {#if part}<Applied partial={part} />{/if}
 
       <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT: above it opens the question, below it answers it. -->
       <div class="q-act">
@@ -599,11 +663,21 @@
             >
           </div>
           <Chip label={copy.aimFor(target.note)} tone={aimTone} />
+          <span class="select-toggle">
+            <Button
+              weight="bare"
+              aria-pressed={selecting}
+              onclick={() => {
+                selecting = !selecting;
+                if (!selecting) picked = new Set();
+              }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
+            >
+          </span>
         </div>
       {/snippet}
 
       {#each groups as g (g.key)}
-        <div class="group" data-picking={picked.size > 0 ? '' : undefined}>
+        <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
           {#if grouping !== 'none'}<h3 class="group-head">{g.name}<span class="group-n">{g.items.length}</span></h3>{/if}
           <ol class="queue">
             {#each g.items as q (q.id)}{@render card(q)}{/each}
@@ -644,10 +718,17 @@
             <Button weight="primary" disabled={batching || (from === 'live' && !batchReason.trim())} onclick={answerPicked}>
               {copy.decideAnswerSuggested(approvable.length)}
             </Button>
-          {:else}
+          {:else if !heldBack}
             <span class="batch-note">{copy.decideNoneSuggested}</span>
           {/if}
-          <Button weight="bare" onclick={() => (picked = new Set())}>{copy.clearSelection}</Button>
+          {#if heldBack}<span class="batch-note">{copy.arrangeNotInBatch}</span>{/if}
+          <Button
+            weight="bare"
+            onclick={() => {
+              picked = new Set();
+              selecting = false;
+            }}>{copy.clearSelection}</Button
+          >
         </div>
       {/if}
     </Section>
@@ -760,12 +841,15 @@
 
   .q-receipt {
     display: flex;
-    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-1) var(--sp-2);
     color: var(--dim);
     font-size: var(--t-ui);
     text-decoration: none;
+  }
+
+  .q-receipt-text {
+    min-inline-size: 0;
   }
 
   .q-receipt .q-title {
@@ -775,7 +859,9 @@
   }
 
   .q-tick {
-    align-self: center;
+    flex: none;
+    align-self: start;
+    padding-block-start: 2px;
     color: var(--earn);
   }
 
@@ -785,7 +871,7 @@
 
   .q-said::before {
     content: '·';
-    margin-inline-end: var(--sp-2);
+    margin-inline: var(--sp-1) var(--sp-2);
   }
 
   .q-top {
@@ -883,10 +969,62 @@
     visibility: visible;
   }
 
-  @media (pointer: coarse) {
-    .pick {
+  /* ON A PHONE THE BOX IS A THUMB'S: drawn larger, reached through a 44px square round it, and shown only once
+     `Select` is pressed, because nothing hovers there to reveal it. */
+  .select-toggle {
+    display: none;
+  }
+
+  /* THE HEADING KEEPS ITS LINE when `Select` joins the aside on a phone; the aside wraps under itself instead. */
+  .page :global(.section-title) {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* ON A PHONE THE HEAD HOLDS THE COUNT AND `Select`, and the aim, a desk's nicety, gives way to them. */
+  @media (width < 640px) {
+    .head-aside :global(.chip) {
       display: none;
     }
+
+    .batch .batch-note {
+      flex-basis: 100%;
+    }
+  }
+
+  @media (width < 900px), (pointer: coarse) {
+    .select-toggle {
+      display: inline-flex;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .pick {
+      position: relative;
+      inline-size: 24px;
+      block-size: 24px;
+      margin-block-start: 0;
+    }
+
+    .pick::after {
+      content: '';
+      position: absolute;
+      inset: -10px;
+    }
+
+    .q:hover .pick,
+    .q[data-cursor] .pick {
+      visibility: hidden;
+    }
+
+    .group[data-picking] .pick {
+      visibility: visible;
+    }
+  }
+
+  .q-applied {
+    padding-block-start: var(--sp-2);
+    padding-inline-start: var(--sp-5);
   }
 
   .q-changes {

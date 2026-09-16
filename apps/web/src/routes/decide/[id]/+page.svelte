@@ -38,9 +38,12 @@
   import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
-  import { ROWSETS } from '$lib/record/data.ts';
+  import { ARRANGING, PROPOSALS, ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
   import Proposed from './Proposed.svelte';
+  import Arranged from './Arranged.svelte';
+  import Applied from './Applied.svelte';
+  import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
@@ -93,7 +96,7 @@
    * decision, so the one just decided keeps its place and the next is the one after it.
    */
   let queue = $state<string[]>([]);
-  const openIds = $derived(from === 'live' ? queue : [...QUESTIONS].sort((a, b) => a.rank - b.rank).map((q) => q.id));
+  const openIds = $derived(from === 'live' ? queue : [...QUESTIONS, ...ARRANGING].sort((a, b) => a.rank - b.rank).map((q) => q.id));
   const here = $derived(openIds.indexOf(String(page.params.id)));
   const nextId = $derived(here >= 0 ? openIds[here + 1] : openIds[0]);
   const prevId = $derived(here > 0 ? openIds[here - 1] : undefined);
@@ -105,12 +108,27 @@
     from === 'live'
       ? (live?.question ?? undefined)
       : from === 'sample'
-        ? [...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id)
+        ? [...QUESTIONS, ...ARRANGING, ...DECIDED].find((q) => q.id === page.params.id)
         : undefined,
   );
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the record. */
   const preview = $derived(from === 'live' && live?.about ? proposedOf(live.about.kind, live.about.body) : null);
+
+  /* A PACK, A SETTINGS CHANGE OR A WHOLE ARRANGEMENT, drawn whole: why, the calls out, the packs, what appears, the words. */
+  const about = $derived(from === 'live' ? live?.about : from === 'sample' ? PROPOSALS[String(page.params.id)] : undefined);
+  const lists = $derived(
+    new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
+  );
+  const story = $derived(
+    about ? arrangedOf(about.kind, about.body, { lists, pagesNow: from === 'live' ? live?.pagesNow : PROPOSALS[String(page.params.id)]?.pagesNow }) : null,
+  );
+
+  /** What an accepted arrangement did, and how far one got when the record stopped part way. */
+  let applied = $state<string[]>([]);
+  let part = $state<Partial | null>(null);
+  const sidebarNow = (): Map<string, string> =>
+    new Map(((page.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
   const updates = $derived(
@@ -280,14 +298,32 @@
     /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
     if (sending) return;
     sending = true;
+    const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
+    const had = accepting ? sidebarNow() : null;
     const out = await answerQuestion(location.origin, a.question, a.option, reason);
     sending = false;
+    /* AN ARRANGEMENT THAT DID NOT ALL LAND. The record reopened the question, so the options come back under what was
+       done and what was not, and the rail reads again for what did land. */
+    if (accepting && out.from === 'refused') {
+      part = partialOf(accepting.kind, accepting.body, out.fix) ?? { why: out.fix, done: [], left: [] };
+      committing = null;
+      fix = '';
+      toasts.push(part.done.length ? copy.arrangePartial : copy.arrangeNotApplied, { intent: 'warn' });
+      await invalidateAll();
+      return;
+    }
     if (await unsent(out, a.question)) return;
     fix = '';
+    part = null;
     saved = true;
     committed = said;
     toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
-    void invalidateAll();
+    if (accepting && out.from === 'written' && had) {
+      applied = appliedLines(out.applied ?? {}, accepting.body);
+      await invalidateAll();
+      const added = [...sidebarNow()].filter(([href]) => !had.has(href)).map(([, title]) => title);
+      if (added.length) applied = appliedLines(out.applied ?? {}, accepting.body, added);
+    } else void invalidateAll();
     setTimeout(() => document.getElementById('next-question')?.focus());
   }
 
@@ -413,6 +449,14 @@
          so a question decided a moment ago on this screen went on showing the options, the reason
          field and a live commit button, which is the one state where the product has to say plainly
          that it is finished. -->
+    <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news; what it would do follows, unchanged. -->
+    {#if part && !settled}<Applied partial={part} />{/if}
+    {#if story && !settled}
+      <section class="changed" aria-label={story.lead}>
+        <Arranged arranged={story} />
+      </section>
+    {/if}
+
     {#if preview && !settled}
       <section class="changed">
         <div class="options-head">
@@ -452,6 +496,7 @@
         <p class="settled-choice">{settled.title}</p>
         <p class="settled-reason">“{settled.reason}”</p>
         <p class="settled-note">{copy.immutable}</p>
+        {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>{/if}
         <!-- NOT SAVED, ON THE RECEIPT, and the way back beside it. `Chip` draws it because the tone
              carries its own glyph and nothing in this app renders an intent without one (13 §5.1):
              a receipt that only went amber says nothing to a screen reader. Only for a decision
@@ -873,6 +918,10 @@
     margin-block-start: var(--sp-3);
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .settled-applied {
+    margin-block-start: var(--sp-4);
   }
 
   /* The chip and the way back, on one line, under the receipt they belong to. */
