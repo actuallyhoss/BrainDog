@@ -376,3 +376,21 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   /* AND ONE THE RECORD SENT NOTHING FOR STILL SAYS SO, rather than drawing an empty walk. */
   assert.equal(blockOf({ kind: 'diff', source: 'register.obligations', rows: [], matched: 0, refusals: [] }, new Map(), now).cannot, liveWords.cannot);
 });
+
+test('a tile over a quantity is drawn as the quantity, and only a currency as money', () => {
+  /* Any reading with a unit went to `money`, so 150 kg drew `KG 1.50` and 12.5 h drew `H 0.13`. */
+  const reading = (value: number, unit: string) => ({ metric, reading: { value, unit, rows: 2, met: null, refusals: [] } });
+  const stat = blockOf(
+    {
+      kind: 'stat',
+      cells: [{ metric }, { metric }, { metric }],
+      readings: [reading(150, 'kg'), reading(12.5, 'h'), reading(129_900, 'GBP')],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    AT,
+  );
+  assert.deepEqual(stat.metrics?.map((m) => m.value), ['150 kg', '12.5 h', 'GBP 1,299.00']);
+});

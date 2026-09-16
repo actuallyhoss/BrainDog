@@ -18,7 +18,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 import { isStale } from '@braindog/kernel';
-import { MISSING, integer, money } from 'braindog-render';
+import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
@@ -221,7 +221,13 @@ function tileOf(cell: NonNullable<Answered['readings']>[number]): Metric {
   return {
     id: cell.metric,
     label,
-    value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
+    /* A CURRENCY CODE IS MONEY AND ANY OTHER UNIT IS A QUANTITY. Every unit went to `money`, so a
+       sum of 150 kg drew `KG 1.50` and 12.5 hours drew `H 0.13`. */
+    value: !r.unit
+      ? format(decl?.format, r.value)
+      : /^[A-Z]{3}$/u.test(r.unit)
+        ? money(Math.round(r.value), r.unit)
+        : quantity(r.value, r.unit),
     note: decl ? targetLine(decl) : '',
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
