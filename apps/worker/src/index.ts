@@ -527,8 +527,14 @@ export class Directory$ extends DurableObject<Env> {
     return { person: { id: person.value.id, email: person.value.email, name: person.value.name } };
   }
 
-  /** The operator's second half, once the record exists: the name now points at it. `null` is named. */
-  name(slug: string, email: string, record: string): Refusal | null {
+  /**
+   * The operator's second half, once the record exists: the name now points at it. `null` is named.
+   *
+   * NOT `name`, WHICH IS THE STUB'S OWN. A Durable Object stub carries `name` as a property, the name its id
+   * came from, so calling it through the stub read that and threw "is not a function": every `/auth/provision` made
+   * a record, answered 500, and left the Directory naming nothing.
+   */
+  nameRecord(slug: string, email: string, record: string): Refusal | null {
     const named = this.#directory().provision({ slug, email, record });
     return named.ok ? null : refusalOf(named);
   }
@@ -1100,7 +1106,7 @@ async function provision(env: Env, args: { slug: string; email: string; name?: s
     ...(store ? { keys: await recordKeys(store, id) } : {}),
   });
   if (made) return { ok: false, refusal: made };
-  const unnamed = await directory.name(args.slug, args.email, id);
+  const unnamed = await directory.nameRecord(args.slug, args.email, id);
   if (unnamed) return { ok: false, refusal: unnamed };
   return ok({ record: id, slug: args.slug, person: owner.id });
 }
