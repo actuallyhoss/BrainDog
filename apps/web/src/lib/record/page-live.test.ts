@@ -362,7 +362,7 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
       kind: 'agents', source: 'activity', first: 5, rows: [], matched: 4, refusals: [],
       feed: [
         { by: 'agent', who: 'S12', count: 3, kind: 'edit', target: 'tickets#2', note: null, at: '2026-09-16T11:00:00.000Z', thing: 'Write the notes' },
-        { by: 'agent', who: 'S14', count: 1, kind: 'create', target: 'tickets#3', note: null, at: '2026-09-16T10:00:00.000Z', thing: 'Fix login' },
+        { by: 'agent', who: 'agent:claude', count: 1, kind: 'create', target: 'tickets#3', note: null, at: '2026-09-16T10:00:00.000Z', thing: 'Fix login' },
       ],
     },
     new Map(),
@@ -371,8 +371,13 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.equal(agents.cannot, undefined, 'what agents did was drawn as a block it cannot');
   assert.deepEqual(agents.rows.map((r) => [r.cells[1], r.cells[2]]), [['3', 'changed Write the notes'], ['1', 'added Fix login']]);
   assert.equal(agents.rows[0]!.cells.length, 4, 'who, count, what and when');
-  assert.deepEqual([agents.shown, agents.total], [2, 4]);
-  assert.doesNotThrow(() => toSegments(agents));
+  assert.equal(agents.rows[1]!.cells[0], 'Claude', 'an agent is named as a person reads it');
+  assert.deepEqual([agents.shown, agents.total], [2, 2], 'every event is on a row, so the block is never a slice');
+  /* AND THE ROWS REACH THE DRAWING: a live block drew its `empty:` over the rows the reader had written. */
+  const [drawn] = toSegments(agents);
+  assert.equal(drawn?.type === 'block' ? drawn.rows.length : -1, 2, 'the agents block drew no rows');
+  const [fed] = toSegments(feed);
+  assert.ok(fed?.type === 'block' && fed.rows.length >= 2, 'the feed block drew no rows');
 
   const diff = blockOf(
     {

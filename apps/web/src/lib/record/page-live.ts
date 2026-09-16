@@ -506,7 +506,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     const feed = feedOf(fed);
     if (!feed) return cannot;
     /* WHAT EACH AGENT DID: the record grouped its rows by who, and the renderer draws one head per agent. */
-    if (kind === 'agents') return { ...shell, feed, ...agentsTable(feed, now), total: matched };
+    /* EVERY EVENT IS ON A ROW, a burst counted on its own and the rest past `first:` folded into one, so nothing is left out to say. */
+    if (kind === 'agents') return { ...shell, feed, ...agentsTable(feed, now), total: feed.length };
     const seen = typeof mark === 'string' ? mark : null;
     const marks = b.since === 'seen' || mark !== undefined;
     return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now), total: matched };

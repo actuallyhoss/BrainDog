@@ -251,7 +251,7 @@ export const TEAM = {
           },
           {
             kind: 'cards',
-            heading: 'Agent runs',
+            heading: 'Runs',
             span: 12,
             source: 'register.session',
             columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],

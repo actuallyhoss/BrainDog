@@ -540,6 +540,10 @@ export function toSegments(block: BlockResult) {
         ? seriesRows(block)
       : block.kind === 'forecast' && block.source === 'forecast.runway'
         ? forecastRows(block)
+      : (block.kind === 'agents' || block.kind === 'feed') && block.source === 'activity'
+        ? /* THE LOG'S ROWS ARE WRITTEN BY THE READER (`agentsTable`, `feedTable`) in the kind's own cells, so they go
+             through as they are. Without this a live `agents` block drew its `empty:` over five things an agent did. */
+          block.rows.map((r) => r.cells.map((c) => escapeCell(c ?? '')).join(' | '))
       : block.kind === 'chips'
         ? chipsRows(block)
       : block.kind === 'gauge'

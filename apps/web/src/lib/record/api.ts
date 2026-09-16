@@ -2281,14 +2281,20 @@ export function agentsCut(rows: readonly FeedRow[], first: number | undefined): 
   return [...kept, ...rest.values()];
 }
 
+/** An agent as a person reads its name: `agent:claude` is Claude. A run (`S42`) and the assistant are said as `actorOf` says them. */
+const agentNamed = (who: string): string => {
+  const named = actorOf(who);
+  return /^agent:/u.test(who) ? named.charAt(0).toUpperCase() + named.slice(1) : named;
+};
+
 /**
- * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as the feed
- * names it, and what it did is the event's note, or the verb and the row it was done to (`agentDoing`).
+ * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as a person reads
+ * it, and what it did is the event's note, or the verb and the row it was done to (`agentDoing`).
  */
 export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.who === null ? '' : actorOf(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    cells: [r.who === null ? '' : agentNamed(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));
@@ -2597,6 +2603,9 @@ export const actorOf = (by: string): string => {
      record* is answered by "the record itself", not by a principal name. */
   if (by === 'system') return 'the record itself';
   if (by === 'spark') return 'the assistant';
+  /* AN AGENT BY ITS NAME: a token's write with no run is signed `agent:claude` (`30 §3`), and Home said "Agent:claude". */
+  const agent = /^agent:(.+)$/u.exec(by);
+  if (agent) return agent[1]!;
   return by;
 };
 
