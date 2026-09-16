@@ -156,12 +156,11 @@
         <ul class="ledger">
           {#each group.hits.slice(0, PER_LIST) as hit (hit.href)}
             <li>
-              <a class="line" href={hit.href}>
-                <span class="seq"><Icon name={hit.icon} size="s" />{hit.spoken ?? ''}</span>
+              <a class="line hit" href={hit.href}>
                 <span class="line-main">
                   <span class="line-title">{hit.title}</span>
                 </span>
-                <span class="line-amount"></span>
+                {#if hit.spoken}<span class="hit-id">{hit.spoken}</span>{/if}
                 <!-- WHY IT IS HERE, and this page needed it more than the palette did. `nordhaven`
                      draws four services named after none of it, because `services.provider` is
                      declared searchable — and this column showed the state instead. The palette got
@@ -185,6 +184,50 @@
     color: var(--dim);
     text-decoration: none;
     cursor: default;
+  }
+
+  /* A RESULT LEADS WITH WHAT IT IS CALLED. The group heading already names the kind, so the type
+     glyph and a fixed id column down the left only pushed every title a sixth of the way across. The
+     id follows as a quiet column, and why it matched closes the row. */
+  .hit {
+    grid-template-columns: minmax(0, 1fr) auto minmax(8ch, auto);
+  }
+
+  .hit-id {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .hit :global(.line-when) {
+    max-inline-size: 36ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ON A PHONE, ONE LINE OF TITLE AND A SECOND OF FACTS, rather than the three-line spine card. */
+  @media (width < 640px) {
+    .hit {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--sp-1) var(--sp-3);
+    }
+
+    .hit .line-main {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+
+    .hit-id {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .hit :global(.line-when) {
+      grid-column: 2;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
   }
 
   .page {

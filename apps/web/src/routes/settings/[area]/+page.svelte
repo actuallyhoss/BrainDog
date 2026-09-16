@@ -1303,7 +1303,7 @@
           take effect without this click.
         -->
         <Section title={copy.navShapeRecommend}>
-          <ul class="ledger">
+          <ul class="ledger ledger-glyph">
             <li>
               <div class="line">
                 <span class="seq"><Icon name="learning" size="s" /></span>
@@ -1343,7 +1343,7 @@
         {:else if pen.length === 0}
           <Empty kind="cleared" title="Nothing waiting." />
         {:else}
-          <ul class="ledger">
+          <ul class="ledger ledger-glyph">
             {#each pen as p}
               <li>
                 <div class="line">
@@ -1702,7 +1702,7 @@
           {:else if liveKeys.length === 0}
             <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic)} />
           {:else}
-            <ul class="ledger">
+            <ul class="ledger ledger-glyph">
               {#each liveKeys as k (k.id)}
                 <li>
                   <div class="line">
@@ -1745,7 +1745,7 @@
         {#if PASSKEYS.length === 0}
           <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(AUTH_METHODS.magic)} />
         {:else}
-          <ul class="ledger">
+          <ul class="ledger ledger-glyph">
             {#each PASSKEYS as k}
               <li>
                 <div class="line">
@@ -1835,7 +1835,7 @@
            offering one act must not answer it two ways, so this is that answer and not a second
            one. The record you are already in is not a link at all: you are in it. -->
       <Section title={copy.yourRecords} count={me.records.length}>
-        <ul class="ledger">
+        <ul class="ledger ledger-glyph">
           {#each me.records as r}
             {@const here = r.slug === SLUG}
             <li>
@@ -2176,7 +2176,7 @@
              are kept" on both, which is right on neither. -->
         <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.keptSelfHost(SNAPSHOTS_KEPT) : copy.keptCloud(SNAPSHOTS_KEPT)}</p>
         {/if}
-        <ul class="ledger">
+        <ul class="ledger ledger-glyph">
           {#each copyLines as snap (snap.id)}
             <li data-intent={snap.failed ? 'bad' : undefined}>
               <div class="line">
@@ -2607,6 +2607,17 @@
     gap: var(--sp-2) var(--sp-3);
   }
 
+  /* A FAILED NIGHT'S REASON IS A SENTENCE, and beside the date on a phone it squeezed the date onto
+     two lines. It takes its own line under the facts there instead. */
+  @media (width < 640px) {
+    li[data-intent='bad'] :global(.line-when) {
+      grid-column: 2 / -1;
+      grid-row: 3;
+      justify-content: flex-start;
+      text-align: start;
+    }
+  }
+
   .means {
     margin: 0;
     color: var(--ink2);
@@ -3025,6 +3036,7 @@
      segment sets a height and its width is the word. The icon beside Light, System and Dark sits on
      the label's line rather than above it. */
   .segmented {
+    margin-block-end: var(--sp-3);
     inline-size: fit-content;
     max-inline-size: 100%;
   }

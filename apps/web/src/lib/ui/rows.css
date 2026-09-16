@@ -208,6 +208,26 @@
     white-space: nowrap;
   }
 
+  /**
+   * A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH.
+   *
+   * The 12ch id column exists so spoken ids line up. A list of passkeys, backups or records has no
+   * id, and the same 12ch left a key icon floating a hand's width from its own name. Here the
+   * glyph sits against the title, and the trailing column may wrap, because what lands in it on
+   * these screens is a sentence (why a backup failed) rather than a date.
+   */
+  .ledger-glyph .line {
+    grid-template-columns: var(--icon-m) minmax(0, 1fr) auto auto;
+    gap: var(--sp-3);
+  }
+
+  .ledger-glyph .line-when {
+    flex-wrap: wrap;
+    max-inline-size: 44ch;
+    white-space: normal;
+    text-align: end;
+  }
+
   /* Below 640px a row becomes a two-line card. It is the register's three declared `mobile:` fields
      that decide what a card shows — a declaration, not a media query (13 §10). */
   @media (width < 640px) {
@@ -274,6 +294,40 @@
     .line-when {
       grid-column: 2;
       grid-row: 3;
+    }
+
+    /* The glyph list keeps its glyph beside the title, the facts under the title, and the row's
+       action at the end of the first line. */
+    .ledger-glyph .line {
+      grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
+      align-items: start;
+      align-content: center;
+      gap: 2px var(--sp-3);
+    }
+
+    .ledger-glyph .seq {
+      grid-column: 1;
+      grid-row: 1;
+      min-inline-size: 0;
+      min-block-size: 1lh;
+    }
+
+    .ledger-glyph .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .ledger-glyph .line-amount {
+      grid-column: 2 / -1;
+      grid-row: 2;
+      text-align: start;
+    }
+
+    /* ACROSS BOTH LINES, so a 44px button does not push the facts a line's height under the title. */
+    .ledger-glyph .line-when {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      align-self: center;
     }
   }
 }
