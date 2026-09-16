@@ -9,6 +9,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { page as route } from '$app/state';
+  import { invalidateAll } from '$app/navigation';
   import { titleOf } from '$lib/title.ts';
   import { since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
@@ -115,6 +116,8 @@
         if (open === item.id) open = items[at]?.id ?? items[at - 1]?.id ?? null;
       }
       toasts.push(out.state === 'ignored' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target));
+      /* AND THE RAIL FOLLOWS, as it does after a decision: its Inbox count, and the list a first row just put on it. */
+      if (had) void invalidateAll();
     } finally {
       busy = false;
     }
