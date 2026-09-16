@@ -64,10 +64,14 @@
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
+    /* OPACITY AND TRANSFORM TOO. The press in `controls.css` dims and scales a button, and with
+       neither property listed here both snapped: the press arrived and left in one frame. */
     transition:
       background var(--d-state) var(--ease-out),
       border-color var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
+      color var(--d-state) var(--ease-out),
+      opacity var(--d-state) var(--ease-out),
+      transform var(--d-state) var(--ease-out);
   }
 
   .btn:hover:not(:disabled) {

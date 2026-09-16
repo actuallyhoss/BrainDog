@@ -81,7 +81,8 @@
     box-shadow: var(--e2);
     color: var(--ink);
     font-size: var(--t-sm);
-    animation: toast-in var(--d-enter) var(--ease-spring);
+    /* Ease-out, as the sheet: no overshoot on a report. */
+    animation: toast-in var(--d-enter) var(--ease-out);
   }
 
   /* No `opacity: 0` in a start state — see Sheet.svelte. A toast that never fades in is still a

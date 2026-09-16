@@ -363,11 +363,13 @@
     --press-dim: 0.62;
     --ease-push: cubic-bezier(0.4, 0, 1, 1);
 
-    --d-press: 90ms;
-    --d-release: 180ms;
+    /* EVERY DURATION BETWEEN 120 AND 200ms (pass five). Entrances ran 240 and 280, which on a sheet
+       or a toast is long enough to watch; motion here answers, it does not perform. */
+    --d-press: 120ms;
+    --d-release: 160ms;
     --d-state: 120ms;
-    --d-move: 240ms;
-    --d-enter: 280ms;
+    --d-move: 200ms;
+    --d-enter: 200ms;
     --d-exit: 160ms;
 
     /* zeta 0.7467, omega 6.56, settle 1.214s, peak 1.0292 — scripts/spring.mjs.

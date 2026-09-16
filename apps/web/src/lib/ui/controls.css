@@ -51,6 +51,26 @@
     transition-timing-function: var(--ease-push);
   }
 
+  /* AND THE ROWS A THUMB PRESSES MOST, WHICH THE LIST ABOVE MISSED: a phone list's cards, Home's
+     feed, the register grid's rows, and the small links that hang in a head. A whole card at 62%
+     opacity reads as the row being disabled, so a row answers with the held wash instead, at the
+     press duration; a small link dims like a control. */
+  .cards .card:active,
+  .feed .event:active,
+  .rowgroup .tr:active {
+    background: var(--hold-wash);
+    transition-duration: var(--d-press);
+  }
+
+  .to-decide:active,
+  .more:active,
+  .who-chip:active,
+  .second .one:active {
+    opacity: var(--press-dim);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
+  }
+
   /* The scale is for buttons only; rows and tabs never scale (DESIGN-BRIEF 4.10). */
   .btn:active:not(:disabled) {
     transform: scale(var(--press-scale));

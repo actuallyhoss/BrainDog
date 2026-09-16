@@ -215,8 +215,10 @@
     background: var(--scrim);
   }
 
+  /* EASE-OUT, NOT THE SPRING. Squeezed into 200ms the spring's 3% overshoot is a flick at the end of
+     every open, which is motion performing rather than answering. */
   .sheet[open] {
-    animation: slide-in var(--d-enter) var(--ease-spring);
+    animation: slide-in var(--d-enter) var(--ease-out);
   }
 
   /* NO `opacity: 0` IN THE START STATE, and this is a failure-mode decision rather than a taste one.
@@ -360,7 +362,7 @@
     }
 
     .sheet[open] {
-      animation: rise var(--d-enter) var(--ease-spring);
+      animation: rise var(--d-enter) var(--ease-out);
     }
 
     @keyframes rise {
