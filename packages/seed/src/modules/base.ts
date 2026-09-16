@@ -112,6 +112,8 @@ export const stamp = (offsetHours: number): string => new Date(NOW + offsetHours
  */
 export const LOOKUPS: Record<string, Record<string, number>> = {
   per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 },
+  /* The monthly share of a repeating amount. `none` is absent, so a one-off is not in a monthly figure. */
+  per_month: { monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 },
 };
 
 /**
@@ -148,6 +150,8 @@ export type SeedMetric = {
   compare?: 'previous' | 'none';
   /** The factor tables a `product` reads, carried with the figure so a pack installs them with it. */
   lookups?: Record<string, Record<string, number>>;
+  /** Remember the reading daily, into the series it names (08 §2.6). */
+  snapshot?: { grain: 'day'; into: string };
 };
 
 /** Everything not settled, in either direction. The four states a register declares, minus two. */

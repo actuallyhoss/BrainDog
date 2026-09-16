@@ -27,14 +27,14 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, crossPack, firstPartyDocument, firstPartyManifest, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { OBLIGATIONS } from './modules/money.ts';
+export { ACCOUNTS, OBLIGATIONS } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES } from './modules/work.ts';
 
 import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './modules/base.ts';
-import { MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, OBLIGATIONS } from './modules/money.ts';
+import { ACCOUNTS, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, OBLIGATIONS } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
@@ -123,6 +123,7 @@ export const TOOLS: Fields[] = [
 
 export const ROWS: Record<string, readonly Fields[]> = {
   obligations: OBLIGATIONS,
+  accounts: ACCOUNTS,
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
@@ -283,7 +284,7 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
  *
  * `session` is the kernel's register, which the seed writes into and does not declare.
  */
-export const ORDER = ['things', 'people', 'tracks', 'obligations', 'services', 'tasks', 'session', 'updates'] as const;
+export const ORDER = ['things', 'people', 'tracks', 'obligations', 'accounts', 'services', 'tasks', 'session', 'updates'] as const;
 
 /**
  * Writes one agent run: THE ONE PLACE THE SEED SETS A FIELD ONLY THE RECORD WRITES.

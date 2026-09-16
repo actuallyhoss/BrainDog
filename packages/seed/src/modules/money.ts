@@ -5,25 +5,25 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
+import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
 
 /* ── obligations ─────────────────────────────────────────────────────────── */
 
 const HAND_OBLIGATIONS: Fields[] = [
-  { what: 'Invoice 2026-041: brand system', party: 1, direction: 'owed_to_me', amount: gbp(480_000), due: day(-38), state: 'open', thing: 2, note: 'Chased twice. 45-day terms expired 3 August.' },
-  { what: 'Invoice 2026-046: retainer, August', party: 2, direction: 'owed_to_me', amount: gbp(240_000), due: day(-9), state: 'open', thing: 2, note: '' },
-  { what: 'Illustration, July set', party: 3, direction: 'owed_by_me', amount: gbp(135_000), due: day(-2), state: 'open', thing: 1, note: '' },
-  { what: 'Corporation tax, payment on account', party: null, direction: 'owed_by_me', amount: gbp(1_910_000), due: day(4), state: 'open', thing: null, note: 'HMRC reference on the letter, not here.' },
-  { what: 'Invoice 2026-049: type licensing', party: 1, direction: 'owed_to_me', amount: gbp(96_000), due: day(11), state: 'open', thing: 1, note: '' },
-  { what: 'Accountant, year-end fee', party: 4, direction: 'owed_by_me', amount: gbp(145_000), due: day(19), state: 'part', thing: null, note: 'Half paid in June.' },
-  { what: 'Backend contract, September', party: 6, direction: 'owed_by_me', amount: gbp(496_000), due: day(27), state: 'open', thing: 3, note: '' },
-  { what: 'Invoice 2026-038: discovery', party: 2, direction: 'owed_to_me', amount: gbp(180_000), due: day(-71), state: 'paid', thing: 2, note: 'Paid 24 July.' },
-  { what: 'Invoice 2026-035: brand refresh', party: 1, direction: 'owed_to_me', amount: gbp(620_000), due: day(-96), state: 'paid', thing: 2, note: '' },
-  { what: 'Studio insurance, annual', party: null, direction: 'owed_by_me', amount: gbp(38_400), due: day(41), state: 'open', thing: null, note: '' },
-  { what: 'VAT quarter to 31 Aug', party: null, direction: 'owed_by_me', amount: gbp(742_000), due: day(63), state: 'open', thing: null, note: '' },
-  { what: 'Conference stand, deposit', party: null, direction: 'owed_by_me', amount: gbp(250_000), due: day(88), state: 'open', thing: 1, note: 'Refundable to 30 days out.' },
-  { what: 'Invoice 2026-051: newsletter setup', party: 2, direction: 'owed_to_me', amount: gbp(75_000), due: day(33), state: 'open', thing: 3, note: '' },
-  { what: 'Illustration, August set', party: 3, direction: 'owed_by_me', amount: gbp(118_000), due: day(15), state: 'open', thing: 1, note: '' },
+  { what: 'Invoice 2026-041: brand system', party: 1, direction: 'owed_to_me', amount: gbp(480_000), due: day(-38), state: 'open', thing: 2, category: 'client_work', note: 'Chased twice. 45-day terms expired 3 August.' },
+  { what: 'Invoice 2026-046: retainer, August', party: 2, direction: 'owed_to_me', amount: gbp(240_000), due: day(-9), state: 'open', thing: 2, category: 'client_work', note: '' },
+  { what: 'Illustration, July set', party: 3, direction: 'owed_by_me', amount: gbp(135_000), due: day(-2), state: 'open', thing: 1, category: 'contractors', note: '' },
+  { what: 'Corporation tax, payment on account', party: null, direction: 'owed_by_me', amount: gbp(1_910_000), due: day(4), state: 'open', thing: null, category: 'tax', note: 'HMRC reference on the letter, not here.' },
+  { what: 'Invoice 2026-049: type licensing', party: 1, direction: 'owed_to_me', amount: gbp(96_000), due: day(11), state: 'open', thing: 1, category: 'licensing', note: '' },
+  { what: 'Accountant, year-end fee', party: 4, direction: 'owed_by_me', amount: gbp(145_000), due: day(19), state: 'part', thing: null, category: 'professional', repeats: 'yearly', note: 'Half paid in June.' },
+  { what: 'Backend contract, September', party: 6, direction: 'owed_by_me', amount: gbp(496_000), due: day(27), state: 'open', thing: 3, category: 'contractors', repeats: 'monthly', note: '' },
+  { what: 'Invoice 2026-038: discovery', party: 2, direction: 'owed_to_me', amount: gbp(180_000), due: day(-71), state: 'paid', thing: 2, category: 'client_work', settled: day(-41), note: 'Paid 24 July.' },
+  { what: 'Invoice 2026-035: brand refresh', party: 1, direction: 'owed_to_me', amount: gbp(620_000), due: day(-96), state: 'paid', thing: 2, category: 'client_work', settled: day(-51), note: '' },
+  { what: 'Studio insurance, annual', party: null, direction: 'owed_by_me', amount: gbp(38_400), due: day(41), state: 'open', thing: null, category: 'insurance', repeats: 'yearly', note: '' },
+  { what: 'VAT quarter to 31 Aug', party: null, direction: 'owed_by_me', amount: gbp(742_000), due: day(63), state: 'open', thing: null, category: 'tax', repeats: 'quarterly', note: '' },
+  { what: 'Conference stand, deposit', party: null, direction: 'owed_by_me', amount: gbp(250_000), due: day(88), state: 'open', thing: 1, category: 'events', note: 'Refundable to 30 days out.' },
+  { what: 'Invoice 2026-051: newsletter setup', party: 2, direction: 'owed_to_me', amount: gbp(75_000), due: day(33), state: 'open', thing: 3, category: 'client_work', note: '' },
+  { what: 'Illustration, August set', party: 3, direction: 'owed_by_me', amount: gbp(118_000), due: day(15), state: 'open', thing: 1, category: 'contractors', repeats: 'monthly', note: '' },
 ];
 
 /** A fixed-seed LCG, so the generated tail is the same grid every time it is opened. */
@@ -32,10 +32,30 @@ function rng(seed: number) {
   return () => ((s = (s * 1_664_525 + 1_013_904_223) >>> 0) / 4_294_967_296);
 }
 
+/**
+ * How many days after its due date each party pays, by the number a person says. Halden pays on 45
+ * days whatever the terms say, which is what its person row's note says too.
+ */
+const LATE_BY: Record<number, number> = { 1: 45, 2: 12, 3: 3, 4: 0, 5: 0, 6: 5 };
+
 function generatedObligations(count: number): Fields[] {
   const r = rng(20260903);
   const kinds = ['Hosting, quarterly', 'Font licence renewal', 'Legal review', 'Print run', 'Photography day rate', 'Translation batch', 'Cloud storage, annual', 'Audit fee', 'Courier account', 'Studio rent'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  /* WHAT EACH KIND OF ROW IS SPENT ON, and money in is client work whatever it was called: a print run
+     invoiced to a client is income from the work, not a print cost. */
+  const spent: Record<string, string> = {
+    'Hosting, quarterly': 'software',
+    'Font licence renewal': 'software',
+    'Legal review': 'professional',
+    'Print run': 'production',
+    'Photography day rate': 'contractors',
+    'Translation batch': 'contractors',
+    'Cloud storage, annual': 'software',
+    'Audit fee': 'professional',
+    'Courier account': 'production',
+    'Studio rent': 'premises',
+  };
   const out: Fields[] = [];
   for (let i = 0; i < count; i++) {
     const owedToMe = r() > 0.62;
@@ -44,23 +64,57 @@ function generatedObligations(count: number): Fields[] {
     // The further past a date a row is, the likelier it was settled — which is what makes the few
     // that ARE still open mean something on Home.
     const paid = dueIn < -45 ? r() > 0.08 : dueIn < -10 ? r() > 0.45 : false;
+    /* THE DRAWS STAY IN THEIR ORDER, so every row keeps the values it had before it had a category. */
+    const kind = kinds[Math.floor(r() * kinds.length)]!;
+    const party = Math.floor(r() * 6) + 1;
+    const amount = gbp(Math.round(r() * 900 + 20) * 1000);
+    const state = paid ? 'paid' : r() > 0.9 ? 'part' : 'open';
     out.push({
-      what: `${kinds[Math.floor(r() * kinds.length)]}, ${months[(i * 5) % 12]}`,
-      party: Math.floor(r() * 6) + 1,
+      what: `${kind}, ${months[(i * 5) % 12]}`,
+      party,
       direction: owedToMe ? 'owed_to_me' : 'owed_by_me',
-      amount: gbp(Math.round(r() * 900 + 20) * 1000),
+      amount,
       due: day(dueIn),
-      state: paid ? 'paid' : r() > 0.9 ? 'part' : 'open',
+      state,
       thing: Math.floor(r() * 4) + 1,
       note: '',
+      category: owedToMe ? 'client_work' : (spent[kind] ?? 'other'),
+      /* Paid when the party pays, never later than yesterday: each party is late by its own habit. */
+      ...(state === 'paid' ? { settled: day(Math.min(dueIn + (LATE_BY[party] ?? 0), -1)) } : {}),
     });
   }
   return out;
 }
 
+/**
+ * The rows that repeat, written after the generated tail so every earlier row keeps its number.
+ *
+ * The storefront payout is money in that arrives every month without an invoice, so the walk has a
+ * recurring income as well as recurring costs, and the rent is the one fixed cost every studio has.
+ */
+const RECURRING: Fields[] = [
+  { what: 'Kiln storefront payout', party: null, direction: 'owed_to_me', amount: gbp(93_000), due: day(12), state: 'open', thing: 1, note: '', category: 'licensing', repeats: 'monthly' },
+  { what: 'Studio rent', party: null, direction: 'owed_by_me', amount: gbp(165_000), due: day(28), state: 'open', thing: null, note: '', category: 'premises', repeats: 'monthly' },
+];
+
 export const OBLIGATIONS: Fields[] = [
   ...HAND_OBLIGATIONS,
   ...generatedObligations(24),
+  ...RECURRING,
+];
+
+/* ── accounts ────────────────────────────────────────────────────────────── */
+
+/**
+ * Where the money is, typed in or pasted, with the day each balance was true.
+ *
+ * NO BANK CONNECTION (25 §10): a balance is a row somebody or an agent writes, and `as_of` is what
+ * makes it honest. `liquid` says whether it counts as cash now: a card's balance is owed, not held.
+ */
+export const ACCOUNTS: Fields[] = [
+  { name: 'Studio current account', kind: 'bank', balance: gbp(985_000), as_of: day(-1), liquid: true },
+  { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-6), liquid: true },
+  { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false },
 ];
 
 export const MONEY_REGISTERS: Record<string, SeedRegister> = {
@@ -121,11 +175,109 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
       { id: 'state', label: 'Status', type: 'enum', values: ['open', 'part', 'paid', 'written_off'], index: true, required: true },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'note', type: 'text' },
+      /* WHAT IT IS FOR, so a page can say where the money goes. Indexed, because a page groups by it
+         and a list filters on it. Money in is client work or licensing; the rest is spending. */
+      {
+        id: 'category',
+        type: 'enum',
+        values: ['client_work', 'licensing', 'contractors', 'tax', 'software', 'premises', 'professional', 'production', 'insurance', 'events', 'other'],
+        index: true,
+      },
+      /* THE DAY IT WAS PAID, which is not the day it was due. How late each client pays is the gap. */
+      { id: 'settled', label: 'Paid on', type: 'day' },
+      /* HOW OFTEN IT COMES ROUND. The cash walk reads it, so a monthly bill is spent every month. */
+      { id: 'repeats', type: 'enum', values: ['none', 'monthly', 'quarterly', 'yearly'] },
+    ],
+  },
+  accounts: {
+    id: 'accounts',
+    name: 'Accounts',
+    icon: 'money',
+    one: 'account',
+    holds: 'what is in each bank account, cash box and card, and the day that was true',
+    title: 'name',
+    mobile: ['name', 'balance', 'as_of'],
+    pack: 'money-core',
+    fields: [
+      { id: 'name', type: 'text', required: true, search: true },
+      { id: 'kind', label: 'Type', type: 'enum', values: ['bank', 'cash', 'card'], index: true, required: true },
+      { id: 'balance', type: 'money', required: true },
+      { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
+      { id: 'liquid', label: 'Counts as cash', type: 'bool', default: true },
     ],
   },
 };
 
 export const MONEY_METRICS: Record<string, SeedMetric> = {
+  /* WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
+     due/owed". Liquid accounts only, and remembered daily so the page can draw how it has moved. */
+  'cash-now': {
+    metric: 'cash-now',
+    name: 'Cash now',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: { sum: 'balance' },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+    snapshot: { grain: 'day', into: 'series.cash-now' },
+  },
+
+  /* THE NEXT THIRTY DAYS, AND LATE MONEY IS STILL COMING. A calendar month shrinks to nothing on the
+     29th, and `before` is exclusive, so the month's last day could not be said anyway. */
+  'in-30d': {
+    metric: 'in-30d',
+    name: 'Coming in, 30 days',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed to me, due before +31d`,
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'out-30d': {
+    metric: 'out-30d',
+    name: 'Going out, 30 days',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed by me, due before +31d`,
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 5_000_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* WHAT GOES OUT EVERY MONTH WITHOUT ANYBODY DECIDING AGAIN: each repeating cost at its monthly
+     share, so a yearly insurance is a twelfth and a quarterly VAT bill is a third. */
+  'every-month-out': {
+    metric: 'every-month-out',
+    name: 'Every month',
+    source: 'register.obligations',
+    where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    lookups: { per_month: LOOKUPS.per_month! },
+    format: 'money.GBP',
+    target: { lte: 1_500_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* MONEY YOU ARE OWED THAT IS PAST ITS DATE, the other side of `overdue`. */
+  'late-in': {
+    metric: 'late-in',
+    name: 'Late to you',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed to me, due before today`,
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'owed-to-you': {
     metric: 'owed-to-you',
     name: 'Owed to you',

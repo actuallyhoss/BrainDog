@@ -443,7 +443,7 @@ export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').incl
 const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 
 /** Every key a metric document may carry here, so one it may not is named rather than ignored. */
-const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups']);
+const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot']);
 
 /** The formats this build writes. A format it does not know printed the bare number. */
 const READS_FORMAT = ['int', 'pct', 'days', 'decimal'];

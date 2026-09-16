@@ -47,8 +47,8 @@ test('every declared metric reads, and none of them refuses', () => {
 test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
   // Ported, not rewritten: if a number here changes, a page changed and somebody has to say why.
   for (const [id, want] of [
-    ['owed-to-you', 'GBP 28,320.00'],
-    ['due-30d', 'GBP 26,690.00'],
+    ['owed-to-you', 'GBP 29,250.00'],
+    ['due-30d', 'GBP 28,340.00'],
     ['overdue', 'GBP 10,540.00'],
     ['renews-30d', '6'],
     ['lapsing', '1'],
@@ -56,7 +56,7 @@ test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
     /* The three project figures, now read through the parameter rather than through three documents
        with the name typed into each. Same numbers as the `kiln-*` documents they replace. */
     ['project-open:Kiln', '5'],
-    ['project-owed:Kiln', 'GBP 4,050.00'],
+    ['project-owed:Kiln', 'GBP 4,980.00'],
     ['project-cost:Kiln', 'GBP 1,036.00'],
   ] as const) {
     assert.equal(metric(id).value, want, `${id} moved`);
@@ -171,7 +171,7 @@ test('A FIXED DATE IS A DATE CLAUSE THAT DOES NOT MOVE, so it is not "no change"
     window: '30d',
   };
   const r = read(fixed);
-  assert.equal(r.value, 10_343_000, 'the figure itself is not what changed');
+  assert.equal(r.value, 10_436_000, 'the figure itself is not what changed');
   assert.equal(r.delta, null, `a fixed date reported a movement of ${r.delta}`);
   assert.match(r.why, /moves nothing/);
   assert.match(r.unmeasured ?? '', /fixed date/, 'the person under the figure is told nothing about why');
@@ -353,13 +353,23 @@ test('and inside a ratio too, on either side', () => {
 });
 
 test('a published key this build ignores is named, because ignoring it changes the figure', () => {
-  // `group_by` and `bucket` are `08` §2.1; `snapshot` is §2.6. Ignored, they returned the UNGROUPED
-  // figure under a heading that says it is grouped, with no refusal and a `good` tone.
-  for (const extra of [{ group_by: 'kind' }, { bucket: 'month' }, { snapshot: { grain: 'day', into: 'series.x' } }]) {
+  // `group_by` and `bucket` are `08` §2.1. Ignored, they returned the UNGROUPED figure under a
+  // heading that says it is grouped, with no refusal and a `good` tone.
+  for (const extra of [{ group_by: 'kind' }, { bucket: 'month' }]) {
     const r = read({ ...METRICS.overdue!, ...extra } as never);
     assert.ok(r.refusals.length, `${Object.keys(extra)[0]} was ignored`);
     assert.match(r.refusals[0] ?? '', /not read by this build/);
   }
+});
+
+test('SNAPSHOT IS READ, because remembering a figure daily does not change the figure', () => {
+  /* `08 §2.6`: `snapshot:` arms a daily schedule that writes the reading into a series. The kernel
+     reads it, and `cash-now` ships with one, so refusing it here printed "cannot be worked out" over
+     the one figure the Money page leads with. */
+  const plain = read(METRICS.overdue!);
+  const kept = read({ ...METRICS.overdue!, snapshot: { grain: 'day', into: 'series.overdue' } } as never);
+  assert.deepEqual(kept.refusals, []);
+  assert.equal(kept.value, plain.value);
 });
 
 test('a format this build cannot write is refused rather than printing the bare number', () => {
@@ -469,7 +479,7 @@ test('A COUNT COUNTS ROWS THAT HAVE A VALUE, whatever type the value is', () => 
   // The record's own numbers, so a change in what a count means shows up as a number and not only
   // as a property.
   assert.equal(read(over('obligations', { count: 'note' })).value, 5, 'five obligations carry a note');
-  assert.equal(read(over('obligations', { count: 'due' })).value, 38, 'every obligation is dated');
+  assert.equal(read(over('obligations', { count: 'due' })).value, 40, 'every obligation is dated');
   assert.equal(read(over('services', { count: 'provider' })).value, 16, 'every service names a provider');
 
   // And `id` is still the row count, which is the one spelling that always worked.

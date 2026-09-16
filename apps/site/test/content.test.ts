@@ -22,10 +22,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 const BUILD = new URL('../build/', import.meta.url);
 const SEED = new URL('../../../packages/seed/src/index.ts', import.meta.url);
+/* THE REGISTERS LIVE IN ONE FILE PER MODULE since the seed was split, so the declarations are read from all of them. */
+const MODULES = new URL('../../../packages/seed/src/modules/', import.meta.url);
+const seedSource = (): string =>
+  readdirSync(MODULES)
+    .filter((name) => name.endsWith('.ts'))
+    .sort()
+    .map((name) => readFileSync(new URL(name, MODULES), 'utf8'))
+    .join('\n');
 
 /** The four routes the static adapter writes, under the names it writes them. */
 const PAGES = ['index.html', 'pricing.html', 'changelog.html', 'legal.html'] as const;
@@ -197,13 +205,14 @@ test('every page links GitHub and the legal page', when(NO_BUILD), () => {
  * measures has stopped measuring.
  */
 test('every register the copy names by example is one the seed declares', when(NO_BUILD ?? NO_SEED), () => {
-  const source = readFileSync(SEED, 'utf8');
-  const opens = source.indexOf('export const REGISTERS');
-  assert.notEqual(opens, -1, 'packages/seed/src/index.ts no longer exports REGISTERS, so this check reads nothing');
-
-  const rest = source.slice(opens);
-  const closes = rest.indexOf('\nexport const ', 1);
-  const block = closes === -1 ? rest : rest.slice(0, closes);
+  const source = seedSource();
+  const blocks = [...source.matchAll(/^export const [A-Z_]*REGISTERS\b/gm)].map((m) => {
+    const rest = source.slice(m.index ?? 0);
+    const closes = rest.indexOf('\nexport const ', 1);
+    return closes === -1 ? rest : rest.slice(0, closes);
+  });
+  assert.notEqual(blocks.length, 0, 'packages/seed/src/modules no longer exports any REGISTERS, so this check reads nothing');
+  const block = blocks.join('\n');
 
   /* The id, the name a person is shown and the singular, at the indentation a register declares
      them at. Field declarations sit two levels deeper and are deliberately out of reach. */
@@ -255,7 +264,7 @@ test('every register the copy names by example is one the seed declares', when(N
  * stopped measuring.
  */
 test('every field the home page draws is one the money register declares', when(NO_BUILD ?? NO_SEED), () => {
-  const source = readFileSync(SEED, 'utf8');
+  const source = seedSource();
   const opens = source.indexOf('  obligations: {');
   assert.notEqual(opens, -1, 'packages/seed/src/index.ts no longer declares the obligations register');
 

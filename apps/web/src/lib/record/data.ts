@@ -118,6 +118,7 @@ export const TASKS: Entry[] = entriesOf('tasks');
 
 export const ROWS: Record<string, Entry[]> = {
   obligations: OBLIGATIONS,
+  accounts: entriesOf('accounts'),
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
