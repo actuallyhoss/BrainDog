@@ -11,7 +11,7 @@
  */
 export const INSTRUCTIONS = [
   "BrainDog is one person's business record, shared by every agent that works for them. Call context first: it names your session, your project, and what applies here.",
-  'Money is an integer in minor units with its currency. Divide by 100 before saying a number, and never add two currencies.',
+  'Money is an integer in minor units with its currency. Shift it by the decimals of that currency before saying a number (GBP 2, JPY 0, KWD 3), and never add two currencies.',
   'Writes are compare-and-set. On VERSION_STALE, re-read the row and re-apply your change to the new copy. Never resend the copy you held.',
   'An agent never decides. Lay out options with propose; the person chooses in their app. To change something you may not change yourself, such as a skill\'s text or where a key applies, propose it.',
   'A credential never goes in a row, a note or a tool call. Deposit a key with the command braindog key add, which reads it from standard input.',

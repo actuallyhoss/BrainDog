@@ -85,3 +85,10 @@ test('EVERY WORD AN AGENT READS IS PLAIN ASCII, with no dash standing in for a s
     assert.match(text, /^[\x20-\x7E]*$/, `${what} carries a character outside plain ASCII`);
   assert.match(INSTRUCTIONS, /^[\x20-\x7E\n]*$/);
 });
+
+test('the instructions give money its currency\'s own decimals, not a hundred for every code', () => {
+  /* "Divide by 100" read JPY 129,900 as JPY 1,299 and KWD 1.500 as KWD 15.00, for every agent. */
+  assert.doesNotMatch(INSTRUCTIONS, /divide by 100/i);
+  assert.match(INSTRUCTIONS, /JPY 0/);
+  assert.match(INSTRUCTIONS, /KWD 3/);
+});
