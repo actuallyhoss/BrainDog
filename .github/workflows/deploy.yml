@@ -35,9 +35,25 @@ concurrency:
 
 jobs:
   deploy:
-    # `workflow_run` FIRES ON FAILURE, CANCELLATION AND TIMEOUT TOO, so without this the workflow
-    # that exists to deploy green masters deploys every master.
-    if: github.event.workflow_run.conclusion == 'success'
+    # `workflow_run` FIRES ON FAILURE, CANCELLATION AND TIMEOUT TOO, so the first clause is what
+    # keeps the workflow that exists to deploy green masters from deploying every master.
+    #
+    # AND THE SECOND CLAUSE IS ABOUT WHAT AN ABSENT CREDENTIAL SHOULD LOOK LIKE. Without it this
+    # job runs on every green `ci`, reaches `wrangler deploy`, and fails with "it's necessary to
+    # set a CLOUDFLARE_API_TOKEN" — which it did, the first time this workflow existed. A red run
+    # on every push, for a reason nobody can act on from inside the repository, is worse than no
+    # signal: it is the failure everybody learns to scroll past, and the day a real deploy breaks
+    # it looks exactly the same. Skipped is the honest state for "not configured yet", and the day
+    # the variables are set the job starts running with no further change here.
+    #
+    # THE TEST IS ON THE VARIABLES, NOT THE SECRET, because GitHub does not expose `secrets` to a
+    # job-level `if`. `CLOUDFLARE_ACCOUNT_ID` and `DEPLOY_HOST` are set in the same sitting as the
+    # token, so they stand in for it; a token missing while both variables exist still fails at the
+    # step, loudly, which is correct.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && vars.CLOUDFLARE_ACCOUNT_ID != ''
+      && vars.DEPLOY_HOST != ''
 
     # THE ENVIRONMENT IS WHERE THE TOKEN LIVES, and naming it here is what scopes the secret to
     # this job rather than to the repository. It is also the place a required reviewer goes if this

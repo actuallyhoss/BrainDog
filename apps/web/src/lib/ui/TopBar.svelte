@@ -67,7 +67,9 @@
   </a>
   <a class="bar-item spine tap" href="/decide" aria-current={under('/decide') ? 'page' : undefined}>
     <Icon name="decide" size="m" /><span class="bar-name">{copy.decide}</span>
-    {#if open}<span class="tally num" data-intent="warn">{open}</span>{/if}
+    <!-- NAMED, NOT ONLY COLOURED (13 §5.1), the same fix as the rail's: `--tone` alone left this
+         the one element in the bar whose meaning was carried by colour and nothing else. -->
+    {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
   </a>
   <a class="bar-item spine tap" href="/inbox" aria-current={under('/inbox') ? 'page' : undefined}>
     <Icon name="inbox" size="m" /><span class="bar-name">{copy.inbox}</span>
@@ -176,6 +178,9 @@
   /* ONE TREATMENT FOR EVERY NUMBER, the rail's rule: a quiet tabular figure, with `--tone` carrying
      the intent rather than a bordered pill that reads as an alert. */
   .tally {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
     color: var(--dim);
     font-size: var(--t-xs);
   }

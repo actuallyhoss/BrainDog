@@ -96,7 +96,11 @@
     background: var(--tone-fill, var(--edge));
     border-radius: var(--r-pill);
     color: var(--accent-ink);
-    font-size: 10px;
+    /* THE SCALE'S SMALLEST STEP, NOT A NUMBER. This was `10px`, which the type scale does not
+       have and `52 §5.2`'s second rule forbids; it survived because that rule is not implemented
+       (see `loop/finding-css-rules.md`). `--t-xs` is 12px, so the badge is 2px larger here, which
+       is the correct direction for a count on a phone. */
+    font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
     line-height: 16px;
     text-align: center;

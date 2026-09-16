@@ -391,7 +391,12 @@
              row — was drawn two ways in one column, and the pill read as an alert rather than a
              count. The figure is quiet everywhere and the INTENT carries the difference, which is
              the one thing that really is different about the questions waiting on you. -->
-        {#if open}<span class="tally num" data-intent="warn">{open}</span>{/if}
+        <!-- AND THE INTENT IS NAMED, NOT ONLY COLOURED (13 §5.1). `--tone` alone made this the one
+             element in the rail whose meaning was carried by colour and nothing else, which `a11y`
+             reported as serious on two hundred page-runs. The glyph sits INSIDE the figure so the
+             collapsed rail's `text-indent` and `overflow` swallow it with the digits, and the dot
+             on the corner of the icon is unchanged. -->
+        {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
       </a>
     </li>
     <li>
@@ -994,6 +999,9 @@
    * the questions waiting on you read as urgent and the number of invoices does not.
    */
   .tally {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
     color: var(--tone, var(--dim));
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
@@ -1176,6 +1184,15 @@
     overflow: hidden;
     text-indent: 100%;
     white-space: nowrap;
+  }
+
+  /* AND THE GLYPH GOES WITH THE DIGITS. `text-indent` pushes a text run out of an overflow-hidden
+     box, which is what hides the figure here, and it does nothing to a flex ITEM — so the glyph
+     that names the intent at full width would sit in the middle of the 6px dot. It is hidden
+     rather than unset, because the name it carries is for the full-width rail; at this width the
+     row's own name carries the meaning and the dot only says that something is waiting. */
+  .rail[data-icons] .tally > :global(svg) {
+    display: none;
   }
 
   /* A saved view has no glyph, deliberately — it is a way of looking at the list above it rather
