@@ -184,6 +184,8 @@ export type PageBlock = {
      * any other kind, draws where the row applies: its project, or Everywhere.
      */
     as?: 'title' | 'figure' | 'fact' | 'trend' | 'ring' | 'who' | 'when' | 'mark' | 'scope';
+    /** A money column's sign, read from an enum: the value that makes the amount go out draws `−`, any other `+`. */
+    sign?: { field: string; minus: string };
   }[];
   /** A `section` that starts shut, folding the blocks after it up to the next section. */
   fold?: boolean;

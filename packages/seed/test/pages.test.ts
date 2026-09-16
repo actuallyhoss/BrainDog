@@ -184,9 +184,9 @@ test('and every column a block draws is a field the register declares', async ()
   // one — which reads as "no value" rather than as "no such thing".
   const { k, sql } = await seeded();
   const missing: string[] = [];
-  /* The four the renderer supplies rather than the register: a row's number and, for the cash walk,
-     its own three. Named, so a fifth is a failure. */
-  const DERIVED = new Set(['seq', 'day', 'what', 'delta', 'balance']);
+  /* The ones the renderer supplies rather than the register: a row's number, who changed it last, and,
+     for the cash walk, its own three. Named, so another is a failure. */
+  const DERIVED = new Set(['seq', 'day', 'what', 'delta', 'balance', 'changed']);
 
   for (const [slug, page] of Object.entries(PAGES))
     for (const block of blocksOf(page as Record<string, unknown>)) {

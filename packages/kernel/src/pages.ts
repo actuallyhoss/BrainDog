@@ -36,7 +36,11 @@ export type PageBlock = {
   source?: string;
   where?: string;
   /** `as: 'scope'` draws where the row applies: its project, or everywhere. */
-  columns?: { field: string; label?: string; as?: string }[];
+  /**
+   * `as: 'scope'` draws where the row applies. `sign:` writes a money column's figure with `−` where an enum says the
+   * money goes out, and a column named `changed`, on a register with no such field, says who changed the row last.
+   */
+  columns?: { field: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /** A `stat`'s: its first figure is the screen's one hero figure. */
@@ -126,6 +130,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net', 'bars',
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
+  /* Who changed each row of a table last, when a column asks. */
+  'changes',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
   'late', 'under', 'lateness',
   /* A card grid's out-of-date rule. */
@@ -168,6 +174,8 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
+  /** Aligned with `rows`, when a column is `changed`: who changed each row last, as a kind of actor and by name, and when. */
+  changes?: ({ by: FeedBy; who: string; at: string } | null)[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
   /**
@@ -598,7 +606,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      such thing" — and the difference is whether anybody investigates. */
   const unknown = (block.columns ?? [])
     .map((c) => c.field)
-    .filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
+    .filter((f) => f !== 'seq' && f !== CHANGED && !Object.hasOwn(schema.fields, f));
 
   /* A REFUSAL MEANS THE BLOCK DREW NOTHING, which is what `BlockResult` says and what it was not
      doing: it returned the rows AND the refusal, so a renderer that drew the rows and ignored the
@@ -615,10 +623,30 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       }),
     };
 
+  /* A SIGN IS READ FROM AN ENUM AND ONE OF ITS VALUES, or the figure would carry a sign nothing decides. */
+  const unsigned = (block.columns ?? []).find((c) => {
+    if (c.sign === undefined) return false;
+    const field = typeof c.sign?.field === 'string' && Object.hasOwn(schema.fields, c.sign.field) ? schema.fields[c.sign.field] : undefined;
+    return !(field?.type === 'enum' && typeof c.sign?.minus === 'string' && (field.values ?? []).includes(c.sign.minus));
+  });
+  if (unsigned)
+    return {
+      ...base,
+      refusals: also({
+        code: 'DECLARATION_INVALID',
+        fix: `sign: names an enum field on ${register} and the value that makes the amount go out, such as { field: direction, minus: owed_by_me }.`,
+        at: 'columns',
+      }),
+    };
+  const asksChanged = (block.columns ?? []).some((c) => c.field === CHANGED) && !Object.hasOwn(schema.fields, CHANGED);
+  if (asksChanged && !deps.history)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
+
   const rows = listed.value.rows;
   return {
     ...base,
     rows,
+    ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
     matched: listed.value.matched,
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
@@ -764,6 +792,18 @@ function listInherited(
 }
 
 /** Where each row applies, as the title of its project, or `null` for a row that applies everywhere. */
+/** The column that says who changed a row last. A register's own field of that name wins. */
+const CHANGED = 'changed';
+
+/** Who changed each row last, from its history: the newest event, its kind of actor, and when. */
+function changesOf(deps: PageDeps, register: string, rows: readonly Entry[]): ({ by: FeedBy; who: string; at: string } | null)[] {
+  return rows.map((r) => {
+    const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
+    const last = events?.ok ? events.value.at(-1) : undefined;
+    return last ? { by: byOf(last.actor), who: last.actor, at: last.ts } : null;
+  });
+}
+
 function scopesOf(deps: PageDeps, rows: readonly Entry[], scope: { field: string; to: string }): (string | null)[] {
   const said = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : []);
   const ids = [...new Set(rows.flatMap((r) => said(r.fields[scope.field])))];

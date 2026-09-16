@@ -217,3 +217,18 @@ test('OUT OF DATE NAMES A DAY AND A WINDOW, or the card grid says what it needs'
   assert.equal(k.block({ ...cards, stale: { field: 'what', after: '7d' } }).refusals[0]?.at, 'stale');
   assert.equal(k.block({ ...cards, stale: { field: 'due', after: 'a week' } }).refusals[0]?.at, 'stale');
 });
+
+test('A TABLE SAYS WHO CHANGED EACH ROW LAST, and a sign is read from an enum or refused', async () => {
+  const k = await record();
+  value(k.update('bills', 'bills#1', { what: 'Rent, September' }, { actor: 'rule:rename' }));
+  const table = { kind: 'table', source: 'register.bills', columns: [{ field: 'what' }, { field: 'changed' }], empty: 'None.' };
+  const out = k.block(table);
+  assert.deepEqual(out.refusals, []);
+  assert.equal(out.changes?.length, 1);
+  assert.equal(out.changes?.[0]?.by, 'rule');
+  assert.equal(out.changes?.[0]?.who, 'rule:rename');
+  assert.equal(k.block({ kind: 'table', source: 'register.bills', columns: [{ field: 'what' }], empty: 'None.' }).changes, undefined, 'nobody asked');
+  const signed = k.block({ ...table, columns: [{ field: 'amount', sign: { field: 'what', minus: 'Rent' } }] });
+  assert.equal(signed.refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(signed.refusals[0]?.at, 'columns');
+});

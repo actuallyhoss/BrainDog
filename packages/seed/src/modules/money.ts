@@ -618,33 +618,22 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         when: { metric: 'overdue', gt: 0 },
       },
       {
+        /* WHAT IS STILL TO COME IN AND GO OUT, IN ONE LIST BY DATE. The amount carries its own sign, so which way a
+           row's money goes is a property of the row rather than the table it sits in, and the last column says who
+           changed the row last, from its history. */
         kind: 'table',
-        heading: 'Coming in',
-        span: 6,
+        heading: 'Coming in and going out',
+        span: 12,
         source: 'register.obligations',
-        where: 'direction is owed to me, state is open or part',
+        where: 'state is open or part',
         columns: [
           { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
           { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+          { field: 'changed', label: 'Changed by', width: '18ch' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
-        empty: 'Nothing is owed to you.',
-        limit: 50,
-      },
-      {
-        kind: 'table',
-        heading: 'Going out',
-        span: 6,
-        source: 'register.obligations',
-        where: 'direction is owed by me, state is open or part',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
-          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'due', dir: 'asc' }],
-        empty: 'Nothing to pay.',
+        empty: 'Nothing is coming in or going out.',
         limit: 50,
       },
       {

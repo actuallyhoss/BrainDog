@@ -1026,3 +1026,23 @@ test('AN ACCOUNT BALANCE OLDER THAN A WEEK SAYS IT IS OUT OF DATE, beside its da
   assert.equal(current.tone, undefined, 'a balance from yesterday is not out of date');
   assert.match(readBlock({ ...cards, stale: { field: 'name', after: '7d' } } as never).refusals.join(), /stale:/);
 });
+
+test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LAST, without a colour', () => {
+  const table = page('money')!.blocks.find((b) => b.kind === 'table' && b.source === 'register.obligations')!;
+  assert.deepEqual(table.refusals, []);
+  const amount = table.columns.findIndex((c) => c.field === 'amount');
+  const changed = table.columns.findIndex((c) => c.field === 'changed');
+  table.entries.forEach((e, n) => {
+    const cell = String(table.rows[n]?.cells[amount] ?? '');
+    assert.equal(cell.charAt(0), e.fields.direction === 'owed_by_me' ? '−' : '+', `${e.fields.what} reads ${cell}`);
+  });
+  /* THE NEWEST THING SAID ABOUT A ROW IS WHO CHANGED IT: a rule matched Halden's reply on 2026-041. */
+  const halden = table.rows.find((r) => r.key === 'obligations#1')!;
+  assert.match(String(halden.cells[changed]), /^Reply rule, \d{1,2} [A-Z][a-z]{2}$/u);
+  const other = table.rows.find((r) => r.key !== 'obligations#1')!;
+  assert.match(String(other.cells[changed]), /^You, \d{1,2} [A-Z][a-z]{2}$/u);
+
+  /* A SIGN NOTHING DECIDES IS REFUSED, as the record refuses it. */
+  const bad = readBlock({ ...table, columns: [{ field: 'amount', sign: { field: 'what', minus: 'x' } }] } as never);
+  assert.match(bad.refusals.join(), /sign: names an enum field/u);
+});

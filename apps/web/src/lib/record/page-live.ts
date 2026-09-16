@@ -27,6 +27,7 @@ import {
   decl as fieldOf,
   feedTable,
   historyTable,
+  markColumns,
   toRows,
   walkTable,
   type BlockResult,
@@ -78,7 +79,7 @@ type Answered = {
   tone?: PageBlock['tone'];
   fold?: boolean;
   icon?: string;
-  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string }[];
+  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string } }[];
   cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
@@ -350,6 +351,17 @@ function historyOf(v: unknown): { at: string; by: string; text: string }[] | nul
     : null;
 }
 
+/**
+ * Who changed row `n` last, as the kernel sent it, in the words the sample's column uses: a person is you, a rule is
+ * named as a rule, and an agent by its name.
+ */
+function changeOf(changes: unknown, n: number): { by: string; at: string } | null {
+  const c = Array.isArray(changes) ? (changes[n] as unknown) : null;
+  if (!isObject(c) || typeof c.who !== 'string' || typeof c.at !== 'string') return null;
+  const by = c.by === 'you' ? 'you' : c.who.replace(/^rule:/u, 'rule.').replace(/^agent:/u, '');
+  return { by, at: c.at };
+}
+
 /** One answered block as the page draws it. */
 export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number): LiveBlock {
   const {
@@ -385,6 +397,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     seen: mark,
     history: versions,
     bars: barred,
+    changes: changed,
     past: remembered,
     ...rest
   } = b;
@@ -492,6 +505,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const live = b.source === 'sessions.live';
   const entries = got.map((r) => entryOf(register, r, refs));
   const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
+  /* WHO CHANGED EACH ROW LAST, named by the kernel on `changes`, and each money column's sign. */
+  markColumns(register, b.columns, entries, rows, (_e, n) => changeOf(changed, n));
   /* WHERE A ROW APPLIES, and which project a run is in, are named by the kernel on `scopes`. */
   (b.columns ?? []).forEach((c, i) => {
     if (c.as !== 'scope' && !(live && c.field === 'project')) return;

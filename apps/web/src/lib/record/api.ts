@@ -10,7 +10,7 @@
  * for `lib/data/call.ts` is the whole of what the wiring costs.
  */
 
-import { day as fmtDay, diffRows, money, relative, since, integer, MISSING } from 'braindog-render';
+import { day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 
 import { amountOf, currencyOf, homeOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
@@ -1917,9 +1917,10 @@ export function readBlock(b: PageBlock): BlockResult {
       /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
          renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to
          even though no register declares it. */
-      const declared = new Set(['seq', ...(REGISTERS[register]?.fields ?? []).map((f) => f.id)]);
+      const declared = new Set(['seq', CHANGED, ...(REGISTERS[register]?.fields ?? []).map((f) => f.id)]);
       for (const c of b.columns ?? [])
         if (!declared.has(c.field)) said.push(`columns: there is no field called ${c.field} on ${register}`);
+      said.push(...signFaults(register, b.columns));
       /* WHERE A ROW APPLIES IS THE SCOPE FIELD'S TO SAY, as the kernel checks it. */
       const scope = scopeFieldOf(register);
       for (const c of b.columns ?? [])
@@ -1969,6 +1970,7 @@ export function readBlock(b: PageBlock): BlockResult {
         if (cells) cells[i] = absent(e.fields[c.field]) ? EVERYWHERE : (cells[i] ?? null);
       });
     });
+    if (register) markColumns(register, b.columns, entries, rows, (e) => provenanceOf(register, e));
     /* A RUN HOLDS ITS PROJECT AS A SPOKEN ID, and the kernel's page layer names it, so this does too. */
     if (live)
       (b.columns ?? []).forEach((c, i) => {
@@ -2437,6 +2439,68 @@ const cursorAt = (rows: readonly Entry[], key: string, cursor: string): number =
  * screen a person lands on had the machine's spelling. A function two surfaces need is not a detail
  * of one of them.
  */
+/**
+ * THE COLUMN THAT SAYS WHO CHANGED A ROW LAST, AND WHEN. It is not a field: a register that declares a field
+ * called `changed` keeps its own, and every other reads the row's history.
+ */
+export const CHANGED = 'changed';
+
+/** What is wrong with a column's `sign:`, as the record checks it: an enum on the register, and one of its values. */
+export function signFaults(register: string, columns: PageBlock['columns']): string[] {
+  return (columns ?? []).flatMap((c) => {
+    if (c.sign === undefined) return [];
+    const field = decl(register, c.sign?.field ?? '');
+    return field?.type === 'enum' && typeof c.sign?.minus === 'string' && (field.values ?? []).includes(c.sign.minus)
+      ? []
+      : [`columns: sign: names an enum field on ${register} and the value that makes the amount go out, such as { field: direction, minus: owed_by_me }`];
+  });
+}
+
+/** Who changed a row last and when, in the sample: the newest thing said about it, or who wrote it. */
+function provenanceOf(register: string, e: Entry): { by: string; at: string } {
+  const href = `/r/${register}/${e.seq}`;
+  const said = NEWS.filter((n) => n.href === href).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+  return said ? { by: said.by, at: said.at } : { by: e.by, at: e.created };
+}
+
+/** `You, 3 Sep` or `Reply rule, 9 Sep`: who changed a row last, and the day. */
+export const changedText = (by: string, at: string): string => {
+  const who = actorOf(by);
+  return `${who.charAt(0).toUpperCase()}${who.slice(1)}, ${shortDay(at.slice(0, 10))}`;
+};
+
+/**
+ * A column's `sign:` and a `changed` column, filled in over the cells `toRows` drew.
+ *
+ * THE SIGN IS A WORD ON THE FIGURE, never a colour: money going out reads `−GBP 1,350.00` and money coming in
+ * `+GBP 4,800.00`, in the same neutral ink (DESIGN-SYSTEM §0 rule 3).
+ */
+export function markColumns(
+  register: string,
+  columns: readonly { field: string; sign?: { field: string; minus: string } }[] | undefined,
+  entries: readonly Entry[],
+  rows: TableRow[],
+  changed: (e: Entry, n: number) => { by: string; at: string } | null,
+): void {
+  (columns ?? []).forEach((c, i) => {
+    rows.forEach((row, n) => {
+      const e = entries[n];
+      if (!e) return;
+      if (c.field === CHANGED && decl(register, CHANGED) === undefined) {
+        const who = changed(e, n);
+        row.cells[i] = who ? changedText(who.by, who.at) : null;
+        return;
+      }
+      const cell = row.cells[i];
+      if (!c.sign || typeof cell !== 'string' || cell === '' || cell === MISSING) return;
+      const out = e.fields[c.sign.field] === c.sign.minus;
+      const bare = cell.replace(/^[−+-]/u, '');
+      const negative = cell.startsWith('−') || cell.startsWith('-');
+      row.cells[i] = `${out !== negative ? '−' : '+'}${bare}`;
+    });
+  });
+}
+
 export const actorOf = (by: string): string => {
   const rule = /^rule\.(.+)$/.exec(by);
   if (rule) return `${rule[1]!.replace(/[._]/g, ' ')} rule`;

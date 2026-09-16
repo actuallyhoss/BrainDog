@@ -126,7 +126,10 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
   assert.deepEqual(table.refusals, []);
   assert.ok(table.rows.length > 0, 'the block drew nothing');
   assert.ok(table.matched >= table.rows.length, 'more rows were drawn than matched');
-  for (const row of table.rows) assert.equal(row.fields.direction, 'owed_to_me');
+  for (const row of table.rows) assert.ok(row.fields.state === 'open' || row.fields.state === 'part', 'a paid row is not still to come');
+  /* AND EACH ROW SAYS WHO CHANGED IT LAST, from its history. */
+  assert.equal(table.changes?.length, table.rows.length);
+  assert.ok(table.changes?.every((c) => c !== null && c.by === 'you' && c.who === 'p_seed'), JSON.stringify(table.changes?.slice(0, 2)));
   sql.close();
 });
 
