@@ -257,3 +257,10 @@ test('A BAR OR A SPLIT MAY READ A FIGURE GROUPED BY A WORD, and nothing else rea
   assert.equal(k.block({ kind: 'split', source: 'metric.by-month', empty: 'None.' }).refusals[0]?.code, 'DECLARATION_INVALID');
   assert.equal(k.block({ kind: 'bar', source: 'metric.nonesuch', empty: 'None.' }).refusals[0]?.code, 'METRIC_UNKNOWN');
 });
+
+test("A PAGE SAYS WHAT THE RECORD'S CLOCK READ, so a host draws today from the record", async () => {
+  const k = await record();
+  value(await k.install([{ id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Desk', requires: ['register.bills'], blocks: [{ kind: 'table', source: 'register.bills', columns: [{ field: 'what' }], empty: 'None.' }] } } as Declaration]));
+  const page = value<{ read_at?: string }>(k.page('desk'));
+  assert.equal(page.read_at, new Date(NOW).toISOString());
+});

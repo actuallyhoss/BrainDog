@@ -452,3 +452,18 @@ test('A FIGURE’S OWN NOTE IS SAID UNDER IT, each figure it names written as th
   );
   assert.equal(one.metrics?.[0]?.note, 'in 1 account');
 });
+
+test("today on a live page is the record's clock when the record says what it read, and this clock when it does not", async () => {
+  const pinned = '2026-03-02T09:00:00.000Z';
+  const { io } = host((method) => (method === 'page' ? json(200, { ok: true, value: { ...ANSWER, read_at: pinned } }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(out.now, Date.parse(pinned));
+  assert.equal(Object.hasOwn(out.page.page, 'read_at'), false, 'the clock is not a key of the page');
+  assert.ok(out.page.blocks.every((b) => b.stale_at === pinned), 'a block was read against another clock');
+
+  const unsaid = host((method) => (method === 'page' ? json(200, { ok: true, value: { ...ANSWER, read_at: 'soon' } }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const fallback = await pageReader(BASE, unsaid.io, () => AT).read('desk');
+  assert.equal(fallback.from === 'live' ? fallback.now : null, AT);
+});

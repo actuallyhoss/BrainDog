@@ -611,8 +611,11 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         return { from: 'refused', fix: out.refusal.fix };
       }
 
-      const { blocks = [], ...page } = out.value as AnsweredPage;
-      const now = clock();
+      const { blocks = [], read_at, ...page } = out.value as AnsweredPage;
+      /* TODAY IS THE RECORD'S, where it says what its clock read, so a record pinned to a day draws its own late rows,
+         out-of-date balances and forecast from that day. A record that does not say is read against this clock. */
+      const said = typeof read_at === 'string' ? Date.parse(read_at) : Number.NaN;
+      const now = Number.isFinite(said) ? said : clock();
       const wanted = new Set<string>();
       for (const b of blocks) {
         const register = b.refusals?.length ? null : registerOf(b);

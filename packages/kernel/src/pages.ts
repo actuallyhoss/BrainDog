@@ -202,7 +202,8 @@ export type ActivityEvent = { ts: string; actor: string; kind: string; target: s
 /** One event about a row, oldest first. A create carries every field in `to` and `field: null`. */
 export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
 
-export type PageResult = { page: string; title: string; blocks: BlockResult[]; [key: string]: unknown };
+/** `read_at` is the record's clock when it read the page, which a host draws "today" and "out of date" against. */
+export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; [key: string]: unknown };
 
 export type PageDeps = {
   /** Every live page declaration. */
@@ -356,8 +357,11 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
 
   /* A PAGE THAT COULD NOT BE EXPANDED IS A PAGE WITH ONE SENTENCE ON IT, not a 404. The person
      reading it is usually the person who wrote the declaration. */
+  /* THE RECORD'S CLOCK, WHEN IT READ THE PAGE. What is out of date, what is late and which day is today on this page are
+     the record's answers, so a host draws them against this rather than against its own clock. */
+  const read_at = new Date(deps.ctx.nowMs).toISOString();
   if (found.refusal)
-    return ok({ ...found.decl, page: found.slug, blocks: [{ kind: 'note', rows: [], matched: 0, refusals: [found.refusal] }] });
+    return ok({ ...found.decl, page: found.slug, read_at, blocks: [{ kind: 'note', rows: [], matched: 0, refusals: [found.refusal] }] });
 
   /* AN EXPANDED PAGE SAYS WHICH ROW IT IS ABOUT, so a host can name the project without guessing it
      from the title. The title is already the row's, so this says nothing the page did not. */
@@ -365,6 +369,7 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
   return ok({
     ...found.decl,
     page: found.slug,
+    read_at,
     ...(found.row && found.row.seq !== null
       ? { param: { register: found.row.register, seq: found.row.seq, title: String((title && Object.hasOwn(found.row.fields, title) ? found.row.fields[title] : null) ?? '') } }
       : {}),
