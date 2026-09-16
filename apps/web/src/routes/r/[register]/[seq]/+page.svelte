@@ -765,7 +765,7 @@
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
                moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
                ways; this route was the third. -->
-          <dd>{since(row.created, clock)}{#if addedBy} by {actorOf(addedBy)}{/if}</dd>
+          <dd>{since(row.created, clock)}{#if addedBy}{' by '}{actorOf(addedBy)}{/if}</dd>
         </dl>
 
         {#if !unwritten}
@@ -922,7 +922,8 @@
 
   /* THE FOUR HEADINGS ON THIS SCREEN ARE SECTION HEADINGS, and they were eyebrows: small, dim and
      led by an icon, so Details, History and each list pointing here read as captions over the
-     facts. Twenty pixels at 600 in ink is what `Section` gives a heading everywhere else. */
+     facts. The body size at 600 in ink is what `Section` gives a heading everywhere else; at twenty
+     pixels they outranked the row's own title and figure. */
   .incoming-title,
   .doc-label,
   .side-title {
@@ -932,9 +933,9 @@
     margin-block-end: var(--sp-3);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-lg);
+    font-size: var(--t-base);
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.006em;
   }
 
   /* The FIELD's label, quieter than the register's name: "Obligations party" reads as one heading
@@ -1064,14 +1065,18 @@
     margin: 0;
   }
 
+  .meta {
+    align-items: baseline;
+  }
+
   .meta dt {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .meta dd {
     margin: 0;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .number {
@@ -1083,7 +1088,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-5);
+    margin-block: var(--sp-5);
   }
 
   .note-label {

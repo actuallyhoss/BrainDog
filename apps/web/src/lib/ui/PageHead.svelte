@@ -214,11 +214,13 @@
   }
 
   /* Geist at 20/600, the one title size on every screen (DESIGN-SYSTEM 2.2). It was Poppins at 24
-     everywhere except Home, which overrode it: two type systems in one product. */
+     everywhere except Home, which overrode it: two type systems in one product.
+
+     A BLOCK AND NOT A FLEX ROW, so a title that wraps is text that wraps. As a flex row the title's
+     span became a box as wide as the line, and a two-line title on a phone left its `#1` stranded at
+     the far edge of an empty column. Inline, the id follows the last word it belongs to. */
   .title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
+    display: block;
     min-inline-size: 0;
     font-family: var(--font-ui);
     font-size: var(--t-lg);
@@ -231,16 +233,19 @@
   /* The thing's own frozen hue, same lightness and chroma as its mark in the grid. A page about
      Kiln is headed in Kiln's colour, which is the one colour here that names something. */
   .title-icon {
-    display: grid;
+    display: inline-grid;
     place-items: center;
-    align-self: center;
+    margin-inline-end: var(--sp-2);
+    vertical-align: -0.15em;
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   .title-id {
+    margin-inline-start: var(--sp-2);
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     font-weight: 400;
     letter-spacing: 0;
   }
