@@ -74,6 +74,11 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
     [['obligations', 3, 0]],
     'an empty list reached the rail',
   );
+  assert.deepEqual(
+    shell.lists.map((l) => l.id),
+    BOOT.registers.map((r) => r.id),
+    'an empty list could not be filed into or given an exception on',
+  );
   assert.deepEqual(shell.nav.map((n) => [n.href, n.section, n.icon]), [['/p/money', 'Work', 'doc']]);
   assert.deepEqual(shell.me, { person: 'p_1', level: 'write', owner: false, records: [{ slug: 'the-studio', name: 'The Studio', level: 'write' }] });
   assert.deepEqual(shell.questions.map((q) => [q.id, q.title]), [['SG4', 'Renew the domain?']]);

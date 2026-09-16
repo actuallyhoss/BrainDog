@@ -663,7 +663,7 @@
 
   /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's on a record and the sample's otherwise. */
   const lists = $derived(
-    ((page.data as { index?: { registers?: readonly { id: string; name: string }[] } }).index?.registers ??
+    ((page.data as { lists?: readonly { id: string; name: string }[] }).lists ??
       Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name }))),
   );
   let picking = $state<string | null>(null);

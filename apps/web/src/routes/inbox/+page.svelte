@@ -94,7 +94,7 @@
    * subject; archiving keeps its bytes. Either way it leaves the list here and the next one opens. A refusal is the
    * record's own sentence, and the arrival stays where it is. The sample keeps its toasts.
    */
-  const lists = $derived<readonly { id: string; name: string }[]>(route.data.index?.registers ?? []);
+  const lists = $derived<readonly { id: string; name: string }[]>(route.data.lists ?? route.data.index?.registers ?? []);
   let into = $state('');
   const target = $derived(lists.some((l) => l.id === into) ? into : (lists[0]?.id ?? ''));
   let busy = $state(false);

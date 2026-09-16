@@ -43,6 +43,14 @@ export type Shell = Omit<Sample, 'me'> & {
    * every shell that could list them.
    */
   recordsRefused?: string | undefined;
+  /**
+   * EVERY LIST THE RECORD HOLDS, the empty ones too, for the places that put something INTO a list.
+   *
+   * `index.registers` is the rail's, and the rail draws only lists that hold something. Filing an arrival and giving
+   * somebody an exception read that same list, so a record whose Clients list had no row yet could neither file its
+   * first client nor give a bookkeeper access to it: the one way to fill a list was hidden until it was full.
+   */
+  lists: { id: string; name: string }[];
   inbox: number;
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
@@ -151,6 +159,7 @@ export function layoutOf(b: Boot): Shell {
         .filter((r) => r.count > 0)
         .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: [] })),
     },
+    lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
     nav,
     pen: [],
     me: { person: person ?? '', level, owner: level === 'owner', records: record ? [{ slug: record.slug, name: record.name, level }] : [] },
@@ -174,4 +183,12 @@ export function layoutOf(b: Boot): Shell {
 export const refusedShell = (): Shell => layoutOf({ registers: [], now: new Date().toISOString() });
 
 /** The sample's shell, with what only a shell carries. */
-export const sampleShell = (sample: Sample, inbox: number): Shell => ({ ...sample, inbox, open: sample.questions.length, now: NOW, live: false, upTo: null });
+export const sampleShell = (sample: Sample, inbox: number): Shell => ({
+  ...sample,
+  lists: Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name })),
+  inbox,
+  open: sample.questions.length,
+  now: NOW,
+  live: false,
+  upTo: null,
+});
