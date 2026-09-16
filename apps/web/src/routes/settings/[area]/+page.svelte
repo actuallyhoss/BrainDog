@@ -52,6 +52,7 @@
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
+  import { checkBrainl } from '@braindog/kernel';
   import { TONES, bytes, relative, since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { methods, passkeyRegister, passkeySignIn, passkeys, removePasskey, signOut, support, type Methods, type PasskeyInfo } from '$lib/auth.ts';
@@ -785,6 +786,32 @@
     a.click();
     URL.revokeObjectURL(url);
     toasts.push(copy.exported(out.value.name), { intent: 'good' });
+  }
+
+  /* ── checking a file: the import's own check, run here, and nothing sent anywhere ── */
+  let checkInput = $state<HTMLInputElement | null>(null);
+  let checking = $state(false);
+  let checkSaid = $state<{ tone: 'good' | 'bad'; text: string } | null>(null);
+
+  async function checkFile(file: File | undefined) {
+    if (!file || checking) return;
+    checking = true;
+    checkSaid = null;
+    try {
+      let text: string;
+      try {
+        text = await file.text();
+      } catch {
+        checkSaid = { tone: 'bad', text: copy.fileUnread(file.name) };
+        return;
+      }
+      const out = await checkBrainl(text.split(/\r?\n/));
+      checkSaid = out.ok ? { tone: 'good', text: copy.fileChecked(file.name) } : { tone: 'bad', text: copy.fileFailed(file.name, out.refusal.fix) };
+    } finally {
+      checking = false;
+      /* The same file picked again is a new check, so the input forgets it. */
+      if (checkInput) checkInput.value = '';
+    }
   }
 
   /* ── backups, erasure and deletion: the live record's answer, and the sample's toast where there is no record ── */
@@ -2393,12 +2420,25 @@
             aria-busy={exporting === 'record'}
             onclick={() => takeCopy('record', 'The whole record would be written to one .brain file, a SQLite database you can open with sqlite3')}
           >{copy.export}</Button>
-          <Button
-            weight="bare"
-            onclick={() =>
-              toasts.push(copy.notWritten('A .brain or .brainl file would be checked against its own manifest and signature'))}
-          >{copy.verifyFile}</Button>
+          <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
+               import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
+          <Button weight="bare" disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{copy.verifyFile}</Button>
+          <input
+            bind:this={checkInput}
+            class="file-pick"
+            type="file"
+            accept=".brainl"
+            tabindex="-1"
+            aria-hidden="true"
+            onchange={(e) => void checkFile(e.currentTarget.files?.[0])}
+          />
         </div>
+        {#if checkSaid}
+          <p class="hint checked" data-intent={checkSaid.tone} role="status">
+            <span class="glyph" role="img" aria-label={TONES[checkSaid.tone].label}>{TONES[checkSaid.tone].glyph}</span>
+            {checkSaid.text}
+          </p>
+        {/if}
       </Section>
 
       <!-- AND THE SLICE, WHICH IS A DIFFERENT FILE FOR A DIFFERENT JOB.
@@ -3051,6 +3091,19 @@
 
   .switch-row :global(.switch) {
     margin-block-start: calc((1em * var(--lh-body) - var(--ctl-h)) / 2);
+  }
+
+  .file-pick {
+    display: none;
+  }
+
+  .hint.checked {
+    margin-block-start: var(--sp-3);
+    color: var(--ink2);
+  }
+
+  .hint.checked .glyph {
+    margin-inline-end: var(--sp-1);
   }
 
   .hint {

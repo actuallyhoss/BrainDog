@@ -1387,6 +1387,12 @@ export const copy = {
      not carry the real one and `03 §4`'s well-known URL is served by none of the three apps, so a
      record gets the fact that its files are signed and the absence said plainly, which is the
      register `notWritten` uses everywhere else on this screen. */
+  /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
+     a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
+  fileChecked: (name: string) =>
+    `${name} is whole and signed. Every table matches its own manifest, and the signature holds for the key inside the file.`,
+  fileFailed: (name: string, fix: string) => `${name} did not pass. ${fix}`,
+  fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
   theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
 
   /* deletion — `02 §9`: browser session, re-authenticated, the slug typed */
