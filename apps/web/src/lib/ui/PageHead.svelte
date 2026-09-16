@@ -270,6 +270,7 @@
   .head-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--sp-2);
     /* A FLEX CHILD DOES NOT SHRINK BELOW ITS CONTENT UNLESS IT IS TOLD TO. Without this the actions
        row kept its widest button's width at every viewport and pushed the header off the side of a

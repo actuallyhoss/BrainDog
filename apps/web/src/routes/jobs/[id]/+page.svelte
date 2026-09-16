@@ -101,23 +101,26 @@
        The status is the subject of the line now, and the tool is the detail. The model id is
        gone: it is a string for whoever set up the runner, not for somebody reading what it did. -->
   <p class="status">
-    {copy.jobStatus[JOB.status] ?? JOB.status}{#if last}
-      · last step <span class="tool">{last.tool}</span>{/if}
+    {copy.jobStatus[JOB.status] ?? JOB.status}{#if last}{' · last step '}<span class="tool">{last.tool}</span>{/if}
   </p>
 
   <!-- ONE ROW, DRAWN ONCE. A pressable step and a flat one differ in the element and in the chevron
        and in nothing else, and two copies of five spans is where the two stop agreeing. -->
+  <!-- THE STEP NUMBER LEADS, the way a numbered list reads, and the tool is the quiet first word of
+       what the step did. It was the tool in a 12ch column, the input, and the number alone at the far
+       end of the row, where on a phone it took a line of its own. -->
   {#snippet step(e: (typeof JOB.events)[number], pressable: boolean)}
-    <span class="seq" data-open={open.has(e.seq) ? '' : undefined}>
-      {#if pressable}<Icon name="chevronDown" size="s" />{/if}{e.tool}
+    <span class="step-n" data-open={open.has(e.seq) ? '' : undefined}>
+      {#if pressable}<Icon name="chevronDown" size="s" />{:else}{e.seq}{/if}
     </span>
-    <span class="line-main"><span class="line-title">{e.input}</span></span>
-    <span class="line-amount out" data-ok={e.ok ? '' : undefined}>
+    <span class="line-main">
+      <span class="line-title"><span class="step-tool">{e.tool}</span> {e.input}</span>
+    </span>
+    <span class="out" data-ok={e.ok ? '' : undefined}>
       <!-- `data-ok` was the only thing separating a result from a failure, which is colour carrying
            meaning alone. -->
       <Icon name={e.ok ? 'check' : 'ban'} size="s" />{e.ok ? e.out : 'failed'}
     </span>
-    <span class="line-when">{e.seq}</span>
   {/snippet}
 
   <ol class="ledger">
@@ -147,10 +150,15 @@
              it read` is the whole content of that row; putting it behind a press would be hiding the
              one thing somebody opened this page to read. -->
         {#if !e.ok || open.has(e.seq)}
+          {@const said = open.has(e.seq) ? e.out : e.out.slice(0, FOLD)}
+          {@const coded = /^([A-Z][A-Z0-9_]{3,}): (.+)$/su.exec(said)}
           <p class="detail">
             <!-- AND THE FOLD FOLDS. It printed `2000 of 41000 characters` under the whole 41,000 of
                  them — a label describing a truncation that had not happened. -->
-            {open.has(e.seq) ? e.out : e.out.slice(0, FOLD)}
+            <!-- THE SENTENCE FIRST AND THE CODE AFTER IT. A refusal arrives as `PROPOSAL_UNCITED: a
+                 proposal must attach the rows it read`; the capitals are for whoever searches the
+                 logs, and the reader wants the sentence. -->
+            {#if coded}{coded[2]} <span class="code">{coded[1]}</span>{:else}{said}{/if}
             {#if long && !open.has(e.seq)}<span class="fold">{FOLD} of {e.out.length} characters</span>{/if}
           </p>
         {/if}
@@ -198,6 +206,23 @@
     font-weight: 500;
   }
 
+  /* A NUMBER, A SENTENCE AND WHAT CAME BACK. */
+  .ledger :global(.line) {
+    grid-template-columns: 3ch minmax(0, 1fr) auto;
+  }
+
+  .step-n {
+    display: flex;
+    align-items: center;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .step-tool {
+    color: var(--dim);
+  }
+
   .line {
     inline-size: 100%;
     border: 0;
@@ -236,11 +261,15 @@
   /* THE REASON IN THE BODY FACE AND INK, failure or not. It is the sentence somebody opened this
      page to read, and red text in the identifier face was the hardest way to read it. */
   .detail {
-    padding: 0 var(--sp-4) var(--sp-3) calc(12ch + var(--sp-4) * 2);
-    background: var(--s1);
+    padding: 0 var(--sp-3) var(--sp-3) calc(3ch + var(--sp-3) + var(--sp-4));
     color: var(--ink2);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+  }
+
+  .detail .code {
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   .fold {
@@ -259,8 +288,32 @@
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
+  }
+
+  /* ON A PHONE THE RESULT GOES UNDER THE SENTENCE, lined up with it. */
+  @media (width < 640px) {
+    .ledger :global(.line) {
+      grid-template-columns: 3ch minmax(0, 1fr);
+      gap: var(--sp-1) var(--sp-3);
+    }
+
+    .step-n {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .out {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
     .detail {
-      padding-inline-start: var(--sp-4);
+      padding-inline-start: calc(3ch + var(--sp-3) * 2);
     }
   }
 
