@@ -16,7 +16,7 @@
  * the rows that made it rather than a reconstruction.
  */
 
-import type { Clock, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
+import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { coerce, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
@@ -578,6 +578,37 @@ export type RecordOptions = {
    */
   sign?: Signer | undefined;
 };
+
+/* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
+   base64url JSON. The `~` keeps it apart from the record order's `<when>|<id>`, which can never start with one. */
+const SORTED_CURSOR = '~';
+
+function orderKeyOf(order: readonly { field: string; dir?: 'asc' | 'desc' }[]): string {
+  return JSON.stringify(order.map((o) => [o.field, o.dir === 'asc' ? 'asc' : 'desc']));
+}
+
+function sortCursor(order: string, values: unknown[]): string {
+  const k = values.map((v) => (typeof v === 'bigint' ? Number(v) : v));
+  let bin = '';
+  for (const b of new TextEncoder().encode(JSON.stringify({ o: order, k }))) bin += String.fromCharCode(b);
+  return SORTED_CURSOR + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** The key values a sorted cursor carries, or `null` for one that is not a cursor for this order. */
+function readSortCursor(cursor: string, order: string): Param[] | null {
+  try {
+    const bin = atob(cursor.slice(SORTED_CURSOR.length).replace(/-/g, '+').replace(/_/g, '/'));
+    const said = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))) as {
+      o?: unknown;
+      k?: unknown;
+    };
+    if (said?.o !== order || !Array.isArray(said.k)) return null;
+    if (!said.k.every((v) => v === null || typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)))) return null;
+    return said.k as Param[];
+  } catch {
+    return null;
+  }
+}
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
@@ -1279,16 +1310,24 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           allowed: ['asc', 'desc'],
         });
     }
+    const cursorText = typeof q.cursor === 'string' ? q.cursor : '';
+    const sortedCursor = cursorText.startsWith(SORTED_CURSOR);
+    if (sortedCursor && !q.order?.length)
+      return no('VALUE_MALFORMED', 'That cursor pages a sorted list. Ask with the order it came from.', { at: 'cursor' });
+    /* THE SORT KEYS, KEPT APART, because a sorted page's cursor is the last row's value under each of them. */
+    const keys: { expr: string; asc: boolean }[] = [];
+    let after = '';
+    const afterParams: Param[] = [];
     if (q.order?.length) {
-      if (typeof q.cursor === 'string' && q.cursor !== '')
+      if (cursorText !== '' && !sortedCursor)
         /* `VALUE_MALFORMED` AT `cursor`, AND IT SAID `WHERE_OPERATOR_UNSUPPORTED` AT `order`, which
            is wrong twice. There is no `where` operator anywhere in this refusal, and the argument
-           that cannot be honoured is the CURSOR: an order is a legitimate thing to ask a list for
-           and a position in the record's order is not a value a sorted query can carry. The code was
-           also outside `30 §6`'s registry, which `refusals.mjs` counts as drift. */
+           that cannot be honoured is the CURSOR: a position in the record's order is not a position
+           in a sorted one. The code was also outside `30 §6`'s registry, which `refusals.mjs` counts
+           as drift. */
         return no(
           'VALUE_MALFORMED',
-          'A cursor pages by when a row last changed, so it cannot also sort by a field. Ask for the whole answer, or page in the record order.',
+          'That cursor pages by when a row last changed, so it cannot page a sorted list. Start the sorted list from its first page.',
           { at: 'cursor' },
         );
       const parts: string[] = [];
@@ -1300,6 +1339,31 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           });
         const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
         parts.push(`${fieldSqlIn(schema, o.field)} ${dir}`);
+        keys.push({ expr: fieldSqlIn(schema, o.field), asc: dir === 'ASC' });
+      }
+      keys.push({ expr: 'id', asc: false });
+
+      /**
+       * A SORTED LIST PAGES, AND IT DID NOT. It answered one page and no cursor, so past the limit a sorted list
+       * simply stopped. The cursor is the last row's value under every sort key, its id last, and the next page is
+       * every row that sorts after it: equal on the keys before one, and past it on that one. SQLite puts `NULL`
+       * first ascending and last descending, and the comparison below is written to agree with that, so a field
+       * some rows leave empty neither loses them nor repeats them.
+       */
+      if (sortedCursor) {
+        const said = readSortCursor(cursorText, orderKeyOf(q.order));
+        if (!said || said.length !== keys.length)
+          return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with, for the same order.', { at: 'cursor' });
+        const ors: string[] = [];
+        keys.forEach((key, i) => {
+          const v = said[i]!;
+          const past = key.asc ? (v === null ? `${key.expr} IS NOT NULL` : `${key.expr} > ?`) : v === null ? null : `(${key.expr} < ? OR ${key.expr} IS NULL)`;
+          if (past === null) return;
+          const same = keys.slice(0, i).map((k) => `${k.expr} IS ?`);
+          ors.push(`(${[...same, past].join(' AND ')})`);
+          afterParams.push(...said.slice(0, i), ...(v === null ? [] : [v]));
+        });
+        after = ` AND (${ors.length ? ors.join(' OR ') : '0'})`;
       }
       /* `id` LAST, ALWAYS. Two rows with the same value have no order otherwise, so the same query
          can return them in two orders on two runs and a reader watching a list re-render sees rows
@@ -1307,8 +1371,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       sort = `ORDER BY ${parts.join(', ')}, id DESC`;
     }
 
-    const [at, afterId] = (typeof q.cursor === 'string' ? q.cursor : '').split('|');
-    const page = at
+    const [at, afterId] = (sortedCursor ? '' : cursorText).split('|');
+    const page = sortedCursor
+      ? sql.all<Record<string, unknown>>(
+          `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql})${after} ${sort} LIMIT ?`,
+          q.register,
+          ...c.params,
+          ...afterParams,
+          limit + 1,
+        )
+      : at
       ? sql.all<Record<string, unknown>>(
           `SELECT ${COLUMNS} FROM entry WHERE register = ?${deleted} AND (${c.sql}) AND (updated_at < ? OR (updated_at = ? AND id < ?)) ${sort} LIMIT ?`,
           q.register,
@@ -1338,10 +1410,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     const rows = page.slice(0, limit).map(hydrate);
     const more = page.length > limit;
     const last = rows.at(-1);
-    /* AND A SORTED ANSWER HANDS BACK NO CURSOR, because the cursor it would hand back is a position
-       in an order this page is not in. `null` says "there is no next page from here", which is true
-       of a query that refuses to be paged. */
-    const paging = q.order?.length ? null : more && last ? `${last.updated_at}|${last.id}` : null;
+    /* AND A SORTED ANSWER HANDS BACK ITS OWN KIND OF CURSOR: the last row's value under each sort key, read by the
+       same expressions the ORDER BY used, so the next page compares like with like. */
+    const paging = !(more && last)
+      ? null
+      : q.order?.length
+        ? sortCursor(
+            orderKeyOf(q.order),
+            Object.values(
+              sql.one<Record<string, Param>>(`SELECT ${keys.map((k, i) => `${k.expr} AS k${i}`).join(', ')} FROM entry WHERE id = ?`, last.id) ?? {},
+            ),
+          )
+        : `${last.updated_at}|${last.id}`;
     return ok({ rows, matched, cursor: paging });
   }
 

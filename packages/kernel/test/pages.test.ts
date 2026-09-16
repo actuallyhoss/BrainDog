@@ -252,7 +252,7 @@ test('a sort on a field the register does not declare is refused, not ignored', 
   sql.close();
 });
 
-test('AND A CURSOR AND AN ORDER ARE ONE QUERY OR THE OTHER', async () => {
+test('AND A RECORD-ORDER CURSOR DOES NOT PAGE A SORTED LIST', async () => {
   /* The cursor is keyset pagination on `updated_at|id`, which is what the `WHERE (updated_at < ?…)`
      clause IS, so a different sort key makes that clause select the wrong rows rather than fewer of
      them. Ignoring one of the two silently would hand back a page that is neither what was asked
@@ -265,12 +265,11 @@ test('AND A CURSOR AND AN ORDER ARE ONE QUERY OR THE OTHER', async () => {
 
   const both = k.list({ register: 'obligations', limit: 2, cursor, order: [{ field: 'amount' }] });
   assert.equal(both.ok, false);
-  assert.match((both as { refusal: { fix: string } }).refusal.fix, /cannot also sort by a field/u);
+  assert.match((both as { refusal: { fix: string } }).refusal.fix, /cannot page a sorted list/u);
 
-  /* AND A SORTED ANSWER HANDS BACK NO CURSOR, because the cursor it would hand back is a position
-     in an order the page is not in. */
+  /* A SORTED ANSWER HANDS BACK ITS OWN CURSOR, and `list-order-paging.test.ts` pages through it. */
   const sorted = k.list({ register: 'obligations', limit: 2, order: [{ field: 'amount', dir: 'desc' }] });
-  assert.equal((sorted as { value: { cursor: string | null } }).value.cursor, null);
+  assert.match(String((sorted as { value: { cursor: string | null } }).value.cursor), /^~/u);
   sql.close();
 });
 
