@@ -717,13 +717,17 @@
                      filtered and may take a block of four rows for the whole register. But the
                      clause that names the page you are already on is dropped: "thing is Kiln" under
                      a heading on the Kiln page is the one fact the reader cannot be missing. -->
-                <a class="block-source tap" href={openHref(block) ?? `/r/${block.register}`}>
+                <a class="block-source tap" href={openHref(block) ?? `/r/${block.register}`} title={whereOf(block) || undefined}>
                   {REGISTERS[block.register]?.name ?? block.register}
                   <!-- AND IT SAYS THAT IT IS A FILTER. `/v/<view>` labels the identical string
                        `FILTER`, so the word existed and the page blocks did not use it — leaving an
                        unlabelled clause of machine grammar under a heading, which a reader can only
                        take for part of the title. -->
+                  <!-- AS A GLYPH, AND THE CLAUSE IS STILL THERE (DESIGN-SYSTEM APPENDIX C5). Printed in full it
+                       read as a debug line and pushed a two-word heading onto two lines; the filter glyph
+                       says the list is narrowed, the tooltip and a screen reader get the whole clause. -->
                   {#if whereOf(block)}
+                    <Icon name="filter" size="s" />
                     <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
                   {/if}
                 </a>
@@ -913,8 +917,9 @@
      own `where:`. That is the down half of the two-altitude ladder, and nothing may break it. */
   .block-source {
     display: flex;
+    flex: none;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
     margin-inline-start: auto;
     color: var(--dim);
     font-size: var(--t-xs);
@@ -932,7 +937,12 @@
      bought; the theme was right and this call site was wrong. Raising the register name says the
      same thing and costs nothing, because the ceiling has room and the floor does not. */
   .block-where {
-    color: var(--dim);
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
