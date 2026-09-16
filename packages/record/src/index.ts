@@ -1363,22 +1363,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async boot(ctx: CallContext): Promise<Result<Boot>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const out: { id: string; name: string; count: number }[] = [];
-      for (const [id, decl] of kernel.registers()) {
-        /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
-           on is inside their ceiling by construction, so its name and its row count went out to the
-           one level whose whole point is that it does not read. */
-        if (readable(ctx, id)) continue;
-        out.push({ id, name: decl.name, count: kernel.count(id) });
-      }
-      return ok({
-        registers: out,
-        now: new Date(clock.now()).toISOString(),
-        /* THE FIRST SCREEN IN ONE ROUND TRIP (`32 §3`): who is working, and what waits on a person, each
-           held to what the caller may read, as the registers above are. */
-        sessions: readable(ctx, SESSION) ? [] : live(ctx),
-        waiting: waitingFor(ctx),
-        ...shellFor(ctx),
+      /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
+         self-host, could commit between the counts and the feed, and the rail said one row beside a
+         feed announcing two. SQLite holds a read transaction to the snapshot of its first read. */
+      return kernel.transaction(() => {
+        const out: { id: string; name: string; count: number }[] = [];
+        for (const [id, decl] of kernel.registers()) {
+          /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
+             on is inside their ceiling by construction, so its name and its row count went out to the
+             one level whose whole point is that it does not read. */
+          if (readable(ctx, id)) continue;
+          out.push({ id, name: decl.name, count: kernel.count(id) });
+        }
+        return ok({
+          registers: out,
+          now: new Date(clock.now()).toISOString(),
+          /* THE FIRST SCREEN IN ONE ROUND TRIP (`32 §3`): who is working, and what waits on a person, each
+             held to what the caller may read, as the registers above are. */
+          sessions: readable(ctx, SESSION) ? [] : live(ctx),
+          waiting: waitingFor(ctx),
+          ...shellFor(ctx),
+        });
       });
     },
 

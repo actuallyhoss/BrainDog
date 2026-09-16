@@ -466,3 +466,45 @@ test('A ROW THAT IS NOT THERE HAS NOTHING POINTING AT IT, and a number or a curs
   assert.equal(codeOf(await api.backlinks({ register: 'nope', seq: 1 }, owner)), 'REGISTER_UNKNOWN');
   sql.close();
 });
+
+test('BOOT IS ONE READ, so a write from another connection lands wholly before it or wholly after it', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'dog-boot-'));
+  const file = join(dir, 'record.sqlite');
+
+  const sql = openSqlite(file);
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok((await api.kernel.install([OBLIGATIONS, DIARY])).ok);
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok,
+  );
+  value(await api.create({ register: 'obligations', fields: { what: 'Before' } }, owner));
+
+  /* A SECOND CONNECTION TO THE SAME FILE, as a CLI beside a running self-host is. */
+  const other = openSqlite(file);
+  const second = await createRecordApi({ sql: other, clock: fixedClock(NOW + 60_000) });
+
+  /* ITS WRITE LANDS THE MOMENT `boot` HAS COUNTED THE LIST AND BEFORE IT READS WHAT IS NEW. */
+  const one = sql.one.bind(sql);
+  let armed = true;
+  sql.one = ((text: string, ...params: never[]) => {
+    const out = one(text, ...params);
+    if (armed && text.includes('count(*) AS n FROM entry WHERE register = ?') && params[0] === 'obligations') {
+      armed = false;
+      assert.ok(second.kernel.create('obligations', { what: 'During' }, { actor: 'p_1' }).ok);
+    }
+    return out;
+  }) as typeof sql.one;
+
+  const boot = value<Boot>(await api.boot(owner));
+  assert.equal(armed, false, 'the write never ran');
+  const counted = boot.registers.find((r) => r.id === 'obligations')?.count;
+  const news = boot.whatsNew.events.filter((e) => e.register === 'obligations').length;
+  assert.equal(counted, news, `boot counted ${counted} rows and told of ${news} created, from two different moments`);
+
+  sql.close();
+  other.close();
+  rmSync(dir, { recursive: true, force: true });
+});
