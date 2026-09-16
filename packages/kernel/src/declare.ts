@@ -462,6 +462,27 @@ const CELL_CEILING = 6;
 const COLUMN_CEILING = 16;
 const ORDER_CEILING = 3;
 
+/**
+ * `42 §4.5`'s text ceilings, in bytes, and the row ceiling an authored block is held to.
+ *
+ * MEASURED IN BYTES, AS `nav.section` ALREADY IS. The ceiling is about what a record stores, sends
+ * and draws, and a heading of eighty accented characters is not eighty bytes. A `label`'s forty is
+ * the cell half of the same table.
+ *
+ * AUTHORED ROWS TAKE THE ROW CEILING A `limit` TAKES, because they are the same fact about the same
+ * block: five hundred is the most rows this record draws from a register, and a block that writes
+ * its rows out by hand does not get a longer page than one that reads them.
+ */
+const HEADING_BYTES = 80;
+const EMPTY_BYTES = 200;
+/* A BLOCK'S BODY, WHICH IS NOT THE ACTION'S `BODY_BYTES` BELOW. That one is `42 §4.7`'s 8 KB on
+   what a scheduled call SENDS, and it is printed whole in the install diff; this is `42 §4.5`'s
+   64 KB of prose a block DRAWS. Two ceilings, two bodies, named apart so neither is read for the
+   other. */
+const BLOCK_BODY_BYTES = 64 * 1024;
+const LABEL_BYTES = 40;
+const AUTHORED_CEILING = LIMIT_MAX;
+
 /** The four intent words `22 §7` admits, and the only path by which a tone reaches the DOM. */
 const TONES = ['good', 'warn', 'bad', 'info'] as const;
 
@@ -483,6 +504,31 @@ const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 const isInt = (n: unknown, lo: number, hi: number): boolean => typeof n === 'number' && Number.isInteger(n) && n >= lo && n <= hi;
 
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
+
+/**
+ * Why a text a reader sees is not one, or `null`.
+ *
+ * THE TEXTS ARE ONE CHECK BECAUSE THEY ARE ONE MISTAKE. A `heading`, an `empty` sentence, a `body`
+ * and a cell's `label` are each drawn through a function that calls `replaceAll` on the value, so a
+ * value that is not a string is a TypeError inside the page's own render rather than a block saying
+ * it cannot be drawn. A block that throws takes every other block on the page with it, which is the
+ * opposite of the per-block boundary `readBlock` is written to keep: *"everything a block can get
+ * wrong comes back as a refusal ON THE BLOCK"*. The app narrows all four again on its own side,
+ * because it reads JSON from a record and should not trust it whatever this file checks; what is
+ * here is the only place the declaration can be refused BEFORE anybody's page is broken by it.
+ *
+ * AN EMPTY STRING IS REFUSED IN THE SAME WORDS AS A MISSING ONE, which is how `title` and
+ * `nav.section` already read. A heading of no characters is a heading nobody sees, and whoever
+ * wrote the key meant to say something in it.
+ */
+function textFault(value: unknown, ceiling: number, at: string, said: string, what: string): Refusal | null {
+  if (typeof value !== 'string' || value.trim() === '')
+    return bad('DECLARATION_INVALID', `${said} is ${JSON.stringify(value ?? null)}. ${what}`, at);
+  const size = byteLength(value);
+  if (size > ceiling)
+    return bad('OUT_OF_BOUNDS', `${said} measures ${size} bytes, and the ceiling is ${ceiling}. Shorten it.`, at);
+  return null;
+}
 
 /**
  * What is already in the record, plus what is arriving with this declaration, by id.
@@ -594,6 +640,11 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       when?: unknown;
       fold?: unknown;
       icon?: unknown;
+      heading?: unknown;
+      empty?: unknown;
+      body?: unknown;
+      target?: unknown;
+      authored?: unknown;
     };
     const at = `blocks[${i}]`;
     if (block === null || typeof block !== 'object')
@@ -603,17 +654,32 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        ENUMERATION, and an enumeration only works over a finite list. A pack may still invent a kind
        — as a `block.<id>` declaration, which is admitted here by prefix and checked as a document of
        its own. A bare word that is neither is a block that draws nothing. */
-    if (block.kind !== undefined) {
-      const kind = block.kind;
-      const declaredKind = typeof kind === 'string' && /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind);
-      if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
-        return bad(
-          'KIND_UNKNOWN',
-          `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the twenty, and no block declares it.`,
-          at,
-          BLOCK_KINDS as unknown as string[],
-        );
-    }
+    /**
+     * AND IT IS REQUIRED, WHICH THIS CHECK READ AS OPTIONAL. `42 §4.5` and `06 §1.1` both mark it
+     * required in their own tables, and a block arriving without one was admitted.
+     *
+     * WHAT A KINDLESS BLOCK DRAWS IS NOTHING, IN SILENCE, which is the same failure the closed list
+     * above exists to end rather than a lesser one. `readBlock` compares `kind` to `stat`, to
+     * `diff`, to `feed` and to the rest, matches none of them, and returns the base result: no rows,
+     * no reading, no refusal, no mark on the page. The renderer then has nothing to look up, so what
+     * a reader gets is a page with a hole in it and nothing anywhere saying why.
+     */
+    const kind = block.kind;
+    if (kind === undefined)
+      return bad(
+        'KIND_UNKNOWN',
+        `${id}.${at} names no kind, so nothing knows what to draw and the block comes back empty. Give it one of the twenty, or a block.<id> this pack declares.`,
+        at,
+        BLOCK_KINDS as unknown as string[],
+      );
+    const declaredKind = typeof kind === 'string' && /^block\.[a-z][a-z0-9_-]{0,31}$/u.test(kind);
+    if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
+      return bad(
+        'KIND_UNKNOWN',
+        `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the twenty, and no block declares it.`,
+        at,
+        BLOCK_KINDS as unknown as string[],
+      );
 
     /* TWELFTHS, AND ONLY TWELFTHS. `06 §1.1` gives a block an order in the list and a width, and
        nothing else — no x, no y, no height. A span of 0 is a block with no width and a span of 13 is
@@ -631,6 +697,36 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
     if (block.tone !== undefined && !(TONES as readonly unknown[]).includes(block.tone))
       return bad('DECLARATION_INVALID', `${String(block.tone)} is not an intent.`, at, TONES as unknown as string[]);
+
+    /* THE THREE TEXTS A READER SEES, none of which was looked at. `42 §4.5` gives each a ceiling and
+       this file forwarded all three unread, so `heading: 12` installed and then threw where the page
+       was being drawn. Their REQUIRED-ness per kind is not decided here: `06 §1.1` marks `heading`
+       required on a section, `body` on a note and `empty` on every source-bound block, and making
+       any of the three required is a change to a population this file does not own, the same reason
+       `requires` above is checked only when it is written. The shape is what the renderer breaks on,
+       and the shape is what is checked. */
+    for (const [key, value, ceiling, what] of [
+      ['heading', block.heading, HEADING_BYTES, 'A heading is the words drawn over a block, and on a section it is the section itself.'],
+      ['empty', block.empty, EMPTY_BYTES, 'An empty state is the sentence a reader gets when the block has no rows.'],
+      ['body', block.body, BLOCK_BODY_BYTES, "A body is the block's own prose, in the dialect a note is written in."],
+    ] as const) {
+      if (value === undefined) continue;
+      const fault = textFault(value, ceiling, at, `${id}.${at}'s ${key}`, what);
+      if (fault) return fault;
+    }
+
+    /* A TARGET IS THE NUMBER A GAUGE DRAWS AGAINST, and it is on the declaration because there is
+       nowhere else it could come from: a budget is a decision somebody made, not a figure in the
+       rows. The renderer divides by it, so a word here is a proportion of a word; a negative one
+       inverts the ladder that colours the bar, and a gauge is then worst where it is best. Zero is
+       admitted because the renderer already answers for it, drawing an empty track rather than
+       dividing, which is what it draws for a gauge with no target at all. */
+    if (block.target !== undefined && (typeof block.target !== 'number' || !Number.isFinite(block.target) || block.target < 0))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}.${at}'s target is ${JSON.stringify(block.target ?? null)}; a target is the number a gauge draws its value against, zero or above.`,
+        at,
+      );
 
     /* A `section`'s two keys. The block keys are not a closed list, so nothing refuses them on another
        kind; only their shape is checked, because `fold: 'yes'` would draw a section shut by accident. */
@@ -667,12 +763,81 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const cells = block.cells;
       if (!Array.isArray(cells) || cells.length === 0 || cells.length > CELL_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${CELL_CEILING} figures.`, at);
-      for (const cell of cells as { metric?: unknown }[]) {
+      for (const cell of cells as { metric?: unknown; label?: unknown }[]) {
         /* THE PARAMETER IS PART OF THE NAME AND NOT PART OF THE ID. `project-owed:Kiln` is one
            document read about one project (`pages.ts` splits on the FIRST colon), so the id being
            checked is the half before it. */
         if (typeof cell?.metric !== 'string' || !METRIC_ID.test(metricNamed(cell.metric)))
           return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(cell?.metric ?? null)} as a figure, and a figure is a metric id.`, at);
+        /* AND THE LABEL, WHICH IS A SHAPE WITHOUT BEING REQUIRED. `42 §4.5` writes a cell as
+           `{ metric, label }` and this checked only the metric, so `label: 12` reached the same
+           escaping the three texts above go through and threw there. It stays OPTIONAL: a cell
+           without one is drawn under the metric's own name, which is a word the reader can still
+           act on, so there is nothing to refuse an author for. What is refused is a label that is
+           not text at all. */
+        if (cell.label === undefined) continue;
+        const fault = textFault(cell.label, LABEL_BYTES, at, `${id}.${at}'s label for ${String(cell.metric)}`, 'A label is what a figure is called on the screen.');
+        if (fault) return fault;
+      }
+    }
+
+    /**
+     * AUTHORED ROWS: the rows of a block nobody queries, and the key with the most ways to throw.
+     *
+     * A block is bound to a register or it is written out by hand, and the hand-written half is a
+     * list of rows, each one a `cells` list with an optional tone. Every part of that was forwarded
+     * unread: `authored: "two"` installed, and so did a row with no `cells` list at all, and both
+     * are drawn by mapping over a list that is not there. That is the TypeError this whole pass is
+     * about, and a row with no `cells` is the commonest shape of it because a row LOOKS complete
+     * with a tone on it and nothing else.
+     *
+     * A ROW CEILING, because authored rows are rows: `limit` caps what a block draws from a register
+     * at five hundred, and a block carrying its rows in the declaration is held to the same number.
+     *
+     * THE CELL COUNT PER ROW IS DELIBERATELY NOT CHECKED. `05 §2.1` is explicit that a row with more
+     * cells than its kind takes degrades AT RENDER, with the block shown as it was written, and that
+     * nothing is refused at write for it. Refusing here would contradict the document and would need
+     * the renderer's per-kind arity table, which this package cannot import (`31 §2`).
+     */
+    if (block.authored !== undefined) {
+      const authored = block.authored;
+      if (!Array.isArray(authored) || authored.length === 0)
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${at}'s authored is ${JSON.stringify(authored ?? null)}; authored rows are a list, each row { cells: [text] }. Write the rows out, or take the key off.`,
+          at,
+        );
+      if (authored.length > AUTHORED_CEILING)
+        return bad('OUT_OF_BOUNDS', `${id}.${at} writes out ${authored.length} rows, and a block draws at most ${AUTHORED_CEILING}.`, at);
+
+      /* A BLOCK DECLARING BOTH A SOURCE AND AUTHORED ROWS IS REFUSED RATHER THAN RESOLVED. Picking
+         one would be a silent decision about where a block's content comes from, made on behalf of
+         whoever wrote the declaration. The renderer already refuses it where it draws, in these
+         words; refused here, the page never reaches a reader in that state at all. */
+      if (block.source !== undefined)
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}.${at} reads ${String(block.source)} and writes its rows out as well. Keep one: source: reads a register, and authored: is written out by hand.`,
+          at,
+        );
+
+      for (const row of authored as { cells?: unknown; tone?: unknown }[]) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row) || !Array.isArray(row.cells) || row.cells.length === 0)
+          return bad(
+            'DECLARATION_INVALID',
+            `${id}.${at} has an authored row with no cells. Every row is { cells: [text] }, with at least one cell in it.`,
+            at,
+          );
+        for (const cell of row.cells)
+          if (typeof cell !== 'string')
+            return bad('DECLARATION_INVALID', `${id}.${at} has an authored cell of ${JSON.stringify(cell ?? null)}, and a cell is text.`, at);
+        if (row.tone !== undefined && !(TONES as readonly unknown[]).includes(row.tone))
+          return bad(
+            'DECLARATION_INVALID',
+            `${id}.${at}: ${JSON.stringify(row.tone)} is not an intent on an authored row.`,
+            at,
+            TONES as unknown as string[],
+          );
       }
     }
 

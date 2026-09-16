@@ -473,7 +473,11 @@ const OVERDUE = {
 const MONEY = {
   id: 'page.money',
   kind: 'page' as const,
-  body: { page: 'money', title: 'Money', blocks: [{ as: 'stat', cells: [{ metric: 'overdue', label: 'Overdue' }] }] } as never,
+  /* `kind:`, not `as:`, which is the digest's word for the same idea (`09 §6`) and was written here
+     by mistake. The block named no kind at all, so the page drew a hole: `readBlock` matched none of
+     its arms and came back empty, and nothing refused it because `declare.ts` treated `kind` as
+     optional. It is required now, and this fixture is what the requirement first caught. */
+  body: { page: 'money', title: 'Money', blocks: [{ kind: 'stat', cells: [{ metric: 'overdue', label: 'Overdue' }] }] } as never,
 };
 
 test('AND A METRIC RESOURCE READS A METRIC', async () => {

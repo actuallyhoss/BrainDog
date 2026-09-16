@@ -1064,6 +1064,16 @@ test('and a figure a page draws is a metric id, parameter and all', () => {
   for (const metric of [undefined, 7, 'Overdue', ''])
     assert.equal(stat([{ metric }]), 'DECLARATION_INVALID', `${String(metric)} is not a figure`);
 
+  /* AND A CELL'S LABEL IS TEXT, WITHOUT BEING REQUIRED. `42 §4.5` writes a cell as
+     `{ metric, label }` and only the metric was checked, so a label that is not a string reached the
+     same escaping a heading does and threw there. A cell with NO label is still sound: it is drawn
+     under the metric's own name, so there is nothing to refuse an author for. */
+  assert.equal(stat([{ metric: 'overdue' }]), null, 'a cell with no label is drawn under the metric’s name');
+  for (const label of [12, null, { said: 'Overdue' }, ''])
+    assert.equal(stat([{ metric: 'overdue', label }]), 'DECLARATION_INVALID', `${JSON.stringify(label)} is not a label`);
+  assert.equal(stat([{ metric: 'overdue', label: 'x'.repeat(40) }]), null, 'forty bytes is the ceiling, not one past it');
+  assert.equal(stat([{ metric: 'overdue', label: 'x'.repeat(41) }]), 'OUT_OF_BOUNDS');
+
   /* AND `when:` IS ONE LEAF NAMING A METRIC (06 §1). A `when:` naming nothing is a block that is
      either always drawn or never, and both are indistinguishable from the block working. */
   assert.equal(refusedWith(block({ when: { metric: 'overdue', gt: 0 } })), null);
@@ -1083,6 +1093,100 @@ test('and the counted keys are counted, and a tone is one of the four', () => {
   for (const tone of ['good', 'warn', 'bad', 'info']) assert.equal(refusedWith(block({ tone })), null, `${tone} is an intent`);
   assert.equal(refusedWith(block({ tone: 'danger' })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(page({ tone: 'danger' })), 'DECLARATION_INVALID');
+});
+
+test('A HEADING, AN EMPTY STATE AND A BODY ARE TEXT, AND A TARGET IS A NUMBER', () => {
+  /**
+   * FIVE KEYS WERE FORWARDED AND NEVER LOOKED AT. `declare.ts` checked `kind`, `span`, `limit`,
+   * `tone`, `fold`, `icon`, `source`, `cells`, `when`, `columns` and `order`, and read nothing of
+   * `heading`, `empty`, `body`, `target` or `authored`, which the kernel forwards correctly,
+   * because a block may carry them and `READS` lists them.
+   *
+   * THE CONSEQUENCE WAS NOT COSMETIC. Four of the five are drawn through a function that calls
+   * `replaceAll` on the value, so a pack declaring `heading: 12` installed with no complaint and
+   * then threw a TypeError while the page was being drawn, and a block that throws takes every
+   * other block on that page with it, which is the opposite of the per-block boundary the page
+   * route promises. The built-in sample cannot reach that: its blocks are typed literals a compiler
+   * checks. A live block is JSON that arrived in a pack, and a pack is a thing a stranger wrote, so
+   * install is the only place a bad declaration can be refused before somebody's page is broken.
+   */
+  assert.equal(refusedWith(block({ heading: 'Open', empty: 'Nothing yet.', body: 'A sentence.', target: 90 })), null);
+
+  for (const said of [12, null, ['a'], { said: 'nothing' }, '', '   '])
+    for (const key of ['heading', 'empty', 'body'])
+      assert.equal(refusedWith(block({ [key]: said })), 'DECLARATION_INVALID', `${JSON.stringify(said)} is not a ${key}`);
+
+  /* AND EACH HAS `42 §4.5`'s CEILING, measured in bytes as `nav.section` already is. */
+  assert.equal(refusedWith(block({ heading: 'x'.repeat(80) })), null, 'eighty bytes is the ceiling, not one past it');
+  assert.equal(refusedWith(block({ heading: 'x'.repeat(81) })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(block({ empty: 'x'.repeat(200) })), null);
+  assert.equal(refusedWith(block({ empty: 'x'.repeat(201) })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(block({ body: 'x'.repeat(64 * 1024) })), null);
+  assert.equal(refusedWith(block({ body: 'x'.repeat(64 * 1024 + 1) })), 'OUT_OF_BOUNDS');
+  assert.match(validateDeclaration(block({ heading: 'x'.repeat(81) }))?.fix ?? '', /81 bytes/);
+
+  /* A HEADING MAY STILL CARRY A `{{path}}`, which is what makes a template page one declaration. */
+  assert.equal(refusedWith(block({ heading: 'Open: {{open-count}}', body: 'The first is {{obligations#1.amount}}.' })), null);
+
+  /* AND A TARGET IS THE NUMBER A GAUGE DRAWS AGAINST, so a word here is a proportion of a word. A
+     negative one inverts the ladder that colours the bar; zero is admitted because the renderer
+     answers for it already, drawing the empty track it draws for a gauge with no target at all. */
+  for (const target of [90, 22_000, 0, 1.5]) assert.equal(refusedWith(block({ kind: 'gauge', target })), null, `${target} is a target`);
+  for (const target of ['soon', null, -1, [90], { lte: 90 }])
+    assert.equal(refusedWith(block({ kind: 'gauge', target })), 'DECLARATION_INVALID', `${JSON.stringify(target)} is not a target`);
+});
+
+test('AND AUTHORED ROWS ARE ROWS, each one a cells list, because a row without one is drawn by mapping over nothing', () => {
+  /* A block is bound to a register or written out by hand, and the hand-written half was forwarded
+     entirely unread. `authored: "two"` installed, and so did a row carrying a tone and no `cells`,
+     and both of those are a TypeError where the rows are drawn rather than a refusal on the block. */
+  assert.equal(refusedWith(block({ authored: [{ cells: ['one', 'two'] }] })), null);
+  assert.equal(refusedWith(block({ authored: [{ cells: ['one'], tone: 'good' }] })), null);
+
+  for (const authored of ['two', 12, [], {}, null, [12], ['one'], [null]])
+    assert.equal(refusedWith(block({ authored })), 'DECLARATION_INVALID', `${JSON.stringify(authored)} is not a list of rows`);
+
+  /* THE ROW WITH NO CELLS, which is the shape that looks most complete and is the one that threw. */
+  assert.equal(refusedWith(block({ authored: [{ cells: ['fine'] }, { tone: 'good' }] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(block({ authored: [{ cells: 'no' }] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(block({ authored: [{ cells: [] }] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(block({ authored: [{ cells: ['one', 12] }] })), 'DECLARATION_INVALID');
+
+  /* A ROW'S TONE IS ONE OF THE FOUR, and the refusal offers them. */
+  const tone = validateDeclaration(block({ authored: [{ cells: ['fine'], tone: 'purple' }] }));
+  assert.equal(tone?.code, 'DECLARATION_INVALID');
+  assert.deepEqual(tone?.allowed, ['good', 'warn', 'bad', 'info']);
+
+  /* AND THE ROW CEILING IS THE ONE A `limit` KEEPS: authored rows are rows. */
+  const rows = (n: number) => Array.from({ length: n }, () => ({ cells: ['one'] }));
+  assert.equal(refusedWith(block({ authored: rows(500) })), null, 'five hundred is the ceiling, not one past it');
+  assert.equal(refusedWith(block({ authored: rows(501) })), 'OUT_OF_BOUNDS');
+
+  /* A BLOCK THAT DECLARES BOTH A SOURCE AND AUTHORED ROWS IS REFUSED RATHER THAN RESOLVED. Picking
+     one would be a silent decision about where a block's content comes from, made on somebody
+     else's behalf; the renderer refuses it where it draws, and refused here the page never reaches
+     a reader in that state. */
+  assert.match(
+    validateDeclaration(block({ source: 'register.obligations', authored: [{ cells: ['one'] }] }))?.fix ?? '',
+    /Keep one/,
+  );
+});
+
+test('A BLOCK NAMES ITS KIND, and one that names none draws nothing and says nothing', () => {
+  /* `42 §4.5` and `06 §1.1` both mark `kind` required and the check read it as optional, so a block
+     with none installed. What it draws is the silence the closed list exists to end rather than a
+     lesser version of it: `readBlock` matches none of its arms, returns the base result with no
+     rows and no refusal, and the renderer has nothing to look up, so a reader gets a hole in a page
+     with nothing anywhere saying why. */
+  const said = validateDeclaration(page({ blocks: [{ heading: 'Open', source: 'register.obligations', empty: 'Nothing.' }] }));
+  assert.equal(said?.code, 'KIND_UNKNOWN');
+  assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
+  assert.ok(said?.allowed?.includes('note'), 'the refusal offers no alternative');
+  assert.match(said?.fix ?? '', /names no kind/);
+
+  /* AND `as:` IS THE DIGEST'S WORD FOR IT (09 §6), which is how a page block came to be written with
+     no kind at all in the first place. */
+  assert.equal(refusedWith(page({ blocks: [{ as: 'stat', cells: [{ metric: 'overdue' }] }] })), 'KIND_UNKNOWN');
 });
 
 test('PAGES CAN APPEAR ON THEIR OWN; NAVIGATION CANNOT', () => {
