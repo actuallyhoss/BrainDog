@@ -246,6 +246,34 @@ The rate table is a dated register, as §3 of [02-DATA-MODEL](02-DATA-MODEL.md) 
 already have, with one new key, `as_of`. *(An earlier draft spelled it `asof` and looked rows up by a
 `pair` the register does not have.)*
 
+### What this build reads: a factor table the figure carries
+
+The dated `fx` register and its `as_of` are not built. What is built is the small version of the same
+row-level product: a **named factor table**, where `by` picks a row's factor by the value of one field.
+A service's `cost` is per cycle, so a yearly domain and a monthly subscription are two units, and the
+figure that adds them multiplies each row by its cycle first:
+
+```yaml
+metric: estate-year
+source: register.services
+where:  state is not cancelled
+value:  { sum: { product: [cost, { lookup: per_year, by: cycle }] } }
+lookups:
+  per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 }
+format: money.GBP
+```
+
+| | |
+|---|---|
+| **The declaration carries its tables** | under `lookups`, so a table is installed, versioned, exported and retired with the figure that multiplies by it, which is the property the `fx` register has. Up to 8 tables, each 1 to 64 numbers ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.9) |
+| **A figure naming a table it does not carry is refused at install** | `LOOKUP_UNKNOWN` at `lookups`: *"metric.estate-year multiplies by per_year and carries no table of that name. Add it under lookups."* |
+| **A `by` value the table has no factor for** | is `LOOKUP_MISSING` when the figure is read, not a factor of one, because a row multiplied by one is a wrong number rather than a missing one |
+| **A body installed before the key existed** | has no `lookups` key at all, and declaration rows are never edited, so it reads against `per_year` as above until its pack is installed again. A body with the key reads only its own tables |
+
+*(Until 2026-09-16 the tables were an option handed to the kernel when a record was opened. No host
+handed one in, so every real record answered `LOOKUP_UNKNOWN` for the estate pack's own Cost per year
+while every test passed the seed's table and read the right number. The open-time option is gone.)*
+
 ## 2.6 · `snapshot:` — materialising a metric into a series
 
 ```yaml

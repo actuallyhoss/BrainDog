@@ -431,10 +431,23 @@ one declared, non-derived, non-`secret`, non-`file` field · `{ move: value }` �
 | `bucket` | — | with a `day`/`instant` `group_by` only | — | `day week month quarter year` |
 | `order` | `[{ field, dir }]` ≤ 2 | with `running` only | — | — |
 | `snapshot` | `{ grain, into: series.<Id> }` | no | — | `grain ∈ day hour month` |
+| `lookups` | named factor tables `{ <name>: { <value>: number } }`: ≤ 8 tables, a name matching `^[a-z][a-z0-9_]{0,31}$`, 1–64 finite numbers each, a key ≤ 64 characters | with a `lookup` operand | — | — |
 
 An **operand** is a field id, `id` (rows), or a row-level `{ product: [a, b] } \| { diff: [a, b] }` where `a`/`b` is a
 field id or `{ lookup: Id, by: Id, as_of?: Id }`. Depth one in either direction; a `where` or `source` key inside an
 operand is `RATIO_MIXED_SOURCE`.
+
+**A figure carries the factor tables it multiplies by.** Every `{ lookup: <name> }` inside `value`, however deep it sits, must
+name a table under the same declaration's `lookups`, or the install refuses `LOOKUP_UNKNOWN` at `lookups`: *`metric.estate-year
+multiplies by per_year and carries no table of that name. Add it under lookups.`* A malformed table is `DECLARATION_INVALID` at
+`lookups`. The kernel's install check raises both (`packages/kernel/src/declare.ts`), so the tables are installed, versioned,
+exported and retired with the figure that reads them. *(Landed 2026-09-16. Until then the tables were an option handed to the
+kernel when a record was opened, `RecordOptions.lookups`; no host handed one in, so every real record answered `LOOKUP_UNKNOWN`
+for the estate pack's own Cost per year while every test passed the seed's table. That option is gone.)*
+
+A body installed before 2026-09-16 carries no `lookups` key at all, and declaration rows are never edited, so the evaluator reads
+such a body against the one table a build ever named without carrying: `per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 }`.
+A body that has the key, even an empty one, reads only its own tables.
 
 ### 4.10 · `theme` — 28 §1 · 13 §2.1
 
