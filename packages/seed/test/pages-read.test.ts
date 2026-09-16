@@ -135,17 +135,18 @@ test('a `stat` block comes back with readings, each in its own currency', async 
   const stat = page(k, 'money').blocks.find((b) => b.kind === 'stat')!;
   assert.ok(stat.readings && stat.readings.length >= 3);
 
-  const owed = stat.readings.find((r) => r.metric === 'owed-to-you')!;
-  assert.ok(owed.reading, owed.refusal ? `${owed.refusal.code}: ${owed.refusal.fix}` : 'no reading');
-  assert.ok((owed.reading.value ?? 0) > 0);
-  assert.equal(owed.reading.unit, 'GBP');
+  for (const metric of ['cash-now', 'in-30d', 'out-30d', 'every-month-out']) {
+    const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric === metric)!;
+    assert.ok(cell?.reading, cell?.refusal ? `${cell.refusal.code}: ${cell.refusal.fix}` : `${metric}: no reading`);
+    assert.ok((cell.reading.value ?? 0) > 0, `${metric} read nothing`);
+    assert.equal(cell.reading.unit, 'GBP');
+  }
 
-  /* `runway` is computed rather than declared, and the block says so on that cell alone — the other
-     three still read. A tile that showed an em dash with no reason would be indistinguishable from
-     a metric that matched nothing. */
-  const runway = stat.readings.find((r) => r.metric === 'runway')!;
-  assert.equal(runway.reading, null);
-  assert.equal(runway.refusal?.code, 'METRIC_UNKNOWN');
+  /* A RECORD THAT HAS NEVER SNAPSHOTTED HAS NO LINE, and the figure still reads. The sample's ninety
+     days are the browser's; a record's series starts the day its figure is declared. */
+  const cash = stat.readings.find((r) => r.metric === 'cash-now')!;
+  assert.equal(cash.trend, undefined);
+  assert.equal(stat.lead, true);
   sql.close();
 });
 
@@ -277,5 +278,32 @@ test('EVERY FIELD IS REACHABLE BY THE NAME THE SCREEN SHOWS FOR IT', async () =>
   }
   assert.deepEqual(bad, []);
   assert.ok(Object.keys(REGISTERS).length > 1, 'no register was probed, so this asserts nothing');
+  sql.close();
+});
+
+test('THE MONEY PAGE READS WHOLE ON A RECORD, and every walk on it starts from Cash now', async () => {
+  const { k, sql } = await seeded();
+  const money = page(k, 'money');
+  for (const block of money.blocks)
+    assert.deepEqual(block.refusals, [], `${block.kind} "${block.heading ?? ''}": ${block.refusals.map((r) => r.fix).join(' / ')}`);
+
+  const cash = k.metric(k.metricDecl('cash-now')!);
+  assert.ok(cash.ok && cash.value.value !== null);
+  const walks = money.blocks.filter((b) => b.source === 'forecast.runway');
+  assert.equal(walks.length, 2, 'the bridge and the table');
+  for (const walk of walks) assert.equal(walk.walk?.from, cash.value.value, `${walk.kind} does not start from Cash now`);
+
+  /* THE BRIDGE LOOKS THIRTY DAYS AHEAD AND THE TABLE SIX MONTHS, over the same legs. */
+  const bridge = walks.find((b) => b.kind === 'bridge')!;
+  const last = bridge.walk!.steps.at(-1)!.day;
+  assert.ok(last <= '2026-10-03', `the bridge walked to ${last}`);
+
+  /* A REPEATING ROW IS SPENT EVERY TIME IT COMES ROUND: the rent appears in each month of the table's walk. */
+  const table = walks.find((b) => b.kind === 'table')!;
+  const rent = table.walk!.steps.filter((s) => s.label === 'Studio rent');
+  assert.ok(rent.length >= 5, `the rent came round ${rent.length} times in six months`);
+
+  const accounts = money.blocks.find((b) => b.kind === 'cards')!;
+  assert.equal(accounts.rows.length, 3);
   sql.close();
 });

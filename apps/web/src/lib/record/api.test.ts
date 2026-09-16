@@ -27,6 +27,7 @@ import { hrefFor } from './metrics.ts';
 import { AUDIT, JOB, NEWS, NOW, PACKS, PAGES, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
 import type { Column } from 'braindog-render/svelte';
+import { magnitudeOf } from 'braindog-render';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 
@@ -308,7 +309,7 @@ function withExtra<T>(n: number, amount: number, fn: () => T): T {
       seq: next + i,
       /* MONEY, not a bare integer: a filler row written as a number would make every total this
          test reads a MIXED one, and the bar would show the refusal rather than the figure. */
-      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount: gbp(amount), due: '2026-12-01', state: 'open', thing: null, note: '' },
+      fields: { what: `Filler ${i}`, party: 3, direction: 'owed_by_me', amount: gbp(amount), due: '2026-09-20', state: 'open', thing: null, note: '', category: 'software' },
       version: 1,
       created: '2026-01-01T00:00:00.000Z',
       by: 'test',
@@ -328,7 +329,7 @@ test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
   // exists, and the figure is wrong by however many rows did not fit — with nothing on screen that
   // says so, because a total is one line either way.
   withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Owed by you, by counterparty');
+    const block = barOf('money', 'Where it goes, next 30 days');
     assert.ok(block, 'the bar is gone; this test is about the bar');
     assert.ok(block.matched.length > 50, `only ${block.matched.length} rows matched, so the cut was never reached`);
     const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
@@ -341,7 +342,7 @@ test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
 
 test('the rows it DRAWS are still cut, because that half was never the bug', () => {
   withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Owed by you, by counterparty');
+    const block = barOf('money', 'Where it goes, next 30 days');
     assert.ok(block);
     assert.ok(block.entries.length <= (block.limit ?? 50), 'the reading cap stopped applying');
     assert.ok(block.matched.length > block.entries.length, 'nothing was cut, so nothing is being tested');
@@ -395,7 +396,7 @@ test('a gauge keeps its currency when nothing matches', () => {
 
 test('chips count every matching row, and the counts add to the matched total', () => {
   withExtra(80, 100_000, () => {
-    const block = page('money')?.blocks.find((b) => b.kind === 'chips');
+    const block = page('estate')?.blocks.find((b) => b.kind === 'chips');
     assert.ok(block);
     const counted = toSegments(block)
       .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
@@ -407,7 +408,7 @@ test('chips count every matching row, and the counts add to the matched total', 
 test('when there are more groups than fit, the rest is CARRIED, not dropped', () => {
   // The other way to get a wrong total: cut the bars instead of the rows and the figure is short by
   // the tail. A named remainder keeps the sum whole and says out loud that there is more.
-  const block = barOf('money', 'Owed by you, by counterparty');
+  const block = barOf('money', 'Where it goes, next 30 days');
   assert.ok(block);
   const rowsOf = (b: typeof block) =>
     toSegments(b).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
@@ -936,4 +937,30 @@ test('the # column is 8ch for short ids and widens with the digits of the highes
   assert.equal(seqWidth([{ seq: 7 }, { seq: 42 }]), '8ch');
   assert.equal(seqWidth([{ seq: 999 }, { seq: 3 }]), '9ch');
   assert.equal(seqWidth([{ seq: 12345 }]), '11ch');
+});
+
+/* ── the Money page's arithmetic ─────────────────────────────────────────── */
+
+const rowsOfBlock = (block: NonNullable<ReturnType<typeof barOf>>) =>
+  toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
+
+test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
+  const block = barOf('money', 'The next 30 days');
+  assert.ok(block?.walk, 'the bridge has no walk');
+  const rows = rowsOfBlock(block);
+  assert.equal(rows.length, 4);
+  const figure = (cell: string | undefined) => magnitudeOf(cell ?? '') * 100;
+  const [start, arrives, leaves, end] = rows.map((r) => figure(r.cells[1]));
+  assert.equal(start, block.walk.from);
+  assert.ok(arrives! >= 0 && leaves! <= 0);
+  assert.equal(Math.round(start! + arrives! + leaves!), Math.round(end!), 'the rows do not add up');
+  assert.equal(rows[3]?.cells[0], 'In 30 days');
+});
+
+test('A SPLIT GROUPS BY WHAT THE MONEY IS FOR, in the words the screen shows', () => {
+  const block = barOf('money', 'Where it goes, next 30 days');
+  assert.ok(block);
+  const labels = rowsOfBlock(block).map((r) => r.cells[0]);
+  assert.ok(labels.includes('Tax'), `no tax group in ${labels.join(', ')}`);
+  assert.ok(!labels.some((l) => l?.includes('_')), 'a category printed as its id');
 });

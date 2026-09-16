@@ -128,12 +128,12 @@ test('the crossing is ONE row, and the rest of the year is not the same colour',
   // The block is widened for the length of the test because its heading is "What is coming" and
   // twelve movements is what that heading promises — the crossing at day 116 is named by the Runway
   // tile, not by this table. What is under test is the mapping, so the window has to reach it.
-  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway');
+  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'table');
   assert.ok(decl, 'the money page has no cash walk');
   const before = decl.limit;
   decl.limit = 60;
   try {
-    const block = page('money')?.blocks.find((b) => b.source === 'forecast.runway');
+    const block = page('money')?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'table');
     assert.ok(block);
     const at = block.rows.findIndex((r) => r.tone === 'bad');
     assert.ok(at >= 0, 'the widened window does not reach the crossing, so nothing is being tested');

@@ -480,7 +480,7 @@ export type PackInfo = {
  * count of what a block draws is computed. Those two disagreeing is a slice line saying "Showing 5
  * of 38" over a chart with all thirty-eight rows in it.
  */
-export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'section']);
+export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'section', 'split']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

@@ -146,7 +146,7 @@ export type Opened =
   | { from: 'refused'; fix: string };
 
 /** The kinds that add rows up, which a slice of the answer would add up wrong. */
-const REDUCES = new Set(['bar', 'chips', 'gauge']);
+const REDUCES = new Set(['bar', 'chips', 'gauge', 'split']);
 
 /** What a scope cell reads for a row that applies to every project, as the sample says it. */
 const EVERYWHERE = 'Everywhere';
@@ -422,7 +422,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
      did not send, or sent in a shape this cannot read, says it cannot be drawn rather than drawing empty. */
   if (b.source === 'forecast.runway') {
     const walk = walkOf(walked);
-    return walk ? { ...shell, ...walkTable(walk, limit, new Date(now).toISOString().slice(0, 10), false) } : cannot;
+    return walk ? { ...shell, walk, ...walkTable(walk, limit, new Date(now).toISOString().slice(0, 10), false) } : cannot;
   }
   if (b.source === 'activity') {
     const feed = feedOf(fed);

@@ -156,11 +156,11 @@ test('and a metric whose format disagrees with its rows is refused rather than r
 });
 
 test('A BAR WITH A MIXED GROUP SAYS SO IN THAT GROUP, and the others still read', () => {
-  const block = page('money')?.blocks.find((b) => b.heading === 'Owed by you, by counterparty');
+  const block = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
   assert.ok(block, 'the bar is gone; this test is about the bar');
 
   withEuro('obligations', 'amount', overduePayable, () => {
-    const again = page('money')?.blocks.find((b) => b.heading === 'Owed by you, by counterparty');
+    const again = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
     const cells = toSegments(again!)
       .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
       .map((r) => r.cells[1] ?? '');

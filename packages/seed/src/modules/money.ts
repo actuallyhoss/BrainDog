@@ -191,6 +191,19 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
         id: 'category',
         type: 'enum',
         values: ['client_work', 'licensing', 'contractors', 'tax', 'software', 'premises', 'professional', 'production', 'insurance', 'events', 'other'],
+        labels: {
+          client_work: 'Client work',
+          licensing: 'Licensing',
+          contractors: 'Contractors',
+          tax: 'Tax',
+          software: 'Software',
+          premises: 'Premises',
+          professional: 'Professional fees',
+          production: 'Production',
+          insurance: 'Insurance',
+          events: 'Events',
+          other: 'Other',
+        },
         index: true,
       },
       /* THE DAY IT WAS PAID, which is not the day it was due. How late each client pays is the gap. */
@@ -336,56 +349,46 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
 };
 
 export const MONEY_PAGES: Record<string, SeedPage> = {
+  /**
+   * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM (`loop/DIRECTION.md` §2, `research-modules.md`
+   * §2.1). It leads with the money there is, then how long it lasts, then what comes in and goes out;
+   * which way an amount goes is a property of the row, never the frame of the page.
+   *
+   * "i want the headlines to be the money i have, not the money im due/owed" (the owner, in Sam
+   * Brain's own Money screen). So the hero figure is Cash now, read from the accounts, and every walk
+   * on this page starts from that same figure rather than from a balance typed into the page.
+   */
   money: {
     page: 'money',
     title: 'Overview',
     nav: { section: 'Money', order: 10 },
     icon: 'money',
-    requires: ['register.obligations', 'register.people'],
+    requires: ['register.obligations', 'register.accounts', 'register.people'],
     pack: 'money-core',
     blocks: [
       {
+        /* THE HERO, AND THREE FIGURES BESIDE IT. Cash now carries its twelve weeks as a line; the other
+           three are the next thirty days either way, and what goes out every month without anybody
+           deciding again. */
         kind: 'stat',
+        lead: true,
         heading: 'Right now',
         span: 12,
         cells: [
-          { metric: 'owed-to-you', label: 'Owed to you' },
-          { metric: 'due-30d', label: 'Due in 30 days' },
-          { metric: 'overdue', label: 'Overdue to pay' },
-          /* `How long the money lasts` AND IT WAS `Runway`. A stat tile carries four words and a
-             number, so the label IS the explanation: `Runway` is a startup word for a fact every
-             business owner already thinks about in a sentence, and this is that sentence. The
-             metric id stays `runway`, which is what a declaration and a predicate say. */
-          { metric: 'runway', label: 'How long the money lasts' },
+          { metric: 'cash-now', label: 'Cash now', trend: '12w' },
+          { metric: 'in-30d', label: 'Coming in, 30 days' },
+          { metric: 'out-30d', label: 'Going out, 30 days' },
+          { metric: 'every-month-out', label: 'Every month' },
         ],
       },
       {
-        /* Where the money sits, in one line. Grouped and counted, so this is four chips whatever
-           the register grows to — the shape stays readable at thirty-eight rows and at three
-           thousand, which a table of them does not. */
-        kind: 'chips',
-        heading: 'Where it sits',
-        span: 12,
-        columns: [{ field: 'state' }],
-        source: 'register.obligations',
-        empty: 'Nothing owed either way.',
-      },
-      /* THE ONLY BLOCK ON ANY PAGE THAT IS ABOUT THE FUTURE. Sourced from the walk rather than from
-         a register (08 §2.3's `running`): what is liquid, then every dated movement in order, and
-         the balance after each. 05 §2 defers a `forecast` KIND to post-v1 and says the primitive
-         layer exists so it can be drawn without one, so this is an ordinary table over a different
-         source. The day the kind ships, the kind changes and the query does not. */
-      {
-        kind: 'table',
-        heading: 'What is coming',
-        span: 12,
-        columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
+        /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
+           that lands. It walks the same legs as the table below, over a shorter horizon. */
+        kind: 'bridge',
+        heading: 'The next 30 days',
+        span: 5,
         source: 'forecast.runway',
-        /* WHAT THE WALK READS IS DECLARED, not wired: a forecast that knew the word "obligations"
-           would be a forecast that works for one record. `opening` is what is liquid today, and it
-           is a number somebody has to supply — a runway seeded from a balance nobody declared is a
-           forecast that looks like a fact and is a guess. */
-        opening: 500_000,
+        opening: { metric: 'cash-now' },
         from: [
           {
             register: 'obligations',
@@ -393,6 +396,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
             amount: 'amount',
             where: 'state is open or part',
             incoming: { field: 'direction', is: 'owed_to_me' },
+            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
           },
           {
             register: 'services',
@@ -402,101 +406,122 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
             every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
           },
         ],
+        horizon: 30,
+        empty: 'Nothing dated in the next 30 days.',
+      },
+      {
+        /* WHERE THE NEXT THIRTY DAYS' SPENDING GOES, by what it is for. */
+        kind: 'split',
+        heading: 'Where it goes, next 30 days',
+        span: 7,
+        source: 'register.obligations',
+        where: 'state is open or part, direction is owed by me, due before +31d',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        empty: 'Nothing to pay in the next 30 days.',
+      },
+      {
+        /* A NOTE THAT DRAWS ONLY WHEN IT IS TRUE, and says what is due, never what to do about it. */
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Late to you',
+        span: 12,
+        body: 'Money you are owed has gone past its date. The oldest is {{ago:obligations.oldest_overdue}}.',
+        when: { metric: 'late-in', gt: 0 },
+      },
+      {
+        kind: 'note',
+        tone: 'bad',
+        heading: 'Late to pay',
+        span: 12,
+        body: 'Something you owe went past its terms {{ago:obligations.oldest_unpaid}}. Statutory interest may be due; the terms are in the contract.',
+        when: { metric: 'overdue', gt: 0 },
+      },
+      {
+        /* WHAT IS COMING, IN ORDER, WITH THE BALANCE AFTER EACH. The walk starts from Cash now, and a
+           repeating row is spent every time it comes round. */
+        kind: 'table',
+        heading: 'What is coming',
+        span: 12,
+        columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
+        source: 'forecast.runway',
+        opening: { metric: 'cash-now' },
+        from: [
+          {
+            register: 'obligations',
+            on: 'due',
+            amount: 'amount',
+            where: 'state is open or part',
+            incoming: { field: 'direction', is: 'owed_to_me' },
+            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+          },
+          {
+            register: 'services',
+            on: 'renews',
+            amount: 'cost',
+            where: 'state is not cancelled',
+            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+          },
+        ],
+        horizon: 180,
         limit: 12,
         empty: 'Nothing dated in the next six months.',
       },
       {
         kind: 'table',
-        heading: 'Who owes you',
-        span: 12,
+        heading: 'Coming in',
+        span: 6,
         source: 'register.obligations',
         where: 'direction is owed to me, state is open or part',
-        /* NO `#` COLUMN, AND THREE PAGE TABLES LED WITH ONE. Nine characters of spoken id, at the
-           head of a table whose question is who owes me and how much, repeated once per row: on a
-           page a friction pass measured at ninety-three numbers for a question needing two or
-           three, the id is the one column that answers none of it. It is what `y` copies, what the
-           row's own screen prints and what `/audit` leads with, which are the three places somebody
-           wants a number they can say out loud. A block on a page is not one of them. */
         columns: [
-        /* THE LABEL THE REGISTER DECLARES. A page column heads itself with `label ?? field`
-           and `/r/<id>` heads the same field with the register's own `label`, so a page that
-           types its own word makes one field two words. The worst of them was `tasks.by`,
-           which the register calls Due and this called By, over a right-aligned column of
-           dates on a page whose block two above it already said Due. */
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
-          { field: 'party', label: 'Who', width: 'minmax(12ch,20ch)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
-          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
-        /* EACH SIDE OF THE LEDGER SAYS ITS OWN NOTHING. All three blocks on this page read "Nothing
-           outstanding.", so on an empty record the identical sentence printed on both sides — what
-           you are owed and what you owe, told apart by a heading and nothing else. */
-        empty: 'Nobody owes you anything.',
+        empty: 'Nothing is owed to you.',
         limit: 50,
-      },
-      {
-        kind: 'note',
-        tone: 'bad',
-        /* THE HEADING NAMES THE SIDE OF THE LEDGER IT IS ABOUT. "Late" sat immediately below the
-           receivables table and above the payables blocks, so reading downwards it attached to the
-           table it followed and read as *who is late paying you* — while its body says "Something
-           you owe". The same confusion has already bitten this block once: the sentence used to
-           interpolate the age of a receivable under a `when:` gated on payables. The figure was
-           fixed and the heading was the other half of it. */
-        heading: 'Late to pay',
-        span: 5,
-        /* THE SENTENCE IS ABOUT THE RECORD, not about one studio's counterparty. It named a
-           contract the reader has never signed, in the danger colour, on every Money page in every
-           record — and when nothing was overdue it degraded to a raw internal path beside that
-           claim, because the figure it referred to was empty. */
-        /* THE INTERPOLATION CARRIES ITS OWN "ago", so the sentence is written around it rather than into
-           it: "Something is 5w ago past its terms" is not English, and it was on the page. */
-        /* AND IT QUOTES THE AGE OF THE SET THAT MADE IT APPEAR. It read
-           `{{ago:obligations.oldest_overdue}}`, which resolves over money owed TO you, while the
-           `when:` below gates on `overdue` — money owed BY you. So the alarm fired because two
-           payables were late and then printed the age of a receivable: 5w on screen for a record
-           whose oldest overdue payable is nine weeks old. The gate and the figure have to describe
-           one set, and the path is named for which one. */
-        body: 'Something you owe went past its terms {{ago:obligations.oldest_unpaid}}. Statutory interest may be due; the terms are in the contract.',
-        /* AND IT DRAWS ONLY WHEN IT IS TRUE. `when:` was documented and not implemented, so this
-           was `drawn: true` — an alarm that is always on, which is an alarm nobody reads. */
-        when: { metric: 'overdue', gt: 0 },
-      },
-      {
-        kind: 'bar',
-        heading: 'Owed by you, by counterparty',
-        span: 7,
-        columns: [{ field: 'party' }, { field: 'amount' }],
-        source: 'register.obligations',
-        /* THE SAME PREDICATE AS "Who you owe" DIRECTLY BELOW IT. This said `state is open` and that
-           one says `state is open or part`, so two panels about the same thing, one above the other,
-           were about different sets — 63,084 and 82,434. Neither prints a total, so nothing on screen
-           was wrong and the two disagreed anyway, which is the shape of a number somebody quotes from
-           the wrong panel. A part-paid obligation is money still owed. */
-        where: 'direction is owed by me, state is open or part',
-        /* ONE FACT, ONE SENTENCE. This block and "Who you owe" below it share a predicate — the
-           comment above says so — and said the same nothing two ways: "You owe nobody anything."
-           stacked directly over "Nothing outstanding.", with the identical filter printed verbatim
-           under both. On a record in its first week that is the first thing on the money page.
-           `19 §6` Partial is right that an empty block stays; it does not ask for the same nothing
-           said twice. The one below keeps the sentence, because it is the one holding the rows. */
-        empty: 'Nothing to break down.',
       },
       {
         kind: 'table',
-        heading: 'Who you owe',
-        span: 12,
+        heading: 'Going out',
+        span: 6,
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
-          { field: 'due', label: 'Due', width: '15ch', align: 'end' },
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'amount', label: 'Amount', width: '14ch', align: 'end' },
+          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
         ],
         order: [{ field: 'due', dir: 'asc' }],
-        empty: 'Nothing outstanding.',
+        empty: 'Nothing to pay.',
         limit: 50,
+      },
+      {
+        /* WHERE THE LAST YEAR'S MONEY WENT, from the rows that say when they were paid. */
+        kind: 'bar',
+        heading: 'Paid out, last 12 months',
+        span: 7,
+        source: 'register.obligations',
+        where: 'state is paid, direction is owed by me, settled after -12m',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 8,
+        empty: 'Nothing paid out in the last 12 months.',
+      },
+      {
+        /* WHERE THE MONEY IS, one card an account, with the day each balance was true. */
+        kind: 'cards',
+        heading: 'Accounts',
+        span: 5,
+        source: 'register.accounts',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'balance', as: 'figure' },
+          { field: 'kind', label: 'Type', as: 'fact' },
+          { field: 'as_of', label: 'As of', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'asc' }],
+        empty: 'No accounts yet. Add what is in the bank and this page starts from it.',
       },
     ],
   },

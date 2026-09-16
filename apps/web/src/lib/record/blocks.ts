@@ -38,6 +38,7 @@ import { money, parse, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
+import { copy } from '../copy.ts';
 import { declaredValue } from './where.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 
@@ -97,6 +98,30 @@ function barRows(block: BlockResult): string[] {
       : (display(block.register ?? '', of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
     return `${escapeCell(key)} | ${escapeCell(shown)} | `;
   });
+}
+
+/**
+ * A bridge over the cash walk: cash now, what comes in and what goes out over the walk, and where it lands.
+ *
+ * THE WALK IS THE ARITHMETIC, so the rows add up by construction: the end is the walk's last balance,
+ * which is the start plus every movement it made. A walk with no movements still draws the start and
+ * the end, because "nothing moves" is an answer about the next thirty days.
+ */
+function bridgeRows(block: BlockResult): string[] {
+  const walk = block.walk;
+  if (!walk) return [];
+  const currency = walk.currency ?? homeCurrency() ?? null;
+  if (currency === null) return [];
+  const ins = walk.steps.filter((s) => s.delta > 0);
+  const outs = walk.steps.filter((s) => s.delta < 0);
+  const sum = (steps: readonly { delta: number }[]) => steps.reduce((n, s) => n + s.delta, 0);
+  const end = walk.steps.at(-1)?.balance ?? walk.from;
+  return [
+    `${escapeCell(copy.bridgeStart)} | ${money(walk.from, currency)} | `,
+    `${escapeCell(copy.bridgeIn)} | ${money(sum(ins), currency)} | ${escapeCell(copy.bridgeCount(ins.length))}`,
+    `${escapeCell(copy.bridgeOut)} | ${money(sum(outs), currency)} | ${escapeCell(copy.bridgeCount(outs.length))}`,
+    `${escapeCell(copy.bridgeEnd(block.horizon ?? 180))} | ${money(end, currency)} | `,
+  ];
 }
 
 /**
@@ -383,8 +408,10 @@ export function toSegments(block: BlockResult) {
     ? block.metrics.map(
         (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
       )
-    : block.kind === 'bar'
+    : block.kind === 'bar' || block.kind === 'split'
       ? barRows(block)
+      : block.kind === 'bridge' && block.source === 'forecast.runway'
+        ? bridgeRows(block)
       : block.kind === 'chips'
         ? chipsRows(block)
       : block.kind === 'gauge'
@@ -405,7 +432,7 @@ export function toSegments(block: BlockResult) {
     !conflicted &&
     !block.authored?.length &&
     !block.metrics &&
-    !['bar', 'chips', 'gauge', 'cards', 'section'].includes(block.kind) &&
+    !['bar', 'split', 'chips', 'gauge', 'cards', 'section'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
   return projected && block.register
     ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)

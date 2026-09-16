@@ -1543,6 +1543,8 @@ export type BlockResult = PageBlock & {
   seen?: string | null;
   /** A `diff` block's versions of its field, newest first. */
   history?: { at: string; by: string; text: string }[];
+  /** A `forecast.runway` block's walk, which a `bridge` draws from rather than from the table. */
+  walk?: Walk;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1605,6 +1607,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     entries: [],
     matched: [],
     refusals,
+    ...(refusals.length ? {} : { walk }),
     ...walkTable(walk, b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
     drawn: b.drawn ?? drawnWhen(b),
     stale_at: new Date(NOW).toISOString(),
