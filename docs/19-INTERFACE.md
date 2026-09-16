@@ -77,12 +77,47 @@ Nothing else in this document may break those two keystrokes.
 ## 3 · Navigation: a sidebar, and the spine/body split
 
 **A left sidebar above 900 px; a bottom tab bar plus a sheet below it. Rows become cards by default
-below 640 px, and size follows the pointer, never the width. Not a top nav. Not palette-first.**
+below 640 px, and size follows the pointer, never the width. Not a top nav **by default**. Not
+palette-first.**
 
 A top nav cannot hold a **variable-length, sectioned, reorderable** list — and BrainDog's nav is a
 query over `page` rows. A freelancer has four entries; a studio with five packs has eighteen across
 six sections. The moment a horizontal strip needs a "More" dropdown, the thing that varies per
 customer is the thing that is hidden.
+
+### A shape is a choice, and the sidebar is the default
+
+The paragraph above defeats a top nav as the **default**. It does not defeat one as a **choice**
+somebody makes about their own record, and the difference between those two is the whole design.
+A nav of four entries in one section on a wide screen is not the nav that argument is about.
+
+| Shape | What it is | Suits |
+|---|---|---|
+| **Rail** | the left sidebar above, sectioned and arrangeable | the default, and every record with sections |
+| **Rail, collapsed** | icons only, names on hover and on focus, full names when it opens | somebody who wants the width back and knows the icons |
+| **Top bar** | one horizontal strip, spine then declared entries, overflow into More | a small nav, a wide screen, a person who wants vertical space |
+| **Menu** | no persistent nav: one button opens the whole sectioned list as a sheet | the smallest chrome, and anybody who lives in the palette |
+| **Tab bar** | the phone shape, spine plus a sheet | below 900 px, where it is not a choice |
+
+Three conditions keep this from being a way to smuggle the rejected default back in.
+
+**The top bar is offered, never defaulted, and it is honest about what it hides.** It states how
+many entries sit behind More rather than quietly swallowing them, which is the precise failure the
+paragraph above names.
+
+**Below 900 px the tab bar stays, whatever the shape says.** A choice that lets somebody put an
+eighteen-entry top bar on a phone is a choice to break their phone.
+
+**The shape follows the person, so it is the record's, not the cookie's** (§5). Whether the rail is
+collapsed is per-device in `bd_pref`, because a wide monitor and a laptop honestly want different
+answers to that one.
+
+And the design agent **recommends** a shape rather than applying one. It reads what the record
+actually has: how many declared pages, how many sections, how many were opened in the last sixty
+days, whether the nav has been arranged by hand. It answers with one shape and one sentence of why,
+in the holding pen the third rule below already defines: never applied, one click to accept,
+Dismiss terminal, and it never writes nav order. It never recommends a shape it cannot justify from
+the record, because a recommendation with no reason is an advertisement.
 
 Palette-first is a documented failure, not a style: it inverts recognition over recall, and the
 same heuristic set says the quiet part — shortcuts are *"hidden from novice users."* A palette is an
