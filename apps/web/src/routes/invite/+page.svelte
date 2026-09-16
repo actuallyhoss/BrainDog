@@ -89,13 +89,17 @@
              state. Drawn as `error` it set `data-screen="refused"`, and `layout` and `a11y` sweep this route bare,
              so both measured an error card at fifteen widths and reported the screen as never auditable. A token
              the host rejects below is still `error`, because that one is a refusal. -->
-        <Empty kind="no-results" title={copy.inviteNoLink} body={copy.inviteAskNew} />
+        <Empty heading kind="no-results" title={copy.inviteNoLink} body={copy.inviteAskNew} />
       {:else if seen && !seen.ok}
-        <Empty kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
+        <Empty heading kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
       {:else if seen && seen.ok && !joined}
         <div class="calm">
           <span class="glyph"><Icon name="link" size="l" /></span>
-          <p class="calm-title">{copy.inviteLanding}</p>
+          <!-- THE PAGE'S ONE LEVEL-ONE HEADING, in every state it can settle into. While this screen
+               drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
+               it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
+               branches are exclusive, so exactly one of these is ever on the page. -->
+          <h1 class="calm-title">{copy.inviteLanding}</h1>
           <p class="calm-body">{copy.inviteFor(seen.value.email)}</p>
           {#if seen.value.signedInAs}<p class="calm-body">{copy.inviteSignedInAs(seen.value.signedInAs)}</p>{/if}
         </div>
@@ -111,7 +115,7 @@
       {:else if joined}
         <div class="calm">
           <span class="glyph ok"><Icon name="check" size="l" /></span>
-          <p class="calm-title">{copy.inviteJoined}</p>
+          <h1 class="calm-title">{copy.inviteJoined}</h1>
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
         </div>
         <div class="doors">
@@ -188,7 +192,11 @@
   }
 
   .calm-title {
+    /* THE SIZE IS STATED HERE BECAUSE THE TAG CHANGED. This was a `p` and is now the page's `h1`,
+       and a user agent draws an `h1` at `2em` against a paragraph's `1em`, so leaving the size to
+       the default would have doubled this line the moment it became a heading. */
     margin: 0;
+    font-size: var(--t-lg);
     font-weight: 600;
   }
 
