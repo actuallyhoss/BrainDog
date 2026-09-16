@@ -138,20 +138,24 @@ test('A CONTAINS TREE SURVIVES THE QUERY STRING, which is what the register list
   }
 });
 
-test('A SORTED LIST ANSWERS ONE PAGE AND NO CURSOR, and an unsorted one pages', async () => {
-  /* The register list draws a sorted answer as a list that stops, with its cap line, because the
-     record will not page an `order`. What makes that honest is the pair: `cursor: null` so nothing
-     asks for a page that cannot come, and `matched` still the whole answer so the line can say how
-     much is missing. */
+test('A SORTED LIST PAGES IN ITS OWN ORDER, and so does an unsorted one', async () => {
+  /* The record pages an `order` now (f8b68d6): a sorted answer carries a cursor for that order, and
+     following it gives the rest in the same order, with `matched` still the whole answer. */
   const c = await connected();
   try {
     for (const what of ['c', 'a', 'b']) value(await c.client.create({ register: 'obligations', fields: { what } }));
+    const order = [{ field: 'what', dir: 'asc' as const }];
     const sorted = value<{ rows: { fields: { what: string } }[]; matched: number; cursor: string | null }>(
-      await c.client.list({ register: 'obligations', order: [{ field: 'what', dir: 'asc' }], limit: 2 }),
+      await c.client.list({ register: 'obligations', order, limit: 2 }),
     );
     assert.deepEqual(sorted.rows.map((r) => r.fields.what), ['a', 'b']);
     assert.equal(sorted.matched, 3);
-    assert.equal(sorted.cursor, null, 'a sorted answer offered a next page the record will refuse');
+    assert.notEqual(sorted.cursor, null, 'a sorted answer with more rows offered no next page');
+    const rest = value<{ rows: { fields: { what: string } }[]; cursor: string | null }>(
+      await c.client.list({ register: 'obligations', order, limit: 2, cursor: sorted.cursor! }),
+    );
+    assert.deepEqual(rest.rows.map((r) => r.fields.what), ['c']);
+    assert.equal(rest.cursor, null);
 
     const paged = value<{ cursor: string | null }>(await c.client.list({ register: 'obligations', limit: 2 }));
     assert.notEqual(paged.cursor, null, 'an unsorted answer with more rows offered no next page');
