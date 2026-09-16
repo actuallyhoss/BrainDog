@@ -775,7 +775,7 @@ test('A SWITCH ASKS THE RECORD ITSELF, and a name that only folds to a slug open
   const kiosk = value<{ record: string }>(d.provision({ slug: 'the-kiosk', email: 'ada@example.com' })).record;
   on.add(`${kiosk}/${who.body.person}`);
   ok(await d.auth({ flow: 'switch', sid, slug: 'THE-KIOSK' }));
-  for (const slug of ['the-Kiosk', 'the-studıo', 'ｔhe-studio', 'the-studio ', 'x'.repeat(40)]) {
+  for (const slug of ['the-Kiosk', 'the-studıo', 'ｔhe-studio', 'the-studio\u0000', 'x'.repeat(40)]) {
     const folded = await d.auth({ flow: 'switch', sid, slug });
     assert.equal(folded.status, 403, JSON.stringify(slug));
   }
