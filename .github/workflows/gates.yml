@@ -7,16 +7,26 @@ name: gates
 # breakpoint the stylesheets declare, plus three floor widths) and `a11y` is 212 axe audits (every
 # route, two schemes, two widths, plus the site). The other seventeen are seconds.
 #
-# THE CHOICE, MADE EXPLICITLY: on merge to master, on a weekly schedule, on demand, and on a pull
-# request only when it carries the `full-gates` label.
+# THE CHOICE, MADE EXPLICITLY: on a weekly schedule, on demand, and on a pull request only when
+# it carries the `full-gates` label. It ran on every merge to master until 16 September 2026.
 #
 #   - NOT EVERY PULL REQUEST. Nineteen minutes on every push to every branch is a queue, and a
 #     queue is where `continue-on-error` gets added. The measurable cost of not doing it is that a
 #     layout or contrast regression is found after the merge rather than before — on a repository
 #     with one committer and no release, that is a red master for the length of one fix, which is
 #     the cheaper of the two prices.
-#   - MERGE TO MASTER, ALWAYS. Master is the tree everything else is measured against; a green
-#     master is the claim this workflow exists to keep true.
+#   - NOT ON EVERY MERGE TO MASTER ANY MORE, AND THIS IS A BUDGET DECISION RATHER THAN A DESIGN
+#     ONE. The argument for it stands and is worth keeping: master is the tree everything else is
+#     measured against, and a green master is the claim this workflow exists to keep true. What
+#     broke it was the loop pushing several times a day. Each push cancelled the run the previous
+#     push had started, so on 16 September nine runs began and five were cancelled partway, which
+#     spends most of eighteen to thirty minutes each time and proves nothing at all. The owner
+#     said the Actions minutes were running short, and a check that is killed before it finishes
+#     is the worst thing to spend them on.
+#
+#     WHAT IS GIVEN UP, PLAINLY: a layout or contrast regression on master is now found by the
+#     Monday run, by somebody dispatching this by hand, or not until it is in front of a person.
+#     Run it with `gh workflow run gates.yml` before anything that depends on master being green.
 #   - THE LABEL IS THE ESCAPE HATCH, and it is a considered part of the answer rather than a
 #     hedge. A change to `apps/web/src`, `packages/skin` or `tools/gates` is exactly the change
 #     whose breakage these gates catch, and putting `full-gates` on that pull request buys the
@@ -35,8 +45,6 @@ name: gates
 # that can be wrong is a bad trade.
 
 on:
-  push:
-    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   schedule:
