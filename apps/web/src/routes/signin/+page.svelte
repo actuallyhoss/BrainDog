@@ -293,7 +293,7 @@
           <span class="glyph ok"><Icon name="check" size="l" /></span>
           <p class="calm-title">{copy.signedInTitle}</p>
           <p class="calm-who">{view.who.email}</p>
-          <p class="calm-body">{copy.sampleStill}</p>
+          <p class="calm-body">{copy.signedInReads}</p>
         </div>
         {#if added}<p class="status" role="status">{added}</p>{/if}
         <div class="doors">

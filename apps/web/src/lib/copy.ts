@@ -1569,11 +1569,8 @@ export const copy = {
   insecureTitle: 'Sign-in needs a secure address.',
   insecureWhy: "Open this page over https, or at localhost on the server's own computer.",
   signedInTitle: 'You are signed in',
-  /**
-   * WHICH SCREENS MOVED AND WHICH DID NOT. Only the lists read a live record so far, so a sign-in that
-   * let the reader assume the whole app had switched would be claiming work that has not happened.
-   */
-  sampleStill: 'Your lists now read this record. Home, pages and every other screen still show the sample.',
+  /* Every screen reads the record once somebody is signed in; the sample is only for a browser with none. */
+  signedInReads: 'Every screen now reads this record.',
   addPasskeyHere: 'Add a passkey on this device',
   addPasskeyWhy: 'Add one now, so next time you can sign in without the key.',
   addingPasskey: 'Waiting for your device',
