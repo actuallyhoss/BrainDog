@@ -23,7 +23,7 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
-  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { columnsFor, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
@@ -1560,8 +1560,14 @@
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard. */
     if (covered()) return;
-    const el = document.activeElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it. This read
+       INPUT and TEXTAREA only, so a bare key fired over an open select and inside a contenteditable
+       block, both of which `keys.svelte.ts` has always covered.
+
+       IMPORTED UNDER A SECOND NAME BECAUSE THIS FILE ALREADY HAS A `typing`, and it is a debounce
+       handle for the query field rather than anything about fields being focused. Aliasing here is
+       smaller than renaming a local in a file this size that other work may be sitting in. */
+    if (isTyping()) return;
 
     /* THE CHORDS COME FIRST, and the blanket `if (modifier) return` above them was eating four of
        them: `⌘Home`, `⌘End`, `⌘a`, `⌥V` and `⌥B` were all registered in the keymap, printed on `?`,

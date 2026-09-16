@@ -34,7 +34,7 @@
   import { titleOf } from '$lib/title.ts';
   import { day, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
@@ -156,20 +156,28 @@
        this session, so after a commit the number keys still moved a highlight behind the settled
        block and the commit chord was one field away from firing twice. */
     if (!question || question.decided || committed || (from === 'live' && live?.closed)) return;
-    const typing = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
+    /* THE COMMIT CHORD KEEPS THE NARROW TEST, AND THE BARE KEYS BELOW DO NOT. This const is read
+       two ways: below it gates Mod+Enter, where it must be TRUE, and further down it silences bare
+       keys, where it must be FALSE. Widening it would widen both, and the direction that matters is
+       that the one keystroke here writing an immutable row should fire from fewer places rather than
+       more. So the chord keeps this event-target test and the bare keys use `typing()`. */
+    const inField = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
     /* ONLY FROM INSIDE THE REASON FIELD, and only with content — 19 §4's own row. This branch ran
-       before the `typing` test below it, so the one keystroke in this product that writes an
+       before the bare key test below it, so the one keystroke in this product that writes an
        immutable row with a named decider on it fired from anywhere on the page: with focus on
        Cancel, or aimed at another application. A gate this file's header calls "deliberately slower
        than every precedent" had a commit chord that was faster than everything. */
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      if (!typing) return;
+      if (!inField) return;
       e.preventDefault();
       if (committing && reason.trim()) commit();
       return;
     }
-    if (typing) return;
+    /* AND THE ONE TEST FOR TYPING, not a narrower copy. This read the event target for INPUT and
+       TEXTAREA only, so a bare number key moved the highlight while somebody was inside an open
+       select or a contenteditable block. */
+    if (typing()) return;
     if (silenced(e)) return;
 
     const n = Number(e.key);

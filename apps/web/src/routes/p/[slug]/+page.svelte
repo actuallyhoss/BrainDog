@@ -17,7 +17,7 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
@@ -304,8 +304,10 @@
   let cursor = $state(-1);
 
   function onkeydown(e: KeyboardEvent) {
-    const el = document.activeElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it. This read
+       INPUT and TEXTAREA only, so a bare key fired over an open select and inside a contenteditable
+       block. `typing()` covers both, and it is the test `keys.svelte.ts` calls the only one. */
+    if (typing()) return;
     if (e.metaKey || e.ctrlKey) return;
 
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this is the handler the defect
