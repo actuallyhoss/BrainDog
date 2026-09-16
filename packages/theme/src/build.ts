@@ -141,7 +141,12 @@ export const HOUSE_PROFILE: Profile = {
    */
   ladder: {
     dark: { sunk: 0.155, bg: 0.185, s1: 0.215, s2: 0.245, s3: 0.275 },
-    light: { sunk: 0.955, bg: 0.99, s1: 0.994, s2: 0.997, s3: 1 },
+    /* LIGHT CAME DOWN A STEP SO THE RUNGS ABOVE `bg` EXIST. At bg 0.99 the three raised surfaces
+       had one hundredth of L to share with white: s2 on bg measured 1.02:1, against 1.15 in dark, so
+       a selected segment, a hover fill on a card and a loading bar all vanished in light and read in
+       dark. `bg` at 0.972 leaves room for three steps a reader can see, and the panel still reads
+       as paper rather than grey. `sunk` moves with it so the rail stays one decisive step below. */
+    light: { sunk: 0.94, bg: 0.972, s1: 0.982, s2: 0.991, s3: 1 },
   },
   /* 2026-09-16: a grey that is not cold, not a tint anyone can name. At 0.004 no hue is visible. */
   groundC: { dark: 0.004, light: 0.004 },
