@@ -359,9 +359,6 @@ export function display(
   }
 }
 
-/** The second line of a date cell: the band a person actually holds. */
-export const dueBand = (iso: unknown, now: number = NOW): string => (typeof iso === 'string' ? relative(iso, now) : '');
-
 /**
  * The identity of the row a `ref` points at, when its register declares one.
  *
