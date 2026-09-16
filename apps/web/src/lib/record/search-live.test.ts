@@ -97,7 +97,7 @@ test('the page asks through the live source and draws a refusal\'s sentence', ()
   const page = readFileSync(new URL('../../routes/search/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/search-live\.ts'/u);
   assert.doesNotMatch(page, /import \{ search \} from '\$lib\/record\/api\.ts'/u, 'the page searches the sample directly again');
-  assert.match(page, /<Empty kind="error" title=\{answer\.fix\} \/>/u);
+  assert.match(page, /<Empty kind="error" title=\{answer\.fix\}(?: \/>|>)/u);
 });
 
 test('a live search finds the record\'s questions and pages too, asked once for the tab', async () => {

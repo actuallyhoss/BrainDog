@@ -58,13 +58,17 @@
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
   import { METRICS } from '../record/declared.ts';
   import { isTemplate, unreadable } from '../record/metrics.ts';
-  import { AUDIT, NOW, QUESTIONS, REGISTERS, ROWS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
+  import { AUDIT, NOW, QUESTIONS, REGISTERS, entry, iconFor, metric, search, type NavEntry } from '../record/api.ts';
   import { toasts } from '../ui/toast.svelte.ts';
   import Kbd from '../ui/Kbd.svelte';
   import Icon from '../ui/Icon.svelte';
   import type { IconName } from '../ui/Icon.svelte';
   import { commands, type Act } from './admit.ts';
   import { savedViews } from '../record/views.ts';
+  import { listsOf, type List, type Recent } from '../record/palette.ts';
+  import type { Hits, Reader } from '../record/palette-live.ts';
+  import type { Metric } from '../record/api.ts';
+  import { latest } from './latest.ts';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -103,6 +107,35 @@
   let input = $state<HTMLInputElement>();
   let q = $state('');
   let cursor = $state(0);
+
+  /**
+   * THE RECORD WHEN THERE IS ONE, AND THE SAMPLE WHEN THERE IS NOT.
+   *
+   * The lists, their counts and the questions waiting come from the shell, which read them from `boot`. What `boot`
+   * does not carry, the record's search, the rows changed last and the figures, is asked of the record through
+   * `record/palette-live.ts`, loaded the first time a live palette needs it. The sample's palette never loads it.
+   */
+  const shell = $derived(page.data as { live?: boolean; now?: number; index?: { registers?: List[] }; questions?: { id: string; title: string }[] });
+  const isLive = $derived(shell.live === true);
+  const lists = $derived(listsOf(isLive, shell.index?.registers ?? []));
+  const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
+
+  let reading: Promise<Reader> | null = null;
+  const reader = (): Promise<Reader> =>
+    (reading ??= import('../record/palette-live.ts').then((m) => m.paletteReader(page.url.origin)));
+
+  /**
+   * THE RECORD'S HITS, FOR THE TEXT THEY ANSWER, and never for any other.
+   *
+   * A live search is a request, so the list is drawn from `found` only while `found.text` is what the box says. Typing
+   * on past it hides the old hits at once, and `latest` drops the answer to any question the box has moved on from, so
+   * a slow reply to `fen` can never land over `fenwick`.
+   */
+  let found = $state<{ text: string; hits: Hits } | null>(null);
+  const asking = latest((text: string) => reader().then((r) => r.find(text, RECORD_CAP)), 120);
+
+  /** The rows changed last and the figures, read once each time a live palette opens. */
+  let extra = $state<{ recent: Recent[]; figures: Metric[] } | null>(null);
 
   /** Which register `@` narrows to. Named once, so the footer's promise and the filter cannot drift. */
   const PEOPLE = 'people';
@@ -157,7 +190,7 @@
     [copy.destinations]: 6,
     [copy.commands]: 7,
   };
-  const REGISTER_NAMES = new Set(Object.values(REGISTERS).map((r) => r.name));
+  const REGISTER_NAMES = $derived(new Set([...Object.values(REGISTERS).map((r) => r.name), ...lists.map((l) => l.name)]));
   const rankOf = (group: string): number => RANK[group] ?? (REGISTER_NAMES.has(group) ? 1 : 5);
 
   /**
@@ -217,6 +250,50 @@
    * simply built again.
    */
   const live = $derived({ undoable: toasts.items.some((t) => t.undo !== undefined) });
+
+  /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
+  const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
+
+  /**
+   * What the search answered for the text in the box, or `null` while the record has not answered it yet.
+   *
+   * THE SAMPLE ANSWERS AT ONCE, as it always has, so a demo never waits a frame for its own rows.
+   */
+  const hits = $derived.by((): Hits | null => {
+    if (!searching) return null;
+    if (!isLive) return { value: search(parsed.text, RECORD_CAP), fix: null };
+    return found?.text === parsed.text ? found.hits : null;
+  });
+
+  /** A live query the record has not answered yet. The panel stays quiet rather than saying nothing matched. */
+  const pending = $derived(searching && hits === null);
+
+  $effect(() => {
+    if (!open || !isLive || !searching) {
+      asking.cancel();
+      return;
+    }
+    const text = parsed.text;
+    asking.ask(text, (answer) => (found = { text, hits: answer }));
+    return () => asking.cancel();
+  });
+
+  $effect(() => {
+    if (!open || !isLive) return;
+    let gone = false;
+    const known = lists;
+    reader()
+      .then((r) => Promise.all([r.recent(known, RECENT_CAP), r.figures()]))
+      .then(
+        ([recent, figures]) => {
+          if (!gone) extra = { recent, figures };
+        },
+        () => {},
+      );
+    return () => {
+      gone = true;
+    };
+  });
 
   /**
    * How many rows the record matched, beside how many of them are drawn.
@@ -278,7 +355,7 @@
     const spoken = SPOKEN.exec(text.toUpperCase());
     const qualified = QUALIFIED.exec(text);
     if (spoken) out.push({ id: 'spoken', title: text.toUpperCase(), detail: copy.openById, href: `/${text.toUpperCase()}`, group: copy.records, icon: 'arrow' });
-    if (qualified) out.push({ id: 'qualified', title: text, detail: `${REGISTERS[qualified[1]!]?.name ?? qualified[1]} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
+    if (qualified) out.push({ id: 'qualified', title: text, detail: `${listNamed.get(qualified[1]!)?.name ?? REGISTERS[qualified[1]!]?.name ?? qualified[1]} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
 
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that
     // keeps a growing action index from rotting (19 §7).
@@ -338,11 +415,11 @@
           complete: v.name,
         });
       }
-      for (const r of Object.values(REGISTERS))
+      for (const r of lists)
         if (starts(r.name))
           /* The count, not a definition of the word "register". A row that explains the app's own
              vocabulary is a row nobody needed, and it was doing it in every search. */
-          out.push({ id: `r-${r.id}`, title: r.name, detail: `${(ROWS[r.id] ?? []).length} rows`, href: `/r/${r.id}`, group: copy.pages, icon: iconFor(r.icon, 'rows'), complete: r.name });
+          out.push({ id: `r-${r.id}`, title: r.name, detail: `${r.count} rows`, href: `/r/${r.id}`, group: copy.pages, icon: r.icon, complete: r.name });
     }
 
     /**
@@ -359,7 +436,11 @@
      * declaration this build cannot evaluate. Neither is greyed out, and neither prints the record's
      * missing-value dash on a surface somebody is scanning at speed.
      */
-    if (prefix === null || prefix === '/') {
+    if ((prefix === null || prefix === '/') && isLive) {
+      for (const read of extra?.figures ?? [])
+        if (starts(read.label) && read.href)
+          out.push({ id: `m-${read.id}`, title: read.label, value: read.value, detail: read.note, tone: read.tone, href: read.href, group: FIGURES, icon: 'observe', complete: read.label });
+    } else if (prefix === null || prefix === '/') {
       for (const [id, decl] of Object.entries(METRICS)) {
         if (!starts(decl.name)) continue;
         if (isTemplate(decl) || unreadable(decl).length > 0) continue;
@@ -394,7 +475,10 @@
      * Only with an empty query, for the same reason the questions below it are: past that `search()`
      * is already answering, and a second source for the same rows would draw each of them twice.
      */
-    if (prefix === null && text === '') {
+    if (prefix === null && text === '' && isLive) {
+      for (const r of extra?.recent ?? [])
+        out.push({ id: `n-${r.target}`, title: r.title, detail: `${r.list} · ${since(r.at, shell.now ?? Date.now())}`, href: r.href, group: RECENT, spoken: r.spoken, icon: r.icon, complete: r.title });
+    } else if (prefix === null && text === '') {
       const seen = new Set<string>();
       for (const event of AUDIT) {
         if (seen.size >= RECENT_CAP) break;
@@ -437,7 +521,7 @@
      * source for the same rows would draw each of them twice.
      */
     if (prefix === null && text === '')
-      for (const question of QUESTIONS.slice(0, OPEN_CAP))
+      for (const question of (isLive ? (shell.questions ?? []) : QUESTIONS).slice(0, OPEN_CAP))
         out.push({ id: `q-${question.id}`, title: question.title, detail: OPEN_QUESTION, href: `/decide/${question.id}`, group: copy.decide, spoken: question.id, icon: 'decide', complete: question.title });
 
     /* `@` IS PEOPLE, AND IT MATCHED NOTHING. The footer of this palette prints `@ people` and this
@@ -445,8 +529,8 @@
        was guarded on a prefix that is not `@`, so typing a colleague's name behind it fell straight
        through to "Nothing matches". The record has a people register; the search already reaches it;
        the only thing missing was the register this prefix narrows to. */
-    if ((prefix === null || prefix === '#' || prefix === '@') && text.length > 1) {
-      const found = search(text, RECORD_CAP);
+    if (hits !== null) {
+      const found = hits.value;
       /* PAGES ARE DRAWN ONCE. `search()` reaches the nav pages too, and the branch above has already
          listed every one of them under their own heading, so an unprefixed query drew each matching
          page twice: once as a page and once as a record hit. The hits are what gets dropped rather
@@ -543,7 +627,7 @@
      * destination listed, and a confident number about a list nobody asked for. A status line is
      * the answer to a question; with no question there is no answer, and the silence is correct.
      */
-    const said = !parsed.text ? '' : drawn > 0 ? copy.showingOf(drawn, total) : flat.length > 0 ? copy.showingOf(flat.length, flat.length) : '';
+    const said = !parsed.text || pending ? '' : drawn > 0 ? copy.showingOf(drawn, total) : flat.length > 0 ? copy.showingOf(flat.length, flat.length) : '';
     const t = setTimeout(() => (announced = said), 250);
     return () => clearTimeout(t);
   });
@@ -786,7 +870,7 @@
     reader who heard both would hear every heading twice.
   -->
   <div class="p-body">
-    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel}>
+    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
       {#each groups as [group, items]}
         <div role="group" aria-label={group}>
           <p class="p-group" aria-hidden="true">{group}</p>
@@ -797,13 +881,13 @@
       {/each}
       {#if overflow}{@render result(overflow)}{/if}
     </div>
-    {#if flat.length === 0}
+    {#if flat.length === 0 && !pending}
       <!-- A query matching nothing falls through to a fallback row when a model is configured.
            Without one the row, the status call and every "Ask BrainDog" button do not exist: ABSENT,
            not disabled (23 §8). This record has no model, so this is what you get.
 
            OUTSIDE THE LISTBOX, because it is a sentence about the list rather than a row in it. -->
-      <p class="p-none">{copy.noMatches} “{q}”</p>
+      <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
     {/if}
   </div>
 
@@ -812,7 +896,7 @@
        `@ people` goes when the record has no people register, because a prefix that narrows to a
        list this record does not hold is an instruction that cannot be followed. -->
   <footer class="p-foot">
-    <span class="p-hint">&gt; commands · # rows{REGISTERS[PEOPLE] ? ' · @ people' : ''} · / pages</span>
+    <span class="p-hint">&gt; commands · # rows{listNamed.has(PEOPLE) ? ' · @ people' : ''} · / pages</span>
   </footer>
 </dialog>
 

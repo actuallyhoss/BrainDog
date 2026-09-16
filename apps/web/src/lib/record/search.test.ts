@@ -188,7 +188,8 @@ test('A TYPED QUERY THAT CANNOT BE ONE MATCHES NOTHING, AND AN EMPTY ONE IS NOT 
    * which is the same answer `ftsQuery` gives the record.
    */
   assert.match(PALETTE, /if \(!want\) return text\.trim\(\) === '';/u, 'a punctuation-only query matches everything again');
-  assert.match(PALETTE, /const said = !parsed\.text \? ''/u, 'an unopened question is answered with a number');
+  /* `|| pending`: a live query the record has not answered yet says nothing either, not a count of a list still arriving. */
+  assert.match(PALETTE, /const said = !parsed\.text(?: \|\| pending)? \? ''/u, 'an unopened question is answered with a number');
   /* And the record agrees: a query with no letters and no digits is not a query. */
   assert.equal(ftsQuery('?'), null);
   assert.equal(search('?', 9_999).total, 0);
