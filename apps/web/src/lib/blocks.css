@@ -1815,6 +1815,15 @@
     inset-inline-start: 0;
   }
 
+  /* AN IDENTIFIER IS QUIET, in the id face, as a register's `#seq` and a card's already are. Only an
+     identifier truncates in the middle, so the declaration already says which cells these are; a
+     backlink table and a saved view ended every row on `#6` in full ink, the loudest cell in it. */
+  .td[data-truncate='middle'] {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
   /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
   .td[data-truncate='never'] {
     overflow: visible;
