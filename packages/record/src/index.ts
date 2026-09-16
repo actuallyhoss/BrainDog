@@ -1979,7 +1979,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          through a method that names no register and therefore ran no ceiling check. `list` refuses
          that register, `boot` hides it, and the digest was taught the same lesson one commit
          earlier; the gate is the last read that had not been. */
-      return ok(rows.value.filter((r) => !holds(ctx, r)));
+      const kept = rows.value.filter((r) => !holds(ctx, r));
+      if (kept.length === rows.value.length) return ok(kept);
+      /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
+         scoped to one register was handed an empty page whenever the newest fifty were about
+         another, with its own questions still open behind them. */
+      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true });
+      if (!every.ok) return every;
+      return ok(every.value.filter((r) => !holds(ctx, r)).slice(0, rows.value.length));
     },
 
     /**

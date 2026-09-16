@@ -521,3 +521,16 @@ test('THE DECIDE COUNT IS EVERY OPEN QUESTION, past two hundred, and what waits 
   assert.equal(scoped.waiting.length, 1, 'the one question the token may see was crowded out of what waits');
   sql.close();
 });
+
+test('A PAGE OF GOVERNANCE IS FILLED FROM WHAT THE CALLER MAY SEE, not trimmed first and filtered after', async () => {
+  const { api, sql } = await record();
+  value(await api.propose({ question: 'File Invoice 1?', body_kind: 'rowset', body: { register: 'obligations', rows: [{ what: 'Invoice 1' }] } }, owner));
+  for (let i = 0; i < 60; i++)
+    value(await api.propose({ question: `Note ${i}?`, body_kind: 'rowset', body: { register: 'diary', rows: [{ body: `Note ${i}` }] } }, owner));
+
+  const seen = value<Record<string, unknown>[]>(await api.governance({}, project));
+  assert.equal(seen.length, 1, 'fifty rows the token may not see took the whole page');
+  assert.equal(value<Record<string, unknown>[]>(await api.governance({ limit: 5 }, owner)).length, 5);
+  assert.equal(value<Record<string, unknown>[]>(await api.governance({}, owner)).length, 50);
+  sql.close();
+});
