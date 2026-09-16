@@ -114,7 +114,21 @@
    */
   $effect(() => watchKeyboard(window));
 
-  let railOff = $state(pref.read().sidebar === false);
+  /**
+   * THE RAIL AT ITS NARROW WIDTH, WHICH IS WHAT "COLLAPSED" MEANS TO EVERYBODY WHO SAYS IT.
+   *
+   * This was `railOff`, and `sidebar: false` took the entire rail out of the shell and left one
+   * button in an empty gutter. Two things were wrong with that. It is not the state people ask for
+   * — a collapsed sidebar is the one that keeps its glyphs — and it stranded anybody who pressed
+   * the chord by accident, because the preference persists and the only ways back were a second
+   * chord, the palette, or noticing a 40px gutter with one control in it.
+   *
+   * SO THE SAME PREFERENCE NARROWS THE RAIL INSTEAD. Every row survives, the spine survives, the
+   * record switcher survives, and `Sidebar` gives the names back on hover and on focus. There is
+   * nothing to strand somebody with, so there is nothing to rescue them from either, and the
+   * restore button that used to live in the gutter is gone with the state that needed it.
+   */
+  let railIcons = $state(pref.read().sidebar === false);
 
   /**
    * The bar saying this is a sample record, and the way out of it.
@@ -144,8 +158,8 @@
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
   function toggleRail() {
-    railOff = !railOff;
-    pref.write({ sidebar: !railOff });
+    railIcons = !railIcons;
+    pref.write({ sidebar: !railIcons });
   }
   const go = new GoPrefix();
 
@@ -181,10 +195,13 @@
       return;
     }
 
-    /* `⌘\` — the rail folds to nothing and the work takes the width. Not a narrow icon rail:
-       19 §3's whole argument is that this nav is a QUERY over `page` rows whose length varies per
-       customer, and a strip of unlabelled icons is where a variable-length sectioned list goes to
-       become unreadable. Hidden, with `g` and the palette still reaching everything. */
+    /* `⌘\` — the rail narrows to its glyphs and the work takes the width.
+       IT USED TO FOLD TO NOTHING, on the argument that `19 §3` forbids an icon rail. That is not
+       what §3 says. §3 argues that a nav which is a QUERY over `page` rows, variable in length and
+       sectioned, cannot be the kind of thing a strip of UNLABELLED icons holds — and it is arguing
+       about the DEFAULT. This is neither: it is a state a person chooses, it keeps the sections and
+       the order, and every glyph says its name on hover and on focus. What §3 does rule out is what
+       was built instead, a nav with nothing in it at all. */
     if (mod && e.key === '\\') {
       e.preventDefault();
       toggleRail();
@@ -261,9 +278,11 @@
        first third. That is the artefact somebody hands an accountant. -->
   <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
-  <div class="shell" data-rail={railOff ? 'off' : undefined}>
+  <div class="shell" data-rail={railIcons ? 'icons' : undefined}>
     <div class="rail-slot">
       <Sidebar
+        icons={railIcons}
+        ontoggle={toggleRail}
         nav={data.nav}
         pen={data.pen}
         record={data.index.name}
@@ -273,13 +292,6 @@
         open={data.open}
         inbox={data.inbox}
       />
-    </div>
-
-    <!-- The way back, and the only chrome that appears when the rail does not. -->
-    <div class="rail-back">
-      <button type="button" class="tap" onclick={toggleRail} aria-label={copy.showSidebar} title={copy.showSidebar}>
-        <Icon name="rows" size="s" />
-      </button>
     </div>
 
     <!--
@@ -489,97 +501,21 @@
   /* Rail on the darker ground, work on the lighter one, one hairline between them, and no inset
      panel: nothing floats, so nothing needs a shadow to explain why it floats. The work area is the
      ONE scroll container, so the rail never moves and the window shows exactly one scrollbar. */
+  /**
+   * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS.
+   *
+   * There were four rules here and a `--rail-back` variable, all of them arithmetic for the state
+   * where the rail was gone: a grid that had to be rewritten to one column, a 40px gutter for the
+   * restore button, and a note recording that the first version of the fix reproduced its own bug
+   * one breakpoint down. None of it is needed to make a rail narrower. `auto` measures whatever the
+   * rail says it is, so the collapsed width is the rail's own declaration and this grid never has
+   * to know which state it is in.
+   */
   .shell {
     display: grid;
-    /* `--rail-back` is 0 while the rail is here and the width of one control while it is not, so the
-       two states are one declaration rather than two grids that can disagree. */
-    --rail-back: 0px;
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
-  }
-
-  @media (width >= 900px) {
-    .shell[data-rail='off'] {
-      --rail-back: 40px;
-    }
-  }
-
-  /**
-   * HIDING THE RAIL LEFT THE COLUMN IT LIVED IN.
-   *
-   * `display: none` takes the rail out of flow, and `.body` — now the first in-flow grid item —
-   * lands in the `auto` track, which sizes to its own content. Measured at a 1,536px window:
-   * `grid-template-columns: 692.75px 843.25px`. The whole app rendered in 45% of the window with a
-   * dead strip of ground beside it, on the one gesture whose entire purpose is to give the work the
-   * width.
-   *
-   * One column when there is one column.
-   */
-  /* AND SCOPED TO THE WIDTH THE RAIL EXISTS AT, because the first version of this fix reproduced
-     the bug it fixed, one breakpoint down. `.shell[data-rail='off']` is (0,2,0) and the phone rule
-     below is (0,1,0), so an unscoped declaration here outranked it — while `--rail-back` was scoped
-     to `>= 900px` and stayed `0px`. Below 900 the grid became `0px 1fr` and `.body`, the only
-     in-flow item, auto-placed into the ZERO track: measured 0px wide at both 899 and 390, on a
-     preference that persists in a cookie. A register rendered thirty-eight cards into nothing. */
-  @media (width >= 900px) {
-    .shell[data-rail='off'] {
-      grid-template-columns: var(--rail-back) minmax(0, 1fr);
-    }
-  }
-
-  .shell[data-rail='off'] .rail-slot {
-    display: none;
-  }
-
-  /**
-   * AND ONE WAY BACK, because `⌘\` is reachable by accident and the state is a cookie.
-   *
-   * With the rail gone, a sweep of every visible control on `/vault` returned six: the six *Reveal
-   * once* buttons. No nav, no menu, no mark, nothing to restore it — and `pref` had already written
-   * `sidebar: false`, so reloading does not clear it. A person who hits the chord by accident is
-   * stranded unless they happen to know `⌘\`, `?` or `⌘K`.
-   *
-   * NOT THE ICON RAIL THE CHORD'S OWN COMMENT REJECTS. `19 §3`'s argument is about the NAV — a query
-   * over `page` rows whose length varies per customer, which a strip of unlabelled glyphs makes
-   * unreadable. This is not the nav. It is one control, in the gutter the nav used to start in, that
-   * does exactly one thing and says so; the same shape as the launcher in the opposite corner.
-   *
-   * It is 40px wide and only above 900px: below that the rail is already gone and the tab bar is the
-   * nav, so a restore control would be offering to bring back something that was never taken.
-   */
-  .rail-back {
-    display: none;
-  }
-
-  @media (width >= 900px) {
-    .shell[data-rail='off'] .rail-back {
-      display: flex;
-      align-items: start;
-      justify-content: center;
-      padding-block-start: var(--sp-3);
-      background: var(--s1);
-      border-inline-end: 1px solid var(--line);
-    }
-  }
-
-  .rail-back button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: var(--ctl-h);
-    block-size: var(--ctl-h);
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    cursor: pointer;
-  }
-
-  .rail-back button:hover {
-    background: var(--s2);
-    color: var(--ink);
   }
 
   /* THE SAMPLE BAR. A note, not an alarm: nothing is wrong and nothing is urgent, and the day it

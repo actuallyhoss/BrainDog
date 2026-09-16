@@ -51,6 +51,8 @@
     registers,
     open = 0,
     inbox = 0,
+    icons = false,
+    ontoggle,
   }: {
     nav: NavEntry[];
     pen: PageDecl[];
@@ -61,7 +63,38 @@
     registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string }[] }[];
     open?: number | undefined;
     inbox?: number | undefined;
+    /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
+    icons?: boolean | undefined;
+    ontoggle?: (() => void) | undefined;
   } = $props();
+
+  /**
+   * ── THE NAME OF THE THING UNDER THE POINTER ────────────────────────────────
+   *
+   * A glyph on its own is a guess, so the narrow rail owes a reader the name back the moment they
+   * ask for it — and asking is hovering OR reaching it with the keyboard, which is why this is not
+   * a `:hover` rule and not `title`. `title` never fires for a keyboard, and a CSS flyout is
+   * clipped by `.scroll`, which has to keep `overflow-y: auto` because the nav is longer than the
+   * window on any real record.
+   *
+   * THE NAME IS STILL IN THE DOM EITHER WAY. `.item-name` is hidden the way a screen reader can
+   * still read it, so nothing here is the accessible name of anything: this is a second copy for
+   * the eye, `aria-hidden`, and the row keeps the name it always had.
+   *
+   * ONE ELEMENT, DELEGATED, because the alternative is a flyout per row and this rail draws
+   * thirty. Only the vertical coordinate needs measuring; the horizontal edge is the rail's own
+   * width, which CSS already knows.
+   */
+  let fly = $state<{ label: string; y: number } | null>(null);
+
+  const flyAt = (target: EventTarget | null) => {
+    const el = (target as HTMLElement | null)?.closest?.('[data-label]');
+    /* THE UTILITY STRIP ASKS FOR THIS AT BOTH WIDTHS, because four glyphs in a row at the foot are
+       icon-only even when the rail is open. Everything else says its own name until it stops. */
+    if (!el || !(icons || el.classList.contains('util'))) return (fly = null);
+    const box = el.getBoundingClientRect();
+    fly = { label: el.getAttribute('data-label') ?? '', y: Math.round(box.top + box.height / 2) };
+  };
 
   /**
    * ── REORDER WITHOUT A MOUSE ────────────────────────────────────────────────
@@ -210,11 +243,14 @@
    * exactly when a reader is most likely to need it.
    */
   const openHere = (entries: NavEntry[]) => entries.some((e) => here(e.href));
-  const isShut = (section: string, entries: NavEntry[]) => shut.has(section) && !openHere(entries);
+  /* AND NOTHING IS FOLDED IN THE NARROW RAIL, because folding is a heading and the narrow rail has
+     no headings to press. A section that stayed shut there would be rows a reader could not get
+     back without widening the rail first, which is the all-or-nothing trap one level down. */
+  const isShut = (section: string, entries: NavEntry[]) => !icons && shut.has(section) && !openHere(entries);
 
   /* The registers are not a declared section, so they carry their own test: the same rule, over the
      one list this rail draws without asking `arrange` for it. */
-  const listsShut = $derived(shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
+  const listsShut = $derived(!icons && shut.has(copy.lists) && !registers.some((r) => under(`/r/${r.id}`)));
 
   /* AND THE SECTION ITSELF GOES WHEN THERE IS NOTHING UNDER IT. A heading over an empty group is a
      fold that opens onto nothing, which is worse than the eight links it replaced. */
@@ -223,15 +259,33 @@
   void ({} as RegisterDecl);
 </script>
 
-<nav class="rail" aria-label="Record" bind:this={rail}>
-  <!-- No lockup. The mark is the red circle in the bottom-right corner, where it is an affordance
-       rather than a caption, and the record switcher takes the space it used to occupy. The name of
-       the thing you are inside is worth more here than the name of the software you are inside: you
-       chose the software once, and you switch records every day. -->
-  <div class="top">
+<nav
+  class="rail"
+  aria-label="Record"
+  data-icons={icons ? '' : undefined}
+  bind:this={rail}
+  onpointerover={(e) => flyAt(e.target)}
+  onpointerleave={() => (fly = null)}
+  onfocusin={(e) => flyAt(e.target)}
+  onfocusout={() => (fly = null)}
+>
+  <!--
+    THE RECORD SWITCHER, AND IT HAS MOVED TO THE FOOT.
+
+    It sat at the top of the rail, in the first position anybody's eye lands on, drawn as the
+    largest thing in the column — and it is the least-pressed control in it. Most people have one
+    record and will press this never; the three rows it was pushing down are the three surfaces
+    whose absence would make this a different product. The name of the thing you are inside is
+    still worth showing, so it keeps its tile and its name; it keeps them at the bottom, where
+    every other product puts the identity you rarely change.
+
+    NO LOCKUP EITHER WAY. The mark is the red circle in the corner, where it is an affordance
+    rather than a caption.
+  -->
+  {#snippet switcher()}
     <Menu label={copy.switchRecord}>
       {#snippet trigger()}
-        <span class="record">
+        <span class="record" data-label={record || copy.switchRecord}>
           {#if record}
             <span class="record-avatar" aria-hidden="true">{record.slice(0, 1)}</span>
             <span class="record-name">{record}</span>
@@ -294,26 +348,56 @@
       <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>
       <a class="mi" role="menuitem" href="/start"><Icon name="plus" size="s" />{copy.newRecord}</a>
     </Menu>
+  {/snippet}
+
+  <!--
+    THE WIDTH CONTROL, WHICH WAS A CHORD AND NOTHING ELSE.
+
+    `⌘\` has always toggled the rail and is in the `?` sheet, and a keyboard shortcut is not a
+    control: nothing on the screen said the rail had two widths, so the only people who knew were
+    the ones who had read the sheet. It is a button at the head of the rail now, the place every
+    reader of this kind of software already looks for one, and the chord still works.
+
+    IT SAYS WHAT IT WILL DO, NOT WHAT HAPPENED. "Collapse the sidebar" and "Show the sidebar" are
+    two whole sentences rather than one word that flips, because the name is what a screen reader
+    announces and "Toggle" tells nobody which way they are about to go.
+  -->
+  <div class="top">
+    <button
+      type="button"
+      class="collapse tap"
+      data-label={icons ? copy.showSidebar : copy.collapseSidebar}
+      aria-label={icons ? copy.showSidebar : copy.collapseSidebar}
+      title={icons ? copy.showSidebar : copy.collapseSidebar}
+      onclick={() => ontoggle?.()}
+    >
+      <Icon name="chevron" size="s" />
+    </button>
   </div>
 
   <!-- The spine. Home, Decide and Inbox are the three surfaces whose absence would make this a
        different product, so no pack may add to it, reorder it or badge it. -->
   <ul class="group spine">
     <li>
-      <a class="item tap" href="/" aria-current={here('/') ? 'page' : undefined}>
+      <a class="item tap" href="/" data-label={copy.home} aria-current={here('/') ? 'page' : undefined}>
         <Icon name="home" size="m" /><span class="item-name">{copy.home}</span>
       </a>
     </li>
     <li>
-      <a class="item tap" href="/decide" aria-current={under('/decide') ? 'page' : undefined}>
+      <a class="item tap" href="/decide" data-label={copy.decide} aria-current={under('/decide') ? 'page' : undefined}>
         <Icon name="decide" size="m" /><span class="item-name">{copy.decide}</span>
-        {#if open}<span class="count" data-intent="warn">{open}</span>{/if}
+        <!-- ONE TREATMENT FOR EVERY NUMBER IN THIS RAIL. These two were bordered pills and the
+             registers' were bare tabular figures, so the same fact — how many rows are behind this
+             row — was drawn two ways in one column, and the pill read as an alert rather than a
+             count. The figure is quiet everywhere and the INTENT carries the difference, which is
+             the one thing that really is different about the questions waiting on you. -->
+        {#if open}<span class="tally num" data-intent="warn">{open}</span>{/if}
       </a>
     </li>
     <li>
-      <a class="item tap" href="/inbox" aria-current={under('/inbox') ? 'page' : undefined}>
+      <a class="item tap" href="/inbox" data-label={copy.inbox} aria-current={under('/inbox') ? 'page' : undefined}>
         <Icon name="inbox" size="m" /><span class="item-name">{copy.inbox}</span>
-        {#if inbox}<span class="count">{inbox}</span>{/if}
+        {#if inbox}<span class="tally num">{inbox}</span>{/if}
       </a>
     </li>
   </ul>
@@ -330,6 +414,7 @@
               class="item tap"
               href={entry.href}
               data-nav={entry.href}
+              data-label={label}
               aria-current={here(entry.href) ? 'page' : undefined}
               style={entry.hue === undefined ? undefined : `--hue:${entry.hue}`}
               data-hued={entry.hue === undefined ? undefined : ''}
@@ -371,6 +456,13 @@
            the section was collapsed and then walked into every link in it. Nothing in this
            repository defines `[hidden]`, so the attribute has never worked on a styled element
            here. -->
+      <!-- A HEADING WITH NOWHERE TO PUT ITS WORDS IS A HAIRLINE, and it is not an empty `<h2>`: a
+           heading whose text is hidden is a heading with no accessible name, which is a defect
+           rather than a narrow rail. A rule says the one thing left to say at this width, that
+           these rows belong together, and claims nothing it cannot draw. -->
+      {#if icons}
+        <hr class="sep" />
+      {:else}
       <h2 class="section">
         <button
           type="button"
@@ -384,6 +476,7 @@
           {section}
         </button>
       </h2>
+      {/if}
       <ul class="group" data-shut={folded ? '' : undefined} inert={folded || undefined} aria-hidden={folded || undefined}>
         {#each entries as entry}
           <li>
@@ -397,6 +490,9 @@
     <!-- The registers themselves. Native, never pack-positioned: a page can be uninstalled with the
          pack that declared it, and the collections underneath it still have to be reachable. -->
     {#if anyList}
+    {#if icons}
+      <hr class="sep" />
+    {:else}
     <h2 class="section">
       <button type="button" class="fold" aria-expanded={!listsShut} onclick={() => fold(copy.lists)}>
         <span class="fold-mark" aria-hidden="true" data-shut={listsShut ? '' : undefined}>
@@ -405,13 +501,14 @@
         {copy.lists}
       </button>
     </h2>
+    {/if}
     <ul class="group" data-shut={listsShut ? '' : undefined} inert={listsShut || undefined} aria-hidden={listsShut || undefined}>
       <!-- Every list this rail is given, and it is given only the ones that hold something: the
            filter is on `index.registers` in `api.ts`, because the phone's More sheet draws the same
            list and the two must not be able to disagree. -->
       {#each registers as r}
         <li>
-          <a class="item tap" href="/r/{r.id}" aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
+          <a class="item tap" href="/r/{r.id}" data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
             <Icon name={r.icon} size="m" />
             <span class="item-name">{r.name}</span>
             <span class="tally num">{r.count}</span>
@@ -438,7 +535,7 @@
            returns it to its stored order, never to the end of the list (19 §3). -->
       <!-- The one row in this rail that had no glyph, sitting between groups that all have one.
            This file's own header argues against exactly that. -->
-      <a class="pen tap" href="/settings/navigation">
+      <a class="pen tap" href="/settings/navigation" data-label={copy.suggested}>
         <Icon name="alert" size="m" />
         <span class="pen-text">{pen.length === 1 ? copy.suggestedPage : `${pen.length} suggested pages.`}</span>
         <span class="pen-action">{copy.review}</span>
@@ -446,50 +543,45 @@
     {/if}
   </div>
 
-  <ul class="group foot">
-    <!-- THE PROVENANCE SURFACE WAS REACHABLE ONLY BY ⌘K on a desktop, because this list opened with
-         an EMPTY `<li>` — a blank row, announced as a blank list item, where the audit belonged.
-         "What happened to this record" is not an advanced feature. -->
-    <li>
-      <a class="item tap" href="/audit" aria-current={under('/audit') ? 'page' : undefined}>
-        <Icon name="clock" size="m" /><span class="item-name">{copy.audit}</span>
-      </a>
-    </li>
-    <li>
-      <a class="item tap" href="/packs" aria-current={under('/packs') ? 'page' : undefined}>
-        <Icon name="packs" size="m" /><span class="item-name">{copy.packs}</span>
-      </a>
-    </li>
-    <li>
-      <a class="item tap" href="/vault" aria-current={under('/vault') ? 'page' : undefined}>
-        <Icon name="vault" size="m" /><span class="item-name">{copy.vault}</span>
-      </a>
-    </li>
-    <li>
-      <a class="item tap" href="/settings/appearance" aria-current={under('/settings') ? 'page' : undefined}>
-        <Icon name="settings" size="m" /><span class="item-name">{copy.settings}</span>
-      </a>
-    </li>
-    <!--
-      THE PALETTE, FROM THE RAIL, AND IT USED TO FLOAT OVER THE LIST.
+  <!--
+    THE FOOT: ONE ROW, ONE STRIP, AND THE RECORD YOU ARE IN.
 
-      On a desktop the way into the palette was a 52px disc fixed to the bottom-right corner, and at
-      rest it sat on top of whatever row happened to be there. Measured at 1440 by 900 on
-      `/r/obligations` it covered four controls, Archive and More on two rows, and on Home the tail
-      of the questions as they scrolled under it. A control that hides the controls of the list it
-      floats over is paid for by every row that passes beneath it.
+    It was five full-width rows carrying Audit, Packs, Vault, Settings and Search, and the count is
+    the whole point. A friction pass counted thirty-four items of navigation on every screen, in a
+    scroller whose content did not fit its own height, and four of those items were utilities
+    nobody opens twice a day drawn at exactly the weight of the lists that hold the record. Four
+    rows are one strip now, and nothing was taken away: each glyph is its own target, says its name
+    on hover and on focus, and still wears `aria-current` on the screen you are looking at.
 
-      The rail is where a desktop already goes to reach things, and it has room at its foot. The
-      disc still exists below 900px, where there is no rail, and it lives in the header there.
-      `Ctrl K` still opens the same palette from anywhere. The row no longer prints the chord: a
-      key cap in the rail read as a tool for people who already know the keys.
-    -->
-    <li>
-      <button type="button" class="item tap" onclick={() => (palette.open = true)}>
-        <Icon name="search" size="m" /><span class="item-name">{copy.paletteLabel}</span>
-      </button>
-    </li>
-  </ul>
+    SEARCH KEEPS ITS ROW. It is the one control here somebody presses all day, and it is the reason
+    the disc fixed to the bottom-right corner could be taken off a desktop — that disc sat on top of
+    whatever row happened to be beneath it, four controls' worth at 1440 by 900. `⌘K` still opens
+    the same surface from anywhere, and the row does not print the chord: a key cap in the rail
+    reads as a tool for people who already know the keys.
+
+    THE PROVENANCE SURFACE IS STILL HERE, which is worth saying because it was once reachable only
+    by `⌘K`: this list opened with an empty `<li>` where the audit belonged. "What happened to this
+    record" is not an advanced feature.
+  -->
+  <div class="foot">
+    <ul class="group">
+      <li>
+        <button type="button" class="item tap" data-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
+          <Icon name="search" size="m" /><span class="item-name">{copy.paletteLabel}</span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="utils">
+      {#each [['/audit', copy.audit, 'clock', '/audit'], ['/packs', copy.packs, 'packs', '/packs'], ['/vault', copy.vault, 'vault', '/vault'], ['/settings/appearance', copy.settings, 'settings', '/settings']] as const as [href, label, glyph, at]}
+        <a class="util tap" {href} data-label={label} aria-label={label} title={label} aria-current={under(at) ? 'page' : undefined}>
+          <Icon name={glyph} size="m" />
+        </a>
+      {/each}
+    </div>
+
+    <div class="who">{@render switcher()}</div>
+  </div>
 
   <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
        a second set of capabilities, it is the same set, discoverable by looking. Hide is the one
@@ -531,6 +623,10 @@
       </button>
     {/if}
   </RowMenu>
+
+  <!-- `position: fixed`, so the one thing in this component that has to escape the scroller can.
+       `aria-hidden`, because the row it names already carries that name. -->
+  {#if fly}<span class="flyout" aria-hidden="true" style="--fly-y:{fly.y}px">{fly.label}</span>{/if}
 </nav>
 
 <style>
@@ -548,6 +644,13 @@
   /* The rail is the darker ground. Navigation is how you get to the work; the work is what should
      be bright. */
   .rail {
+    /* ONE TAP TARGET AND ITS GUTTERS. The narrow rail is not a smaller rail: every row in it is
+       still exactly the square `13 §7` designs a target at, and the width is that square plus the
+       padding the open rail already has. */
+    --rail-icons: calc(var(--tap) + var(--sp-2) * 2);
+    /* Where a flyout starts, which is the edge the rail ends at, whichever width it is. */
+    --fly-x: var(--rail);
+
     display: flex;
     flex-direction: column;
     inline-size: var(--rail);
@@ -556,7 +659,11 @@
     background: var(--sunk);
   }
 
+  /* THE HEAD OF THE RAIL, WHICH USED TO BE THE RECORD SWITCHER. One control, at the edge the rail
+     ends at, so the biggest thing at the top of the column is the work rather than the chrome. */
   .top {
+    display: flex;
+    justify-content: flex-end;
     padding-inline: var(--sp-2);
   }
 
@@ -875,23 +982,19 @@
     white-space: nowrap;
   }
 
-  .count {
-    min-inline-size: 18px;
-    padding: 0 5px;
-    border: 1px solid color-mix(in srgb, var(--tone, var(--line)) 55%, var(--line));
-    border-radius: var(--r-pill);
-    color: var(--tone, var(--dim));
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-    line-height: 15px;
-    text-align: center;
-  }
-
-  /* A count, not a badge: it says how many rows the register holds, which is a fact and not an
-     alert. The body face with tabular figures, so the column of them lines up down the rail
-     without reading as a readout. */
+  /**
+   * A COUNT, NOT A BADGE, AND THERE USED TO BE TWO OF THESE.
+   *
+   * The spine drew `.count` — an 18px bordered pill with its own 10px face — and the registers drew
+   * `.tally`, bare tabular figures in `dim`. One column, one fact (how many rows are behind this
+   * row), two drawings, and the pill read as an alert for something that is not one. It is one
+   * treatment now: the body's tabular figures, quiet, right where the eye already scans for them.
+   *
+   * INTENT IS THE ONLY DIFFERENCE LEFT, and it is carried by `--tone` rather than by a border, so
+   * the questions waiting on you read as urgent and the number of invoices does not.
+   */
   .tally {
-    color: var(--dim);
+    color: var(--tone, var(--dim));
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
   }
@@ -938,5 +1041,180 @@
   .foot {
     padding-block-start: var(--sp-2);
     border-block-start: 1px solid var(--line);
+  }
+
+  /* FOUR UTILITIES ON ONE ROW, each an equal share of the width so the strip reads as one control
+     with four positions rather than four things that happen to be beside each other. */
+  .utils {
+    display: flex;
+    gap: var(--sp-1);
+  }
+
+  .util {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    min-block-size: var(--ctl-h);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    text-decoration: none;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .util:hover {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* The same raised pill the rows wear, because it is the same fact: this is where you are. */
+  .util[aria-current='page'] {
+    background: var(--s2);
+    box-shadow: var(--e1);
+    color: var(--ink);
+  }
+
+  .who {
+    padding-block-start: var(--sp-1);
+  }
+
+  .collapse {
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .collapse:hover {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  /* ONE GLYPH THAT TURNS, NOT TWO THAT CAN DISAGREE — the same argument the fold mark makes eighty
+     lines up. It points at the wall the rail is about to fold against. */
+  .collapse :global(.icon) {
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .rail:not([data-icons]) .collapse :global(.icon) {
+    transform: rotate(180deg);
+  }
+
+  /* What a section heading becomes when there is no room for its words. */
+  .sep {
+    margin: var(--sp-4) var(--sp-2) var(--sp-2);
+    border: 0;
+    border-block-start: 1px solid var(--line);
+  }
+
+  /**
+   * ── THE NARROW RAIL ────────────────────────────────────────────────────────
+   *
+   * Every row survives, every glyph survives, and the names go behind the pointer and the focus
+   * ring. This is what `⌘\` does now; the state it replaced took the whole nav off the screen and
+   * left one button, which is the thing nobody means by "collapsed".
+   */
+  .rail[data-icons] {
+    --fly-x: var(--rail-icons);
+
+    inline-size: var(--rail-icons);
+    padding-inline: var(--sp-2);
+  }
+
+  .rail[data-icons] .top {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .rail[data-icons] .item,
+  .rail[data-icons] .pen,
+  .rail[data-icons] .record,
+  .rail[data-icons] .util {
+    /* `relative`, so the clipped name below anchors to its own row rather than escaping to the
+       viewport, and so the count has a corner to sit in. */
+    position: relative;
+    justify-content: center;
+    gap: 0;
+    min-block-size: var(--tap);
+    padding-inline: 0;
+  }
+
+  /* CLIPPED, NEVER REMOVED. The name is the row's accessible name — a screen reader reads exactly
+     the same rail at both widths — and the flyout is a second copy for the eye. `display: none`
+     here would leave a column of links called nothing at all. */
+  .rail[data-icons] .item-name,
+  .rail[data-icons] .pen-text,
+  .rail[data-icons] .pen-action,
+  .rail[data-icons] .record-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A COUNT HAS NO ROOM AND STILL HAS TO BE SEEN, so it becomes a dot on the corner of the glyph.
+     The figure itself is still in the row's name for a screen reader; what the eye needs at this
+     width is that there is something waiting, not how many. */
+  .rail[data-icons] .tally {
+    position: absolute;
+    inset-block-start: var(--sp-1);
+    inset-inline-end: var(--sp-1);
+    inline-size: 6px;
+    block-size: 6px;
+    background: var(--tone, var(--dim));
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    text-indent: 100%;
+    white-space: nowrap;
+  }
+
+  /* A saved view has no glyph, deliberately — it is a way of looking at the list above it rather
+     than a sibling of it — so at this width it would be a blank square. It comes back with the
+     names. */
+  .rail[data-icons] .view {
+    display: none;
+  }
+
+  .rail[data-icons] .record :global(.icon) {
+    display: none;
+  }
+
+  .rail[data-icons] .utils {
+    flex-direction: column;
+  }
+
+  /**
+   * THE NAME OF THE THING UNDER THE POINTER, OR UNDER THE FOCUS RING.
+   *
+   * Fixed, because `.scroll` has to keep `overflow-y: auto` and a flyout inside it is cut off at
+   * the rail's own edge. The vertical coordinate is measured; the horizontal one is `--fly-x`,
+   * which is the rail's width, so this is correct at both widths and under `dir="rtl"` without
+   * arithmetic.
+   */
+  .flyout {
+    position: fixed;
+    inset-block-start: var(--fly-y);
+    inset-inline-start: calc(var(--fly-x) + var(--sp-1));
+    z-index: var(--z-hint);
+    padding: var(--sp-1) var(--sp-3);
+    background: var(--s3);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    box-shadow: var(--e2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    translate: 0 -50%;
   }
 </style>

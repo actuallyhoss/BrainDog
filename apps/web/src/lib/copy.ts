@@ -351,10 +351,11 @@ export const copy = {
   rightNow: 'Right now',
   sinceAway: 'Since you were away',
   nothingNeedsYou: 'Nothing needs you today.',
-  /* THE ONE CONTROL THAT APPEARS WHEN THE NAV DOES NOT. It names the thing it brings back rather
-     than the gesture that hid it: "Toggle the sidebar" is what the key sheet calls the chord, and a
-     reader looking at a blank gutter does not know a toggle happened. */
+  /* THE TWO HALVES OF ONE CONTROL, AT THE HEAD OF THE RAIL. Each names what it will do rather than
+     the gesture that got you here: "Toggle the sidebar" is what the key sheet calls the chord, and
+     a reader looking at a column of glyphs does not know a toggle happened. */
   showSidebar: 'Show the sidebar',
+  collapseSidebar: 'Collapse the sidebar',
   andMore: 'and more',
   /* THE OVERFLOW OF A FEED, as a count and a place to go. Home is not the log — `19 §2` gives that
      job to `/audit` — so what this screen owes a reader is how much it is not showing and the door

@@ -42,7 +42,20 @@ export type Pref = {
    * written was the one nothing read.
    */
   contrast?: boolean | undefined;
-  /** `false` folds the rail. `undefined` is open, which is what a first visit should be. */
+  /**
+   * `false` collapses the rail to its glyphs. `undefined` is open, which is what a first visit
+   * should be.
+   *
+   * IT USED TO TAKE THE WHOLE RAIL AWAY, and that is not what anybody means by collapsed. `⌘\`
+   * removed every row of navigation and left one button in an empty gutter: a sweep of `/vault` in
+   * that state returned six visible controls and all six were *Reveal once*. The record switcher,
+   * the spine and the lists were then reachable only from a chord or the palette, and this
+   * preference persists, so a chord pressed by accident survived the reload.
+   *
+   * SO IT IS ONE RAIL AT TWO WIDTHS NOW. Collapsed keeps every row, every glyph, the spine and the
+   * switcher, and hands the names back on hover and on focus. Nothing becomes unreachable, which is
+   * what makes this a width rather than a disappearance.
+   */
   sidebar?: boolean | undefined;
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
