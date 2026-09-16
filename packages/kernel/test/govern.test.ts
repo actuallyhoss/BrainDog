@@ -860,3 +860,26 @@ test('and a target the scorer cannot read is refused at filing', async () => {
   }
   sql.close();
 });
+
+test('A DECISION NAMES THE QUESTION IT SETTLED, and the question names its decision, even decided in the same instant', async () => {
+  const { k, sql } = await record();
+  const first = value<{ id: string }>(k.propose({ ...options, question: 'Same words?' }, 'p_1'));
+  const second = value<{ id: string }>(k.propose({ ...options, question: 'Same words?' }, 'p_1'));
+  const dropped = value<{ id: string }>(k.propose({ ...options, question: 'Dropped?' }, 'p_1'));
+
+  /* ANSWERED OUT OF ORDER, BY ONE PERSON, AT ONE INSTANT, WITH THE SAME QUESTION: nothing but the link tells them apart. */
+  const d2 = value<{ decision: string }>(k.decide(second.id, { decide: { option: 'no', reason: 'not this one' } }, 'p_2')).decision;
+  const d1 = value<{ decision: string }>(k.decide(first.id, { decide: { option: 'accept', reason: 'this one' } }, 'p_2')).decision;
+  value(k.decide(dropped.id, { resolved_as: 'wont-fix', reason: 'no' }, 'p_2'));
+
+  const decisions = value<Record<string, unknown>[]>(k.governance('decision'));
+  assert.equal(decisions.find((d) => d.id === d1)?.suggestion, first.id);
+  assert.equal(decisions.find((d) => d.id === d2)?.suggestion, second.id);
+
+  const settled = value<Record<string, unknown>[]>(k.governance('suggestion', { status: 'all' }));
+  assert.equal(settled.find((s) => s.id === first.id)?.decision, d1);
+  assert.equal(settled.find((s) => s.id === second.id)?.decision, d2);
+  assert.equal(settled.find((s) => s.id === dropped.id)?.decision, null, 'a question closed without a decision named one');
+  assert.equal(k.governanceRow('decision', d1)?.suggestion, first.id);
+  sql.close();
+});

@@ -113,9 +113,23 @@ export type Prediction = {
   on_miss?: 'suggest' | 'none';
 };
 
+/**
+ * WHICH QUESTION A DECISION SETTLED, AND WHICH DECISION SETTLED A QUESTION.
+ *
+ * Neither table says, so a screen paired them by the option offered and the order they were opened,
+ * which two questions worded alike and answered in the same instant defeat. `decide` writes its
+ * `decide` event and the question's `resolve` event one after the other in one transaction, so the
+ * pair is two adjacent rows of the log, for every decision ever made and with no migration. A
+ * decision that superseded another, or a question closed without one, reads `null`.
+ */
+const SETTLED =
+  "(SELECT substr(r.target, 12) FROM event d JOIN event r ON r.rowid = d.rowid + 1 WHERE d.kind = 'decide' AND d.target = 'decision:' || decision.id AND r.kind = 'resolve' AND r.target LIKE 'suggestion:%') AS suggestion";
+const SETTLED_BY =
+  "(SELECT substr(d.target, 10) FROM event r JOIN event d ON d.rowid = r.rowid - 1 WHERE r.kind = 'resolve' AND r.target = 'suggestion:' || suggestion.id AND d.kind = 'decide' AND d.target LIKE 'decision:%' ORDER BY r.rowid DESC LIMIT 1) AS decision";
+
 const COLUMNS: Record<GovernRegister, string> = {
-  suggestion: 'id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why',
-  decision: 'id, question, answer, reason, decided_by, ts, supersedes',
+  suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, ${SETTLED_BY}`,
+  decision: `id, question, answer, reason, decided_by, ts, supersedes, ${SETTLED}`,
   prediction:
     'id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, observed, met, on_miss',
 };
