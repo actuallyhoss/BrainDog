@@ -142,6 +142,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },
   { name: 'packConfig', group: 'READ+', writes: false, what: "One pack's settings, and the value each holds now.",
     takes: { id: 'text' } },
+  { name: 'arrangement', group: 'READ+', writes: false, what: 'How this BrainDog is arranged and what may be proposed about it: packs, the catalogue, voice and pages; one page declaration; or a grammar.',
+    takes: { page: 'text', grammar: 'text' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
@@ -367,6 +369,7 @@ export type RecordSurface = {
   fileArrival(args: never, ctx: never): Promise<Result<unknown>>;
   archiveArrival(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
+  arrangement(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -439,6 +442,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     fileArrival: (a, ctx) => api.fileArrival(a as never, ctx as never),
     archiveArrival: (a, ctx) => api.archiveArrival(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
+    arrangement: (a, ctx) => api.arrangement(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),

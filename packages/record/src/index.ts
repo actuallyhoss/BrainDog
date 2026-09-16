@@ -75,6 +75,11 @@ import {
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 
+import { arranger, type CatalogueEntry } from './arrange.ts';
+import { grammarOf } from './grammar.ts';
+
+export type { CatalogueEntry } from './arrange.ts';
+
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
 /** What a token may do. Three, and there is deliberately no `admin` — ADR-060. */
@@ -638,6 +643,13 @@ export type RecordDeps = {
    * Absent is the same as a host that cannot, so a link is never minted for a door that is not there.
    */
   invitations?: (() => string | null) | undefined;
+  /**
+   * What this host offers to install: packs, and use cases with the modules they build on.
+   *
+   * THE HOST'S AND NEVER THE RECORD'S, because the record names no use case. A host with none still takes a
+   * pack proposal that carries its own document, and says so when one is asked for by name.
+   */
+  catalogue?: readonly CatalogueEntry[] | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -651,7 +663,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations'>) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue'>) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
@@ -916,6 +928,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     claimed: (pack) => kernel.packClaims(pack),
     keyHeld: (name) => kernel.keyHeld(name),
   });
+
+  /* WHAT AN AGENT OR SPARK MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
+  const arrangement = arranger({
+    kernel,
+    catalogue: deps.catalogue ?? [],
+    installed: () => installedState(),
+    host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
+  });
+
+  /** The pages a caller may open, as `pages` lists them: one is visible when any register it draws from is readable. */
+  const visiblePages = (ctx: CallContext) =>
+    kernel
+      .pages()
+      .filter((p) => p.registers.length === 0 || p.registers.some((id) => !readable(ctx, id)))
+      .map((p) => ({ slug: p.slug, title: p.title }));
 
   /**
    * The `example` marker, which IS the value `example` in a register's own `tags` field.
@@ -1637,6 +1664,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * How this BrainDog is arranged, and what may be proposed about it (`loop/research-spark.md` S12).
+     *
+     * ONE READ FOR WHAT AN AGENT NEEDS BEFORE IT PROPOSES AN ARRANGEMENT, and compact, because it is read
+     * in a turn: the packs and whether each is on, what else the host offers, the voice and other settings,
+     * the pages the caller can open and the arrangements already waiting. With `page` it is that page's
+     * declaration, the thing a changed layout is written from. With `grammar` it is what a page body or a
+     * proposal body may contain, so the lint is no longer the only teacher.
+     */
+    async arrangement(args: { page?: string; grammar?: string } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['page', 'grammar']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (args?.grammar !== undefined) return grammarOf(String(args.grammar));
+      if (args?.page !== undefined) {
+        if (typeof args.page !== 'string' || !args.page) return no('REQUIRED_MISSING', 'A page is asked for by its slug, such as studies.', { at: 'page' });
+        return arrangement.declaration(args.page, visiblePages(ctx));
+      }
+      return ok(arrangement.overview(visiblePages(ctx)));
+    },
+
+    /**
      * One page, with every block run.
      *
      * A PAGE IS SCOPED LIKE ANYTHING ELSE. A block over a register the caller cannot reach comes back
@@ -2089,6 +2138,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const named = args?.body_kind === 'rowset' ? (args.body as { register?: unknown })?.register : undefined;
       const stop = guard(ctx, 'propose', typeof named === 'string' ? named : undefined);
       if (stop) return { ok: false as const, refusal: stop };
+      /* AN ARRANGEMENT IS FILED WITH WHAT IT WOULD DO, worked out here from the catalogue and the record, so the
+         owner reads the packs, pages, calls out and settings it would change, and nothing the proposer said about them. */
+      if (args?.body_kind === 'pack' || args?.body_kind === 'settings' || args?.body_kind === 'arrange') {
+        const body = args.body as Record<string, unknown> | undefined;
+        if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+          const filed = await arrangement.prepare(args.body_kind, body);
+          if (!filed.ok) return filed;
+          return tail(kernel.propose({ ...args, body: filed.value }, writerOf(ctx)));
+        }
+      }
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. */
       return kernel.propose(args, writerOf(ctx));
     },
@@ -2122,7 +2181,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          against it. `setDeclaration` wraps the same `kernel.install` in `tail` twenty lines below,
          which is the proof this was an omission rather than a decision. On a provisioned record the
          hourly purge row re-armed within the hour; on one without an identity row, nothing did. */
+      /* ACCEPTING AN ARRANGEMENT IS INSTALLING, so it is held to the install's own door: an owner, and never a token
+         (ADR-060). A member who may decide other questions may not change what this record is by accepting one. */
+      if (args.decide?.option === 'accept') {
+        const asked = kernel.governanceRow('suggestion', String(args.id));
+        const kind = asked?.body_kind;
+        if (kind === 'pack' || kind === 'settings' || kind === 'arrange') {
+          const owner = admin(ctx, 'accept a change to what this record is');
+          if (owner) return { ok: false as const, refusal: owner };
+        }
+      }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
+      if (out.ok && out.value.apply) {
+        /* AND IT LANDS BEFORE THE ANSWER IS TRUE. What will not apply reopens the question, with what was kept in its sentence. */
+        const applied = await arrangement.apply(out.value.apply.kind, out.value.apply.body, actorOf(ctx));
+        if (!applied.ok) {
+          kernel.reopen(out.value.suggestion, 'refusal' in applied ? applied.refusal.fix : undefined);
+          return tail(applied);
+        }
+        const { apply: _handed, ...decided } = out.value;
+        return tail(ok({ ...decided, applied: applied.value }));
+      }
       if (!out.ok || !out.value.install) return tail(out);
 
       /* THE DECLARATION LANDS BEFORE THE ANSWER DOES. If it will not install, the gate's own

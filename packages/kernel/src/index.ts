@@ -4135,6 +4135,16 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       });
     },
 
+    /**
+     * The checks an install runs, and nothing written: what an arrangement is held to when it is filed.
+     *
+     * THE BATCH OVERLAYS WHAT IS INSTALLED, so a page over a list a pack in the same arrangement declares is
+     * linted against that list, and the owner is never the one who finds a page that would not install.
+     */
+    lint(batch: readonly Declaration[]): Refusal | null {
+      return unreadable(batch) ?? lintBatch(sql, batch);
+    },
+
     retire(ids: readonly string[]) {
       const refused = schemaRefusal(state);
       if (refused) return refused;
