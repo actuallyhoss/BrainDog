@@ -257,3 +257,29 @@ test('the page route reads the record, waits for it, and draws what it cannot sa
   assert.match(route, /<Actions project=\{param\.title\} \/>/, 'Runs on went missing from the project pages');
   assert.doesNotMatch(route, /\$effect\(\(\) => drew\('ready'\)\)/, 'the page says it drew before the record answered');
 });
+
+/* A MONEY COLUMN IS ONE THE REGISTER DECLARES AS MONEY, ON THE LIVE PATH TOO.
+   This asked the field's NAME and matched `amount` or `cost`. `things.revenue` is declared money
+   and is named neither, so it was drawn as ordinary text: clipped with an ellipsis, which reads as
+   a smaller figure rather than as damage (13 §4.2), and passed over by `cardPlan` when it picks
+   which column is a card's figure on a phone. The sample path was repaired first and this one went
+   on guessing, so the two halves of the same product disagreed about the same field. */
+test('a money column is one the register declares as money, not one called amount', async () => {
+  const answered = {
+    page: 'desk',
+    title: 'Desk',
+    blocks: [
+      { kind: 'table', source: 'register.things', columns: [{ field: 'revenue' }, { field: 'name' }], rows: [], matched: 0, refusals: [] },
+    ],
+  };
+  const { io } = host((method) =>
+    method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.'),
+  );
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [table] = out.page.blocks;
+
+  assert.equal(table!.columns[0]?.truncate, 'never');
+  assert.equal(table!.columns[1]?.truncate, 'end');
+});

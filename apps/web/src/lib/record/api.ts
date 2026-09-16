@@ -203,7 +203,9 @@ export function noticed(register: string, suspended: string | null = SUSPENDED):
 
 /* ── values ──────────────────────────────────────────────────────────────── */
 
-const decl = (register: string, field: string): FieldDecl | undefined =>
+/** WHAT A REGISTER SAYS A FIELD IS. Exported because the live path has to ask the same question
+   the sample path asks, and answering it twice is how the two came to disagree. */
+export const decl = (register: string, field: string): FieldDecl | undefined =>
   REGISTERS[register]?.fields.find((f) => f.id === field);
 
 /** A label is the field id with `_` as a space, until a pack needs a different word (50 §10). */

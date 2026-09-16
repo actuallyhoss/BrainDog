@@ -22,7 +22,7 @@ import { MISSING, integer, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
-import { REGISTERS, toRows, type BlockResult, type Metric } from './api.ts';
+import { REGISTERS, decl as fieldOf, toRows, type BlockResult, type Metric } from './api.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { format, hrefFor, targetLine, withParam } from './metrics.ts';
@@ -156,18 +156,33 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
 const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
 const roleOf = (v: unknown): (typeof ROLES)[number] | undefined => ROLES.find((r) => r === v);
 
-const columnsOf = (b: Answered) =>
-  (b.columns ?? []).map((c) => {
+const columnsOf = (b: Answered) => {
+  /* THE REGISTER SAYS WHICH COLUMNS ARE FIGURES, AND UNTIL NOW THIS PATH GUESSED FROM THE NAME.
+     It matched `amount` or `cost`, which are the only two money fields any page currently
+     declares, so nothing on screen was wrong. It was one pack away from being wrong in both
+     directions: `revenue` and `rate` are declared money and were drawn as ordinary text, and a
+     text field called `cost_centre` would have been drawn as a figure.
+
+     THE COST IS NOT ONLY AN ELLIPSIS. A truncated figure reads as a smaller number rather than as
+     damage (13 §4.2), and `truncate: 'never'` is also how `cardPlan` and `cardRoles` pick which
+     column is a card's figure, so a money column this missed was demoted to a fact on every phone.
+
+     The sample path was fixed in `d666678` to ask `decl`. This asks the same function rather than
+     a second copy of the same guess, which is how the two halves came to disagree in the first
+     place. A block over no register has nothing to ask and truncates as the text it is drawn as. */
+  const register = registerOf(b) ?? '';
+  return (b.columns ?? []).map((c) => {
     const as = roleOf(c.as);
     return {
       field: c.field,
       label: c.label ?? c.field,
       width: c.width ?? 'minmax(12ch,1fr)',
       align: c.align ?? 'start',
-      truncate: c.field === 'amount' || c.field === 'cost' ? ('never' as const) : ('end' as const),
+      truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
       ...(as === undefined ? {} : { as }),
     };
   });
+};
 
 /**
  * One figure of a `stat` block, as a tile.
