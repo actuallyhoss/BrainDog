@@ -364,3 +364,36 @@ test('an answer that lands after a navigation is not counted against the screen 
   });
   assert.equal(screen.settled(), undefined, 'the previous screen’s refusal was attributed to this one');
 });
+
+test('A SORTED LIST PAGES WITH THE RECORD’S CURSOR, and a later page keeps the record’s order', async () => {
+  /* THE RECORD PAGES AN ORDER NOW, handing back a `~` cursor that belongs to that order. The list asks
+     for the next page with the cursor and the same order, and draws the rows in the order they came. */
+  /* THE RECORD ORDERS TEXT BY ITS BYTES, so `Invoice C` sorts before `invoice a`, where the reader's
+     collation would put them the other way round. A page re-sorted here would swap them. */
+  const B = row(ulid(22), 8, { what: 'Invoice B', party: AMARA, thing: KILN, state: 'open' });
+  const A = row(ulid(23), 9, { what: 'invoice a', party: BEN, thing: KILN, state: 'open' });
+  const C = row(ulid(24), 10, { what: 'Invoice C', party: BEN, thing: KILN, state: 'open' });
+  tab((name, params) => {
+    if (name === 'list' && params.get('register') === 'obligations') {
+      if (params.get('order') === null) return json(400, { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'That cursor pages a sorted list.' } });
+      return params.get('cursor') === '~next' ? page([C, A], null, 3) : page([B], '~next', 3);
+    }
+    return record(name, params);
+  });
+  const source = await open();
+  const sort = { field: 'what', dir: 'asc' as const };
+
+  const first = value(await source.page('obligations', { filters: [], q: '', sort }, null), 'the first sorted page');
+  assert.equal(first.cursor, '~next', 'the sorted page dropped the record’s cursor');
+  const second = value(await source.page('obligations', { filters: [], q: '', sort }, first.cursor), 'the next sorted page');
+
+  const asks = sent.filter((r) => r.name === 'list' && r.params.get('register') === 'obligations');
+  assert.equal(asks[1]?.params.get('cursor'), '~next');
+  assert.deepEqual(JSON.parse(asks[1]?.params.get('order') ?? 'null'), [sort], 'the next page was not asked in the order its cursor belongs to');
+  assert.equal(second.cursor, null);
+  assert.deepEqual(
+    [...first.entries, ...second.entries].map((e) => e.fields.what),
+    ['Invoice B', 'Invoice C', 'invoice a'],
+    'a later page was re-sorted on its own, so the list is no longer the record’s order',
+  );
+});

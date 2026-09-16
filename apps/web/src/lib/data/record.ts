@@ -85,15 +85,16 @@ function said<T>(r: { ok: true; value: T } | { ok: false; refusal: Refusal } | {
 /**
  * The record over HTTP, from this page's own origin, with no token: `50 §1`, the app never holds one.
  *
- * IT PAGES IN THE RECORD'S ORDER, newest first, with the record's keyset cursor. A SORTED LIST IS
- * ONE PAGE: the kernel will not page an `order`, so the answer is the first `PAGE` rows with
- * `cursor: null` and the screen draws it as a list that stops, with the cap line saying so.
+ * IT PAGES IN THE RECORD'S ORDER, newest first, with the record's keyset cursor. A SORTED LIST PAGES
+ * TOO: the record hands back a `~` cursor that belongs to the order it was asked, and refuses it under
+ * any other, so the next page is asked with the same cursor and the same order, and its rows are drawn
+ * in the order they came.
  *
- * AND A SORTED ANSWER THAT IS WHOLE IS ORDERED HERE, the way this screen has always ordered it. The
- * record orders the stored value, so a ref sorts by its ULID and text by its bytes; `sortRows` orders
- * what the cell shows, by name and in the reader's collation. When the page holds every row there is
- * nothing the second order can get wrong. When it does not, the record's order is the only one there
- * is, and the cap line is the honest part.
+ * AND A SORTED ANSWER THAT IS WHOLE ON ITS FIRST PAGE IS ORDERED HERE, the way this screen has always
+ * ordered it. The record orders the stored value, so a ref sorts by its ULID and text by its bytes;
+ * `sortRows` orders what the cell shows, by name and in the reader's collation. When the page holds
+ * every row there is nothing the second order can get wrong. When it does not, re-sorting one page
+ * would disagree with the pages either side of it, so the record's order is the one drawn.
  */
 function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   const declared = new Map<string, RegisterDecl>();
