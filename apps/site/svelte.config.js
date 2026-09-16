@@ -1,5 +1,7 @@
 import adapter from '@sveltejs/adapter-static';
 
+const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'build';
+
 /**
  * PRERENDERED, and every page of it.
  *
@@ -16,7 +18,9 @@ import adapter from '@sveltejs/adapter-static';
  */
 export default {
   kit: {
-    adapter: adapter({ precompress: false, strict: true }),
+    /* `BRAINDOG_ENV=alpha` writes `build-alpha`, which `env.alpha` in `wrangler.jsonc` serves, so an
+       alpha build never replaces production's `build`. */
+    adapter: adapter({ pages: OUT, assets: OUT, precompress: false, strict: true }),
     alias: { $lib: 'src/lib' },
     files: { assets: 'static' },
     prerender: { entries: ['*'] },

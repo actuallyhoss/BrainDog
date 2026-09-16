@@ -1,5 +1,8 @@
 import adapter from '@sveltejs/adapter-static';
 
+const SUFFIX = [process.env.BRAINDOG_VARIANT, process.env.BRAINDOG_ENV].filter(Boolean).join('-');
+const OUT = SUFFIX ? `build-${SUFFIX}` : 'build';
+
 /**
  * A static shell. `fallback: 'index.html'` and `ssr = false` build one `build/` directory that both
  * hosts serve unchanged — the Worker's ASSETS binding and the self-host's disk root — and no request
@@ -12,10 +15,12 @@ export default {
   kit: {
     /* A VARIANT BUILD GOES SOMEWHERE ELSE. `adapter-static` writes the pages, not Vite's `outDir`, so
        `BRAINDOG_VARIANT=cloud` would otherwise overwrite the shipped record's build — and the next
-       gate to run would measure the wrong one silently. The default is unchanged. */
+       gate to run would measure the wrong one silently. The default is unchanged.
+       `BRAINDOG_ENV=alpha` goes to `build-alpha` for the same reason: `env.alpha` in the Worker's
+       wrangler file serves that directory, so an alpha build can never replace production's. */
     adapter: adapter({
-      pages: process.env.BRAINDOG_VARIANT ? `build-${process.env.BRAINDOG_VARIANT}` : 'build',
-      assets: process.env.BRAINDOG_VARIANT ? `build-${process.env.BRAINDOG_VARIANT}` : 'build',
+      pages: OUT,
+      assets: OUT,
       fallback: 'index.html',
       precompress: false,
       strict: false,

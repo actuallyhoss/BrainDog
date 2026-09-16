@@ -145,3 +145,36 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ALPHA, LAST, AND OFF UNTIL THE OWNER SETS `DEPLOY_ALPHA` TO `true`. Its own build in alpha's
+      # palette (`build-alpha`), after every production step, and `continue-on-error` so an alpha
+      # failure can never turn a production deploy red.
+      - name: Build the alpha shell
+        if: vars.DEPLOY_ALPHA == 'true'
+        continue-on-error: true
+        run: pnpm --filter ./apps/web build
+        env:
+          BRAINDOG_ENV: alpha
+
+      - name: Deploy alpha
+        if: vars.DEPLOY_ALPHA == 'true'
+        continue-on-error: true
+        run: pnpm --filter ./apps/worker exec wrangler deploy --env alpha --var BRAINDOG_BUILD:"$BRAINDOG_BUILD"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Build the alpha marketing site
+        if: vars.DEPLOY_ALPHA == 'true'
+        continue-on-error: true
+        run: pnpm --filter ./apps/site build
+        env:
+          BRAINDOG_ENV: alpha
+
+      - name: Deploy the alpha marketing site
+        if: vars.DEPLOY_ALPHA == 'true'
+        continue-on-error: true
+        run: pnpm --filter ./apps/site exec wrangler deploy --env alpha
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

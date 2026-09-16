@@ -216,6 +216,29 @@
          shape of lie this repository spends most of its comments hunting. */
       "routes": [{ "pattern": "app.alpha.brain.dog", "custom_domain": true }],
 
+      /* ALPHA'S SHELL IS ITS OWN BUILD, `BRAINDOG_ENV=alpha` into `build-alpha`, so its accent differs
+         from production's. An `assets` key inside an environment REPLACES the top-level one rather
+         than merging, so every field is repeated: keep it identical to the top level but for the
+         directory. */
+      "assets": {
+        "directory": "../web/build-alpha",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": [
+          "/api/*",
+          "/mcp",
+          "/a",
+          "/a/*",
+          "/in/*",
+          "/s/*",
+          "/ws",
+          "/ws/*",
+          "/auth/*",
+          "/account/*",
+          "/.well-known/*"
+        ]
+      },
+
       /* `PUBLIC_HOST` IS THE CSRF CHECK. 51 §5.1 step 3 compares `Origin` against
          `https://<PUBLIC_HOST>` on every cookie-authenticated mutation, so a `PUBLIC_HOST` copied
          from production means every write in alpha is a 403 `FORBIDDEN` and every read works —

@@ -53,9 +53,9 @@
      key, so — exactly as in the Worker's config — it is declared per environment and never at the
      top level, or `--env alpha` would claim the apex.
 
-     `assets` IS ALSO INHERITABLE and is deliberately left at the top level: both environments
-     serve the same directory, and the whole point of alpha is that the bytes are the same
-     bytes. */
+     `assets` IS ALSO INHERITABLE, and alpha overrides it: an `assets` key inside an environment
+     replaces the top-level one. Alpha serves `build-alpha`, the same pages built with
+     `BRAINDOG_ENV=alpha` so its accent is its own; production keeps `build`. */
   "env": {
     /* THERE IS AN ALPHA SITE NOW, AND THE REASON THERE WAS NOT IS GONE.
        This said: "two Workers cannot share one Custom Domain. `alpha.brain.dog` belongs to the
@@ -71,8 +71,7 @@
        catch cannot happen to it." A rehearsal is not only about data. A marketing site's failures
        are a broken link, a claim the product does not back, and a page that reads wrong at 390px,
        and every one of those is easier to see on a real hostname than in a preview URL nobody
-       shares. It also costs nothing: the bytes are the same bytes, which is what the top-level
-       `assets` key already says.
+       shares. It also costs nothing: the pages are the same pages in alpha's palette.
 
        THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one has
        no code, so it cannot redirect, and giving it code to move `www` to the apex would be writing
@@ -83,7 +82,8 @@
     },
 
     "alpha": {
-      "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }]
+      "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
+      "assets": { "directory": "build-alpha" }
     }
   }
 }
