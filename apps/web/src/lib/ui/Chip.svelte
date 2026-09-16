@@ -15,11 +15,10 @@
   let {
     label,
     tone,
-    filled = false,
-  }: { label: string; tone?: Tone | undefined; filled?: boolean | undefined } = $props();
+  }: { label: string; tone?: Tone | undefined } = $props();
 </script>
 
-<span class="chip" data-intent={tone} data-filled={filled ? '' : undefined}>
+<span class="chip" data-intent={tone}>
   {#if tone}<span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>{/if}
   {label}
 </span>
@@ -48,9 +47,15 @@
    * same hue at 12%, so the chip was asking a colour to be read against a dilution of itself.
    * Measured on the shipped palette, `danger` on its own wash: 4.10:1 over `--bg` in light, 3.83
    * over `--sunk`, 4.34 over `--s1` in dark, 3.82 over `--s3` in dark, 4.40 over `--bg` in
-   * high-contrast light. Body text needs 4.5. The FILLED chip below is worse, because its ground is
-   * 20% of the louder `-fill` band: `danger` measures 3.17 over `--sunk` in light and 3.44 in
-   * high-contrast light, which is under the 4.5 floor by a third.
+   * high-contrast light. Body text needs 4.5.
+   *
+   * AND THERE IS NO FILLED CHIP ANY MORE, because it was worse and nothing ever asked for one. Its
+   * ground was 20% of the louder `-fill` band, where `danger` measured 3.17 over `--sunk` in light
+   * and 3.44 in high-contrast light, a third under the floor. No caller in the app passed the
+   * `filled` prop, so `data-filled` never reached the DOM and the rule keyed on it never applied:
+   * an unreachable variant that fails the contrast floor is not a spare option, it is a contrast
+   * failure nobody has shipped yet. The prop and its rule are gone rather than waiting to be
+   * reached for.
    *
    * WEAKENING THE TINT DOES NOT RESCUE IT, and that is what makes this a colour decision rather
    * than a number. The same pair is 4.34 at 8% and 4.84 with no tint at all. `28 §4.4` check G
@@ -71,9 +76,5 @@
    */
   .chip[data-intent] {
     background: var(--tone-wash);
-  }
-
-  .chip[data-filled][data-intent] {
-    background: color-mix(in srgb, var(--tone-fill) 20%, transparent);
   }
 </style>
