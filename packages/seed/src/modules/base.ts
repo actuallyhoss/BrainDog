@@ -152,6 +152,9 @@ export type SeedMetric = {
   lookups?: Record<string, Record<string, number>>;
   /** Remember the reading daily, into the series it names (08 §2.6). */
   snapshot?: { grain: 'day'; into: string };
+  /** Read the figure once per value of one field, a date cut into buckets (08 §2.1). */
+  group_by?: string;
+  bucket?: 'day' | 'week' | 'month' | 'quarter' | 'year';
 };
 
 /** Everything not settled, in either direction. The four states a register declares, minus two. */

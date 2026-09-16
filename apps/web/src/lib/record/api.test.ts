@@ -964,3 +964,20 @@ test('A SPLIT GROUPS BY WHAT THE MONEY IS FOR, in the words the screen shows', (
   assert.ok(labels.includes('Tax'), `no tax group in ${labels.join(', ')}`);
   assert.ok(!labels.some((l) => l?.includes('_')), 'a category printed as its id');
 });
+
+test('THE MONEY PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each line and a row a month', async () => {
+  const { draw } = await import('./blocks.ts');
+  const series = page('money')!.blocks.find((b) => b.kind === 'series')!;
+  const drawn = draw(series);
+  assert.equal(drawn.refusal, null);
+  const [segment] = drawn.segments;
+  assert.equal(segment?.type, 'block');
+  if (segment?.type !== 'block') return;
+  assert.equal(segment.kind, 'series');
+  assert.deepEqual(segment.rows[0]?.cells, ['Month', 'in: Money in', 'out: Money out', 'state']);
+  const months = segment.rows.slice(1);
+  assert.equal(months.length, series.bars!.keys.length);
+  assert.match(months[0]!.cells[0]!, /^[A-Z][a-z]{2} \d{4}$/u, 'a month as a person says it');
+  assert.ok(months.some((r) => /^£[\d,]+\.\d\d$/u.test(r.cells[1] ?? '')), 'money in the home currency');
+  assert.deepEqual(months.slice(-4).map((r) => r.cells[3]), ['partial', 'ahead', 'ahead', 'ahead']);
+});

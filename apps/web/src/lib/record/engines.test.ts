@@ -298,3 +298,18 @@ test('A FIGURE GROUPED BY MONTH, BY WEEK AND BY A WORD HAS THE SAME PARTS IN BOT
     assert.equal(web.current, kernel.value.current, `${decl.metric}: the bucket the clock is in`);
   }
 });
+
+test('THE MONEY PAGE’S BARS BY MONTH are the same buckets and the same figures in both engines', async () => {
+  await seeded;
+  const kernel = opened!.page('money');
+  assert.ok(kernel.ok, JSON.stringify(kernel));
+  const k = kernel.value.blocks.find((b) => b.kind === 'series');
+  const w = page('money')?.blocks.find((b) => b.kind === 'series');
+  assert.ok(k && w, 'the Money page has no series');
+  assert.deepEqual(k.refusals, [], JSON.stringify(k.refusals));
+  assert.deepEqual(w.refusals, []);
+  assert.ok(k.bars && k.bars.keys.length >= 6, `the kernel drew ${k.bars?.keys.length} buckets`);
+  assert.deepEqual(w.bars, k.bars);
+  assert.deepEqual(k.bars.states.slice(-4), ['partial', 'ahead', 'ahead', 'ahead'], 'this month so far, then three months due');
+  assert.ok(k.bars.values.every((line) => line.some((v) => v !== null)), 'a line with nothing in it');
+});

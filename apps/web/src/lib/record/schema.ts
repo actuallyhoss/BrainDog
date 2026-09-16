@@ -290,6 +290,14 @@ export type PageBlock = {
 
   /** The server evaluated `when:` and said whether to draw it. */
   drawn?: boolean;
+
+  /** A `series`'s lines: figures grouped by one date bucket, each `in` or `out`, and `then:` for buckets to come. */
+  series?: readonly { metric: string; then?: string; label?: string; dir?: 'in' | 'out' }[];
+  /** A `series`'s reach, in buckets: back from the current one, including it, and ahead of it. */
+  back?: number;
+  ahead?: number;
+  /** A `series`'s: draw what was left, in minus out, as a line. */
+  net?: boolean;
 };
 
 export type PageDecl = {

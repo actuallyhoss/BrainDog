@@ -301,6 +301,65 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* MONEY THAT MOVED, MONTH BY MONTH, by the day it was paid rather than the day it was due; and money still
+     to move, by the day it is due. The series on the Money page draws the first for the months behind
+     and the second for the months ahead. */
+  'in-by-month': {
+    metric: 'in-by-month',
+    name: 'Paid in, by month',
+    source: 'register.obligations',
+    where: 'state is paid, direction is owed to me, settled after -7m',
+    value: { sum: 'amount' },
+    group_by: 'settled',
+    bucket: 'month',
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'out-by-month': {
+    metric: 'out-by-month',
+    name: 'Paid out, by month',
+    source: 'register.obligations',
+    where: 'state is paid, direction is owed by me, settled after -7m',
+    value: { sum: 'amount' },
+    group_by: 'settled',
+    bucket: 'month',
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'in-due-by-month': {
+    metric: 'in-due-by-month',
+    name: 'Due to come in, by month',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed to me, due after yesterday, due before +4m`,
+    value: { sum: 'amount' },
+    group_by: 'due',
+    bucket: 'month',
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'out-due-by-month': {
+    metric: 'out-due-by-month',
+    name: 'Due to go out, by month',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed by me, due after yesterday, due before +4m`,
+    value: { sum: 'amount' },
+    group_by: 'due',
+    bucket: 'month',
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'owed-to-you': {
     metric: 'owed-to-you',
     name: 'Owed to you',
@@ -419,6 +478,22 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'category' }, { field: 'amount' }],
         limit: 6,
         empty: 'Nothing to pay in the next 30 days.',
+      },
+      {
+        /* MONTH BY MONTH: what was paid in and out in the six months to now, and what is due in the three
+           after, with what was left each month as a line. The current month is so far, and the months
+           ahead are what is due, not a guess. */
+        kind: 'series',
+        heading: 'In and out, by month',
+        span: 12,
+        series: [
+          { metric: 'in-by-month', then: 'in-due-by-month', label: 'Money in' },
+          { metric: 'out-by-month', then: 'out-due-by-month', label: 'Money out', dir: 'out' },
+        ],
+        back: 6,
+        ahead: 3,
+        net: true,
+        empty: 'Nothing paid or due in these months.',
       },
       {
         /* A NOTE THAT DRAWS ONLY WHEN IT IS TRUE, and says what is due, never what to do about it. */

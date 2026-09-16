@@ -311,6 +311,10 @@ a value outside the closed list is `ENUM_VALUE_UNKNOWN`.
 | `limit` | int 1–500 | no | `50` | — |
 | `empty` | text ≤ 200, interpolatable | **yes on every block with a `source`** | — | — |
 | `cells` | 1–6 of `{ metric: Id, label: text ≤ 40 }` | `stat` | — | — |
+| `series` | 1–4 of `{ metric: Id, then?: Id, label?: text ≤ 40, dir?: in \| out }`; every metric grouped by a date with a `bucket`, all the same bucket (`DECLARATION_INVALID`), one currency (`MIXED_CURRENCY`) | `series` | — | `dir ∈ in out` |
+| `back` | int 1–24 buckets, the current one included (`OUT_OF_BOUNDS`) | no | `6` | — |
+| `ahead` | int 0–12 buckets after the current one (`OUT_OF_BOUNDS`) | no | `0` | — |
+| `net` | bool; on a `series`, in minus out as a line | no | `false` | — |
 | `tone` | intent | no | — | the four |
 | `body` | the dialect, ≤ 64 KB | `note` | — | — |
 | `icon` | `Glyph`, beside a `section`'s heading | no | — | — |

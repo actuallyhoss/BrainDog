@@ -198,6 +198,8 @@ export const copy = {
     diff: 'Before and after',
     sparkline: 'Small trend line',
     split: 'Parts of a whole',
+    series: 'Bars by month',
+    forecast: 'Cash ahead',
     bridge: 'From start to end',
   } as Record<string, string>,
 
@@ -579,6 +581,9 @@ export const copy = {
   bridgeIn: 'Coming in',
   bridgeOut: 'Going out',
   bridgeEnd: (days: number) => `In ${days} days`,
+  /* A series's first column names what each bar is, by the bucket it is cut into. */
+  seriesAxis: { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year' } as Record<string, string>,
+  seriesWeekOf: (day: string) => `Week of ${day}`,
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
   aboutTheSame: 'about the same',
   /* THE FIVE STATES, ON THE FOUR SCREENS THAT COULD NOT DRAW ANY OF THEM. `grep -c "<Empty"` was

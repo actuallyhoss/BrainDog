@@ -27,6 +27,7 @@ import type { Json } from './coerce.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
+import { barsOf, type Bars, type SeriesLine } from './series.ts';
 
 export type PageBlock = {
   kind: string;
@@ -78,6 +79,12 @@ export type PageBlock = {
    * are on it.
    */
   when?: { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
+  /** A `series`'s lines: figures grouped by one date bucket, and how many buckets back and ahead it draws. */
+  series?: SeriesLine[];
+  back?: number;
+  ahead?: number;
+  /** A `series`'s: whether it draws what was left, in minus out, as a line. */
+  net?: boolean;
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -102,6 +109,8 @@ const READS = new Set([
   'rows', 'matched', 'readings', 'walk', 'refusals',
   'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions', 'lead',
   'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
+  /* A `series`'s lines and reach, and the bars it answers with. */
+  'series', 'back', 'ahead', 'net', 'bars',
 ]);
 
 export type PageDecl = {
@@ -136,6 +145,8 @@ export type BlockResult = PageBlock & {
   seen?: string | null;
   /** A `diff` block's versions of its field, newest first, at most `versions` of them. */
   history?: { at: string; by: string; text: string }[];
+  /** A `series` block's buckets and each line's value in them. */
+  bars?: Bars;
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
@@ -426,6 +437,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         return refused(read) ? { ...cell, reading: null, refusal: read.refusal } : { ...cell, reading: null };
       }),
     };
+  }
+
+  /* A SERIES READS ITS FIGURES, grouped by one bucket, and lines them up on one run of buckets. */
+  if (block.kind === 'series') {
+    const got = barsOf(block.series, block.back, block.ahead, deps.metric, deps.read);
+    return 'refusal' in got ? { ...base, refusals: also(got.refusal) } : { ...base, bars: got.bars, matched: got.bars.keys.length };
   }
 
   /* A BLOCK WITH NO SOURCE IS A WRITTEN BLOCK, and the record has nothing to add to it. `05` §1 makes
@@ -987,6 +1004,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const at = cell.metric.indexOf(':');
       add(metric?.(at < 0 ? cell.metric : cell.metric.slice(0, at))?.source);
     }
+    /* A SERIES READS EVERY FIGURE IT LINES UP. */
+    for (const line of block.series ?? []) for (const id of [line?.metric, line?.then]) if (typeof id === 'string') add(metric?.(id)?.source);
     /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST. */
     if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a

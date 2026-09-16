@@ -101,7 +101,7 @@ test('a block that HAS something to draw refuses nothing', () => {
     if (refusal) continue;
     asked += 1;
     /* Every key a block can carry its content in: a table has rows, a chips or bar block has
-       entries, a stat has its read metrics, a forecast has a walk and everything else has the
+       entries, a stat has its read metrics, a forecast has a walk, a series has its bars and everything else has the
        fenced text it was written with. */
     const held = block as unknown as Record<string, unknown>;
     const many = (key: string) => Array.isArray(held[key]) && (held[key] as unknown[]).length > 0;
@@ -111,6 +111,7 @@ test('a block that HAS something to draw refuses nothing', () => {
       many('metrics') ||
       many('readings') ||
       ((held.walk as { steps?: unknown[] } | undefined)?.steps?.length ?? 0) > 0 ||
+      ((held.bars as { keys?: unknown[] } | undefined)?.keys?.length ?? 0) > 0 ||
       String(held.body ?? '').trim() !== '';
     assert.ok(drawn, `${block.heading} refused nothing and holds nothing to draw`);
   }

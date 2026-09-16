@@ -53,7 +53,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, findingsFrom, isStale } from '@braindog/kernel';
+import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type SeriesLine } from '@braindog/kernel';
 import { meetsTarget, read, targetLine, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
@@ -1545,6 +1545,8 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `forecast.runway` block's walk, which a `bridge` draws from rather than from the table. */
   walk?: Walk;
+  /** A `series` block's buckets and each line's value in them, as the record's `barsOf` lines them up. */
+  bars?: Bars;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1615,6 +1617,47 @@ function runwayBlock(b: PageBlock): BlockResult {
     metrics: undefined,
   };
 }
+
+/**
+ * A series: each figure read here, grouped as the record groups it, and lined up by the record's own `barsOf`.
+ *
+ * The figures are this build's readings and the arithmetic that lines them up is imported, so the
+ * sample and a record draw the same bars in the same buckets.
+ */
+function seriesBlock(b: PageBlock): BlockResult {
+  const got = barsOf(
+    b.series as SeriesLine[] | undefined,
+    b.back,
+    b.ahead,
+    (id) => (METRICS[id] ?? null) as never,
+    (decl) => {
+      const r = read(decl as never);
+      return r.refusals.length
+        ? { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: r.refusals[0]! } }
+        : { ok: true, value: { groups: r.groups ?? [], current: r.current ?? '', unit: r.rows === 0 ? null : unitOfFormat((decl as { format?: string }).format) } };
+    },
+  );
+  const refusals = 'refusal' in got ? [got.refusal.fix] : [];
+  const unread = Object.keys(b).filter((k) => !READS.has(k)).map((k) => `${k}: is not a key this build reads`);
+  return {
+    ...b,
+    register: undefined,
+    columns: [],
+    entries: [],
+    matched: [],
+    refusals: [...unread, ...refusals],
+    rows: [],
+    ...('bars' in got ? { bars: got.bars } : {}),
+    shown: 'bars' in got ? got.bars.keys.length : 0,
+    total: 'bars' in got ? got.bars.keys.length : 0,
+    drawn: b.drawn ?? drawnWhen(b),
+    stale_at: new Date(NOW).toISOString(),
+    metrics: undefined,
+  };
+}
+
+/** The currency a `money.<CUR>` format names, or `null`. */
+const unitOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
 export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string };
@@ -1742,6 +1785,8 @@ const READS = new Set([
   'inherit',
   /* A stat whose first figure is the screen's hero. */
   'lead',
+  /* A series's lines and its reach. */
+  'series', 'back', 'ahead', 'net',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1791,6 +1836,7 @@ export function readBlock(b: PageBlock): BlockResult {
        cash walk. Nothing about the block is new, and the day a real `forecast` kind ships, the
        declaration that changes is the kind, not the query. */
     if (b.source === 'forecast.runway') return runwayBlock(b);
+    if (b.kind === 'series') return seriesBlock(b);
     /* A FEED READS THE LEDGER and a diff reads one row's history, so neither is a register's rows. */
     if (b.source === 'activity') return activityBlock(b);
     if (b.kind === 'diff') return diffBlock(b);

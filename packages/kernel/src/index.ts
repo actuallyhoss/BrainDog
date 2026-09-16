@@ -218,6 +218,8 @@ export {
 } from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
+export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
+export type { Bars, SeriesLine } from './series.ts';
 export { BODY_KINDS, GOVERNANCE } from './govern.ts';
 export { MET_CAP, PEOPLE } from './people.ts';
 export type { MeetArgs, Met } from './people.ts';

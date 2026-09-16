@@ -17,7 +17,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { isStale } from '@braindog/kernel';
+import { isBucket, isStale, type Bars } from '@braindog/kernel';
 import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -290,6 +290,17 @@ const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const isStep = (v: unknown): v is WalkStep =>
   isObject(v) && typeof v.day === 'string' && typeof v.label === 'string' && Number.isFinite(v.delta) && Number.isFinite(v.balance) && typeof v.source === 'string';
 
+/** A `series` block's `bars`, when they are what the record's `barsOf` sends: every line as long as the keys. */
+function barsOf(v: unknown): Bars | null {
+  if (!isObject(v) || !Array.isArray(v.keys) || !v.keys.every((k) => typeof k === 'string')) return null;
+  const n = v.keys.length;
+  const cell = (x: unknown) => x === null || (typeof x === 'number' && Number.isFinite(x));
+  if (!Array.isArray(v.values) || !v.values.every((line) => Array.isArray(line) && line.length === n && line.every(cell))) return null;
+  if (!Array.isArray(v.states) || v.states.length !== n || !v.states.every((s) => s === '' || s === 'partial' || s === 'ahead')) return null;
+  if (!isBucket(v.bucket) || typeof v.current !== 'string') return null;
+  return { bucket: v.bucket, current: v.current, keys: v.keys, states: v.states, values: v.values, unit: typeof v.unit === 'string' ? v.unit : null };
+}
+
 /** A `forecast.runway` block's `walk`, when it is one. The record builds it; a record on another build may not have. */
 function walkOf(v: unknown): Walk | null {
   if (!isObject(v) || !Array.isArray(v.steps) || !v.steps.every(isStep) || !Number.isFinite(v.from)) return null;
@@ -357,6 +368,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     feed: fed,
     seen: mark,
     history: versions,
+    bars: barred,
     ...rest
   } = b;
 
@@ -411,6 +423,10 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
 
   if (refusals.length || drawn === false) return shell;
   if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map(tileOf) };
+  if (kind === 'series') {
+    const bars = barsOf(barred);
+    return bars ? { ...shell, bars, shown: bars.keys.length, total: bars.keys.length } : cannot;
+  }
   if (!b.source) return shell;
   if (b.source === 'actions') {
     const actions = got.map((r) => actionOf(r.fields));

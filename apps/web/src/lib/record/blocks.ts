@@ -125,6 +125,46 @@ function bridgeRows(block: BlockResult): string[] {
 }
 
 /**
+ * A series as the dialect writes it: a header naming each line in or out, then a row a bucket.
+ *
+ * THE LABEL IS THE BUCKET AS A PERSON SAYS IT, `Apr 2026` rather than `2026-04`, and a figure is money
+ * in the lines' one currency. A bucket nothing fell in is an empty cell, which the renderer draws as a
+ * gap. No buckets at all is no rows, which `draw` answers with the block's `empty:` sentence.
+ */
+function seriesRows(block: BlockResult): string[] {
+  const bars = block.bars;
+  if (!bars || bars.keys.length === 0) return [];
+  const currency = bars.unit ?? homeCurrency() ?? null;
+  const lines = block.series ?? [];
+  const head = [
+    escapeCell(copy.seriesAxis[bars.bucket] ?? bars.bucket),
+    ...lines.map((l) => `${l.dir === 'out' ? 'out' : 'in'}: ${escapeCell(l.label ?? l.metric)}`),
+    'state',
+  ].join(' | ');
+  const rows = bars.keys.map((key, i) => {
+    const cells = bars.values.map((line) => {
+      const v = line[i];
+      return v === null || v === undefined ? '' : currency ? money(v, currency) : String(v);
+    });
+    return [escapeCell(bucketLabel(key, bars.bucket)), ...cells, bars.states[i] ?? ''].join(' | ');
+  });
+  return [head, ...rows];
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A bucket's key as a person reads it: `Apr 2026`, `Q3 2026`, `2026`, `17 Sep`, or the week it begins. */
+export function bucketLabel(key: string, bucket: string): string {
+  const [y, rest] = key.split('-', 2) as [string, string | undefined];
+  if (bucket === 'year' || rest === undefined) return y;
+  if (bucket === 'quarter') return `${rest} ${y}`;
+  const month = MONTHS[Number(key.slice(5, 7)) - 1] ?? '';
+  if (bucket === 'month') return `${month} ${y}`;
+  const day = `${Number(key.slice(8, 10))} ${month}`;
+  return bucket === 'week' ? copy.seriesWeekOf(day) : day;
+}
+
+/**
  * One cell, safe to put between pipes.
  *
  * The dialect reads `\\|` as a literal pipe and `\\\\` as a literal backslash, so both have to be
@@ -381,7 +421,7 @@ function sectionRow(block: BlockResult): string {
 export function toSegments(block: BlockResult) {
   const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
-  const form = block.kind === 'stat' && block.lead ? ' lead' : '';
+  const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : '';
   const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
@@ -412,6 +452,8 @@ export function toSegments(block: BlockResult) {
       ? barRows(block)
       : block.kind === 'bridge' && block.source === 'forecast.runway'
         ? bridgeRows(block)
+      : block.kind === 'series'
+        ? seriesRows(block)
       : block.kind === 'chips'
         ? chipsRows(block)
       : block.kind === 'gauge'
