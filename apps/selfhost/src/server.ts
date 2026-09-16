@@ -675,6 +675,7 @@ export async function start(options: {
   /* WHETHER AN INVITATION CAN BE SPENT HERE, known once sign-in is decided below. Until then, and wherever sign-in
      is off, it cannot. */
   let invitesOff: string | null = INVITES_OFF;
+  const buildApp = options.build ?? env.BRAINDOG_BUILD ?? '';
   api = await createRecordApi({
     sql,
     clock,
@@ -688,7 +689,7 @@ export async function start(options: {
        No `SPARK_ENDPOINT`: `31 §2` has this host at rank 21 and `spark` at 13 and unbuilt, so
        claiming a Spark here would be claiming something nothing serves. */
     snapshots: kept,
-    destroy,    build: { app: options.build ?? env.BRAINDOG_BUILD ?? '', spark: false },
+    destroy,    build: { app: buildApp, spark: false },
   });
 
   const refused = api.kernel.refused();
@@ -733,6 +734,14 @@ export async function start(options: {
      The 500 says what happened in one sentence and the socket is closed, which is the promise
      `serveApi` makes one layer down and the one this layer was breaking. */
   const server = createServer((req, res) => {
+    /* `/.well-known/braindog-build`, AS THE WORKER ANSWERS IT: which build this process is, before any door and with
+       no credential, `null` when it was never told. A deployment is not a record, so a deleted record does not change
+       the answer, and a gate comparing hosts reads the same shape from both. */
+    if (/^\/+\.well-known\/+braindog-build\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ app: buildApp || null }));
+      return;
+    }
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */
     if (gone) {
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });

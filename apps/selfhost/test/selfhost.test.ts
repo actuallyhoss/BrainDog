@@ -561,3 +561,22 @@ test('and the same write from the page this host served is 200', async () => {
     s.clean();
   }
 });
+
+test('`/.well-known/braindog-build` ANSWERS AS THE WORKER DOES: the build string, or null, with no credential', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-build-'));
+  try {
+    for (const [build, app] of [['2026.09.16-abc', '2026.09.16-abc'], ['', null]] as const) {
+      const running = await start({ file: join(dir, `${app ?? 'none'}.sqlite`), port: 0, token: 'a-token-this-request-does-not-carry', build });
+      try {
+        const res = await fetch(`http://127.0.0.1:${bound(running)}/.well-known/braindog-build`);
+        assert.equal(res.status, 200);
+        assert.equal(res.headers.get('cache-control'), 'no-store');
+        assert.deepEqual(await res.json(), { app });
+      } finally {
+        await running.close();
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
