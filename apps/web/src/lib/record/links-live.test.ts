@@ -152,7 +152,7 @@ test("a pack's own list that points here is drawn under its declared name and la
       });
     if (url.pathname === '/api/schema') {
       const r = url.searchParams.get('register');
-      return r === 'study_courses' ? json(200, { ok: true, value: COURSES }) : r === 'study_assignments' ? json(200, { ok: true, value: ASSIGNMENTS }) : json(404, { ok: false, refusal: { code: 'NOT_FOUND', fix: 'No such list.' } });
+      return r === 'study_courses' ? json(200, { ok: true, value: COURSES }) : r === 'study_assignments' ? json(200, { ok: true, value: ASSIGNMENTS }) : json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'No such list.' } });
     }
     if (url.pathname === '/api/list') return json(200, { ok: true, value: { rows: [{ id: '01JCOURSE0000000000000000', seq: 2, fields: { name: 'Linear algebra' } }], cursor: null } });
     return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
