@@ -130,12 +130,14 @@
     text-wrap: pretty;
   }
 
-  /* `align-items: start` and the plans stop being the same height, because the free plan has no
-     action under it while the repository is private. */
+  /* THE SAME HEIGHT, SIDE BY SIDE. `align-items: start` kept the free plan short because it has no
+     action under it while the repository is private, and two cards ending 50px apart read as a
+     layout that did not finish. The space under the free plan's list is quieter than a ragged
+     edge, and on a phone, where they stack, height does not apply. */
   .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    align-items: stretch;
     gap: var(--sp-3);
   }
 
