@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty-four kinds, and the four intent words.
+ * The eight primitives, the twenty-five kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -144,7 +144,7 @@ export type KindSpec = {
 };
 
 /**
- * Twenty-four, counted. `diagram` and `forecast` are post-v1 and arrive as a
+ * Twenty-five, counted. `diagram` is post-v1 and arrives as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -175,6 +175,10 @@ const TABLE = {
   /* A header row `Month | in: Money in | out: Money out | state`, then a row a bucket: bars in above a
      zero rule and out below it, and the `net` form's line of what was left (`src/series.ts`). */
   series: { primitive: 'proportional', cells: 0, tone: false, header: true, forms: ['net'], minSpan: 6, purpose: 'figure' },
+  /* `opening | day | label | balance`, then `past`, `step`, `horizon` and `knobs` rows: a cash walk as a
+     line, with knobs where the host asks for them (`src/forecast.ts`). Page-only, because its rows are
+     a walk the record computed. */
+  forecast: { primitive: 'proportional', cells: 4, tone: false, pageOnly: true, minSpan: 8, purpose: 'figure' },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */

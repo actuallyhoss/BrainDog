@@ -67,30 +67,30 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds, twenty-four
+### Kinds, twenty-five
 
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `forecast`, a cash walk as a line, **page-only** |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
 | Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it. All three **page-only** |
 
-Twenty-four, counted: the sixteen of v1, the four kinds of the agent path
-(`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), and `series` (S13), which sit on existing primitives so
+Twenty-five, counted: the sixteen of v1, the four kinds of the agent path
+(`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), and `series` and `forecast` (S13 and S11), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
-arbitrary SVG — and `forecast` are **post-v1**, and everything after them
+arbitrary SVG — is **post-v1**, and everything after it
 arrives as a pack, which is the whole reason for the primitive layer.
 
 ### 2.1 · Row shape per kind — the grammar, stated
 
 The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of it:
 
-- The info string is `^(?<kind>[a-z]+)(\s+(?<form>[a-z]+))?(\s*\|\s*(?<heading>.*))?$`. A form is a word the kind names: `stat lead` is the only one. Any other word after the kind degrades under `DIALECT_KIND_UNKNOWN`, naming the forms there are. The heading half is row-split like a row, and a trailing tone word there is the block's tone — `note | Kicker | bad` (36 §13 D6).
+- The info string is `^(?<kind>[a-z]+)(\s+(?<form>[a-z]+))?(\s*\|\s*(?<heading>.*))?$`. A form is a word the kind names: `stat lead` and `series net` are the two. Any other word after the kind degrades under `DIALECT_KIND_UNKNOWN`, naming the forms there are. The heading half is row-split like a row, and a trailing tone word there is the block's tone — `note | Kicker | bad` (36 §13 D6).
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
@@ -105,6 +105,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `split` | label \| value \| note \| *tone*, or `hole` as on `bar`. One 6px track cut into parts in neutral steps (a toned row in its intent), a legend of 7px dots, figures and shares, then the hole row. A row with no number, zero or less has no part. All zero, a sentence |
 | `bridge` | label \| ±amount \| note. The first row is the start and the last the end; the rows between move it. Floating bars, up in `earn`, down neutral; rows that do not add up get a warn line saying so; a row with no number draws no bars. In a narrow container, a list with inline bars |
 | `series` | a header row, then a row a bucket: bucket \| up to four series, each headed `in: Label` or `out: Label` (bare is in) \| *`state`*, a last header cell whose rows say `partial` (the current bucket, drawn faint) or `ahead` (still to come, an outline). Bars in stand above a zero rule in `earn`, bars out hang under it in a neutral, one scale; the `net` form adds in minus out as the one accent line. An empty cell is a gap, never zero. Two axis figures, the bucket labels, a legend and "The numbers" fold are text; all empty or zero, a sentence |
+| `forecast` | page-only. mark \| day \| label \| amount, the mark one of `opening` (today, what the figure is called, the balance; once), `past` (a remembered daily balance before today), `step` (a signed movement), `horizon` (days walked, in the day cell) and `knobs` (any of `horizon late spend leave`, in the day cell). The remembered balance solid and the walk dashed in the accent, a zero rule always in view, stems from it for every movement worth a twentieth of the range (up in `earn`, down neutral), the first day under zero as a warn dot with its date, the lowest point as a dim dot, a sentence over the chart and every movement in a fold. With `RenderOptions.scenario` the Svelte drawer adds the knobs (horizon 3, 6 or 12 months within the walk; clients paying late by 0 to 60 days; spending the record does not know, 0 to 5,000 a month; leaving out the five heaviest movements) and a scrub, in memory only, with the untouched walk drawn faint beside it. No opening row, a sentence |
 | `bar` | label \| number \| note \| *tone* |
 | `gauge` | label \| value \| target \| *tone* |
 | `chips` | glyph \| figure \| word \| *tone* — one row is one run |

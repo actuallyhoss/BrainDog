@@ -21,6 +21,7 @@
   import Split from '../Split.svelte';
   import Bridge from '../Bridge.svelte';
   import Series from '../Series.svelte';
+  import Forecast from '../Forecast.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -52,6 +53,8 @@
   <Bridge {block} {opts} />
 {:else if block.kind === 'series'}
   <Series {block} {opts} />
+{:else if block.kind === 'forecast'}
+  <Forecast {block} {opts} />
 {:else}
 <div class="prop">
   {#if block.kind === 'sparkline'}

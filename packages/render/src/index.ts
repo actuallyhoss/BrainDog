@@ -62,6 +62,27 @@ export { SPLIT_PART, SPLIT_STEPS, SPLIT_ZERO, splitPlan, splitSentence, type Spl
 export { BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
 export { SERIES_AHEAD, SERIES_MOST, SERIES_NET, SERIES_NONE, SERIES_NUMBERS, SERIES_PARTIAL, seriesPlan, seriesValue, type SeriesBar, type SeriesDir, type SeriesPlan, type SeriesState } from './series.ts';
 export { figureLike } from './figure.ts';
+export {
+  FORECAST_KNOBS,
+  addDays,
+  against,
+  baseKnobs,
+  daysBetween,
+  forecastModel,
+  forecastPlan,
+  horizonChoices,
+  knobsMoved,
+  largest,
+  readoutAt,
+  scenario,
+  shortDay,
+  type ForecastKnob,
+  type ForecastModel,
+  type ForecastPlan,
+  type ForecastStep,
+  type Knobs,
+  type Scenario,
+} from './forecast.ts';
 export { inline, text, magnitudeOfCell, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

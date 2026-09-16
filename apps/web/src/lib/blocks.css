@@ -1933,6 +1933,283 @@
     }
   }
 
+  /* ── forecast: the cash walk as a line ────────────────────────────────────
+     The balance is the one accent series: solid where it was remembered, dashed where it is walked.
+     Stems stand on the zero rule, up in `earn` and down in a quiet neutral. The crossing is the warn
+     intent with its glyph; the lowest point a dim dot; the baseline a faint mark once a knob moved.
+     Every word sits in HTML over the chart, placed along it by `--at`. */
+  .block[data-kind='forecast'] {
+    container-type: inline-size;
+  }
+
+  .forecast {
+    gap: var(--sp-3);
+  }
+
+  .forecast-said,
+  .forecast-against,
+  .forecast-empty {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin-inline: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  .forecast-against,
+  .forecast-empty {
+    color: var(--ink2);
+  }
+
+  .forecast-plot {
+    position: relative;
+    margin-inline: var(--sp-2);
+    touch-action: pan-y;
+  }
+
+  .forecast-chart {
+    display: block;
+    inline-size: 100%;
+    block-size: 240px;
+    overflow: visible;
+  }
+
+  .forecast-zero {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1px;
+  }
+
+  .forecast-past,
+  .forecast-future,
+  .forecast-base {
+    fill: none;
+    stroke-width: 1.75px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .forecast-past,
+  .forecast-future {
+    stroke: var(--accent);
+  }
+
+  .forecast-future {
+    stroke-dasharray: 5 4;
+  }
+
+  .forecast-base {
+    stroke: var(--faint);
+    stroke-width: 1.25px;
+    stroke-dasharray: 2 3;
+  }
+
+  .forecast-stem {
+    fill: none;
+    stroke-width: 2px;
+  }
+
+  .forecast-stem[data-move='up'] {
+    stroke: var(--earn);
+  }
+
+  .forecast-stem[data-move='down'] {
+    stroke: color-mix(in srgb, var(--ink2) 55%, transparent);
+  }
+
+  .forecast-low,
+  .forecast-cross {
+    fill: none;
+    stroke-width: 8px;
+    stroke-linecap: round;
+  }
+
+  .forecast-low {
+    stroke: var(--dim);
+  }
+
+  .forecast-cross {
+    stroke: var(--warn);
+  }
+
+  .forecast-pin {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(var(--at) * 100%);
+    translate: -50% -100%;
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .forecast-readout {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(var(--at) * 100%);
+    display: grid;
+    gap: var(--sp-1);
+    max-inline-size: 18rem;
+    padding: var(--sp-2) var(--sp-3);
+    margin-inline-start: var(--sp-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--s1);
+    box-shadow: var(--e2);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    pointer-events: none;
+  }
+
+  .forecast-readout[data-flip] {
+    translate: calc(-100% - 2 * var(--sp-2)) 0;
+  }
+
+  .forecast-readout-day {
+    color: var(--dim);
+  }
+
+  .forecast-readout-balance {
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .forecast-readout-move {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    color: var(--ink2);
+  }
+
+  .forecast-ticks {
+    position: relative;
+    block-size: 1.5em;
+    margin-inline: var(--sp-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .forecast-tick {
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    translate: -50% 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .forecast-knobs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-3) var(--sp-5);
+    margin-inline: var(--sp-2);
+  }
+
+  .forecast-knob {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 12rem;
+    font-size: var(--t-sm);
+  }
+
+  .forecast-knob-name {
+    color: var(--ink2);
+  }
+
+  .forecast-knob-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .forecast-knob-note {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .forecast-range {
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    accent-color: var(--accent);
+  }
+
+  .forecast-segs,
+  .forecast-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .forecast-seg,
+  .forecast-chip,
+  .forecast-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--s1);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .forecast-seg:hover,
+  .forecast-chip:hover,
+  .forecast-reset:hover {
+    background: var(--s2);
+  }
+
+  .forecast-seg[aria-pressed='true'],
+  .forecast-chip[aria-pressed='true'] {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  .forecast-chip[aria-pressed='true'] .forecast-chip-label {
+    text-decoration: line-through;
+  }
+
+  .forecast-chip-amount {
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (pointer: coarse) {
+    .forecast-seg,
+    .forecast-chip,
+    .forecast-reset,
+    .forecast-range {
+      min-block-size: var(--tap);
+      font-size: var(--t-md);
+    }
+  }
+
+  @container (inline-size < 30rem) {
+    .forecast-chart {
+      block-size: 160px;
+    }
+
+    .forecast-knobs {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .forecast-knob {
+      min-inline-size: 0;
+    }
+
+    .forecast-readout {
+      max-inline-size: 12rem;
+    }
+  }
+
   /* ── inline: chips ──────────────────────────────────────────────────────── */
 
   /* A RUN OF COUNTS, SET AS FIGURES AND NOT AS BOXES. Each was a tinted box with 12px of padding

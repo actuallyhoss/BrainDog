@@ -11,17 +11,19 @@
  * the cell it is. That is all a host's stylesheet draws against (05 §7.7).
  *
  * ONE escape function, used on every value, and the only inline `style` values in the output are
- * `--cells` and `--magnitude`, both numbers this file formats itself.
+ * `--cells`, `--magnitude` and `--at`, all numbers this file formats itself.
  */
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
+import { MISSING, day, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
+import { figureLike } from './figure.ts';
+import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
@@ -61,6 +63,12 @@ export type RenderOptions = InlineOptions & {
    * identical and the parity gate keeps meaning something.
    */
   hole?: ((path: string | null) => void) | true;
+  /**
+   * Whether a `forecast` draws its knobs and its scrub. Only the Svelte drawer reads it: the knobs
+   * are state in a component, so `toHTML` always draws the walk as the host made it, and the parity
+   * tests compare the two without it.
+   */
+  scenario?: boolean;
 };
 
 /**
@@ -238,6 +246,7 @@ function proportional(b: Block, o: RenderOptions): string {
   if (b.kind === 'split') return split(b, o);
   if (b.kind === 'bridge') return bridge(b, o);
   if (b.kind === 'series') return series(b, o);
+  if (b.kind === 'forecast') return forecast(b, o);
 
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
@@ -617,7 +626,33 @@ function series(b: Block, o: RenderOptions): string {
   return `<div class="prop series" style="--cells:${plan.buckets.length}">${legend}${chart}${numbers}</div>`;
 }
 
-const PRIMITIVE_RENDERERS = { panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;
+/**
+ * `forecast`: the cash walk as a line over a zero rule (`src/forecast.ts`), the sentence over it, the
+ * crossing pinned, month ticks, and every movement in a fold. Always the walk as the host made it:
+ * the knobs and the scrub are `Forecast.svelte`'s, and only where the host asks for them.
+ */
+function forecast(b: Block, o: RenderOptions): string {
+  const model = forecastModel(b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))));
+  if (!model) return `<div class="prop forecast"><p class="forecast-empty">${escape(FORECAST_NONE)}</p></div>`;
+  const shown = scenario(model, baseKnobs(model));
+  const plan = forecastPlan(model, shown, null);
+  const path = (cls: string, d: string, extra = '') => (d ? `<path class="${cls}"${extra} d="${d}" vector-effect="non-scaling-stroke"></path>` : '');
+  const said = `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>`;
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-zero', `M0 ${plan.zero}H1000`)}${path('forecast-base', plan.base)}${path('forecast-stem', plan.up, ' data-move="up"')}${path('forecast-stem', plan.down, ' data-move="down"')}${path('forecast-past', plan.past)}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg>${
+    plan.cross ? `<span class="forecast-pin" style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph}${escape(plan.cross.day)}</span>` : ''
+  }</div>`;
+  const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks.map((t) => `<li class="forecast-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}</ol>`;
+  const row = (when: string, what: string, move: string, balance: string) =>
+    `<tr><th scope="row">${escape(when)}</th><td>${escape(what)}</td><td class="num">${escape(move)}</td><td class="num">${escape(balance)}</td></tr>`;
+  const numbers = `<details class="forecast-numbers"><summary class="forecast-toggle">${escape(FORECAST_NUMBERS)}</summary><table class="forecast-table"><thead><tr>${[FORECAST_WHEN, FORECAST_WHAT, FORECAST_MOVE, FORECAST_BALANCE]
+    .map((h) => `<th scope="col">${escape(h)}</th>`)
+    .join('')}</tr></thead><tbody>${row(day(model.today), model.label, '', model.template)}${shown.steps
+    .map((s) => row(day(s.day), s.label, figureLike(model.template, s.delta), figureLike(model.template, s.balance)))
+    .join('')}</tbody></table></details>`;
+  return `<div class="prop forecast">${said}${chart}${ticks}${numbers}</div>`;
+}
+
+const PRIMITIVE_RENDERERS ={ panel, grid, rows, proportional, inline: inlinePrimitive, list, table, media } as const;
 
 /* ── segments ─────────────────────────────────────────────────────────────── */
 

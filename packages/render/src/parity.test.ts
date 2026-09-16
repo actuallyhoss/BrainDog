@@ -109,6 +109,10 @@ const SHAPES: Record<string, string> = {
     '```series net\nMonth | in: Money in | out: Money out | state\nApr 2026 | £4,800.00 | £2,300.00 | \nMay 2026 |  |  | \nSep 2026 | £1,000.00 | £900.00 | partial\nOct 2026 | £2,000.00 |  | ahead\n```',
   'a series with no numbers at all': '```series | In and out\nMonth | Sales\nApr | \n```',
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
+  'a forecast with a past, stems, knobs and a crossing':
+    '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',
+  'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
+  'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
@@ -125,4 +129,13 @@ test('and the comparison is not vacuous: a tree that differs is told apart', () 
   const a = tree(toHTML([page(SHAPES['a section with a count']!)]));
   const b = tree(toHTML([page(SHAPES['a section that counts nothing']!)]));
   assert.notEqual(a, b);
+});
+
+test('a forecast draws its knobs only where the host asks, and the rest of the tree is the same', () => {
+  const block = page(SHAPES['a forecast with a past, stems, knobs and a crossing']!);
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  const knobs = render(Knobbed, { props: { block, opts: { scenario: true } } }).body;
+  assert.match(knobs, /type="range"/u);
+  assert.match(knobs, /aria-pressed/u);
+  assert.doesNotMatch(render(Block, { props: { block } }).body, /type="range"/u);
 });
