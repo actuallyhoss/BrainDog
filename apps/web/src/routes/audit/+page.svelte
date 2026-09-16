@@ -19,6 +19,7 @@
   import { AUDIT, DECIDED, DOM_CAP, NOW, PAGES, QUESTIONS, REGISTERS, actorOf, entry } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -383,6 +384,9 @@
   -->
   {#if refused}
     <Empty kind="error" title={refused} />
+  {:else if route.data.live && !live}
+    <!-- Bars while the live log is on its way, rather than a blank panel under the title. -->
+    <Waiting />
   {:else if matched.length === 0 && (!route.data.live || live)}
     <Empty
       kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}

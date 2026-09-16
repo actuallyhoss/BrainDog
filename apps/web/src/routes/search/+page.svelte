@@ -26,6 +26,7 @@
   import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -121,7 +122,8 @@
          the record. -->
     <Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} />
   {:else if !answer}
-    <!-- Nothing until the first answer, so the sample never shows over a live record. -->
+    <!-- Bars until the first answer, so the sample never shows over a live record. -->
+    <Waiting />
   {:else if answer.from === 'refused'}
     <Empty kind="error" title={answer.fix} />
   {:else if found.total === 0}

@@ -37,6 +37,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { CapLine } from 'braindog-render/svelte';
@@ -2001,10 +2002,10 @@
     </Empty>
   </div>
 {:else if !decl && !refusal}
-  <!-- LOADING, AND NOTHING IS DRAWN FOR IT. The answer is a round trip away, and a placeholder list
-       would be rows that are not there. `aria-busy` says the region is on its way, and
-       `data-screen` stays off until it has arrived. -->
-  <div class="page" aria-busy="true"></div>
+  <!-- LOADING. The answer is a round trip away, and a placeholder list would be rows that are not
+       there, so it is bars with no words in them, after 300ms (`Waiting.svelte`). `aria-busy` says
+       the region is on its way, and `data-screen` stays off until it has arrived. -->
+  <div aria-busy="true"><Waiting head rows={8} /></div>
 {:else if !decl}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has

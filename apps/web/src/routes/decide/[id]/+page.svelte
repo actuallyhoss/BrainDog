@@ -53,6 +53,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
@@ -344,7 +345,8 @@
 <svelte:window {onkeydown} />
 
 {#if from === 'reading'}
-  <!-- Nothing until the read answers. -->
+  <!-- Bars, and after 300ms, until the read answers. -->
+  <Waiting head />
 {:else if from === 'refused'}
   <div class="page">
     <Empty kind="error" heading title={refusal}>

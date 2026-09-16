@@ -27,6 +27,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
@@ -498,7 +499,8 @@
 <svelte:window {onkeydown} />
 
 {#if got === null}
-  <!-- Nothing until the record answers: a sample page drawn and then swapped is two pages. -->
+  <!-- Bars until the record answers: a sample page drawn and then swapped is two pages. -->
+  <Waiting head />
 {:else if got.from === 'refused'}
   <div class="page said">
     <Empty kind="error" heading title={got.fix}>

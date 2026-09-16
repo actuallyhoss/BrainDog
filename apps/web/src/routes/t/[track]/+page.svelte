@@ -44,6 +44,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -218,7 +219,8 @@
     <Empty kind="error" heading title={refused} />
   </div>
 {:else if !answered}
-  <!-- Nothing until the record has answered, so the sample never flashes over a live thread. -->
+  <!-- Bars until the record has answered, so the sample never flashes over a live thread. -->
+  <Waiting head />
 {:else if !track}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has

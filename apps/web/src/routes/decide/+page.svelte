@@ -43,6 +43,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
@@ -271,7 +272,8 @@
 
 <div class="page">
   {#if from === 'reading'}
-    <!-- Nothing until the first read answers. -->
+    <!-- Bars, and after 300ms, until the first read answers. -->
+    <Waiting />
   {:else if from === 'refused'}
     <Empty kind="error" title={refusal} />
   {:else if open.length === 0}

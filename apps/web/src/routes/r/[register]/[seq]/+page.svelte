@@ -28,6 +28,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
@@ -474,7 +475,8 @@
 <svelte:head><title>{titleOf(row && decl && String(row.fields[decl.title] ?? ""), decl?.name)}</title></svelte:head>
 
 {#if waiting}
-  <!-- Nothing until the row has been read. -->
+  <!-- Bars until the row has been read, never the sample's row. -->
+  <Waiting head rows={6} />
 {:else if got?.from === 'refused'}
   <div class="page">
     <Empty kind="error" heading title={got.fix}>

@@ -642,6 +642,8 @@ export const copy = {
   requestAccess: 'Request access',
   tryAgain: 'Load it again',
   addOne: 'Add the first row',
+  /* The one word a screen reader hears while a screen waits on the record (`Waiting.svelte`). */
+  waiting: 'Loading',
   addTheRow: 'Add the row',
   /* The two questions an audit log exists to answer, as the labels of the two controls. */
   auditWho: 'Who',

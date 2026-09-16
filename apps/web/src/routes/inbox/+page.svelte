@@ -18,6 +18,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
@@ -142,7 +143,8 @@
   {#if refused}
     <Empty kind="error" title={refused} />
   {:else if !answered || unrouted}
-    <!-- Nothing before the first answer, and nothing from a host that has no inbox to read. -->
+    <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
+    {#if !answered}<Waiting />{/if}
   {:else if INBOX.length === 0}
     <!--
       AN EMPTY INBOX IS TWO DIFFERENT FACTS AND THIS DREW ONE OF THEM, WRONGLY.
