@@ -265,3 +265,23 @@ test('WITHOUT node:net, AN ADDRESS IS READ THE WAY net.isIP READS IT, and a host
   assert.equal(refusedHost(new URL('https://LOCALHOST./')), 'local');
   assert.equal(refusedHost(new URL('https://a.b.localhost/')), 'local');
 });
+
+test('HOLDING TELLS THE LEDGER HOW MANY RUNS THIS PASS HAS ALREADY LET THROUGH, and a held run is not one of them', async () => {
+  const asked: number[] = [];
+  let sent = 0;
+  const execute = holding(
+    async () => {
+      sent++;
+      return { status: 200, body: 'ok', bytes: 2, ms: 1, requests: 1 };
+    },
+    'rec_x',
+    (_record, _action, pending = 0) => {
+      asked.push(pending);
+      return pending >= 2 ? { until: 0, say: 'waiting' } : null;
+    },
+  );
+  const request = { ingest: 'ping' } as Parameters<typeof execute>[0];
+  for (let i = 0; i < 4; i++) await execute(request);
+  assert.deepEqual(asked, [0, 1, 2, 2]);
+  assert.equal(sent, 2, 'a pass sent past the allowance, because nothing it let through counted until it was metered');
+});

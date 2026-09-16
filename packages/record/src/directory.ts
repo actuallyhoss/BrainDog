@@ -888,7 +888,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      * sentence names the action, the day it runs again, and what the record used up. A plan with no allowance
      * is never held, and neither is a record this directory does not know.
      */
-    mayRun: (record: string, action: string): { until: number; say: string } | null => {
+    mayRun: (record: string, action: string, pending = 0): { until: number; say: string } | null => {
       const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
       const allowance = row ? ALLOWANCE[planOf(row.plan)] : null;
       if (!allowance) return null;
@@ -897,6 +897,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
       const used = totalsOf(
         sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ?`, record, dayOf(monthStart(now)), dayOf(until)),
       );
+      /* AND THE RUNS A PASS HAS LET THROUGH AND NOT YET METERED, which the host counts and this cannot see. */
+      used.runs += Math.max(0, Math.floor(Number(pending) || 0));
       const over = (['runs', 'requests', 'bytes', 'ms'] as const).find((k) => used[k] >= allowance[k]);
       if (over === undefined) return null;
       const turns = new Date(until);

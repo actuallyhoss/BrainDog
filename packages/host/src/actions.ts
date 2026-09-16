@@ -68,7 +68,8 @@ export type Hold = { until: number; say: string } | null;
 
 /** The Directory's half of a pass: whether a record's action may run, and counting what one did. */
 export type Ledger = {
-  mayRun: (record: string, action: string) => Hold | Promise<Hold>;
+  /** `pending` is how many runs this pass has already let through, which the ledger has not been told of yet. */
+  mayRun: (record: string, action: string, pending?: number) => Hold | Promise<Hold>;
   meter: (record: string, run: Metered) => unknown;
 };
 
@@ -79,9 +80,18 @@ export type Ledger = {
  * kernel writes its event and moves the action to the day it may run again.
  */
 export function holding(execute: Execute, record: string, mayRun: Ledger['mayRun']): Execute {
+  /* THE RUNS THIS PASS LET THROUGH, because the ledger is told of them only after the pass. Asked without them, every
+     run of a pass saw the count from before it, so a record one run short of its allowance sent a whole pass. Taken
+     before the await, so two runs asked at once cannot both be told there is room for one. ONE PER PASS: the count is
+     forgotten only when the executor is. */
+  let admitted = 0;
   return async (request) => {
-    const hold = await mayRun(record, request.ingest);
-    if (hold) return { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: hold };
+    const pending = admitted++;
+    const hold = await mayRun(record, request.ingest, pending);
+    if (hold) {
+      admitted--;
+      return { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: hold };
+    }
     return execute(request);
   };
 }

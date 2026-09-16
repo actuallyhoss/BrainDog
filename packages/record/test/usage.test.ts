@@ -244,3 +244,12 @@ test('THE LEDGER AGREES WITH THE RECORD’S OWN EVENTS, and a record at its limi
   sql.close();
   dirSql.close();
 });
+
+test('A PASS DOES NOT RUN PAST THE ALLOWANCE: runs already let through this pass count before they are metered', async () => {
+  const { d, sql, record } = ledger();
+  const limit = ALLOWANCE.hosted!.runs;
+  sql.exec("INSERT INTO dir_usage_day (record, day, scope, action, runs) VALUES (?, '2026-09-02', 'global', 'backfill', ?)", record, limit - 2);
+  assert.equal(d.mayRun(record, 'npm downloads', 1), null, 'the last run of the allowance was held');
+  assert.notEqual(d.mayRun(record, 'npm downloads', 2), null, 'two runs already let through this pass were not counted');
+  sql.close();
+});

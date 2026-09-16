@@ -246,7 +246,7 @@ export class Record$ extends DurableObject<Env> {
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
       const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey: keyOpener(api, this.env.KEK) });
-      const execute = holding(inner, record, (r, action) => ledger.mayRun(r, action));
+      const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending));
       const out = await api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler: this.#alarm });
       await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
     } catch (e) {
@@ -513,8 +513,8 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /** Whether a record's scheduled action may run now: `null`, or until when it waits and why. A record's alarm asks before each run. */
-  mayRun(record: string, action: string): { until: number; say: string } | null {
-    return this.#directory().mayRun(record, action);
+  mayRun(record: string, action: string, pending = 0): { until: number; say: string } | null {
+    return this.#directory().mayRun(record, action, pending);
   }
 
   /** Count one run a record's alarm metered. `null` is counted, already counted or too old to count; a refusal is a row that is not a run. */
