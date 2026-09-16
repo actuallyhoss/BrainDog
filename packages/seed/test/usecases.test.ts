@@ -88,6 +88,11 @@ test('A CARRIED PACK WITHOUT ITS MODULES IS REFUSED, naming what to install', as
 test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   assert.deepEqual(pagesOf(useCase('student')!), [{ page: 'studies', title: 'Studies', section: 'Studies' }]);
   assert.deepEqual(pagesOf(useCase('founder')!), [{ page: 'dashboard', title: 'Dashboard', section: 'Dashboard' }]);
+  assert.deepEqual(pagesOf(useCase('team')!), [
+    { page: 'board', title: 'Board', section: 'Board' },
+    { page: 'agent-work', title: 'Agent work', section: 'Board' },
+  ]);
+  assert.deepEqual(pagesOf(useCase('guide')!), [{ page: 'guide', title: 'Guide', section: 'Guide' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);
@@ -134,9 +139,29 @@ const SENTENCES: [string, string | null][] = [
   ['STUDENT', 'student'],
   ['side-projects', null],
   ['my running club', null],
+  ['I run the product team at a 200-person company and our agents take tickets', 'team'],
+  ['a product manager with a backlog and two-week sprints', 'team'],
+  ['our engineering team lives in Jira and wants agents on the tickets', 'team'],
+  ['Tasks for a small team', 'team'],
+  ['kanban for my squad', 'team'],
+  ['standups and a roadmap for the department', 'team'],
+  ['agentic task list for an enterprise', 'team'],
+  ['my team', 'team'],
+  ['issues and assignees', 'team'],
+  ['we plan in cycles', 'team'],
+  ["I want to start a podcast and don't know where to begin", 'guide'],
+  ['A new project', 'guide'],
+  ['starting a newsletter from scratch', 'guide'],
+  ['I have an idea for a YouTube channel', 'guide'],
+  ['writing my first novel, step by step', 'guide'],
+  ['getting started with a charity event', 'guide'],
+  ['I want a checklist and milestones for my passion project', 'guide'],
+  ['a band', 'guide'],
+  ['where to start with a blog', 'guide'],
+  ["I'm starting something new", 'guide'],
 ];
 
-test('FORTY SENTENCES LAND ON THE USE CASE THEY DESCRIBE', () => {
+test('SIXTY SENTENCES LAND ON THE USE CASE THEY DESCRIBE', () => {
   for (const [said, want] of SENTENCES) assert.equal(arrange(said).pick?.usecase ?? null, want, JSON.stringify(said));
 });
 
@@ -149,6 +174,6 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
   const mixed = arrange('a student who freelances for clients on the side');
   assert.deepEqual(
     mixed.ranked.map((r) => [r.usecase.usecase, r.score]),
-    [['student', 1], ['business', 1], ['founder', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
+    [['student', 1], ['business', 1], ['founder', 0], ['team', 0], ['guide', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
   );
 });

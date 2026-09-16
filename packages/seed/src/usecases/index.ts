@@ -14,7 +14,9 @@ import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';
 
 import { BUSINESS } from './business.ts';
 import { FOUNDER } from './founder.ts';
+import { GUIDE } from './guide.ts';
 import { STUDENT } from './student.ts';
+import { TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
 export { VOICE_KEYS, voiceOf } from '@braindog/declare';
@@ -26,7 +28,7 @@ function checked(doc: unknown): UseCase {
 }
 
 /** In the order a tie is broken: the most specific first, and the business setup last. */
-export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER), checked(BUSINESS)];
+export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
 
 export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) => u.usecase === id);
 
