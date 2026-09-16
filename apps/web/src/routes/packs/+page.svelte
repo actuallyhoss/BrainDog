@@ -144,6 +144,12 @@
         return;
       }
       const turned = new Set([id, ...out.value.packs]);
+      /* OFF IS UNDONE, NOT ASKED. Its lists leave the sidebar, which is easy to miss from here, and on is the same
+         call over the same rows. The pack pressed comes back first, so a dependent that leans on it can follow. */
+      if (!on && out.value.changed) {
+        const went = [id, ...out.value.packs.filter((p) => p !== id)];
+        toasts.push(copy.packTurnedOffNamed(went.map(nameOf)), { undo: () => void turnBack(went) });
+      }
       blocks = Object.fromEntries(Object.entries(blocks).filter(([k, b]) => !turned.has(k) && !(b.kind === 'off' && turned.has(b.pack))));
       const again = await source.packs();
       if (again.ok) states = again.value;
@@ -152,6 +158,30 @@
     }
   }
 
+  /** Undo for a switch turned off: each pack on again, in the order they went. */
+  async function turnBack(ids: readonly string[]) {
+    if (!source || busy !== null) return;
+    busy = ids[0] ?? null;
+    try {
+      for (const id of ids) {
+        const out = await source.enable(id);
+        if (!out.ok) {
+          blocks = { ...blocks, [id]: blocked(id, out.refusal) };
+          break;
+        }
+      }
+      const again = await source.packs();
+      if (again.ok) states = again.value;
+    } finally {
+      busy = null;
+    }
+  }
+
+  /** The row whose Uninstall was pressed once, asking before the second press does it. */
+  let asking = $state<string | null>(null);
+  /** Focus moves to the safe answer, so a second Enter keeps the add-on rather than removing it. */
+  const focusOn = (node: HTMLElement) => node.focus();
+
   /**
    * Uninstall one. The sample keeps the sentence it always toasted; a record takes it out, and the list is read
    * again, so what is drawn is what the record now holds. A refusal is the record's sentence, and a race reads again.
@@ -159,6 +189,7 @@
   async function uninstall(id: string, name: string) {
     if (!source || busy !== null) return;
     busy = id;
+    asking = null;
     try {
       const out = await source.uninstall(id);
       if (source.sample) {
@@ -278,7 +309,15 @@
             {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
-          {#if block}
+          {#if pack && asking === state.id}
+            <!-- ASKED, BECAUSE IT CANNOT BE UNDONE (copy.uninstallLeaves says why), and named, so the answer is
+                 about this add-on and its counts rather than "Are you sure?". -->
+            <p class="pack-said" role="status">
+              <span>{copy.uninstallLeaves(pack.name, state.registers.length, pack.pages?.length ?? 0)}</span>
+              <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => uninstall(pack.id, pack.name)}>{copy.uninstallNamed(pack.name)}</Button>
+              <Button weight="bare" {@attach focusOn} onclick={() => (asking = null)}>{copy.uninstallKeep}</Button>
+            </p>
+          {:else if block}
             <p class="pack-said" role="status">
               {#if block.kind === 'required'}
                 <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
@@ -307,7 +346,7 @@
               weight="bare"
               tone="bad"
               disabled={busy !== null}
-              onclick={() => uninstall(pack.id, pack.name)}
+              onclick={() => (asking = pack.id)}
             >{copy.uninstall}</Button>
           {/if}
           </footer>

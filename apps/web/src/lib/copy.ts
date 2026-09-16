@@ -821,6 +821,25 @@ export const copy = {
      second press, never as a side effect of the first. */
   packTurnedOff: 'Turned off',
   packSwitch: (name: string) => `${name}, on or off`,
+  /* UNINSTALL IS ASKED, NOT UNDONE, and it is the one place on this screen that is. The kernel
+     retires the declarations, forgets the pack row with its chosen settings and deletes its pending
+     schedules, and a second install plants the examples again, so there is no state before to give
+     back. The question names what leaves, in counts a person can check against the row above it. */
+  uninstallLeaves: (pack: string, lists: number, pages: number): string => {
+    const parts = [
+      ...(lists > 0 ? [lists === 1 ? 'its list' : `its ${lists} lists`] : []),
+      ...(pages > 0 ? [pages === 1 ? 'its page' : `its ${pages} pages`] : []),
+    ];
+    const leave = `${list([pack, ...parts])} ${parts.length > 0 ? 'leave' : 'leaves'} the sidebar.`;
+    return lists > 0
+      ? `${leave} Their rows are kept; its settings and schedules are not.`
+      : `${leave} Its settings and schedules go with it.`;
+  },
+  uninstallNamed: (pack: string) => `Uninstall ${pack}`,
+  uninstallKeep: 'Keep it',
+  /* TURNING OFF IS UNDONE, because turning back on is the same kernel call over the same rows. */
+  packTurnedOffNamed: (names: string[]) =>
+    `${list(names)} ${names.length === 1 ? 'is' : 'are'} turned off and out of the sidebar. The rows are kept.`,
   packNeededBy: (names: string[]) => `Needed by ${list(names)}`,
   packOffTogether: (others: number) => (others === 1 ? 'Turn both off' : `Turn all ${others + 1} off`),
   packIsOff: (name: string) => `${name} is off`,
