@@ -2054,7 +2054,9 @@
          this tab to read, so these rows are the in-browser sample every other screen draws; that is
          where they came from, not something that went wrong. See `open` in `lib/data/record.ts`,
          which is also where this stops being reachable. -->
-    {#if sample}<p class="sample-note">{copy.sampleWhat}</p>{/if}
+    <!-- AND ONLY ONCE THE SAMPLE BAR HAS BEEN PUT AWAY. While the bar stands at the top of the panel
+         this printed its first sentence a second time, forty pixels under it. -->
+    {#if sample && pref.read().sampleSaid === true}<p class="sample-note">{copy.sampleWhat}</p>{/if}
     <!--
       CAPTURE, FIRST ON THE PAGE.
 

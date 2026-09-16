@@ -779,7 +779,9 @@
     .sample {
       gap: var(--sp-2) var(--sp-3);
       align-items: center;
-      padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-4);
+      /* 56px AT THE END, THE SAME ROOM `PageHead` LEAVES, because the search button is fixed in that
+         corner at this width and sat on top of the bar's sentence. */
+      padding: var(--sp-1) 56px var(--sp-1) var(--gutter);
       /* It still WRAPS, because "Start your own" and "Put this away" beside a bold sentence do not
          fit 390px and shrinking either below the 44px floor is the one thing a small screen may
          not trade. Two rows instead of six is the whole of the fix. */
