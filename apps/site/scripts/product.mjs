@@ -148,6 +148,16 @@ for (const size of SIZES)
       // No entrance animations racing the shutter, and no motion in a still image anyway.
       reducedMotion: 'reduce',
     });
+    /* A READER WHO HAS BEEN HERE BEFORE. The first visit's furniture, the sample bar and the one-line
+       definitions under a title, is right for somebody opening the app and noise on a marketing
+       page: it pushed the product down the frame and put a paragraph about the sample above it. */
+    await context.addCookies([
+      {
+        name: 'bd_pref',
+        value: encodeURIComponent(JSON.stringify({ scheme, sampleSaid: true, defined: ['row', 'page', 'block'] })),
+        url: BASE,
+      },
+    ]);
     const page = await context.newPage();
 
     for (const shot of SHOTS) {
@@ -165,7 +175,9 @@ for (const size of SIZES)
           await page.waitForSelector('main#main[data-screen]', { timeout: 10000 }).catch(() => {});
           // The same reason both other scripts do it: an off-screen rowgroup photographs empty.
           await page.addStyleTag({
-            content: '.rowgroup{content-visibility:visible !important}',
+            /* And the one-line "This is a sample record." note a list keeps after the bar is put away:
+               on brain.dog the page around the picture already says so. */
+            content: '.rowgroup{content-visibility:visible !important}.sample-note{display:none !important}',
           });
           /* AND THE ACT IS THE LAPTOP'S. `arrange` presses a control that a phone lays out somewhere
          else or not at all, and a shot whose setup silently failed is a picture of the screen
