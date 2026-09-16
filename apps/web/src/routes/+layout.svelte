@@ -194,7 +194,7 @@
   /* HOW MANY ROWS ARE WAITING, ANYWHERE. A row typed on the first run and left behind was known only
      to the list it belongs to, which is the one screen the person is no longer on. This is the read
      that makes it true from every other one, and it tracks because the rows are in a `SvelteMap`. */
-  const unsaved = $derived(anyPending());
+  const unsaved = $derived(anyPending(!data.live));
 
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */

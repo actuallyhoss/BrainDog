@@ -67,7 +67,7 @@
   const written = $derived(
     got?.from === 'live' ? (got.entry ?? undefined) : got?.from === 'sample' ? entry(id, seq) : undefined,
   );
-  const unwritten = $derived(written ? undefined : pending.of(id).find((r) => r.seq === seq));
+  const unwritten = $derived(written ? undefined : pending.of(id, got?.from === 'sample').find((r) => r.seq === seq));
   const row = $derived(written ?? unwritten);
 
   /* WHAT POINTS AT THIS ROW. A `ref` declares `to:` and nothing declared the other direction, so a

@@ -27,7 +27,14 @@ import type { Fields } from './schema.ts';
 
 export { anyPending, drop, of, replace } from './pending-held.svelte.ts';
 
-/** Add one, and hand back the sequence it was given so a caller can point a receipt at it. */
-export function add(register: string, fields: Fields): number {
-  return keep(register, fields, new Date(NOW).toISOString());
+/**
+ * Add one, and hand back the sequence it was given so a caller can point a receipt at it.
+ *
+ * `sample` IS WHAT THE SCREEN TAKING THE ROW BELIEVES IT IS LOOKING AT, and it is passed rather
+ * than assumed here for the reason `pending-held.svelte.ts` sets out: every caller of this is
+ * already inside its own answer to that question, the three screens do not all ask the same call,
+ * and a row drawn against the wrong one is somebody else's row standing in a live business.
+ */
+export function add(register: string, fields: Fields, sample: boolean): number {
+  return keep(register, fields, new Date(NOW).toISOString(), sample);
 }

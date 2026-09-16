@@ -280,7 +280,7 @@ test('THE HEAD AND THE CAP LINE COUNT AGAINST THE SAME NUMBER', () => {
      pending rows, because they are merged into the answer before it is counted. */
   assert.match(
     REGISTER,
-    /const denominator = \$derived\(filters\.length \|\| q \? result\.matched : result\.total \+ pending\.of\(id\)\.length\)/u,
+    /const denominator = \$derived\(filters\.length \|\| q \? result\.matched : result\.total \+ pending\.of\(id, sample\)\.length\)/u,
   );
   assert.match(REGISTER, /total=\{denominator\}/u);
   assert.doesNotMatch(REGISTER, /total=\{result\.total\}/u, 'the head counts against the register again');

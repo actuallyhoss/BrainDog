@@ -12,6 +12,29 @@
  * NEGATIVE SEQUENCES, so a pending row can never collide with one the record has. The spoken id is
  * what every screen addresses a row by, and two rows answering to `obligations#7` is the one
  * collision that would put a receipt, a menu or an edit on the wrong one.
+ *
+ * AND A ROW BELONGS TO THE THING IT WAS TYPED AGAINST, WHICH IS WHAT `whose` KEEPS.
+ *
+ * EVERY WRITE WAS GATED ON THE SAMPLE AND EVERY READ WAS GATED ON NOTHING. The three screens that
+ * hold a row only ever do it when there is no record to write to, so the rows in here are the
+ * sample's by construction; the screens that DRAW them asked for them whatever they were looking
+ * at. A row typed against the built-in sample was therefore drawn on a live record's list, merged
+ * into its answer, counted in its head, and announced by the shell as a row of yours that had not
+ * been saved. It is not yours and it is not that record's: it is a row about a fictional studio's
+ * shell, standing in a real business.
+ *
+ * TWO WAYS IT HAPPENS, AND NEITHER NEEDS A BUG ANYWHERE ELSE. The source is decided per tab from
+ * `boot` (`data/record.ts`), and `/start` decides its own from `packs` (`record/packs.ts`), so one
+ * transient `UNREACHABLE` on either call is enough for the two to disagree: the screen that takes
+ * the row believes there is no record while the list that draws it is live. And `boot-live.ts`'s
+ * answer is dropped by `forget()` after a write, so a tab that read the sample and then reached the
+ * record flips underneath rows that are already held.
+ *
+ * SO THE SOURCE COMES FROM THE CALLER, exactly as the clock does one file over, and for the same
+ * reason: the holder cannot know it and must not guess. A reader says what it is drawing and is
+ * handed the rows typed against that and no others. It is scoping rather than a reset because a
+ * reset is a call somebody has to remember at the one moment it matters, and the moment here is a
+ * fetch failing on another screen.
  */
 
 import { SvelteMap } from 'svelte/reactivity';
@@ -37,12 +60,26 @@ const rows = new SvelteMap<string, Entry[]>();
 let next = 0;
 
 /**
+ * What the rows in hand were typed against: `true` for the sample, `false` for a record.
+ *
+ * `null` UNTIL SOMETHING IS HELD, because an empty holder belongs to nobody and answering either
+ * way would be a claim about rows that do not exist.
+ */
+let whose: boolean | null = null;
+
+/**
  * Hold one, and hand back the sequence it was given so a caller can point a receipt at it.
  *
  * THE INSTANT COMES FROM THE CALLER because the clock does not belong to the holder. It is the
  * record's, and reaching for it is what would drag the whole sample into the shell.
+ *
+ * AND SO DOES `sample`, FOR THE REASON THE HEADER GIVES: what the screen taking the row believes it
+ * is looking at. Rows typed against something else go, because they are answers about a shell this
+ * one is not drawing and there is no screen left that could put them right.
  */
-export function keep(register: string, fields: Fields, created: string): number {
+export function keep(register: string, fields: Fields, created: string, sample: boolean): number {
+  if (whose !== null && whose !== sample) rows.clear();
+  whose = sample;
   next -= 1;
   const seq = next;
   const row: Entry = { seq, version: 1, created, by: 'you', fields };
@@ -50,8 +87,15 @@ export function keep(register: string, fields: Fields, created: string): number 
   return seq;
 }
 
-/** What is waiting for one register, newest first. Empty for a register nobody has typed into. */
-export function of(register: string): Entry[] {
+/**
+ * What is waiting for one register, newest first. Empty for a register nobody has typed into.
+ *
+ * `sample` IS WHAT THE READER IS DRAWING, and rows typed against the other thing are not its rows.
+ * A live list asking this gets nothing back from a tab that spent its first minute on the sample,
+ * which is the whole of what this argument is for.
+ */
+export function of(register: string, sample: boolean): Entry[] {
+  if (whose !== sample) return [];
   return rows.get(register) ?? [];
 }
 
@@ -98,5 +142,11 @@ export function drop(register: string, seq: number): void {
  * ZERO IS AN ANSWER AND NOT A STATE TO DRAW. The shell reads this to decide whether to say anything
  * at all, so a nought reaching a screen would be the product reporting on a thing that has not
  * happened.
+ *
+ * AND ZERO IS ALSO WHAT A SHELL OVER A RECORD IS OWED. The sentence this number draws says "a row
+ * you typed has not been saved", which is true of a tab holding the sample's rows and false in
+ * front of a business whose rows are all written: said there, it is the product reporting somebody
+ * else's unfinished screen as unsaved work of yours.
  */
-export const anyPending = (): number => [...rows.values()].reduce((n, r) => n + r.length, 0);
+export const anyPending = (sample: boolean): number =>
+  whose === sample ? [...rows.values()].reduce((n, r) => n + r.length, 0) : 0;

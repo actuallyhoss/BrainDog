@@ -331,7 +331,7 @@
           /* NO `party` ON THE DEMO: a waiting row cannot point at another waiting row, because the
              demo resolves a ref against the seed's rows and would print `people#-1`. */
           const fields: Fields = { ...row.fields };
-          if (had === undefined || !pending.replace(row.register, had, fields)) madeRows.set(key, pending.add(row.register, fields));
+          if (had === undefined || !pending.replace(row.register, had, fields)) madeRows.set(key, pending.add(row.register, fields, chosen.source.sample));
           out.made.push({ name: title, list, register: row.register });
           continue;
         }
@@ -413,7 +413,7 @@
       const asked = introduce(now, null, packs);
       if (!asked) return;
       const row = personRow(asked, now.bio);
-      if (me === null || !pending.replace('people', me, row)) me = pending.add('people', row);
+      if (me === null || !pending.replace('people', me, row)) me = pending.add('people', row, chosen.source.sample);
       known = { name: asked.name, waiting: true };
       return;
     }
@@ -590,7 +590,7 @@
         if (made !== null && pending.replace(choice.key, made, taken)) {
           toasts.push(copy.notWritten(firstRun.rowChanged(thing, list)));
         } else {
-          made = pending.add(choice.key, taken);
+          made = pending.add(choice.key, taken, chosen.source.sample);
         }
         saved = null;
       } else {

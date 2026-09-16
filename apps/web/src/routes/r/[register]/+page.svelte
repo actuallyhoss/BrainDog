@@ -534,13 +534,13 @@
        was read at and brings back one the answer has since dropped — the reopened row that no longer matches the
        chip it was found under. The hold is released when the question changes, with the receipt it belongs to. */
     entries: holdInPlace(
-      [...pending.of(id), ...pages.flat()],
+      [...pending.of(id, sample), ...pages.flat()],
       held,
     ).map((e) => {
       const patch = edits.get(e.seq);
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
-    matched: matched + pending.of(id).length,
+    matched: matched + pending.of(id, sample).length,
     names: named,
   });
 
@@ -671,7 +671,7 @@
      and does not: so every successful add printed a numerator larger than its denominator, "39 of
      38" on Money after a first row and "15 of 14" on Tasks after one capture. A person who has just
      added something is the last reader who should be shown arithmetic that looks broken. */
-  const denominator = $derived(filters.length || q ? result.matched : result.total + pending.of(id).length);
+  const denominator = $derived(filters.length || q ? result.matched : result.total + pending.of(id, sample).length);
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -968,7 +968,7 @@
       return;
     }
     const named = display(id, decl.title, taken[decl.title]) ?? '';
-    const seq = pending.add(id, taken);
+    const seq = pending.add(id, taken, sample);
     receipt(seq, { mark: copy.markNotWritten, intent: 'warn', undo: () => pending.drop(id, seq) });
     closeCreate();
     /* THE NAME, NOT THE NOUN AND THE NAME. `${decl.one} ${named}` read "item Deposit for the print
@@ -999,7 +999,7 @@
        are the same kind of thing, waiting on the same missing write path, and holding one of them
        in this component and the other in a module would be two answers to one question: the second
        screen to need it would have found the wrong one. */
-    const seq = pending.add(id, { ...inherited, [title]: said });
+    const seq = pending.add(id, { ...inherited, [title]: said }, sample);
     /**
      * THE ROW IS ADDED EVEN WHEN THE REGISTER WANTS MORE, and the chip says what it wants.
      *
@@ -1197,7 +1197,7 @@
   const shownValue = (seq: number, field: string): unknown => {
     const patch = edits.get(seq);
     if (patch && Object.hasOwn(patch, field)) return patch[field];
-    const held = rowAt(seq) ?? pending.of(id).find((r) => r.seq === seq);
+    const held = rowAt(seq) ?? pending.of(id, sample).find((r) => r.seq === seq);
     return held?.fields[field];
   };
 
@@ -1400,7 +1400,7 @@
     });
 
   const peekedEntry = $derived(
-    peeked === null ? undefined : (rowAt(peeked) ?? pending.of(id).find((r) => r.seq === peeked)),
+    peeked === null ? undefined : (rowAt(peeked) ?? pending.of(id, sample).find((r) => r.seq === peeked)),
   );
 
   /** Only INDEXED fields are offered, in declaration order, at most eight. A filter on an unindexed
@@ -1433,7 +1433,7 @@
     };
     for (const [field, held] of counted) {
       const n = new Map(held);
-      for (const e of pending.of(id)) bump(n, e.fields[field], 1);
+      for (const e of pending.of(id, sample)) bump(n, e.fields[field], 1);
       for (const e of pages.flat()) {
         const patch = edits.get(e.seq);
         if (!patch || !Object.hasOwn(patch, field)) continue;

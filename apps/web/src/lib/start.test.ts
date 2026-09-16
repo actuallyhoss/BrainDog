@@ -165,7 +165,7 @@ test('THE FIRST ROW REPORTS WHERE THE PERSON IS STANDING, and does not navigate'
    */
   assert.match(
     commit,
-    /chosen\.source\.sample[\s\S]*pending\.add\(choice\.key, taken\)/u,
+    /chosen\.source\.sample[\s\S]*pending\.add\(choice\.key, taken, chosen\.source\.sample\)/u,
     'the demo row no longer waits in `pending`, or it waits for a record that could have taken it',
   );
   assert.match(startPage, /bind:taken/u, 'the form holds what was typed and hands out nothing');
