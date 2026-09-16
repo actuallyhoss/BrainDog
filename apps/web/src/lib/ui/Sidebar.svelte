@@ -364,6 +364,8 @@
     announces and "Toggle" tells nobody which way they are about to go.
   -->
   <div class="top">
+    <!-- THE RECORD IS THE SCOPE OF EVERYTHING BELOW IT, so it heads the rail (DESIGN-BRIEF 4.4). -->
+    <div class="who">{@render switcher()}</div>
     <button
       type="button"
       class="collapse tap"
@@ -430,7 +432,8 @@
                 openMenu(entry, e.currentTarget);
               }}
             >
-              <Icon name={entry.icon} size="m" />
+              <!-- A PROJECT IS A SQUARE OF ITS OWN COLOUR, not a tinted cube glyph (DESIGN-BRIEF 4.4). -->
+              {#if entry.hue === undefined}<Icon name={entry.icon} size="m" />{:else}<span class="swatch" aria-hidden="true"></span>{/if}
               <span class="item-name">{label}</span>
             </a>
     {/snippet}
@@ -586,7 +589,6 @@
       {/each}
     </div>
 
-    <div class="who">{@render switcher()}</div>
   </div>
 
   <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
@@ -661,7 +663,7 @@
     flex-direction: column;
     inline-size: var(--rail);
     block-size: 100dvh;
-    padding: var(--sp-4) var(--sp-3) var(--sp-3);
+    padding: var(--sp-2) var(--sp-2) var(--sp-3);
     background: var(--sunk);
   }
 
@@ -669,8 +671,14 @@
      ends at, so the biggest thing at the top of the column is the work rather than the chrome. */
   .top {
     display: flex;
-    justify-content: flex-end;
-    padding-inline: var(--sp-2);
+    align-items: center;
+    gap: var(--sp-1);
+    margin-block-end: var(--sp-2);
+  }
+
+  .top .who {
+    flex: 1;
+    min-inline-size: 0;
   }
 
   /* A CONTROL, not a caption, and now the largest thing in the rail.
@@ -684,15 +692,15 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 44px;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
     padding: 0 var(--sp-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-md);
-    font-weight: 600;
-    letter-spacing: -0.018em;
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
     transition:
       background var(--d-state) var(--ease-out),
       border-color var(--d-state) var(--ease-out);
@@ -794,13 +802,13 @@
   .record-avatar {
     display: grid;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: 20px;
+    block-size: 20px;
     flex: none;
-    background: var(--accent-wash);
-    border-radius: var(--r-md);
-    color: var(--accent-text);
-    font-family: var(--font-display);
+    background: var(--ink);
+    border-radius: var(--r-sm);
+    color: var(--bg);
+    font-family: var(--font-ui);
     /* 14px sat exactly between `--t-sm` (13) and `--t-base` (15) with no house rule to break the
        tie either way, so this follows the other 28px letter-in-a-tile marks in the app
        (`Face.svelte`, `.cards-mark`/`.cards-face` in blocks.css) onto `--t-xs`, the step they all
@@ -826,7 +834,7 @@
   /* `.item.view` AND NOT `.view`: `.item` is declared further down with `padding: 0 var(--sp-3)` at
      the same specificity, so the indent lost and every saved view sat flush against the rail edge. */
   .item.view {
-    padding-inline-start: calc(var(--sp-3) + 20px + 10px);
+    padding-inline-start: calc(var(--sp-2) * 2 + var(--icon-m));
     color: var(--ink2);
     font-size: var(--t-sm);
   }
@@ -880,7 +888,7 @@
     /* A THIN BAR IN THE RAIL'S OWN INK. Without these Windows draws the classic 17px scrollbar with
        arrow buttons down the middle of the navigation. */
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
+    scrollbar-color: transparent transparent;
     /* The covers are the RAIL's ground, `--sunk`. They were `--bg`, a different colour, so the edges
        of the scroller drew visible bands across the rows instead of hiding the shadows. */
     background:
@@ -890,16 +898,21 @@
       linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
   }
 
+  /* The bar appears only while the pointer is over the list, which is when it is any use. */
+  .scroll:hover {
+    scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
+  }
+
   /* SENTENCE CASE, AND A STEP UP FROM WHERE IT WAS. It was letterspaced caps at 11px, on the
      argument that a group header is a ruler the eye scans rather than words it reads. Five of them
      down the rail read as a filing cabinet. The product this one is measured against names its
      sections in plain words and lets weight and space do the separating, and so does this. */
   .section {
-    margin: var(--sp-5) 0 var(--sp-1);
-    color: var(--dim);
+    margin: var(--sp-4) 0 var(--sp-1);
+    color: var(--faint);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 600;
+    font-size: var(--t-xs);
+    font-weight: 500;
   }
 
   /* THE WHOLE HEADING IS THE TARGET, so the padding moves off the `h2` and onto the button: a
@@ -911,8 +924,8 @@
     gap: var(--sp-2);
     align-items: center;
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
     background: none;
     border: 0;
     color: inherit;
@@ -948,15 +961,15 @@
   .item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
+    gap: var(--sp-2);
+    min-block-size: var(--rail-item-h);
+    padding: 0 var(--sp-2);
     /* `blocks.css` draws a rule under every `.item` for its own lists, and that class name reaches
        this rail too, so rows followed by a saved view grew a line. The rail draws no rules. */
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     font-weight: 500;
     text-decoration: none;
     transition:
@@ -965,12 +978,12 @@
   }
 
   .item :global(.icon) {
-    color: var(--dim);
+    color: var(--faint);
     transition: color var(--d-state) var(--ease-out);
   }
 
   .item:hover {
-    background: var(--hover-wash);
+    background: var(--s2);
     color: var(--ink);
   }
 
@@ -984,19 +997,28 @@
   .item[aria-current='page'] {
     background: var(--s2);
     color: var(--ink);
-    font-weight: 600;
-    box-shadow: var(--e1);
   }
   .item[aria-current='page'] :global(.icon) {
-    color: var(--ink);
+    color: var(--ink2);
   }
 
   /* Only the glyph takes it. The label stays `ink` so the row still reads as a row, and a rail of
      coloured words would be a rail nobody can scan. Same lightness and chroma as `IdentityMark`,
      which is what makes the mark in the grid and the row in the rail the same colour. */
-  .item[data-hued] :global(svg),
-  .item[data-hued][aria-current] :global(svg) {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  .swatch {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
+  .swatch::before {
+    content: '';
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: 2px;
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   .item-name {
@@ -1029,8 +1051,8 @@
   /* Questions waiting on you: the same quiet figure, in full ink and weight, so it is noticed
      without a glyph or a colour standing in for the meaning. */
   .tally[data-waiting] {
-    color: var(--ink);
-    font-weight: 600;
+    color: var(--warn);
+    font-weight: 500;
   }
 
   .item[aria-current='page'] .tally {
@@ -1074,7 +1096,6 @@
 
   .foot {
     padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--line);
   }
 
   /* FOUR UTILITIES ON ONE ROW, each an equal share of the width so the strip reads as one control
@@ -1089,8 +1110,8 @@
     flex: 1;
     place-items: center;
     min-block-size: var(--ctl-h);
-    border-radius: var(--r-md);
-    color: var(--dim);
+    border-radius: var(--r-sm);
+    color: var(--faint);
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
@@ -1105,7 +1126,6 @@
   /* The same raised pill the rows wear, because it is the same fact: this is where you are. */
   .util[aria-current='page'] {
     background: var(--s2);
-    box-shadow: var(--e1);
     color: var(--ink);
   }
 
@@ -1164,8 +1184,8 @@
   }
 
   .rail[data-icons] .top {
+    flex-direction: column;
     justify-content: center;
-    padding-inline: 0;
   }
 
   .rail[data-icons] .item,
