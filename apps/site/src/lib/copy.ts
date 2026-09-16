@@ -41,8 +41,14 @@ export const site = {
     pricing: {
       title: 'Pricing · BrainDog',
       description:
-        'Two ways to run BrainDog: hosted at $12 a month per record, or self-hosted for free under ' +
-        'Apache-2.0. Neither plan is open yet.',
+        'Two ways to run BrainDog: hosted at $12 a month per record, or self-hosted for free on your ' +
+        'own machine. Neither plan is open yet.',
+    },
+    legal: {
+      title: 'Legal · BrainDog',
+      description:
+        'The licence BrainDog is published under, and where its Terms and Privacy policy will be ' +
+        'published before hosted sign-up opens.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
@@ -56,7 +62,7 @@ export const site = {
     pricing: 'Pricing',
     changelog: 'Changelog',
     docs: 'Design',
-    source: 'Source',
+    source: 'GitHub',
     open: 'Open the app',
     menu: 'Menu',
   },
@@ -283,8 +289,8 @@ export const site = {
     keepTitle: 'Yours to keep',
     keep: [
       {
-        title: 'An open licence',
-        body: 'Apache-2.0, and the renderer is MIT. The repository is private for now, so there is nothing to read yet.',
+        title: 'Open source',
+        body: 'The code is on GitHub, and the self-hosted build is built from it. The repository opens to the public when the product launches.',
       },
       {
         title: 'Run it yourself',
@@ -354,7 +360,7 @@ export const site = {
       price: 'Free',
       /* `and yours to run` and not `and complete`: a running self-host cannot open its own vault. */
       unit: 'and yours to run',
-      body: 'No seat count, no key to phone home for. Apache-2.0.',
+      body: 'No seat count, no key to phone home for.',
       points: [
         /* `one record file`: an installation writes three files, and the RECORD is one of them. */
         'One process, one record file, one port',
@@ -382,6 +388,34 @@ export const site = {
       'for the people paying for it.',
   },
 
+  /**
+   * THE LEGAL PAGE. The licence lives here and in the READMEs, not in the marketing copy.
+   *
+   * THE TERMS AND THE PRIVACY POLICY ARE NOT WRITTEN, and this page says so rather than drawing a
+   * placeholder that reads like one. Nothing here is a legal term that has not been decided.
+   */
+  legal: {
+    title: 'Legal',
+    lede: 'The licence BrainDog is published under, and what is still to be written.',
+    licence: {
+      title: 'Licence',
+      body: [
+        'BrainDog is open source. The software is licensed under the Apache License 2.0, and the renderer in packages/render is licensed under the MIT License.',
+        'It is provided as is, without warranty of any kind, express or implied. The licence texts set out the full terms.',
+      ],
+      links: [
+        { label: 'Apache License 2.0', href: 'https://www.apache.org/licenses/LICENSE-2.0' },
+        { label: 'MIT License', href: 'https://opensource.org/license/mit' },
+        { label: 'The code on GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
+      ],
+      note: 'The repository is private until the product launches, so the GitHub link opens for the public then.',
+    },
+    terms: {
+      title: 'Terms and privacy',
+      body: 'The Terms of Service and the Privacy policy are not published yet. Both will be published here before hosted sign-up opens. Until then there is no sign-up and no billing, and the demo keeps nothing you type into it.',
+    },
+  },
+
   changelog: {
     lede: "What shipped and when, in the repository's own words.",
     count: (entries: number, days: number) => `${entries} entries over ${days} days`,
@@ -395,6 +429,7 @@ export const site = {
         links: [
           { label: 'Pricing', href: '/pricing' },
           { label: 'Changelog', href: '/changelog' },
+          { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
           /* THE FOOTER AND NOT THE HEADER: the hero says there is no sign-up, and a sign-in beside
              it would contradict the sentence a reader has just been given. A literal and not
              `${APP}/signin`, because `APP` is declared below `site` in this module. */
@@ -402,15 +437,9 @@ export const site = {
         ],
       },
       {
-        /* `Licence` and not `Open source`: the source and design links 404 while the repository is
-           private, and the licence is the claim that is true today. */
-        title: 'Licence',
-        links: [
-          {
-            label: 'Apache-2.0',
-            href: 'https://www.apache.org/licenses/LICENSE-2.0',
-          },
-        ],
+        /* THE LICENCE IS NAMED ON THE LEGAL PAGE AND IN THE READMES, not in the marketing copy. */
+        title: 'Legal',
+        links: [{ label: 'Licence', href: '/legal' }],
       },
     ],
   },
@@ -419,13 +448,16 @@ export const site = {
 /**
  * The addresses, in one place.
  *
- * `SOURCE`, `DOCS` AND `BUILD` ARE `null` BECAUSE THE REPOSITORY IS PRIVATE, and a link that 404s
- * is worse than an absent one on the page whose whole argument is that you can check things.
- * `null` and not a different URL, so every call site has to decide what to draw when there is no
- * address, and the type makes it decide.
+ * `SOURCE` IS PUBLISHED AHEAD OF THE REPOSITORY GOING PUBLIC, on the owner's word, 2026-09-16. The
+ * repository is private until the product launches, and the link is on the site now so it is
+ * already in place on the day it opens.
+ *
+ * `DOCS` AND `BUILD` ARE STILL `null`. They point inside the repository at pages that are not
+ * written for a stranger yet. `null` and not a different URL, so every call site has to decide what
+ * to draw when there is no address, and the type makes it decide.
  */
 export const APP = 'https://app.brain.dog';
-export const SOURCE: string | null = null;
+export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
 export const DOCS: string | null = null;
 /** The build instructions, which is what a self-hoster is actually sent to. */
 export const BUILD: string | null = null;

@@ -27,8 +27,8 @@ import { existsSync, readFileSync } from 'node:fs';
 const BUILD = new URL('../build/', import.meta.url);
 const SEED = new URL('../../../packages/seed/src/index.ts', import.meta.url);
 
-/** The three routes the static adapter writes, under the names it writes them. */
-const PAGES = ['index.html', 'pricing.html', 'changelog.html'] as const;
+/** The four routes the static adapter writes, under the names it writes them. */
+const PAGES = ['index.html', 'pricing.html', 'changelog.html', 'legal.html'] as const;
 
 const absent = PAGES.filter((page) => !existsSync(new URL(page, BUILD)));
 
@@ -152,6 +152,34 @@ test('every href goes somewhere', when(NO_BUILD), () => {
       const found = tries.some((candidate) => existsSync(new URL(candidate, BUILD)));
       assert.equal(found, true, `${where}, and build/ holds none of ${tries.join(', ')}`);
     }
+  }
+});
+
+/**
+ * THE LICENCE IS ON THE LEGAL PAGE AND NOT IN THE MARKETING. The owner's call, 2026-09-16: the pages
+ * that sell say open source and point at the code, and the licence names live on /legal and in the
+ * READMEs. Both halves are checked, so the disclaimer cannot quietly leave /legal either.
+ */
+test('the marketing pages name no licence, and /legal names both', when(NO_BUILD), () => {
+  const LICENCE = /\bApache\b|\bMIT\b/;
+  for (const page of ['index.html', 'pricing.html']) {
+    const hit = LICENCE.exec(readable(read(page)));
+    assert.equal(hit, null, `${page} names a licence: ${hit ? around(readable(read(page)), hit[0]).join(' | ') : ''}`);
+  }
+  const legal = readable(read('legal.html'));
+  assert.match(legal, /\bApache License 2\.0\b/, 'legal.html no longer names the Apache License 2.0');
+  assert.match(legal, /\bMIT License\b/, 'legal.html no longer names the MIT License');
+  assert.match(legal, /without warranty/, 'legal.html no longer says the software comes without warranty');
+});
+
+/**
+ * THE GITHUB LINK IS IN THE NAV AND THE FOOTER of every page, and the footer reaches /legal.
+ */
+test('every page links GitHub and the legal page', when(NO_BUILD), () => {
+  for (const page of PAGES) {
+    const html = uncommented(read(page));
+    assert.match(html, /href="https:\/\/github\.com\/actuallyhoss\/BrainDog"/, `${page} does not link the repository`);
+    assert.match(html, /href="\/legal"/, `${page} does not link /legal`);
   }
 });
 

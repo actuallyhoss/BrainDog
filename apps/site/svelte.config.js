@@ -23,7 +23,9 @@ export default {
     adapter: adapter({ pages: OUT, assets: OUT, precompress: false, strict: true }),
     alias: { $lib: 'src/lib' },
     files: { assets: 'static' },
-    prerender: { entries: ['*'] },
+    /* `*` is every route without a parameter. `/legal` is named as well, so the page a licence
+       points at is prerendered even on a day nothing on the site links to it. */
+    prerender: { entries: ['*', '/legal'] },
   },
   compilerOptions: {
     css: 'external',

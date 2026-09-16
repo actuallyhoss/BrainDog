@@ -124,5 +124,9 @@ worth reading before your first pull request. `SECURITY.md` is how to report a v
 
 ## Licence
 
-Apache-2.0, except `packages/render`, which is MIT so the block dialect can be embedded anywhere.
+BrainDog is open source under the Apache License 2.0 (`LICENSE`), except `packages/render`, which
+is under the MIT License (`packages/render/LICENSE`) so the block dialect can be embedded anywhere.
 `LICENSING.md` explains the split.
+
+The software is provided as is, without warranty of any kind, express or implied. See the licence
+texts for the full terms.

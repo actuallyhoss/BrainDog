@@ -27,9 +27,8 @@
   let menuOpen = $state(false);
   let menu: HTMLDetailsElement | undefined = $state();
 
-  /* `Design` AND `Source` ARE ABSENT WHILE THE REPOSITORY IS PRIVATE. A link in a site's own
-     navigation that answers 404 is the loudest thing a site can say about how carefully it was
-     made. They come back with the repository, from one constant. */
+  /* `Design` IS ABSENT UNTIL `DOCS` HAS AN ADDRESS. `GitHub` is drawn from `SOURCE`, which is
+     published ahead of the repository going public, on the owner's word (see `copy.ts`). */
   const links: { href: string; label: string }[] = [
     { href: '/pricing', label: site.nav.pricing },
     { href: '/changelog', label: site.nav.changelog },

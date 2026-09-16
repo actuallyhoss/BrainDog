@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Three pages, which is all of them. `svelte.config.js` prerenders exactly `/`, `/pricing` and
-  `/changelog` with `strict: true`, so a route that quietly stopped prerendering fails the build:
+  Four pages, which is all of them. `svelte.config.js` prerenders `/`, `/pricing`, `/changelog` and
+  `/legal` with `strict: true`, so a route that quietly stopped prerendering fails the build:
   this file and that list cannot drift without the build going red first.
 
   NO `app.brain.dog`. It is a shell behind authentication that answers the same 4,456 bytes on every
@@ -11,4 +11,5 @@
   <url><loc>https://brain.dog/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://brain.dog/pricing</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://brain.dog/changelog</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://brain.dog/legal</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
 </urlset>
