@@ -616,6 +616,16 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          out-of-date balances and forecast from that day. A record that does not say is read against this clock. */
       const said = typeof read_at === 'string' ? Date.parse(read_at) : Number.NaN;
       const now = Number.isFinite(said) ? said : clock();
+      /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR, and kept beside the ones it does. A use case's own lists
+         (`loop/research-spark.md` §2.1) are declared by the record and by no file here, and a page over them drew
+         "cannot be drawn" on every block: the display knew only the lists of one use case. */
+      for (const b of blocks) {
+        const register = b.refusals?.length ? null : registerOf(b);
+        if (!register || REGISTERS[register]) continue;
+        const schema = await client.schema(register);
+        const body = schema.ok ? (schema.value as { id?: unknown; fields?: unknown }) : null;
+        if (body && Array.isArray(body.fields)) REGISTERS[register] = { ...body, id: register } as (typeof REGISTERS)[string];
+      }
       const wanted = new Set<string>();
       for (const b of blocks) {
         const register = b.refusals?.length ? null : registerOf(b);

@@ -467,3 +467,25 @@ test("today on a live page is the record's clock when the record says what it re
   const fallback = await pageReader(BASE, unsaid.io, () => AT).read('desk');
   assert.equal(fallback.from === 'live' ? fallback.now : null, AT);
 });
+
+test('a page over a list this build does not ship asks the record for that list, and draws it', async () => {
+  const answer = {
+    page: 'studies',
+    title: 'Studies',
+    blocks: [{ kind: 'table', source: 'register.homework_x', columns: [{ field: 'what' }], rows: [{ ...row(1, { what: 'Problem set 1' }), register: 'homework_x' }], matched: 1, refusals: [] }],
+  };
+  const { io, sent } = host((method) =>
+    method === 'page'
+      ? json(200, { ok: true, value: answer })
+      : method === 'schema'
+        ? json(200, { ok: true, value: { id: 'homework_x', name: 'Homework', one: 'piece', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } })
+        : json(200, { ok: true, value: { rows: [], cursor: null } }),
+  );
+  const out = await pageReader(BASE, io, () => AT).read('studies');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [table] = out.page.blocks;
+  assert.equal(table!.cannot, undefined);
+  assert.equal(table!.rows.length, 1);
+  assert.ok(sent.includes('schema'));
+});
