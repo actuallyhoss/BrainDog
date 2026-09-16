@@ -436,8 +436,10 @@
                   <dd>{#each offer.plan.conflicts as c (c)}<p>{c}</p>{/each}</dd>
                 {/if}
                 <CallsOut calls={offer.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
-                <dt>{copy.diffSeeds}</dt>
-                <dd>{offer.plan.seeds}</dd>
+                {#if offer.plan.seeds}
+                  <dt>{copy.diffSeeds}</dt>
+                  <dd>{offer.plan.seeds}</dd>
+                {/if}
                 <dt>{copy.diffTouches}</dt>
                 <dd>{offer.plan.touches}</dd>
               </dl>

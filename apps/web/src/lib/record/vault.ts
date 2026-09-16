@@ -310,7 +310,8 @@ export type Plan = {
   summary: string;
   adds: { kind: 'list' | 'page'; name: string; detail: string }[];
   conflicts: string[];
-  seeds: string;
+  /** What example rows it writes, or `null` when it writes none, so the plan has no line to say so. */
+  seeds: string | null;
   touches: string;
   planHash: string;
 };
@@ -340,7 +341,7 @@ export function planOf(diff: unknown, nameOf: (kind: 'register' | 'page', id: st
         : { kind: 'page', name, detail: counted(a.summary, 'table or figure', 'tables and figures') };
     }),
     conflicts: (d.conflicts ?? []).map((c) => words.conflict(split(c.id).name, c.pack)),
-    seeds: words.seeds(d.seeds?.count ?? 0),
+    seeds: (d.seeds?.count ?? 0) === 0 ? null : words.seeds(d.seeds?.count ?? 0),
     touches: words.touches,
     planHash: d.planHash,
   };

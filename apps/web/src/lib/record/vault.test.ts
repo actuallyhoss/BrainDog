@@ -207,6 +207,13 @@ test('a plan from the record reads in the Packs screen words, and keeps its hash
   assert.equal(plan.touches, words.touches);
 });
 
+test('a plan that writes no example rows has no line about them, not "0 example rows, marked example"', () => {
+  const plan = planOf({ adds: [], seeds: { count: 0, registers: [] }, planHash: '3.def' }, (_, id) => id);
+  assert.equal(plan?.seeds, null);
+  assert.equal(planOf({ adds: [], planHash: '3.def' }, (_, id) => id)?.seeds, null);
+  assert.equal(planOf({ adds: [], seeds: { count: 6, registers: [] }, planHash: '3.def' }, (_, id) => id)?.seeds, '6 example rows, marked example, clearable in one action');
+});
+
 test('an answer with no plan hash is no plan, so nothing can be installed from it', () => {
   assert.equal(planOf(null, (_, id) => id), null);
   assert.equal(planOf({ adds: [] }, (_, id) => id), null);

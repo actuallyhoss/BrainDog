@@ -2057,8 +2057,10 @@
                   <dd>{#each offer.conflicts as c (c)}<p>{c}</p>{/each}</dd>
                 {/if}
                 <CallsOut calls={offerCalls} hosted={DEPLOYMENT.kind !== 'self-host'} />
-                <dt>{copy.diffSeeds}</dt>
-                <dd>{offer.seeds}</dd>
+                {#if offer.seeds}
+                  <dt>{copy.diffSeeds}</dt>
+                  <dd>{offer.seeds}</dd>
+                {/if}
                 <dt>{copy.diffTouches}</dt>
                 <dd>{offer.touches}</dd>
               </dl>
