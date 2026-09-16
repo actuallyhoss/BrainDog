@@ -472,9 +472,44 @@ export function unreadable(decl: MetricDecl): string[] {
     }
   }
 
+  out.push(...unaggregatable(decl));
+
   if (decl.format && !decl.format.startsWith('money.') && !READS_FORMAT.includes(decl.format))
     out.push(`format: ${decl.format} is not a format this build writes. It writes money.<CUR> · ${READS_FORMAT.join(' · ')}`);
 
+  return out;
+}
+
+/** The field types `sum`, `avg`, `min` and `max` read as numbers: the kernel's `NUMERIC`. A `bool` is one or zero. */
+const NUMERIC = new Set(['int', 'decimal', 'duration', 'money', 'quantity', 'bool']);
+
+/**
+ * Every aggregation that reads a day or a word as a number, as the kernel refuses it at install and at run.
+ *
+ * A DAY IS TEXT TO SQLITE, so the record summed `2026-07-28` as 2026 and answered NaN for its minimum, and
+ * now refuses both as `VALUE_MALFORMED`. This build skipped the text in `amountOf` and answered a sum of
+ * nothing instead. `count` and `distinct` read any field, and a field the register does not declare is
+ * left to the predicate's own refusal.
+ */
+function unaggregatable(decl: MetricDecl): string[] {
+  const register = registerOf(decl.source ?? '');
+  const fields = register ? REGISTERS[register]?.fields : undefined;
+  const value = decl.value as Value | undefined;
+  if (!fields || !value || typeof value !== 'object') return [];
+  const pair = 'ratio' in value ? value.ratio : 'diff' in value ? value.diff : null;
+  const aggs = (pair ? [pair.of, pair.per] : [value]) as Record<string, unknown>[];
+  const out: string[] = [];
+  for (const agg of aggs) {
+    for (const kind of ['sum', 'avg', 'min', 'max']) {
+      if (!agg || !Object.hasOwn(agg, kind)) continue;
+      const op = agg[kind] as Operand;
+      const field = typeof op === 'string' ? op : op?.product?.[0];
+      if (typeof field !== 'string' || field === 'id') continue;
+      const type = fields.find((f) => f.id === field)?.type;
+      if (type !== undefined && !NUMERIC.has(type))
+        out.push(`value: ${kind} reads a number, and ${field} is a ${type}. Count it, or aggregate a number field`);
+    }
+  }
   return out;
 }
 
