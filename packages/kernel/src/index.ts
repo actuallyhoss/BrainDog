@@ -968,6 +968,33 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             at: 'field',
           };
 
+      /* A PAGE BLOCK'S `where` IS READ HERE TOO, for the rule's reason: `declare.ts` checks its shape
+         only, so a table filtering on a field the register lacks installed and drew its refusal on
+         every open instead. Only a `register.<id>` source has a schema to read against; a computed
+         source (`forecast.runway`, `activity`, `sessions.live`, `actions`) is left to the page layer,
+         and so is a diff, which reads one row's history and never its `where`. A source naming no
+         register is the page layer's `SOURCE_UNKNOWN` at render, not a refusal this check invents.
+
+         A `where` HOLDING A `{{...}}` IS SKIPPED, not filled. It is a template's (`for:`) or a
+         parameterised page's, and it becomes a sentence only when its row fills it. No one stand-in
+         value is right for every field it could sit against: a word is refused by an int, an enum and
+         a date alike, so filling one in would refuse correct templates by the type of the field. */
+      if (decl.kind === 'page' && Array.isArray(body.blocks))
+        for (const [i, raw] of body.blocks.entries()) {
+          const block = raw as { kind?: unknown; source?: unknown; where?: unknown } | null;
+          if (!block || block.kind === 'diff') continue;
+          /* A SENTENCE OR A TREE ONLY. Anything else is `declare.ts`'s `DECLARATION_INVALID`, and this
+             check runs first, so reading `null` here would answer the same mistake with another code. */
+          const where = block.where;
+          if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where))) continue;
+          if (typeof block.source !== 'string' || !block.source.startsWith('register.')) continue;
+          if (JSON.stringify(where).includes('{{')) continue;
+          const schema = shape(block.source.slice('register.'.length));
+          if (!schema) continue;
+          const bad = unreadWhere(`${decl.id}.blocks[${i}]`, where, schema);
+          if (bad) return bad;
+        }
+
       const source = typeof body.source === 'string' ? body.source : '';
       const register =
         decl.kind === 'rule'
@@ -986,9 +1013,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          block, so a rule with no `when` — which is a legal rule, meaning "every row" — installed
          with no bound, no `once_per`, three axes and a target register nobody has. */
       if (where !== undefined) {
-        const said = predicateOf(where as Predicate | string, schema, evalContext());
-        const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
-        if (stop) return { ...stop, fix: `${decl.id} cannot be read: ${stop.fix}` };
+        const bad = unreadWhere(decl.id, where, schema);
+        if (bad) return bad;
+      }
+
+      if (decl.kind === 'rule') {
+        const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
+        if (bad) return bad;
+      }
+    }
+    return null;
+  }
+
+  /** A `where` read against the register it filters: `null` when it can be read, the refusal when not. */
+  function unreadWhere(id: string, where: unknown, schema: Schema): Refusal | null {
+    const said = predicateOf(where as Predicate | string, schema, evalContext());
+    const stop = said.bad.find((b) => b.code !== 'REF_UNKNOWN');
+    if (stop) return { ...stop, fix: `${id} cannot be read: ${stop.fix}` };
 
         /**
          * AND THEN COMPILED, BECAUSE THAT IS WHAT "CAN BE READ" MEANS.
@@ -1009,16 +1050,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          * now to fire on nothing where it used to fire correctly. `compile` raises no `REF_UNKNOWN`,
          * so nothing a row written tomorrow could satisfy is refused here.
          */
-        const unread = compile(said.predicate, schema).bad[0];
-        if (unread) return { ...unread, fix: `${decl.id} cannot be read: ${unread.fix}` };
-      }
-
-      if (decl.kind === 'rule') {
-        const bad = undeclarable(decl.id, body as unknown as RuleDecl, shape);
-        if (bad) return bad;
-      }
-    }
-    return null;
+    const unread = compile(said.predicate, schema).bad[0];
+    return unread ? { ...unread, fix: `${id} cannot be read: ${unread.fix}` } : null;
   }
 
   /**
