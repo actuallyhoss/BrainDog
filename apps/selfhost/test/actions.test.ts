@@ -18,7 +18,19 @@ import type { ActionAnswer, ActionRequest } from '@braindog/kernel';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { actionExecutor, holding, lookupFor, meterPass, type OpenKey, type Pinned, type Resolve, type Send } from '../src/actions.ts';
+import {
+  IDEMPOTENCY_KEY,
+  MAY_HAVE_LANDED,
+  actionExecutor,
+  holding,
+  idempotentCalls,
+  lookupFor,
+  meterPass,
+  type OpenKey,
+  type Pinned,
+  type Resolve,
+  type Send,
+} from '../src/actions.ts';
 import { start } from '../src/server.ts';
 
 const ORIGIN = 'https://api.example.test';
@@ -364,4 +376,42 @@ test('A SELF-HOST IS NEVER HELD: its record goes on the selfhost plan at the fir
     await running.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/* ── a retry that is not a second call ──────────────────────────────────── */
+
+/**
+ * THE SAME TWO RULES THE WORKER ASSERTS, held here so the hosts cannot drift. The ladder itself, the cap and the
+ * reclaimed lease are the record's and are asserted once, on the Worker.
+ */
+
+test('ONLY A CALL CARRIES AN IDEMPOTENCY KEY, and it is the outbox id; a poll and a pull carry none', async () => {
+  const seen: (string | undefined)[] = [];
+  const stub = idempotentCalls(async (r) => (seen.push(r.headers[IDEMPOTENCY_KEY]), { status: 200, body: '', bytes: 0, ms: 1, requests: 1 }));
+
+  await stub(request({ channel: 'call', method: 'POST', job: 'o_7' }));
+  await stub(request({ channel: 'poll', job: 'o_8' }));
+  await stub(request({ channel: 'pull', job: 'o_9' }));
+  assert.deepEqual(seen, ['o_7', undefined, undefined]);
+});
+
+test('A CALL CARRIES ITS KEY THROUGH THE SOCKET, and one that never answers says it may have landed', async () => {
+  const net = wire(new Response('accepted', { status: 202 }));
+  const sent = await actionExecutor(declaring(ORIGIN), { openKey, send: net.send, resolve: publicNames().resolve })(
+    request({ channel: 'call', method: 'POST', job: 'o_7' }),
+  );
+  assert.equal(codeOf(sent), 202);
+  assert.equal(new Headers(net.calls[0]?.init.headers).get(IDEMPOTENCY_KEY), 'o_7');
+
+  /* NOTHING CAME BACK, so the record cannot say whether the call landed, and the sentence says exactly that. */
+  const hang: Send = (_url, init) => new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason)));
+  const late = await actionExecutor(declaring(ORIGIN), { openKey, send: hang, resolve: publicNames().resolve })(
+    request({ channel: 'call', method: 'POST', job: 'o_7', timeoutMs: 20 }),
+  );
+  assert.equal(codeOf(late), 'PULL_PROVIDER_UNAVAILABLE');
+  assert.ok(fixOf(late).endsWith(MAY_HAVE_LANDED), `the sentence did not say the call may have landed: ${fixOf(late)}`);
+
+  /* AND A POLL THAT NEVER ANSWERS DOES NOT SAY IT, because a GET has nothing to have landed. */
+  const poll = await actionExecutor(declaring(ORIGIN), { openKey, send: hang, resolve: publicNames().resolve })(request({ timeoutMs: 20 }));
+  assert.doesNotMatch(fixOf(poll), /idempotency key/);
 });

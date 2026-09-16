@@ -18,7 +18,20 @@ import { createRecordApi } from '@braindog/record';
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { createDirectory } from '@braindog/record/directory';
 
-import { ALARM_RUNS, NO_KEY_STORE, REDIRECT_HOPS, actionExecutor, holding, keyOpener, meterPass, type OpenKey, type Send } from '../src/actions.ts';
+import {
+  ALARM_RUNS,
+  IDEMPOTENCY_KEY,
+  MAY_HAVE_LANDED,
+  NO_KEY_STORE,
+  REDIRECT_HOPS,
+  actionExecutor,
+  holding,
+  idempotentCalls,
+  keyOpener,
+  meterPass,
+  type OpenKey,
+  type Send,
+} from '../src/actions.ts';
 import { servesAccount } from '../src/route.ts';
 import { keyStoreOf, recordKeys, unwrap, type KeyStore, type WrappedKey } from '../src/keys.ts';
 
@@ -290,4 +303,145 @@ test('THE LEDGER: a pass is counted in the Directory once however often it is re
 test('/account/* IS THE WORKER’S, in front of the assets, and nothing that only starts with the word', () => {
   for (const path of ['/account/usage', '/account', '//account/usage']) assert.equal(servesAccount(path), true, `${path} is not served`);
   for (const path of ['/accounts', '/api/account', '/r/account', '/']) assert.equal(servesAccount(path), false, `${path} was claimed`);
+});
+
+/* ── a run that fails, and the retry that follows it ─────────────────────── */
+
+/**
+ * A record with one 15-minute `call` to ORIGIN that sends the key called "example read".
+ *
+ * A CALL AND NOT A POLL, because the whole question is what a retried POST does to the other end. A poll is a GET
+ * and has nothing to duplicate.
+ */
+async function callingRecord() {
+  const clock = fixedClock(Date.UTC(2026, 8, 15, 12));
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock });
+  assert.ok(
+    api.kernel.bindGrant(
+      { label: 'example read', opens: 'api.example.test', kind: 'api_token', ciphertext: new Uint8Array([1, 2, 3]), nonce: new Uint8Array([9, 8, 7]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
+      'p_1',
+    ).ok,
+  );
+  const installed = await api.kernel.install([
+    { id: 'ingest.ping', kind: 'ingest', body: { ingest: 'ping', channel: 'call', url: `${ORIGIN}/in`, every: '15m', grant: 'example read', body: { text: 'up' } } as never },
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  return { sql, api, clock };
+}
+
+const keysSent = (calls: { init: RequestInit }[]): (string | null)[] => calls.map((c) => new Headers(c.init.headers).get(IDEMPOTENCY_KEY));
+const outboxRow = (sql: ReturnType<typeof openSqlite>) =>
+  sql.one<{ id: string; state: string; attempts: number }>("SELECT id, state, attempts FROM outbox WHERE kind = 'pull.fetch'");
+
+/** Six hours clears every rung of the ladder, which is capped there. */
+const PAST_THE_RUNG = 7 * 3_600_000;
+
+test('ONLY A CALL CARRIES AN IDEMPOTENCY KEY, and it is the outbox id; a poll and a pull carry none', async () => {
+  const seen: (string | undefined)[] = [];
+  const stub = idempotentCalls(async (r) => (seen.push(r.headers[IDEMPOTENCY_KEY]), { status: 200, body: '', bytes: 0, ms: 1, requests: 1 }));
+
+  await stub(request({ channel: 'call', method: 'POST', job: 'o_7' }));
+  await stub(request({ channel: 'poll', job: 'o_8' }));
+  await stub(request({ channel: 'pull', job: 'o_9' }));
+  assert.deepEqual(seen, ['o_7', undefined, undefined]);
+});
+
+test('A CALL THAT FAILS AND THEN SUCCEEDS IS RETRIED, once, with the same idempotency key both times', async () => {
+  const { sql, api, clock } = await callingRecord();
+  const net = wire(new Response('busy', { status: 503 }), new Response('ok', { status: 200 }));
+  const execute = actionExecutor(() => api.kernel.actionOrigins(), { openKey, send: net.send });
+
+  const first = await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+  assert.equal(first.failed, 1);
+  const job = outboxRow(sql);
+  assert.equal(job?.state, 'failed');
+  assert.equal(job?.attempts, 1);
+  assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry'").length, 1, 'no rung was armed');
+
+  /* THE RUNG COMES ROUND. The 15-minute interval has passed several times over by now, and queues nothing on top:
+     one request is in flight per action, and a job waiting on its rung is that one request. */
+  clock.advance(PAST_THE_RUNG);
+  /* THE DRAIN COMES FIRST, AND THAT IS THE WHOLE OF WHY THE ALARM IS WRITTEN IN THAT ORDER. `runActions` claims the
+     `pull`, `call` and `poll` rows; the rung of the ladder is a `retry` row, and only the schedule drain releases
+     it. A pass without the drain would re-run the interval and never the retry. */
+  await api.kernel.drain();
+  const second = await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+  assert.equal(second.ok, 1);
+  assert.equal(net.calls.length, 2, 'the interval queued a second call on top of the retry');
+
+  const sent = keysSent(net.calls);
+  assert.equal(sent[0], job?.id);
+  assert.equal(sent[1], sent[0], 'the retry presented itself to the provider as a different call');
+  assert.equal(outboxRow(sql)?.state, 'done');
+});
+
+test('A CALL THAT KEEPS FAILING STOPS AT EIGHT ATTEMPTS, and every one of them carried the same key', async () => {
+  const { sql, api, clock } = await callingRecord();
+  const net = wire(new Response('busy', { status: 503 }));
+  const execute = actionExecutor(() => api.kernel.actionOrigins(), { openKey, send: net.send });
+
+  /* EIGHT ALARMS, each one a drain that releases the rung and a pass that sends. */
+  for (let rung = 0; rung < 8; rung++) {
+    await api.kernel.drain();
+    await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+    clock.advance(PAST_THE_RUNG);
+  }
+
+  const job = outboxRow(sql);
+  assert.equal(job?.attempts, 8, 'the ladder did not stop where it says it stops');
+  assert.equal(job?.state, 'dead');
+  assert.equal(net.calls.length, 8, 'the provider was sent more than the eight attempts the ladder allows');
+  assert.deepEqual([...new Set(keysSent(net.calls))], [job?.id], 'eight attempts, and not one call');
+});
+
+test('A PROCESS THAT STOPS MID-RUN SENDS THE SAME KEY WHEN THE LEASE COMES BACK, and does not lose the call', async () => {
+  const { api, clock } = await callingRecord();
+  const net = wire(new Response('ok', { status: 200 }));
+  const execute = actionExecutor(() => api.kernel.actionOrigins(), { openKey, send: net.send });
+
+  /* THE ALARM FIRES THE ROW AND CLAIMS THE JOB, and the process stops there: no ack, so the lease simply runs out.
+     `limit: 0` is that alarm — it drains the schedule and leases nothing. */
+  await api.kernel.runActions(execute, { limit: 0 });
+  const claimed = api.kernel.leaseOutbox(['pull.fetch'], 10);
+  assert.equal(claimed.length, 1);
+  assert.equal(net.calls.length, 0, 'something was sent before the job was ever leased');
+
+  /* FIVE MINUTES IS THE LEASE. Past it, the next alarm reclaims the job rather than leaving it held by a process
+     that is gone. */
+  clock.advance(6 * 60_000);
+  const after = await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+  assert.equal(after.ok, 1, 'the call was lost with the process that was holding it');
+  assert.equal(net.calls.length, 1);
+  assert.equal(keysSent(net.calls)[0], claimed[0]?.id, 'the reclaimed job announced itself as a different call');
+});
+
+test('WHEN THE FIRST ATTEMPT LANDED AND THE ANSWER DID NOT, the run says so and the retry is the same call', async () => {
+  const { sql, api, clock } = await callingRecord();
+  /* A PROVIDER THAT HONOURS THE HEADER: it acted on the first call and never got the answer back, and it
+     recognises the retry as the call it already ran. */
+  const landed: string[] = [];
+  const net = wire(
+    async (_url, init) => {
+      landed.push(new Headers(init.headers).get(IDEMPOTENCY_KEY) ?? '');
+      throw new TypeError('fetch failed');
+    },
+    async (_url, init) =>
+      new Response(landed.includes(new Headers(init.headers).get(IDEMPOTENCY_KEY) ?? '') ? 'already done' : 'done twice', { status: 200 }),
+  );
+  const execute = actionExecutor(() => api.kernel.actionOrigins(), { openKey, send: net.send });
+
+  const first = await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+  assert.equal(first.failed, 1);
+  /* THE RUN EVENT SAYS WHAT THE RECORD DOES NOT KNOW, rather than reporting a clean failure. */
+  const note = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' ORDER BY ts DESC, id DESC LIMIT 1")?.note ?? '';
+  assert.match(note, /could not be reached/);
+  assert.ok(note.includes(MAY_HAVE_LANDED), `the run event did not say the call may have landed: ${note}`);
+
+  clock.advance(PAST_THE_RUNG);
+  await api.kernel.drain();
+  const second = await api.kernel.runActions(execute, { limit: ALARM_RUNS });
+  assert.equal(second.ok, 1);
+  assert.equal(net.calls.length, 2);
+  assert.deepEqual([...new Set(keysSent(net.calls))].length, 1, 'the provider could not tell it was the same call');
 });
