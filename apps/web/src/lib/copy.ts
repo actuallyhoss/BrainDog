@@ -1277,6 +1277,13 @@ export const copy = {
      rather than quietly swallowing them". */
   navBehindMore: (n: number) => `More, and ${n.toLocaleString('en')} ${n === 1 ? 'page' : 'pages'} behind it`,
 
+  /* THE DESIGN AGENT'S OWN RECOMMENDATION, `19 §3`: the design agent reads the record and answers
+     with one shape and one sentence of why. The sentence itself comes from `design/nav-shape.ts`;
+     these are the verbs around it, never applied on their own and Dismiss is terminal. */
+  navShapeRecommend: 'A shape that might suit this record better',
+  navShapeRecommendAccept: (label: string) => `Switch to ${label}`,
+  navShapeRecommendDismiss: 'Dismiss',
+
   /* the signing key — `53 §4` puts the public half on the export screen, and `03 §4` says why */
   theSignature: 'How anybody checks a copy is yours',
   /* IT SAID ANYBODY COULD FETCH IT AT `/.well-known/braindog-key`, and there is no such route in

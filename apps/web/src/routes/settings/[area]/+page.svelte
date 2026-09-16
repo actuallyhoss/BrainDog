@@ -20,6 +20,8 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
+  import { dismiss as dismissNavRec, dismissedFor, signatureOf } from '$lib/design/dismissed.ts';
+  import { navShapeSignals, recommendNavShape, type NavShape, type NavShapeRecommendation } from '$lib/design/nav-shape.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -432,6 +434,47 @@
   /* THE RAIL UNLESS SOMEBODY SAID OTHERWISE. `19 §3` keeps the sidebar as the default in bold, and
      the other two shapes are offered rather than defaulted. */
   let navShape = $state<'rail' | 'bar' | 'menu'>(held.navShape ?? 'rail');
+
+  /**
+   * THE DESIGN AGENT'S OWN RECOMMENDATION, read from the record rather than typed here.
+   *
+   * `19 §3`: it reads how many declared pages and lists are placed, how many sections they fall
+   * into, whether the nav has been arranged by hand, and answers with one shape and one sentence of
+   * why. `navShape` above is what it is compared against, not `held.navShape`, so picking the
+   * recommended shape by hand in the segmented control above makes the recommendation disappear on
+   * its own rather than nagging about a choice just made.
+   */
+  const navRec = $derived(
+    recommendNavShape(
+      navShapeSignals(
+        shell.nav,
+        shell.index.registers.length,
+        { nav: held.nav, navShape },
+        typeof window === 'undefined' ? undefined : window.innerWidth,
+      ),
+    ),
+  );
+  /* DISMISS IS TERMINAL, `19 §3`'s own word. `dismissed.ts` explains why that lives in
+     `localStorage` keyed by the record rather than in `Pref`: there is no table to hold it and no
+     `setPref` yet, the same deviation `navShape` itself already carries. */
+  let navRecDismissed = $state<string | null>(null);
+  $effect(() => {
+    navRecDismissed = dismissedFor(shell.index.slug);
+  });
+  const navRecShown = $derived(navRec !== null && signatureOf(navRec) !== navRecDismissed);
+
+  const navShapeLabel = (s: NavShape): string => (s === 'rail' ? copy.navShapeRail : s === 'bar' ? copy.navShapeBar : copy.navShapeMenu);
+
+  /** Accepting is the one click `19 §3` allows: it sets the shape, exactly as picking it by hand would. */
+  function acceptNavRec(rec: NavShapeRecommendation) {
+    navShape = rec.shape;
+  }
+
+  function dismissNavRecommendation(rec: NavShapeRecommendation) {
+    const sig = signatureOf(rec);
+    dismissNavRec(shell.index.slug, sig);
+    navRecDismissed = sig;
+  }
 
   let accent = $state<string | null>(held.theme ?? null);
   let accentWrong = $state<string | null>(null);
@@ -1248,6 +1291,36 @@
         <p class="hint">{copy.navShapeOnPhone}</p>
         <p class="hint">{copy.perDevice}</p>
       </Section>
+
+      {#if navRecShown && navRec}
+        <!--
+          THE DESIGN AGENT'S RECOMMENDATION, drawn the same way `settings/navigation` already draws
+          a proposed page below: one row in a `.ledger`, a plain sentence, and a button that acts
+          rather than a switch that silently rearranges anything (`19 §3`).
+
+          NEVER APPLIED. `acceptNavRec` only sets the value the segmented control above already
+          writes through; there is no second path into `navShape`, so the recommendation can never
+          take effect without this click.
+        -->
+        <Section title={copy.navShapeRecommend}>
+          <ul class="ledger">
+            <li>
+              <div class="line">
+                <span class="seq"><Icon name="learning" size="s" /></span>
+                <span class="line-main">
+                  <span class="line-title">{navShapeLabel(navRec.shape)}</span>
+                  <span class="line-detail">{navRec.reason}</span>
+                </span>
+                <span class="line-amount"></span>
+                <span class="line-when">
+                  <Button weight="quiet" onclick={() => acceptNavRec(navRec)}>{copy.navShapeRecommendAccept(navShapeLabel(navRec.shape))}</Button>
+                  <Button weight="bare" onclick={() => dismissNavRecommendation(navRec)}>{copy.navShapeRecommendDismiss}</Button>
+                </span>
+              </div>
+            </li>
+          </ul>
+        </Section>
+      {/if}
 
       <Section title={copy.suggestPages}>
         <p class="hint">{copy.suggestPagesHint}</p>

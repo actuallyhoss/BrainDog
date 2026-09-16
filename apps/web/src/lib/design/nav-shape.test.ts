@@ -1,0 +1,115 @@
+/**
+ * The design agent's navigation recommendation, read against fixed record shapes.
+ *
+ * Every case is a record `19 §3` and `loop/research-navigation.md §6` already describe: the
+ * freelancer with four entries, the studio with eighteen across six sections, and the record with
+ * nothing placed yet. Each assertion checks the shape AND that a reason was actually stated, because
+ * `29 §4`'s rule this recommendation is held to is that a recommendation with no reason is an
+ * advertisement.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { dismiss, dismissedFor, signatureOf } from './dismissed.ts';
+import { navShapeSignals, recommendNavShape, type NavShapeSignals } from './nav-shape.ts';
+
+const base: NavShapeSignals = { entries: 0, sections: 0, handArranged: false, current: undefined };
+
+/** A `localStorage` with a jar behind it, since that is the whole of what `dismissed.ts` touches. */
+function jar() {
+  const data = new Map<string, string>();
+  (globalThis as { localStorage?: Storage }).localStorage = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+    removeItem: (k: string) => void data.delete(k),
+    clear: () => data.clear(),
+    key: (i: number) => [...data.keys()][i] ?? null,
+    get length() {
+      return data.size;
+    },
+  } as Storage;
+}
+
+test('nothing placed yet recommends the menu, and says why', () => {
+  const rec = recommendNavShape({ ...base, entries: 0 });
+  assert.equal(rec?.shape, 'menu');
+  assert.match(rec!.reason, /nothing/i);
+});
+
+test('THE FREELANCER, four entries, fits the top bar with nothing behind More', () => {
+  const rec = recommendNavShape({ ...base, entries: 4, sections: 1 });
+  assert.equal(rec?.shape, 'bar');
+  assert.match(rec!.reason, /4 nav entries/);
+});
+
+test("THE STUDIO, eighteen across six sections, is exactly 19 §3's own example against the top bar", () => {
+  const rec = recommendNavShape({ ...base, entries: 18, sections: 6, current: 'bar' });
+  assert.equal(rec?.shape, 'rail');
+  assert.match(rec!.reason, /18 entries across 6 sections/);
+  assert.match(rec!.reason, /hiding 14/);
+});
+
+test('already on the shape that suits the record recommends nothing', () => {
+  assert.equal(recommendNavShape({ ...base, entries: 18, sections: 6, current: 'rail' }), null);
+  assert.equal(recommendNavShape({ ...base, entries: 4, sections: 1, current: 'bar' }), null);
+  assert.equal(recommendNavShape({ ...base, entries: 0, current: 'menu' }), null);
+});
+
+test('a hand-arranged nav is never told to hide behind a menu, even at one entry', () => {
+  const rec = recommendNavShape({ ...base, entries: 1, handArranged: true, current: 'menu' });
+  assert.equal(rec?.shape, 'rail');
+  assert.match(rec!.reason, /arranged your nav by hand/);
+});
+
+test('below 900px nothing is recommended, because no shape chosen there would be seen', () => {
+  assert.equal(recommendNavShape({ ...base, entries: 18, sections: 6, viewportWidth: 480 }), null);
+});
+
+test('never recommends without a stated reason, across the whole matrix', () => {
+  for (const entries of [0, 1, 2, 4, 5, 10, 40])
+    for (const sections of [0, 1, 3, 8])
+      for (const current of ['rail', 'bar', 'menu', undefined] as const) {
+        const rec = recommendNavShape({ entries, sections, handArranged: false, current });
+        if (rec) assert.ok(rec.reason.length > 0, `${entries}/${sections}/${current}`);
+      }
+});
+
+test('navShapeSignals reads entries and sections off the nav list and the register count', () => {
+  const nav = [{ section: 'Money' }, { section: 'Money' }, { section: 'Estate' }];
+  const signals = navShapeSignals(nav, 2, { nav: [], navShape: 'bar' }, 1440);
+  assert.equal(signals.entries, 5);
+  assert.equal(signals.sections, 3);
+  assert.equal(signals.handArranged, false);
+  assert.equal(signals.current, 'bar');
+  assert.equal(signals.viewportWidth, 1440);
+});
+
+test('navShapeSignals reads a hand-arranged nav from a non-empty Pref.nav', () => {
+  const signals = navShapeSignals([{ section: 'Money' }], 0, { nav: ['/p/money'], navShape: undefined });
+  assert.equal(signals.handArranged, true);
+});
+
+test('a dismissal is terminal for the exact recommendation, and not for a different one', () => {
+  jar();
+  const rec = { shape: 'bar' as const, reason: 'You have 4 nav entries.' };
+  const sig = signatureOf(rec);
+  assert.equal(dismissedFor('a-record-nobody-else-uses'), null);
+  dismiss('a-record-nobody-else-uses', sig);
+  assert.equal(dismissedFor('a-record-nobody-else-uses'), sig);
+  assert.notEqual(dismissedFor('a-record-nobody-else-uses'), signatureOf({ shape: 'rail', reason: 'grew' }));
+});
+
+test('a second record dismissing its own recommendation does not touch the first', () => {
+  jar();
+  dismiss('record-a', signatureOf({ shape: 'bar', reason: 'small' }));
+  dismiss('record-b', signatureOf({ shape: 'menu', reason: 'empty' }));
+  assert.equal(dismissedFor('record-a'), 'bar:small');
+  assert.equal(dismissedFor('record-b'), 'menu:empty');
+});
+
+test('dismissedFor reads null rather than throwing when localStorage is absent', () => {
+  delete (globalThis as { localStorage?: Storage }).localStorage;
+  assert.equal(dismissedFor('never-touched-record'), null);
+  dismiss('never-touched-record', 'bar:x');
+});
