@@ -2511,7 +2511,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       const guess = typeof f.type === 'string' ? nearest(f.type) : null;
       return bad(
         'FIELD_TYPE_UNKNOWN',
-        `${id}.${f.id}: type ${JSON.stringify(f.type ?? null)} is not one of the sixteen${guess ? ` — did you mean '${guess}'?` : '.'}`,
+        `${id}.${f.id}: type ${JSON.stringify(f.type ?? null)} is not a field type this record knows${guess ? `; did you mean '${guess}'?` : '.'}`,
         f.id,
         FIELD_TYPES as unknown as string[],
       );
