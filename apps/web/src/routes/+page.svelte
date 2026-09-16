@@ -335,6 +335,9 @@
     gap: var(--sp-1);
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
+    /* The padding hangs past both edges, so the words end where the column's times end on a laptop
+       and start on the gutter on a phone, where the link wraps under the date. */
+    margin-inline: calc(-1 * var(--sp-2));
     border-radius: var(--r-sm);
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -551,9 +554,12 @@
 
   /* ── since you were away ──────────────────────────────────────────────── */
 
+  /* NO GAP: the hairline between events is the separation, and a flex gap inherited on top of each
+     event's own padding put 40px between one sentence and the next. */
   .feed {
     display: flex;
     flex-direction: column;
+    gap: 0;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -569,9 +575,13 @@
     align-items: center;
     column-gap: var(--sp-2);
     row-gap: 2px;
-    padding-block: var(--sp-2);
+    padding-block: var(--sp-3);
     color: var(--ink2);
-    font-size: var(--t-base);
+    /* A STEP BELOW THE MAIN COLUMN. The feed is what happened while you were away and the column
+       beside it is what needs you; at 14px in ink, each news sentence outranked the titles of the
+       things waiting on a decision, and three of them filled the height of four of those. */
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
     text-decoration: none;
   }
 
@@ -615,7 +625,8 @@
   .event-text {
     grid-column: 2 / -1;
     grid-row: 2;
-    color: var(--ink);
+    color: var(--ink2);
+    text-wrap: pretty;
   }
 
   /* A verb in a section head, not a button: it must not compete with the rows under it. The target
@@ -626,6 +637,7 @@
     justify-content: center;
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-2);
+    margin-inline-end: calc(-1 * var(--sp-2));
     border: 0;
     border-radius: var(--r-sm);
     background: none;
