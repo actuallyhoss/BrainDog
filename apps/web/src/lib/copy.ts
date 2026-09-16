@@ -111,6 +111,20 @@ export const copy = {
   raiseIt: 'Open a question',
   /** The way from a session to the run behind it: the tool calls, in order, with their answers. */
   watchRun: 'Watch the run',
+  /**
+   * TWO SCREENS DRAW WORKED EXAMPLES AND NEITHER OF THEM SAID SO.
+   *
+   * A run's transcript and a shared page are both written into the app rather than read from a
+   * record: there is no method that answers with a run's tool calls, and a share token resolves to
+   * nothing, so the same rows are drawn whichever record the reader is signed in to. Somebody
+   * looking at their own record was shown invented rows with nothing to tell them apart from theirs,
+   * which is worse than an empty screen.
+   *
+   * SO THE SCREEN SAYS WHICH IT IS, in the sample bar's register and no louder. It states the fact
+   * and stops: what the reader needs is to know these rows are not theirs, not an account of why.
+   */
+  exampleRun: 'This is an example run, and not one from your record.',
+  exampleShared: 'This is an example of a shared page, and not data from a record.',
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
   /* WHAT WOULD HAVE HAPPENED, AND THAT IT DID NOT. The second half used to name the build —

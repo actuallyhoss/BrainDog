@@ -14,6 +14,7 @@
   putting the runs or the tasks above it would separate the claim from its evidence by a screen.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { since } from 'braindog-render';
   import { CapLine } from 'braindog-render/svelte';
   import { page as route } from '$app/state';
@@ -29,12 +30,15 @@
     display,
     healthLabel,
     healthTone,
+    healthOf,
     jobOf,
-    runsOn,
-    trackHealth,
-    updatesFor,
-    working,
+    runsIn,
+    updatesIn,
+    workingAt,
   } from '$lib/record/api.ts';
+  import type { Entry } from '$lib/record/schema.ts';
+  /* Type only, so the client's route table stays out of this chunk. */
+  import type { Opened } from '$lib/record/track-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -43,16 +47,43 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+
+  /**
+   * ON A LIVE RECORD THIS THREAD IS THE RECORD'S, and nothing of the sample is mixed into it.
+   *
+   * Every block on this screen used to come from the built-in sample whatever record was open, so
+   * somebody signed into their own record read another business's updates under their own thread's
+   * name, with nothing on the page to doubt. The five registers it draws from are all readable
+   * already: `tracks`, `updates`, `tasks` and `things` are declared, and `session` is the kernel's.
+   *
+   * `sample` IS A LIVE SHELL WHOSE READ FOUND NO RECORD, which draws the sample as before. A refusal
+   * is the record's own sentence, and the sample is not drawn under it: a record that said no is
+   * still a record, so the sample would be a lie about it.
+   *
+   * THE READ IS FOR THE WHOLE RECORD RATHER THAN FOR ONE THREAD, so moving between threads on one
+   * record costs nothing and the component is not re-read when the address changes.
+   */
+  let got = $state<Opened | null>(null);
+  const fromRecord = $derived(route.data.live && got?.from === 'live');
+  const refused = $derived(got?.from === 'refused' ? got.fix : null);
+  /** Nothing is drawn until the record has answered, or the sample would flash over a live thread. */
+  const answered = $derived(!route.data.live || got !== null);
+  const rows: Record<string, Entry[] | undefined> = $derived(
+    fromRecord && got?.from === 'live' ? got.thread : ROWS,
+  );
+  /* THE CLOCK THE AGES ARE READ AGAINST: the reader's on a live record, the sample's frozen one
+     otherwise. An update's staleness and whether a run is working now are both measured from it. */
+  const clock = $derived(fromRecord && got?.from === 'live' ? got.now : NOW);
 
   const seq = $derived(Number(route.params.track ?? 0));
-  const track = $derived((ROWS.tracks ?? []).find((t) => t.seq === seq));
+  const track = $derived((rows.tracks ?? []).find((t) => t.seq === seq));
 
-  const health = $derived(trackHealth(seq));
-  const updates = $derived(updatesFor(seq));
+  const health = $derived(healthOf(track, rows.updates ?? [], seq, clock));
+  const updates = $derived(updatesIn(rows.updates ?? [], seq));
   /* The thread's project, and the runs placed in it by the project's spoken id, `things#1`. */
-  const project = $derived((ROWS.things ?? []).find((t) => track !== undefined && t.seq === Number(track.fields.thing)));
-  const runs = $derived(project ? runsOn(`things#${project.seq}`) : []);
+  const project = $derived((rows.things ?? []).find((t) => track !== undefined && t.seq === Number(track.fields.thing)));
+  const runs = $derived(project ? runsIn(rows.session ?? [], `things#${project.seq}`) : []);
   /**
    * The tasks on this track that are STILL OPEN, which is what the heading says.
    *
@@ -62,27 +93,38 @@
    * than no heading: somebody reads three and believes three are outstanding.
    */
   const tasks = $derived(
-    (ROWS.tasks ?? []).filter(
+    (rows.tasks ?? []).filter(
       (t) => Number(t.fields.track) === seq && t.fields.state !== 'done' && t.fields.state !== 'dropped',
     ),
   );
 
-  const live = $derived(runs.filter(working).length);
+  const live = $derived(runs.filter((r) => workingAt(r, clock)).length);
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * THE SCREEN SAYING IT HAS SETTLED, and on a live record that is the read coming back.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
-   *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * from a shell that has fetched nothing. On the sample this screen still computes its content
+   * synchronously, so it says so as it always did. On a record it now fetches, and the claim is
+   * bracketed by `opened()` and `closed()` instead: a call still out takes the attribute away, which
+   * is the line the old comment here promised would be honoured the day this screen started asking.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (!route.data.live) {
+      drew('ready');
+      return;
+    }
+    /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
+    const at = untrack(opened);
+    let ok = false;
+    void import('$lib/record/track-live.ts')
+      .then((m) => m.trackReader(location.origin).read())
+      .then((out) => {
+        got = out;
+        ok = out.from !== 'refused';
+      })
+      .finally(() => closed(ok, at));
+  });
 </script>
 
 <!-- THE REGISTER'S OWN NAME. Both of these were the literal `Tracks`, so the rename to Threads
@@ -90,7 +132,17 @@
      word the rest of the product had stopped using. -->
 <svelte:head><title>{titleOf(track && String(track.fields.name), REGISTERS.tracks?.name ?? '')}</title></svelte:head>
 
-{#if !track}
+{#if refused !== null}
+  <div class="page">
+    <!-- THE RECORD'S OWN SENTENCE, AND THE SAMPLE IS NOT DRAWN UNDER IT. A record that answered with
+         a refusal is still a record, so falling back to the built-in thread here would be inventing
+         one for somebody who has their own. A record without the work pack has no `tracks` at all,
+         and being told so is the honest answer to an address that names one. -->
+    <Empty kind="error" heading title={refused} />
+  </div>
+{:else if !answered}
+  <!-- Nothing until the record has answered, so the sample never flashes over a live thread. -->
+{:else if !track}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -143,7 +195,7 @@
                   label={String(u.fields.health).replace(/_/g, ' ')}
                   tone={healthTone(String(u.fields.health) as never)}
                 />
-                <span class="u-at">{since(String(u.fields.at), NOW)}</span>
+                <span class="u-at">{since(String(u.fields.at), clock)}</span>
               </div>
               <p class="u-body" dir="auto">{u.fields.body}</p>
             </li>
@@ -167,13 +219,16 @@
       {:else}
         <ul class="rows">
           {#each runs.slice(0, DOM_CAP) as s (s.seq)}
-            {@const job = jobOf(s)}
+            <!-- A JOB IS THE SAMPLE'S AND ONLY THE SAMPLE'S. Nothing answers with a run's tool calls,
+                 so a run on a live record has no transcript to open, and the door is not drawn rather
+                 than opening somebody else's worked example under this record's run. -->
+            {@const job = fromRecord ? null : jobOf(s)}
             <li>
               <a class="row" href="/r/session/{s.seq}">
-                <span class="dot" data-live={working(s)}></span>
+                <span class="dot" data-live={workingAt(s, clock)}></span>
                 <span class="row-main">
                   <span class="row-title" dir="auto">{s.fields.doing}</span>
-                  <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), NOW)}</span>
+                  <span class="row-sub">{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
                 </span>
               </a>
               <!-- A RUN SAYS WHAT IT IS DOING; ITS JOB IS WHAT IT IS DOING IT WITH, the tool calls in

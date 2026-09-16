@@ -158,6 +158,16 @@
     {/each}
   </ol>
 
+  <!-- WHOSE RUN THIS IS, ON A RECORD THAT HAS ONE.
+
+       The transcript above is written into the app rather than read from a record: there is no
+       method that answers with a run's tool calls, so the same six steps are drawn whichever record
+       the reader is signed in to. On the sample that is what the whole screen is and the bar at the
+       top of the page already says so. On a live record it is somebody being shown invented steps
+       under their own record's chrome, which is worse than an empty screen, because nothing tells
+       them what they are looking at. So the screen says which it is, once, in a note. -->
+  {#if route.data.live}<p class="note" role="note">{copy.exampleRun}</p>{/if}
+
   <p class="note">
     <!-- AND NOT HOW IT IS BUILT. "A real run polls every 700 ms while it is live and stops on a
          terminal status" is `23 §7`'s explaining-the-interface, in milliseconds, to somebody

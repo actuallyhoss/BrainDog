@@ -90,6 +90,17 @@
     <div class="body">
       <h1 class="title">{result.page.title}</h1>
       <p class="from">Shared from The Studio</p>
+      <!-- AND IT IS AN EXAMPLE, WHICHEVER TOKEN OPENED IT.
+
+           A share token resolves against a map written into this file, and the page it names is the
+           built-in one: there is no record-side read for a share, no scheme that authorises one, and
+           nothing that turns a token into a record's page. So these blocks are the same blocks for
+           every reader, and this is the one surface reached by somebody with no account, no rail and
+           no other screen to compare them against. The byline above says who shared it, which is the
+           sentence that makes them read as somebody's figures, so the correction goes directly under
+           it. Unconditional, because there is no reading of this screen where the rows are a
+           record's. -->
+      <p class="example" role="note">{copy.exampleShared}</p>
 
       {#each result.blocks as block}
         {#if block.drawn}
@@ -243,6 +254,14 @@
     margin-block-start: calc(var(--sp-5) * -1 + var(--sp-1));
     color: var(--dim);
     font-size: var(--t-ui);
+  }
+
+  /* Directly under the byline it corrects, in the ink a note takes. It is not an alarm: the page is
+     doing what it was built to do, and this is the sentence that says which page it is. */
+  .example {
+    margin-block-start: calc(var(--sp-5) * -1 + var(--sp-2));
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .block-name {

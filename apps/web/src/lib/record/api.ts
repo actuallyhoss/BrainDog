@@ -770,12 +770,20 @@ const UPDATE_WINDOW_DAYS = 14;
  * anything about it. Without the distinction, every finished and parked track piles into the
  * missing bucket, the bucket becomes noise, and the nudge built on it is dead inside a month.
  */
-export function trackHealth(seq: number): TrackHealth {
-  const track = ROWS.tracks?.find((t) => t.seq === seq);
+/**
+ * The same derivation over rows a caller hands in, against a clock it names.
+ *
+ * IT IS SPLIT OUT SO A LIVE THREAD CAN BE DERIVED THE SAME WAY. `/t/<track>` read the sample's rows
+ * whatever record was open, and the fix is for it to hand its own rows to the derivation rather than
+ * for a second copy of the rule to exist beside this one. The `not_expected` distinction and the
+ * newest-wins ordering are the two things every implementation of this drops, so there is one
+ * implementation and `trackHealth` is a reading of it against the sample.
+ */
+export function healthOf(track: Entry | undefined, updates: readonly Entry[], seq: number, now: number): TrackHealth {
   const state = String(track?.fields.state ?? '');
   const expected = state === 'open';
 
-  const newest = (ROWS.updates ?? [])
+  const newest = updates
     .filter((u) => Number(u.fields.track) === seq)
     .sort((a, b) => String(a.fields.at).localeCompare(String(b.fields.at)))
     .at(-1);
@@ -785,13 +793,22 @@ export function trackHealth(seq: number): TrackHealth {
   }
 
   const asOf = String(newest.fields.at);
-  const age = (NOW - Date.parse(asOf)) / 86_400_000;
+  const age = (now - Date.parse(asOf)) / 86_400_000;
   return {
     health: newest.fields.health as Health,
     asOf,
     by: String(newest.fields.by ?? ''),
     state: !expected ? 'not_expected' : age > UPDATE_WINDOW_DAYS ? 'missing' : 'current',
   };
+}
+
+export function trackHealth(seq: number): TrackHealth {
+  return healthOf(
+    ROWS.tracks?.find((t) => t.seq === seq),
+    ROWS.updates ?? [],
+    seq,
+    NOW,
+  );
 }
 
 /** The intent a health carries. `null` is not an alarm — nobody having spoken is not bad news. */
@@ -806,11 +823,14 @@ export function healthLabel(t: TrackHealth): string {
   return t.state === 'missing' ? `${words[t.health]}, and stale` : words[t.health];
 }
 
-/** Every update on a track, newest first — the thread a person actually reads. */
-export const updatesFor = (seq: number): Entry[] =>
-  (ROWS.updates ?? [])
+/** Every update on a track, newest first, out of the rows a caller hands in. */
+export const updatesIn = (updates: readonly Entry[], seq: number): Entry[] =>
+  updates
     .filter((u) => Number(u.fields.track) === seq)
     .sort((a, b) => String(b.fields.at).localeCompare(String(a.fields.at)));
+
+/** The same thread, read against the sample. */
+export const updatesFor = (seq: number): Entry[] => updatesIn(ROWS.updates ?? [], seq);
 
 /**
  * The agent runs placed in one project, most recently seen first.
@@ -818,10 +838,13 @@ export const updatesFor = (seq: number): Entry[] =>
  * BY PROJECT, BECAUSE A RUN HAS NO THREAD. The kernel's `session` register holds a run's `project` as
  * the project's spoken id, `things#1`, and nothing narrower.
  */
-export const runsOn = (project: string): Entry[] =>
-  (ROWS.session ?? [])
+export const runsIn = (runs: readonly Entry[], project: string): Entry[] =>
+  runs
     .filter((x) => x.fields.project === project)
     .sort((a, b) => String(b.fields.last_seen).localeCompare(String(a.fields.last_seen)));
+
+/** The same runs, read against the sample. */
+export const runsOn = (project: string): Entry[] => runsIn(ROWS.session ?? [], project);
 
 /** A run's spoken id, `S1`, which is the name the kernel signs its writes with. */
 export const runName = (run: Entry): string => `${REGISTERS.session?.seq_prefix ?? 'S'}${run.seq}`;
@@ -830,8 +853,11 @@ export const runName = (run: Entry): string => `${REGISTERS.session?.seq_prefix 
  * Whether a run is working now: active, and heard from within the kernel's 45 minutes. Worked out on
  * read, as the kernel does, because a run that crashed never says so.
  */
-export const working = (run: Entry): boolean =>
-  run.fields.state === 'active' && NOW - Date.parse(String(run.fields.last_seen)) < STALE_MS;
+export const workingAt = (run: Entry, now: number): boolean =>
+  run.fields.state === 'active' && now - Date.parse(String(run.fields.last_seen)) < STALE_MS;
+
+/** The same question, asked against the sample's frozen clock. */
+export const working = (run: Entry): boolean => workingAt(run, NOW);
 
 /** The job a run is doing, found by the run the job names, or `null`. */
 export const jobOf = (run: Entry): Job | null => Object.values(JOBS).find((j) => j.run === runName(run)) ?? null;
