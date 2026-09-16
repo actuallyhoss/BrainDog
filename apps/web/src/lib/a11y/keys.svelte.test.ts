@@ -1,5 +1,9 @@
 /**
+ * `keys.svelte.ts`: the three questions the shell asks before a bare key is allowed to mean anything.
+ *
  * `overlays` and `covered()`: whether a keystroke reaches the page underneath an open sheet.
+ * `typing()`: whether a bare key is a shortcut or a character the person meant to type.
+ * `GoPrefix`: the `g` then letter chord, and the one second it lives for.
  *
  * The counter in `keys.svelte.ts` is the whole of that decision, and nothing checked it at any
  * height. Its own header records what it costs when the answer is wrong: open a page, press Add a
@@ -22,11 +26,13 @@
  *
  * WHAT `generate: 'server'` LEAVES UNCOVERED, STATED SO NOBODY READS MORE INTO A GREEN RUN THAN IS
  * THERE. Compiled for the server, `$state(0)` is a plain `0` and `this.#count++` is an increment and
- * nothing more. The counter therefore holds the right VALUE in every test below, and none of it is
+ * nothing more, and `GoPrefix`'s `armed = $state(false)` is a plain field. The counter and the
+ * prefix therefore hold the right VALUE in every test below, and none of it is
  * reactive. Nothing here proves that the shell's `<svelte:window>` handler re-reads the depth when a
- * sheet opens, that a browser re-renders, or that an effect ever runs. A `#count` that had quietly
+ * sheet opens, that the `role="status"` hint appears when the prefix arms and goes when it expires,
+ * that a browser re-renders, or that an effect ever runs. A `#count` or an `armed` that had quietly
  * stopped being reactive would pass this entire file. The reactivity is the browser gates' claim to
- * make; the arithmetic and the clamp are this file's.
+ * make; the arithmetic, the clamp and the deadline are this file's.
  *
  * AND WHAT IS NOT TESTED ANYWHERE ELSE, so that the division is legible. `tools/gates/keys.mjs`
  * reads the binding registry out of `bindings.ts` as text and presses every bare binding in a real
@@ -60,11 +66,21 @@ registerHooks({
  * throw rather than pass unnoticed.
  */
 const html = { style: { overflow: '' } };
-(globalThis as { document?: { documentElement: typeof html } }).document = { documentElement: html };
+
+/**
+ * AND `activeElement`, WHICH IS THE WHOLE OF `typing()`'s INPUT: a tag name and the contenteditable
+ * flag beside it, because those are the only two things the module reads off it.
+ *
+ * It starts `null`, which is not a convenience. `typing()` guards for a document with nothing
+ * focused explicitly, and a test that never sees that state would not notice the guard going.
+ */
+type Focused = { tagName: string; isContentEditable: boolean } | null;
+const doc: { documentElement: typeof html; activeElement: Focused } = { documentElement: html, activeElement: null };
+(globalThis as { document?: typeof doc }).document = doc;
 
 /* AFTER THE HOOK, AND THAT IS WHY IT IS DYNAMIC. A static import is evaluated before this file's
    body runs, so the module would load before the hook that makes it loadable was registered. */
-const { covered, overlays } = await import('./keys.svelte.ts');
+const { GoPrefix, covered, overlays, typing } = await import('./keys.svelte.ts');
 
 /**
  * A page with nothing over it, which is where each test starts.
@@ -265,4 +281,131 @@ test('EVERY ROUTE HANDLER THAT OWNS THE WINDOW ASKS WHETHER SOMETHING IS OVER TH
   /* A WALK THAT FOUND NOTHING WOULD PASS THE LOOP ABOVE SILENTLY, which is the shape this repository
      exists to catch. Seven were guarded when this was written, out of eight handlers. */
   assert.ok(asked >= 7, `this walk found only ${asked} window keydown handlers, so it is not reading the routes`);
+});
+
+/* ── 5. `typing()`: a shortcut, or a character somebody meant ─────────────── */
+
+/**
+ * WHAT IS RIDING ON EACH ANSWER, because both wrong answers are destructive and they are destructive
+ * in opposite directions. A `false` while somebody is in a field turns the letter they typed into a
+ * shortcut, so the sentence loses a character and the app navigates out from under it. A `true` when
+ * nothing is focused kills the bare-key namespace outright and every shortcut in the app is dead.
+ *
+ * The shell asks this twice per keydown (`typing() && !mod`, then again below the modifier chords),
+ * so it is the single most-pressed branch in the interface.
+ */
+function focus(tagName: string, isContentEditable = false): void {
+  doc.activeElement = { tagName, isContentEditable };
+}
+
+test('EVERY KIND OF FIELD COUNTS AS TYPING, including the two a hand-written copy of this check forgets', () => {
+  /* `SELECT` IS IN HERE ON PURPOSE. A native select answers bare letters by jumping to the option
+     that starts with them, so a bare-key handler that fires over an open select both steals the
+     letter and acts on it. Two routes carry their own narrower version of this test that stops at
+     INPUT and TEXTAREA, which is the drift the module header exists to forbid. */
+  for (const tag of ['INPUT', 'TEXTAREA', 'SELECT']) {
+    focus(tag);
+    assert.equal(typing(), true, `a key pressed inside a focused ${tag} was read as a shortcut, so it never reached what the person was typing`);
+  }
+});
+
+test('and a contenteditable counts, which is the one a tag name alone cannot see', () => {
+  /* A block editor is a `DIV`. Nothing about the tag says a person is writing in it, so the flag is
+     the only thing that does. */
+  focus('DIV', true);
+  assert.equal(typing(), true, 'a key typed into a contenteditable was read as a shortcut, so the app acted on somebody mid sentence');
+});
+
+test('AN ORDINARY ELEMENT IS NOT A FIELD, or every shortcut in the app is dead', () => {
+  focus('DIV');
+  assert.equal(typing(), false, 'focus sitting on an ordinary element was called typing, which silences the whole bare-key namespace');
+
+  /* A BUTTON IS THE CASE THIS REALLY DECIDES. `AddBlock` is a sheet made entirely of buttons, and
+     the row grids put focus on one too, so `BUTTON` is where focus actually sits when a bare key is
+     meant to work. */
+  focus('BUTTON');
+  assert.equal(typing(), false, 'focus on a button was called typing, and the grids are where the bare letters live');
+});
+
+test('and a document with nothing focused is not typing either, which is the guard the module writes out', () => {
+  /* Not hypothetical: `activeElement` is `null` in a freshly created or detached document, and the
+     module reads it before it reads a tag name. Without the guard this is a TypeError thrown inside
+     a keydown handler, which takes every key after it down with it rather than misreading one. */
+  doc.activeElement = null;
+  assert.equal(typing(), false, 'a document with nothing focused was called typing, so the keyboard is dead until something takes focus');
+});
+
+/* ── 6. `GoPrefix`: a chord with a deadline ──────────────────────────────── */
+
+/** `19 §4`: "The `g` prefix is armed for one second, then expires. `g w` is a chord, not a mode." */
+const WINDOW = 1_000;
+
+test('A FRESH PREFIX IS NOT ARMED, because a mode you are already in is not a chord', () => {
+  assert.equal(new GoPrefix().armed, false, 'the prefix is armed before anyone pressed g, so the next letter typed navigates the app');
+});
+
+test('`g` ARMS IT AND IT LIVES THE WHOLE WINDOW, not part of it', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const go = new GoPrefix();
+
+  go.arm();
+  assert.equal(go.armed, true, 'g was pressed and nothing armed, so `g h` does nothing at all');
+
+  /* The hint is a `role="status"` line, so the window is also how long a screen reader has to hear
+     that the prefix is up and answer it. A second that is really 300 ms is a chord for one person. */
+  t.mock.timers.tick(WINDOW - 1);
+  assert.equal(go.armed, true, 'the prefix expired inside the second it promises, so a letter pressed in time went nowhere');
+});
+
+test('AND IT EXPIRES AT THE DEADLINE, so a `g` nobody followed does not eat the next letter', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const go = new GoPrefix();
+
+  go.arm();
+  t.mock.timers.tick(WINDOW);
+  /* A prefix that never expires IS the mode the header rules out: the `j` somebody presses a minute
+     later is swallowed by a `g` they have forgotten pressing, or navigates the app if it is in the
+     GOTO map. */
+  assert.equal(go.armed, false, 'the prefix was still armed a full second after the g, so an unrelated key later was read as the second half of a chord');
+});
+
+test('A SECOND `g` RESTARTS THE WINDOW rather than being timed out by the first one', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const go = new GoPrefix();
+
+  go.arm();
+  t.mock.timers.tick(WINDOW - 100);
+  go.arm();
+
+  /* Past the FIRST arm's deadline and well inside the second's. A stale timer firing here disarms a
+     prefix the person armed 100 ms ago, and the letter they are about to press is eaten. */
+  t.mock.timers.tick(200);
+  assert.equal(go.armed, true, 'the first g deadline disarmed a prefix that a later g had re-armed');
+
+  t.mock.timers.tick(WINDOW - 200);
+  assert.equal(go.armed, false, 're-arming bought the prefix a window with no end');
+});
+
+test('DISARMING DISARMS IT, so a chord already spent does not take the next letter as well', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const go = new GoPrefix();
+
+  /* WHAT DISARMS IT, READ OFF THE SHELL: the letter being spent, whether or not it went anywhere,
+     and any modifier held while the prefix is up, because `Mod+H` belongs to the browser and the arm
+     used to read the key without asking. Both are this one call. */
+  go.arm();
+  go.disarm();
+  assert.equal(go.armed, false, 'the chord was spent and the prefix stayed armed, so the NEXT letter navigated too');
+
+  /* AND THE SPENT CHORD'S DEADLINE CANNOT REACH THE NEXT ONE. Worth pressing because the sequence is
+     ordinary, `g h` and then `g` again; NOT worth crediting to `disarm`'s own `clearTimeout`, which
+     is what this comment said first. `arm` clears whatever handle is stored before it sets its own,
+     and `disarm` leaves that handle in place, so by the time a second chord exists the stale timer
+     is already cleared by `arm`. Deleting the `clearTimeout` from `disarm` changes nothing anybody
+     can observe: its callback only ever writes `false` over a `false`. Said here rather than
+     asserted, so the line is not read as covered when no honest test can hold it. */
+  t.mock.timers.tick(WINDOW - 100);
+  go.arm();
+  t.mock.timers.tick(200);
+  assert.equal(go.armed, true, 'a g pressed 100 ms ago was disarmed by the deadline of a chord already spent');
 });
