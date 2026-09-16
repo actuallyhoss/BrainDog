@@ -23,9 +23,11 @@
  *
  * WHAT IT CANNOT DO TODAY, SAID PLAINLY, because the first two are why it has not been run:
  *
- *   - CREATE THE RECORD. `createRecord` is in `UNROUTED` (`packages/host/src/index.ts`) and the
- *     Directory has no provisioning call the Worker exposes, so nothing reachable over HTTP writes a
- *     record's identity, its owner or its entry in the Directory. That is the sign-up work.
+ *   - CREATE THE RECORD, WHICH WAS TRUE THE DAY THIS WAS WRITTEN AND IS NOT NOW. `/auth/provision`
+ *     makes a record's identity, its owner and their membership behind the operator key, so the
+ *     record this script writes into can exist as soon as `PROVISION_KEY` is set. `createRecord` is
+ *     still in `UNROUTED` and that is correct rather than a gap: provisioning belongs to the
+ *     Directory and not to a record's own call. What blocks this script is the next line, not this one.
  *   - GET PAST `setDeclaration` WITH A BEARER. It is an ADMIN route, and `admin()` in
  *     `packages/record/src/index.ts` refuses every token by kind (`NEEDS_BROWSER_SESSION`, ADR-060).
  *     ADMIN admits an owner's browser session or an operation grant, and neither is built. The
