@@ -9,7 +9,8 @@
 -->
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type RenderOptions } from '../src/index.ts';
-  import { bridgePlan, bridgeSentence, signedOf } from '../src/bridge.ts';
+  import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from '../src/bridge.ts';
+  import { SERIES_NUMBERS } from '../src/series.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -46,5 +47,20 @@
   </ol>
   {#if plan.warn}
     <p class="bridge-warn" data-intent="warn"><span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>{plan.warn}</p>
+  {/if}
+  {#if block.rows.length}
+    <details class="bridge-numbers">
+      <summary class="bridge-toggle">{SERIES_NUMBERS}</summary>
+      <table class="bridge-table">
+        <thead>
+          <tr><th scope="col">{BRIDGE_STEP}</th><th scope="col">{BRIDGE_AMOUNT}</th></tr>
+        </thead>
+        <tbody>
+          {#each block.rows as row}
+            <tr><th scope="row">{text(inline(row.cells[0] ?? '', opts))}</th><td class="num">{text(inline(row.cells[1] ?? '', opts)) || MISSING}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    </details>
   {/if}
 </div>

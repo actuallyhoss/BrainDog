@@ -1853,12 +1853,18 @@
 
   /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
   .series-numbers,
-  .forecast-numbers {
+  .forecast-numbers,
+  .bridge-numbers,
+  .split-numbers,
+  .spark-numbers {
     margin-inline: var(--sp-2);
   }
 
   .series-toggle,
-  .forecast-toggle {
+  .forecast-toggle,
+  .bridge-toggle,
+  .split-toggle,
+  .spark-toggle {
     display: flex;
     align-items: center;
     min-block-size: var(--ctl-h);
@@ -1869,24 +1875,36 @@
   }
 
   .series-toggle::-webkit-details-marker,
-  .forecast-toggle::-webkit-details-marker {
+  .forecast-toggle::-webkit-details-marker,
+  .bridge-toggle::-webkit-details-marker,
+  .split-toggle::-webkit-details-marker,
+  .spark-toggle::-webkit-details-marker {
     display: none;
   }
 
   .series-toggle:hover,
-  .forecast-toggle:hover {
+  .forecast-toggle:hover,
+  .bridge-toggle:hover,
+  .split-toggle:hover,
+  .spark-toggle:hover {
     color: var(--ink2);
   }
 
   @media (pointer: coarse) {
     .series-toggle,
-    .forecast-toggle {
+    .forecast-toggle,
+    .bridge-toggle,
+    .split-toggle,
+    .spark-toggle {
       min-block-size: var(--tap);
     }
   }
 
   .series-table,
-  .forecast-table {
+  .forecast-table,
+  .bridge-table,
+  .split-table,
+  .spark-table {
     inline-size: 100%;
     border-collapse: collapse;
     font-size: var(--t-sm);
@@ -1895,7 +1913,13 @@
   .series-table th,
   .series-table td,
   .forecast-table th,
-  .forecast-table td {
+  .forecast-table td,
+  .bridge-table th,
+  .bridge-table td,
+  .split-table th,
+  .split-table td,
+  .spark-table th,
+  .spark-table td {
     padding: var(--sp-1) var(--sp-2);
     border-block-end: 1px solid var(--line-soft);
     color: var(--ink);
@@ -1904,13 +1928,19 @@
   }
 
   .series-table thead th,
-  .forecast-table thead th {
+  .forecast-table thead th,
+  .bridge-table thead th,
+  .split-table thead th,
+  .spark-table thead th {
     color: var(--dim);
     font-size: var(--t-xs);
   }
 
   .series-table th:first-child,
   .forecast-table th:first-child,
+  .bridge-table th:first-child,
+  .split-table th:first-child,
+  .spark-table th:first-child,
   .forecast-table td:nth-child(2) {
     text-align: start;
   }

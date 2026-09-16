@@ -56,3 +56,11 @@ test('A BRIDGE IS A CHART NAMED BY ITS ROWS, then the rows as text with their in
   assert.match(html, /<p class="bridge-warn" data-intent="warn"><span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>These rows do not add up/u);
   assert.equal(parse('```bridge\nA | 1 | n | good\n```')[0]?.type, 'degraded', 'a bridge row takes no tone');
 });
+
+test('A BRIDGE PUTS ITS NUMBERS IN A FOLD, a row for each step with its amount as written', () => {
+  const html = toHTML(parse('```bridge\nStart | 100\nSomething | soon\nEnd | \n```'));
+  assert.match(
+    html,
+    /<details class="bridge-numbers"><summary class="bridge-toggle">The numbers<\/summary><table class="bridge-table"><thead><tr><th scope="col">Step<\/th><th scope="col">Amount<\/th><\/tr><\/thead><tbody><tr><th scope="row">Start<\/th><td class="num">100<\/td><\/tr><tr><th scope="row">Something<\/th><td class="num">soon<\/td><\/tr><tr><th scope="row">End<\/th><td class="num">—<\/td><\/tr><\/tbody><\/table><\/details><\/div>/u,
+  );
+});

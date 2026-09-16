@@ -80,6 +80,9 @@ export const TONE_ALIAS: Record<string, Tone> = {
 /** `hole` is a tone, on `bar` only: the row that is a task, not a value (05 §7.5). */
 export const BAR_HOLE = 'hole';
 
+/** The head of the position column in a `sparkline`'s fold, where each drawn line's points are a column. */
+export const SPARKLINE_POINT = 'Point';
+
 export type KindSpec = {
   primitive: Primitive;
   /** How many cells a row takes, before the optional trailing tone word. */

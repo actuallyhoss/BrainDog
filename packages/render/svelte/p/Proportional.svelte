@@ -15,7 +15,7 @@
   one-pixel stub: the chart unreadable because of the thing it reports (05 §7.5).
 -->
 <script lang="ts">
-  import { inline, magnitudeOfCell, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { inline, magnitudeOfCell, text, trendOf, SERIES_NUMBERS, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -36,6 +36,15 @@
   const fill = () => {
     if (typeof opts.hole === 'function') opts.hole(null);
   };
+
+  /** A sparkline's fold: the points of every line that drew, a column each, a row per position. */
+  const runs = $derived(
+    block.rows.flatMap((r) => {
+      const t = trendOf(text(inline(r.cells[1] ?? '', opts)));
+      return t ? [{ label: text(inline(r.cells[0] ?? '', opts)) || TREND, said: t.said }] : [];
+    }),
+  );
+  const depth = $derived(Math.max(0, ...runs.map((r) => r.said.length)));
 
   const scale = $derived(Math.max(0, ...block.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite)));
   const gauge = $derived.by(() => {
@@ -68,6 +77,21 @@
         {/if}
       </div>
     {/each}
+    {#if runs.length}
+      <details class="spark-numbers">
+        <summary class="spark-toggle">{SERIES_NUMBERS}</summary>
+        <table class="spark-table">
+          <thead>
+            <tr><th scope="col">{SPARKLINE_POINT}</th>{#each runs as run}<th scope="col">{run.label}</th>{/each}</tr>
+          </thead>
+          <tbody>
+            {#each { length: depth }, i}
+              <tr><th scope="row">{i + 1}</th>{#each runs as run}<td class="num">{run.said[i] ?? MISSING}</td>{/each}</tr>
+            {/each}
+          </tbody>
+        </table>
+      </details>
+    {/if}
   {:else if block.kind === 'gauge'}
     {@const row = block.rows[0] ?? { cells: [] }}
     <div class="prop-row" data-intent={row.tone}>

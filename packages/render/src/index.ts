@@ -58,8 +58,8 @@ export {
   type DiffOp,
   type DiffPart,
 } from './diff.ts';
-export { SPLIT_PART, SPLIT_STEPS, SPLIT_ZERO, splitPlan, splitSentence, type SplitPart, type SplitPlan } from './split.ts';
-export { BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
+export { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_STEPS, SPLIT_ZERO, splitPlan, splitSentence, type SplitPart, type SplitPlan } from './split.ts';
+export { BRIDGE_AMOUNT, BRIDGE_STEP, BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
 export { SERIES_AHEAD, SERIES_MOST, SERIES_NET, SERIES_NONE, SERIES_NUMBERS, SERIES_PARTIAL, seriesPlan, seriesValue, type SeriesBar, type SeriesDir, type SeriesPlan, type SeriesState } from './series.ts';
 export { figureLike } from './figure.ts';
 export {
@@ -91,6 +91,7 @@ export {
   TONES,
   TONE_ALIAS,
   BAR_HOLE,
+  SPARKLINE_POINT,
   isKind,
   type DegradeCode,
   type Kind,

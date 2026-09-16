@@ -74,3 +74,6 @@ export const splitSentence = (parts: readonly { label: string; share: string }[]
 /** The renderer's own words, as `cards.ts` keeps `CARDS_NONE`: it imports nothing from the app. */
 export const SPLIT_ZERO = 'Every part is zero, so there is nothing to divide yet.';
 export const SPLIT_PART = 'Part';
+/** The heads of the fold's table after `SPLIT_PART`: each row's figure, then its share of the whole. */
+export const SPLIT_AMOUNT = 'Amount';
+export const SPLIT_SHARE = 'Share';

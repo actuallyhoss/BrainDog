@@ -14,13 +14,13 @@
  * `--cells`, `--magnitude` and `--at`, all numbers this file formats itself.
  */
 
-import { KINDS, TONES, type Kind } from './kinds.ts';
+import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { MISSING, day, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
-import { SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
-import { bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
+import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
+import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario } from './forecast.ts';
@@ -174,6 +174,19 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`;
 }
 
+/**
+ * The numbers a figure was drawn from, as a table in a fold: `bridge`, `split` and `sparkline` put
+ * one under the drawing, as `series` does. Column heads first, then each row as its row head and
+ * its cells, all plain text this function escapes.
+ */
+function numbersFold(kind: string, heads: readonly string[], rows: readonly (readonly string[])[]): string {
+  return `<details class="${kind}-numbers"><summary class="${kind}-toggle">${SERIES_NUMBERS}</summary><table class="${kind}-table"><thead><tr>${heads
+    .map((h) => `<th scope="col">${escape(h)}</th>`)
+    .join('')}</tr></thead><tbody>${rows
+    .map(([head, ...cells]) => `<tr><th scope="row">${escape(head ?? '')}</th>${cells.map((c) => `<td class="num">${escape(c)}</td>`).join('')}</tr>`)
+    .join('')}</tbody></table></details>`;
+}
+
 function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'cards') return cards(b, o);
   if (b.kind === 'board') {
@@ -235,13 +248,27 @@ function proportional(b: Block, o: RenderOptions): string {
 
   /* `sparkline`: a label, a small line in the quiet ink ending in a dot, and the figure it ends at.
      Fewer than two points draw no line, and the figure is still said. */
-  if (b.kind === 'sparkline')
+  if (b.kind === 'sparkline') {
+    /* The fold holds the points of every line that drew, a column each, a row per position. */
+    const runs = b.rows.flatMap((r) => {
+      const t = trendOf(plain(inline(r.cells[1] ?? '', o)));
+      return t ? [{ label: plain(inline(r.cells[0] ?? '', o)) || TREND, said: t.said }] : [];
+    });
+    const depth = Math.max(0, ...runs.map((r) => r.said.length));
+    const numbers = runs.length
+      ? numbersFold(
+          'spark',
+          [SPARKLINE_POINT, ...runs.map((r) => r.label)],
+          Array.from({ length: depth }, (_, i) => [String(i + 1), ...runs.map((r) => r.said[i] ?? MISSING)]),
+        )
+      : '';
     return `<div class="prop">${b.rows
       .map(
         (r) =>
           `<div class="spark-row"${toneAttrs(r.tone)}>${cell('spark-label', r.cells[0], o)}${trendSvg('spark-line', r.cells[0] ?? '', r.cells[1] ?? '', o)}<span class="spark-figure num">${drawn(r.cells[2] || MISSING)}</span>${toneGlyph(r.tone)}</div>`,
       )
-      .join('')}</div>`;
+      .join('')}${numbers}</div>`;
+  }
 
   if (b.kind === 'split') return split(b, o);
   if (b.kind === 'bridge') return bridge(b, o);
@@ -399,7 +426,15 @@ function split(b: Block, o: RenderOptions): string {
         : `<div class="split-hole" data-hole${toneAttrs(r.tone)}>${inner}</div>`;
     })
     .join('');
-  return `<div class="prop split">${track}${legend}${hole}</div>`;
+  const all = [...rows, ...b.rows.filter((r) => r.hole)];
+  const numbers = all.length
+    ? numbersFold(
+        'split',
+        [SPLIT_PART, SPLIT_AMOUNT, SPLIT_SHARE],
+        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || MISSING, plan.parts.find((p) => p.at === i && !r.hole)?.share ?? MISSING]),
+      )
+    : '';
+  return `<div class="prop split">${track}${legend}${hole}${numbers}</div>`;
 }
 
 /**
@@ -427,7 +462,14 @@ function bridge(b: Block, o: RenderOptions): string {
     })
     .join('');
   const warn = plan.warn ? `<p class="bridge-warn" data-intent="warn">${toneGlyph('warn')}${escape(plan.warn)}</p>` : '';
-  return `<div class="prop bridge" style="--cells:${b.rows.length}">${chart}<ol class="bridge-rows">${rows}</ol>${warn}</div>`;
+  const numbers = b.rows.length
+    ? numbersFold(
+        'bridge',
+        [BRIDGE_STEP, BRIDGE_AMOUNT],
+        b.rows.map((r) => [plain(inline(r.cells[0] ?? '', o)), plain(inline(r.cells[1] ?? '', o)) || MISSING]),
+      )
+    : '';
+  return `<div class="prop bridge" style="--cells:${b.rows.length}">${chart}<ol class="bridge-rows">${rows}</ol>${warn}${numbers}</div>`;
 }
 
 /**

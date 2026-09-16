@@ -1597,3 +1597,13 @@ test('A SPARKLINE ROW IS A LABEL, A LINE AND ITS FIGURE, and under two points it
   assert.doesNotMatch(html, /style=/u);
   assert.equal(parse('```sparkline\nA | 1 2 | 2 | x\n```')[0]?.type, 'degraded', 'a fourth cell that is not a tone is too wide');
 });
+
+test('A SPARKLINE PUTS THE POINTS IT DREW IN A FOLD, a column per line and a row per position', () => {
+  const html = toHTML(parse('```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\nLonely | 7 | 7\n```'));
+  assert.match(
+    html,
+    /<details class="spark-numbers"><summary class="spark-toggle">The numbers<\/summary><table class="spark-table"><thead><tr><th scope="col">Point<\/th><th scope="col">Cash<\/th><th scope="col">Trend<\/th><\/tr><\/thead><tbody><tr><th scope="row">1<\/th><td class="num">18<\/td><td class="num">1<\/td><\/tr><tr><th scope="row">2<\/th><td class="num">20<\/td><td class="num">2<\/td><\/tr><tr><th scope="row">3<\/th><td class="num">no value<\/td><td class="num">—<\/td><\/tr><tr><th scope="row">4<\/th><td class="num">24<\/td><td class="num">—<\/td><\/tr><\/tbody><\/table><\/details><\/div>/u,
+  );
+  assert.doesNotMatch(toHTML(parse('```sparkline\nLonely | 7 | 7\n```')), /<details/u, 'a line that did not draw has no points to show');
+  assert.doesNotMatch(toHTML(parse('```stat\nCash | 10 | | 1 2 3\n```')), /<details/u, 'the stat trend cell keeps no fold');
+});

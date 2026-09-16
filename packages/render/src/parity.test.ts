@@ -1,6 +1,7 @@
 /**
  * The two renderers, compared as trees: the Svelte drawers compiled and rendered on the server,
- * against `toHTML`, for every shape a `cards`, `section`, `feed` and `diff` block can take.
+ * against `toHTML`, for every shape a `cards`, `section`, `feed` and `diff` block can take,
+ * and the figures that keep their numbers in a fold.
  *
  * "EQUAL BY CONSTRUCTION" WAS A PROMISE AND NOTHING KEPT IT. The rest of this package asserts the
  * Svelte side by reading its source as text, because a `.svelte` file cannot be mounted under
@@ -113,6 +114,8 @@ const SHAPES: Record<string, string> = {
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',
   'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
+  'sparklines of two lengths, one with a gap': '```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\n```',
+  'a split with an unnamed part': '```split\nRent | 300\n | 100\n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 

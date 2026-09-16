@@ -7,7 +7,8 @@
 -->
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_ZERO, splitPlan, splitSentence } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from '../src/split.ts';
+  import { SERIES_NUMBERS } from '../src/series.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -69,4 +70,23 @@
       <div class="split-hole" data-hole data-intent={row.tone}>{@render holeBody(row)}</div>
     {/if}
   {/each}
+  {#if block.rows.length}
+    <details class="split-numbers">
+      <summary class="split-toggle">{SERIES_NUMBERS}</summary>
+      <table class="split-table">
+        <thead>
+          <tr><th scope="col">{SPLIT_PART}</th><th scope="col">{SPLIT_AMOUNT}</th><th scope="col">{SPLIT_SHARE}</th></tr>
+        </thead>
+        <tbody>
+          {#each [...rows, ...holes] as row, i}
+            <tr>
+              <th scope="row">{said(row) || SPLIT_PART}</th>
+              <td class="num">{text(inline(row.cells[1] ?? '', opts)) || MISSING}</td>
+              <td class="num">{(!row.hole && plan.parts.find((p) => p.at === i)?.share) || MISSING}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </details>
+  {/if}
 </div>
