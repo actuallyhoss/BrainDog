@@ -151,7 +151,10 @@ The artefacts an operator handles, each with invariants a test can check.
 
 *Amended September 16th 2026.* Two rows below name something an operator cannot reach today. In the `.brain` /
 `.brainl` row, "`braindog verify` passes offline" is the property the format is built to have and not a check anybody
-can run: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (§2.1). In the signing
+can run from the CLI: `verify` is specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (§2.1). What
+an operator can run is Settings → export's **Check an exported file**, which checks a `.brainl` in the browser with the
+import's own `checkBrainl` (format, every table against the manifest, the signature against the key inside the file) and
+sends nothing (03 §4). It does not read a `.brain`, and it cannot pin the key. In the signing
 key row, "the public half in Settings → export and at the well-known URL 03 §4 names" is true of the built-in sample
 alone. The export screen draws that key on the demo only, and tells a live record that its exports and backups are
 signed and that the public half is not shown there yet; `03 §4`'s well-known URL is served by none of the three apps.

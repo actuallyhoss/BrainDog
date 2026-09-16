@@ -170,7 +170,7 @@ toYaml(decl: Declaration): string · fromYaml(text: string): Declaration | Refus
 // the record over HTTP (33 §2)                              spec 45 — the shapes this app renders
 GET  /api/version → { version, spark: boolean }             // 46 §5.1; the polling fallback and the Spark switch
 boot() → { index, sessions, suggestions, whatsNew, sinceCapped, theme: { id, version, css },
-           me: { person, level, owner: boolean, records: { slug, name }[] } }        // records → /auth/switch/<slug> (51 D4)
+           me: { kind, person, name, level }, signIn: boolean }  // the switcher's rows: GET /account/records, then POST /auth/switch (§5.13, 51 D4)
 page(slug) → { page: PageDecl, blocks: { rows: Entry[], total: number, drawn: boolean, stale_at: string }[],
                kinds: KindTable, values: Record<Path, Value | null> }               // `when:` and every {{path}} resolved server-side
 listJobs({ id?, after? }) → { jobs: Job[], events: JobEvent[] }                     // events with seq > after; [] when job.seq ≤ after; owner (46 §5.2)
@@ -442,6 +442,15 @@ mechanism 2, amended in §13 D1). Per device — §10.
    `declare.toYaml(page)` in a `<pre>`.
 7. Streaming is not used; a page renders in under 2.12 ms (22 §5). `ponytail:` stream at block granularity when a
    block's projected rows exceed ~200 and the buffered TTFB is measured worse.
+8. **Edit layout keeps what it arranged.** *(Built September 16th 2026; until then Done said the page was rearranged
+   here and nothing was saved.)* Done on a live page (`saveArrangement` in `lib/record/page-write.ts`) reads the
+   declaration the record stores, lays its blocks out in the order and at the widths chosen, declares any added block
+   where it was put with only the keys a declaration may carry, and sets the body whole through `setDeclaration`
+   (33 §2, an ADMIN method, so the owner's). Two cases are refused rather than written over: a stored body whose block count differs from
+   the one drawn, which is a page that changed while it was arranged (*"Open it again, then arrange it."*), and a
+   template's one-row expansion, since setting that would turn one declaration for every row into a page about one row.
+   The toast's undo sets the body read before. A body read back starts with its `page` key, because the record reads
+   a declaration's kind from its first key and a body that began with `nav` was refused.
 
 ### 5.2 · The register grid — `Grid.svelte`
 
@@ -645,8 +654,15 @@ mechanism 2, amended in §13 D1). Per device — §10.
 2. Fire `boot()`, `GET /api/version` and the route's own call **in parallel**; a page therefore costs one round trip
    after the shell. `UNAUTHORIZED` from any of them → `location.assign('/signin?next=' + path)`. `/signin` goes on to `next` only when it is a path on this origin (`safeNext` in `packages/host/src/auth.ts`: no `//`, no backslash, no scheme, nothing that decodes to one), else to `/`.
 3. `live.spark = version.spark`; `version.record = max(boot.version, version.version)`; `aria-busy` is set back.
-4. `me.records` draws the record switcher as links to `GET /auth/switch/<slug>` — the record is on the session row, and moving it is the host's
-   (51 D4); the app never reads or sends it.
+4. The record switcher's rows come from `GET /account/records` (33 §4), read only when `boot.signIn` is not `false`: a host
+   where nobody signs in answers that route 401, the answer an ended session gets, and the switcher would offer a
+   sign-in with nowhere to sign in. A host older than the field says nothing and is asked as before. Pressing another
+   record's row sends `POST /auth/switch { slug }` from this origin (`openRecord` in `lib/record/switcher.ts`); the host
+   moves the session row and not the cookie, and the app starts again at Home. The record is on the session row, and
+   moving it is the host's (51 D4); the app never reads or sends it. A host with no such route (the sample on a static
+   host, or `ROUTE_UNKNOWN`) holds no second record, and the row says what would open. *(Amended September 16th 2026:
+   this step drew links to `GET /auth/switch/<slug>`, and a GET that moves a session is a link any page can make a
+   browser follow.)*
 5. Register `sw.js`; open the socket (§5.4); apply `boot.theme` (§5.7 step 3).
 6. `/s/<token>` skips steps 2–5: it calls `page(slug)` once with `Authorization: Share <token>` — the header 51 §5.6
    names — and renders `Page` with `me.level = 'read'`, no nav and no palette.

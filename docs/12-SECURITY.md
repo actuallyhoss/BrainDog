@@ -70,8 +70,11 @@ and the sign-in half is data: `AUTH_ROUTES` in `packages/host/src/auth.ts`, whic
 (`POST /auth/passkey/assert`, `POST /auth/magic/redeem`), except the server key's exchange, which is
 `POST /auth/token`. The device grant's two routes, `POST /auth/device` and `POST /auth/device/token`, are rows of
 the same table, kept in `packages/host/src/device.ts`. The invitation's route, `POST /auth/invite`, is a row of the table too, kept in
-`packages/host/src/invite.ts`. The operation grant's approval and the record switch (`/auth/device/approve`, `/auth/switch`)
-are specified and not built, and keep those paths when they land. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in `token.hash`
+`packages/host/src/invite.ts`. The record switch, `POST /auth/switch`, is a row too: a POST from a page on this origin and
+never a GET, since a GET that moves a session is a link any page can make a browser follow; a slug that is not ASCII is
+refused before it is lowered; and the record itself is asked whether the person is on it (`admits`), since the Directory's
+list outlives a removal. Every refusal is the one 403, so it tells nobody which records exist. The operation grant's approval
+(`/auth/device/approve`) is specified and not built, and keeps that path when it lands. A bearer on the wire is `<rec_id>.<secret>`; the record keeps only `sha256(secret)`, in `token.hash`
 or `device_grant.token_hash`.
 **Passkeys first, and no passwords at all.** A record holding credentials should not be protected
 by a reusable secret that can be phished. WCAG 2.2's accessible-authentication criterion is

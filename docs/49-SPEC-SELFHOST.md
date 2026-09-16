@@ -232,6 +232,7 @@ type Route = { method: 'GET' | 'POST'; path: string | RegExp; group: Group; auth
 | `/s/<token>` | GET | share | READ+ | 7 |
 | `/<ID>` (34 §4's two spoken grammars) | GET | cookie | READ+ | 2 |
 | the sign-in routes of 33 §4 (`AUTH_ROUTES`), the operator's two excepted: `/auth/methods` · `/auth/session` · `/auth/token` · `/auth/magic/start` · `/auth/magic/redeem` · `/auth/passkeys` · `/auth/passkey/remove` · `/auth/logout` | GET · POST | none, or the session cookie | AUTH | 2 |
+| `/auth/switch` (September 16th 2026): moves the session to another record the person is on. This process opens only the record it serves, so the Directory's `admits(record, person)` is `record === this record's id` and the kernel's `access(person)`; any other name, and a person the record's own table no longer holds, is the one 403 at `slug`. It is asked after the session, so a caller with no cookie gets 401 for every name and cannot learn which one this process serves | POST | the session cookie, same origin | AUTH | 2 |
 | `/auth/invite` | GET | none | AUTH | 2 |
 | `/account/usage?from&to` (`ACCOUNT_ROUTES`): what the records the signed-in person owns used, from the Directory's ledger | GET | the session cookie | AUTH | 2 |
 | `/account/records` (`ACCOUNT_ROUTES`): every open record the signed-in person can reach, each named and levelled by that record's own answer: the record switcher's rows | GET | the session cookie | AUTH | 2 |

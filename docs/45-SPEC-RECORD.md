@@ -449,13 +449,14 @@ Effective level for a token = `min(scopeLevel(scope), memberLevel)` with `read �
 
 **`get`**
 
-1. `r = kernel.get(ref)` — the kernel resolves `{ spoken }` (`D` → decision, `SG` → suggestion, a prefix → its register, `tasks#7`); a bare `#7` is its `REGISTER_UNKNOWN` (41 §2). Not `ok` → pass through.
-2. `r.value === null` → `ok, value: null` (§13 #10). `r.value.register ∉ scope.registers` → `FORBIDDEN`.
-3. `level`: `index` → `{ spoken, title, state, register }`; `row` (default) → `mapRow` over **all** declared fields (`document → { words }`, `secret → label`); `full` → `path` required, else `REQUIRED_MISSING` at `path`, `wanted: 'a path when level is full'`, `fix: "Name the field you want: path: 'note'"`; the value at `path` (`<field>(.<key>)*` over `fields`; a missing key is `null`), a `document` whole.
+1. Nothing asked (no `spoken`, `register` or `seq`) → `REQUIRED_MISSING` at `spoken`; asked by `register` and `seq` rather than `spoken`, a missing `register` or `seq` → `REQUIRED_MISSING` at that key; a `seq` that is not a whole number from 1 → `VALUE_MALFORMED` at `seq`. *(September 16th 2026: `get({})` answered `null` and `get()` threw.)*
+2. `r = kernel.get(ref)` — the kernel resolves `{ spoken }` (`D` → decision, `SG` → suggestion, a prefix → its register, `tasks#7`); a bare `#7` is its `REGISTER_UNKNOWN` (41 §2). Not `ok` → pass through.
+3. `r.value === null` → `ok, value: null` (§13 #10). `r.value.register ∉ scope.registers` → `FORBIDDEN`.
+4. `level`: `index` → `{ spoken, title, state, register }`; `row` (default) → `mapRow` over **all** declared fields (`document → { words }`, `secret → label`); `full` → `path` required, else `REQUIRED_MISSING` at `path`, `wanted: 'a path when level is full'`, `fix: "Name the field you want: path: 'note'"`; the value at `path` (`<field>(.<key>)*` over `fields`; a missing key is `null`), a `document` whole.
 
 **`list`**
 
-1. Register ∈ scope and declared, else `REGISTER_UNKNOWN`; `limit = min(args.limit ?? 25, 200)`. The governance pseudo-registers `decision` · `suggestion` · `prediction` read their table with the same envelope (§13 #10), default order `ts desc` · `opened_at desc` · `score_at asc`, keyset on `(order, id)`.
+1. No `register` named → `REQUIRED_MISSING` at `register`. Register ∈ scope and declared, else `REGISTER_UNKNOWN`. A `limit` that parses as a number below 1 → `OUT_OF_BOUNDS` at `limit`, *"A list shows from 1 to 500 rows at a time, and 0 is below 1."*; the kernel reads the rest as `min(limit ?? 50, 500)`. *(September 16th 2026: `limit: 0` came back as fifty rows and `limit: -3` as one. This line said `min(args.limit ?? 25, 200)`, which the kernel never did.)* The governance pseudo-registers `decision` · `suggestion` · `prediction` read their table with the same envelope (§13 #10), default order `ts desc` · `opened_at desc` · `score_at asc`, keyset on `(order, id)`.
 2. `where.validate(pred, schemas[register], schemas)` → refusals as is; `compiled = compile(pred ?? null, { subject: 'entry', register, schemas, now, tz, scope })`; a filtered field absent from `compiled.uses.indexes` → `kernel.observe([{ kind: 'query.scan', subject: register + '.' + field }])`.
 3. `order`: default `{ field: 'updated_at', dir: 'desc' }`; a kernel field or a declared field; unknown → `FIELD_UNKNOWN` at `order.field`.
 4. `page = kernel.list({ register, where: compiled, order, limit, cursor })` — the keyset SELECT is 41 §5.8's; `scope.rows` is already inside `compiled.sql` (30 §7).
@@ -464,7 +465,7 @@ Effective level for a token = `min(scopeLevel(scope), memberLevel)` with `read �
 
 **`create` · `update`** (`api.ts`) — the write path's host
 
-1. Verb per §5.1 (`create ≥ append`; `update ≥ write`).
+1. Verb per §5.1 (`create ≥ append`; `update ≥ write`). No `register` → `REQUIRED_MISSING` at `register`; an `update` with no `seq` → `REQUIRED_MISSING` at `seq`, and one that is not a whole number from 1 → `VALUE_MALFORMED` at `seq`. A `create` whose fields carry `deleted_at` → `FIELD_UNKNOWN` at `deleted_at`, *"deleted_at is kept by the record, and a new row cannot arrive deleted. Create it, then delete it."* A row does not arrive deleted, and dropping the key quietly would be a write that did less than it was asked; `delete` is how a row goes. *(September 16th 2026.)*
 2. REPLAY: `r = kernel.replay(op_id)` → defined → return it (41 §2: the row as it is now, the original rowid as `version`; 33 §2).
 3. `out = kernel.transaction(() => kernel.write(register, id ?? null, patch, { ctx, opId: op_id, version, cascade: true, rules: fired => runRules(fired, ctx) }))` — 30 §4 steps 1–10 and 12a, one synchronous transaction; `update` passes `ref` through `kernel.update(register, ref, patch, w)` so `{ seq }` resolves inside (41 §2). A refusal is a return value, so the step-R observation commits; only a thrown `TypeError` or an unmapped `SqlError` rolls back and propagates to the host as a bare 500 (41 §2; 12 §8).
 4. `{ nextDueMs, outboxPending } = kernel.pendingWork()`.
@@ -580,7 +581,12 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 
 As built, `boot` answers `registers`, `now`, `sessions` and `waiting` (20 open suggestions), and what the web shell
 draws: `record`, `me` (with the member's name), `pages` filtered as `pages` filters them, `counts { decide, inbox }`
-(`inbox` is `null` below owner) and `whatsNew` with the default cursor, each held to what the caller may read. It is
+(`inbox` is `null` below owner), `whatsNew` with the default cursor, each held to what the caller may read, and
+`signIn: boolean`, whether anybody signs in on this host. `signIn` is read off the host's `invitations` hook: an
+invitation is spent by signing in, so a host that cannot take one has no sign-in, and a host that never said is `false`.
+A self-host started without a key, or a Worker with no `SESSION_SECRET`, answers `/account/records` 401 on every load,
+the same answer an ended session gets, so the app reads `signIn` instead and skips that read where it is `false`
+(50 §5.13). *(`signIn` added September 16th 2026.)* It is
 not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
 **`views({ register? })`** — `scoped(ctx, 'read')` first, then `guard(ctx, 'read', register)` when one is named; any
@@ -883,9 +889,9 @@ same `Result`; this table is what **this layer** raises, with the `fix` a person
 | `DEVICE_CODE_EXPIRED` | `devicePoll` on a pending row past its ten minutes | `device_code` | `The code expired; ask for a new one.` |
 | `DEVICE_CODE_TRIES` | the fifth wrong `deviceApprove`; `devicePoll` on a denied row | `user_code` | `Five wrong codes — every pending request was denied. Start again.` |
 | `REGISTER_UNKNOWN` | an undeclared register, page, ingest or `log.target`; the kernel's bare `#n` passes through | `register` · `slug` · `ingest_id` · `target` | `Registers on this record: <list>.` |
-| `FIELD_UNKNOWN` | `order.field`; a `body.<key>` the shape lacks | the path | `Fields on this register: <list>.` |
-| `REQUIRED_MISSING` | `get(level: full)` without `path`; `decide` without `reason`; a body key absent | the path | `Name the field you want: path: 'note'.` |
-| `OUT_OF_BOUNDS` | `note` outside 1–280; an unknown grant, token or outbox id; `applyPull` on an unleased outbox row | `note` · `id` · `outbox` | `A note is one sentence: 1–280 characters.` |
+| `FIELD_UNKNOWN` | `order.field`; a `body.<key>` the shape lacks; `deleted_at` in a `create` | the path | `Fields on this register: <list>.` |
+| `REQUIRED_MISSING` | `get(level: full)` without `path`; `get` asking nothing; no `register` on `get` `list` `create` `update`, no `seq` on `update`; `decide` without `reason`; a body key absent | the path | `Name the field you want: path: 'note'.` |
+| `OUT_OF_BOUNDS` | `note` outside 1–280; a `list` `limit` below 1; an unknown grant, token or outbox id; `applyPull` on an unleased outbox row | `note` · `limit` · `id` · `outbox` | `A note is one sentence: 1–280 characters.` |
 | `ENUM_VALUE_UNKNOWN` | `body_kind`, an `observe` kind, a job `end` status, a `createToken` scope outside its list | the path | `One of: <list>.` |
 | `TRANSITION_ILLEGAL` | `decide` / `resolved_as` on a suggestion that is not `open` | `status` | `SG23 was resolved on <date> as <resolved_as>.` |
 | `LEVEL_REQUIRED` | `invite` would leave no `owner` on `'*'` | `levels` | `A record keeps at least one owner.` |

@@ -472,6 +472,18 @@ lit.amount`; `quantity` likewise on `unit`/`value`; everything else `===`. **Mon
 value in another currency or unit is *incomparable* — `is not gt gte lt lte` are all `false` on it; only the missing
 rule makes `not` true (34 §1.5: two currencies are never compared). `state` on a register that declares it is its enum.
 
+**As built, September 16th 2026: three leaves §5.1 would refuse as shapes, and what the built package does with them.**
+The package ships `compile` and `evaluate` over `index.ts`, and no `parse` step stands in front of them, so each of
+these reaches both renderings. Both split the leaf the same way (`splitLeaf`), so the SQL and the row test agree.
+
+| Leaf | Reads as | Why |
+|---|---|---|
+| several operators on one field, `{ field: n, gt: 1, lt: 3 }` | `all` of them, one leaf per operator | it read the first operator found and dropped the rest, so a range written the obvious way answered a wider question than it asked |
+| `{ field, present: false }` · `{ field, empty: false }` | `{ field, empty: true }` · `{ field, present: true }` | the value was ignored, so `present: false` matched exactly the rows it asked to leave out |
+| `{ not: { …a predicate… } }` with no `field` | refused, `VALUE_MALFORMED` at `not`: *"not compares a field with a value. To leave out the rows a predicate matches, write none: [predicate]."* | `not` is the field operator; it was refused as `FIELD_UNKNOWN` about `undefined`, which named nothing the caller wrote |
+
+`VALUE_MALFORMED` is not one of §6's fourteen; it is 30 §6's, borrowed for this one leaf.
+
 ### 5.6 · `derive` — one definition, two renderings
 
 `derive(row, field, ctx)` in JS and the inline in SQL are the same table. `F(x)` is the operand's value in JS and

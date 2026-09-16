@@ -211,6 +211,13 @@ Twenty-five is the thirty-one of a live record less the six `local` tables that 
 `dog_section` names each omitted table as `local`, so the count is a check, not a surprise. *(An earlier
 draft printed `format 3`; v1 ships at `1` — §7.)*
 
+**The one check a person can run today is in the browser.** *(Built September 16th 2026.)* Settings → export has
+**Check an exported file**: it opens a file picker for a `.brainl` and runs the kernel's own `checkBrainl` over it, the
+same check an import runs before it writes a row: the format line, every table against the file's manifest, then the
+Ed25519 signature. Nothing is sent anywhere. A file that passes is said to be whole and signed *for the key inside the
+file*, which is the `unpinned` claim above and all a check without the record's public key can make; a file that fails
+is named with the kernel's sentence about the table that failed. It reads `.brainl` only, not the `.brain` SQLite file.
+
 ---
 
 ## 5 · Encryption: the file is readable, the grants are not
