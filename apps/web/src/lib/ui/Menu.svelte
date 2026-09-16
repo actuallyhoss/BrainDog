@@ -11,6 +11,12 @@
   closes and returns focus to the trigger. `aria-expanded` on the trigger, `role="menu"` on the
   list, `role="menuitem"` on the items, and the list is labelled by the trigger.
 
+  A CHECKABLE ITEM LEAVES THE MENU OPEN. `role="menuitemcheckbox"` (or `menuitemradio` among
+  several) is a choice somebody may make twice in one visit, Live and Lapsing, and a menu that shut
+  on the first made them open it again for the second. An ordinary `menuitem` is a verb, and doing
+  it is the end of the menu, so it still closes. A checkable menu closes on Esc, Tab, an outside
+  press, or its trigger.
+
   Closing returns focus to the trigger, ALWAYS. A menu that drops focus on the body leaves a
   keyboard user at the top of the document, which is the single most common way a custom menu is
   worse than the native one it replaced.
@@ -37,7 +43,7 @@
   let button = $state<HTMLButtonElement>();
   let list = $state<HTMLElement>();
 
-  const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]') ?? [])];
+  const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])];
 
   /**
    * The gap the panel keeps from the edge of the screen. Eight, so a clamped menu reads as sitting
@@ -113,6 +119,9 @@
   }
 
   function onTriggerKey(e: KeyboardEvent) {
+    /* The keys that open the menu are the menu's, or a page that binds Enter or an arrow acts on
+       the same press: Enter here opened the list's cursor row as the menu opened over it. */
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) e.stopPropagation();
     if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       show('first');
@@ -133,7 +142,7 @@
    */
   function onListKey(e: KeyboardEvent) {
     const all = items();
-    if (['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) e.stopPropagation();
+    if (['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' '].includes(e.key)) e.stopPropagation();
     const at = all.indexOf(document.activeElement as HTMLElement);
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -154,6 +163,13 @@
       // Tab out of a menu closes it. Trapping focus in a non-modal popup is worse than letting go.
       close(false);
     }
+  }
+
+  /** A verb closes the menu; a checkable item does not, so a second value is one press away. */
+  function onListClick(e: MouseEvent) {
+    const role = (e.target as Element).closest('[role^="menuitem"]')?.getAttribute('role');
+    if (role === 'menuitemcheckbox' || role === 'menuitemradio') return;
+    close();
   }
 
   /** Pointerdown, not click: a click that lands on a control elsewhere should close this AND press
@@ -189,7 +205,7 @@
       tabindex="-1"
       aria-label={label}
       onkeydown={onListKey}
-      onclick={() => close()}
+      onclick={onListClick}
     >
       {@render children()}
     </div>

@@ -129,6 +129,8 @@
   /** What the sheet's form holds, so the submit can put the row somewhere rather than describing it. */
   let taken = $state<Fields>({});
   let displayOpen = $state(false);
+  /* The phone's filter sheet: every enum field and Clear, behind one button beside Display. */
+  let filterOpen = $state(false);
   let bindOpen = $state(false);
 
   /**
@@ -643,6 +645,15 @@
    * once, and layout never measures a cell.
    */
   function weighed<C extends { field: string; width: string }>(c: C, isTitle: boolean): C {
+    /* THE SPOKEN ID GIVES WAY. Its 11ch was sized for a project's mark and `#999` in one cell, and
+       the mark has since moved in front of the title, so on Keys the column held `#6` in 102px while
+       "Fenwick Cloud recovery codes" was cut beside it. It takes the digits the rows in hand have,
+       plus the `#` and the cell's padding, and never less than eight. */
+    if (c.field === 'seq') {
+      let top = 0;
+      for (const e of result.entries) if (e.seq > top) top = e.seq;
+      return { ...c, width: `${Math.max(8, String(top).length + 6)}ch` };
+    }
     const track = /^minmax\(([^,]+),\s*[\d.]+fr\)$/.exec(c.width);
     if (!track) return c;
     let longest = 0;
@@ -651,7 +662,11 @@
       if (typeof v === 'string' && v.length > longest) longest = v.length;
     }
     const fr = Math.min(4, Math.max(isTitle ? 3 : 1, Math.ceil(longest / 10)));
-    return { ...c, width: `minmax(${track[1]}, ${fr}fr)` };
+    /* And a title that fits is not cut to feed a column that will be cut anyway: its floor is its
+       longest value, up to thirty characters. A `ch` here is wider than an average letter, so the
+       floor is a little generous, which is the side to be wrong on. */
+    const floor = isTitle && longest > 0 ? `max(${track[1]}, ${Math.min(30, longest)}ch)` : track[1];
+    return { ...c, width: `minmax(${floor}, ${fr}fr)` };
   }
 
   const columns = $derived([
@@ -1674,6 +1689,10 @@
       e.preventDefault();
       peek(result.entries[focus.row]?.seq ?? null);
     } else if (e.key === 'Enter') {
+      /* ENTER ON A CONTROL IS THAT CONTROL'S. It pressed Display, opened a filter menu or chose a
+         value in it, and then took the page to the cursor's row as well, so the choice was made on a
+         screen that had already gone. */
+      if ((e.target as Element | null)?.closest?.('button, a, [role^="menuitem"]')) return;
       const row = result.entries[focus.row];
       if (row) goto(`/r/${id}/${row.seq}`);
     } else if (e.key === 'v') {
@@ -2168,7 +2187,27 @@
         and a menu of every value with its count. Two fields still fit, and stay pills, where every
         choice is visible without a press.
       -->
-      {#if enums.length >= 3}
+      <!--
+        ON A PHONE THE FIELDS ARE ONE BUTTON AND A SHEET. Three field menus, Clear filters and Display
+        measured past 390 on Services with one filter on, so Clear and Display were reached by
+        scrolling the bar sideways, and a control nobody knows is there is a control that is not
+        there. Filter names what is chosen, the sheet holds every field and Clear, and Display sits
+        beside it: two controls that fit any phone, with nothing out of sight.
+      -->
+      {#if rowsAsCards() && enums.length}
+        {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)))}
+        <button
+          type="button"
+          class="sift sift-sheet tap"
+          data-on={chosen.length ? '' : undefined}
+          aria-haspopup="dialog"
+          onclick={() => (filterOpen = true)}
+        >
+          <Icon name="filter" size="s" />
+          <span class="sift-name">{copy.filter}</span>
+          {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => copy.valueWord(value)).join(', ')}</span>{/if}
+        </button>
+      {:else if enums.length >= 3}
         {#each enums as f}
           {@const chosen = (f.values ?? []).filter((value) => isOn(f.id, value))}
           <Menu label={labelOf(f)}>
@@ -2220,7 +2259,7 @@
         {/each}
       {/if}
 
-      {#if q || filters.length}
+      {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
         <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
       {/if}
 
@@ -2935,6 +2974,44 @@
     {/snippet}
   </Sheet>
 
+  <!-- The phone's filter sheet. The same fields and values as the bar's menus, as the Display sheet's
+       rows, each with its count, and Clear beside Done so undoing every filter is in the same place
+       as setting one. -->
+  {#if rowsAsCards() && enums.length}
+    <Sheet bind:open={filterOpen} title={copy.filter}>
+      <div class="filter-groups">
+        {#each enums as f}
+          <fieldset class="filter-group">
+            <legend class="filter-legend">{labelOf(f)}</legend>
+            <div class="filter-values">
+              {#each f.values ?? [] as value}
+                {@const on = isOn(f.id, value)}
+                <button
+                  type="button"
+                  class="filter-value"
+                  data-on={on ? '' : undefined}
+                  aria-pressed={on ? 'true' : 'false'}
+                  onclick={() => toggleFilter(f.id, value)}
+                >
+                  <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                  {copy.valueWord(value)}
+                  <span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+                </button>
+              {/each}
+            </div>
+          </fieldset>
+        {/each}
+      </div>
+
+      {#snippet footer()}
+        <Button weight="primary" onclick={() => (filterOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
+        {#if q || filters.length}
+          <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+        {/if}
+      {/snippet}
+    </Sheet>
+  {/if}
+
   <!-- The filter drawer. The bar above holds the enum filters because they are the ones worth a
        permanent control; everything else declared `indexed:` lives here, so the bar stays one line
        on a register with eight filterable fields.
@@ -3222,6 +3299,29 @@
 
   .sift-chosen {
     color: var(--ink);
+  }
+
+  /* The phone's one filter control is a real button, so it sheds the button's own box, and what is
+     chosen gives way with an ellipsis before Display is pushed off the screen. */
+  .sift-sheet {
+    min-inline-size: 0;
+    border: 0;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .sift-sheet .sift-chosen {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .filter-n {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
   }
 
   .sift-open {
@@ -3907,6 +4007,12 @@
 
     .bar-rest > * {
       flex: 0 0 auto;
+    }
+
+    /* The one control allowed to shrink, so a long list of chosen values ends in an ellipsis
+       inside the phone rather than past its edge. */
+    .bar-rest > .sift-sheet {
+      flex: 0 1 auto;
     }
   }
 </style>
