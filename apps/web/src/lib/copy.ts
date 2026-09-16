@@ -1638,6 +1638,19 @@ export const copy = {
   /* What points at this row, when the record refuses that read alone: the sections are absent and the
      reason is said once, rather than the page looking like nothing points here. */
   linksRefused: 'What points at this row could not be read.',
+  /* Lane L */
+  /**
+   * WHY THE RECORD SWITCHER IS ONE ROW LONG ON A REAL RECORD.
+   *
+   * The record's surface has no method that answers which records a person can reach. `boot` names
+   * the record you are in, and `whoami` says who you are ON that one; neither knows there is
+   * another. So a live switcher can only list the record you are already inside, and the honest
+   * thing for it to do is say so rather than look like a menu whose other rows have not loaded yet.
+   *
+   * IT IS NOT AN ERROR AND IS NOT WORDED AS ONE. Nothing failed: the reach is real and the record
+   * cannot report it yet, which is a fact about this build and not about the person's access.
+   */
+  recordsUnlisted: 'This record cannot list the other records you can reach yet.',
 } as const;
 
 export type Copy = typeof copy;

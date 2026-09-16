@@ -26,6 +26,8 @@
   import { covered, silenced } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { columnsFor, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  /* Type only, so the client's route table stays out of this chunk. */
+  import type { Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
@@ -306,6 +308,15 @@
   let cursor = $state<string | null>(null);
   /** The whole answer's size, as the record counted it. The rows in hand are `pages`. */
   let matched = $state(0);
+  /**
+   * WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, and `null` where the sample drew the list.
+   *
+   * A `ref` is stored as another row's id and drawn as that row's NAME, and the only names this
+   * screen had were the built-in sample's — so a live list printed the sample's row for every
+   * number, which is a different record's name under this record's column. The walk that turns the
+   * stored id into a number already reads every row of the target list, so the name comes with it.
+   */
+  let named = $state<Names | null>(null);
   /* The answer this page set belongs to. A cursor from a different question is not a cursor. */
   let asked = $state('');
   /** A question is out, the first page or the next one. `aria-busy` reads it. */
@@ -332,6 +343,7 @@
       pages = [];
       cursor = null;
       matched = 0;
+      named = null;
       counted = new Map();
     }
     refusal = null;
@@ -391,6 +403,9 @@
       if (asked !== said) return true;
       if (!next.ok) return refuse(next.refusal);
       pages = [...pages, next.value.entries];
+      /* A LATER PAGE MAY NAME ROWS THE FIRST ONE DID NOT, and it must not take away the names the
+         rows already on screen are drawn with. The two are added together, newest last. */
+      named = next.value.names === null ? named : new Map([...(named ?? []), ...next.value.names]);
       cursor = next.value.cursor;
       return true;
     });
@@ -433,6 +448,7 @@
       if (!answer.ok) return refuse(answer.refusal);
       declared = { register, decl: s.value };
       pages = [answer.value.entries];
+      named = answer.value.names;
       cursor = answer.value.cursor;
       matched = answer.value.matched;
       counted = facets;
@@ -525,6 +541,7 @@
       return patch ? { ...e, fields: { ...e.fields, ...patch } } : e;
     }),
     matched: matched + pending.of(id).length,
+    names: named,
   });
 
   /**
@@ -755,7 +772,9 @@
     io.observe(el);
     return () => io.disconnect();
   });
-  const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now));
+  /* NAMED BY WHICHEVER RECORD DREW THEM. `result.names` is the record's own title for every row a
+     ref on this list points at, and `null` is the sample, which names them out of its own rows. */
+  const rows = $derived(toRows(id, result.entries.slice(0, DOM_CAP), columns, now, result.names ?? undefined));
 
   /**
    * WHAT A READER CAN ORDER THE LIST BY, and what each direction is CALLED.
@@ -2710,7 +2729,7 @@
       <dl class="peek">
         {#each readableFields(id) as f}
           <dt>{labelOf(f)}</dt>
-          <dd dir={dirOf(id, f.id)}>{display(id, f.id, peekedEntry.fields[f.id]) ?? MISSING}</dd>
+          <dd dir={dirOf(id, f.id)}>{display(id, f.id, peekedEntry.fields[f.id], now, result.names ?? undefined) ?? MISSING}</dd>
         {/each}
       </dl>
     {/if}

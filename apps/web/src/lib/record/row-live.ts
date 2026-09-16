@@ -15,12 +15,20 @@
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { noRecord } from './device.ts';
-import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, namesOf, refMapOf, targetsOf, type Names, type RecordRow, type RefMap } from './remote.ts';
 import type { Entry } from './schema.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
-export type Got = { from: 'live'; entry: Entry | null } | { from: 'sample' } | { from: 'refused'; fix: string };
+/**
+ * `names` IS WHAT THE RECORD CALLS THE ROWS THIS ONE POINTS AT, and it travels with the row because
+ * the page draws every field through `display`: without it a live `ref` was drawn as the sample's
+ * row of the same number, which is another record's name under this record's field.
+ */
+export type Got =
+  | { from: 'live'; entry: Entry | null; names: Names }
+  | { from: 'sample' }
+  | { from: 'refused'; fix: string };
 
 function missed(out: object): Got {
   if (!('refusal' in out)) return { from: 'refused', fix: 'The row changed while it was being read.' };
@@ -44,7 +52,7 @@ export function rowReader(base: string, io?: Fetch): RowReader {
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
-    const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+    const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
       const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
@@ -52,7 +60,7 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
-    const map = refMapOf(rows);
+    const map = refMapOf(register, rows);
     maps.set(register, map);
     return map;
   }
@@ -63,13 +71,13 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       if (!Number.isInteger(seq) || seq < 1) return { from: 'sample' };
       const got = await client.get(register, seq);
       if (!got.ok) return missed(got);
-      if (got.value === null) return { from: 'live', entry: null };
+      if (got.value === null) return { from: 'live', entry: null, names: new Map() };
       const refs = new Map<string, RefMap>();
       for (const target of targetsOf(register)) {
         const map = await mapOf(target);
         if (map) refs.set(target, map);
       }
-      return { from: 'live', entry: entryOf(register, got.value as RecordRow, refs) };
+      return { from: 'live', entry: entryOf(register, got.value as RecordRow, refs), names: namesOf(refs) };
     },
   };
 }

@@ -126,9 +126,15 @@ test('and the delete field does not put the answer in the box', () => {
   const at = AREA.indexOf('id="delete-slug"');
   assert.ok(at > 0, 'the delete field is gone');
   const field = AREA.slice(at, at + 400);
-  assert.doesNotMatch(field, /placeholder=\{boot\(\)\.index\.slug\}/u, 'the placeholder is the answer again');
-  /* The label still says it, because the person has to know what to type. */
-  assert.match(AREA, /copy\.typeSlug\(boot\(\)\.index\.slug\)/u);
+  assert.doesNotMatch(field, /placeholder=\{(?:boot\(\)\.index\.slug|SLUG)\}/u, 'the placeholder is the answer again');
+  /* The label still says it, because the person has to know what to type.
+
+     AND IT IS THE SHELL'S SLUG NOW, NOT THE SAMPLE'S. `SLUG` is `page.data.index.slug`: the record's
+     own name where there is a record and the sample's where there is none. It read `boot()` — the
+     in-browser sample — so on a live record this control asked somebody to type the SAMPLE's slug to
+     delete a record that is not it, which is a confirmation that confirms the wrong thing. */
+  assert.match(AREA, /copy\.typeSlug\(SLUG\)/u);
+  assert.match(AREA, /const SLUG = \$derived\(shell\.index\.slug\)/u, 'the slug is not read from the shell');
 });
 
 

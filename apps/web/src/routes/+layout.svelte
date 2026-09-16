@@ -268,6 +268,7 @@
         pen={data.pen}
         record={data.index.name}
         records={data.me.records}
+        live={data.live}
         registers={data.index.registers}
         open={data.open}
         inbox={data.inbox}

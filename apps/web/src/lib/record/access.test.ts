@@ -489,7 +489,10 @@ test('and the delete control is the confirmation rather than a sentence about on
    */
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'), 'utf8');
   assert.match(src, /id="delete-slug"/u, 'there is no field to type the slug into');
-  assert.match(src, /disabled=\{typedSlug\.trim\(\) !== boot\(\)\.index\.slug\}/u, 'the button is not gated on the typed slug');
+  /* `SLUG` IS THE SHELL'S SLUG, which is the record's own where there is a record and the sample's
+     where there is none. It was `boot().index.slug` — the in-browser sample, on every record — so a
+     live record's delete gate was satisfied by typing the SAMPLE's name and refused the real one. */
+  assert.match(src, /disabled=\{typedSlug\.trim\(\) !== SLUG\}/u, 'the button is not gated on the typed slug');
   /* The old toast, and not the comment quoting it — a bare grep over the file matches the paragraph
      explaining why the toast is gone, which is the assertion catching its own evidence. */
   assert.doesNotMatch(src, /toasts\.push\([^)]*Deleting a record asks you to type its name first/u, 'the toast still describes the safeguard');

@@ -19,7 +19,15 @@ import type { Entry, Fields, Filter } from './schema.ts';
 import { declaredValue } from './where.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
-export type RefMap = { seqOf: ReadonlyMap<string, number>; idOf: ReadonlyMap<number, string> };
+export type RefMap = {
+  seqOf: ReadonlyMap<string, number>;
+  idOf: ReadonlyMap<number, string>;
+  /** The name a person says for each row, from the register's own declared title. */
+  titleOf: ReadonlyMap<number, string>;
+};
+
+/** Every ref target's title, keyed `<register>#<seq>`: what a ref is DRAWN as on a live record. */
+export type Names = ReadonlyMap<string, string>;
 
 /** A `RefMap` for each register a ref field on the asked register points at. */
 export type Refs = ReadonlyMap<string, RefMap>;
@@ -43,16 +51,46 @@ export function targetsOf(register: string): string[] {
   return out;
 }
 
-/** A register's rows as a `RefMap`. A row with no sequence has no number to be called by. */
-export function refMapOf(rows: readonly Pick<RecordRow, 'id' | 'seq'>[]): RefMap {
+/**
+ * A register's rows as a `RefMap`. A row with no sequence has no number to be called by.
+ *
+ * AND THE NAME EACH NUMBER GOES BY, because that is what a ref is drawn as. `display` renders a ref
+ * as the title of the row it points at, and the only titles it had were the built-in sample's — so a
+ * live record drew the SAMPLE's name against this record's number, which is worse than drawing no
+ * name at all, because it is a wrong name a reader has no reason to doubt. The walk that builds this
+ * map already asks for every row of the target register, and every row carries its declared title,
+ * so the name is here for nothing.
+ *
+ * A ROW WITH NO TITLE IS LEFT OUT rather than mapped to an empty string, and `display` then draws
+ * `<list>#<number>`: a row somebody can go and open, instead of a blank where a name should be.
+ */
+export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' | 'seq' | 'fields'>[]): RefMap {
   const seqOf = new Map<string, number>();
   const idOf = new Map<number, string>();
+  const titleOf = new Map<number, string>();
+  const title = REGISTERS[register]?.title;
   for (const r of rows) {
     if (r.seq === null) continue;
     seqOf.set(r.id, r.seq);
     idOf.set(r.seq, r.id);
+    const said = title === undefined ? undefined : r.fields?.[title];
+    if (typeof said === 'string' && said !== '') titleOf.set(r.seq, said);
   }
-  return { seqOf, idOf };
+  return { seqOf, idOf, titleOf };
+}
+
+/**
+ * The titles behind a screen's refs, in the one shape `display` reads.
+ *
+ * ITS PRESENCE IS WHAT SAYS THE ROW CAME FROM A RECORD. A screen drawing the sample passes nothing
+ * and `display` reads the sample's rows as it always did; a screen drawing a record passes this, and
+ * it is then the only source of a ref's name. An empty map is a live answer too: it means the record
+ * named none of them, not that the sample may be consulted.
+ */
+export function namesOf(refs: Refs): Names {
+  const out = new Map<string, string>();
+  for (const [register, map] of refs) for (const [seq, title] of map.titleOf) out.set(`${register}#${seq}`, title);
+  return out;
 }
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();

@@ -58,6 +58,10 @@
    */
   let got = $state<Got | null>(null);
   const live = $derived(got?.from === 'live');
+  /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT. Undefined on the sample, where `display`
+     names a ref out of the sample's own rows as it always has; on a record it is the only source,
+     so a ref the record did not name is drawn as `<list>#<number>` and never as a sample row. */
+  const names = $derived(got?.from === 'live' ? got.names : undefined);
   /* NOTHING IS DRAWN UNTIL THE ROW HAS BEEN READ, so the sample never shows over a live row. */
   const waiting = $derived(Number.isInteger(seq) && seq >= 1 && got === null);
   const written = $derived(
@@ -312,7 +316,7 @@
     saving = false;
     if (askedFor !== key) return;
     if (out.ok) {
-      got = { from: 'live', entry: out.entry };
+      got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       stopEdit();
       toasts.push(copy.writeMarkSaved);
       void refreshHistory(register, n);
@@ -321,7 +325,7 @@
     /* A CONFLICT RE-READS AND SAYS SO. What is on screen is now the record's latest rather than what
        this tab was holding, so there is nothing for the box to stay open over. */
     if (out.why === 'conflict') {
-      if (out.entry) got = { from: 'live', entry: out.entry };
+      if (out.entry) got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       else void readRow(register, n);
       stopEdit();
       toasts.push(out.fix, { intent: 'warn' });
@@ -349,11 +353,13 @@
     saving = false;
     if (askedFor !== key) return;
     if (!out.ok) {
-      if (out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry };
+      if (out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       toasts.push(out.fix, { intent: 'warn' });
       return;
     }
-    got = { from: 'live', entry: out.entry };
+    /* A WRITE KEEPS THE NAMES THE SCREEN ALREADY HAS. The row came back from the same record, and a
+       ref it now points at that nothing named draws as `<list>#<number>` rather than as a sample row. */
+    got = { from: 'live', entry: out.entry, names: names ?? new Map() };
     archived = to;
     stopEdit();
     toasts.push(to ? copy.writeArchived(named) : copy.rowRestored(named));
@@ -561,7 +567,7 @@
             </span>
           {/if}
           {#if due && dueField}
-            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock)} <span class="rel">{relative(String(due), clock)}</span></span>
+            <span class="lead-due">{labelOf(dueField)} {display(id, dueField.id, due, clock, names)} <span class="rel">{relative(String(due), clock)}</span></span>
           {/if}
         </p>
       </section>
@@ -636,12 +642,12 @@
                   {:else if identityOf(id, f.id, value)}
                     <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
                   {:else if f.type === 'day'}
-                    {display(id, f.id, value, clock)}
+                    {display(id, f.id, value, clock, names)}
                     <span class="rel">{relative(String(value), clock)}</span>
                   {:else if f.type === 'enum'}
-                    <span class="enum-word">{display(id, f.id, value, clock)}</span>
+                    <span class="enum-word">{display(id, f.id, value, clock, names)}</span>
                   {:else}
-                    {display(id, f.id, value, clock)}
+                    {display(id, f.id, value, clock, names)}
                   {/if}
                   {#if live && editable(f)}
                     <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>

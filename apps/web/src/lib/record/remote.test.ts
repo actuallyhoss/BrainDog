@@ -68,7 +68,7 @@ const seeded = (async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW }, { lookups: LOOKUPS });
   const out = await installSeed(k);
   assert.ok(out.ok, JSON.stringify(out));
-  const refs: Refs = new Map(ORDER.map((r) => [r, refMapOf(rowsOf(k, r))] as const));
+  const refs: Refs = new Map(ORDER.map((r) => [r, refMapOf(r, rowsOf(k, r))] as const));
   return { k, refs };
 })();
 

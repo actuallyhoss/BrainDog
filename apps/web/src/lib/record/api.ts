@@ -46,6 +46,8 @@ import {
   NEWS,
   VAULT,
 } from './data.ts';
+/* Type only, and there is no cycle: `remote.ts` reads the declaration and the sample, never this file. */
+import type { Names } from './remote.ts';
 import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
@@ -273,7 +275,13 @@ const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 6
  * `now` IS THE RECORD'S INSTANT, and it defaults to the seed's. A screen reading a real record passes
  * the one `boot` answered with, so an `instant` is banded against the day the record thinks it is.
  */
-export function display(register: string, field: string, value: unknown, now: number = NOW): string | null {
+export function display(
+  register: string,
+  field: string,
+  value: unknown,
+  now: number = NOW,
+  names?: Names,
+): string | null {
   if (value === null || value === undefined || value === '') return null;
   const f = decl(register, field);
   if (!f) return String(value);
@@ -330,6 +338,15 @@ export function display(register: string, field: string, value: unknown, now: nu
     case 'enum':
       return String(value).replace(/_/g, ' ');
     case 'ref': {
+      /**
+       * A LIVE ROW IS NEVER NAMED FROM THE SAMPLE.
+       *
+       * `names` holds the record's own title for every row a ref on this screen points at, gathered
+       * by the same walk that turned the stored ULID into this number. Where it is given it is the
+       * ONLY source: a number the record did not name draws as `<list>#<number>`, which is a row
+       * somebody can open, rather than as whatever the built-in sample happens to call that number.
+       */
+      if (names) return names.get(`${f.to}#${value}`) ?? `${f.to}#${value}`;
       const target = f.to ? ROWS[f.to] : undefined;
       const hit = target?.find((e) => e.seq === Number(value));
       const titleField = f.to ? REGISTERS[f.to]?.title : undefined;
@@ -544,12 +561,12 @@ export function toneOf(register: string, e: Entry, now: number = NOW): TableRow[
   return undefined;
 }
 
-export function toRows(register: string, entries: Entry[], columns: Column[], now: number = NOW): TableRow[] {
+export function toRows(register: string, entries: Entry[], columns: Column[], now: number = NOW, names?: Names): TableRow[] {
   return entries.map((e) => ({
     key: `${register}#${e.seq}`,
     href: `/r/${register}/${e.seq}`,
     tone: toneOf(register, e, now),
-    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field], now))),
+    cells: columns.map((c) => (c.field === 'seq' ? `#${e.seq}` : display(register, c.field, e.fields[c.field], now, names))),
   }));
 }
 

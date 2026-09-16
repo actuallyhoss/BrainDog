@@ -20,7 +20,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 
 import { columnsFor, iconFor, labelOf, REGISTERS, toRows, type Backlink } from './api.ts';
 import { noRecord } from './device.ts';
-import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -62,7 +62,7 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
-    const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+    const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
       const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
@@ -70,7 +70,7 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
-    const map = refMapOf(rows);
+    const map = refMapOf(register, rows);
     maps.set(register, map);
     return map;
   }
@@ -111,7 +111,9 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
           label: labelOf(f),
           icon: iconFor(r.icon, 'rows'),
           total: g.matched,
-          rows: toRows(g.register, rows, columns, now),
+          /* NAMED BY THIS RECORD. A pointing row's own refs are drawn from the titles that walk
+             collected, never from the sample's rows of the same numbers. */
+          rows: toRows(g.register, rows, columns, now, namesOf(refs)),
           columns,
           href: `/r/${g.register}?f=${g.field}:is:${seq}`,
         });

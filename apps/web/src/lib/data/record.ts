@@ -15,7 +15,7 @@ import { createClient, type Boot } from '@braindog/client';
 
 import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
 import { readBoot } from '../record/boot-live.ts';
-import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap } from '../record/remote.ts';
+import { entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 
@@ -34,8 +34,13 @@ export type Ask = {
   sort?: { field: string; dir: 'asc' | 'desc' } | undefined;
 };
 
-/** One page of the answer, and where the next one starts. `matched` is the whole answer's size. */
-export type Answer = { entries: Entry[]; matched: number; cursor: string | null };
+/**
+ * One page of the answer, and where the next one starts. `matched` is the whole answer's size.
+ *
+ * `names` IS WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, and `null` is the sample saying it
+ * has none to give: the screen then draws a ref the way it always did, out of the sample's own rows.
+ */
+export type Answer = { entries: Entry[]; matched: number; cursor: string | null; names: Names | null };
 
 /** Where this tab's list comes from. One code path on the screen, whichever this is. */
 export type Source = {
@@ -98,7 +103,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   async function refMap(register: string): Promise<Said<RefMap>> {
     const kept = maps.get(register);
     if (kept) return { ok: true, value: kept };
-    const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+    const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
       const out: Said<{ rows: unknown[]; cursor: string | null }> = said(
@@ -108,7 +113,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
-    const map = refMapOf(rows);
+    const map = refMapOf(register, rows);
     maps.set(register, map);
     return { ok: true, value: map };
   }
@@ -142,7 +147,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     let entries = rows.map((r) => entryOf(register, r, refs.value));
     if (a.sort && out.value.cursor === null && entries.length === out.value.matched)
       entries = sortRows(register, entries, a.sort.field, a.sort.dir);
-    return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor } };
+    return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor, names: namesOf(refs.value) } };
   }
 
   return {
@@ -215,7 +220,7 @@ const SAMPLE: Source = {
       limit: PAGE,
       ...(cursor === null ? {} : { cursor }),
     });
-    return ok({ entries: out.entries, matched: out.matched, cursor: out.cursor });
+    return ok({ entries: out.entries, matched: out.matched, cursor: out.cursor, names: null });
   },
   count: async (register, a) => ok(list(register, { filters: [...a.filters], q: a.q }).matched),
 };

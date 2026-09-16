@@ -27,7 +27,7 @@ import { REGISTERS, toRows, type BlockResult, type Metric } from './api.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { format, hrefFor, targetLine, withParam } from './metrics.ts';
-import { entryOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -193,7 +193,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
 
   const live = b.source === 'sessions.live';
   const entries = got.map((r) => entryOf(register, r, refs));
-  const rows = toRows(register, entries, shell.columns, now);
+  const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
   /* WHERE A ROW APPLIES, and which project a run is in, are named by the kernel on `scopes`. */
   (b.columns ?? []).forEach((c, i) => {
     if (c.as !== 'scope' && !(live && c.field === 'project')) return;
@@ -251,7 +251,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
-    const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+    const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
       const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
@@ -259,7 +259,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
-    const map = refMapOf(rows);
+    const map = refMapOf(register, rows);
     maps.set(register, map);
     return map;
   }

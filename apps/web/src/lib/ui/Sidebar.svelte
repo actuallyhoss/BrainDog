@@ -47,6 +47,7 @@
     pen,
     record,
     records = [],
+    live = false,
     registers,
     open = 0,
     inbox = 0,
@@ -55,6 +56,8 @@
     pen: PageDecl[];
     record: string;
     records?: { slug: string; name: string; level: string }[];
+    /** Whether the rail was drawn from a record rather than from the built-in sample. */
+    live?: boolean | undefined;
     registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string }[] }[];
     open?: number | undefined;
     inbox?: number | undefined;
@@ -277,6 +280,16 @@
           {#if r.name === record}<Icon name="check" size="s" />{/if}
         </button>
       {/each}
+      <!--
+        AND ON A REAL RECORD THE MENU SAYS WHY IT IS ONE ROW LONG.
+
+        `boot` names the record you are in and no other, and the record's surface has no method that
+        answers which records a person can reach: `whoami` says who you are on THIS one. So a live
+        switcher can only ever list the record you are already in, and a control called "Switch
+        record" that silently offers nothing to switch to is the shape this app's own rule is
+        written about. It says the fact instead, and the sample keeps the rows and the toast it had.
+      -->
+      {#if live}<p class="mi-note">{copy.recordsUnlisted}</p>{/if}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>
       <a class="mi" role="menuitem" href="/start"><Icon name="plus" size="s" />{copy.newRecord}</a>
@@ -645,6 +658,15 @@
     color: var(--dim);
     font-size: var(--t-xs);
     font-weight: 600;
+  }
+
+  /* A SENTENCE, NOT A ROW. It is not a menu item and must not look like one or be reachable as one:
+     nothing happens when it is pressed, and the whole point of it is that there is nothing to press. */
+  .mi-note {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   .mi-rule {

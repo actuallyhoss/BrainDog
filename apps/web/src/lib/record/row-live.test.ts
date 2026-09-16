@@ -50,7 +50,13 @@ const record = (url: URL): Response => {
             },
     });
   if (url.pathname === '/api/list' && url.searchParams.get('register') === 'things')
-    return json(200, { ok: true, value: { rows: [{ id: '01JTHING000000000000000000', seq: 4 }], cursor: null, matched: 1 } });
+    /* `Kiln`, WHERE THE SAMPLE'S `things#4` IS `Tallow`. The two differ on purpose: a ref is drawn as
+       the name of the row it points at, and the only way to see which record named it is to make the
+       two records disagree about what number four is called. */
+    return json(200, {
+      ok: true,
+      value: { rows: [{ id: '01JTHING000000000000000000', seq: 4, fields: { name: 'Kiln' } }], cursor: null, matched: 1 },
+    });
   return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
 };
 
@@ -74,9 +80,29 @@ test("the record's row is drawn, with a ref as the number a person says", async 
   assert.equal(sent.length, before + 1);
 });
 
+test('a ref is named by THIS record, and never by the sample row of the same number', async () => {
+  /**
+   * THE NAMES WERE THE SAMPLE'S AND THE NUMBERS WERE THE RECORD'S.
+   *
+   * A ref is stored as another row's id, turned into that row's number here, and drawn as that row's
+   * TITLE — and the only titles `display` had were the built-in sample's. So a live row pointing at
+   * this record's `things#4` was drawn as whatever the sample calls number four, which is a name
+   * from another business printed under this business's field, with nothing on screen to doubt.
+   */
+  const { io } = host(record);
+  const out = await rowReader(BASE, io).read('services', 2);
+  assert.equal(out.from, 'live');
+  assert.ok(out.from === 'live');
+  assert.equal(out.names.get('things#4'), 'Kiln');
+  assert.notEqual(out.names.get('things#4'), ROWS.things!.find((e) => e.seq === 4)!.fields.name);
+  /* AND A NUMBER THIS RECORD DID NOT NAME IS NOT IN THE MAP, so `display` draws `things#7` rather
+     than reaching for the sample's row of that number. */
+  assert.equal(out.names.get('things#7'), undefined);
+});
+
 test('a row the record does not hold is no row, not the sample row of that number', async () => {
   const { io } = host(record);
-  assert.deepEqual(await rowReader(BASE, io).read('services', 99), { from: 'live', entry: null });
+  assert.deepEqual(await rowReader(BASE, io).read('services', 99), { from: 'live', entry: null, names: new Map() });
 });
 
 for (const [what, answer] of [

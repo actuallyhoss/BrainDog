@@ -246,7 +246,7 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
         out.set(target, kept);
         continue;
       }
-      const rows: Pick<RecordRow, 'id' | 'seq'>[] = [];
+      const rows: RecordRow[] = [];
       let cursor: string | null = null;
       let whole = true;
       do {
@@ -259,7 +259,7 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
         cursor = got.value.cursor;
       } while (cursor !== null);
       if (!whole) continue;
-      const map = refMapOf(rows);
+      const map = refMapOf(target, rows);
       maps.set(target, map);
       out.set(target, map);
     }

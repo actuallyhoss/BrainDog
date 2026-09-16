@@ -20,10 +20,12 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import type { PageDecl } from '$lib/record/schema.ts';
+  /* Type only, so the client's route table stays out of this chunk. */
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
     AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
-    REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, boot, pages,
+    REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, pages,
   } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import {
@@ -54,8 +56,21 @@
 
   /* THE RECORD'S OWN NAME. The Danger section named it two ways in three lines — `this record` and
      `the studio` — and one of the two was a literal. */
-  const RECORD = boot().index.name;
-  const me = boot().me;
+  /**
+   * AND IT IS THE SHELL'S NAME, NOT THE SAMPLE'S.
+   *
+   * This whole screen read `boot()` — the in-browser sample — for who you are, what you hold and
+   * what the record is called, on every record. So on a live record it said the sample's level
+   * beside your address, counted the sample's records under "Records you can open", decided whose
+   * row was yours in People by a sample id, and asked somebody to type the SAMPLE's slug to delete
+   * a record that is not it. The layout already asked `boot` once and kept the answer: it is the
+   * record's on a record and the sample's where there is none, which is exactly the one source
+   * every other screen reads.
+   */
+  const shell = $derived(page.data as unknown as Shell);
+  const RECORD = $derived(shell.index.name);
+  const SLUG = $derived(shell.index.slug);
+  const me = $derived(shell.me);
 
   /* Bytes as a person reads them — `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
@@ -562,8 +577,11 @@
   const owners = $derived(people.filter((p) => p.level === 'owner' && (peopleFrom === 'live' || p.since)).length);
   const lastOwner = (who: Person) => who.level === 'owner' && owners <= 1;
 
+  /* IDENTITY READS THE SAME LIST, because it draws a person too: the address it prints beside
+     "Signed in as" is a fact about a member of this record, and it was being read out of the
+     sample while the record sat one call away. */
   $effect(() => {
-    if (area !== 'people') return;
+    if (area !== 'people' && area !== 'identity') return;
     untrack(() => void readPeopleNow());
   });
 
@@ -702,7 +720,7 @@
     if (exporting) return;
     exporting = kind;
     const at = opened();
-    const out = await exportFile(location.origin, kind, boot().index.slug);
+    const out = await exportFile(location.origin, kind, SLUG);
     closed(true, at);
     exporting = null;
     if (!out.ok) {
@@ -888,8 +906,15 @@
    * is refused is doing it to yourself, alone, by pressing a segment.
    */
   const self = (who: Person) => who.id === me.person;
-  /** The signed-in person's own row, which is where their name and address live. */
-  const mine = $derived(PEOPLE_ACCESS.find((p) => p.id === me.person));
+  /**
+   * The signed-in person's own row, which is where their name and address live.
+   *
+   * FROM WHICHEVER LIST WAS DRAWN, AND NEVER THE SAMPLE'S OVER A LIVE RECORD. It read
+   * `PEOPLE_ACCESS` directly, so a live record printed a sample address beside your name if the two
+   * happened to share an id, and nothing at all if they did not. On a record the answer is the
+   * record's members or it is nothing yet.
+   */
+  const mine = $derived(shell.live && peopleFrom !== 'live' ? undefined : people.find((p) => p.id === me.person));
 
   /**
    * WHAT THE HOST SAYS ABOUT SIGNING IN, read only on the two areas that draw it.
@@ -1707,7 +1732,7 @@
       <Section title={copy.yourRecords} count={me.records.length}>
         <ul class="ledger">
           {#each me.records as r}
-            {@const here = r.slug === boot().index.slug}
+            {@const here = r.slug === SLUG}
             <li>
               <svelte:element
                 this={here ? 'div' : 'a'}
@@ -1729,6 +1754,12 @@
             </li>
           {/each}
         </ul>
+        <!-- AND THE HEADING SAYS WHAT IT CAN AND CANNOT COUNT. On a record this list is the one
+             record you are inside, because nothing in the record's surface answers which others you
+             can reach — `boot` names this one and `whoami` says who you are on it. A section called
+             "Records you can open" that quietly holds one row reads as a product with one record in
+             it, which is a different claim from the true one. -->
+        {#if shell.live}<p class="hint">{copy.recordsUnlisted}</p>{/if}
       </Section>
     {:else if area === 'agents'}
       <!--
@@ -2183,7 +2214,7 @@
                nothing of the record remains anywhere"*, and a final snapshot exists only so that a
                same-day "wait" is answerable. -->
           <p class="danger-why">{copy.deleteCosts}</p>
-          <label class="code-label" for="delete-slug">{copy.typeSlug(boot().index.slug)}</label>
+          <label class="code-label" for="delete-slug">{copy.typeSlug(SLUG)}</label>
           <div class="code-row">
             <div class="field field-lg">
               <input
@@ -2198,7 +2229,7 @@
             </div>
           <Button
             tone="bad"
-            disabled={typedSlug.trim() !== boot().index.slug}
+            disabled={typedSlug.trim() !== SLUG}
             aria-busy={deleting}
             onclick={deleteNow}
             >{copy.deleteRecord(RECORD)}</Button
