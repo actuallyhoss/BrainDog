@@ -43,6 +43,11 @@ export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' 
  * `rp` ABSENT MEANS NO PASSKEYS: the host decides, because only it knows whether its origin is one a browser
  * will run WebAuthn on. `magic` says the host can deliver mail. `key` is the self-host's server key, absent on
  * the Worker. `log` receives the reason for every refusal, and nothing that identifies anyone.
+ *
+ * `admits` IS THE RECORD'S OWN ANSWER to whether a person is on it, asked before a session is moved there. The
+ * Directory's `dir_member` is written by `join` and `leave` and the record's `member` table by `invite` and
+ * `removeMember`, so a person removed from a record is still listed here; without it a switch would answer "opened"
+ * and leave the browser on a record that refuses every read.
  */
 export type AuthConfig = {
   mac: Uint8Array;
@@ -50,6 +55,7 @@ export type AuthConfig = {
   magic: boolean;
   key?: { serverKey: string };
   log?: (line: { flow: Flow; reason: Reason }) => void;
+  admits?: (record: string, person: string) => boolean | Promise<boolean>;
 };
 
 const MINUTE = 60_000;
@@ -615,18 +621,32 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
         const keep = carry(found);
-        const slug = text(call.slug).trim().toLowerCase();
-        const to = sql.one<{ record: string }>(
-          `SELECT s.record AS record FROM dir_slug s
+        const refused: AuthResult = { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' }, ...keep };
+        /* ASCII BEFORE IT IS LOWERED. `toLowerCase` folds the Kelvin sign to `k` and more besides, so a name no slug can
+           be spelt with would otherwise open the record whose name it folds to. */
+        const typed = text(call.slug).trim();
+        if (!/^[A-Za-z][A-Za-z0-9-]{1,31}$/.test(typed)) return refused;
+        const slug = typed.toLowerCase();
+        const live = `SELECT s.record FROM dir_slug s
              JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
-             JOIN dir_member m ON m.record = s.record AND m.person = ?
-            WHERE s.slug = ? AND s.released_at IS NULL`,
+             JOIN dir_member m ON m.record = s.record AND m.person = ?1
+            WHERE s.slug = ?2 AND s.released_at IS NULL`;
+        const to = sql.one<{ record: string }>(live, found.row.person, slug);
+        if (!to) return refused;
+        /* AND THE RECORD ITSELF SAYS THEY ARE ON IT, or the browser would be moved somewhere every read refuses. */
+        if (config?.admits && !(await config.admits(to.record, found.row.person))) return refused;
+        /* THE ROW AS IT IS NOW. A day-old cookie was rotated by `current` above, so the hash it was read under is gone;
+           and the host may have awaited `admits`, in which time another request can rotate it again. The update
+           asks the same question as the select, so a name released meanwhile moves nothing. */
+        const hash = found.rotated ? await hmac('s:', found.rotated.sid) : found.row.id_hash;
+        const moved = sql.one<{ record: string }>(
+          `UPDATE dir_session SET record = ?3 WHERE (id_hash = ?4 OR prev_hash = ?4) AND ?3 IN (${live}) RETURNING record`,
           found.row.person,
           slug,
+          to.record,
+          hash,
         );
-        if (!to)
-          return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' }, ...keep };
-        sql.exec('UPDATE dir_session SET record = ? WHERE id_hash = ?', to.record, found.row.id_hash);
+        if (!moved) return refused;
         return { status: 200, body: { ...whoOf(found.row), record: to.record }, ...keep };
       }
 

@@ -513,6 +513,10 @@ export class Directory$ extends DurableObject<Env> {
             magic: Boolean(this.env.AUTH_MAIL_FROM && this.env.EMAIL),
             /* The reason a sign-in failed, for the operator's tail. A flow and a word, never who or with what. */
             log: (line) => console.error(`auth: ${line.flow} refused (${line.reason})`),
+            /* A SWITCH ASKS THE RECORD ITSELF, over RPC to its own object by id: `dir_member` still lists somebody
+               `removeMember` took off it, and moving their browser there would answer "opened" to a record that
+               refuses every read. */
+            admits: async (record, person) => (await this.env.RECORD.get(this.env.RECORD.idFromName(record)).access(person)) !== null,
           }
         : undefined,
     );

@@ -13,10 +13,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { start } from '../src/server.ts';
@@ -59,6 +60,7 @@ async function stack(o: { token?: string | null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-signin-'));
   const serverKey = o.token === null ? undefined : (o.token ?? randomBytes(32).toString('base64url'));
   let now = Date.UTC(2026, 8, 5, 12);
+  const sessionKey = new Uint8Array(randomBytes(32));
   const logs = listen();
   const running = await start({
     file: join(dir, 'record.brain'),
@@ -66,7 +68,7 @@ async function stack(o: { token?: string | null } = {}) {
     port: 0,
     host: '127.0.0.1',
     ...(serverKey === undefined ? {} : { token: serverKey }),
-    sessionKey: new Uint8Array(randomBytes(32)),
+    sessionKey,
     now: () => now,
     pollMs: 0,
   });
@@ -116,6 +118,19 @@ async function stack(o: { token?: string | null } = {}) {
     call,
     keyIn,
     directory: running.directory,
+    api: running.api,
+    /** A session for somebody the server key cannot sign in, written the way the Directory writes one. */
+    plant(person: string): string {
+      const sid = randomBytes(32).toString('base64url');
+      const db = new DatabaseSync(join(dir, 'directory.sqlite'));
+      try {
+        db.prepare('INSERT INTO dir_session (id_hash, person, record, expires, rotated_at, authed_at) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(createHmac('sha256', sessionKey).update(`s:${sid}`).digest('hex'), person, REC, now + HOUR, now, now);
+      } finally {
+        db.close();
+      }
+      return sid;
+    },
     sidOf,
     origin,
     id,
@@ -390,6 +405,33 @@ test('POST /auth/switch OPENS ONLY THE RECORD THIS PROCESS SERVES, and never mov
     assert.equal(who.body?.value?.record, REC);
     assert.equal((await s.call('/api/boot', { sid })).status, 200);
     s.clean();
+  } finally {
+    await s.close();
+  }
+});
+
+test('POST /auth/switch ASKS THE RECORD: a person removed from it is refused, and nobody signed out learns which name is served', async () => {
+  const s = await stack();
+  try {
+    const sid = await s.keyIn();
+    assert.ok(s.directory.provision({ slug: 'the-other-shop', email: 'ada@example.com' }).ok);
+    for (const cookie of [undefined, 'A'.repeat(43)]) {
+      const here = await s.call('/auth/switch', { body: { slug: 'the-studio' }, ...(cookie ? { sid: cookie } : {}) });
+      const there = await s.call('/auth/switch', { body: { slug: 'the-other-shop' }, ...(cookie ? { sid: cookie } : {}) });
+      assert.deepEqual([here.status, here.raw], [there.status, there.raw], 'the served name answered differently to somebody signed out');
+      assert.equal(here.status, 401);
+    }
+
+    const bob = s.directory.person$('bob@example.com', 'Bob');
+    assert.ok(bob.ok);
+    assert.equal((await s.call('/api/invite', { body: { person: bob.value.id, email: 'bob@example.com', name: 'Bob', level: 'read' }, sid })).status, 200);
+    assert.ok(s.directory.join(REC, bob.value.id).ok);
+    const bobs = s.plant(bob.value.id);
+    assert.equal((await s.call('/auth/switch', { body: { slug: 'the-studio' }, sid: bobs })).status, 200);
+    assert.equal((await s.call('/api/removeMember', { body: { person: bob.value.id }, sid })).status, 200);
+    const gone = await s.call('/auth/switch', { body: { slug: 'the-studio' }, sid: bobs });
+    assert.equal(gone.status, 403, gone.raw);
+    assert.deepEqual(gone.body?.refusal, { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' });
   } finally {
     await s.close();
   }

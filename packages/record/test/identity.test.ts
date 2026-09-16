@@ -746,6 +746,41 @@ test('A SESSION OPENS ANOTHER RECORD ITS PERSON IS ON, and only one they are on,
   notYou(await d.auth({ flow: 'switch', sid: 'C'.repeat(43), slug: 'the-studio' }), true);
 });
 
+test('A SWITCH ON A DAY-OLD COOKIE MOVES THE ROW IT ROTATED, and the new cookie names the record opened', async () => {
+  const { d, clock } = setup();
+  const sid = sidOf(await keyIn(d));
+  const shop = value<{ record: string }>(d.provision({ slug: 'the-shop', email: 'ada@example.com' })).record;
+  clock.set(NOW + DAY + 1);
+  const moved = ok(await d.auth({ flow: 'switch', sid, slug: 'the-shop' }));
+  assert.equal(moved.body.record, shop);
+  const next = moved.session;
+  if (!next || next === 'clear') return assert.fail('the switch did not carry the rotation');
+  assert.equal(ok(await d.auth({ flow: 'session', sid: next.sid })).body.record, shop, 'the switch answered opened and the row stayed');
+});
+
+test('A SWITCH ASKS THE RECORD ITSELF, and a name that only folds to a slug opens nothing', async () => {
+  const on = new Set<string>();
+  const { d, record } = setup((c) => ({ ...c, admits: async (rec, person) => on.has(`${rec}/${person}`) }));
+  const who = ok(await keyIn(d));
+  const sid = sidOf(who);
+  const refused = { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' };
+
+  /* LISTED IN THE DIRECTORY, AND REMOVED FROM THE RECORD'S OWN TABLE: refused, and the row stays. */
+  const out = await d.auth({ flow: 'switch', sid, slug: 'the-studio' });
+  assert.equal(out.status, 403);
+  assert.deepEqual('refusal' in out && out.refusal, refused);
+
+  on.add(`${record}/${who.body.person}`);
+  ok(await d.auth({ flow: 'switch', sid, slug: 'The-Studio' }));
+  const kiosk = value<{ record: string }>(d.provision({ slug: 'the-kiosk', email: 'ada@example.com' })).record;
+  on.add(`${kiosk}/${who.body.person}`);
+  ok(await d.auth({ flow: 'switch', sid, slug: 'THE-KIOSK' }));
+  for (const slug of ['the-Kiosk', 'the-studıo', 'ｔhe-studio', 'the-studio ', 'x'.repeat(40)]) {
+    const folded = await d.auth({ flow: 'switch', sid, slug });
+    assert.equal(folded.status, 403, JSON.stringify(slug));
+  }
+});
+
 /* ── the migration ────────────────────────────────────────────────────── */
 
 test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT FORWARD, and signs its person in', async () => {
