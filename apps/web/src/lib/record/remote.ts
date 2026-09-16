@@ -254,3 +254,32 @@ export function declOf(raw: RegisterDecl): RegisterDecl {
   const mobile = Array.isArray(raw.mobile) && raw.mobile.length === 3 ? raw.mobile : picked;
   return { ...raw, name, one, fields, mobile };
 }
+
+/** The one call `learn` needs: the record's `schema`, answered the way the client answers it. */
+export type SchemaCall = (register: string) => Promise<{ ok: boolean; value?: unknown }>;
+
+/**
+ * A list's declaration, asked of the record when this build does not ship it, and kept beside the ones it does.
+ *
+ * A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD AND BY NO FILE HERE, so every helper that reads `REGISTERS` (a
+ * group's name and icon, a column's label, a ref's target, a row's title) knew only the sample's lists. Search named a
+ * course by its id and a row's page dropped what pointed at it from one. `page-live.ts` asks the same way. The sample's
+ * own lists are never asked about and never replaced.
+ *
+ * `asked` IS THE READER'S, so a list the record will not declare is asked once per tab rather than on every read.
+ */
+export function learn(schema: SchemaCall, register: string, asked: Map<string, Promise<void>>): Promise<void> {
+  if (REGISTERS[register]) return Promise.resolve();
+  let held = asked.get(register);
+  if (!held) {
+    held = schema(register).then(
+      (out) => {
+        const body = out.ok ? (out.value as { fields?: unknown } | null) : null;
+        if (!REGISTERS[register] && body && Array.isArray(body.fields)) REGISTERS[register] = declOf({ ...(body as RegisterDecl), id: register });
+      },
+      () => undefined,
+    );
+    asked.set(register, held);
+  }
+  return held;
+}

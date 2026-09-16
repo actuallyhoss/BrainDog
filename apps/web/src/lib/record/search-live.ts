@@ -23,6 +23,7 @@ import { copy } from '../copy.ts';
 import { iconFor, REGISTERS, search as sampleSearch, type SearchHit, type SearchResult } from './api.ts';
 import { noRecord } from './device.ts';
 import { terms, tokensOf } from './find.ts';
+import { learn } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -132,6 +133,7 @@ export function searcher(base: string, io?: Fetch): Searcher {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   let absent = false;
   let others: Promise<Others> | null = null;
+  const asked = new Map<string, Promise<void>>();
   return {
     async find(q) {
       /* NOTHING TO ASK, SO NOTHING IS SENT. The same folding the record's index uses decides it. */
@@ -143,6 +145,8 @@ export function searcher(base: string, io?: Fetch): Searcher {
           ([b, d]) => othersOf(b as Wire, d as Wire),
           () => NO_OTHERS,
         );
+        /* A LIST THIS BUILD DOES NOT SHIP IS NAMED BY THE RECORD, so a course is grouped under Courses and not its id. */
+        await Promise.all([...new Set(out.value.map((h) => h.register))].map((r) => learn(client.schema, r, asked)));
         return { from: 'live', value: groupsOf(q, out.value, await others) };
       }
       if ('refusal' in out && noRecord(out.refusal.code)) {

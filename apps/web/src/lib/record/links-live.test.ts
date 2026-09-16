@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { ROWS } from './api.ts';
+import { iconFor, REGISTERS, ROWS } from './api.ts';
 import { linkReader, type Fetch } from './links-live.ts';
 
 const BASE = 'http://record.test';
@@ -125,4 +125,56 @@ test('the row page draws what points at the row from the record, and the sample 
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/links-live\.ts'/u);
   assert.match(page, /linked\?\.from === 'live'/u, 'the live groups are what the page draws when there are any');
+});
+
+test("a pack's own list that points here is drawn under its declared name and labelled columns, not dropped", async () => {
+  assert.equal(REGISTERS.study_assignments, undefined, 'the build ships this list, so this proves nothing');
+  const COURSES = { id: 'study_courses', name: 'Courses', one: 'course', icon: 'doc', title: 'name', fields: [{ id: 'name', label: 'Course', type: 'text' }] };
+  const ASSIGNMENTS = {
+    id: 'study_assignments',
+    name: 'Assignments',
+    one: 'assignment',
+    icon: 'task',
+    title: 'what',
+    mobile: ['what', 'course', 'due'],
+    fields: [
+      { id: 'what', label: 'Assignment', type: 'text', required: true },
+      { id: 'course', label: 'Course', type: 'ref', to: 'study_courses' },
+      { id: 'due', label: 'Due', type: 'day', deadline: true },
+    ],
+  };
+  const pointing = { id: '01JASSIGN0000000000000000', seq: 5, fields: { what: 'Problem set 1', course: '01JCOURSE0000000000000000', due: '2026-09-20' }, version: 1, created_at: '2026-09-01T09:00:00.000Z' };
+  const { io, sent } = host((url) => {
+    if (url.pathname === '/api/backlinks')
+      return json(200, {
+        ok: true,
+        value: { to: { register: 'study_courses', seq: 2, id: '01JCOURSE0000000000000000' }, from: [{ register: 'study_assignments', field: 'course', matched: 1, rows: [pointing] }], cursor: null },
+      });
+    if (url.pathname === '/api/schema') {
+      const r = url.searchParams.get('register');
+      return r === 'study_courses' ? json(200, { ok: true, value: COURSES }) : r === 'study_assignments' ? json(200, { ok: true, value: ASSIGNMENTS }) : json(404, { ok: false, refusal: { code: 'NOT_FOUND', fix: 'No such list.' } });
+    }
+    if (url.pathname === '/api/list') return json(200, { ok: true, value: { rows: [{ id: '01JCOURSE0000000000000000', seq: 2, fields: { name: 'Linear algebra' } }], cursor: null } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  });
+  const out = await linkReader(BASE, io).read('study_courses', 2);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(out.groups.length, 1, 'the section is drawn, not skipped');
+  const group = out.groups[0]!;
+  assert.equal(group.name, 'Assignments');
+  assert.equal(group.label, 'Course');
+  assert.equal(group.icon, iconFor('task', 'rows'));
+  assert.deepEqual(
+    group.columns.filter((c) => c.field !== 'seq').map((c) => c.label),
+    ['Assignment', 'Due'],
+  );
+  assert.equal(group.rows[0]!.href, '/r/study_assignments/5');
+  assert.ok(sent.some((u) => u.pathname === '/api/list' && u.searchParams.get('register') === 'study_courses'), 'its refs are walked');
+});
+
+test('a sample list that points here asks the record for no declaration', async () => {
+  const { io, sent } = host(record);
+  await linkReader(BASE, io).read('things', 4);
+  assert.ok(!sent.some((u) => u.pathname === '/api/schema'));
 });

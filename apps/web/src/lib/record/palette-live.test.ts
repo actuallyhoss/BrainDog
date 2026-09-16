@@ -173,3 +173,15 @@ test('a burst of typing within the wait sends one read', async () => {
   assert.equal(drawn, 'hal');
 });
 
+
+test("a live search names a pack's own list as the record declares it", async () => {
+  assert.equal(REGISTERS.study_modules, undefined, 'the build ships this list, so this proves nothing');
+  const { io } = host((url) => {
+    if (url.pathname === '/api/search') return json(200, { ok: true, value: [{ register: 'study_modules', seq: 1, title: 'Linear algebra' }] });
+    if (url.pathname === '/api/schema') return json(200, { ok: true, value: { id: 'study_modules', name: 'Modules', icon: 'doc', title: 'name', fields: [{ id: 'name', type: 'text' }] } });
+    return json(200, { ok: true, value: url.pathname === '/api/boot' ? {} : [] });
+  });
+  const out = await paletteReader(BASE, io).find('linear', 24);
+  assert.deepEqual(out.value.groups.map((g) => g.kind), ['Modules']);
+  assert.equal(out.value.hits[0]!.kind, 'Modules');
+});

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { REGISTERS, search } from './api.ts';
+import { iconFor, REGISTERS, search } from './api.ts';
 import { groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
 
 const BASE = 'http://record.test';
@@ -144,4 +144,38 @@ test('a question is found by its whole id, and nothing of the sample is mixed in
   const out = groupsOf('d2', [], othersOf({ ok: true, value: {} }, { ok: true, value: [{ id: 'D2', question: 'Pay early?' }] }));
   assert.deepEqual(out.hits.map((h) => h.href), ['/decide/D2']);
   assert.deepEqual(othersOf({ ok: false }, { ok: false }), { pages: [], questions: [] });
+});
+
+test("a pack's own list is grouped under the name and icon the record declares, and a sample list is never asked about", async () => {
+  assert.equal(REGISTERS.study_courses, undefined, 'the build ships this list, so this proves nothing');
+  const sent: URL[] = [];
+  const io = (async (url: string | URL | Request) => {
+    const at = new URL(String(url));
+    sent.push(at);
+    if (at.pathname === '/api/search')
+      return json(200, {
+        ok: true,
+        value: [
+          { register: 'study_courses', seq: 1, title: 'Linear algebra', rank: -3 },
+          { register: 'obligations', seq: 1, title: 'Linear invoice', rank: -2 },
+        ],
+      });
+    if (at.pathname === '/api/schema')
+      return json(200, { ok: true, value: { id: 'study_courses', name: 'Courses', one: 'course', icon: 'doc', title: 'name', fields: [{ id: 'name', label: 'Course', type: 'text', search: true }] } });
+    return json(200, { ok: true, value: at.pathname === '/api/boot' ? {} : [] });
+  }) as Fetch;
+  const find = searcher(BASE, io);
+  const out = await find.find('linear');
+  assert.equal(out.from, 'live');
+  assert.deepEqual(
+    out.value.groups.map((g) => [g.kind, g.hits[0]!.icon]),
+    [
+      ['Courses', iconFor('doc', 'rows')],
+      [REGISTERS.obligations!.name, iconFor(REGISTERS.obligations!.icon, 'rows')],
+    ],
+  );
+  const schemas = sent.filter((u) => u.pathname === '/api/schema');
+  assert.equal(schemas.length, 1, 'only the list the build does not ship is asked about');
+  await find.find('linear');
+  assert.equal(sent.filter((u) => u.pathname === '/api/schema').length, 1, 'and it is asked once for the tab');
 });

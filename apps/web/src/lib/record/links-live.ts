@@ -20,7 +20,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 
 import { columnsFor, iconFor, labelOf, REGISTERS, toRows, type Backlink } from './api.ts';
 import { noRecord } from './device.ts';
-import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -58,10 +58,12 @@ function missed(out: object): Linked {
 export function linkReader(base: string, io?: Fetch): LinkReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const maps = new Map<string, RefMap>();
+  const asked = new Map<string, Promise<void>>();
 
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
+    await learn(client.schema, register, asked);
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
@@ -94,11 +96,13 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
       const now = Date.now();
       const groups: Backlink[] = [];
       for (const g of out.value.from) {
+        /* A LIST THIS BUILD DOES NOT SHIP IS ASKED FOR FIRST: a use case's own lists are declared by the record alone. */
+        await learn(client.schema, g.register, asked);
         const r = REGISTERS[g.register];
         const f = r?.fields.find((x) => x.id === g.field);
-        /* A LIST THIS BUILD DOES NOT DECLARE IS LEFT OUT rather than drawn with its id for a name: a
-           pack can add a register after this app shipped, and a heading reading `service_events` over
-           columns nothing here can label is worse than the section being absent. */
+        /* A LIST NEITHER THIS BUILD NOR THE RECORD WILL DECLARE IS LEFT OUT rather than drawn with its id
+           for a name: a heading reading `service_events` over columns nothing here can label is worse
+           than the section being absent. */
         if (!r || !f) continue;
         const refs = await refsFor(g.register);
         const rows = (g.rows as RecordRow[]).map((row) => entryOf(g.register, row, refs));
