@@ -221,6 +221,10 @@ export const copy = {
   arrangedNotSaved: (title: string) =>
     `${title} rearranged here. Nothing was saved yet.`,
   arrangeNothing: 'Nothing moved.',
+  arranged: (title: string) => `${title} rearranged.`,
+  arrangeTemplate: 'This page is drawn once for each row from one declaration, so its layout is changed in that declaration rather than here.',
+  arrangeMoved: 'This page changed while it was being arranged. Open it again, then arrange it.',
+  blockAddedLive: (name: string) => `Added a ${name}. Press Done to keep it.`,
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   newRecord: 'New record',

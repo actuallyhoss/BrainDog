@@ -237,7 +237,8 @@
       ...(arrangement.slots ?? (result?.blocks ?? []).map((b, i) => ({ i, span: spanOf(b) }))),
       { i: (result?.blocks.length ?? 0) + extra.length - 1, span: block.span ?? 12 },
     ];
-    toasts.push(copy.blockAdded(copy.kindNames[block.kind] ?? block.kind), { intent: 'warn' });
+    const named = copy.kindNames[block.kind] ?? block.kind;
+    toasts.push(live ? copy.blockAddedLive(named) : copy.blockAdded(named), { intent: live ? undefined : 'warn' });
   }
 
   /**
@@ -247,14 +248,40 @@
    * a query over that batch. Committing per drag would put four unrelated lines in the audit log
    * for one act of tidying, and leave no single thing to undo.
    */
-  function commitArrange() {
+  let saving = false;
+  async function commitArrange() {
     if (!arrangement.dirty) {
       arrangement.cancel();
       toasts.push(copy.arrangeNothing);
       return;
     }
+    /* ON A LIVE PAGE DONE SETS THE DECLARATION, whole, and the page is read again from the record. A refusal leaves the
+       mode open with the draft in it, so Cancel still means cancel. Undo sets the body that was there before. */
+    if (live) {
+      if (saving) return;
+      saving = true;
+      const title = result?.page.title ?? slug;
+      const m = await import('$lib/record/page-write.ts');
+      const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
+      const out = await m.saveArrangement(location.origin, slug, result?.blocks.length ?? 0, placed, extra);
+      saving = false;
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      arrangement.commit();
+      await reread();
+      extra = [];
+      arrangement.slots = null;
+      const before = out.before;
+      toasts.push(copy.arranged(title), {
+        undo: () =>
+          void m.setBody(location.origin, before).then(async (back) => {
+            if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
+            await reread();
+          }),
+      });
+      return;
+    }
     const undo = arrangement.commit();
-    /* The layout STAYS. In the real client this is where `setDeclaration({ body })` goes; here the
+    /* The layout STAYS. On a live page the branch above set the declaration; on the sample the
        toast says plainly that nothing was written, because a mock that pretends to have saved is a
        mock that will be believed. */
     toasts.push(copy.arrangedNotSaved(result?.page.title ?? slug), { intent: 'warn', undo });

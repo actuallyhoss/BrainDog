@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
-import { movePatch, tickPatch, updateRow, type Fetch } from './page-write.ts';
+import type { Fetch as ClientFetch } from './pages-live.ts';
+import { arrangedBody, movePatch, saveArrangement, tickPatch, updateRow, type Fetch } from './page-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -73,4 +74,62 @@ test('no record is a calm sentence and never the error text', async () => {
     from: 'unreachable',
     fix: copy.recordNotReached,
   });
+});
+
+/* ── arranging a page ─────────────────────────────────────────────────── */
+
+const BODY = {
+  page: 'money',
+  title: 'Money',
+  nav: { section: 'Work', order: 1 },
+  blocks: [
+    { kind: 'stat', span: 12, cells: ['owed'] },
+    { kind: 'table', span: 12, source: 'register.obligations' },
+    { kind: 'list', span: 6, source: 'register.tasks' },
+  ],
+};
+
+test('AN ARRANGED BODY IS THE STORED ONE REORDERED AND RESIZED, with an added block declared where it was put', () => {
+  const added = { kind: 'chips', source: 'register.obligations', columns: [{ field: 'state', label: 'State', width: 'minmax(8ch,1fr)', align: 'start' }], rows: [] };
+  const out = arrangedBody(BODY, [{ i: 2, span: 12 }, { i: 3, span: 4 }, { i: 0, span: 6 }], [added]);
+  assert.deepEqual(out, {
+    page: 'money',
+    title: 'Money',
+    nav: { section: 'Work', order: 1 },
+    blocks: [
+      { kind: 'list', span: 12, source: 'register.tasks' },
+      { kind: 'chips', span: 4, source: 'register.obligations', columns: [{ field: 'state', label: 'State' }] },
+      { kind: 'stat', span: 6, cells: ['owed'] },
+    ],
+  });
+  assert.equal(arrangedBody(BODY, [{ i: 9, span: 12 }], []), null, 'a place past both lists was written as a guess');
+});
+
+test('DONE READS THE STORED BODY, SETS IT WHOLE, and hands back the one before for undo', async () => {
+  const sent: { url: string; body: unknown }[] = [];
+  const io: ClientFetch = async (input, init) => {
+    const url = String(input);
+    sent.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (url.includes('/api/page')) return json(200, { ok: true, value: { nav: BODY.nav, page: BODY.page, title: BODY.title, blocks: BODY.blocks.map((b) => ({ ...b, rows: [], drawn: true })) } });
+    return json(200, { ok: true, value: { id: 'page.money' } });
+  };
+  const out = await saveArrangement(BASE, 'money', 3, [{ i: 1, span: 12 }, { i: 0, span: 12 }, { i: 2, span: 6 }], [], io);
+  assert.equal(out.from, 'written');
+  assert.deepEqual(out.from === 'written' && out.before.blocks.map((b) => b.kind), ['stat', 'table', 'list']);
+  const set = sent.find((s) => s.url.endsWith('/api/setDeclaration'));
+  assert.deepEqual((set?.body as { body: { blocks: { kind: string }[] } }).body.blocks.map((b) => b.kind), ['table', 'stat', 'list']);
+  assert.ok(!JSON.stringify(set?.body).includes('drawn'), 'the answer was written back as the declaration');
+  assert.equal(Object.keys((set?.body as { body: object }).body)[0], 'page', 'the record reads a declaration by its first key, and it was not page');
+
+  /* A page that gained a block since it was drawn is not written over. */
+  const moved = await saveArrangement(BASE, 'money', 2, [{ i: 0, span: 12 }], [], io);
+  assert.deepEqual(moved, { from: 'refused', fix: copy.arrangeMoved });
+
+  /* A template's answer is one row's expansion, and is never set. */
+  const template: ClientFetch = async () => json(200, { ok: true, value: { ...BODY, for: { register: 'projects' }, param: { register: 'projects', seq: 1, title: 'Kiln' } } });
+  assert.deepEqual(await saveArrangement(BASE, 'kiln', 3, [], [], template), { from: 'refused', fix: copy.arrangeTemplate });
+
+  const refused: ClientFetch = async (url) =>
+    String(url).includes('/api/page') ? json(200, { ok: true, value: BODY }) : json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an admin sets a declaration.' } });
+  assert.deepEqual(await saveArrangement(BASE, 'money', 3, [{ i: 0, span: 12 }], [], refused), { from: 'refused', fix: 'Only an owner or an admin sets a declaration.' });
 });

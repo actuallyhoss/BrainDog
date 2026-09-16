@@ -127,12 +127,10 @@ export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
  */
 function bodyOf(slug: string, answered: Record<string, unknown>): PageBody {
   const { blocks, ...rest } = answered;
-  return {
-    ...rest,
-    page: typeof rest.page === 'string' ? rest.page : slug,
-    title: typeof rest.title === 'string' ? rest.title : '',
-    blocks: Array.isArray(blocks) ? blocks.filter(isObject).map(bodyOfBlock) : [],
-  };
+  /* `page` IS THE FIRST KEY, because the record reads a declaration's kind from its first key and the answer does not keep
+     the order a page was declared in: a body read back with `nav` first was refused as a declaration that begins with nav. */
+  const named = { page: typeof rest.page === 'string' ? rest.page : slug, title: typeof rest.title === 'string' ? rest.title : '' };
+  return { ...named, ...rest, ...named, blocks: Array.isArray(blocks) ? blocks.filter(isObject).map(bodyOfBlock) : [] };
 }
 
 /**

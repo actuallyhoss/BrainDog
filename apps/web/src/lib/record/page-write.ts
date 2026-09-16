@@ -1,5 +1,6 @@
 /**
- * A declared page's two gestures against the record: a card moved to another column of a board, and a task ticked.
+ * A declared page's gestures against the record: a card moved to another column of a board, a task ticked, and the page
+ * itself arranged.
  *
  * A ROUTE-ONLY MODULE, loaded by `/p/<slug>` when one of the two happens. ONLY A LIVE PAGE CALLS THIS: the sample says
  * `cardMovedTo` and `taskTicked` as it always did.
@@ -13,10 +14,12 @@
  * is the first terminal state, and not done is the first state that is not terminal.
  */
 
+import { createClient } from '@braindog/client';
 import type { RowRef } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './data.ts';
+import { pagesReader, type BlockBody, type Fetch as ClientFetch, type PageBody } from './pages-live.ts';
 import { declaredValue } from './where.ts';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -69,4 +72,89 @@ export async function updateRow(base: string, ref: RowRef, patch: Record<string,
   if ('conflict' in said || refusal?.code === 'VERSION_STALE') return { from: 'conflict', fix: copy.pageRowConflict(title) };
   if (refusal?.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
   return { from: 'refused', fix: typeof refusal?.fix === 'string' && refusal.fix !== '' ? refusal.fix : copy.recordNotReached };
+}
+
+/* ── arranging a page ────────────────────────────────────────────────────── */
+
+/** One place in the arrangement: which block (declared first, then added) and the width it takes. */
+export type Placed = { i: number; span: number };
+
+/** A block added in arrange mode, in the app's spelling. Only the keys a declaration may carry go to the record. */
+export type Added = { kind: string; [key: string]: unknown };
+
+/**
+ * THE KEYS AN ADDED BLOCK DECLARES, and no others. The picker's block is the app's `PageBlock`, which carries drawing
+ * hints (a column's width and alignment) the record does not read and would name as keys it cannot. A column keeps its
+ * field, its label and its role.
+ */
+const DECLARES = ['kind', 'heading', 'span', 'source', 'where', 'cells', 'order', 'limit', 'target', 'authored', 'empty', 'tone', 'body', 'when', 'icon', 'fold'];
+
+export function declaredBlock(block: Added): BlockBody {
+  const out: Record<string, unknown> = {};
+  for (const key of DECLARES) if (block[key] !== undefined) out[key] = block[key];
+  if (Array.isArray(block.columns))
+    out.columns = (block.columns as { field: string; label?: unknown; as?: unknown }[]).map((c) => ({
+      field: c.field,
+      ...(typeof c.label === 'string' ? { label: c.label } : {}),
+      ...(typeof c.as === 'string' ? { as: c.as } : {}),
+    }));
+  return { ...out, kind: block.kind };
+}
+
+/**
+ * The page's body with its blocks in the order and at the widths placed, and the added ones declared where they were put.
+ *
+ * `null` WHEN THE PLACES DO NOT FIT THE BODY: an index past both lists means the page changed under the arrangement, and
+ * writing a body built from a guess would drop or duplicate a block somebody else declared.
+ */
+export function arrangedBody(body: PageBody, placed: readonly Placed[], added: readonly Added[]): PageBody | null {
+  const declared = body.blocks.length;
+  const blocks: BlockBody[] = [];
+  for (const p of placed) {
+    const from = p.i < declared ? body.blocks[p.i] : added[p.i - declared] ? declaredBlock(added[p.i - declared]!) : undefined;
+    if (!from) return null;
+    blocks.push({ ...from, span: p.span });
+  }
+  return { ...body, blocks };
+}
+
+export type Arranged = { from: 'written'; before: PageBody } | { from: 'refused'; fix: string } | { from: 'unreachable'; fix: string };
+
+/**
+ * Done, on a live page: read the body the record stores, lay it out as arranged, and set it whole.
+ *
+ * `drawn` IS HOW MANY BLOCKS THE SCREEN WAS ARRANGING, and a body with another number is a page that changed since it was
+ * read. `before` comes back so the toast's undo can set it again.
+ *
+ * A TEMPLATE IS REFUSED. Its answer is one row's expansion, and setting that would turn one declaration for every row into
+ * a page about one row.
+ */
+export async function saveArrangement(
+  base: string,
+  slug: string,
+  drawn: number,
+  placed: readonly Placed[],
+  added: readonly Added[],
+  io?: ClientFetch,
+): Promise<Arranged> {
+  const read = await pagesReader(base, io).readOne(slug);
+  if (read.from === 'absent') return { from: 'refused', fix: copy.recordNotReached };
+  if (read.from === 'refused') return read;
+  if (read.from === 'expanded') return { from: 'refused', fix: copy.arrangeTemplate };
+  if (read.page.body.blocks.length !== drawn) return { from: 'refused', fix: copy.arrangeMoved };
+  const body = arrangedBody(read.page.body, placed, added);
+  if (!body) return { from: 'refused', fix: copy.arrangeMoved };
+  const out = await setBody(base, body, io);
+  return out.from === 'written' ? { from: 'written', before: read.page.body } : out;
+}
+
+/** One page body, set whole through `setDeclaration`. Undo is this with the body read before. */
+export async function setBody(base: string, body: PageBody, io?: ClientFetch): Promise<{ from: 'written' } | { from: 'refused' | 'unreachable'; fix: string }> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call('setDeclaration', { body });
+  if (out.ok) return { from: 'written' };
+  if (!('refusal' in out)) return { from: 'unreachable', fix: copy.recordNotReached };
+  if (out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
+  if (out.refusal.code === 'UNAUTHORIZED') return { from: 'refused', fix: copy.signInAgain };
+  return { from: 'refused', fix: out.refusal.fix };
 }
