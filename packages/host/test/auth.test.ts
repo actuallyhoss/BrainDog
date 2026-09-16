@@ -207,7 +207,7 @@ test('sessionContext is the bearer-shaped context, with the proof time and nothi
 
 /* ── the loop, against a real Directory ───────────────────────────────── */
 
-type Body = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string }; retryAfter?: number };
+type Body = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string; at?: string }; retryAfter?: number };
 
 function setup(o: { auth?: AuthConfig | null; door?: Partial<AuthDoor> } = {}) {
   const sql = openSqlite();
