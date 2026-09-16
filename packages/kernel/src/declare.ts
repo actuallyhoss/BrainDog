@@ -420,35 +420,8 @@ function metricBody(decl: Declaration): Refusal | null {
       return bad('DECLARATION_INVALID', `${id} buckets by ${String(body.bucket)} and groups by nothing.`, 'bucket');
   }
 
-  /**
-   * AND THEN THE GROUPING ITSELF, BECAUSE THE GUARD AGAINST IT FIRES WHERE NOBODY WRITES THE KEY.
-   *
-   * `metrics.ts`'s `NOT_IN_THIS_BUILD` branch walks `keysOf(decl.value)`, and `group_by` is not
-   * inside `value`: `42 §4.9` and the two checks above both put it at the TOP LEVEL of a metric
-   * body. So the guard caught the spelling nobody uses and let the documented one through. Driven,
-   * over three rows summing GBP 700:
-   *
-   *     plain sum, no group_by                       {"value":700,"rows":3,"unit":"GBP"}
-   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"unit":"GBP"}
-   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
-   *
-   * The harm is the one the guard's own sentence names, word for word: *"its figure would be the
-   * ungrouped one"*. A tile declaring `group_by: 'party'` draws one number over every party and
-   * labels it with one of them.
-   *
-   * REFUSED AT THE DECLARATION AND NOT AT THE READING, so the metric does not install rather than
-   * installing and answering wrongly — and it is refused AFTER the two checks above so that
-   * `GROUP_BY_TWICE` and the bucket's shape still answer first, each about a mistake that survives
-   * the day grouping is built. `08 §2.2` publishes the shape and this build reads it nowhere: the
-   * repair is a deploy, not an edit.
-   */
-  if (body.group_by !== undefined)
-    return bad(
-      'NOT_IN_THIS_BUILD',
-      `${id}: group_by is a published shape this build does not read, so its figure would be the ungrouped one.`,
-      'group_by',
-    );
-
+  /* THE GROUPING IS READ (`metrics.ts`'s `groupsOf`), so a well-formed one installs. Whether the
+     field is a date, and so whether it takes a bucket, is the evaluator's to say: it has the schema. */
   return null;
 }
 

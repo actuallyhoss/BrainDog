@@ -199,7 +199,9 @@ export type { EraseReport, EraseRequest } from './erase.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
-export { AGGREGATIONS, deltaFrom, evaluateMetric, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
+export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
+export type { Bucket } from './buckets.ts';
+export { AGGREGATIONS, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export {
   CHANNELS,
@@ -245,7 +247,7 @@ export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
-export type { Aggregation, EvalContext, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
+export type { Aggregation, EvalContext, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';

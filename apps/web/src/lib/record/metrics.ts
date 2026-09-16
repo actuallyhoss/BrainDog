@@ -27,6 +27,7 @@
  * URL, so they cannot disagree.
  */
 
+import { GROUP_CAP, bucketOf, bucketRun, isBucket, largestFirst, type Bucket, type Group } from '@braindog/kernel';
 import { integer, money } from 'braindog-render';
 
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
@@ -95,6 +96,10 @@ export type MetricDecl = {
    * is where the seed's declarations copy theirs from, so the two cannot name different factors.
    */
   lookups?: Record<string, Record<string, number>>;
+  /** One field the figure is also read per value of, as the record reads it (`08 §2.1`). */
+  group_by?: string;
+  /** `day` · `week` · `month` · `quarter` · `year`, beside a date `group_by` only. */
+  bucket?: Bucket;
 };
 
 /* ── evaluating one ──────────────────────────────────────────────────────── */
@@ -132,6 +137,12 @@ export type Reading = {
   unmeasured: string | null;
   refusals: string[];
   href: string;
+  /** A grouped figure's parts, as the record's `groupsOf` returns them. */
+  groups?: Group[];
+  /** The bucket the clock is in, on a figure bucketed by date. */
+  current?: string;
+  /** Groups past the cap of fifty, left out. */
+  more?: number;
 };
 
 const DAY_MS = 86_400_000;
@@ -445,7 +456,7 @@ export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').incl
 const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 
 /** Every key a metric document may carry here, so one it may not is named rather than ignored. */
-const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot']);
+const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket']);
 
 /** The formats this build writes. A format it does not know printed the bare number. */
 const READS_FORMAT = ['int', 'pct', 'days', 'decimal'];
@@ -562,6 +573,8 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
 
   if (register && REGISTERS[register])
     refusals.push(...explain(compile(register, decl.where)).map((r) => `${decl.metric}: ${r}`));
+
+  refusals.push(...groupingFaults(decl, register).map((r) => `${decl.metric}: ${r}`));
 
   if (refusals.length || !register)
     return { value: null, shown: '—', rows: 0, held: 0, delta: null, why: refusals[0] ?? '', unmeasured: null, refusals, href: '/p/money' };
@@ -686,7 +699,71 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     unmeasured,
     refusals: [],
     href: hrefFor(decl),
+    ...(decl.group_by === undefined ? {} : groupsOf(rows, decl, now)),
   };
+}
+
+/** What is wrong with a grouping, in the record's own terms (`metrics.ts`'s checks in the kernel). */
+function groupingFaults(decl: MetricDecl, register: string | null): string[] {
+  const fields = register ? REGISTERS[register]?.fields : undefined;
+  if (decl.group_by === undefined)
+    return decl.bucket === undefined ? [] : [`buckets by ${String(decl.bucket)} and groups by nothing`];
+  const out: string[] = [];
+  const by = typeof decl.group_by === 'string' ? decl.group_by : null;
+  const type = by && fields ? fields.find((f) => f.id === by)?.type : undefined;
+  const dated = type === 'day' || type === 'instant';
+  if (by === null) out.push('group_by is one field name');
+  else if (fields && type === undefined) out.push(`${register} has no field called ${by}`);
+  else if (dated && decl.bucket === undefined) out.push(`${by} is a date, so group_by needs a bucket: day, week, month, quarter or year`);
+  else if (!dated && fields && decl.bucket !== undefined) out.push(`a bucket cuts a date, and ${by} is a ${type}`);
+  if (decl.bucket !== undefined && !isBucket(decl.bucket)) out.push(`${String(decl.bucket)} is not a bucket`);
+  const value = decl.value as object | undefined;
+  if (value && ('ratio' in value || 'diff' in value)) out.push('a ratio or a diff is not grouped in this build; group each half as its own figure');
+  return out;
+}
+
+/**
+ * A figure's parts, one per value of `group_by`, as the record's `groupsOf` reads them.
+ *
+ * THE SAME BUCKETS, IMPORTED FROM THE RECORD, so a bar labelled June holds the same rows here as there;
+ * a bucket between the first and the last that nothing fell in is a gap with no value, never a zero.
+ */
+function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, 'groups' | 'current' | 'more'> {
+  const by = decl.group_by!;
+  const held = rows.filter((e) => carries(e, by));
+  const part = (key: string, of: Entry[]): Group => ({
+    key,
+    value: of.length === 0 ? null : evaluateValue(of, decl.value),
+    rows: of.length,
+    state: 'full',
+  });
+
+  if (decl.bucket !== undefined) {
+    const bucket = decl.bucket;
+    const current = bucketOf(new Date(now).toISOString(), bucket)!;
+    const byKey = new Map<string, Entry[]>();
+    for (const e of held) {
+      const key = bucketOf(String(e.fields[by]), bucket);
+      if (key !== null) byKey.set(key, [...(byKey.get(key) ?? []), e]);
+    }
+    const keys = [...byKey.keys()].sort();
+    if (keys.length === 0) return { groups: [], current, more: 0 };
+    const last = keys.at(-1)! > current ? keys.at(-1)! : current;
+    const run = bucketRun(keys[0]!, last, bucket, GROUP_CAP);
+    const groups = run.keys.map((key): Group => {
+      const g = part(key, byKey.get(key) ?? []);
+      return { ...g, state: g.rows === 0 ? 'empty' : key >= current ? 'partial' : 'full' };
+    });
+    return { groups, current, more: run.more };
+  }
+
+  const byValue = new Map<string, Entry[]>();
+  for (const e of held) {
+    const key = String(e.fields[by]);
+    byValue.set(key, [...(byValue.get(key) ?? []), e]);
+  }
+  const groups = [...byValue.entries()].map(([key, of]) => part(key, of)).sort(largestFirst);
+  return { groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) };
 }
 
 /**

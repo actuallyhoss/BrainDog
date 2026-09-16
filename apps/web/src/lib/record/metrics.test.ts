@@ -352,14 +352,17 @@ test('and inside a ratio too, on either side', () => {
   }
 });
 
-test('a published key this build ignores is named, because ignoring it changes the figure', () => {
-  // `group_by` and `bucket` are `08` §2.1. Ignored, they returned the UNGROUPED figure under a
-  // heading that says it is grouped, with no refusal and a `good` tone.
-  for (const extra of [{ group_by: 'kind' }, { bucket: 'month' }]) {
+test('a grouping the register cannot answer is named, and one it can is read', () => {
+  // `group_by` and `bucket` are `08` §2.1, read as the record reads them: a field the list does not
+  // have, or a bucket with nothing to cut, is said rather than answered with the ungrouped figure.
+  for (const extra of [{ group_by: 'kind' }, { bucket: 'month' }, { group_by: 'due' }, { group_by: 'state', bucket: 'month' }]) {
     const r = read({ ...METRICS.overdue!, ...extra } as never);
-    assert.ok(r.refusals.length, `${Object.keys(extra)[0]} was ignored`);
-    assert.match(r.refusals[0] ?? '', /not read by this build/);
+    assert.ok(r.refusals.length, `${JSON.stringify(extra)} was ignored`);
   }
+  const r = read({ ...METRICS.overdue!, group_by: 'due', bucket: 'month' } as never);
+  assert.deepEqual(r.refusals, []);
+  assert.equal(r.value, read(METRICS.overdue!).value, 'the figure is still the whole');
+  assert.equal(r.groups!.reduce((n, g) => n + (g.value ?? 0), 0), r.value);
 });
 
 test('SNAPSHOT IS READ, because remembering a figure daily does not change the figure', () => {

@@ -16,6 +16,7 @@ import { isStale, openRecord, readBlock as kernelBlock, type Kernel, type PageBl
 import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
+import { read as webRead, type MetricDecl as WebMetric } from './metrics.ts';
 import type { PageBlock } from './schema.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
@@ -89,10 +90,13 @@ function depsOf(k: Kernel): PageDeps {
   };
 }
 
+let opened: Kernel | null = null;
+
 const seeded = (async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, JSON.stringify(out));
+  opened = k;
   return depsOf(k);
 })();
 
@@ -261,4 +265,36 @@ test('an as: scope column on a field that does not say where a row applies is re
   const block = { ...blockOver('skills', 'Kiln'), inherit: false, columns: [{ field: 'name', as: 'scope' }] } as KernelBlock & PageBlock;
   assert.equal(kernelBlock(deps, block).refusals[0]?.code, 'DECLARATION_INVALID');
   assert.match(webBlock(block).refusals.join('; '), /as: scope/);
+});
+
+test('A FIGURE GROUPED BY MONTH, BY WEEK AND BY A WORD HAS THE SAME PARTS IN BOTH ENGINES', async () => {
+  await seeded;
+  const k = opened!;
+  const base = { name: 'Grouped', source: 'register.obligations', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
+  const cases: WebMetric[] = [
+    { ...base, metric: 'paid-in-by-month', where: 'state is paid, direction is owed to me', value: { sum: 'amount' }, group_by: 'settled', bucket: 'month' },
+    { ...base, metric: 'paid-out-by-month', where: 'state is paid, direction is owed by me, settled after -12m', value: { sum: 'amount' }, group_by: 'settled', bucket: 'month' },
+    { ...base, metric: 'due-by-week', where: 'state is open or part', value: { sum: 'amount' }, group_by: 'due', bucket: 'week' },
+    { ...base, metric: 'due-by-quarter', where: 'state is open or part, direction is owed by me', value: { sum: 'amount' }, group_by: 'due', bucket: 'quarter' },
+    { ...base, metric: 'count-by-day', format: 'int', where: 'state is paid', value: { count: 'id' }, group_by: 'settled', bucket: 'day' } as WebMetric,
+    { ...base, metric: 'spent-by-category', where: 'direction is owed by me', value: { sum: 'amount' }, group_by: 'category' },
+    {
+      ...base,
+      metric: 'monthly-by-category',
+      where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
+      value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+      lookups: { per_month: { monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 } },
+      group_by: 'category',
+    },
+  ];
+  for (const decl of cases) {
+    const kernel = k.metric(decl as never);
+    assert.ok(kernel.ok, `${decl.metric}, the kernel: ${JSON.stringify(kernel)}`);
+    const web = webRead(decl);
+    assert.deepEqual(web.refusals, [], `${decl.metric}, the app: ${web.refusals.join('; ')}`);
+    assert.ok((kernel.value.groups ?? []).length > 1, `${decl.metric} grouped into nothing`);
+    assert.equal(web.value, kernel.value.value, `${decl.metric}: the whole`);
+    assert.deepEqual(web.groups, kernel.value.groups, `${decl.metric}: the parts`);
+    assert.equal(web.current, kernel.value.current, `${decl.metric}: the bucket the clock is in`);
+  }
 });

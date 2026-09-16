@@ -352,34 +352,41 @@ test('a shape this build does not read is named rather than answered as the ungr
   sql.close();
 });
 
-test('AND THE GUARD FIRED WHERE NOBODY WRITES THE KEY, so the documented spelling got the ungrouped figure', async () => {
-  /**
-   * The loop above walks `keysOf(decl.value)`, and `group_by` is not inside `value`: `42 §4.9` and
-   * `declare.ts`'s `metricBody` both put it at the TOP LEVEL of a metric body, and `MetricDecl` has
-   * no field for either it or `bucket`. So a stored body carrying one arrived here as an extra key
-   * nothing looked at. Driven over the same rows, with a control:
-   *
-   *     plain sum, no group_by                       {"value":700,"rows":3,"unit":"GBP","refusals":0}
-   *     GROUP_BY_CARDINALITY: group_by: 'party'      {"value":700,"rows":3,"unit":"GBP","refusals":0}
-   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
-   *
-   * Identical figures, zero refusals, and the harm is the one the guard's own sentence names word
-   * for word: *"its figure would be the ungrouped one"*. A tile declaring `group_by: 'party'` draws
-   * one number over every party.
-   */
+test('A GROUPED FIGURE KEEPS ITS WHOLE AND CARRIES ITS PARTS, a missing bucket a gap and never a zero', async () => {
   const { k, sql } = await record();
-  const ungrouped = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 } }));
+  const whole = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 } }));
 
-  for (const key of ['group_by', 'bucket']) {
-    const said = refusal(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, [key]: 'party' } as never));
-    assert.equal(said.code, 'NOT_IN_THIS_BUILD');
-    assert.equal(said.at, key);
-    assert.match(said.fix, /the ungrouped one/);
-  }
+  const byParty = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, group_by: 'party' }));
+  assert.equal(byParty.value, whole.value, 'the figure is still the whole');
+  assert.ok(byParty.groups && byParty.groups.length > 0);
+  assert.equal(
+    byParty.groups!.reduce((n, g) => n + (g.value ?? 0), 0),
+    whole.value,
+    'the parts add up to the whole when every row names a party',
+  );
 
-  /* AND THE CONTROL, so this is about the key and not about the metric: the same declaration
-     without it still answers, and the figure it answered with is the one the grouped tile drew. */
-  assert.equal(ungrouped.value, 2_945_000);
+  const byMonth = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, group_by: 'due', bucket: 'month' }));
+  const keys = byMonth.groups!.map((g) => g.key);
+  assert.deepEqual(keys, [...keys].sort(), 'in order');
+  for (let i = 1; i < keys.length; i++) assert.notEqual(keys[i], keys[i - 1]);
+  for (const g of byMonth.groups!) if (g.rows === 0) assert.equal(g.value, null, `${g.key} held nothing and is a gap`);
+  assert.equal(byMonth.current, '2026-09');
+  assert.deepEqual(keys, ['2026-06', '2026-07', '2026-08', '2026-09']);
+  assert.equal(byMonth.groups!.at(-1)!.state, 'partial', 'the month the clock is in is not finished');
+
+  const byWeek = value<Reading>(k.metric({ ...OVERDUE, where: undefined, target: { gte: 0 }, group_by: 'due', bucket: 'week' }));
+  const gaps = byWeek.groups!.filter((g) => g.state === 'empty');
+  assert.ok(gaps.length > 0 && gaps.every((g) => g.value === null), 'a week nothing fell in is a gap');
+  assert.equal(byWeek.groups![0]!.key, '2026-06-22', 'a week is keyed by its Monday');
+
+  /* A DATE WITH NO BUCKET, A BUCKET ON A WORD, AND A RATIO OF GROUPS are each said by name. */
+  assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'due' })).at, 'bucket');
+  assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'party', bucket: 'month' })).code, 'DECLARATION_INVALID');
+  assert.equal(refusal(k.metric({ ...OVERDUE, group_by: 'nonesuch' })).code, 'FIELD_UNKNOWN');
+  assert.equal(
+    refusal(k.metric({ ...OVERDUE, group_by: 'party', value: { ratio: { of: { sum: 'amount' }, per: { count: 'id' } } } })).code,
+    'NOT_IN_THIS_BUILD',
+  );
   sql.close();
 });
 

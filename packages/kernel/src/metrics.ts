@@ -15,8 +15,8 @@
  * one group comes back: a total across two is a number of the right size in the wrong unit, sitting
  * in a tile with a code beside it, and there is no screen on which anybody notices.
  *
- * WHAT IS NOT HERE IS REFUSED BY NAME. `group_by`, `bucket`, `running`, `trend`, `last`, `median`
- * and the `lookup` product are published shapes with no consumer in this build. Reading one and
+ * WHAT IS NOT HERE IS REFUSED BY NAME. `running`, `trend`, `last` and `median` are published shapes
+ * with no consumer in this build. `group_by` and `bucket` are read (`groupsOf`). Reading one and
  * quietly returning the ungrouped figure would be a number under a heading that says it is grouped,
  * which is worse than an em dash.
  */
@@ -24,6 +24,8 @@
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
 import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
+
+import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -88,7 +90,22 @@ export type MetricDecl = {
    * with the figure that multiplies by it, which is the property the `fx` register of `08 §2.5` has.
    */
   lookups?: Lookups | undefined;
+  /**
+   * One field the figure is read per value of (`08 §2.1`): an enum, a ref or a word, or a day or an
+   * instant cut into `bucket`s. The figure itself stays the whole; `groups` carries the parts.
+   */
+  group_by?: string | undefined;
+  /** `day` · `week` · `month` · `quarter` · `year`, and only beside a date `group_by`. */
+  bucket?: Bucket | undefined;
 };
+
+/**
+ * One part of a grouped figure.
+ *
+ * `empty` is a bucket nothing fell in, and its value is `null`: a gap, never a zero (`08 §2.1`).
+ * `partial` is the bucket the clock is in, or one after it, which is not finished and is drawn faint.
+ */
+export type Group = { key: string; value: number | null; rows: number; state: 'empty' | 'partial' | 'full' };
 
 /** Named factor tables: a table's name, then each `by` value's factor. */
 export type Lookups = Record<string, Record<string, number>>;
@@ -117,6 +134,12 @@ export type Reading = {
   why: string;
   met: boolean | null;
   refusals: Refusal[];
+  /** A grouped figure's parts, in key order. Absent on a figure with no `group_by`. */
+  groups?: Group[];
+  /** On a figure bucketed by date: the bucket the clock is in, which a chart marks as unfinished. */
+  current?: string;
+  /** How many groups past the cap of fifty were left out, the oldest first. */
+  more?: number;
 };
 
 const WINDOW = /^(\d{1,4})([dwm])$/;
@@ -336,29 +359,24 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
       at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
 
   /**
-   * AND THE BODY'S OWN KEYS, BECAUSE THE WALK ABOVE FIRED WHERE NOBODY WRITES THEM.
+   * THE GROUPING, WHICH IS READ NOW, AND CHECKED AGAINST THE REGISTER IT GROUPS.
    *
-   * `keysOf(decl.value)` reads inside the value expression, and `group_by` and `bucket` are not
-   * there: `42 §4.9` and `declare.ts`'s `metricBody` both put them at the TOP LEVEL of a metric
-   * body, and `MetricDecl` above has no field for either — so a stored body carrying one arrives
-   * here as an extra key nothing looks at. Driven over three rows summing GBP 700:
-   *
-   *     plain sum, no group_by                       {"value":700,"rows":3,"refusals":0}
-   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"refusals":0}
-   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
-   *
-   * The comment above is precise about the harm — *"its figure would be the ungrouped one"* — and
-   * that is exactly what came back, with no refusal beside it.
-   *
-   * `declare.ts` NOW REFUSES THE DECLARATION, WHICH IS THE BETTER HALF AND IS NOT ALL OF IT: a
-   * metric installed before that check existed is still in somebody's record, and this is the side
-   * that reads it. Only the two shapes that can reach a body's top level are looked for, so a
-   * register field called `trend` is still summable — the reason the `keysOf` walk exists.
+   * `08 §2.1`'s rules: one field; a `bucket` only beside a day or an instant, and a day or an instant
+   * only with one, because a bar per distinct date is a list rather than a chart. A ratio or a diff
+   * of groups is a second dimension of arithmetic this build does not do, so it says so.
    */
-  const body = decl as unknown as Record<string, unknown>;
-  for (const word of ['group_by', 'bucket'])
-    if (body[word] !== undefined)
-      at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, word);
+  if (decl.group_by !== undefined) {
+    const by = typeof decl.group_by === 'string' ? decl.group_by : null;
+    const type = by && schema && Object.hasOwn(schema.fields, by) ? schema.fields[by]?.type : undefined;
+    const dated = type === 'day' || type === 'instant';
+    if (by === null) at('DECLARATION_INVALID', 'group_by is one field name', 'group_by');
+    else if (schema && type === undefined) at('FIELD_UNKNOWN', `${register} has no field called ${by}`, 'group_by');
+    else if (dated && decl.bucket === undefined) at('DECLARATION_INVALID', `${by} is a date, so group_by needs a bucket: day, week, month, quarter or year`, 'bucket');
+    else if (!dated && schema && decl.bucket !== undefined) at('DECLARATION_INVALID', `a bucket cuts a date, and ${by} is a ${type}`, 'bucket');
+    if (decl.bucket !== undefined && !isBucket(decl.bucket)) at('DECLARATION_INVALID', `${String(decl.bucket)} is not a bucket`, 'bucket');
+    if ('ratio' in decl.value || 'diff' in decl.value)
+      at('NOT_IN_THIS_BUILD', 'a ratio or a diff is not grouped in this build; group each half as its own figure', 'group_by');
+  } else if (decl.bucket !== undefined) at('DECLARATION_INVALID', `buckets by ${String(decl.bucket)} and groups by nothing`, 'bucket');
 
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
@@ -441,12 +459,85 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     else delta = deltaFrom(before.value.value, now.value.value);
   }
 
+  const grouped = decl.group_by === undefined ? null : groupsOf(sql, said.predicate, schema, decl, ctx);
+  if (grouped && !grouped.ok) return grouped;
+
   return ok({
     ...now.value,
     delta,
     why,
     met: now.value.value === null || !decl.target ? null : meets(now.value.value, decl.target),
+    ...(grouped ? grouped.value : {}),
   });
+}
+
+/** The order a grouping by a word draws in: the largest part first, then the key. Exported for the browser's reader. */
+export const largestFirst = (a: Group, b: Group): number =>
+  (b.value ?? -Infinity) - (a.value ?? -Infinity) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+/**
+ * A figure read once per group, each part by the same aggregation over the same predicate.
+ *
+ * EACH PART IS THE WHOLE QUERY WITH ONE MORE CLAUSE, rather than a second implementation of summing
+ * with a `GROUP BY` in it: a part then refuses a second currency, a missing factor and a day summed
+ * as a number exactly as the whole does, because it is the same code.
+ *
+ * A DATE IS CUT INTO BUCKETS by `buckets.ts`, which the browser's reader imports, so a bar labelled
+ * June holds the same rows in both engines. Every bucket between the first and the last that hold a
+ * row is returned, and one nothing fell in is `empty` with no value: a gap, never a zero.
+ */
+function groupsOf(
+  sql: Sql,
+  predicate: Predicate | undefined,
+  schema: Schema,
+  decl: MetricDecl,
+  ctx: EvalContext,
+): Result<Pick<Reading, 'groups' | 'current' | 'more'>> {
+  const w = compile(predicate, schema);
+  if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
+  const by = decl.group_by!;
+  const where = `register = ? AND deleted_at IS NULL AND ${w.sql}`;
+  const params: (string | number)[] = [schema.register, ...w.params];
+  const field = `json_extract(fields, '${jsonPath(by)}')`;
+  const tables = tablesOf(decl);
+  const value = decl.value as Aggregation;
+
+  const part = (clause: string, more: (string | number)[]): Result<{ value: number | null; rows: number }> => {
+    const got = one(sql, schema, value, `${where} AND ${clause}`, [...params, ...more], tables);
+    if (!got.ok) return got;
+    return ok({ value: got.value.rows === 0 ? null : got.value.value, rows: got.value.rows });
+  };
+
+  if (decl.bucket !== undefined) {
+    const bucket = decl.bucket;
+    const day = `substr(${field}, 1, 10)`;
+    const days = sql.all<{ d: string }>(`SELECT DISTINCT ${day} AS d FROM entry WHERE ${where} AND ${field} IS NOT NULL ORDER BY d`, ...params);
+    const current = bucketOf(new Date(ctx.asOfMs ?? ctx.nowMs).toISOString(), bucket)!;
+    const keys = [...new Set(days.map((r) => bucketOf(String(r.d), bucket)).filter((k): k is string => k !== null))].sort();
+    if (keys.length === 0) return ok({ groups: [], current, more: 0 });
+    /* TO THE BUCKET THE CLOCK IS IN AT LEAST, so a month since the last row reads as the gap it is. */
+    const last = keys.at(-1)! > current ? keys.at(-1)! : current;
+    const run = bucketRun(keys[0]!, last, bucket, GROUP_CAP);
+    const groups: Group[] = [];
+    for (const key of run.keys) {
+      const got = part(`${day} >= ? AND ${day} < ?`, [bucketStart(key, bucket), bucketStart(nextBucket(key, bucket), bucket)]);
+      if (!got.ok) return got;
+      groups.push({ key, ...got.value, state: got.value.rows === 0 ? 'empty' : key >= current ? 'partial' : 'full' });
+    }
+    return ok({ groups, current, more: run.more });
+  }
+
+  /* THE LARGEST FIRST, the key breaking a tie, and past fifty the rest are counted rather than drawn
+     (`45 §5.8`). Every part is read before the cut, because which fifty are largest is the question. */
+  const values = sql.all<{ v: string | number }>(`SELECT DISTINCT ${field} AS v FROM entry WHERE ${where} AND ${field} IS NOT NULL`, ...params);
+  const groups: Group[] = [];
+  for (const { v } of values) {
+    const got = part(`${field} = ?`, [v]);
+    if (!got.ok) return got;
+    groups.push({ key: String(v), ...got.value, state: 'full' });
+  }
+  groups.sort(largestFirst);
+  return ok({ groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) });
 }
 
 /** Does the figure clear its target? A target is a bound, and `met` is a fact about one number. */

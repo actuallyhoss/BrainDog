@@ -723,40 +723,20 @@ test('and one dimension, because two is a report generator', () => {
   assert.equal(refusedWith(metric({ group_by: 7 })), 'DECLARATION_INVALID');
 });
 
-test('AND A GROUPING THIS BUILD CANNOT DRAW SAYS SO, RATHER THAN DRAWING THE UNGROUPED FIGURE', () => {
-  /**
-   * `metrics.ts`'s guard against an unread shape walks `keysOf(decl.value)`, and `group_by` is not
-   * in `value`: `42 §4.9` and `metricBody` both put it at the top level of a metric body. So the
-   * guard fired where nobody writes the key and the documented spelling went through. Driven over
-   * three rows summing GBP 700:
-   *
-   *     plain sum, no group_by                       {"value":700,"rows":3,"refusals":0}
-   *     group_by: 'party' (the documented spelling)  {"value":700,"rows":3,"refusals":0}
-   *     group_by inside value (the checked place)    REFUSED NOT_IN_THIS_BUILD
-   *
-   * The harm is the one the guard's own sentence names: *"its figure would be the ungrouped one"*.
-   */
-  const said = validateDeclaration(metric({ group_by: 'channel' }));
-  assert.equal(said?.code, 'NOT_IN_THIS_BUILD');
-  assert.equal(said?.at, 'group_by');
-  assert.match(said?.fix ?? '', /the ungrouped one/);
-  assert.equal(refusedWith(metric({ group_by: ['channel'] })), 'NOT_IN_THIS_BUILD', 'a list of one is one grouping');
-
-  /* AND THE SHAPE CHECKS STILL ANSWER FIRST, each about a mistake that survives the day grouping
-     is built: a second dimension is `GROUP_BY_TWICE` above, and a bucket is checked below. */
-  assert.equal(refusedWith(metric()), null, 'a metric with no grouping was caught by the guard');
+test('A GROUPING INSTALLS NOW THAT THE RECORD READS ONE', () => {
+  /* `metrics.ts`'s `groupsOf` reads `group_by` and `bucket`, so a well-formed one is a declaration like
+     any other. Whether the field is a date that needs a bucket is the evaluator's to say, with the schema. */
+  assert.equal(refusedWith(metric({ group_by: 'channel' })), null);
+  assert.equal(refusedWith(metric()), null);
 });
 
 test('and a bucket buckets a grouping, or it buckets nothing', () => {
-  /* `08 §2.1`: *"only with a date `group_by`"*. Handed one alone, the evaluator returns the
-     ungrouped figure with a bucket key nobody reads — a chart that draws one bar and looks like
-     data. */
+  /* `08 §2.1`: *"only with a date `group_by`"*. Handed one alone, the evaluator would return the
+     ungrouped figure with a bucket key nobody reads. */
   assert.equal(refusedWith(metric({ bucket: 'week' })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(metric({ group_by: 'due', bucket: 'fortnight' })), 'DECLARATION_INVALID');
-  /* AND A WELL-FORMED ONE REACHES THE GROUPING GUARD ABOVE rather than installing: the bucket is
-     the shape of a chart whose bars this build does not compute. */
   for (const bucket of ['day', 'week', 'month', 'quarter', 'year'])
-    assert.equal(refusedWith(metric({ group_by: 'due', bucket })), 'NOT_IN_THIS_BUILD', `${bucket} is a bucket`);
+    assert.equal(refusedWith(metric({ group_by: 'due', bucket })), null, `${bucket} is a bucket`);
 });
 
 test('AN OPERAND CARRYING ITS OWN where: WAS ACCEPTED, AND THE FIGURE WAS THE OUTER ONE', () => {
