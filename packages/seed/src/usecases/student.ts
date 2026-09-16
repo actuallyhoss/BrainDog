@@ -81,11 +81,87 @@ export const STUDENT = {
         ],
       },
       {
+        register: 'study_sessions',
+        name: 'Study sessions',
+        one: 'study session',
+        icon: 'calendar',
+        holds: 'the time you set aside to study, what for and how long',
+        title: 'what',
+        mobile: ['what', 'on', 'minutes'],
+        fields: [
+          { id: 'what', label: 'Session', type: 'text', required: true, search: true },
+          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true },
+          { id: 'on', label: 'Day', type: 'day', required: true, index: true },
+          { id: 'minutes', label: 'Minutes', type: 'int' },
+          { id: 'done', label: 'Done', type: 'bool', index: true },
+          { id: 'note', label: 'Notes', type: 'document' },
+          { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
+      {
+        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13). No `nav`, because Home is already on the
+           rail: the display draws the page called `home-<use case>` there in place of the house figures. Its
+           headings read the voice, so a line changed at `/packs` changes the heading with it. */
+        page: 'home-student',
+        title: 'Today',
+        icon: 'home',
+        requires: ['register.assignments', 'register.study_sessions'],
+        blocks: [
+          {
+            kind: 'table',
+            heading: '{{config:voice_right_now}}',
+            span: 12,
+            source: 'register.assignments',
+            where: 'state is not handed_in or marked, due before +8d',
+            columns: [
+              { field: 'what', label: 'Assignment', width: 'minmax(18ch,1fr)' },
+              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
+              { field: 'state', label: 'Status', width: '12ch' },
+              { field: 'due', label: 'Due', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'due', dir: 'asc' }],
+            limit: 8,
+            empty: '{{config:voice_nothing_needs_you}}',
+          },
+          {
+            kind: 'table',
+            heading: 'Study sessions',
+            span: 12,
+            source: 'register.study_sessions',
+            where: 'on after yesterday, on before +8d',
+            columns: [
+              { field: 'what', label: 'Session', width: 'minmax(18ch,1fr)' },
+              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
+              { field: 'minutes', label: 'Minutes', width: '10ch', align: 'end' },
+              { field: 'on', label: 'Day', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'on', dir: 'asc' }],
+            limit: 8,
+            empty: 'No study time planned this week.',
+          },
+          {
+            kind: 'table',
+            heading: '{{config:voice_needs_you}}',
+            span: 12,
+            source: 'register.assignments',
+            where: 'state is not handed_in or marked, due after +7d',
+            columns: [
+              { field: 'what', label: 'Assignment', width: 'minmax(18ch,1fr)' },
+              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
+              { field: 'due', label: 'Due', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'due', dir: 'asc' }],
+            limit: 8,
+            empty: 'Nothing due after this week yet.',
+          },
+        ],
+      },
+      {
         page: 'studies',
         title: 'Studies',
         nav: { section: 'Studies', order: 10 },
         icon: 'board',
-        requires: ['register.assignments', 'register.courses'],
+        requires: ['register.assignments', 'register.courses', 'register.study_sessions'],
         blocks: [
           {
             kind: 'table',
@@ -112,6 +188,21 @@ export const STUDENT = {
           },
           {
             kind: 'table',
+            heading: 'Study sessions',
+            span: 12,
+            source: 'register.study_sessions',
+            columns: [
+              { field: 'what', label: 'Session', width: 'minmax(20ch,1fr)' },
+              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
+              { field: 'minutes', label: 'Minutes', width: '10ch', align: 'end' },
+              { field: 'on', label: 'Day', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'on', dir: 'desc' }],
+            limit: 20,
+            empty: 'No study sessions yet.',
+          },
+          {
+            kind: 'table',
             heading: 'Courses',
             span: 12,
             source: 'register.courses',
@@ -125,9 +216,12 @@ export const STUDENT = {
         ],
       },
     ],
+    /* A DAY WRITTEN `+3d` IS COUNTED FROM THE DAY THE RECORD IS MADE (`install.ts` `dated`), so the example is due
+       this week on whichever day somebody starts, and Home has something to show. */
     seeds: [
       { register: 'courses', fields: { name: 'Introduction to statistics', term: 'Autumn', teacher: 'Dr Adeyemi' } },
-      { register: 'assignments', fields: { what: 'Problem set 1', state: 'to_do' } },
+      { register: 'assignments', fields: { what: 'Problem set 1: probability', state: 'doing', due: '+3d' } },
+      { register: 'study_sessions', fields: { what: 'Go over the lecture on conditional probability', on: '+1d', minutes: 90, done: false } },
     ],
   },
 };

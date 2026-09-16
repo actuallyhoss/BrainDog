@@ -90,6 +90,69 @@ export const FOUNDER = {
         ],
       },
       {
+        metric: 'datapoints-30d',
+        name: 'Numbers reported, 30 days',
+        source: 'register.datapoints',
+        where: 'at after -30d',
+        value: { count: 'id' },
+        format: 'int',
+        target: { gte: 1 },
+        window: '30d',
+        compare: 'none',
+      },
+      {
+        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13): the money across every organisation and
+           the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
+           already. The first heading reads the voice, so a line changed at `/packs` changes it too. */
+        page: 'home-founder',
+        title: 'Overview',
+        icon: 'home',
+        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
+        blocks: [
+          {
+            kind: 'stat',
+            heading: '{{config:voice_right_now}}',
+            span: 12,
+            cells: [
+              { metric: 'cash-now', label: 'Cash now' },
+              { metric: 'in-30d', label: 'Coming in, 30 days' },
+              { metric: 'out-30d', label: 'Going out, 30 days' },
+              { metric: 'datapoints-30d', label: 'Numbers reported, 30 days' },
+            ],
+          },
+          {
+            kind: 'table',
+            heading: 'Latest numbers',
+            span: 12,
+            source: 'register.datapoints',
+            columns: [
+              { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
+              { field: 'value', label: 'Value', width: '12ch', align: 'end' },
+              { field: 'unit', label: 'Unit', width: '8ch' },
+              { field: 'source', label: 'Source', width: '11ch' },
+              { field: 'at', label: 'When', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 6,
+            empty: 'No project has reported a number yet.',
+          },
+          {
+            kind: 'table',
+            heading: 'Organisations',
+            span: 12,
+            source: 'register.organisations',
+            columns: [
+              { field: 'name', label: 'Organisation', width: 'minmax(18ch,1fr)' },
+              { field: 'kind', label: 'Kind', width: '12ch' },
+              { field: 'country', label: 'Registered in', width: '16ch' },
+              { field: 'currency', label: 'Currency', width: '9ch' },
+            ],
+            limit: 6,
+            empty: 'No organisations yet.',
+          },
+        ],
+      },
+      {
         /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name. */
         page: 'dashboard',
         title: 'Dashboard',
@@ -131,7 +194,23 @@ export const FOUNDER = {
     ],
     seeds: [
       { register: 'organisations', fields: { name: 'Northwind Labs Ltd', kind: 'company', country: 'United Kingdom', currency: 'GBP' } },
-      { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'reported' } },
+      { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'reported', at: '-1d' } },
     ],
   },
 };
+
+/**
+ * THE EXAMPLE ROWS THE FOUR MODULES GET IN A FOUNDER'S RECORD, in place of the sample studio's Kiln, Halden Type Co
+ * and brand-system invoice. One per list at most, no refs, and a day written `+5d` is counted from the day the
+ * record is made (`install.ts`). People gets none: onboarding writes the founder's own row there.
+ */
+export const FOUNDER_EXAMPLES = [
+  { register: 'things', fields: { name: 'Northwind app', lane: 'earning', since: '-400d' } },
+  { register: 'accounts', fields: { name: 'Northwind current account', kind: 'bank', balance: { amount: 2_480_000, currency: 'GBP' }, as_of: '0d', liquid: true } },
+  {
+    register: 'obligations',
+    fields: { what: 'Cloud hosting, Northwind app', direction: 'owed_by_me', amount: { amount: 32_000, currency: 'GBP' }, due: '+9d', state: 'open', category: 'software', repeats: 'monthly' },
+  },
+  { register: 'tracks', fields: { name: 'Launch the annual plan', state: 'open', opened: '-12d' } },
+  { register: 'tasks', fields: { what: 'Write the pricing page copy', state: 'open', by: '+4d' } },
+];

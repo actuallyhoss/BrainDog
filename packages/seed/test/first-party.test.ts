@@ -61,10 +61,18 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
   const requires = Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).requires]));
   assert.deepEqual(requires, {
     portfolio: [],
-    people: ['register.things'],
+    people: [],
     'money-core': ['register.people', 'register.things'],
     estate: ['register.things'],
     work: ['register.things'],
+  });
+  /* PEOPLE ONLY LINKS TO PROJECTS: "Met in" is left out of a record that holds none (`LINKS`). */
+  assert.deepEqual(Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).links])), {
+    portfolio: [],
+    people: ['register.things'],
+    'money-core': [],
+    estate: [],
+    work: [],
   });
 
   for (const id of FIRST_PARTY) {

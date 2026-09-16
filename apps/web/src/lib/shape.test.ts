@@ -196,7 +196,8 @@ test('EVERY PACK IS ONE THE APP SHIPS, and every row lands in a register of a pa
 test('WHAT TURNS ON: dependencies first, and People whenever turn 1 heard a name', () => {
   assert.deepEqual(toTurnOn(read('I freelance'), false), ['portfolio', 'people', 'money-core']);
   assert.deepEqual(toTurnOn(read(''), false), []);
-  assert.deepEqual(toTurnOn(read(''), true), ['portfolio', 'people']);
+  /* A name alone is a person, not a project: People goes in without Projects. */
+  assert.deepEqual(toTurnOn(read(''), true), ['people']);
   assert.deepEqual(toTurnOn(read('I use Claude'), true), ['portfolio', 'people', 'agents']);
   /* An invoice is to somebody, so Money brings People with it. */
   assert.deepEqual(toTurnOn(read('I send invoices'), false), ['portfolio', 'people', 'money-core']);

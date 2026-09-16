@@ -296,7 +296,8 @@ export function shape(sentence: string, today: string = new Date().toISOString()
  */
 export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
   portfolio: [],
-  people: ['portfolio'],
+  /* People only links to Projects, to say where somebody was met, and goes in without them (`first-party.ts` `LINKS`). */
+  people: [],
   'money-core': ['portfolio', 'people'],
   estate: ['portfolio'],
   work: ['portfolio'],

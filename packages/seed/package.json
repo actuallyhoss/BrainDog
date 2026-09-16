@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./usecases": "./src/usecases/index.ts"
+    "./usecases": "./src/usecases/index.ts",
+    "./usecases/install": "./src/usecases/install.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",

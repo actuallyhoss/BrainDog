@@ -41,6 +41,15 @@ const VERSION = '1.0.0';
 
 type Body = Record<string, unknown>;
 
+/**
+ * THE FIELDS THAT LINK A ROW TO ANOTHER MODULE'S LIST WITHOUT NEEDING IT. People says which projects a person
+ * was met in, and a record with no Projects still has people: a student's classmates, a founder's accountant.
+ * So "Met in" is a link and not a dependency. When the record will not hold the list it points at, the field is
+ * left out of the document with every column drawn over it, and the pack installs on its own. Installing the
+ * pack again once that list is there puts the field back.
+ */
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'] };
+
 /** The id a declaration in a document is filed under: its kind's key. */
 const idOf = (d: Body): string =>
   typeof d.rule === 'string'
@@ -53,13 +62,14 @@ const idOf = (d: Body): string =>
         ? `metric.${d.metric}`
         : '';
 
-/** Every register a body leans on: a field's `to:`, a page's `requires`, a metric's `source`. */
-function leansOn(d: Body): Set<string> {
+/** Every register a body leans on: a field's `to:`, a page's `requires`, a metric's `source`. The `links` fields are not counted. */
+function leansOn(d: Body, links: readonly string[] = []): Set<string> {
   const out = new Set<string>();
   const add = (v: unknown) => {
     if (typeof v === 'string') out.add(v.replace(/^register\./, ''));
   };
-  for (const f of Array.isArray(d.fields) ? (d.fields as Body[]) : []) if (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) add(f.to);
+  for (const f of Array.isArray(d.fields) ? (d.fields as Body[]) : [])
+    if ((f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && !links.includes(String(f.id))) add(f.to);
   for (const r of Array.isArray(d.requires) ? d.requires : []) add(r);
   if (typeof d.source === 'string' && d.source.startsWith('register.')) add(d.source);
   out.delete('session');
@@ -98,20 +108,64 @@ function split(): Split {
   return { owner, packs, cross, seeds: doc.seeds };
 }
 
-/** One first-party pack's manifest: its id, its version, and the registers it needs already there. */
-export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[] } {
+/**
+ * One first-party pack's manifest: its id, its version, the registers it needs already there, and the ones it
+ * only links to (`LINKS`), which it points at when the record holds them and leaves out when it does not.
+ */
+export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[]; links: readonly string[] } {
   const { packs } = split();
   const mine = packs.get(id)!.declarations;
   const own = new Set(mine.filter((d) => typeof d.register === 'string').map((d) => d.register as string));
   const needs = new Set<string>();
-  for (const d of mine) for (const r of leansOn(d)) if (!own.has(r)) needs.add(`register.${r}`);
-  return { id, version: VERSION, requires: [...needs].sort(), provides: mine.map(idOf).sort() };
+  const any = new Set<string>();
+  for (const d of mine) {
+    for (const r of leansOn(d, LINKS[id])) if (!own.has(r)) needs.add(`register.${r}`);
+    for (const r of leansOn(d)) if (!own.has(r)) any.add(`register.${r}`);
+  }
+  const links = [...any].filter((r) => !needs.has(r)).sort();
+  return { id, version: VERSION, requires: [...needs].sort(), provides: mine.map(idOf).sort(), links };
 }
 
+/** A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. */
+function without(d: Body, gone: ReadonlySet<string>): Body {
+  if (gone.size === 0) return d;
+  const out: Body = { ...d };
+  if (Array.isArray(d.fields)) out.fields = (d.fields as Body[]).filter((f) => !gone.has(String(f.id)));
+  if (Array.isArray(d.mobile)) out.mobile = (d.mobile as unknown[]).filter((f) => !gone.has(String(f)));
+  if (Array.isArray(d.blocks))
+    out.blocks = (d.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => !gone.has(String(c.field))) } : b));
+  return out;
+}
+
+export type DocumentOptions = {
+  /**
+   * The lists the record will hold once this pack is in. A link field (`LINKS`) to a list not among them is left
+   * out. Absent keeps every link, which is the document as it always was.
+   */
+  holds?: Iterable<string>;
+  /** The example rows to carry in place of the sample's, `[]` for none. Absent keeps the sample's. */
+  seeds?: readonly Body[];
+};
+
 /** One first-party pack as a document, with its example rows. `null` for an id that is not one of the five. */
-export function firstPartyDocument(id: string): Record<string, unknown> | null {
+export function firstPartyDocument(id: string, options: DocumentOptions = {}): Record<string, unknown> | null {
   if (!(FIRST_PARTY as readonly string[]).includes(id)) return null;
-  const pack = split().packs.get(id as FirstPartyId)!;
+  const whole = split().packs.get(id as FirstPartyId)!;
+  const links = LINKS[id as FirstPartyId] ?? [];
+  const gone = new Set<string>();
+  if (options.holds !== undefined) {
+    const held = new Set(options.holds);
+    for (const d of whole.declarations)
+      for (const f of Array.isArray(d.fields) ? (d.fields as Body[]) : [])
+        if (links.includes(String(f.id)) && f.to !== d.register && !held.has(String(f.to))) gone.add(String(f.id));
+  }
+  const pack = {
+    declarations: whole.declarations.map((d) => without(d, gone)),
+    seeds: (options.seeds ?? whole.seeds).map((s) => ({
+      ...s,
+      fields: Object.fromEntries(Object.entries(s.fields as Body).filter(([k]) => !gone.has(k))),
+    })),
+  };
   return {
     pack: id,
     version: VERSION,

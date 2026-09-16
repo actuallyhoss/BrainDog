@@ -13,6 +13,7 @@
 import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';
 
 import { BUSINESS } from './business.ts';
+import { dated, dayOf } from './dates.ts';
 import { FOUNDER } from './founder.ts';
 import { GUIDE } from './guide.ts';
 import { STUDENT } from './student.ts';
@@ -32,10 +33,14 @@ export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER)
 
 export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) => u.usecase === id);
 
-/** The pack document a use case installs, with its voice as settings, or `null`. */
-export const useCaseDocument = (id: string): Record<string, unknown> | null => {
+/**
+ * The pack document a use case installs, with its voice as settings, or `null`. A day in an example row written
+ * `+3d` is counted from `today` (`dates.ts`), so the example is due that week whenever the record is made.
+ */
+export const useCaseDocument = (id: string, today: string = dayOf(Date.now())): Record<string, unknown> | null => {
   const u = useCase(id);
-  return u ? useCasePack(u) : null;
+  const doc = u ? useCasePack(u) : null;
+  return doc ? dated(doc, today) : null;
 };
 
 export type Span = { at: number; text: string };
@@ -83,11 +88,11 @@ export function modulesFor(u: UseCase, named: readonly string[] = []): string[] 
   return MODULE_ORDER.filter((id) => wanted.has(id));
 }
 
-/** The pages and rail sections a use case's own pack declares, for the proposal to say. */
+/** The pages and rail sections a use case's own pack declares, for the proposal to say. Its Home is not one: it is Home. */
 export function pagesOf(u: UseCase): { page: string; title: string; section: string | null }[] {
   const declarations = (u.pack?.declarations ?? []) as Record<string, unknown>[];
   return declarations
-    .filter((d) => typeof d.page === 'string')
+    .filter((d) => typeof d.page === 'string' && d.page !== `home-${u.usecase}`)
     .map((d) => ({
       page: d.page as string,
       title: typeof d.title === 'string' ? d.title : (d.page as string),

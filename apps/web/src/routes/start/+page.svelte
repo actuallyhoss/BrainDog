@@ -30,8 +30,9 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
-  import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, useCaseDocument, type UseCase } from '@braindog/seed/usecases';
+  import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
+  import { carriedDocument, dayOf, moduleDocument } from '@braindog/seed/usecases/install';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
   import { choose as recordOrSample } from '$lib/record/packs.ts';
@@ -348,7 +349,7 @@
             out.absent.push(packName(id));
             continue;
           }
-          const refused = await addPack(client, id as FirstPartyId, doc, held);
+          const refused = await addPack(client, id as FirstPartyId, held, u);
           if (refused) {
             out.refused.push(refused);
             continue;
@@ -371,7 +372,7 @@
 
       /* THE USE CASE'S OWN PACK, after the modules it builds on: its lists, its pages and its voice. A
          pack already here that is off is turned on; one that is here and on is left as it is. */
-      const doc = u ? useCaseDocument(u.usecase) : null;
+      const doc = u ? carriedDocument(u, dayOf(Date.now())) : null;
       if (u && doc) {
         const id = String(doc.pack);
         const state = installed.find((p) => p.id === id);
@@ -460,10 +461,15 @@
    * lists came from the seed has no `pack` row for them), and the record installs a list whose fields
    * point at one it does not hold.
    */
-  async function addPack(client: ReturnType<typeof createClient>, id: FirstPartyId, doc: Record<string, unknown>, held: Set<string>): Promise<string | null> {
+  async function addPack(client: ReturnType<typeof createClient>, id: FirstPartyId, held: Set<string>, u: UseCase | null): Promise<string | null> {
     const manifest = firstPartyManifest(id);
     const lacking = manifest.requires.map((r) => r.slice('register.'.length)).filter((r) => !held.has(r));
     if (lacking.length > 0) return firstRun.shapeNeedsFirst(packName(id), firstRun.shapeAnd(lacking.map((r) => REGISTERS[r]?.name ?? r)));
+    /* THE MODULE AS THIS USE CASE INSTALLS IT: its example rows or none, never the sample studio's, and a link to a
+       list this record will not hold (People's "Met in" without Projects) left out (`install.ts`). */
+    const holds = [...held, ...manifest.provides.flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []))];
+    const doc = moduleDocument(u, id, { today: dayOf(Date.now()), holds });
+    if (!doc) return firstRun.shapeAbsent(packName(id));
 
     const planned = await client.planPack({ doc });
     if (!planned.ok) return firstRun.shapeNotAdded(packName(id), 'refusal' in planned ? planned.refusal.fix : firstRun.shapeChanged);
@@ -504,7 +510,7 @@
         const refused = await ready(need.slice('register.'.length), depth + 1);
         if (refused) return refused;
       }
-      return addPack(client, id as FirstPartyId, doc, held);
+      return addPack(client, id as FirstPartyId, held, null);
     };
     return ready(register, 0);
   }
