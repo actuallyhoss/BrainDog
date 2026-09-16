@@ -98,7 +98,14 @@ const SHAPES: Record<string, string> = {
   'a diff with no change': '```diff\n  same\n  again\n```',
   'a lead stat with trends and a tone':
     '```stat lead | Money\nCash now | GBP 12,400.00 | in 2 accounts · as of 2 Sep | 18 20 - 24 | good\nComing in | GBP 4,800.00 | 5 invoices, 2 late\nGoing out | GBP 1,300.00 | 7 bills | 3 | warn\nEvery month | EGP 900.00 |  | 1 2 3 4\n```',
-  'sparklines, with one point and none': '```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
+  'a split with a tone, a part with no number and a hole':
+    '```split | Where it goes\nPayroll | GBP 6,000.00 | 4 people\nRent | GBP 3,000.00 |  | warn\nRefunds | −£40.00\nTools | pending\nUncategorised | GBP 900.00 | 12 rows | hole\n```',
+  'a split that is all zero': '```split\nA | 0\nB | 0 | none yet\n```',
+  'a bridge that does not add up': '```bridge | This month\nStart | £9,000\nComing in | +£2,000 | 5 invoices\nGoing out | −£1,600\nEnd of month | £9,000\n```',
+  'a bridge that goes under zero': '```bridge\nStart | 100\nTax | -300 | due 5 Nov\nEnd | -200\n```',
+  'a bridge with a row that has no number': '```bridge\nStart | 100\nSomething | soon\nEnd | 100\n```',
+  'a bridge of one row': '```bridge\nStart | 100\n```',
+  'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {

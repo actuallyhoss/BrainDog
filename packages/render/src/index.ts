@@ -58,6 +58,8 @@ export {
   type DiffOp,
   type DiffPart,
 } from './diff.ts';
+export { SPLIT_PART, SPLIT_STEPS, SPLIT_ZERO, splitPlan, splitSentence, type SplitPart, type SplitPlan } from './split.ts';
+export { BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
 export { inline, text, magnitudeOfCell, safeHref, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

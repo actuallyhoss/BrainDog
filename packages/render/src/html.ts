@@ -19,6 +19,8 @@ import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions
 import { MISSING, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
+import { SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
+import { bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
@@ -232,6 +234,9 @@ function proportional(b: Block, o: RenderOptions): string {
       )
       .join('')}</div>`;
 
+  if (b.kind === 'split') return split(b, o);
+  if (b.kind === 'bridge') return bridge(b, o);
+
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
     const value = numeric(r);
@@ -346,7 +351,73 @@ function media(b: Block): string {
   return `<pre class="media"${lang} tabindex="0" role="group" aria-label="${label}"><code>${body}</code></pre>`;
 }
 
-/* ── two kinds with a drawer of their own ─────────────────────────────────── */
+/* ── kinds with a drawer of their own ─────────────────────────────────────── */
+
+/**
+ * `split`: one track cut into parts (`src/split.ts`), then a legend of dots, labels, figures and
+ * shares, then the hole. A part is drawn in a neutral step, or in its intent when the row has one.
+ * All zero, the track is a sentence and the legend still prints every figure.
+ */
+function split(b: Block, o: RenderOptions): string {
+  const rows = b.rows.filter((r) => !r.hole);
+  const holes = b.rows.filter((r) => r.hole);
+  /* Signed as drawn, so `−£40.00` is a credit with no part rather than a part of 40. */
+  const plan = splitPlan(rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o)))));
+  const partOf = (i: number) => plan.parts.find((p) => p.at === i);
+  const said = (r: Row) => plain(inline(r.cells[0] ?? '', o));
+  const track = plan.empty
+    ? `<p class="split-empty">${escape(SPLIT_ZERO)}</p>`
+    : `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
+        splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]!), share: p.share }))),
+      )}">${plan.parts
+        .map((p) => `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`)
+        .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
+  const legend = rows.length
+    ? `<ul class="split-legend">${rows
+        .map((r, i) => {
+          const part = partOf(i);
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(r.cells[1] || MISSING, o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+        })
+        .join('')}</ul>`
+    : '';
+  const hole = holes
+    .map((r) => {
+      const inner = `${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(r.cells[1] || MISSING, o), o)}</span>${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
+      return o.hole
+        ? `<button type="button" class="split-hole" data-hole${toneAttrs(r.tone)}>${inner}</button>`
+        : `<div class="split-hole" data-hole${toneAttrs(r.tone)}>${inner}</div>`;
+    })
+    .join('');
+  return `<div class="prop split">${track}${legend}${hole}</div>`;
+}
+
+/**
+ * `bridge`: bars floating from the first row to the last (`src/bridge.ts`), then the rows as text
+ * under them, and a warn line when the rows do not add up. The chart is the wide form; a narrow
+ * container hides it and draws each row's bar inline, so both are in the markup and neither is text.
+ */
+function bridge(b: Block, o: RenderOptions): string {
+  const values = b.rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o))));
+  const plan = bridgePlan(values);
+  const chart = plan.bars
+    ? `<svg class="bridge-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
+        bridgeSentence(b.rows.map((r) => ({ label: plain(inline(r.cells[0] ?? '', o)), value: plain(inline(r.cells[1] ?? '', o)) }))),
+      )}">${plan.zero === null ? '' : `<path class="bridge-zero" d="M0 ${plan.zero}H1000" vector-effect="non-scaling-stroke"></path>`}${plan.bars
+        .map((bar) => `<rect class="bridge-bar" data-move="${bar.move}" x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}"></rect>`)
+        .join('')}</svg>`
+    : '';
+  const rows = b.rows
+    .map((r, i) => {
+      const bar = plan.bars?.[i];
+      const inline_ = bar
+        ? `<svg class="bridge-inline" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><rect class="bridge-bar" data-move="${bar.move}" x="${bar.from}" y="0" width="${bar.span}" height="100"></rect></svg>`
+        : '';
+      return `<li class="bridge-row"${bar ? ` data-move="${bar.move}"` : ''}>${cell('bridge-label', r.cells[0], o)}${inline_}<span class="bridge-value num">${renderInline(inline(r.cells[1] || MISSING, o), o)}</span>${cell('bridge-note', r.cells[2], o)}</li>`;
+    })
+    .join('');
+  const warn = plan.warn ? `<p class="bridge-warn" data-intent="warn">${toneGlyph('warn')}${escape(plan.warn)}</p>` : '';
+  return `<div class="prop bridge" style="--cells:${b.rows.length}">${chart}<ol class="bridge-rows">${rows}</ol>${warn}</div>`;
+}
 
 /**
  * An amount, drawn with its currency's symbol where it has one (`£4,800.00`), and otherwise with its

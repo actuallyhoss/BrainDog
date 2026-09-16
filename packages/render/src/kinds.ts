@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty-one kinds, and the four intent words.
+ * The eight primitives, the twenty-three kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -144,7 +144,7 @@ export type KindSpec = {
 };
 
 /**
- * Twenty-one, counted. `diagram`, `series` and `forecast` are post-v1 and arrive as a
+ * Twenty-three, counted. `diagram`, `series` and `forecast` are post-v1 and arrive as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -166,6 +166,12 @@ const TABLE = {
   chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
   /* `label | 18 20 19 24 | figure`: a small line and the figure it ends at (`src/cards.ts`'s `trendOf`). */
   sparkline: { primitive: 'proportional', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
+  /* `label | value | note`: one track cut into parts, with a legend, and a `hole` row after it as
+     `bar` has (`src/split.ts`). */
+  split: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
+  /* `label | ±amount | note`: from the first row to the last, the rows between moving it
+     (`src/bridge.ts`). */
+  bridge: { primitive: 'proportional', cells: 3, tone: false, minSpan: 4, purpose: 'figure' },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */

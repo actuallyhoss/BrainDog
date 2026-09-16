@@ -64,6 +64,12 @@
   .prop-note,
   .spark-label,
   .spark-figure,
+  .split-label,
+  .split-value,
+  .split-note,
+  .bridge-label,
+  .bridge-value,
+  .bridge-note,
   .quote-text,
   .quote-by,
   .row-label,
@@ -1412,6 +1418,285 @@
 
   .spark-row > .glyph {
     grid-column: 4;
+  }
+
+  /* ── split: one track in parts, a legend, and the hole ────────────────────
+     COLOUR IS STATE, NEVER DECORATION. A part is a neutral step, darkest first, and a row with a
+     tone is drawn in its intent's fill; the dot in the legend is the same step, so a part is found
+     by its place and its figure rather than by a hue. The hairline where two parts meet is the
+     page's own ground showing through. */
+  .split {
+    gap: var(--sp-3);
+  }
+
+  .split-track,
+  .split-legend,
+  .split-empty {
+    margin-inline: var(--sp-2);
+  }
+
+  .split-track {
+    display: block;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+
+  .split-seg,
+  .split-dot {
+    fill: var(--ink);
+    background: var(--ink);
+  }
+
+  .split-seg[data-step='1'],
+  .split-dot[data-step='1'] {
+    fill: var(--ink2);
+    background: var(--ink2);
+  }
+
+  .split-seg[data-step='2'],
+  .split-dot[data-step='2'] {
+    fill: var(--dim);
+    background: var(--dim);
+  }
+
+  .split-seg[data-step='3'],
+  .split-dot[data-step='3'] {
+    fill: var(--faint);
+    background: var(--faint);
+  }
+
+  .split-seg[data-intent],
+  .split-item[data-intent] > .split-dot {
+    fill: var(--tone-fill);
+    background: var(--tone-fill);
+  }
+
+  /* A row with no part keeps its place in the legend, and its dot is an empty ring. */
+  .split-dot:not([data-step]) {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  .split-cut {
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 2px;
+  }
+
+  .split-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-5);
+    padding: 0;
+    list-style: none;
+  }
+
+  .split-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    font-size: var(--t-sm);
+  }
+
+  .split-dot {
+    flex: none;
+    align-self: center;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: var(--r-pill);
+  }
+
+  /* The dot already carries the intent, so the glyph keeps its name for a screen reader and draws nothing. */
+  .split-item > .glyph {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .split-label {
+    color: var(--ink2);
+  }
+
+  .split-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .split-share,
+  .split-note {
+    color: var(--dim);
+  }
+
+  .split-note:empty {
+    display: none;
+  }
+
+  .split-empty {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The hole is `bar`'s, and a button only where the host can act on it. */
+  .split-hole {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding: var(--sp-1) var(--sp-2);
+    min-block-size: var(--row-h);
+    border: 1px dashed var(--edge);
+    border-radius: var(--r-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: var(--t-sm);
+    text-align: start;
+  }
+
+  button.split-hole {
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  button.split-hole:hover {
+    background: var(--s2);
+  }
+
+  @media (pointer: coarse) {
+    button.split-hole {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ── bridge: from a start to an end ───────────────────────────────────────
+     Wide, the bars stand in columns over the rows. In a narrow block the columns are a list and
+     each row carries its own bar, the same level laid along it. Up is money in, in `earn`; down is
+     a quiet neutral; the start and the end are the ink the walk is measured in. */
+  .block[data-kind='bridge'] {
+    container-type: inline-size;
+  }
+
+  .bridge {
+    gap: var(--sp-2);
+  }
+
+  .bridge-chart,
+  .bridge-rows,
+  .bridge-warn {
+    margin-inline: var(--sp-2);
+  }
+
+  .bridge-chart {
+    display: block;
+    block-size: 120px;
+    overflow: visible;
+  }
+
+  .bridge-bar {
+    fill: var(--ink2);
+  }
+
+  .bridge-bar[data-move='up'] {
+    fill: var(--earn-fill);
+  }
+
+  .bridge-bar[data-move='down'] {
+    fill: color-mix(in srgb, var(--ink2) 40%, transparent);
+  }
+
+  .bridge-zero {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1px;
+  }
+
+  .bridge-rows {
+    display: grid;
+    grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
+    padding: 0;
+    list-style: none;
+  }
+
+  .bridge-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-1);
+    padding-inline: var(--sp-1);
+    font-size: var(--t-sm);
+    text-align: center;
+  }
+
+  .bridge-inline {
+    display: none;
+  }
+
+  .bridge-label {
+    color: var(--ink2);
+  }
+
+  .bridge-value {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .bridge-note {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .bridge-note:empty {
+    display: none;
+  }
+
+  /* An error in ink with the intent's mark, never a red headline (DESIGN-SYSTEM rule 8). */
+  .bridge-warn {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  @container (inline-size < 30rem) {
+    .bridge-chart {
+      display: none;
+    }
+
+    .bridge-rows {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .bridge-row {
+      display: grid;
+      grid-template-columns: minmax(8ch, 1fr) minmax(0, 1fr) auto;
+      column-gap: var(--sp-3);
+      align-items: center;
+      min-block-size: var(--row-h);
+      padding-inline: 0;
+      text-align: start;
+    }
+
+    .bridge-inline {
+      display: block;
+      grid-column: 2;
+      inline-size: 100%;
+      block-size: 8px;
+    }
+
+    .bridge-value {
+      grid-column: 3;
+      justify-self: end;
+    }
+
+    .bridge-note {
+      grid-column: 1 / -1;
+    }
   }
 
   /* ── inline: chips ──────────────────────────────────────────────────────── */

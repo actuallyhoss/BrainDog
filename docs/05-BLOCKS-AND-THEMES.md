@@ -67,20 +67,20 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds, twenty-one
+### Kinds, twenty-three
 
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
 | Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it. All three **page-only** |
 
-Twenty-one, counted: the sixteen of v1, the four kinds of the agent path
-(`loop/research-agent-path.md` steps 20 and 21) and `sparkline` (`loop/research-modules.md` S9), which sit on existing primitives so
+Twenty-three, counted: the sixteen of v1, the four kinds of the agent path
+(`loop/research-agent-path.md` steps 20 and 21), and `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — `series` and `forecast` are **post-v1**, and everything after them
@@ -102,6 +102,8 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 | `quote` | text \| attribution |
 | `stat` | label \| figure \| note \| *trend* \| *tone* — six rows at most. The trend is optional, a run of numbers (`18 20 19 24`) drawn as a small line under the figure; a word there with no number degrades under `DIALECT_ARITY`. A tone straight after three cells is still the tone. `stat lead` draws the first figure as the screen's one hero figure, at `--t-2xl` |
 | `sparkline` | label \| run of numbers \| figure \| *tone*. A 120 by 28 line in `--dim` with a dot on the last point, no axes; under two points, the figure only |
+| `split` | label \| value \| note \| *tone*, or `hole` as on `bar`. One 6px track cut into parts in neutral steps (a toned row in its intent), a legend of 7px dots, figures and shares, then the hole row. A row with no number, zero or less has no part. All zero, a sentence |
+| `bridge` | label \| ±amount \| note. The first row is the start and the last the end; the rows between move it. Floating bars, up in `earn`, down neutral; rows that do not add up get a warn line saying so; a row with no number draws no bars. In a narrow container, a list with inline bars |
 | `bar` | label \| number \| note \| *tone* |
 | `gauge` | label \| value \| target \| *tone* |
 | `chips` | glyph \| figure \| word \| *tone* — one row is one run |

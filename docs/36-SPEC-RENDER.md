@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, twenty-one, counted:
+`KINDS`, twenty-three, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -147,6 +147,8 @@ interface KindSpec {
 | `gauge` | proportional | label · value · target | 3 | yes | 1 | |
 | `chips` | inline | glyph · figure · word | 3 | yes | — | |
 | `sparkline` | proportional | label · run of numbers · figure | 3 | yes | — | |
+| `split` | proportional | label · value · note | 3 | yes | — | hole |
+| `bridge` | proportional | label · ±amount · note | 3 | no | — | |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |
 | `todo` | list | title · detail | 2 | no | — | marker |
@@ -375,6 +377,8 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `stat` | `<ul class="cells" style="--cells:N"><li class="cell[ tone-x]">glyph? <span class="label"> <span class="figure"> <span class="note"></li>…</ul>` — N = row count, declared, never inferred (05 §4) |
 | `bar` | `<ul class="bars"><li class="bar[ tone-x]" style="--magnitude:0.42"><span class="label"> <span class="figure"> <span class="note"></li>…</ul>`; a number that does not parse → no `style` — the row keeps its words and loses its bar (05 §7.4); the `hole` row is drawn **last**: `<li class="bar hole tone-warn"><button type="button" data-hole="label">glyph label figure note</button></li>` |
 | `sparkline` | `<div class="prop"><div class="spark-row"[ data-intent]><span class="spark-label"> <svg class="spark-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="label: 18, 20, 19, 24"><path class="trend-line"><path class="trend-end"></svg> <span class="spark-figure num"> glyph?</div>…</div>`; under two points there is no `svg`. A stat row's trend is the same `svg` with `class="cell-trend"`, after the figure. `stat lead` puts `data-form="lead"` on the `figure` |
+| `split` | `<div class="prop split">`, then `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Payroll 60%, Rent 30%">` with `<rect class="split-seg" data-step="0-3"[ data-intent] x width>` per part and `<path class="split-cut">` where parts meet, or `<p class="split-empty">` when all are zero; `<ul class="split-legend"><li class="split-item"[ data-intent]><span class="split-dot"[ data-step] aria-hidden="true"> <span class="split-label"> <span class="split-value num"> <span class="split-share num">`, when a part `<span class="split-note"> glyph?</li>…</ul>`; then the hole row, `<button type="button" class="split-hole" data-hole>` when the host passes `hole`, else a `div`. `src/split.ts` holds the plan |
+| `bridge` | `<div class="prop bridge" style="--cells:N">`, `<svg class="bridge-chart" … role="img" aria-label="Start £9,000, Coming in +£2,000, …">` with `<path class="bridge-zero">` when the walk crosses zero and `<rect class="bridge-bar" data-move="start\|up\|down\|end">`, then `<ol class="bridge-rows"><li class="bridge-row"[ data-move]><span class="bridge-label"> <svg class="bridge-inline" aria-hidden="true"><rect class="bridge-bar"></svg> <span class="bridge-value num"> <span class="bridge-note"></li>…</ol>`, then `<p class="bridge-warn" data-intent="warn">` glyph and sentence when the rows do not add up or a row has no number. `src/bridge.ts` holds the plan and `signedOf` |
 | `gauge` | `<div class="gauge[ tone-x]" style="--magnitude:0.70"><span class="label"> <span class="figure">value</span> <span class="target">target</span></div>` |
 | `chips` | `<ul class="chips"><li class="chip[ tone-x]"><span class="glyph" data-glyph="G" aria-hidden="true"></span><span class="figure"> <span class="word"></li>…</ul>`; a row with an empty figure or an empty word is not drawn (05 §7.4) |
 | `spec` · `params` | `<dl><div class="row"><dt>label</dt><dd class="value">value</dd><dd class="note">note</dd></div>…</dl>` |

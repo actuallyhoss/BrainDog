@@ -1,5 +1,6 @@
 <!--
-  `proportional` — rows whose number drives a drawn magnitude. Kinds: `bar`, `gauge`, `sparkline`.
+  `proportional` — rows whose number drives a drawn magnitude. Kinds: `bar`, `gauge`, `sparkline`,
+  and `split` and `bridge`, which have a drawer of their own (`Split.svelte`, `Bridge.svelte`).
 
   A `sparkline` row is a label, a small line in the quiet ink ending in a dot, and the figure it ends
   at. Fewer than two points draw no line, and the figure is still said.
@@ -17,6 +18,8 @@
   import { inline, magnitudeOfCell, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
+  import Split from '../Split.svelte';
+  import Bridge from '../Bridge.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -42,6 +45,11 @@
   });
 </script>
 
+{#if block.kind === 'split'}
+  <Split {block} {opts} />
+{:else if block.kind === 'bridge'}
+  <Bridge {block} {opts} />
+{:else}
 <div class="prop">
   {#if block.kind === 'sparkline'}
     {#each block.rows as row}
@@ -105,3 +113,4 @@
     {/each}
   {/if}
 </div>
+{/if}

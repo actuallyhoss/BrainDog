@@ -197,6 +197,8 @@ export const copy = {
     feed: 'What happened',
     diff: 'Before and after',
     sparkline: 'Small trend line',
+    split: 'Parts of a whole',
+    bridge: 'From start to end',
   } as Record<string, string>,
 
   kinds: {
@@ -219,6 +221,8 @@ export const copy = {
     feed: 'what agents, rules and you did since you last looked',
     diff: 'how a text changed, line by line',
     sparkline: 'a figure with the run of numbers that led to it',
+    split: 'one total cut into its parts',
+    bridge: 'how a start became an end, step by step',
   } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
     `${title} rearranged here. Nothing was saved yet.`,

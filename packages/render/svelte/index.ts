@@ -1,5 +1,5 @@
 /**
- * `braindog-render/svelte` — the same twenty kinds, drawn as components.
+ * `braindog-render/svelte` — the same twenty-three kinds, drawn as components.
  *
  * This subpath ships NO stylesheet. The markup contract is the whole of what a host draws against:
  * every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes,
@@ -29,6 +29,8 @@ export { default as Cards } from './Cards.svelte';
 export { default as Section } from './Section.svelte';
 export { default as Feed } from './Feed.svelte';
 export { default as Diff } from './Diff.svelte';
+export { default as Split } from './Split.svelte';
+export { default as Bridge } from './Bridge.svelte';
 
 /* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
    host chooses between this component and its own card list. Two subscriptions could disagree for a
