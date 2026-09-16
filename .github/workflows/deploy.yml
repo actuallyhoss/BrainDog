@@ -99,8 +99,14 @@ jobs:
       # `--env production` BECAUSE `apps/worker/wrangler.jsonc` SPLITS `alpha` AND `production`.
       # 52 §96 writes this step as a bare `wrangler deploy`, which predates that split; a bare
       # deploy against a file with named environments does not deploy either of them.
+      # AND THE BUILD ID HAS TO BE HANDED TO `wrangler`, NOT MERELY EXPORTED. The step above puts the
+      # tuple in the environment, and the Parity step below reads it from there, so both halves of the
+      # comparison looked correct while the deployed Worker answered `null`. `wrangler` takes `vars` from
+      # `wrangler.jsonc`, where `BRAINDOG_BUILD` is declared empty on purpose, and never from the shell.
+      # So every deploy this workflow has ever made shipped a Worker that did not know its own build, and
+      # nothing could report it while the check that would have was locked out behind a 401.
       - name: Deploy
-        run: pnpm --filter ./apps/worker exec wrangler deploy --env production
+        run: pnpm --filter ./apps/worker exec wrangler deploy --env production --var BRAINDOG_BUILD:"$BRAINDOG_BUILD"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
