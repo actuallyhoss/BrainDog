@@ -1646,6 +1646,67 @@
     overflow: auto;
   }
 
+  /* A TABLE WIDER THAN ITS SPACE SAYS SO AT THE EDGE IT IS CUT, as the settings strip does (4.7).
+     At 768 a list scrolled sideways inside itself with its last columns sliced mid-word and nothing
+     to say there was more. Hiding columns would drop a field the reader chose in Display, so the
+     columns stay and the clipped edge fades instead.
+
+     THE SCROLL DRIVES IT, NOT SCRIPT. The region's own inline scroll timeline moves the two fade
+     widths: the far edge fades until the end is reached, the near edge once it has left the start.
+     A region that does not overflow has no timeline, the animation does not apply, and both widths
+     stay 0, so a table that fits is drawn exactly as before. A browser without scroll timelines
+     draws no fade, which is the old behaviour and not a broken one. */
+  @property --edge-start {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --edge-end {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @keyframes table-edges {
+    0% {
+      --edge-start: 0px;
+      --edge-end: var(--sp-7);
+    }
+
+    4% {
+      --edge-start: var(--sp-7);
+    }
+
+    96% {
+      --edge-end: var(--sp-7);
+    }
+
+    100% {
+      --edge-start: var(--sp-7);
+      --edge-end: 0px;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .table-region {
+      --edge-dir: to right;
+      mask-image: linear-gradient(
+        var(--edge-dir),
+        transparent,
+        black var(--edge-start),
+        black calc(100% - var(--edge-end)),
+        transparent
+      );
+      animation: table-edges linear both;
+      animation-timeline: scroll(self inline);
+    }
+
+    .table-region:dir(rtl) {
+      --edge-dir: to left;
+    }
+  }
+
   /* AND NEVER UNDER 44 UNDER A THUMB. A tablet at 768 draws the table, not the cards, and measured
      40px rows: a row is the target that opens the row. Density still moves it above the floor. */
   @media (pointer: coarse) {
@@ -1654,7 +1715,12 @@
     }
   }
 
+  /* AS WIDE AS ITS COLUMNS, AND NEVER NARROWER THAN ITS SPACE. It was only as wide as the region, so
+     a grid whose tracks came to 1002px in a 736px region at 768 laid its rows out past the row box,
+     and each `.rowgroup`, whose `content-visibility` contains paint, clipped them at 736: scrolling
+     sideways showed the header and blank rows under it. The table now takes the header's width. */
   .table {
+    inline-size: max-content;
     min-inline-size: 100%;
     font-size: var(--t-ui);
   }
@@ -1724,8 +1790,14 @@
     content: ' ↓';
   }
 
+  /* THE ROWS NEVER WIDEN THE TABLE. Sized to their content, a long title let the flexible column grow
+     to 1520px at every width, 1440 included. A zero width with a full minimum gives the group no say in
+     the table's width and then fills it; `contain: inline-size` should do the same and, measured in
+     Chromium beside `content-visibility`, did not. */
   .rowgroup {
     content-visibility: auto;
+    inline-size: 0;
+    min-inline-size: 100%;
   }
 
   .td {
