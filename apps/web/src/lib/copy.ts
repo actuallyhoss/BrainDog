@@ -1556,6 +1556,8 @@ export const copy = {
         : 'A link works once, for fifteen minutes.',
   unreachableTitle: 'The server did not answer.',
   unreachableWhy: 'Check your connection, then try again.',
+  /* After a press of Try again that came back the same, so the press visibly did something. */
+  unreachableStill: (at: string) => `Asked again at ${at}, and it still did not answer. Check your connection, then try again.`,
   askAgain: 'Try again',
   noHostTitle: 'There is nothing to sign in to here.',
   noHostWhy: 'This copy of BrainDog runs without a server, so there is no record behind it.',

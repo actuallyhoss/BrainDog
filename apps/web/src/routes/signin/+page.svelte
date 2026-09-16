@@ -179,10 +179,16 @@
       step = { at: 'out' };
     });
 
+  /* WHEN TRY AGAIN LAST CAME BACK, so a second failure does not draw the same screen as the first and read as a dead button. */
+  let retried = $state('');
+
   function again() {
+    retried = '';
     step = { at: 'idle' };
     asked = null;
-    void load();
+    void load().then(() => {
+      retried = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    });
   }
 
   async function mail() {
@@ -236,7 +242,7 @@
         <p class="status" role="status">{copy.checkingWays}</p>
       {:else if view.name === 'unreachable'}
         <div class="said">
-          <Empty kind="error" title={copy.unreachableTitle} body={copy.unreachableWhy}>
+          <Empty kind="error" title={copy.unreachableTitle} body={retried ? copy.unreachableStill(retried) : copy.unreachableWhy}>
             {#snippet actions()}<Button onclick={again}>{copy.askAgain}</Button>{/snippet}
           </Empty>
         </div>
