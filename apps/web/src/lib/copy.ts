@@ -862,8 +862,6 @@ export const copy = {
      person needs before pressing Off is what stops working and what does not. */
   characterKeysHint:
     'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the palette and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
-  on: 'On',
-  off: 'Off',
 
   /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
      says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most

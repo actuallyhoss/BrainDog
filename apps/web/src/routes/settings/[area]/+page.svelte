@@ -1163,21 +1163,17 @@
         the state said in something other than styling: `aria-pressed` carries it.
       -->
       <Section title={copy.contrast}>
-        <p class="hint">{copy.contrastHint}</p>
-        <div class="segmented" role="group" aria-label={copy.contrast}>
+        <!-- ONE THING ON OR OFF IS A SWITCH beside the sentence that says what it does. It was two
+             segments reading On and Off, which is a choice between two things. -->
+        <div class="switch-row">
+          <p class="hint">{copy.contrastHint}</p>
           <button
             type="button"
-            class="segment"
-            aria-pressed={moreContrast}
-            data-on={moreContrast ? '' : undefined}
-            onclick={() => pickContrast(true)}>{copy.on}</button
-          >
-          <button
-            type="button"
-            class="segment"
-            aria-pressed={!moreContrast}
-            data-on={!moreContrast ? '' : undefined}
-            onclick={() => pickContrast(false)}>{copy.off}</button
+            class="switch"
+            role="switch"
+            aria-checked={moreContrast}
+            aria-label={copy.contrast}
+            onclick={() => pickContrast(!moreContrast)}><span class="switch-track"></span></button
           >
         </div>
       </Section>
@@ -1226,10 +1222,16 @@
              buttons"* — the gate knowing, in those words, that a compound noun and two buttons were
              all a reader got. `19 §4` calls this the app's WCAG 2.1.4 conformance; a switch whose
              effect nobody states is a switch nobody turns on deliberately. -->
-        <p class="hint">{copy.characterKeysHint}</p>
-        <div class="segmented" role="group" aria-label={copy.characterKeys}>
-          <button type="button" class="segment" aria-pressed={chars} data-on={chars ? '' : undefined} onclick={() => (chars = true)}>{copy.on}</button>
-          <button type="button" class="segment" aria-pressed={!chars} data-on={!chars ? '' : undefined} onclick={() => (chars = false)}>{copy.off}</button>
+        <div class="switch-row">
+          <p class="hint">{copy.characterKeysHint}</p>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={chars}
+            aria-label={copy.characterKeys}
+            onclick={() => (chars = !chars)}><span class="switch-track"></span></button
+          >
         </div>
       </Section>
       <!--
@@ -1323,10 +1325,16 @@
       {/if}
 
       <Section title={copy.suggestPages}>
-        <p class="hint">{copy.suggestPagesHint}</p>
-        <div class="segmented" role="group" aria-label={copy.suggestPages}>
-          <button type="button" class="segment" aria-pressed={suggestPages} data-on={suggestPages ? '' : undefined} onclick={() => (suggestPages = true)}>{copy.on}</button>
-          <button type="button" class="segment" aria-pressed={!suggestPages} data-on={!suggestPages ? '' : undefined} onclick={() => (suggestPages = false)}>{copy.off}</button>
+        <div class="switch-row">
+          <p class="hint">{copy.suggestPagesHint}</p>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={suggestPages}
+            aria-label={copy.suggestPages}
+            onclick={() => (suggestPages = !suggestPages)}><span class="switch-track"></span></button
+          >
         </div>
         <!-- `19 §3` and `29 §4` both say this belongs to the record and not to the device, and there
              is no table in `30 §1` that could hold it — `50 §10` owns the deviation. The screen says
@@ -2999,6 +3007,24 @@
     margin: 0;
     color: var(--tone, var(--ink2));
     font-size: var(--t-sm);
+  }
+
+  /* THE SENTENCE AND ITS SWITCH ON ONE LINE, the switch at the end of the sentence's measure rather
+     than across a wide page from it, and lined up with the sentence's first line. */
+  .switch-row {
+    display: grid;
+    grid-template-columns: minmax(0, var(--measure)) auto;
+    align-items: start;
+    justify-content: start;
+    gap: var(--sp-6);
+  }
+
+  .switch-row .hint {
+    margin: 0;
+  }
+
+  .switch-row :global(.switch) {
+    margin-block-start: calc((1em * var(--lh-body) - var(--ctl-h)) / 2);
   }
 
   .hint {
