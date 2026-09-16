@@ -413,7 +413,7 @@ Every route declares its group; a CI gate walks the router and fails on a route 
 | `/a/<sha256>` | PUT | cookie, or a `write` bearer | upload: the client computes the hash, the server verifies it — a mismatch is `CHECKSUM_MISMATCH` |
 | `/s/<token>` | GET | the share token → a `share` principal | one projected page, read-only; an invalid token is 404 |
 | `/<ID>` | GET | cookie | a spoken id, resolved by the shell — there is no server 302 |
-| `/.well-known/braindog-key` | GET | none | `{ key_id, public_key }` — the host's signing key, for `braindog verify` |
+| `/.well-known/braindog-key` | GET | none | **Specified and not built.** `{ key_id, public_key }`, the host's signing key, for `braindog verify` (03 §4; 48 §13 D10). Neither host answers it, and `braindog-build` is the only path served under this prefix. It keeps this path when it lands |
 | `/.well-known/braindog-build` | GET | none | `{ app }`: the `BRAINDOG_BUILD` tuple this Worker version was deployed with, and `null` when the deploy named none. It needs no credential because it is a fact about the deployment rather than about any record; `deploy-parity` reads it (§8) |
 | `/.well-known/oauth-protected-resource` | GET | none | **deferred** — Phase A ships agent tokens only; when built BrainDog is its own authorization server |
 | `/ws` | GET (upgrade) | cookie | Cloud: the hibernatable WebSocket, the frame `{ version, registers }` on change; self-host phase 2: 404, the client polls `/api/version` |

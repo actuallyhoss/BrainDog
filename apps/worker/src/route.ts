@@ -74,8 +74,10 @@ export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathn
  * IT IS NOT A RECORD QUESTION, which is the whole reason it is not `/api/version`. That route is
  * `READ+` because it answers one record's own activity cursor, so reading the deployed build through
  * it meant carrying a bearer for a question with no record in it. The build id is a property of the
- * Worker version, so it is answered where nothing has to be opened to read it, beside the
- * `/.well-known/braindog-key` that `braindog verify` reads with no credential (`33 §4`).
+ * Worker version, so it is answered where nothing has to be opened to read it. `33 §4` puts the
+ * `/.well-known/braindog-key` that `braindog verify` reads beside it, under the same rule and with no
+ * credential, and THAT one is specified and not built: nothing answers it in any of the three apps, and
+ * the test below pins this prefix to `braindog-build` alone.
  *
  * `/.well-known/*` IS IN `run_worker_first`, which is what makes this path the Worker's at all. Off
  * that list the app shell answers here with `index.html` and a 200, which is worse than a 404

@@ -188,7 +188,13 @@ The private key lives in the record's own vault — `vault_key(purpose = 'signin
 DEK ([12-SECURITY](12-SECURITY.md) §6) — and is generated on first run, self-host and Cloud alike.
 Cloud shows the public half in the UI and serves it at a well-known URL — `GET /.well-known/braindog-key`
 → `{ key_id, public_key }`, on both hosts — so a customer can verify a backup they downloaded a year ago
-against a key they can independently fetch.
+against a key they can independently fetch. **That sentence is specified and not built, in both of its
+halves.** No host serves the path: the only thing answered under `/.well-known/` is `braindog-build`, a fact
+about the deployment rather than about a record, and the self-host's own route table does not carry the key
+route either ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §4.7). Nor does a record publish the key in the UI:
+`boot` does not carry it, so the export screen draws one for the built-in sample alone and tells a live
+record that the public half is not shown there yet ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §4). The
+path, the body and the reason stand as specified, and they keep them when they land.
 
 Verification is offline and dependency-free, and accepts either container. `--key` is optional: without
 it the signature is checked against the key the file carries and reported as **`unpinned`**, which is a
