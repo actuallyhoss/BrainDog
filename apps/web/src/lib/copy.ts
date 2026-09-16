@@ -1711,6 +1711,9 @@ export const copy = {
   /* Lane O: the page's source as a file. The name is on the button because the name is the point —
      one page, one file, called what the declaration's first line calls it. */
   pageSourceSave: (file: string) => `Download ${file}`,
+  /* Phase 1's last reads: what a question found by `/search` on a record says beside its title. */
+  searchOpenQuestion: 'Open question',
+  searchDecided: 'Decided',
 } as const;
 
 export type Copy = typeof copy;
