@@ -1,0 +1,4 @@
+/* The seeded violation: outline set to none, with no reason written beside it. */
+.control:focus {
+  outline: none;
+}

@@ -1,0 +1,4 @@
+/* The seeded violation: a literal colour on a colour property. */
+.button {
+  border-color: #ff0000;
+}

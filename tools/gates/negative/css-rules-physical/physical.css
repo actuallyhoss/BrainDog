@@ -1,0 +1,4 @@
+/* The seeded violation: a physical inline-axis property, which breaks under dir="rtl". */
+.panel {
+  margin-left: 8px;
+}

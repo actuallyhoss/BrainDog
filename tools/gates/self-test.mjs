@@ -50,7 +50,28 @@ const CASES = [
      colour names and ordinary English, so the rule is the PROPERTY plus the name, and a count of
      one is what proves the distinction rather than asserting it. */
   { gate: 'colour-grep-named', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  { gate: 'css-rules', expect: /findings/, findings: 1 },
+  /* `css-rules` CLAIMS ELEVEN OF `52 §5.2`'s TWELVE ROWS (row 12 is skipped — see the gate's own
+     header) plus the two rules the table does not number, and this is where the finding that started
+     this work landed: the gate seeded TWO cases for TWELVE-ish rules, so one working rule
+     (`unknown-property`, below) made every other one look alive, including the four that had never
+     fired once. `loop/finding-css-rules.md` is the record of it. One fixture per rule now, each one
+     crafted so it trips EXACTLY the rule under test and nothing else — a fixture that also fires
+     `unknown-property` on an incidental `var()` would assert a count that means something else. */
+  { gate: 'css-rules-colour', run: 'css-rules', expect: /never a colour/, findings: 1 },
+  { gate: 'css-rules-font-size', run: 'css-rules', expect: /escapes it the same way/, findings: 1 },
+  { gate: 'css-rules', expect: /resolves to nothing/, findings: 1 },
+  { gate: 'css-rules-outline', run: 'css-rules', expect: /focus-ok/, findings: 1 },
+  { gate: 'css-rules-physical', run: 'css-rules', expect: /breaks under dir="rtl"/, findings: 1 },
+  { gate: 'css-rules-zindex', run: 'css-rules', expect: /a fight the next literal wins/, findings: 1 },
+  /* ROW 7 HAS TWO HALVES — an `<Icon size=…>` outside the four names, and a literal `width`/`height`
+     on an `<svg>` — and one fixture carries both, so a count of two is what proves neither half is
+     riding on the other's finding. */
+  { gate: 'css-rules-icon-size', run: 'css-rules', expect: /not a number/, findings: 2 },
+  { gate: 'css-rules-identifier-size', run: 'css-rules', expect: /two roles colliding/, findings: 1 },
+  { gate: 'css-rules-icon-color', run: 'css-rules', expect: /currentColor only/, findings: 1 },
+  { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /a rename left the rule behind/, findings: 1 },
+  { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
+  { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
 

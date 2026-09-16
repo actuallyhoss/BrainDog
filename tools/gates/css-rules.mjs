@@ -12,6 +12,14 @@
  *   - THE PHYSICAL-PROPERTY RULE is a day's work now and a manual audit of hundreds of declarations
  *     later, which is why it is in the first commit rather than after sixteen block kinds exist.
  *
+ * `52 §5.2` NAMES TWELVE RULES AND THIS FILE HOLDS ELEVEN OF THEM (`loop/finding-css-rules.md`).
+ * ROW 12 — every semantic colour token has a `pairs.json` entry — IS SKIPPED, NOT FAKED: `pairs.json`
+ * is not a file that exists anywhere in this source tree. `39-SPEC-THEME.md` D14 says it is
+ * apps/web's to emit, and the only consumer named anywhere in this repo is a browser-based
+ * `contrast` gate that does not exist yet either. This tokeniser reads source off disk with no
+ * browser and no build; asserting membership in a JSON file that nothing here produces would be a
+ * check against data invented for the occasion, which is the one thing a gate must never be.
+ *
  * Usage:  node tools/gates/css-rules.mjs
  */
 
@@ -133,6 +141,23 @@ const PHYSICAL_OK = new Set(['width', 'height', 'min-width', 'min-height', 'max-
 
 const PHYSICAL_ALIGN = /^(text-align|float|clear)$/;
 
+/**
+ * The four names an `<Icon size=…>` may hold.
+ *
+ * `52 §5.2` row 7 spells these `xs sm md lg` in its table, and that is a typo in that document, not
+ * a fourth naming scheme this gate should invent a fifth for. `50-SPEC-WEB.md`'s token row is
+ * unambiguous — `--icon-s --icon-m --icon-l --icon-xl`, "the four names" — and it is what
+ * `Icon.svelte` actually declares (`size?: 's' | 'm' | 'l' | 'xl'`) on both copies of the component
+ * in this tree. Coding the table's spelling literally would red every `<Icon>` in the app on day
+ * one, which is not a hole this gate has found; it is a typo two rows of the same document disagree
+ * about. Routed rather than silently resolved: `docs/52-SPEC-TESTING-AND-CI.md:460` should read
+ * `s m l xl`.
+ */
+const ICON_SIZES = new Set(['s', 'm', 'l', 'xl']);
+
+/** The type-scale steps that are a display size, per `52 §5.2` row 8. */
+const DISPLAY_SIZE = /--t-(xl|2xl|3xl)\b/;
+
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     if (skipDir(e.name) || SKIP.has(e.name)) continue;
@@ -181,6 +206,71 @@ function* declarations(css, offset) {
   }
 }
 
+/**
+ * Every LEAF selector block in a stylesheet — `selector { declarations }` — found by matching
+ * braces rather than assumed to be flat. Three rules need to know which SELECTOR a declaration sits
+ * under, not only its value, and the flat `declarations()` regex above throws that away on purpose
+ * (it does not care about nesting). An at-rule (`@media`, `@container`, `@supports`, `@keyframes`)
+ * is not a leaf: its body holds further blocks, so this descends into it and yields what is nested
+ * rather than the at-rule's own prelude.
+ *
+ * `inMedia` IS TRUE ONLY UNDER `@media`, never `@container` or `@keyframes`, because rule 11 is
+ * about the one at-rule this codebase actually uses for a responsive override — the thing that goes
+ * quiet when an ordinary rule later in the file matches the same selector at equal specificity and
+ * wins on source order alone, media query or not.
+ */
+function* leaves(css, base = 0, inMedia = false) {
+  const re = /([^{}]*)\{/g;
+  for (let m; (m = re.exec(css)); ) {
+    const prelude = m[1].trim();
+    const bodyStart = re.lastIndex;
+    let depth = 1;
+    let j = bodyStart;
+    while (j < css.length && depth > 0) {
+      if (css[j] === '{') depth++;
+      else if (css[j] === '}') depth--;
+      j++;
+    }
+    const body = css.slice(bodyStart, j - 1);
+    if (prelude.startsWith('@')) yield* leaves(body, base + bodyStart, inMedia || /^@media\b/i.test(prelude));
+    else yield { selector: prelude, body, at: base + bodyStart, inMedia };
+    re.lastIndex = j;
+  }
+}
+
+/**
+ * Blank the inside of every `:global(...)` in a selector, matching parens, so a class named there is
+ * never asked to be one this component emits — escaping scoping is what `:global` is for.
+ */
+function blankGlobal(sel) {
+  let out = '';
+  for (let i = 0; i < sel.length; i++) {
+    if (sel.startsWith(':global(', i)) {
+      let depth = 1;
+      let j = i + 8;
+      while (j < sel.length && depth > 0) {
+        if (sel[j] === '(') depth++;
+        else if (sel[j] === ')') depth--;
+        j++;
+      }
+      out += ' '.repeat(j - i);
+      i = j - 1;
+    } else out += sel[i];
+  }
+  return out;
+}
+
+/** Every class a selector names, `:global(...)` excluded. */
+const classesOf = (sel) => [...blankGlobal(sel).matchAll(/\.([a-zA-Z_-][\w-]*)/g)].map((m) => m[1]);
+
+/**
+ * Does this component's own markup ever write this class — a static `class="…"`, a `class:name`
+ * directive, or any other spelling that puts the literal name in the file outside its `<style>`
+ * block? A membership test on the raw text on purpose: the cost of missing a genuinely dead class is
+ * nothing, and the cost of flagging one a template literal builds at runtime is a gate nobody trusts.
+ */
+const emits = (markup, cls) => new RegExp(`(^|[^\\w-])${cls}([^\\w-]|$)`).test(markup);
+
 const findings = [];
 const declared = new Set();
 const used = [];
@@ -194,6 +284,39 @@ for (const file of files) {
 
   // Inline `style="--x: …"` in a template declares a custom property too.
   for (const m of text.matchAll(/style=["'][^"']*?--([a-z-]+)\s*:/gi)) declared.add(`--${m[1]}`);
+
+  /* `52 §5.2` ROW 7, FIRST HALF. A literal `size="…"` on the markup, not the value of a template
+     expression — `size={x}` is computed at runtime and this gate reads source, not output, so it is
+     out of reach the same way a colour built from a variable is out of reach of rule 1. Missing a
+     dynamic one is the safe direction; inventing a violation for an expression it never evaluated
+     would not be. */
+  for (const m of text.matchAll(/<Icon\b[^>]*>/gs)) {
+    const size = m[0].match(/\bsize\s*=\s*"([^"]*)"/);
+    if (size && !ICON_SIZES.has(size[1]))
+      findings.push({ where: `${rel}:${lineOf(text, m.index)}`, rule: 'icon-size', text: `size="${size[1]}"` });
+  }
+
+  /* `52 §5.2` ROW 7, SECOND HALF. A literal `width`/`height` on an `<svg>` is how a glyph grows to a
+     fixed box instead of its container — the same escape rule 2 blocks for text, aimed at markup
+     instead of a `<style>` block, so it is read off the tag rather than a declaration. */
+  for (const m of text.matchAll(/<svg\b[^>]*>/gs)) {
+    /* `(?<![\w-])` rather than `\b`, because `\b` sits happily between the hyphen and the `w` of
+       `stroke-width` — every `<Icon>` glyph in this tree carries one, and `\b` alone read each as a
+       literal SIZE rather than the stroke rule actually asks for. */
+    const dim = m[0].match(/(?<![\w-])(width|height)\s*=\s*"(\d[\d.]*)(px)?"/);
+    if (dim) findings.push({ where: `${rel}:${lineOf(text, m.index)}`, rule: 'icon-size', text: `${dim[1]}="${dim[2]}${dim[3] ?? ''}"` });
+  }
+
+  /* `52 §5.2` ROW 9, over the one file the rule names. `Icon.svelte` exists in two copies
+     (`apps/web` and `apps/site`) and both are read: a `color` prop on either is a colour-writing
+     icon component, which is exactly what `13`'s "no icon accepts a colour" rests on and what the
+     component's own header comment (line 4) promises is impossible. */
+  if (rel.endsWith('Icon.svelte')) {
+    const props = text.match(/\{([^}]*)\}(?:\s*:[^=]+)?\s*=\s*\$props\(\)/s);
+    const keys = props ? props[1].split(',').map((k) => k.trim().split(/[=:]/)[0].trim()) : [];
+    if (keys.includes('color'))
+      findings.push({ where: `${rel}:${lineOf(text, props.index)}`, rule: 'icon-color', text: '$props() destructures color' });
+  }
 
   for (const { css, offset } of cssOf(file, text)) {
     for (const d of declarations(css, offset)) {
@@ -236,6 +359,28 @@ for (const file of files) {
       if (PHYSICAL_ALIGN.test(d.prop) && /\b(left|right)\b/.test(d.value))
         findings.push({ where, rule: 'physical-property', text: `${d.prop}: ${d.value}` });
 
+      /* `52 §5.2` ROW 2. A literal escapes the type scale the same way `left`/`right` escapes the
+         logical axis: it reads fine until the day something downstream — here, every OTHER element
+         sized from the same scale — assumes the ladder holds. `TabBar.svelte:99` was a `10px` this
+         rule would have caught the day it was written; it carried no `font` string for this gate to
+         match on at all, because the check did not exist. */
+      if (d.prop === 'font-size' && /^[0-9.]/.test(d.value))
+        findings.push({ where, rule: 'font-size-literal', text: `${d.prop}: ${d.value}` });
+
+      /* `52 §5.2` ROW 6. Zero and negative are not this rule's business — `z-index: -1` is a
+         deliberate "behind everything" and has no stacking-order ambiguity to protect against.
+         A POSITIVE literal is the one that silently wins or loses a fight with the next developer's
+         own positive literal, which is exactly what a named `--z-*` scale exists to make explicit. */
+      if (d.prop === 'z-index' && /^[1-9]/.test(d.value))
+        findings.push({ where, rule: 'z-index-literal', text: `${d.prop}: ${d.value}` });
+
+      /* `52 §5.2` ROW 8. The identifier role (13 §3.2) is deliberately small and quiet — an id, a
+         hash, a token — and a DISPLAY size in the SAME RULE is the two roles colliding: a monospace
+         face at `--t-xl` reads as a heading that happens to be unreadable, not as an identifier.
+         `blockOf` is `flexed`'s own bounded-slice trick, reused rather than duplicated. */
+      if (d.prop === 'font-family' && /--font-id\b/.test(d.value) && DISPLAY_SIZE.test(blockOf(text, d.at)))
+        findings.push({ where, rule: 'identifier-display-size', text: `${d.prop}: ${d.value}` });
+
       /* `text-overflow` DOES NOTHING ON A FLEX OR GRID CONTAINER, and says nothing about it.
          It applies to a block container's own inline content, so on `display: flex` the browser
          silently ignores it and the parent clips instead — a hard cut with no ellipsis, which is a
@@ -252,6 +397,44 @@ for (const file of files) {
       if (d.prop === 'color' && /--faint/.test(d.value))
         findings.push({ where, rule: 'faint-on-text', text: `${d.prop}: ${d.value}` });
     }
+
+    if (generated) continue;
+
+    const allLeaves = [...leaves(css, offset)];
+
+    /* `52 §5.2` ROW 10, `.svelte` ONLY. A plain `.css` file such as `blocks.css` has no markup of
+       its own to check its selectors against — it is a shared sheet several templates draw on — so
+       "its own markup" only means something for a component that carries both halves in one file. */
+    if (!file.endsWith('.css')) {
+      const markup = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gs, '');
+      for (const leaf of allLeaves)
+        for (const cls of classesOf(leaf.selector))
+          if (!emits(markup, cls))
+            findings.push({ where: `${rel}:${lineOf(text, leaf.at)}`, rule: 'unemitted-class', text: `.${cls}` });
+    }
+
+    /* `52 §5.2` ROW 11. Specificity is tied — same selector, same declaration — so the cascade falls
+       back to SOURCE ORDER, and a bare rule always wins that regardless of which one sits inside an
+       `@media` block. The override was written to read as conditional; it never was. Reported at the
+       LATER copy, because that is the line silently winning. */
+    const reported = new Set();
+    for (const early of allLeaves.filter((l) => l.inMedia)) {
+      const earlyProps = new Set([...declarations(early.body, 0)].map((d) => d.prop));
+      for (const later of allLeaves.filter((l) => !l.inMedia && l.at > early.at)) {
+        if (later.selector.trim().replace(/\s+/g, ' ') !== early.selector.trim().replace(/\s+/g, ' ')) continue;
+        for (const d of declarations(later.body, 0)) {
+          const key = `${later.at}|${d.prop}`;
+          if (earlyProps.has(d.prop) && !reported.has(key)) {
+            reported.add(key);
+            findings.push({
+              where: `${rel}:${lineOf(text, later.at)}`,
+              rule: 'media-overridden',
+              text: `${later.selector} { ${d.prop} }`,
+            });
+          }
+        }
+      }
+    }
   }
 }
 
@@ -260,21 +443,28 @@ for (const u of used)
     findings.push({ where: u.where, rule: 'unknown-property', text: `var(${u.name})` });
 
 /**
+ * The rule a declaration at `at` sits inside, by the enclosing braces — not a parse, a bounded
+ * slice, and exact enough for what its two callers each decide about a single sibling declaration.
+ * Shared rather than duplicated: `flexed` asks it for `display`, the identifier/display-size check
+ * (rule 8) asks it for `font-size`.
+ */
+function blockOf(text, at) {
+  const open = text.lastIndexOf('{', at);
+  if (open < 0) return '';
+  const close = text.indexOf('}', at);
+  return text.slice(open, close < 0 ? text.length : close);
+}
+
+/**
  * Does the rule this declaration sits in also make the element a flex or grid CONTAINER?
  *
- * BY THE ENCLOSING BRACES, which is the same bounded-slice technique `justified` uses and is exact
- * enough for the one thing it decides: a `display` on the same selector as the `text-overflow`.
  * `display: inline-flex` counts and `display: block` does not, and a rule with no `display` at all
  * is a block by default, which is where `text-overflow` works.
  */
 function flexed(text, at) {
-  const open = text.lastIndexOf('{', at);
-  if (open < 0) return false;
-  const close = text.indexOf('}', at);
-  const block = text.slice(open, close < 0 ? text.length : close);
   /* Read as words rather than matched as a pattern: `display` and its value, with whatever
      whitespace is between them collapsed, so the check is about what the rule SAYS. */
-  const flat = block.replace(/\s+/g, ' ');
+  const flat = blockOf(text, at).replace(/\s+/g, ' ');
   return flat.includes('display: flex') || flat.includes('display: grid') || flat.includes('display: inline-flex');
 }
 
@@ -297,6 +487,13 @@ const RULES = {
   'outline-none': 'the focus ring is not removable without a `focus-ok:` reason beside it',
   'faint-on-text': 'faint clears the large-text floor only; not below 24px',
   'ellipsis-on-flex': 'text-overflow does nothing on a flex or grid container — put it on the child that holds the text',
+  'font-size-literal': 'the type scale has a step for this — a literal escapes it the same way a hardcoded colour does',
+  'z-index-literal': 'a positive stacking order is a `--z-*` token or it is a fight the next literal wins',
+  'icon-size': 'an icon grows to a name from the scale, not a number — s, m, l or xl',
+  'identifier-display-size': 'the identifier role is small and quiet by design; a display size on it is the two roles colliding',
+  'icon-color': 'an icon component takes no colour prop — currentColor only, or it is a colour-writing component',
+  'unemitted-class': "this component's own markup never writes this class — a rename left the rule behind",
+  'media-overridden': 'a later bare rule matches this selector and property at equal specificity and wins on source order, media query or not',
 };
 
 if (findings.length === 0) {

@@ -1,0 +1,4 @@
+/* The seeded violation: a font-size literal, escaping the type scale. */
+.label {
+  font-size: 13px;
+}

@@ -1,0 +1,12 @@
+/* The seeded violation: the identifier role (mono face) sharing a rule with a display size.
+   --font-id and --t-xl are declared here so the fixture is about THIS rule and not also two
+   unresolved tokens. */
+:root {
+  --font-id: monospace;
+  --t-xl: 2rem;
+}
+
+.record-id {
+  font-family: var(--font-id);
+  font-size: var(--t-xl);
+}

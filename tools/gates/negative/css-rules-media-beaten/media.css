@@ -1,0 +1,18 @@
+/* The seeded violation: a bare rule later in the file matches an earlier @media override's
+   selector and property, and wins on source order regardless of the media query.
+   --warn and --info are declared here so the fixture is about THIS rule and not also two
+   unresolved tokens. */
+:root {
+  --warn: #900;
+  --info: #009;
+}
+
+@media (width < 640px) {
+  .banner {
+    color: var(--warn);
+  }
+}
+
+.banner {
+  color: var(--info);
+}

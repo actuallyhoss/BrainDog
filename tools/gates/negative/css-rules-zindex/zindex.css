@@ -1,0 +1,4 @@
+/* The seeded violation: a positive z-index that is not a --z-* token. */
+.modal {
+  z-index: 20;
+}

@@ -1,0 +1,9 @@
+/* The seeded violation: --faint clears the large-text floor only, and this is ordinary text.
+   --faint is declared here so the fixture is about THIS rule and not also an unresolved token. */
+:root {
+  --faint: #999;
+}
+
+.hint {
+  color: var(--faint);
+}
