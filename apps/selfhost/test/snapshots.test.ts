@@ -113,3 +113,21 @@ test('DELETING THE RECORD REMOVES ITS FILE AND ITS COPIES, and every request aft
     rmSync(s.dir, { recursive: true, force: true });
   }
 });
+
+test('COPIES TAKEN IN THE SAME SECOND SORT BY THEIR NUMBER, so pruning drops the oldest and not -now-10', async () => {
+  const { fileSnapshots } = await import('../src/snapshots.ts');
+  const { mkdirSync, writeFileSync, readdirSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-snap-order-'));
+  try {
+    mkdirSync(join(dir, 'snapshots'));
+    const stamp = '2026-09-16T12-00-00Z-now';
+    const ids = [stamp, ...Array.from({ length: 10 }, (_, i) => `${stamp}-${i + 2}`)];
+    for (const id of ids) writeFileSync(join(dir, 'snapshots', `${id}.brain`), '');
+    const snaps = fileSnapshots({} as never, join(dir, 'record.sqlite'), () => 0);
+    assert.deepEqual((await snaps.list()).map((s) => s.id), [...ids].reverse());
+    await snaps.prune(3);
+    assert.deepEqual(readdirSync(join(dir, 'snapshots')).sort(), [`${stamp}-10.brain`, `${stamp}-11.brain`, `${stamp}-9.brain`]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

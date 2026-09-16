@@ -33,6 +33,10 @@ export type FileSnapshots = Snapshots & {
   path(id: string): string | null;
 };
 
+/* COPIES TAKEN IN ONE SECOND ARE NUMBERED, `-now`, `-now-2` … `-now-10`, AND THEY SORT AS NUMBERS. By name,
+   `-now-10` came before `-now-2` and after `-now-9`, so pruning could delete a newer copy and keep an older one. */
+const NATURAL = new Intl.Collator('en', { numeric: true });
+
 const atOf = (id: string): string => {
   const m = ID.exec(id);
   return m ? `${m[1]}T${m[2]}:${m[3]}:${m[4]}.000Z` : '';
@@ -52,7 +56,7 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
     return readdirSync(dir)
       .filter((name) => name.endsWith(EXT) && ID.test(name.slice(0, -EXT.length)))
       .map((name) => ({ id: name.slice(0, -EXT.length), at: atOf(name.slice(0, -EXT.length)), bytes: statSync(join(dir, name)).size }))
-      .sort((a, b) => (a.at === b.at ? (a.id < b.id ? 1 : -1) : a.at < b.at ? 1 : -1));
+      .sort((a, b) => (a.at === b.at ? NATURAL.compare(b.id, a.id) : a.at < b.at ? 1 : -1));
   };
 
   const prune = async (keep: number): Promise<void> => {
