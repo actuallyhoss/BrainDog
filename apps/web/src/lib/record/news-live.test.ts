@@ -9,7 +9,7 @@ import { MISSING } from 'braindog-render';
 import { copy } from '../copy.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
-import { HOME_FIGURES, LOG_PAGE, markAll, readHome, readLog, tileOf } from './news-live.ts';
+import { HOME_FIGURES, LOG_PAGE, homeFigures, markAll, readHome, readLog, tileOf } from './news-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -78,6 +78,20 @@ test('Home asks for what is new and its three figures together, and leaves out a
   assert.deepEqual(out.news.items.map((i) => [i.by, i.text]), [['you', 'Added Rent']]);
   assert.equal(out.news.upTo, 5);
   assert.equal(sent.length, 4);
+});
+
+test('A RECORD WITHOUT MONEY IS NOT ASKED FOR MONEY FIGURES, and a declared Home asks for none', async () => {
+  assert.deepEqual(homeFigures([{ id: 'obligations' }, { id: 'people' }], false), HOME_FIGURES);
+  assert.deepEqual(homeFigures([{ id: 'courses' }, { id: 'assignments' }], false), []);
+  assert.deepEqual(homeFigures([{ id: 'obligations' }], true), []);
+
+  const { io, sent } = host((url) =>
+    url.pathname === '/api/whatsNew' ? json(200, { ok: true, value: { events: [], upTo: 1, sinceCapped: false } }) : json(404, { ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'No.' } }),
+  );
+  const out = await readHome(BASE, 'p_1', io, homeFigures([{ id: 'courses' }], false));
+  assert.equal(out.from, 'live');
+  if (out.from === 'live') assert.deepEqual(out.tiles, []);
+  assert.equal(sent.length, 1, 'only what is new was asked for');
 });
 
 test('Home with no record draws the sample, and a refusal is the record sentence', async () => {

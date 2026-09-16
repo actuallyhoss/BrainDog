@@ -7,9 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack } from '@braindog/seed/usecases';
+import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, labelsOf, lineOf, listNamed, relabel, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, labelsOf, lineOf, listNamed, relabel, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -72,4 +73,9 @@ test('A LABEL IS DRAWN OVER THE DECLARATION, AND A KEY LEFT OUT READS THE DECLAR
   assert.equal(people.name, 'People');
   assert.equal(listNamed({ people: 'Teammates' }, 'people', 'People'), 'Teammates');
   assert.equal(listNamed({ people: 'Teammates' }, 'tasks', 'Tasks'), 'Tasks');
+});
+
+test("A USE CASE'S HOME IS THE PAGE THE SEED DECLARES FOR IT, by its pack's id", () => {
+  for (const u of USE_CASES) assert.equal(homePageOf(`usecase-${u.usecase}`), homeOfPack(u.usecase));
+  assert.equal(homePageOf('usecase-student'), 'home-student');
 });

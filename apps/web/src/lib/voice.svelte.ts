@@ -8,15 +8,21 @@
  * house voice.
  */
 
-import { heardLabels, labelsOf, lineOf, speaking, voiceOf, type Voice, type VoiceKey } from './voice.ts';
+import { heardLabels, homePageOf, labelsOf, lineOf, speaking, voiceOf, type Voice, type VoiceKey } from './voice.ts';
 
 export { labels, listNamed } from './voice.ts';
 
-const state = $state<{ voice: Voice }>({ voice: {} });
+const state = $state<{ voice: Voice; pack: string | null }>({ voice: {}, pack: null });
 let heardFor: unknown = null;
 
 /** The line to draw for a voice key. Reactive where it is read in markup. */
 export const said = (key: VoiceKey): string => lineOf(state.voice, key);
+
+/**
+ * The page this record's use case declares as its Home, `home-<use case>`, or `null` when no use case speaks here
+ * and Home is the house one (`loop/research-spark.md` S13).
+ */
+export const homePage = (): string | null => (state.pack === null ? null : homePageOf(state.pack));
 
 /** Ask the record for its voice, once per `boot` answer. `null` for the sample or a refused boot. */
 export async function listen(boot: object | null, base: string): Promise<void> {
@@ -24,6 +30,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   heardFor = boot;
   if (boot === null) {
     state.voice = {};
+    state.pack = null;
     heardLabels({});
     return;
   }
@@ -34,6 +41,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   const id = packs.ok ? speaking(packs.value as { id: string; disabled_at: string | null }[]) : null;
   if (id === null) {
     state.voice = {};
+    state.pack = null;
     heardLabels({});
     return;
   }
@@ -41,6 +49,7 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   const values = settings.ok ? ((settings.value as { values?: Record<string, unknown> }).values ?? {}) : {};
   if (heardFor !== boot) return;
   state.voice = voiceOf(values);
+  state.pack = id;
   /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES (S8), read by the list reader and the rail. */
   heardLabels(labelsOf(values));
 }

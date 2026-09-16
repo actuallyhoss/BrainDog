@@ -15,10 +15,11 @@
   import { titleOf } from '$lib/title.ts';
   import { MISSING, relative, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { said } from '$lib/voice.svelte.ts';
+  import { homePage, said } from '$lib/voice.svelte.ts';
   import * as pref from '$lib/pref.ts';
   import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
+  import type { LiveBlock } from '$lib/record/page-live.ts';
   import { amountOf, currencyOf, drawn, symbolText } from '$lib/record/money.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -27,6 +28,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import DeclaredHome from '$lib/ui/DeclaredHome.svelte';
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../lib/ui/screen.svelte.ts';
@@ -65,6 +67,16 @@
   /* ON A LIVE RECORD THE MARK IS THE RECORD'S, and `whatsNew` answers only what is after it. */
   let feed = $state<News | null>(null);
   let tiles = $state<Metric[] | null>(null);
+
+  /**
+   * HOME AS THE RECORD'S USE CASE DECLARES IT (`loop/research-spark.md` S13). A use case names its Home as the page
+   * `home-<use case>`, and that page is drawn here in place of the house figures, which read Money and asked a
+   * student's record for three figures it refuses. `null` is the house Home: the sample, a record with no use case,
+   * or a use case that declares no Home. Nothing is drawn in its place until the record has said which.
+   */
+  const declares = $derived(data.live ? homePage() : null);
+  let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
+  let asking = $state(false);
   const news = $derived(data.live ? (feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped }) : null);
 
   const fresh = $derived(news ? news.items : data.whatsNew.filter((item) => !seen || item.at > seen));
@@ -73,11 +85,20 @@
   $effect(() => {
     if (!data.live) return;
     const me = data.me.person;
+    const slug = declares;
+    const lists = data.lists;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
-    void import('$lib/record/news-live.ts')
-      .then((m) => m.readHome(location.origin, me))
+    asking = slug !== null;
+    const page = slug === null ? Promise.resolve(null) : import('$lib/record/page-live.ts').then((m) => m.pageReader(location.origin).read(slug)).catch(() => null);
+    const home = import('$lib/record/news-live.ts').then((m) => m.readHome(location.origin, me, undefined, m.homeFigures(lists, slug !== null)));
+    void page
+      .then((got) => {
+        declared = got?.from === 'live' ? { blocks: got.page.blocks, now: got.now } : null;
+        asking = false;
+      })
+      .then(() => home)
       .then((out) => {
         if (out.from !== 'live') return;
         tiles = out.tiles;
@@ -174,7 +195,9 @@
       THE FIGURES LEAD. A person opens this to find out where the money is. All of them are one size:
       no figure is louder than another, and state lives in the qualifier line under each.
     -->
-    {#if cells.length > 0}
+    {#if declared}
+      <DeclaredHome blocks={declared.blocks} now={declared.now} />
+    {:else if cells.length > 0 && !asking}
       <Section title={said('right_now')}>
         <!-- Up to four across; three figures take thirds rather than leaving a fourth track empty. -->
         <div class="stats" style="--cols:{Math.min(4, Math.max(3, cells.length))}">
@@ -200,6 +223,8 @@
       </Section>
     {/if}
 
+    <!-- A DECLARED HOME SAYS WHAT IS DUE ITSELF, so this is only the questions waiting, and only when there are some. -->
+    {#if !asking && (!declared || data.questions.length > 0)}
     <Section title={said('needs_you')} count={needCount}>
       {#if data.questions.length === 0 && shown.length === 0 && lapsing.length === 0}
         {@const anything =
@@ -284,6 +309,7 @@
         {/if}
       {/if}
     </Section>
+    {/if}
   </div>
 
   <aside class="secondary">

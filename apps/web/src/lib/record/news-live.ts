@@ -24,6 +24,14 @@ import type { AuditEvent, NewsItem } from './schema.ts';
 /** The three figures Home leads with, in the order it draws them. */
 export const HOME_FIGURES = ['owed-to-you', 'due-30d', 'overdue'] as const;
 
+/**
+ * THE FIGURES HOME ASKS A RECORD FOR, AND NONE WHERE THEY CANNOT BE WORKED OUT. The three read Money's obligations,
+ * so a record without that list (a student's) was asked for three figures it refuses every time. A use case that
+ * declares its own Home asks for none: that page says what leads.
+ */
+export const homeFigures = (lists: readonly { id: string }[], declared: boolean): readonly string[] =>
+  !declared && lists.some((l) => l.id === 'obligations') ? HOME_FIGURES : [];
+
 /** A reading as the kernel's `metrics.ts` sends one, and only the keys read here. */
 type Reading = { value: number | null; unit: string | null; rows: number; met: boolean | null; refusals: unknown[] };
 
@@ -63,16 +71,16 @@ export type HomeRead = { from: 'live'; tiles: Metric[]; news: News } | { from: '
  * A FIGURE THE RECORD WILL NOT WORK OUT FOR THIS CALLER IS LEFT OUT. A figure over a register somebody may not read is
  * `METRIC_UNKNOWN` to them, and a tile saying so would name the figure the refusal exists to withhold.
  */
-export async function readHome(base: string, me: string | null, io?: Fetch): Promise<HomeRead> {
+export async function readHome(base: string, me: string | null, io?: Fetch, asked: readonly string[] = HOME_FIGURES): Promise<HomeRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const [news, ...figures] = await Promise.all([client.whatsNew(), ...HOME_FIGURES.map((id) => client.metric(id))]);
+  const [news, ...figures] = await Promise.all([client.whatsNew(), ...asked.map((id) => client.metric(id))]);
   if (!news.ok) {
     const refusal = refusalOf(news);
     return noRecord(refusal.code) ? { from: 'sample' } : { from: 'refused', fix: refusal.fix };
   }
   return {
     from: 'live',
-    tiles: figures.flatMap((out, i) => (out.ok ? [tileOf(HOME_FIGURES[i]!, out.value as Reading)] : [])),
+    tiles: figures.flatMap((out, i) => (out.ok ? [tileOf(asked[i]!, out.value as Reading)] : [])),
     news: { items: newsOf(news.value.events, me), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
   };
 }

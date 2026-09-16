@@ -44,6 +44,9 @@ export function voiceOf(values: Readonly<Record<string, unknown>>): Voice {
 /** The line to draw: the voice's, or the house voice's. */
 export const lineOf = (voice: Voice, key: VoiceKey): string => voice[key] ?? VOICE_LINES[key];
 
+/** The page a use case declares as its Home: `usecase-student` answers `home-student`. The seed's `homePageOf` agrees. */
+export const homePageOf = (pack: string): string => `home-${pack.replace(/^usecase-/u, '')}`;
+
 /** The use-case pack whose voice a record speaks in: the first one switched on, in the order the record lists them. */
 export const speaking = (packs: readonly { id: string; disabled_at: string | null }[]): string | null =>
   packs.find((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null)?.id ?? null;
