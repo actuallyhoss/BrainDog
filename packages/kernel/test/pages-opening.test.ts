@@ -232,3 +232,28 @@ test('A TABLE SAYS WHO CHANGED EACH ROW LAST, and a sign is read from an enum or
   assert.equal(signed.refusals[0]?.code, 'DECLARATION_INVALID');
   assert.equal(signed.refusals[0]?.at, 'columns');
 });
+
+test('A BAR OR A SPLIT MAY READ A FIGURE GROUPED BY A WORD, and nothing else reads one', async () => {
+  const k = await record();
+  value(
+    await k.install([
+      {
+        id: 'metric.by-bill',
+        kind: 'metric',
+        body: { metric: 'by-bill', name: 'By bill', source: 'register.bills', value: { sum: 'amount' }, group_by: 'what', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+      } as Declaration,
+      {
+        id: 'metric.by-month',
+        kind: 'metric',
+        body: { metric: 'by-month', name: 'By month', source: 'register.bills', value: { sum: 'amount' }, group_by: 'due', bucket: 'month', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+      } as Declaration,
+    ]),
+  );
+  const split = k.block({ kind: 'split', source: 'metric.by-bill', unset: 'Unnamed', empty: 'None.' });
+  assert.deepEqual(split.refusals, []);
+  assert.equal(split.readings?.[0]?.reading?.groups?.[0]?.key, 'Rent');
+  assert.equal(split.readings?.[0]?.reading?.value, 600_000);
+  assert.equal(k.block({ kind: 'table', source: 'metric.by-bill', empty: 'None.' }).refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(k.block({ kind: 'split', source: 'metric.by-month', empty: 'None.' }).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(k.block({ kind: 'bar', source: 'metric.nonesuch', empty: 'None.' }).refusals[0]?.code, 'METRIC_UNKNOWN');
+});

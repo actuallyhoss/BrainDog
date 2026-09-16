@@ -112,6 +112,7 @@ test('a block that HAS something to draw refuses nothing', () => {
       many('readings') ||
       ((held.walk as { steps?: unknown[] } | undefined)?.steps?.length ?? 0) > 0 ||
       ((held.bars as { keys?: unknown[] } | undefined)?.keys?.length ?? 0) > 0 ||
+      ((held.parts as { groups?: unknown[] } | undefined)?.groups?.length ?? 0) > 0 ||
       String(held.body ?? '').trim() !== '';
     assert.ok(drawn, `${block.heading} refused nothing and holds nothing to draw`);
   }
@@ -175,9 +176,10 @@ test('a block that throws becomes a block that refuses, whatever threw', () => {
 });
 
 test('a `source:` that resolves to nothing says which prefixes do', () => {
-  // `06-PAGES` §1.1 documents `metric.<id>` and `block.<n>`; neither is implemented, and both used
-  // to draw the author's own "nothing matched" sentence.
-  for (const source of ['metric.overdue', 'block.0', 'nonsense']) {
+  // `06-PAGES` §1.1 documents `metric.<id>` and `block.<n>`. `block.<n>` is not implemented, and used to draw the
+  // author's own "nothing matched" sentence; `metric.<id>` is read by a bar or a split only, and says so on a table.
+  assert.match(declared({ source: 'metric.overdue' }).refusals.join(' '), /a bar or a split does/u);
+  for (const source of ['block.0', 'nonsense']) {
     const block = declared({ source });
     assert.ok(block.refusals.some((r) => r.startsWith('source:')), `${source} was accepted`);
     assert.match(block.refusals.join(' '), /register\.<id>/);

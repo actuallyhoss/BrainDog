@@ -1497,6 +1497,8 @@ export function packDiff(pack: PackInfo): PackDiff {
 }
 
 export type BlockResult = PageBlock & {
+  /** A `bar` or `split` over a grouped figure: the whole, and each part by its key, largest first. */
+  parts?: Parts;
   rows: TableRow[];
   columns: Column[];
   /** The rows this block DRAWS: the matched set cut to `limit:`, aligned one-to-one with `rows`. */
@@ -1834,6 +1836,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net',
   /* A forecast's remembered figure and its knobs, its late mark and its warning reach. */
   'recorded', 'knobs', 'late', 'under',
+  /* A bar's or a split's row for what no part holds. */
+  'unset',
   /* A card grid's out-of-date rule. */
   'stale',
 ]);
@@ -1885,6 +1889,7 @@ export function readBlock(b: PageBlock): BlockResult {
        cash walk. Nothing about the block is new, and the day a real `forecast` kind ships, the
        declaration that changes is the kind, not the query. */
     if (b.source === 'forecast.runway') return runwayBlock(b);
+    if (b.source?.startsWith('metric.')) return partsBlock(b, b.source.slice('metric.'.length));
     if (b.kind === 'series') return seriesBlock(b);
     /* A FEED READS THE LEDGER and a diff reads one row's history, so neither is a register's rows. */
     if (b.source === 'activity') return activityBlock(b);
@@ -2134,6 +2139,27 @@ function inheritFor(register: string, all: Entry[], b: PageBlock): { entries: En
 }
 
 /** The shell every block that is not a register's rows returns, so each says only what it adds. */
+/** A grouped figure's whole and its parts, as a `bar` or a `split` draws them. */
+export type Parts = { metric: string; value: number | null; groups: { key: string; value: number | null }[]; more: number };
+
+/**
+ * A `bar` or a `split` over a grouped figure, as the record's `metricBlock` reads it: the figure's parts.
+ *
+ * A PART MAY BE A MONTHLY SHARE OF A YEARLY COST, which a sum over the rows cannot be. A date cut into buckets is a
+ * series and not parts of a whole, so only a figure grouped by a word is drawn this way.
+ */
+function partsBlock(b: PageBlock, id: string): BlockResult {
+  if (b.kind !== 'bar' && b.kind !== 'split') return computed(b, [`source: a ${b.kind} does not read a figure yet; a bar or a split does`]);
+  const decl = METRICS[id];
+  if (!decl) return computed(b, [`source: there is no metric called ${id}`]);
+  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
+    return computed(b, [`source: a ${b.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series`]);
+  const r = read(decl);
+  if (r.refusals.length) return computed(b, r.refusals);
+  const groups = (r.groups ?? []).map((g) => ({ key: g.key, value: g.value }));
+  return { ...computed(b, []), parts: { metric: id, value: r.value, groups, more: r.more ?? 0 }, shown: groups.length, total: groups.length };
+}
+
 const computed = (b: PageBlock, refusals: string[]): BlockResult => ({
   ...b,
   register: undefined,

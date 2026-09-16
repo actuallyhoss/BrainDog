@@ -306,6 +306,8 @@ export type PageBlock = {
   stale?: { field: string; after: string };
   /** A `forecast`'s: which knobs a reader may move. */
   knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
+  /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
+  unset?: string;
   /** A `forecast`'s: the figure its late knob marks, how late money has come in on average. */
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */

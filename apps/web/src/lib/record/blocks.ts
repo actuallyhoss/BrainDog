@@ -39,8 +39,9 @@ import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
 import { copy } from '../copy.ts';
-import { declaredValue } from './where.ts';
-import { windowMs } from './metrics.ts';
+import { declaredValue, registerHref } from './where.ts';
+import { format, windowMs } from './metrics.ts';
+import { METRICS } from './declared.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 
 /**
@@ -75,8 +76,15 @@ function barRows(block: BlockResult): string[] {
   /* `matched`, NOT `entries`. The block draws the first `limit:` rows and it ADDS UP all of them:
      summing the page instead of the answer is a figure that is wrong by however many rows did not
      fit, silently, and it is the same number of pixels either way. */
+  const unset: unknown[] = [];
   for (const e of block.matched) {
-    const key = display(block.register ?? '', by, e.fields[by]) ?? 'Nobody in particular';
+    const said = display(block.register ?? '', by, e.fields[by]);
+    /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
+    if (said === null && block.unset) {
+      unset.push(e.fields[of]);
+      continue;
+    }
+    const key = said ?? 'Nobody in particular';
     const list = grouped.get(key) ?? [];
     list.push(e.fields[of]);
     grouped.set(key, list);
@@ -86,7 +94,7 @@ function barRows(block: BlockResult): string[] {
      bar whose length is a number about nothing — and it sits in a chart beside bars that are real,
      which is the version of this nobody catches. */
   const totals = [...grouped].map(([key, values]) => [key, total(values)] as const);
-  return cutTotals(
+  const drawn = cutTotals(
     totals.sort((a, b) => b[1].amount - a[1].amount),
     block.limit,
   ).map(([key, sum]) => {
@@ -99,6 +107,40 @@ function barRows(block: BlockResult): string[] {
       : (display(block.register ?? '', of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
     return `${escapeCell(key)} | ${escapeCell(shown)} | `;
   });
+  if (!block.unset || unset.length === 0 || !block.register) return drawn;
+  const sum = total(unset);
+  const shown = sum.mixed.length ? mixedFix(sum.mixed) : (display(block.register, of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
+  return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown)];
+}
+
+/** Two clauses of a sentence predicate as one. */
+const joined = (where: string | undefined, clause: string): string => (where?.trim() ? `${where}, ${clause}` : clause);
+
+/** The row for what no part holds: its label, linked to those rows, and its figure. */
+const unsetRow = (label: string, href: string, shown: string): string => `[${escapeCell(label)}](${href}) | ${escapeCell(shown)} | `;
+
+/**
+ * A bar or a split over a grouped figure: each part, labelled as its field labels it, largest first, and what no part
+ * holds as the block's `unset:` row.
+ *
+ * THE WHOLE LESS THE PARTS IS WHAT NO PART HOLDS, because a grouping leaves out rows with no value in its field. It is
+ * only said when every part was read: past the cap the rest is not known to be unset.
+ */
+function partsRows(block: BlockResult): string[] {
+  const parts = block.parts!;
+  const decl = METRICS[parts.metric];
+  const register = decl?.source?.startsWith('register.') ? decl.source.slice('register.'.length) : '';
+  const field = decl?.group_by ?? '';
+  const currency = decl?.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const said = (v: number) => (currency ? money(Math.round(v), currency) : format(decl?.format, v));
+  const limit = block.limit ?? parts.groups.length;
+  const rows = parts.groups
+    .filter((g): g is { key: string; value: number } => g.value !== null)
+    .slice(0, limit)
+    .map((g) => `${escapeCell(display(register, field, g.key) ?? g.key)} | ${escapeCell(said(g.value))} | `);
+  const rest = parts.value === null || parts.more > 0 ? 0 : parts.value - parts.groups.reduce((n, g) => n + (g.value ?? 0), 0);
+  if (!block.unset || !register || Math.round(rest) < 1) return rows;
+  return [...rows, unsetRow(block.unset, registerHref(register, joined(decl?.where, `${field} is empty`)), said(rest))];
 }
 
 /**
@@ -489,7 +531,9 @@ export function toSegments(block: BlockResult) {
         (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
       )
     : block.kind === 'bar' || block.kind === 'split'
-      ? barRows(block)
+      ? block.parts
+        ? partsRows(block)
+        : barRows(block)
       : block.kind === 'bridge' && block.source === 'forecast.runway'
         ? bridgeRows(block)
       : block.kind === 'series'

@@ -53,7 +53,16 @@ export const liveWords = {
 type Said = { code: string; fix: string };
 
 /** A reading as the kernel's `metrics.ts` sends one, and only the keys read here. */
-type Reading = { value: number | null; unit: string | null; rows: number; met: boolean | null; refusals: Said[] };
+type Reading = {
+  value: number | null;
+  unit: string | null;
+  rows: number;
+  met: boolean | null;
+  refusals: Said[];
+  /** A grouped figure's parts, and how many past the cap were not drawn. */
+  groups?: { key: string; value: number | null }[];
+  more?: number;
+};
 
 type Row = RecordRow & { updated_at?: string };
 
@@ -458,6 +467,14 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
 
   if (refusals.length || drawn === false) return shell;
   if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
+  /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read. */
+  if (typeof source === 'string' && source.startsWith('metric.')) {
+    const reading = readings?.[0]?.reading;
+    if (!reading) return cannot;
+    const groups = (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null }));
+    const parts = { metric: source.slice('metric.'.length), value: reading.value, groups, more: typeof reading.more === 'number' ? reading.more : 0 };
+    return { ...shell, parts, shown: groups.length, total: groups.length };
+  }
   if (kind === 'series') {
     const bars = barsOf(barred);
     return bars ? { ...shell, bars, shown: bars.keys.length, total: bars.keys.length } : cannot;

@@ -100,6 +100,8 @@ export type PageBlock = {
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
   under?: number;
+  /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
+  unset?: string;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
   stale?: { field: string; after: string };
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
@@ -130,8 +132,8 @@ const READS = new Set([
   'series', 'back', 'ahead', 'net', 'bars',
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
-  /* Who changed each row of a table last, when a column asks. */
-  'changes',
+  /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
+  'changes', 'unset',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
   'late', 'under', 'lateness',
   /* A card grid's out-of-date rule. */
@@ -526,6 +528,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
+  /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
+     cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
+  if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
   if (COMPUTED.has(block.source))
     return {
       ...base,
@@ -792,6 +797,27 @@ function listInherited(
 }
 
 /** Where each row applies, as the title of its project, or `null` for a row that applies everywhere. */
+/**
+ * A `bar` or a `split` over a figure grouped by a word: the reading, whose parts the host draws.
+ *
+ * A DATE CUT INTO BUCKETS IS A SERIES, not parts of a whole, so only a figure grouped by a word is read here.
+ */
+function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockResult, also: (...r: Refusal[]) => Refusal[]): BlockResult {
+  if (block.kind !== 'bar' && block.kind !== 'split')
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: `A ${block.kind} does not read a figure yet; a bar or a split does.`, at: 'source' }) };
+  const decl = deps.metric(id);
+  if (!decl) return { ...base, refusals: also({ code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id}.`, at: 'source' }) };
+  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
+    return {
+      ...base,
+      refusals: also({ code: 'DECLARATION_INVALID', fix: `A ${block.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series.`, at: 'source' }),
+    };
+  const read = deps.read(decl);
+  if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
+  if (read.value.refusals.length) return { ...base, refusals: also(...read.value.refusals) };
+  return { ...base, readings: [{ metric: id, reading: read.value }], matched: read.value.groups?.length ?? 0 };
+}
+
 /** The column that says who changed a row last. A register's own field of that name wins. */
 const CHANGED = 'changed';
 
@@ -1129,8 +1155,11 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     }
     /* A SERIES READS EVERY FIGURE IT LINES UP. */
     for (const line of block.series ?? []) for (const id of [line?.metric, line?.then]) if (typeof id === 'string') add(metric?.(id)?.source);
-    /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST. */
+    /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST, and so does the figure its late knob marks. */
     if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
+    if (typeof block.late === 'string') add(metric?.(block.late)?.source);
+    /* A BAR OR A SPLIT OVER A FIGURE READS THE FIGURE'S LIST. */
+    if (typeof block.source === 'string' && block.source.startsWith('metric.')) add(metric?.(block.source.slice('metric.'.length))?.source);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
     if (block.when?.metric) {

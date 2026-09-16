@@ -342,6 +342,22 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT GOES OUT EVERY MONTH, BY WHAT IT IS FOR: each repeating cost at its monthly share, grouped by category. What
+     no category holds is the whole less the parts, which the page draws as its own row. */
+  'every-month-by-category': {
+    metric: 'every-month-by-category',
+    name: 'Every month, by category',
+    source: 'register.obligations',
+    where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    lookups: { per_month: LOOKUPS.per_month! },
+    group_by: 'category',
+    format: 'money.GBP',
+    target: { lte: 1_500_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* MONEY THAT MOVED, MONTH BY MONTH, by the day it was paid rather than the day it was due; and money still
      to move, by the day it is due. The series on the Money page draws the first for the months behind
      and the second for the months ahead. */
@@ -645,13 +661,25 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         where: 'state is paid, direction is owed by me, settled after -12m',
         columns: [{ field: 'category' }, { field: 'amount' }],
         limit: 8,
+        /* WHAT NO CATEGORY HOLDS IS SAID, LAST, and opens those rows so they can be given one. */
+        unset: 'Uncategorised',
         empty: 'Nothing paid out in the last 12 months.',
+      },
+      {
+        /* WHAT GOES OUT EVERY MONTH, by what it is for, at each cost's monthly share, and what no category holds. */
+        kind: 'split',
+        heading: 'Every month',
+        span: 5,
+        source: 'metric.every-month-by-category',
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing repeats every month.',
       },
       {
         /* WHERE THE MONEY IS, one card an account, with the day each balance was true. */
         kind: 'cards',
         heading: 'Accounts',
-        span: 5,
+        span: 12,
         source: 'register.accounts',
         columns: [
           { field: 'name', as: 'title' },

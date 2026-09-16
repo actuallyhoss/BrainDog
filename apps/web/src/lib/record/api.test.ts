@@ -1046,3 +1046,29 @@ test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LA
   const bad = readBlock({ ...table, columns: [{ field: 'amount', sign: { field: 'what', minus: 'x' } }] } as never);
   assert.match(bad.refusals.join(), /sign: names an enum field/u);
 });
+
+test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no category holds is its own row, linked', async () => {
+  const { draw } = await import('./blocks.ts');
+  const split = page('money')!.blocks.find((b) => b.kind === 'split' && b.source === 'metric.every-month-by-category')!;
+  assert.deepEqual(split.refusals, []);
+  const whole = metric('every-month-out');
+  const parts = split.parts!;
+  assert.ok(parts.groups.length > 0, 'nothing repeats');
+  assert.equal(
+    parts.groups.reduce((n, g) => n + (g.value ?? 0), 0),
+    parts.value,
+    'every repeating cost in the sample has a category, so the parts are the whole',
+  );
+  assert.ok(whole.value.length > 0);
+
+  /* A COST WITH NO CATEGORY IS THE WHOLE LESS THE PARTS, drawn last and opening those rows. */
+  const holed = { ...split, parts: { ...parts, value: (parts.value ?? 0) + 12_345 } };
+  const drawn = draw(holed);
+  const [segment] = drawn.segments;
+  assert.equal(segment?.type, 'block');
+  if (segment?.type !== 'block') return;
+  const last = segment.rows.at(-1)!;
+  assert.match(String(last.cells[0]), /Uncategorised/u);
+  assert.match(String(last.cells[1]), /123\.45/u);
+  assert.equal(segment.rows.length, Math.min(parts.groups.length, split.limit ?? 99) + 1);
+});

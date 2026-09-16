@@ -130,6 +130,11 @@ test('EVERY BLOCK NAMES A SOURCE THE RECORD HAS', async () => {
     for (const block of blocksOf(page as Record<string, unknown>)) {
       if (!block.source) continue;
       if (COMPUTED.has(block.source)) continue;
+      /* A BAR OR A SPLIT MAY READ A FIGURE, which the record has when it is declared. */
+      if (block.source.startsWith('metric.')) {
+        if (!k.declarations().some((d) => d.id === block.source)) missing.push(`${slug}: ${block.source}`);
+        continue;
+      }
       const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
       if (!register || !k.register(register)) missing.push(`${slug}: ${block.source}`);
     }
