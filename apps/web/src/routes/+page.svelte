@@ -25,7 +25,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { initialOf } from '$lib/ui/face.ts';
+  import Face from '$lib/ui/Face.svelte';
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../lib/ui/screen.svelte.ts';
@@ -302,7 +302,7 @@
               <a class="event" href={item.href}>
                 <!-- The agent that wrote it, named. Never a sparkle badge: disclosed AI use costs
                      trust without buying anything (19 §6). -->
-                <span class="avatar" aria-hidden="true">{initialOf(who)}</span>
+                <span class="avatar"><Face name={who} you={who === 'you'} size="s" /></span>
                 <span class="event-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
                 <span class="event-when num">{since(item.at, data.now)}</span>
                 <span class="event-text">{item.text}</span>
@@ -589,19 +589,12 @@
     color: var(--ink);
   }
 
+  /* The same face History and a row's history draw, so an actor is one shape wherever it turns up. */
   .avatar {
     grid-column: 1;
     grid-row: 1;
     display: grid;
     place-items: center;
-    inline-size: 20px;
-    block-size: 20px;
-    border-radius: var(--r-pill);
-    background: var(--s2);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 500;
-    line-height: 1;
   }
 
   .event-by {

@@ -13,15 +13,23 @@
 -->
 <script lang="ts">
   import { initialOf } from './face.ts';
+  import Icon from './Icon.svelte';
 
   let {
     name,
     you = false,
     size = 'm',
   }: { name: string; you?: boolean | undefined; size?: 's' | 'm' | undefined } = $props();
+
+  const glyph = $derived(/(^|\s)rule$/i.test(name.trim()) ? 'filter' : /^the record/i.test(name.trim()) ? 'rows' : /^the assistant$/i.test(name.trim()) ? 'ask' : null);
 </script>
 
-<span class="face" data-you={you ? '' : undefined} data-size={size} aria-hidden="true">{initialOf(name)}</span>
+<!-- A RULE, THE RECORD AND THE ASSISTANT ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL (DESIGN-SYSTEM
+     APPENDIX C6). `R` stood for a reply rule, a renewal rule and the record itself on one screen. A
+     rule takes the glyph the inbox gives rules, the record its own list glyph, the assistant the ask. -->
+<span class="face" data-you={you ? '' : undefined} data-size={size} data-kind={glyph ? '' : undefined} aria-hidden="true"
+  >{#if glyph}<Icon name={glyph} size="s" />{:else}{initialOf(name)}{/if}</span
+>
 
 <style>
   .face {
@@ -34,7 +42,7 @@
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-xs);
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .face[data-size='s'] {
