@@ -83,7 +83,7 @@
   let links: LinkReader | null = null;
   /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS, NOT ITS NUMBER (DESIGN-SYSTEM rule 7, appendix C7). The
      relation arrives with `#` first; the column and every row's cell at that index move to the end. */
-  const idLast = <R extends { columns: { field: string }[]; rows: { cells: string[] }[] }>(rel: R): R => {
+  const idLast = <R extends { columns: { field: string }[]; rows: { cells: (string | null)[] }[] }>(rel: R): R => {
     const at = rel.columns.findIndex((c) => c.field === 'seq');
     if (at < 0) return rel;
     const moved = <T,>(list: readonly T[]): T[] => [...list.slice(0, at), ...list.slice(at + 1), list[at]!];
