@@ -20,21 +20,30 @@
  * browser and no build; asserting membership in a JSON file that nothing here produces would be a
  * check against data invented for the occasion, which is the one thing a gate must never be.
  *
- * Usage:  node tools/gates/css-rules.mjs
+ * Usage:  node tools/gates/css-rules.mjs [root]
  */
 
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { budget, skipDir } from './lib.mjs';
 
 const R = budget('cssRules');
 
-const ROOT = process.cwd();
+/* A ROOT ON THE COMMAND LINE IS OBEYED RATHER THAN IGNORED, and silently ignoring one was worse
+   than refusing it. A run handed a directory walked the whole repository instead and then printed a
+   count in the shape of an answer about that directory, so a `0 findings` was read as "the rule
+   works" by an operator whose run had never once looked at the tree they named. `process.cwd()`
+   stays the default because it is how both callers aim this gate: `run.mjs` and `self-test.mjs`
+   each spawn it with the root as the child's working directory and no argument. */
+const ROOT = resolve(process.argv[2] ?? process.cwd());
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
 /* `negative` is this gate's own seeded violation, which it must not find while checking the app.
    Everything else a gate never walks into is `skipDir`. */
+/* THIS IS TESTED AGAINST ENTRIES FOUND WHILE WALKING, NEVER AGAINST THE ROOT ITSELF, so a root
+   pointed INSIDE `negative/` is still scanned. Skipping the root you were explicitly handed would
+   make the argv form above useless for the one tree anybody aims it at by hand. */
 const SKIP = new Set(['negative']);
 
 /** Properties whose value paints. A literal in any of them is a component writing a colour. */
