@@ -144,11 +144,11 @@ export function homeOf(values: Iterable<unknown>): string | null {
 
 /**
  * An amount in parts: the whole and the fraction apart, so a figure can set its pence quieter, and
- * `code` present only when the currency is not the home one or has no symbol.
+ * `iso` present only when the currency is not the home one or has no symbol.
  *
  * `text` is the output of `money()`. Anything that is not a figure `money()` wrote comes back `null`.
  */
-export type Drawn = { lead: string; whole: string; fraction: string; code: string | null };
+export type Drawn = { lead: string; whole: string; fraction: string; iso: string | null };
 
 const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
 
@@ -162,7 +162,7 @@ export function drawn(text: string, home: string | null): Drawn | null {
     lead: `${minus}${symbol ?? ''}`,
     whole,
     fraction: fraction ?? '',
-    code: foreign ? currency : null,
+    iso: foreign ? currency : null,
   };
 }
 
@@ -172,6 +172,6 @@ export function symbolText(text: string, home: string | null): string {
     const d = drawn(hit, home);
     if (!d) return hit;
     if (d.lead.replace('−', '') === '') return hit;
-    return `${d.lead}${d.whole}${d.fraction}${d.code ? ` ${d.code}` : ''}`;
+    return `${d.lead}${d.whole}${d.fraction}${d.iso ? ` ${d.iso}` : ''}`;
   });
 }

@@ -210,9 +210,9 @@ test('and a money value renders in its OWN currency wherever it appears', () => 
 /* ── drawing an amount ──────────────────────────────────────────────────── */
 
 test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other keeps its code after it', () => {
-  assert.deepEqual(drawn('GBP 28,320.00', 'GBP'), { lead: '£', whole: '28,320', fraction: '.00', code: null });
-  assert.deepEqual(drawn('USD −4,800.00', 'GBP'), { lead: '−$', whole: '4,800', fraction: '.00', code: 'USD' });
-  assert.deepEqual(drawn('JPY 1,299', 'GBP'), { lead: '¥', whole: '1,299', fraction: '', code: 'JPY' });
+  assert.deepEqual(drawn('GBP 28,320.00', 'GBP'), { lead: '£', whole: '28,320', fraction: '.00', iso: null });
+  assert.deepEqual(drawn('USD −4,800.00', 'GBP'), { lead: '−$', whole: '4,800', fraction: '.00', iso: 'USD' });
+  assert.deepEqual(drawn('JPY 1,299', 'GBP'), { lead: '¥', whole: '1,299', fraction: '', iso: 'JPY' });
   assert.equal(drawn('about 12', 'GBP'), null, 'text money() did not write is not redrawn');
 });
 

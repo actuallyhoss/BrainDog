@@ -186,7 +186,7 @@
               <span class="stat-figure num">
                 {#if !m.value}{MISSING}{:else if parts}{parts.lead}{parts.whole}<span class="stat-minor"
                     >{parts.fraction}</span
-                  >{#if parts.code}<span class="stat-code">{parts.code}</span>{/if}{:else}{m.value}{/if}
+                  >{#if parts.iso}<span class="stat-code">{parts.iso}</span>{/if}{:else}{m.value}{/if}
               </span>
               <span class="stat-note">
                 {#if toned && !q.phrase && m.tone !== 'good'}<span class="dot" aria-hidden="true"></span>{/if}{q.before}{#if q.phrase}<span
@@ -328,13 +328,6 @@
     display: contents;
   }
 
-  .home-head :global(.title) {
-    font-family: var(--font-ui);
-    font-size: var(--t-lg);
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-
   /* A ghost link, not a figure: the words at the small size, the count in `warn`. */
   .to-decide {
     display: inline-flex;
@@ -367,7 +360,7 @@
     gap: var(--sp-7);
     max-inline-size: var(--page-max);
     /* The head's own inline padding, so the figures start under the title. */
-    padding: var(--sp-5) var(--sp-5) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
   }
 
   .primary,
@@ -376,24 +369,6 @@
     flex-direction: column;
     gap: var(--sp-7);
     min-inline-size: 0;
-  }
-
-  /* Section titles on Home are the body size at 600, with the count in `dim` at 400. The 20px step
-     belongs to the page title alone. */
-  .page :global(.section-title) {
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: -0.005em;
-  }
-
-  .page :global(.section-count) {
-    font-size: var(--t-base);
-    font-weight: 400;
-  }
-
-  .page :global(.section-head) {
-    min-block-size: var(--ctl-h-sm);
-    align-items: center;
   }
 
   /* ── right now ────────────────────────────────────────────────────────── */
@@ -701,7 +676,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-3) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 

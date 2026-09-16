@@ -437,7 +437,7 @@
                 <span class="card-n num">{i + 1}</span>
                 <h3 class="card-title">{option.title}</h3>
                 <!-- Shown, never pre-selected. -->
-                {#if option.recommended}<span class="card-rec">Suggested</span>{/if}
+                {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
               </header>
               <p class="card-body">{option.body}</p>
               <Button weight={highlighted === option.key ? 'primary' : 'quiet'} onclick={() => choose(option.key)}>
@@ -538,7 +538,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
@@ -828,7 +828,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
     /* The gate is a first-class phone surface, not a degraded one: options as stacked cards, and the

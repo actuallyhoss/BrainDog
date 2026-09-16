@@ -28,7 +28,7 @@
 </script>
 
 <span class="money num" data-weight={weight}>
-  {#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.code}<span class="code">{parts.code}</span>{/if}{:else}<span class="amount">{text}</span>{/if}
+  {#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.iso}<span class="code">{parts.iso}</span>{/if}{:else}<span class="amount">{text}</span>{/if}
 </span>
 
 <style>

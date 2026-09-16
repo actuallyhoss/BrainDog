@@ -203,6 +203,10 @@
     --tab-h: 56px;
     --tabbar: calc(var(--tab-h) + env(safe-area-inset-bottom));
     --measure: 72ch;
+    /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT (DESIGN-SYSTEM 3.1). The head
+       padded 24 and every page padded 32, so no title on any screen shared a left edge with the list
+       it named. A width query and not a pointer query, because this is layout, not target size. */
+    --gutter: var(--sp-6);
     --sticky: 52px;
     --rail: 240px;
     --kb: 0px;
@@ -412,6 +416,10 @@
      query that changes a control's size is how it starts behaving like one (05 §6). */
   @media (pointer: coarse) {
     :root { --ctl-h: 44px; }
+  }
+
+  @media (width < 900px) {
+    :root { --gutter: var(--sp-4); }
   }
 
   html[data-density='compact'] { --row-h: 32px; }

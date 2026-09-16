@@ -392,7 +392,7 @@
                        is found rather than chosen. The argument is over `take`. -->
                   {#each optionsOf(q) as o (o.key)}
                     <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
-                      {o.title}{#if o.recommended}<span class="rec">Suggested</span>{/if}
+                      {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
                     </Button>
                   {/each}
                 </div>
@@ -435,7 +435,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-7);
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
@@ -684,7 +684,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 </style>

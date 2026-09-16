@@ -412,7 +412,7 @@ export const copy = {
   rankedBy: 'Ranked by the cost of being wrong',
   costOfDelay: 'Cost of deciding late',
   theOptions: 'The options',
-  recommended: 'Recommended',
+  recommended: 'Suggested',
   /* VERB + NOUN, which `19 §2` asks for and "Choose this" is not — it is verb plus pronoun, and
      the noun is a hundred and seventy pixels away in an `<h3>` nothing associates with the button.
      Three of them on `/decide/<id>` gave a screen reader the same three words three times, on one of

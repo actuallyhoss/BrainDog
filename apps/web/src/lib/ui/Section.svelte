@@ -39,31 +39,31 @@
 <style>
   .section-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-3);
+    min-block-size: var(--ctl-h-sm);
     margin-block-end: var(--sp-3);
   }
 
-  /* A HEADING THAT READS AS ONE, and it was body text. At the body size in `--ink2` weight 500, "What
-     needs you" was the size of the rows under it, so a screen of three sections read as one list.
-     Twenty pixels at 600 in ink is what the reference product gives a section, and the count sits
-     beside it on the same baseline in the body face, not the identifier one. */
+  /* THE BODY SIZE AT 600, ON EVERY SCREEN (DESIGN-SYSTEM 2.2). It was 20px, which made every group on
+     a settings page or a search result read as a second page title; Home had already overridden it
+     back down locally. Weight and ink rank it above the rows, and 48px of space above it does the
+     rest. The count sits beside it at the same size in `dim`. */
   .section-title {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-lg);
+    font-size: var(--t-base);
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.006em;
   }
 
   .section-count {
     color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    letter-spacing: 0;
+    font-size: var(--t-base);
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 
