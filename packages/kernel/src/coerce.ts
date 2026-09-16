@@ -118,8 +118,13 @@ const KEY_SHAPES: readonly RegExp[] = [
   /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/iu,
 ];
 
-/** A run a key could be written as: the base64 and base64url alphabets, thirty-two or longer. */
-const KEY_RUN = /[A-Za-z0-9+/=_-]{32,}/gu;
+/**
+ * A run a key could be written as: the base64 and base64url alphabets, thirty-two or longer.
+ *
+ * BOUNDED, so a long run is judged a piece at a time: an unbounded match over a text of tens of
+ * megabytes in one run overflows the stack, and the write answered 500. No key is 4096 long.
+ */
+const KEY_RUN = /[A-Za-z0-9+/=_-]{32,4096}/gu;
 
 /** A URL's path, where a document's own id lives. A link to a document is not a key to it. */
 const URL_PATH = /\b([a-z][a-z0-9+.-]*:\/\/[^\s/?#]+)\/[^\s?#]*/giu;

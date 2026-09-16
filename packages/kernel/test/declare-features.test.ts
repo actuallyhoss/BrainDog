@@ -438,3 +438,10 @@ test('AND WHAT IT LETS THROUGH: digests, ids, names, paths and links', () => {
   assert.equal(looksLikeCredential(`https://api.example.com/v1/items?token=${noise(40, 5)}`), true);
   for (const key of Object.values(SHAPES)) assert.equal(looksLikeCredential(key), true, key.slice(0, 12));
 });
+
+test('A TEXT OF TENS OF MEGABYTES IN ONE RUN IS JUDGED, NOT THROWN, and a key after it is still found', () => {
+  const long = 'x'.repeat(30_000_000);
+  assert.equal(looksLikeCredential(long), false);
+  assert.equal(looksLikeCredential(`${long} ${SHAPES.Stripe}`), true);
+  assert.equal(looksLikeCredential(`${long} ${noise(48, 7)}`), true, 'a random run after the long one');
+});
