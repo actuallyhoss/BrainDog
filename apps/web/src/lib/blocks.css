@@ -661,24 +661,29 @@
     margin: 0;
   }
 
+  /* A LABEL AND ITS VALUE READ AS A PAIR (DESIGN-SYSTEM APPENDIX C9). They sat at opposite edges of a
+     340px card, so "Kind" and "Method" were 300px apart and a two-line "Next" was right-aligned prose.
+     The labels share a column the width of the longest one, and the value starts beside it. */
+  .cards-facts {
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: var(--sp-3);
+  }
+
   .cards-fact {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
+    display: contents;
     font-size: var(--t-sm);
   }
 
   .cards-fact dt {
-    flex: none;
     color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .cards-fact dd {
     min-inline-size: 0;
     margin: 0;
     color: var(--ink2);
-    text-align: end;
+    font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
