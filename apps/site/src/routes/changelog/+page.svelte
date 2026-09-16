@@ -26,16 +26,12 @@
 
   const STATUS = {
     title: 'The app is live. Nothing is for sale yet.',
+    /* THREE SENTENCES, AND IT WAS NINE. At the top of the page it was a 120-word block over the
+       first entry, and the entries below already say, day by day, what it summarised. */
     body:
-      'The record app deploys itself from this repository on every green build, and you can open ' +
-      'it. It still draws a synthetic record rather than yours, because there is no hosted record ' +
-      'to draw: signing in began working today, and the key that makes a record is not set, so ' +
-      'there is nothing behind the door yet. There is no sign-up, no billing and no release to ' +
-      'install, and a record is made by the operator rather than by a visitor. The kernel behind ' +
-      'the app is about three fifths built. The design is fifty-four documents, written before ' +
-      'the code and still the only thing it is built from, and they open with the source. This ' +
-      'page is what there is to read until then, and it is written the same way: what is built, ' +
-      'what is not, and what is wrong with what is.',
+      'The record app deploys from this repository on every green build, and you can open it. ' +
+      'For now it draws a made-up record: there is no sign-up, no billing and no release to install. ' +
+      'This page says what is built, what is not, and what is wrong with what is.',
   };
 
   const ENTRIES: Entry[] = [
@@ -754,11 +750,18 @@
     position: absolute;
     inset-block-start: 0.6em;
     inset-inline-start: calc(var(--sp-5) * -1 - 3px);
-    inline-size: 5px;
-    block-size: 5px;
-    background: var(--edge);
+    inline-size: 6px;
+    block-size: 6px;
+    /* THE KIND'S HUE ON THE RAIL, AND NOT A SECOND DOT BESIDE THE WORD. An entry drew a grey mark
+       on the rail and a coloured dot sixty pixels right of it on the same line: two dots for one
+       entry. The word still carries the kind for a reader who does not see the colour. */
+    background: var(--hue);
     border-radius: var(--r-pill);
     box-shadow: 0 0 0 3px var(--bg);
+  }
+
+  .entry .dot {
+    display: none;
   }
 
   /* A label on the title's own line: the word is in the ink and the hue is only a dot, so the kind
