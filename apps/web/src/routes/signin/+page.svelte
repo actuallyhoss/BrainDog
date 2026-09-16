@@ -513,10 +513,11 @@
 
   .calm-title {
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-lg);
+    font-family: var(--font-ui);
+    font-size: var(--t-md);
     font-weight: 600;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
   .calm-who {

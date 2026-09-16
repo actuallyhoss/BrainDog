@@ -89,7 +89,7 @@
              state. Drawn as `error` it set `data-screen="refused"`, and `layout` and `a11y` sweep this route bare,
              so both measured an error card at fifteen widths and reported the screen as never auditable. A token
              the host rejects below is still `error`, because that one is a refusal. -->
-        <Empty heading kind="no-results" title={copy.inviteNoLink} body={copy.inviteAskNew} />
+        <Empty heading kind="no-results" glyph="link" title={copy.inviteNoLink} body={copy.inviteAskNew} />
       {:else if seen && !seen.ok}
         <Empty heading kind="error" title={sentence(seen)} body={copy.inviteAskNew} />
       {:else if seen && seen.ok && !joined}

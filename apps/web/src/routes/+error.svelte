@@ -28,7 +28,7 @@
     that was never a route.
   -->
   {#if page.status === 404}
-    <Empty kind="no-results" title={`There is nothing at ${page.url.pathname}.`}>
+    <Empty kind="no-results" glyph="globe" title={`There is nothing at ${page.url.pathname}.`}>
       {#snippet actions()}
         <Button weight="primary" href="/">{copy.home}</Button>
       {/snippet}

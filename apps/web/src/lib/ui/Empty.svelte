@@ -32,6 +32,7 @@
     heading = false,
     lines,
     compact = false,
+    glyph,
   }: {
     kind: EmptyKind;
     title: string;
@@ -64,13 +65,15 @@
      * states rather than a sixth shape that drifts from them.
      */
     compact?: boolean;
+    /** The kind's glyph, replaced when the screen knows a truer one: a broken invite is a link. */
+    glyph?: IconName | undefined;
   } = $props();
 
   /* One glyph per kind. Five states were designed as five different things and then drawn as one
      paragraph in five colours, so the difference between "nothing here yet" and "you cannot see
      this" was carried by the sentence alone. */
   const GLYPH: Record<EmptyKind, IconName> = {
-    'no-data-yet': 'plus',
+    'no-data-yet': 'rows',
     'no-results': 'search',
     cleared: 'check',
     'no-permission': 'lock',
@@ -113,7 +116,7 @@
 </script>
 
 <div class="empty" data-kind={kind} class:compact>
-  <span class="empty-glyph" aria-hidden="true"><Icon name={GLYPH[kind]} size="l" /></span>
+  <span class="empty-glyph" aria-hidden="true"><Icon name={glyph ?? GLYPH[kind]} size="l" /></span>
   {#if heading}
     <h1 class="empty-title">{title}</h1>
   {:else}
@@ -192,12 +195,16 @@
     color: var(--earn);
   }
 
+  /* THE UI FACE, AT THE SIZE OF A SECTION'S LEAD. An empty state is a sentence, not a poster, and
+     the display face here made every not-found page louder than the Home it should lead back to. */
   .empty-title {
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-lg);
+    font-family: var(--font-ui);
+    font-size: var(--t-md);
     font-weight: 600;
-    letter-spacing: -0.015em;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
   /* The refusals, as a list, because they are several separate facts and a joined sentence reads as
@@ -314,11 +321,6 @@
     margin-block-start: var(--sp-2);
   }
 
-  .empty[data-kind='cleared'] .empty-title {
-    color: var(--earn);
-  }
-
-  .empty[data-kind='error'] .empty-title {
-    color: var(--danger);
-  }
+  /* THE TITLE STAYS INK IN EVERY KIND. The glyph carries the tone; a whole sentence in the alarm
+     colour is harder to read and says nothing the glyph beside it does not. */
 </style>
