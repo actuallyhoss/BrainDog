@@ -3468,15 +3468,18 @@
 
   /* ONE FRIENDLY FIELD: a rounded line on the first raised surface with a plus at its head, which
      is the shape "add" has in every list a person has used. */
+  /* ONE HEIGHT FOR THE WHOLE HEAD (DESIGN-SYSTEM APPENDIX C8). This was 47px over a 34px search and
+     32px filters, three sizes of box in two rows; it is `--ctl-h` now, 32 under a mouse and 44 under
+     a thumb, with the radius every control has. */
   .capture-field {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--tap);
-    padding-inline: var(--sp-4) var(--sp-2);
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3) var(--sp-1);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
   }
@@ -3492,8 +3495,9 @@
 
   .capture-input {
     flex: 1;
+    align-self: stretch;
     min-inline-size: 0;
-    padding-block: var(--sp-3);
+    padding-block: 0;
     background: none;
     border: 0;
     color: var(--ink);

@@ -122,6 +122,15 @@
     opacity: 1;
   }
 
+  /* UNDER A MOUSE THE WRAPPER IS THE CONTROL HEIGHT, BORDER INCLUDED. The stretched input's own
+     `--ctl-h` floor made the box 34 beside 32px filters and buttons (DESIGN-SYSTEM APPENDIX C8). The
+     coarse-pointer floor below is untouched: that one is the thumb's. */
+  @media (pointer: fine) {
+    .field:not(.field-lg) .field-input {
+      min-block-size: calc(var(--ctl-h) - 2px);
+    }
+  }
+
   .field-lg {
     min-block-size: 44px;
     padding-inline: var(--sp-4);
