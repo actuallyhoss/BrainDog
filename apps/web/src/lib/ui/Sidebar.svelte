@@ -998,8 +998,11 @@
     background: var(--s2);
     color: var(--ink);
   }
+  /* THE GLYPH OF THE PLACE YOU ARE IN TAKES THE ACCENT, AND NOTHING ELSE IN THE ROW DOES
+     (DESIGN-SYSTEM 1.3). The row stays a neutral lifted surface with an ink label; the one small
+     mark of the brand's colour is how "here" reads at a glance down a rail of grey glyphs. */
   .item[aria-current='page'] :global(.icon) {
-    color: var(--ink2);
+    color: var(--accent-text);
   }
 
   /* Only the glyph takes it. The label stays `ink` so the row still reads as a row, and a rail of
@@ -1127,6 +1130,10 @@
   .util[aria-current='page'] {
     background: var(--s2);
     color: var(--ink);
+  }
+
+  .util[aria-current='page'] :global(.icon) {
+    color: var(--accent-text);
   }
 
   .who {

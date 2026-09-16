@@ -966,7 +966,7 @@
   }
 
   .page {
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1140px;
   }
 
@@ -1170,7 +1170,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 

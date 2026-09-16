@@ -836,7 +836,7 @@
     grid-template-columns: repeat(12, minmax(0, 1fr));
     align-items: start;
     gap: var(--sp-7) var(--sp-6);
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
@@ -1054,7 +1054,7 @@
   @media (width < 900px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
     .block-slot {

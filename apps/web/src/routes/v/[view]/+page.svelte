@@ -289,7 +289,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
   }
 
   /* IT WRAPS, because the filter is a sentence now and a sentence is longer than the chip was. */
@@ -322,7 +322,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 </style>

@@ -3002,7 +3002,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-6) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
   /* The sample bar's sentence, in the dim ink a note takes: it says where the rows came from. */
@@ -3695,7 +3695,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 

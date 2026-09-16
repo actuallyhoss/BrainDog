@@ -9,12 +9,15 @@
 @layer a11y {
   /* Nothing in this layer is reachable by a theme, because `@layer theme` is declared before it. */
 
-  /* A two-tone ring, so it is visible on every surface in both schemes. Never animated — keyboard
-     navigation through an animated ring is wading (13 §9). */
+  /* THE RING IS THE BRAND'S SIGNATURE (DESIGN-SYSTEM 1.3, owner decision 2026-09-16). It was a
+     two-tone ink ring, which was visible and anonymous. `--accent-text` is solved for 4.5:1 as text
+     on every declared surface in both schemes, so as a 2px ring it clears the 3:1 a focus indicator
+     needs with room to spare, and the 2px offset leaves a gap of the element's own ground between
+     the ring and a filled control. Never animated: keyboard navigation through an animated ring is
+     wading (13 §9). Forced colours still replace it with `Highlight` below. */
   :focus-visible {
-    outline: 2px solid var(--focus-in);
-    outline-offset: 1px;
-    box-shadow: 0 0 0 4px var(--focus-out);
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
     border-radius: var(--r-sm);
   }
 

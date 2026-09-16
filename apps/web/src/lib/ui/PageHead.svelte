@@ -85,43 +85,45 @@
            be fixed — but `.title` is a flex row, so putting the attribute on the `h1` resolved the
            FLEX direction too and swung our own id chip to the other side of the heading. Chrome
            keeps the UI's direction; data follows its own. See the note in `blocks.css`. -->
-      <h1 class="title">
-        <!-- ONLY WITH A HUE. A page about one thing wears that thing's coloured mark; a grey glyph
-             before every other heading only repeated the rail and read as admin navigation. -->
-        {#if icon && hue !== undefined}
-          <span class="title-icon" style="--hue:{hue}">
-            <Icon name={icon} size="l" />
-          </span>
+      <div class="title-row">
+        <h1 class="title">
+          <!-- ONLY WITH A HUE. A page about one thing wears that thing's coloured mark; a grey glyph
+               before every other heading only repeated the rail and read as admin navigation. -->
+          {#if icon && hue !== undefined}
+            <span class="title-icon" style="--hue:{hue}">
+              <Icon name={icon} size="l" />
+            </span>
+          {/if}
+          <span dir="auto">{title}</span>
+          {#if id}<span class="title-id">{id}</span>{/if}
+        </h1>
+        <!--
+          A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, and the zero is the half that
+          says nothing. This was `count !== undefined`, and `0 !== undefined`, so `/vault` printed
+          `Vault 0` over "No credential yet." and `/inbox` printed `Inbox 0` over its own sentence.
+          `Section` had the identical line and the identical defect.
+
+          AND `0 of 38` IS NOT THE SAME THING AT ALL. It is a filter that matched nothing over a list
+          that holds thirty-eight rows, which is a fact somebody needs: `19 §6` is that a surface showing
+          nothing must never be indistinguishable from a surface with nothing to show. So a bare zero
+          goes and a zero with a total beside it stays, which is why this is not the one-line fix
+          `Section` got.
+
+          AND THE TEST IS ON THE TOTAL'S VALUE, NOT ON WHETHER IT WAS PASSED. The first attempt at this
+          read `total !== undefined`, which let the bare zero straight back through: the register sets
+          its denominator to the MATCHED count while a filter is on, so searching for something with no
+          matches gives `count: 0, total: 0` and the head printed `Obligations 0` over "38 rows, none
+          matching". Both halves zero is the state with nothing to say.
+        -->
+        {#if count || total}
+          <p class="count num">
+            {(count ?? 0).toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
+                class="of">&nbsp;of {total.toLocaleString('en')}</span
+              >{/if}
+          </p>
         {/if}
-        <span dir="auto">{title}</span>
-        {#if id}<span class="title-id">{id}</span>{/if}
-      </h1>
+      </div>
     </div>
-    <!--
-      A COUNT OF NOTHING OVER AN EMPTY STATE IS THE SAME FACT TWICE, and the zero is the half that
-      says nothing. This was `count !== undefined`, and `0 !== undefined`, so `/vault` printed
-      `Vault 0` over "No credential yet." and `/inbox` printed `Inbox 0` over its own sentence.
-      `Section` had the identical line and the identical defect.
-
-      AND `0 of 38` IS NOT THE SAME THING AT ALL. It is a filter that matched nothing over a list
-      that holds thirty-eight rows, which is a fact somebody needs: `19 §6` is that a surface showing
-      nothing must never be indistinguishable from a surface with nothing to show. So a bare zero
-      goes and a zero with a total beside it stays, which is why this is not the one-line fix
-      `Section` got.
-
-      AND THE TEST IS ON THE TOTAL'S VALUE, NOT ON WHETHER IT WAS PASSED. The first attempt at this
-      read `total !== undefined`, which let the bare zero straight back through: the register sets
-      its denominator to the MATCHED count while a filter is on, so searching for something with no
-      matches gives `count: 0, total: 0` and the head printed `Obligations 0` over "38 rows, none
-      matching". Both halves zero is the state with nothing to say.
-    -->
-    {#if count || total}
-      <p class="count num">
-        {(count ?? 0).toLocaleString('en')}{#if atLeast}<span class="more-sign">+</span>{/if}{#if total !== undefined && (atLeast || total !== count)}<span
-            class="of">&nbsp;of {total.toLocaleString('en')}</span
-          >{/if}
-      </p>
-    {/if}
     {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
   </div>
 </header>
@@ -152,13 +154,10 @@
     margin: 0;
     /* The head's own inline padding, so the sentence starts under the title it defines now that it
        is outside the box that used to pad it. */
-    padding: var(--sp-2) var(--sp-5) 0;
-  }
-
-  @media (width < 900px) {
-    .head-define {
-      padding-inline: var(--sp-3);
-    }
+    padding: var(--sp-2) var(--gutter) 0;
+    max-inline-size: calc(var(--measure) + var(--gutter) * 2);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .head {
@@ -171,7 +170,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--sp-5) var(--sp-3);
+    /* One gutter for the head and the content under it (DESIGN-SYSTEM 3.1), so a title and its
+       list share a left edge. It was 24 here and 32 on every page. */
+    padding: var(--sp-5) var(--gutter) var(--sp-3);
     background: color-mix(in srgb, var(--bg) 82%, transparent);
     backdrop-filter: blur(12px);
     /* Transparent rather than absent, so the head does not grow a pixel when the rule appears. */
@@ -198,18 +199,33 @@
      house style of a report; the reference product has none, and the kicker reads as the words
      it is rather than as a label stamped on the page. */
   .kicker {
-    margin-block-end: 1px;
+    margin-block-end: 2px;
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 500;
+    font-weight: 400;
   }
 
+  .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  /* Geist at 20/600, the one title size on every screen (DESIGN-SYSTEM 2.2). It was Poppins at 24
+     everywhere except Home, which overrode it: two type systems in one product. */
   .title {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    font-size: var(--t-xl);
-    letter-spacing: -0.026em;
+    min-inline-size: 0;
+    font-family: var(--font-ui);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
   }
 
   /* The thing's own frozen hue, same lightness and chroma as its mark in the grid. A page about
@@ -224,17 +240,18 @@
   .title-id {
     color: var(--dim);
     font-family: var(--font-id);
-    font-size: var(--t-md);
+    font-size: var(--t-sm);
     font-weight: 400;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 
 
+  /* Beside the title on its baseline, and quieter than it. At 20px on the far right it read as a
+     second, unlabelled figure. */
   .count {
-    color: var(--ink2);
-    font-size: var(--t-lg);
+    color: var(--dim);
+    font-size: var(--t-base);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
   }
 
   /* THE SPACE IS A CHARACTER, AND IT HAS TO BE.
@@ -269,7 +286,7 @@
          screen in the product was behind the status bar. Padding rather than an inset, so the
          head's own translucent blurred background fills the notch strip the way a native screen
          does, and so it costs nothing on a device where the inset is zero. */
-      padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--sp-3) var(--sp-2);
+      padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--gutter) var(--sp-2);
       padding-inline-end: 56px;
     }
 
@@ -297,17 +314,13 @@
 
 
     .head-actions {
-      margin-inline-start: auto;
+      flex-basis: 100%;
     }
 
     /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. It is
        the widest thing in the button and it is advice nobody on a phone can take. */
     .head-actions :global(kbd) {
       display: none;
-    }
-
-    .title {
-      font-size: var(--t-lg);
     }
   }
 </style>

@@ -2790,7 +2790,7 @@
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--sp-6) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1100px;
   }
 
@@ -2812,10 +2812,11 @@
     align-items: center;
     gap: var(--sp-3);
     padding: 0 var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-sm);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     font-weight: 500;
+    white-space: nowrap;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
@@ -2825,10 +2826,20 @@
     color: var(--ink);
   }
 
+  /* The rail's own "here": a lifted neutral row, an ink label, and the accent on the glyph only
+     (DESIGN-SYSTEM 1.3, 4.7). An accent wash behind an accent word was the brand colour spent as a
+     row background, which is the one place the owner ruled it out. */
   .area[aria-current='page'] {
-    background: var(--accent-wash);
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  .area :global(.icon) {
+    color: var(--dim);
+  }
+
+  .area[aria-current='page'] :global(.icon) {
     color: var(--accent-text);
-    font-weight: 600;
   }
 
   .body {
@@ -3059,13 +3070,20 @@
   @media (width < 900px) {
     .shell {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-4) var(--sp-4) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
+    /* A strip that runs to the panel's edges and scrolls under a thumb, with no scrollbar and no
+       label ever wrapping onto a second line: "People & sharing" was three lines tall and set the
+       height of every item beside it. */
     .areas {
       position: static;
       flex-direction: row;
+      gap: var(--sp-1);
+      margin-inline: calc(var(--gutter) * -1);
+      padding-inline: var(--gutter);
       overflow-x: auto;
+      scrollbar-width: none;
     }
   }
 </style>
