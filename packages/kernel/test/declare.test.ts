@@ -1005,7 +1005,7 @@ test('and a source is one of the three forms, or the one the record computes', (
   /* `42 §4.5` gives three; `pages.ts`'s `COMPUTED` set adds `forecast.runway`, which the money page
      ships. A source list written from the document with the product left out would refuse the
      record's own page. */
-  for (const source of ['register.obligations', 'metric.overdue', 'block.2', 'forecast.runway'])
+  for (const source of ['register.obligations', 'metric.overdue', 'block.2', 'forecast.runway', 'activity', 'sessions.live', 'actions'])
     assert.equal(refusedWith(page({ requires: undefined, blocks: [{ kind: 'table', source, empty: 'x' }] })), null, `${source} is a source`);
   for (const source of ['obligations', 'table.obligations', 'register.', 7, null])
     assert.equal(

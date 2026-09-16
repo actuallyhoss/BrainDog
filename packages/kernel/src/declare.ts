@@ -495,7 +495,7 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
  */
 const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
-const COMPUTED_SOURCES = ['forecast.runway', 'sessions.live', 'actions'] as const;
+const COMPUTED_SOURCES = ['forecast.runway', 'activity', 'sessions.live', 'actions'] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
