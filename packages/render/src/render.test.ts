@@ -16,8 +16,8 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
 /* ── the closed sets ──────────────────────────────────────────────────────── */
 
-test('twenty-five kinds over eight primitives, and every kind names one that exists', () => {
-  assert.equal(Object.keys(KINDS).length, 25);
+test('twenty-six kinds over eight primitives, and every kind names one that exists', () => {
+  assert.equal(Object.keys(KINDS).length, 26);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
@@ -289,7 +289,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-five kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-six kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
@@ -1163,6 +1163,20 @@ test('new is said in words as well as in the accent: the head counts it, and a l
   assert.match(html, /<li class="feed-seen">Before you last looked<\/li><li class="feed-row" data-intent="bad">/u);
   assert.match(html, /<h3 class="feed-head">You<span class="feed-tally num">1<\/span><\/h3>/u, 'nothing new is a plain count');
   assert.equal(html.match(/feed-seen/gu)?.length, 1, 'a group with nothing read, or nothing new, has no line');
+});
+
+test('AGENTS GROUPS BY WHO DID IT, one head per agent in the order they first appear, and a folded rest says earlier', () => {
+  const src =
+    '```agents\nClaude | 3 | changed [Write the notes](/r/tickets/2) | 3h ago\nCodex | 1 | added Fix login | 5h ago | warn\nClaude | 9 |  | 1d ago\n```';
+  assert.equal(parse(src)[0]?.type, 'degraded', 'page-only, as a feed is');
+  const html = toHTML(onPage(src));
+  const heads = [...html.matchAll(/<h3 class="feed-head">([^<]+)<span class="feed-tally num">(\d+)<\/span>/gu)].map((m) => `${m[1]} ${m[2]}`);
+  assert.deepEqual(heads, ['Claude 12', 'Codex 1']);
+  assert.match(html, /<span class="feed-what">changed <a href="\/r\/tickets\/2">Write the notes<\/a><\/span>/u);
+  assert.match(html, /<span class="feed-what">earlier<\/span><span class="feed-when">1d ago<\/span>/u);
+  assert.match(html, /<li class="feed-row" data-intent="warn">/u);
+  assert.match(toHTML(onPage('```agents\n```')), /<p class="feed-empty">No agent has done anything here yet\.<\/p>/u);
+  assert.doesNotMatch(html, /style=/u);
 });
 
 test('an empty feed says one of two things: nothing new, or no mark yet', () => {

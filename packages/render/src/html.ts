@@ -19,6 +19,7 @@ import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions
 import { MISSING, day, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
+import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
@@ -321,6 +322,7 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
 
 function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'feed') return feed(b, o);
+  if (b.kind === 'agents') return agents(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -596,6 +598,34 @@ function feed(b: Block, o: RenderOptions): string {
         })
         .join('');
       return `<div class="feed-group" data-by="${g.by}"><h3 class="feed-head">${escape(g.label)}${head}</h3><ul class="feed-rows">${rows}</ul></div>`;
+    })
+    .join('');
+  return `<div class="feed">${body}</div>`;
+}
+
+/**
+ * `agents`: what each agent did, one group per agent, a burst on one row (`src/agents.ts`).
+ *
+ * Drawn with `feed`'s classes, so a host that styles one styles both: the head is the agent's name with its
+ * tally, and each row leads with its count. A row with no `what` is the rest of that agent's work, said as earlier.
+ */
+function agents(b: Block, o: RenderOptions): string {
+  const plan = agentsPlan(b.rows);
+  if (plan.groups.length === 0) return `<p class="feed-empty">${escape(plan.empty)}</p>`;
+  const said = (v: string | undefined): string => plain(inline(v ?? '', o));
+  const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
+  const body = plan.groups
+    .map((g) => {
+      const face = initialOf(said(g.who));
+      const rows = g.rows
+        .map((r) => {
+          const what = (r.cells[2] ?? '').trim() === '' ? escape(AGENTS_EARLIER) : drawn(r.cells[2]);
+          return `<li class="feed-row"${toneAttrs(r.tone)}><span class="feed-count num">${
+            counted(said(r.cells[1])) ? drawn(r.cells[1]) : ''
+          }</span><span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span><span class="feed-what">${what}${toneGlyph(r.tone)}</span><span class="feed-when">${drawn(r.cells[3])}</span></li>`;
+        })
+        .join('');
+      return `<div class="feed-group" data-by="agent"><h3 class="feed-head">${drawn(g.who)}<span class="feed-tally num">${g.total}</span></h3><ul class="feed-rows">${rows}</ul></div>`;
     })
     .join('');
   return `<div class="feed">${body}</div>`;

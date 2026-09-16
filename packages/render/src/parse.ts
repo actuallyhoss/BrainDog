@@ -269,7 +269,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the twenty-five kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the twenty-six kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -322,8 +322,8 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         fix:
           kind === 'section'
             ? `"section" is a heading on a page, so it has no place in a fence. Write a "##" heading. The block is shown as you wrote it.`
-            : kind === 'feed'
-              ? `"feed" draws what happened in the record, on a page, so it has no rows in a fence. Use "timeline". The block is shown as you wrote it.`
+            : kind === 'feed' || kind === 'agents'
+              ? `"${kind}" draws what happened in the record, on a page, so it has no rows in a fence. Use "timeline". The block is shown as you wrote it.`
               : `"${kind}" draws a register on a page, so it has no rows in a fence. Use "comparison". The block is shown as you wrote it.`,
         raw,
         info,

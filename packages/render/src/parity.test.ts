@@ -89,6 +89,9 @@ const SHAPES: Record<string, string> = {
     'seen | 2d ago\nagent | Codex |  | opened Kiln | 3d ago | bad\nyou | You | 1 | decision on Pricing | 4d ago\n```',
   'a feed row with nobody named': '```feed\nagent |  | 2 | saves | now\n```',
   'a feed with nothing new': '```feed\nseen | 2d ago\n```',
+  'what each agent did, with a folded rest and a tone':
+    '```agents\nClaude | 3 | changed [Write the notes](/r/tickets/2) | 3h ago\nCodex | 1 | added Fix login | 5h ago | warn\nClaude | 9 |  | 1d ago\n```',
+  'no agent has done anything': '```agents\n```',
   'a feed with no mark yet': '```feed\nseen | \n```',
   'a diff with a change in the middle':
     '```diff | Deploy, v3 to v4\n  When a deploy fails,\n- retry once.\n+ retry twice,\n+ then page the owner.\n  Log the run.\n```',

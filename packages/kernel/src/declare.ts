@@ -446,7 +446,7 @@ function metricBody(decl: Declaration): Refusal | null {
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents',
 ] as const;
 
 /**

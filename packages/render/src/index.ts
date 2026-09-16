@@ -31,6 +31,7 @@ export {
   type CardLayout,
   type CardRole,
 } from './cards.ts';
+export { AGENTS_EARLIER, AGENTS_NOTHING, AGENT_VERBS, agentDoing, agentsPlan, type AgentGroup } from './agents.ts';
 export {
   FEED_BY,
   FEED_EARLIER,

@@ -10,7 +10,7 @@
  * for `lib/data/call.ts` is the whole of what the wiring costs.
  */
 
-import { day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
+import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 
 import { amountOf, currencyOf, homeOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
@@ -1564,6 +1564,8 @@ export type FeedRow = {
   target: string | null;
   note: string | null;
   at: string;
+  /** What the target is called, where the record could say: a row's title. */
+  thing?: string | null;
 };
 
 /**
@@ -2205,6 +2207,25 @@ function activityBlock(b: PageBlock): BlockResult {
   if (bad.length) return computed(b, bad);
 
   const kept = AUDIT.filter((e) => tests.every((t) => t({ actor: feedByOf(e.by), kind: e.kind, target: e.target ?? '' })));
+  /* AN `agents` BLOCK IS THE AGENTS' WORK, one group per agent, each keeping its own rest past `first:`. The kernel's `agentRows`, mirrored. */
+  if (b.kind === 'agents') {
+    const theirs = kept.filter((e) => feedByOf(e.by) === 'agent');
+    const named = (target: string | null): string | null => {
+      const m = target === null ? null : /^([a-z][a-z0-9_]*)#([0-9]+)$/u.exec(target);
+      const title = m ? REGISTERS[m[1]!]?.title : undefined;
+      const row = m && title ? (ROWS[m[1]!] ?? []).find((e) => e.seq === Number(m[2])) : undefined;
+      const said = row && title ? row.fields[title] : undefined;
+      return typeof said === 'string' && said !== '' ? said : target;
+    };
+    const rows: FeedRow[] = [];
+    for (const e of theirs) {
+      const last = rows.at(-1);
+      if (last && last.who === e.by && last.kind === e.kind && last.target === (e.target ?? null)) last.count += 1;
+      else rows.push({ by: 'agent', who: e.by, count: 1, kind: e.kind, target: e.target ?? null, note: e.note ?? null, at: e.at, thing: named(e.target ?? null) });
+    }
+    const feed = agentsCut(rows, b.first);
+    return { ...computed(b, []), feed, ...agentsTable(feed, NOW), total: theirs.length };
+  }
   const bursts: FeedRow[] = [];
   for (const e of kept) {
     const last = bursts.at(-1);
@@ -2237,6 +2258,41 @@ function activityBlock(b: PageBlock): BlockResult {
     ...feedTable(feed, b.since === 'seen', null, NOW),
     total: kept.length,
   };
+}
+
+/** Past `first` rows, one agent's remainder as one row that keeps its name, so no count is lost. */
+export function agentsCut(rows: readonly FeedRow[], first: number | undefined): FeedRow[] {
+  if (first === undefined) return [...rows];
+  const cap = Math.min(50, Math.max(1, Math.floor(first)));
+  const kept: FeedRow[] = [];
+  const taken = new Map<string, number>();
+  const rest = new Map<string, FeedRow>();
+  for (const row of rows) {
+    const who = row.who ?? '';
+    const n = taken.get(who) ?? 0;
+    taken.set(who, n + 1);
+    if (n < cap) kept.push(row);
+    else {
+      const folded = rest.get(who);
+      if (folded) folded.count += row.count;
+      else rest.set(who, { ...row, kind: null, target: null, note: null, thing: null });
+    }
+  }
+  return [...kept, ...rest.values()];
+}
+
+/**
+ * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as the feed
+ * names it, and what it did is the event's note, or the verb and the row it was done to (`agentDoing`).
+ */
+export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockResult, 'rows' | 'shown'> {
+  const rows: TableRow[] = feed.map((r, i) => ({
+    key: `${r.at}-${i}`,
+    cells: [r.who === null ? '' : actorOf(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    href: undefined,
+    tone: undefined,
+  }));
+  return { rows, shown: feed.length };
 }
 
 /** When a feed row happened, in words: a day against today, and an instant as how long ago. */

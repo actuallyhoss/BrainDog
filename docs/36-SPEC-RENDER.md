@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, twenty-five, counted:
+`KINDS`, twenty-six, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -165,6 +165,7 @@ interface KindSpec {
 | `section` | panel | glyph · count · fold | 3 | no | 1 | pageOnly |
 | `feed` | list | by (`agent rule you`, or `seen`) · who · count · what · when | 5 | yes | — | pageOnly |
 | `diff` | media | — verbatim, each row marked `- `, `+ ` or two spaces | 0 | no | — | |
+| `agents` | list | who · count · what (empty on the row that folds an agent's rest) · when | 4 | yes | none | pageOnly |
 
 ```ts
 type Segment = Markdown | Block | Degraded;

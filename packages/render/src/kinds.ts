@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty-five kinds, and the four intent words.
+ * The eight primitives, the twenty-six kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -214,6 +214,8 @@ const TABLE = {
      `- `, `+ ` or two spaces (`src/diff.ts`), so a write-up can carry one too. */
   feed: { primitive: 'list', cells: 5, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
   diff: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },
+  /* What each agent did, one group per agent (`src/agents.ts`): `who | count | what | when`. Page-only, as `feed` is. */
+  agents: { primitive: 'list', cells: 4, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

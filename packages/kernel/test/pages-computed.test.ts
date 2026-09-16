@@ -15,7 +15,7 @@ import type { Schema } from '@braindog/where';
 
 import type { ActionRow } from '../src/actions.ts';
 import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
-import { feedRows, readBlock, versionsOf, type ActivityEvent, type BlockResult, type PageBlock, type PageDeps } from '../src/pages.ts';
+import { agentRows, feedRows, readBlock, versionsOf, type ActivityEvent, type BlockResult, type PageBlock, type PageDeps } from '../src/pages.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 15, 12);
@@ -322,6 +322,36 @@ test('A FEED IS THE RECORD’S EVENTS, a burst on one row, and no count lost pas
 
   const { activity: _unwired, ...bare } = deps;
   assert.equal(readBlock(bare, { kind: 'feed', source: 'activity', empty: 'Nothing yet.' }).refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  sql.close();
+});
+
+test('AN `agents` BLOCK IS THE AGENTS’ WORK, one group per agent, and each agent keeps its own rest past `first`', () => {
+  const at = '2026-09-15T12:00:00Z';
+  const event = (actor: string, target: string): ActivityEvent => ({ ts: at, actor, kind: 'edit', target, note: null });
+  const rows = agentRows([event('S4', 'a'), event('S4', 'a'), event('S4', 'b'), event('S7', 'c'), event('S4', 'd'), event('S7', 'e')], 1);
+  assert.deepEqual(
+    rows.map((r) => [r.who, r.count, r.target]),
+    [['S4', 2, 'a'], ['S7', 1, 'c'], ['S4', 2, null], ['S7', 1, null]],
+    'a burst is one row, and past one row an agent’s rest is one row with its name kept',
+  );
+});
+
+test('THE RECORD WIRES ITS OWN ACTIVITY: an agents block reads agents only, names rows as a page does, and leaves the owner’s lines out', async () => {
+  const { k, sql } = await record();
+  value(k.update('skills', 'skills#3', { body: '# Deploy\nTag first.' }, { actor: 'S2' }));
+  value(k.update('skills', 'skills#3', { body: '# Deploy\nTag, then push.' }, { actor: 'S2' }));
+  value(k.create('things', { name: 'Harbour' }, { actor: 'S5' }));
+  sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind) VALUES ('ev_grant', '2026-09-15T12:00:00Z', 'S2', 'grant.add', 'grant:g_1', 'grant')");
+
+  const agents = k.block({ kind: 'agents', source: 'activity', first: 5, empty: 'Nothing yet.' } as PageBlock);
+  assert.deepEqual(agents.refusals, []);
+  assert.deepEqual(
+    (agents.feed ?? []).map((r) => [r.who, r.count, r.kind, r.target, r.thing]),
+    [['S5', 1, 'create', 'things#3', 'Harbour'], ['S2', 2, 'edit', 'skills#3', 'deploy']],
+    'no grant line, and no person’s writes',
+  );
+  const feed = k.block({ kind: 'feed', source: 'activity', empty: 'Nothing yet.' } as PageBlock);
+  assert.ok((feed.feed ?? []).some((r) => r.by === 'you'), 'a feed still reads everybody');
   sql.close();
 });
 

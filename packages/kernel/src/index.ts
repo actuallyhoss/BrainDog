@@ -2484,6 +2484,40 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .filter((e): e is Entry => e !== null),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
+    /*
+     * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,
+     * `tickets#3`, with its title beside it, so a reader is never handed an entry id.
+     *
+     * NOT THE OWNER'S LINES. Keys, access, shares and members belong to the owner's own screens (the record's
+     * `lineOf` holds them to an owner), and a page is read by whoever may open it, so they are left out here.
+     * The read mark is a person's, and the kernel does not know who is reading, so it is `null`.
+     */
+    activity: (limit) => ({
+      events: sql
+        .all<{ ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; note: string | null }>(
+          `SELECT ts, actor, kind, target, target_kind, note FROM event
+            WHERE kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
+              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+            ORDER BY rowid DESC LIMIT ?`,
+          limit,
+        )
+        .map((e) => {
+          const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
+          const row = id === null ? null : byId(id);
+          if (!row) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: e.note === '--erased--' ? null : e.note };
+          const title = registers.get(row.register)?.title;
+          const named = title ? row.fields[title] : undefined;
+          return {
+            ts: e.ts,
+            actor: e.actor,
+            kind: e.kind,
+            target: `${row.register}#${row.seq}`,
+            note: e.note === '--erased--' ? null : e.note,
+            thing: typeof named === 'string' && named !== '' ? named : `${row.register}#${row.seq}`,
+          };
+        }),
+      seen: null,
+    }),
   });
 
   /**

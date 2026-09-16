@@ -194,10 +194,20 @@ export const FEED_BY = ['agent', 'rule', 'you'] as const;
 export type FeedBy = (typeof FEED_BY)[number];
 
 /** One row of a feed. `who`, `kind` and `target` are `null` on the row that folds a group's rows past `first:`. */
-export type FeedRow = { by: FeedBy; who: string | null; count: number; kind: string | null; target: string | null; note: string | null; at: string };
+export type FeedRow = {
+  by: FeedBy;
+  who: string | null;
+  count: number;
+  kind: string | null;
+  target: string | null;
+  note: string | null;
+  at: string;
+  /** What the target is called, where the host could say (a row's title), for a reader who is not handed an id. */
+  thing?: string | null;
+};
 
 /** One event, as the activity source reads it. */
-export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null };
+export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null };
 
 /** One event about a row, oldest first. A create carries every field in `to` and `field: null`. */
 export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
@@ -924,6 +934,37 @@ export function feedRows(events: readonly ActivityEvent[], first?: number): Feed
   return [...kept, ...rest.values()];
 }
 
+/**
+ * An agent's events, newest first, as rows grouped by WHO did them: a burst is one row with a count, and past
+ * `first` rows one agent's remainder is one row that keeps its name, so no count is lost and no agent's work is
+ * folded into another's.
+ */
+export function agentRows(events: readonly ActivityEvent[], first?: number): FeedRow[] {
+  const bursts: FeedRow[] = [];
+  for (const e of events) {
+    const last = bursts.at(-1);
+    if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
+    else bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts, thing: e.thing ?? null });
+  }
+  if (first === undefined) return bursts;
+  const cap = Math.min(50, Math.max(1, Math.floor(first)));
+  const kept: FeedRow[] = [];
+  const rest = new Map<string, FeedRow>();
+  const taken = new Map<string, number>();
+  for (const row of bursts) {
+    const who = row.who ?? '';
+    const n = taken.get(who) ?? 0;
+    taken.set(who, n + 1);
+    if (n < cap) kept.push(row);
+    else {
+      const folded = rest.get(who);
+      if (folded) folded.count += row.count;
+      else rest.set(who, { by: row.by, who: row.who, count: row.count, kind: null, target: null, note: null, at: row.at, thing: null });
+    }
+  }
+  return [...kept, ...rest.values()];
+}
+
 function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
   if (!deps.activity)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its activity onto a page yet.', at: 'source' }) };
@@ -931,6 +972,11 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const read = deps.activity(FEED_EVENTS);
   const kept = read.events.filter((e) => evaluate(said.predicate, { actor: byOf(e.actor), kind: e.kind, target: e.target }, ACTIVITY));
+  /* AN `agents` BLOCK IS THE AGENTS' WORK ONLY, one group per agent, so its `first:` counts each agent's rows. */
+  if (block.kind === 'agents') {
+    const theirs = kept.filter((e) => byOf(e.actor) === 'agent');
+    return { ...base, feed: agentRows(theirs, block.first), matched: theirs.length };
+  }
   return {
     ...base,
     feed: feedRows(kept, block.first),

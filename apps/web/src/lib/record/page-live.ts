@@ -24,6 +24,7 @@ import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
 import {
   REGISTERS,
+  agentsTable,
   decl as fieldOf,
   feedTable,
   historyTable,
@@ -348,7 +349,7 @@ function feedOf(v: unknown): FeedRow[] | null {
   const ok = v.every(
     (r) =>
       isObject(r) && FEED_BY.includes(r.by as FeedRow['by']) && Number.isFinite(r.count) && typeof r.at === 'string' &&
-      textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note),
+      textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note) && (r.thing === undefined || textOrNull(r.thing)),
   );
   return ok ? (v as FeedRow[]) : null;
 }
@@ -504,6 +505,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (b.source === 'activity') {
     const feed = feedOf(fed);
     if (!feed) return cannot;
+    /* WHAT EACH AGENT DID: the record grouped its rows by who, and the renderer draws one head per agent. */
+    if (kind === 'agents') return { ...shell, feed, ...agentsTable(feed, now), total: matched };
     const seen = typeof mark === 'string' ? mark : null;
     const marks = b.since === 'seen' || mark !== undefined;
     return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now), total: matched };

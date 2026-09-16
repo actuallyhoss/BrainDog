@@ -357,6 +357,23 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.deepEqual([feed.shown, feed.total], [2, 3]);
   assert.doesNotThrow(() => toSegments(feed));
 
+  const agents = blockOf(
+    {
+      kind: 'agents', source: 'activity', first: 5, rows: [], matched: 4, refusals: [],
+      feed: [
+        { by: 'agent', who: 'S12', count: 3, kind: 'edit', target: 'tickets#2', note: null, at: '2026-09-16T11:00:00.000Z', thing: 'Write the notes' },
+        { by: 'agent', who: 'S14', count: 1, kind: 'create', target: 'tickets#3', note: null, at: '2026-09-16T10:00:00.000Z', thing: 'Fix login' },
+      ],
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(agents.cannot, undefined, 'what agents did was drawn as a block it cannot');
+  assert.deepEqual(agents.rows.map((r) => [r.cells[1], r.cells[2]]), [['3', 'changed Write the notes'], ['1', 'added Fix login']]);
+  assert.equal(agents.rows[0]!.cells.length, 4, 'who, count, what and when');
+  assert.deepEqual([agents.shown, agents.total], [2, 4]);
+  assert.doesNotThrow(() => toSegments(agents));
+
   const diff = blockOf(
     {
       kind: 'diff', source: 'register.obligations', row: 'obligations#7', field: 'note', rows: [], matched: 4, refusals: [],

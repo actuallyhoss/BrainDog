@@ -345,6 +345,32 @@ test('A PAGE MADE OF FIGURES NAMES THE REGISTERS BEHIND THEM, and it used to nam
   sql.close();
 });
 
+test('A PAGE OF WHAT AGENTS DID IS FOR WHOEVER MAY READ THE WHOLE RECORD, because the log names rows of every list', async () => {
+  const { api, sql } = await record();
+  assert.ok(
+    (
+      await api.kernel.install([
+        {
+          id: 'page.agent-work',
+          kind: 'page' as const,
+          body: { page: 'agent-work', title: 'Agent work', blocks: [{ kind: 'agents', source: 'activity', first: 5, empty: 'Nothing yet.' }] } as never,
+        },
+      ])
+    ).ok,
+  );
+  assert.ok(api.kernel.create('notes', { body: 'Ship it' }, { actor: 'S3' }).ok);
+
+  const narrow = { ...owner, registers: ['notes'] } as CallContext;
+  const theirs = value<{ blocks: { feed?: unknown[]; refusals?: { code: string }[] }[] }>(await api.page({ slug: 'agent-work' }, narrow));
+  assert.deepEqual(theirs.blocks[0]?.feed, [], 'the log was handed to somebody invited to one list');
+  assert.equal(theirs.blocks[0]?.refusals?.[0]?.code, 'FORBIDDEN');
+
+  const mine = value<{ blocks: { feed?: { who: string; thing?: string }[]; refusals?: unknown[] }[] }>(await api.page({ slug: 'agent-work' }, owner));
+  assert.deepEqual(mine.blocks[0]?.refusals, []);
+  assert.deepEqual(mine.blocks[0]?.feed?.map((r) => [r.who, r.thing]), [['S3', 'Ship it']]);
+  sql.close();
+});
+
 /* ── who the record says did it ──────────────────────────────────────────── */
 
 test('A TOKEN WRITES AS ITS RUN, never as itself and never as the person who holds it', async () => {

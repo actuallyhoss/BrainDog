@@ -1734,11 +1734,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            * THE LEVEL AND NOT ONLY THE CEILING, for the reason `readable` gives: a block over a
            * register somebody may only append to used to draw its rows.
            */
-          const beyond = kernel
-            .blockRegisters(b)
-            .map((register) => readable(ctx, register))
-            .find((said) => said !== null);
-          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.values ? { values: {} } : {}), refusals: [beyond] } : b;
+          /* WHAT HAPPENED ACROSS THE RECORD IS FOR WHOEVER MAY READ ALL OF IT. A `feed` or `agents` block reads the
+             whole log and names rows of every list, so somebody invited to named lists is refused the block, as
+             `whatsNew` holds a line about the record as a whole back from them. */
+          const log: Refusal | null =
+            b.source === 'activity' && (!wholeRecord(ctx) || allows(ctx, 'read') !== null)
+              ? { code: 'FORBIDDEN', fix: 'What happened across this BrainDog is shown to people who can read all of it.', at: 'source' }
+              : null;
+          const beyond =
+            log ??
+            kernel
+              .blockRegisters(b)
+              .map((register) => readable(ctx, register))
+              .find((said) => said !== null);
+          return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.values ? { values: {} } : {}), ...(b.feed ? { feed: [] } : {}), refusals: [beyond] } : b;
         }),
       });
     },
