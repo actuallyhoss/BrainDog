@@ -16,11 +16,14 @@
     label,
     tone,
   }: { label: string; tone?: Tone | undefined } = $props();
+
+  /* Sentence case, whatever the stored value was: `running` and `on track` are words a person reads. */
+  const said = $derived(label ? label.charAt(0).toUpperCase() + label.slice(1) : label);
 </script>
 
 <span class="chip" data-intent={tone}>
   {#if tone}<span class="glyph" role="img" aria-label={TONES[tone].label}>{TONES[tone].glyph}</span>{/if}
-  {label}
+  {said}
 </span>
 
 <style>
@@ -35,7 +38,7 @@
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-xs);
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.35;
     white-space: nowrap;
   }
@@ -74,7 +77,10 @@
    * `--ink2` on these grounds measures 5.67 at its worst, over every surface, plain and filled, in
    * all four palettes.
    */
-  .chip[data-intent] {
-    background: var(--tone-wash);
+  /* FRESH EYES, APPENDIX C1: THE WASH WENT TOO. A green, amber or blue capsule beside a page's primary
+     was the loudest thing on Decide, a thread and a run, and rule 1.2 allows a status capsule only on
+     `--hold-wash`. The shape stays neutral and the glyph alone is the colour. */
+  .chip[data-intent] .glyph {
+    color: var(--tone);
   }
 </style>
