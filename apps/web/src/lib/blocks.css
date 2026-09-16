@@ -1775,6 +1775,33 @@
     background: var(--tone-fill, var(--faint));
   }
 
+  /* A TABLE ON A PAGE STARTS ON THE HEADING'S EDGE AND ENDS ON THE PAGE'S. Every cell kept 12px of
+     padding on both sides, so a block's first column began 12px in from the section title over it
+     and its last figure stopped 12px short of the edge the stats above it end on. The outer cells
+     lose the outer padding; the gap between columns is unchanged. A toned table's dot takes the
+     first 6px and the words follow it.
+
+     NOT THE REGISTER GRID (`.table-slot`), whose rows are pressable and washed on hover and focus:
+     there the padding is the inside of that wash, and text against its edge would read as clipped. */
+  :not(.table-slot) > .table-region .th:first-child,
+  :not(.table-slot) > .table-region .td:first-child {
+    padding-inline-start: 0;
+  }
+
+  :not(.table-slot) > .table-region .th:last-child,
+  :not(.table-slot) > .table-region .td:last-child {
+    padding-inline-end: 0;
+  }
+
+  :not(.table-slot) > .table-region .table[data-toned] .td[data-glyph]:first-child,
+  :not(.table-slot) > .table-region .table[data-toned]:has(.td[data-glyph]:first-child) .th:first-child {
+    padding-inline-start: calc(var(--dot) + var(--sp-2));
+  }
+
+  :not(.table-slot) > .table-region .td[data-glyph]:first-child .td-glyph {
+    inset-inline-start: 0;
+  }
+
   /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
   .td[data-truncate='never'] {
     overflow: visible;

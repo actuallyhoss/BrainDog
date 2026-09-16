@@ -48,7 +48,7 @@ test('and the mark goes down in the same tick, not in an effect', () => {
      effect would let both through, and the reader would meet the same clause twice on one screen —
      which is exactly the "never again" the rule is about. */
   forget();
-  const answers = [teach('list'), teach('list'), teach('list')];
+  const answers = [teach('page'), teach('page'), teach('page')];
   assert.deepEqual(answers, [true, false, false]);
 });
 

@@ -61,7 +61,11 @@
 import * as pref from './pref.ts';
 
 /** The four this build teaches. Closed, so a fifth is a decision rather than a call site. */
-export const NOUNS = ['list', 'row', 'page', 'block'] as const;
+/* `list` WAS A FIFTH AND WENT. Its clause sat under a list's title the first time one opened, and
+   under a heading like "Money 38" over a table of rows with the same columns, "a list of one kind of
+   thing, with the same fields on every row" described what the screen was already showing. A
+   definition a reader could have written from the screen is not teaching anything. */
+export const NOUNS = ['row', 'page', 'block'] as const;
 export type Noun = (typeof NOUNS)[number];
 
 /**

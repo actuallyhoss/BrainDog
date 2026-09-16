@@ -955,7 +955,6 @@ export const copy = {
        badly under the heading "Obligations", where the three examples sit directly beneath one of
        themselves and scan as the list's FIELDS. What "typed" actually means is the half a reader
        needs, so that is the half this says. */
-    list: 'a list of one kind of thing, with the same fields on every row',
     /**
      * DEFINED BY EXAMPLE, NOT BY ANOTHER NOUN. This read "one thing in a list. It has a number you
      * can say" and broke `copy.ts`'s own stated invariant two lines up — none of these defines
@@ -975,7 +974,11 @@ export const copy = {
 
        WHAT IS LEFT IS WHAT A READER CAN DO WITH IT. `block` is defined on its own, one line down,
        on the screen where somebody meets one. */
-    page: 'a screen you arrange yourself, made of pieces that each read from a list',
+    /* AND IT SAYS WHAT TO DO ABOUT IT. The clause was a description of the idea, standing between the
+       title and the figures; what a reader meeting a page needs is that it is theirs to change and
+       that nothing on it is typed in twice. It names no control, because Edit layout is absent on
+       a phone. */
+    page: 'this page is yours to arrange, and every figure on it is read from your lists',
     block: 'one piece of a page: a table, a figure, a note',
   } as const,
 
