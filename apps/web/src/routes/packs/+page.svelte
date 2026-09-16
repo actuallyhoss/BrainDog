@@ -473,20 +473,32 @@
    * 900, which is what this rule now works out on its own, and while they stood they put a single
    * card back into half a page at every width below 1200.
    */
+  /* ROWS, NOT A WALL OF CARDS (DESIGN-SYSTEM APPENDIX C13). Six bordered cards with a switch and a
+     ruled footer each read as a marketplace grid, and put six accent shapes side by side. An installed
+     add-on is a row: its name, version and switch on the first line, what it is under it, and its
+     three links at the trailing edge, with a hairline between rows as every list has. */
   .grid-packs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    max-inline-size: var(--page-max);
   }
 
   .pack {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--sp-6);
+    row-gap: var(--sp-1);
+    align-items: start;
+    padding-block: var(--sp-4);
+    border-block-end: 1px solid var(--line-soft);
+  }
+
+  .pack > :global(*) {
+    grid-column: 1;
+  }
+
+  .pack > .pack-head {
+    grid-column: 1 / -1;
   }
 
   .pack-head {
@@ -570,15 +582,27 @@
   /* A hairline, and the card's own padding pulled back over it, so the actions read as the card's
      FOOTER rather than as two more lines of its body. Without it "What this adds" sits at the same
      level as the blurb above it and the card has no bottom. */
-  .pack-foot {
+  .pack > .pack-foot {
+    grid-column: 2;
+    grid-row: 2 / span 2;
     display: flex;
     gap: var(--sp-1);
     flex-wrap: wrap;
-    margin-block-start: auto;
-    padding-block-start: var(--sp-3);
-    margin-inline: calc(var(--sp-4) * -1);
-    padding-inline: calc(var(--sp-4) - var(--sp-3));
-    border-block-start: 1px solid var(--line);
+    justify-content: end;
+    margin-inline-end: calc(var(--sp-3) * -1);
+  }
+
+  @media (width < 640px) {
+    .pack {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .pack > .pack-foot {
+      grid-column: 1;
+      grid-row: auto;
+      justify-content: start;
+      margin-inline: calc(var(--sp-3) * -1) 0;
+    }
   }
 
   /* A DEFINITION LIST, NOT A CODE BLOCK. It was a `<pre>` in the id face with its own horizontal
