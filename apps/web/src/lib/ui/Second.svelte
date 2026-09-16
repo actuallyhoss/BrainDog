@@ -76,7 +76,7 @@
          every term in this product is introduced under (19 §9). -->
     <p class="packs">
       {firstRun.secondPacks}
-      <Button href="/packs" weight="bare">Browse packs</Button>
+      <Button href="/packs" weight="bare">{firstRun.secondBrowse}</Button>
     </p>
   </section>
 {/if}
@@ -145,13 +145,18 @@
     font-size: var(--t-sm);
   }
 
+  /* THE SENTENCE, THEN ITS LINK ON A LINE OF ITS OWN, with the link's padding hung into the gutter so
+     its word starts where the sentence does. Wrapped inline, the link started 13px in from the text. */
   .packs {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
+    display: grid;
+    justify-items: start;
+    gap: var(--sp-1);
     margin-block: var(--sp-5) 0;
     max-inline-size: 60ch;
     color: var(--ink2);
+  }
+
+  .packs :global(.btn) {
+    margin-inline-start: calc(-1 * (var(--sp-3) + 1px));
   }
 </style>

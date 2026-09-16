@@ -2197,6 +2197,7 @@
            that one IS their words. -->
       <Empty
         kind={emptyKind}
+        glyph={emptyKind === 'no-data-yet' ? iconFor(decl.icon, 'rows') : undefined}
         title={emptyKind === 'no-results'
           ? `${result.total} rows, none matching:`
           : emptyKind === 'cleared'
@@ -2213,7 +2214,9 @@
           {#if emptyKind === 'no-results'}
             <Button href="/r/{id}">{copy.clearFilters}</Button>
           {:else if emptyKind === 'no-data-yet'}
-            <Button weight="primary" onclick={() => (createOpen = true)}>{copy.addOne}</Button>
+            <!-- NO "Add the first row" HERE ANY MORE. The capture line sits directly above and the New
+                 button beside the title, so an empty list drew three ways to add a row and two filled
+                 buttons. The one offer only this state can make is the example. -->
             <!-- ON A LIVE RECORD IT ADDS THE EXAMPLE ROW, through the same `create` and the same inference the
                  capture line uses: an empty list offering to show you what a row looks like, and answering with a
                  sentence about what it would have done, is the defect this phase exists to remove. It is a REAL
@@ -2631,7 +2634,9 @@
       eight would describe a record that person does not have.
     -->
     {#if arriving}
-      <Second held={[id]} register={id} first />
+      <!-- AND THE LISTS IT ALREADY HAS WITH ROWS IN THEM. A list added on the way to this one (Services
+           brings Projects) was offered again as a card for something already done. -->
+      <Second held={[id, ...(page.data.index?.registers ?? []).map((r: { id: string }) => r.id)]} register={id} first />
     {/if}
 
     <!-- AND UNDER THE ROWS, NOT OVER THEM.

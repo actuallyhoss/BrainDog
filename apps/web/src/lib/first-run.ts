@@ -122,14 +122,16 @@ export const firstRun = {
      which manufactures work is the failure. */
   secondHeading: 'One kind of thing is a list. Two is a record.',
   secondBody:
-    'Rows in one list can point at rows in another: an invoice at the client it is for, a renewal at the project it belongs to. That is where the record starts answering questions you did not ask it.',
+    'Rows in one list can point at rows in another: an invoice at the client it is for, a renewal at the project it belongs to.',
 
   /* AND THE WORD *PACK*, FOR THE FIRST TIME IN THE PRODUCT, DEFINED IN PLACE. It does not appear on
      screen one at all: selecting a pack means reading an install diff written in the language of
      metrics and nav order, and asking somebody to approve four schema reviews before they have seen
      one of their own rows is worse than a tour. Here they have seen one. */
-  secondPacks:
-    'A pack is a list somebody else already worked out the fields for, with the figures and the pages that go with it. Nothing installs without you reading what it would change.',
+  /* Cut to two short sentences: under a heading, a paragraph and three cards, the fourth block of
+     prose on a first minute was the one nobody read. */
+  secondPacks: 'A pack is a list somebody already worked out, with its figures and pages. Nothing installs until you have read what it changes.',
+  secondBrowse: 'Browse packs',
 
   /**
    * SCREEN 2b: WHAT HAPPENED TO THE ROW THEY JUST TYPED.
@@ -160,8 +162,9 @@ export const firstRun = {
   keptNothingWhy: 'This record cannot be written to from the browser, so the row lasts until this tab is closed or reloaded.',
   /* AND THE WAY ONWARD IS AN OFFER, NAMED FOR WHAT IS THERE. It used to be the only path and it was
      taken without asking: a list of somebody else's invoices, arrived at with no explanation, reads
-     as the row having been written and gone somewhere strange. Named, it reads as what it is. */
-  seeTheList: (label: string) => `See ${label} as it comes`,
+     as the row having been written and gone somewhere strange. Named, it reads as what it is.
+     "See Money as it comes" named it and then hedged; the verb is the whole offer. */
+  seeTheList: (label: string) => `Open ${label}`,
   /**
    * AND THE ROW THEY TYPED IS IN IT.
    *

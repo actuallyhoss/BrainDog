@@ -268,9 +268,10 @@
     }));
   });
 
-  type Outcome = { made: { name: string; list: string; register: string }[]; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean };
+  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
+  let kept = $state<HTMLDivElement | undefined>(undefined);
   /** Rows this screen already made, by register and title, so a second press corrects or skips rather than duplicates. */
   const madeRows = new Map<string, number>();
 
@@ -293,7 +294,7 @@
       const client = createClient({ base: location.origin });
       const chosen = await recordOrSample(client, sampled);
       const installed = chosen.first.ok ? chosen.first.value : [];
-      const out: Outcome = { made: [], on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample };
+      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample };
 
       /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
       const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
@@ -367,7 +368,17 @@
 
       /* TURN 1'S ROW IN THE SAME PRESS, after People is on, so `remember` reads it as on. */
       await remember();
+      /* THE WAY ONWARD IS THERE WHENEVER A LIST IS. It used to follow only a made row, so a sentence
+         that named a client and no invoice added four lists, said "Your lists are ready." and ended
+         the screen with no way into any of them. The first row made, else the first list now on in
+         the order the sentence named them, so "I send invoices" opens Money and not the Projects
+         list Money happened to need first. */
+      const named = [...new Set([...now.packs.filter((p) => p.why.length > 0).map((p) => p.id as string), ...usable])];
+      const firstOn = named.filter((id) => usable.has(id)).map((id) => packOf(id)?.registers[0]).find((r): r is string => Boolean(r));
+      out.onward = out.made[0] ?? (firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
       outcome = out;
+      await tick();
+      kept?.scrollIntoView({ block: 'nearest' });
     } finally {
       making = false;
     }
@@ -394,6 +405,40 @@
 
     for (const p of manifest.provides) if (p.startsWith('register.')) held.add(p.slice('register.'.length));
     return null;
+  }
+
+  /**
+   * Make sure the list a typed row goes into is there and on, before the row is sent.
+   *
+   * A FRESH RECORD HOLDS NO LISTS, so the one-row path refused its own first row with "There is no
+   * register called services" while the sentence path, which adds its lists first, worked. The same
+   * `addPack` the sentence path uses, with whatever the pack points at added ahead of it. Answers the
+   * sentence to show when the list could not be made ready, and `null` when it is.
+   */
+  async function ensure(client: ReturnType<typeof createClient>, chosen: Awaited<ReturnType<typeof recordOrSample>>, register: string): Promise<string | null> {
+    const installed = chosen.first.ok ? chosen.first.value : [];
+    const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
+    if (held.has(register)) return null;
+    const ready = async (reg: string, depth: number): Promise<string | null> => {
+      if (held.has(reg)) return null;
+      const id = PACKS.find((p) => p.registers.includes(reg))?.id;
+      if (!id || depth > 4) return firstRun.shapeAbsent(REGISTERS[reg]?.name ?? reg);
+      const state = installed.find((p) => p.id === id);
+      if (state) {
+        const on = await chosen.source.enable(id);
+        if (!on.ok) return firstRun.shapeRefused(packName(id), on.refusal.fix);
+        for (const r of state.registers) held.add(r);
+        return null;
+      }
+      const doc = firstPartyDocument(id as FirstPartyId);
+      if (!doc) return firstRun.shapeAbsent(packName(id));
+      for (const need of firstPartyManifest(id as FirstPartyId).requires) {
+        const refused = await ready(need.slice('register.'.length), depth + 1);
+        if (refused) return refused;
+      }
+      return addPack(client, id as FirstPartyId, doc, held);
+    };
+    return ready(register, 0);
   }
 
   /** Which of the two ways in is on screen. In the address, so Back from the list returns to the sentence. */
@@ -611,10 +656,14 @@
         }
         saved = null;
       } else {
-        saved = await write(client, choice.key);
+        const missing = await ensure(client, chosen, choice.key);
+        saved = missing === null ? await write(client, choice.key) : { ok: false, why: missing };
       }
       said = true;
       void remember();
+      /* THE OUTCOME IS BELOW THE FOLD ON A PHONE, and it holds the way onward. */
+      await tick();
+      kept?.scrollIntoView({ block: 'nearest' });
     } finally {
       writing = false;
     }
@@ -761,7 +810,7 @@
                     {#if l.rows.length > 0}
                       <ul class="col-rows">
                         {#each l.rows as r}
-                          <li>{r.title}{#if r.note} <span class="became">{r.note}</span>{/if}</li>
+                          <li>{r.title}{#if r.note}{' '}<span class="became">{r.note}</span>{/if}</li>
                         {/each}
                       </ul>
                     {/if}
@@ -773,12 +822,12 @@
         {/if}
 
         <div class="actions shape-actions">
-          <Button weight="primary" disabled={!read || read.declined !== null || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
+          <Button weight={outcome?.onward ? 'quiet' : 'primary'} disabled={!read || read.declined !== null || making} onclick={() => void make()}>{firstRun.shapeMake}</Button>
           <Button weight="bare" onclick={() => void goto('/start?list', { keepFocus: true, noScroll: true })}>{firstRun.shapeFromList}</Button>
         </div>
 
         {#if outcome}
-          <div class="kept" role="status">
+          <div class="kept" role="status" bind:this={kept}>
             {#if outcome.made.length > 0}
               {@const items = firstRun.shapeAnd(outcome.made.map((m) => firstRun.shapeIn(m.name, m.list)))}
               <p class="kept-what">{outcome.waiting ? firstRun.shapeMadeWaiting(items, copy.markNotWritten) : firstRun.shapeMade(items)}</p>
@@ -793,9 +842,9 @@
             {#if outcome.absent.length > 0}<p class="kept-why">{firstRun.shapeAbsent(firstRun.shapeAnd(outcome.absent))}</p>{/if}
             {#each outcome.refused as r}<p class="kept-why">{r}</p>{/each}
             {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>{/if}
-            {#if outcome.made[0]}
+            {#if outcome.onward}
               <div class="actions">
-                <Button href={`/r/${outcome.made[0].register}?first=1`}>{firstRun.seeTheList(outcome.made[0].list)}</Button>
+                <Button weight="primary" href={`/r/${outcome.onward.register}?first=1`}>{firstRun.seeTheList(outcome.onward.list)}</Button>
               </div>
             {/if}
           </div>
@@ -900,8 +949,10 @@
         {#if problems.length > 0}<p class="first-why" id="first-why">{problems[0]}</p>{/if}
 
         <div class="actions">
+          <!-- ONE FILLED CONTROL. Once the row has landed the filled one is the way onward, below, and
+               this steps down to a correction. -->
           <Button
-            weight="primary"
+            weight={said && (saved === null || saved.ok) ? 'quiet' : 'primary'}
             type="submit"
             disabled={problems.length > 0 || writing}
             aria-describedby={problems.length > 0 ? 'first-why' : undefined}>{copy.addTheRow}</Button
@@ -926,7 +977,7 @@
           pressed the button, so nothing here needs to interrupt what they were reading (13 §7).
         -->
         {#if said}
-          <div class="kept" role="status">
+          <div class="kept" role="status" bind:this={kept}>
             <!-- WHAT HAPPENED FIRST, THEN WHY. This opened on "Nothing was saved yet." and said it
                  twice more before it said where the row was, so the one thing that had happened
                  came last. That it is not saved is now said once as a sentence and once as the name
@@ -959,7 +1010,7 @@
                  undoing the sentence above. -->
             {#if saved === null || saved.ok}
               <div class="actions">
-                <Button href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
+                <Button weight="primary" href={`/r/${choice.key}?first=1`}>{firstRun.seeTheList(list)}</Button>
               </div>
             {/if}
           </div>
@@ -1071,8 +1122,14 @@
 
   /* ── turn 2 ───────────────────────────────────────────────────────────── */
 
-  .turn .question {
+  /* ONLY WHERE IT OPENS THE TURN. Under the claim and its paragraph it needs its own space, and
+     this rule took it away, so "Where do you want to start?" sat on the paragraph's last line. */
+  .turn .question:first-child {
     margin-block-start: 0;
+  }
+
+  .turn .heard-now:not(:empty) {
+    margin-block-start: var(--sp-2);
   }
 
   .shape-field {
