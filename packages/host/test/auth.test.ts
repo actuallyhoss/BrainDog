@@ -54,6 +54,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'GET /auth/passkeys both',
       'POST /auth/passkey/remove both',
       'POST /auth/logout both',
+      'POST /auth/switch both',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
       'POST /auth/device both',
@@ -66,7 +67,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
 test('every flow has one route, named by the rule, and only reads are GETs', () => {
   const flows: AuthFlow[] = [
     'methods', 'session', 'key.exchange', 'passkey.register.options', 'passkey.register', 'passkey.assert.options',
-    'passkey.assert', 'magic.start', 'magic.redeem', 'passkeys', 'passkey.remove', 'logout', 'claim.mint',
+    'passkey.assert', 'magic.start', 'magic.redeem', 'passkeys', 'passkey.remove', 'logout', 'switch', 'claim.mint',
   ];
   for (const flow of flows) {
     const rows = AUTH_ROUTES.filter((r) => r.flow === flow);
@@ -283,6 +284,29 @@ test('a cookie that names nothing is a 401 with the one sentence, and it is clea
   assert.equal(out.status, 401);
   assert.deepEqual(out.body.refusal, { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' });
   assert.deepEqual(out.headers.getSetCookie(), [clearCookie('secure')]);
+});
+
+test('OPENING ANOTHER RECORD MOVES THE SESSION, from a page here only, and keeps the cookie it came with', async () => {
+  const { call, d } = setup();
+  const signed = await call('/auth/token', { body: { serverKey: KEY } });
+  const cookie = (signed.headers.getSetCookie()[0] ?? '').split(';')[0] ?? '';
+  const shop = d.provision({ slug: 'the-shop', email: 'ada@example.com' });
+  assert.ok(shop.ok);
+
+  const foreign = await call('/auth/switch', { body: { slug: 'the-shop' }, headers: { cookie, origin: 'https://evil.example' } });
+  assert.equal(foreign.status, 403);
+  assert.equal((await call('/auth/session', { headers: { cookie } })).body.value?.record, signed.body.value?.record, 'a page elsewhere moved the session');
+
+  const moved = await call('/auth/switch', { body: { slug: 'the-shop' }, headers: { cookie } });
+  assert.equal(moved.status, 200);
+  assert.equal(moved.body.value?.record, shop.ok ? shop.value.record : '');
+  assert.deepEqual(moved.headers.getSetCookie(), [], 'a switch wrote a cookie');
+  assert.equal((await call('/auth/session', { headers: { cookie } })).body.value?.record, moved.body.value?.record);
+
+  const elsewhere = await call('/auth/switch', { body: { slug: 'somebody-elses' }, headers: { cookie } });
+  assert.equal(elsewhere.status, 403);
+  assert.equal(elsewhere.body.refusal?.at, 'slug');
+  assert.equal((await call('/auth/switch', { body: { slug: 'the-shop' } })).status, 401, 'no cookie opened a record');
 });
 
 test('TEN WRONG KEYS ARE COMPARED, THE ELEVENTH IS A 429 WITH Retry-After, and the right key during it is too', async () => {

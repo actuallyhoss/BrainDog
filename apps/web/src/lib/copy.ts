@@ -236,6 +236,8 @@ export const copy = {
    * It is one key now, so the next rename reaches both call sites or neither.
    */
   otherRecord: (name: string) => `${name} would open, with its own lists and pages`,
+  recordNotOpened: 'That record could not be opened just now. Try again in a moment.',
+  recordOpenSignIn: 'Sign in again to open another record.',
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
      successfully", which reports on the software rather than on the record. */

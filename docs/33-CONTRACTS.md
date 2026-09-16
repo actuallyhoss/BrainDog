@@ -441,10 +441,12 @@ is a bare `429` with `Retry-After` and `{ ok: false, retryAfter }`; a lockout st
 | `/auth/device` | POST | both | `{ slug?, reach, label, scope? }` with no credential, and no `Origin` needed because a CLI sends none: `{ device_code, user_code, verification_uri, expires_in, expires, interval }`, where `verification_uri` is always `<origin>/settings/agents`. `403` when the host was reached by another name or a page on another origin sent it; ten starts per address in 15 minutes, then `429` |
 | `/auth/device/token` | POST | both | `{ slug?, device_code }`: `{ pending: true, interval }` until approved, then the bearer once. `slug` names the record on Cloud; the self-host holds one, and answers both routes only when `BRAINDOG_TOKEN` is set |
 | `/auth/invite` | POST | both | `{ inviteToken, accept? }`, the token from the link's fragment: without `accept` it looks and spends nothing, answering `{ email, expires_at, signedInAs }`. With it, somebody signed in at that address goes on the record; an address that can already sign in here is 401 and signs in first; a new address is made, put on the record and given a session. A self-host whose owner has no passkey is 409, because its server key stops working at the second person |
+| `/auth/switch` | POST | both | `{ slug }` with the session cookie, from a page on this origin: the session row's record moves to that one, and `Who` comes back with no new cookie. A record the person is not on, a closed one or a released name is one `403 FORBIDDEN` at `slug`; what they may do inside is still the record's own table |
 | `/auth/provision` · `/auth/claim/mint` | POST | Cloud | the operator's, behind `PROVISION_KEY`: a record, its Directory rows and a 24-hour claim link handed back, never mailed |
 
 Specified and not built: `/auth/device/approve` (the operation grant of
-§10) and `/auth/switch`. They keep these paths when they land. *(`/auth/invite` landed September 16th 2026, as a POST taking the
+§10). It keeps this path when it lands. *(`/auth/switch` landed September 16th 2026 as a POST taking `{ slug }`, not the
+`GET /auth/switch/<slug>` of `50`: a GET that moves a session is a link any page can make a browser follow.)* *(`/auth/invite` landed September 16th 2026, as a POST taking the
 token in its body: the link is `<origin>/invite#<token>` and the fragment keeps the token out of logs, proxies and `Referer`,
 as a sign-in link's does.)*
 

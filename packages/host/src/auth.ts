@@ -133,6 +133,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/passkeys', method: 'GET', flow: 'passkeys', on: 'both', needs: 'session', what: 'Your passkeys, never their keys.' },
   { path: '/auth/passkey/remove', method: 'POST', flow: 'passkey.remove', on: 'both', needs: 'session', what: 'Remove one of your passkeys, the last one included.' },
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
+  { path: '/auth/switch', method: 'POST', flow: 'switch', on: 'both', needs: 'session', what: 'Open another record you are on, in this browser. `{ slug }`.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   ...DEVICE_ROUTES,
@@ -448,6 +449,8 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
         : { flow, linkToken: text(body.linkToken), ip, ...presented };
     case 'passkey.remove':
       return { flow, sid: sid ?? '', id: text(body.id) };
+    case 'switch':
+      return { flow, sid: sid ?? '', slug: text(body.slug) };
     default:
       return null;
   }

@@ -41,6 +41,7 @@
   import RowMenu from './RowMenu.svelte';
   import Kbd from './Kbd.svelte';
   import { toasts } from './toast.svelte.ts';
+  import { openRecord } from '../record/switcher.ts';
 
   let {
     nav,
@@ -67,6 +68,20 @@
     icons?: boolean | undefined;
     ontoggle?: (() => void) | undefined;
   } = $props();
+
+  /**
+   * ANOTHER RECORD OPENS IN THIS BROWSER: the session moves to it, and the app starts again at Home, reading only that record.
+   * A host with no second record to open (the sample) says what would have opened, as it did; a refusal is the host's sentence.
+   */
+  let opening = false;
+  async function openOther(r: { slug: string; name: string }) {
+    if (r.name === record || opening) return;
+    opening = true;
+    const out = await openRecord((url, init) => fetch(url, init), r.slug, location.origin);
+    opening = false;
+    if (out.from === 'opened') return location.assign('/');
+    toasts.push(out.from === 'absent' ? copy.notWritten(copy.otherRecord(r.name)) : out.fix, out.from === 'absent' ? {} : { intent: 'warn' });
+  }
 
   /**
    * ── THE NAME OF THE THING UNDER THE POINTER ────────────────────────────────
@@ -299,8 +314,8 @@
 
       <!-- THE ONE CONTROL THAT ASSERTS THIS PRODUCT HOLDS MORE THAN ONE BUSINESS could not reach the
            second one: every row was `href="/"`, so choosing another record left you in this one with
-           the name unchanged and no toast. The record this app draws is a fixture, so the other row
-           says so instead of pretending — a control that silently does nothing is the failure this
+           the name unchanged and no toast. On a record the other row opens that record now, through
+           `/auth/switch`; on the sample there is nothing to open, so the row says so instead of pretending — a control that silently does nothing is the failure this
            app's own rule is written about. -->
       <!--
         AND THE RECORD YOU ARE ALREADY IN TOOK YOU SOMEWHERE ELSE.
@@ -310,8 +325,8 @@
         the anchor's default action was the one wearing the tick, and pressing "you are here" from a
         register put you on the dashboard.
 
-        IT IS A `<button>` NOW, because none of these rows navigates: the other records cannot be
-        opened yet and say so, and the current one has nowhere to go. A menu item that is a link to
+        IT IS A `<button>` NOW, because none of these rows is a link: another record is opened by
+        moving the session and starting again at Home, and the current one has nowhere to go. A menu item that is a link to
         a place it does not take you is the shape a reader learns not to trust.
       -->
       {#each records as r}
@@ -320,10 +335,7 @@
           class="mi"
           role="menuitem"
           aria-current={r.name === record ? 'true' : undefined}
-          onclick={() => {
-            if (r.name === record) return;
-            toasts.push(copy.notWritten(copy.otherRecord(r.name)));
-          }}
+          onclick={() => void openOther(r)}
         >
           <span class="mi-avatar" aria-hidden="true">{r.name.slice(0, 1)}</span>
           <span class="mi-name">{r.name}</span>

@@ -718,6 +718,34 @@ test('each way in is off until the host turns it on, and methods says which are 
   assert.equal(ok(await on.auth({ flow: 'methods', sid: 'C'.repeat(43) })).session, 'clear', 'a dead cookie was not cleared');
 });
 
+/* ── opening another record ───────────────────────────────────────────── */
+
+test('A SESSION OPENS ANOTHER RECORD ITS PERSON IS ON, and only one they are on, open, under a live name', async () => {
+  const { sql, d, ada, record } = setup();
+  const sid = sidOf(await keyIn(d));
+  const shop = value<{ record: string }>(d.provision({ slug: 'the-shop', email: 'ada@example.com' })).record;
+  const gone = value<{ record: string }>(d.provision({ slug: 'the-old-shop', email: 'ada@example.com' })).record;
+  value(d.close(gone));
+  value(d.person$('bob@example.com', 'Bob'));
+  value(d.provision({ slug: 'bobs-books', email: 'bob@example.com' }));
+
+  const moved = ok(await d.auth({ flow: 'switch', sid, slug: 'The-Shop ' }));
+  assert.deepEqual(moved.body, { person: ada, email: 'ada@example.com', record: shop, provedAt: NOW });
+  assert.equal(moved.session, undefined, 'a switch minted a new cookie, and the record is on the row');
+  assert.equal(ok(await d.auth({ flow: 'session', sid })).body.record, shop, 'the next request still named the first record');
+
+  for (const slug of ['bobs-books', 'the-old-shop', 'nobody', '']) {
+    const refused = await d.auth({ flow: 'switch', sid, slug });
+    assert.equal(refused.status, 403, slug);
+    assert.deepEqual('refusal' in refused && refused.refusal, { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' });
+  }
+  assert.equal(ok(await d.auth({ flow: 'session', sid })).body.record, shop, 'a refused switch moved the session');
+
+  ok(await d.auth({ flow: 'switch', sid, slug: 'the-studio' }));
+  assert.equal(sql.one<{ record: string }>('SELECT record FROM dir_session')?.record, record);
+  notYou(await d.auth({ flow: 'switch', sid: 'C'.repeat(43), slug: 'the-studio' }), true);
+});
+
 /* ── the migration ────────────────────────────────────────────────────── */
 
 test('A DIRECTORY WRITTEN BY VERSION 2 IS BROUGHT FORWARD, and signs its person in', async () => {

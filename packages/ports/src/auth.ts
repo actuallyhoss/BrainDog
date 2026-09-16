@@ -56,6 +56,8 @@ export type AuthCall =
   | { flow: 'passkeys'; sid: string }
   | { flow: 'passkey.remove'; sid: string; id: string }
   | { flow: 'logout'; sid: string }
+  /** Open another record this person is on, in this browser: the session row's record moves, and the cookie does not. */
+  | { flow: 'switch'; sid: string; slug: string }
   /** Operator only: the host checks who is asking before this reaches the Directory. */
   | { flow: 'claim.mint'; email: string };
 
@@ -149,6 +151,7 @@ export type AuthBodies = {
   passkeys: PasskeyInfo[];
   'passkey.remove': Record<string, never>;
   logout: Record<string, never>;
+  switch: Who;
   'claim.mint': { expires: number };
 };
 

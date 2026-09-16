@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readRecordsForSwitcher, type Fetch, type SwitcherRow } from './switcher.ts';
+import { copy } from '../copy.ts';
+import { openRecord, readRecordsForSwitcher, type Fetch, type SwitcherRow } from './switcher.ts';
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -53,4 +54,23 @@ test('any other refusal is passed through as the host said it', async () => {
   const { io } = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Records are the account holder’s.' } }));
   const out = await readRecordsForSwitcher(io);
   assert.deepEqual(out, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Records are the account holder’s.' } });
+});
+
+/* ── opening another record ─────────────────────────────────────────── */
+
+test('OPENING ANOTHER RECORD posts its name from this page, and a host that holds one record is not a refusal', async () => {
+  const opened = host(() => json(200, { ok: true, value: { person: 'p_1', record: 'rec_2' } }));
+  assert.deepEqual(await openRecord(opened.io, 'kiln', 'https://app.brain.dog'), { from: 'opened' });
+  assert.equal(opened.sent[0]?.url, 'https://app.brain.dog/auth/switch');
+  assert.equal(opened.sent[0]?.init?.method, 'POST');
+  assert.equal(opened.sent[0]?.init?.body, JSON.stringify({ slug: 'kiln' }));
+
+  /* The sample on a static host answers with its 404 page, and a host where nobody signs in has no such route. */
+  assert.deepEqual(await openRecord(host(() => new Response('<!doctype html>', { status: 404 })).io, 'kiln'), { from: 'absent' });
+  assert.deepEqual(await openRecord(host(() => json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'x' } })).io, 'kiln'), { from: 'absent' });
+
+  assert.deepEqual(await openRecord(host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } })).io, 'kiln'), { from: 'refused', fix: copy.recordOpenSignIn });
+  const fix = 'You are on no open record by that name.';
+  assert.deepEqual(await openRecord(host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix, at: 'slug' } })).io, 'kiln'), { from: 'refused', fix });
+  assert.deepEqual(await openRecord(host(null).io, 'kiln'), { from: 'refused', fix: copy.recordNotOpened });
 });

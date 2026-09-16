@@ -824,7 +824,13 @@ export async function start(options: {
     door: {
       on: 'selfhost',
       origin,
-      auth: directory.auth,
+      /* OPENING ANOTHER RECORD OPENS ONLY THE ONE THIS PROCESS SERVES. The Directory may list more records under one data
+         directory, and moving a session to one this process never opened would answer "opened" and keep serving this
+         one. So any other name is the Directory's own refusal, before the row is touched. */
+      auth: ((call) =>
+        call.flow === 'switch' && directory.resolve(String(call.slug).trim().toLowerCase())?.record !== api.kernel.identity()?.id
+          ? Promise.resolve({ status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' } })
+          : directory.auth(call)) as Auth,
       open: token === undefined,
       /* AN INVITATION LINK IS SPENT BY SIGNING IN, so it is taken only where somebody can: the record says who may join,
          and the Directory makes the person and holds the session. */

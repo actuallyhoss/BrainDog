@@ -115,6 +115,7 @@ async function stack(o: { token?: string | null } = {}) {
   return {
     call,
     keyIn,
+    directory: running.directory,
     sidOf,
     origin,
     id,
@@ -364,6 +365,30 @@ test('GET /account/records IS THE SWITCHER\'S ROW: the one record this process h
 
     const posted = await s.call('/account/records', { body: {}, sid });
     assert.equal(posted.status, 405);
+    s.clean();
+  } finally {
+    await s.close();
+  }
+});
+
+test('POST /auth/switch OPENS ONLY THE RECORD THIS PROCESS SERVES, and never moves the session to one it does not', async () => {
+  const s = await stack();
+  try {
+    const sid = await s.keyIn();
+    /* A SECOND RECORD IN THE SAME DIRECTORY, owned by the same person, that this process never opened. */
+    assert.ok(s.directory.provision({ slug: 'the-other-shop', email: 'ada@example.com' }).ok);
+    const here = await s.call('/auth/switch', { body: { slug: 'the-studio' }, sid });
+    assert.equal(here.status, 200, here.raw);
+    assert.equal(here.body?.value?.record, REC);
+
+    const elsewhere = await s.call('/auth/switch', { body: { slug: 'the-other-shop' }, sid });
+    assert.equal(elsewhere.status, 403);
+    assert.deepEqual(elsewhere.body?.refusal, { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' });
+
+    /* AND THE SESSION STILL READS AND WRITES THIS RECORD. */
+    const who = await s.call('/auth/session', { sid });
+    assert.equal(who.body?.value?.record, REC);
+    assert.equal((await s.call('/api/boot', { sid })).status, 200);
     s.clean();
   } finally {
     await s.close();

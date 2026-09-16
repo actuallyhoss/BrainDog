@@ -601,6 +601,35 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Auth {
         return { status: 200, body: {}, ...carry(found) };
       }
 
+      /**
+       * Open another record, by its live name, in the browser this session is in (`51 §13 D4`, `33 §4`).
+       *
+       * THE RECORD IS ON THE ROW, SO THE ROW MOVES AND THE COOKIE DOES NOT. Every request after this one names the
+       * record it opened, and every other browser this person is signed in on stays where it was.
+       *
+       * ONLY A RECORD THEY ARE ON, OPEN, UNDER A NAME IT STILL HOLDS. A released slug, a closed record and a record
+       * somebody else is on are one answer, so asking names nothing about records this person cannot reach. What they
+       * may do inside it is still the record's own table, asked on every request after.
+       */
+      case 'switch': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const keep = carry(found);
+        const slug = text(call.slug).trim().toLowerCase();
+        const to = sql.one<{ record: string }>(
+          `SELECT s.record AS record FROM dir_slug s
+             JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
+             JOIN dir_member m ON m.record = s.record AND m.person = ?
+            WHERE s.slug = ? AND s.released_at IS NULL`,
+          found.row.person,
+          slug,
+        );
+        if (!to)
+          return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are on no open record by that name.', at: 'slug' }, ...keep };
+        sql.exec('UPDATE dir_session SET record = ? WHERE id_hash = ?', to.record, found.row.id_hash);
+        return { status: 200, body: { ...whoOf(found.row), record: to.record }, ...keep };
+      }
+
       /** The row goes and the cookie is cleared, and an id that names nothing is signed out just the same. */
       case 'logout': {
         const hash = await hashOf(call.sid);

@@ -379,7 +379,7 @@ server key, and adds the operator's two.
 | `GET /auth/methods` · `/session` · `/passkeys`; `POST /auth/passkey/remove` · `/logout` | as named | a logout deletes the row and clears the cookie |
 | `POST /auth/provision` | (the operator's) | a `PROVISION_KEY` bearer; `{ slug, email, name? }` → the record first, then its Directory rows (D21), then a 24-hour claim link handed back to the operator and never mailed |
 | `POST /auth/claim/mint` | `claim.mint` | a `PROVISION_KEY` bearer; a new claim link for a person already provisioned |
-| `POST /auth/device/start` · `/poll` · `/approve`; `/auth/invite`; `/auth/switch` | none yet | specified, not built |
+| `POST /auth/device/start` · `/poll` · `/approve` | none yet | specified, not built |
 
 Self-service sign-up is not built: a hosted record is made by the operator today. A record provisioned while `KEK`
 is bound is made with its three keys wrapped under it. One provisioned without it has no vault keys, and binding
