@@ -79,7 +79,7 @@ type Answered = {
   fold?: boolean;
   icon?: string;
   columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string }[];
-  cells?: { metric: string; label?: unknown }[];
+  cells?: { metric: string; label?: unknown; trend?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
      `heading`, `empty`, `body`, `target`, `authored`, and every `label` a column, cell or reading
@@ -100,7 +100,7 @@ type Answered = {
   authored?: unknown;
   rows?: Row[];
   matched?: number;
-  readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said }[];
+  readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said; trend?: unknown }[];
   scopes?: (string | null)[];
   inherited?: number;
   refusals?: Said[];
@@ -218,9 +218,12 @@ function tileOf(cell: NonNullable<Answered['readings']>[number]): Metric {
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const met = r.rows === 0 ? null : r.met;
+  /* THE LINE IS THE RECORD'S SERIES, and only numbers and gaps are drawn: anything else is not a day. */
+  const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   return {
     id: cell.metric,
     label,
+    ...(trend ? { trend } : {}),
     /* A CURRENCY CODE IS MONEY AND ANY OTHER UNIT IS A QUANTITY. Every unit went to `money`, so a
        sum of 150 kg drew `KG 1.50` and 12.5 hours drew `H 0.13`. */
     value: !r.unit
@@ -370,7 +373,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const authored = authoredOf(b.authored);
   /* A FIGURE'S LABEL IS THE RECORD'S OR ITS OWN NAME. The record checks that a cell names a metric
      and does not check that it carries a label, and the app's type says every cell has one. */
-  const cells = b.cells?.map((c) => ({ metric: c.metric, label: str(c.label) ?? c.metric }));
+  const cells = b.cells?.map((c) => ({ metric: c.metric, label: str(c.label) ?? c.metric, ...(typeof c.trend === 'string' ? { trend: c.trend } : {}) }));
 
   /* THE DECLARATION'S COLUMNS ARE REPLACED BY DRAWN ONES, and everything the record sent that this
      file does not name rides through untouched, so a key a later kernel adds is carried rather than

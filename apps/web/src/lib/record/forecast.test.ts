@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { runway, trend, type Leg } from './forecast.ts';
 import { NOW, PAGES, ROWS } from './data.ts';
-import { page } from './api.ts';
+import { openingOf, page, trendOf } from './api.ts';
 import { magnitudeOf } from 'braindog-render';
 
 /**
@@ -455,4 +455,36 @@ test('A BILL DUE TODAY IS NOT OVERDUE, whatever the hour', () => {
   } finally {
     rows.pop();
   }
+});
+
+/* ── where the walk starts ───────────────────────────────────────────────── */
+
+test('AN OPENING NAMED BY ITS FIGURE IS THAT FIGURE, the one the Cash now tile reads', () => {
+  const opened = openingOf({ metric: 'cash-now' });
+  const liquid = (ROWS.accounts ?? [])
+    .filter((e) => e.fields.liquid === true)
+    .reduce((n, e) => n + ((e.fields.balance as { amount: number }).amount ?? 0), 0);
+  assert.ok(liquid > 0, 'the sample holds no cash, so this proves nothing');
+  assert.equal(opened.value, liquid);
+  assert.equal(opened.unit, 'GBP');
+  assert.equal(opened.refusal, undefined);
+});
+
+test('a typed opening is still a number, and a figure nobody declared is said rather than walked from zero', () => {
+  assert.deepEqual(openingOf(500_000), { value: 500_000, unit: null });
+  const unknown = openingOf({ metric: 'cash-later' });
+  assert.equal(unknown.value, null);
+  assert.match(unknown.refusal ?? '', /no metric called cash-later/);
+});
+
+/* ── how cash has moved ──────────────────────────────────────────────────── */
+
+test('THE SAMPLE HAS NINETY DAYS OF CASH, and the trend reads them as the record would', () => {
+  const trend = trendOf('cash-now', '12w');
+  assert.equal(trend?.length, 84);
+  assert.ok(trend!.every((v) => typeof v === 'number'), 'the sample has a point every day');
+  const now = openingOf({ metric: 'cash-now' }).value;
+  assert.equal(trend!.at(-1), now, 'yesterday closes at the balance the tile reads');
+  assert.equal(trendOf('cash-now', 'a while'), undefined);
+  assert.equal(trendOf('overdue', '12w'), undefined, 'a figure with no series has no line');
 });

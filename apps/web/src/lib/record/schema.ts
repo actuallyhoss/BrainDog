@@ -196,7 +196,10 @@ export type PageBlock = {
   row?: string;
   field?: string;
   versions?: number;
-  cells?: readonly { metric: string; label: string }[];
+  /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
+  cells?: readonly { metric: string; label: string; trend?: string }[];
+  /** A `stat`'s: its first figure is the screen's one hero figure. */
+  lead?: boolean;
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];
   limit?: number;
   /**
@@ -234,7 +237,7 @@ export type PageBlock = {
    * while its own declaration said GBP 5,000, so the tile and the page it sat on disagreed by 8.4
    * times, in the one figure this product computes about the future.
    */
-  opening?: number;
+  opening?: number | { metric: string };
 
   /**
    * `forecast.runway` only: which registers the walk reads, and what each one contributes.

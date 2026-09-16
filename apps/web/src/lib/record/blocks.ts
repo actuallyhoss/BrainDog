@@ -107,6 +107,17 @@ function barRows(block: BlockResult): string[] {
  * backslash it just introduced and turn one literal pipe into a backslash followed by a column
  * break. Doing it here means an author never has to know the rule.
  */
+/**
+ * A figure's trend as the dialect's fourth `stat` cell: whole units, a gap as `-`.
+ *
+ * WHOLE UNITS FOR MONEY, because the line's accessible name reads these numbers out, and `3385000` is
+ * pence nobody says. The shape is the same at any scale. A trend of gaps only draws no cell at all.
+ */
+export function trendCell(trend: readonly (number | null)[] | undefined, money = false): string {
+  if (!trend || !trend.some((v) => v !== null)) return '';
+  return ` | ${trend.map((v) => (v === null ? '-' : String(money ? Math.round(v / 100) : v))).join(' ')}`;
+}
+
 const escapeCell = (c: string): string =>
   c.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
@@ -344,7 +355,9 @@ function sectionRow(block: BlockResult): string {
  */
 export function toSegments(block: BlockResult) {
   const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
-  const head = `${block.kind}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
+  /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
+  const form = block.kind === 'stat' && block.lead ? ' lead' : '';
+  const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
   /* AUTHORED ROWS COME FIRST, and a block that declares both a source and authored rows is refused
@@ -368,7 +381,7 @@ export function toSegments(block: BlockResult) {
         )
       : block.metrics
     ? block.metrics.map(
-        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${m.tone ? ` | ${m.tone}` : ''}`,
+        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
       )
     : block.kind === 'bar'
       ? barRows(block)

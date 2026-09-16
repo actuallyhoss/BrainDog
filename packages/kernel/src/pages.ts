@@ -25,7 +25,7 @@ import { evaluate } from '@braindog/where';
 import type { ActionRow } from './actions.ts';
 import type { Json } from './coerce.ts';
 import type { Entry } from './index.ts';
-import { predicateOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 
 export type PageBlock = {
@@ -36,7 +36,10 @@ export type PageBlock = {
   where?: string;
   /** `as: 'scope'` draws where the row applies: its project, or everywhere. */
   columns?: { field: string; label?: string; as?: string }[];
-  cells?: { metric: string; label?: string }[];
+  /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
+  cells?: { metric: string; label?: string; trend?: string }[];
+  /** A `stat`'s: its first figure is the screen's one hero figure. */
+  lead?: boolean;
   /** A `section`'s: whether it starts shut, and the glyph beside its heading. */
   fold?: boolean;
   icon?: string;
@@ -55,8 +58,13 @@ export type PageBlock = {
   versions?: number;
   order?: { field: string; dir?: 'asc' | 'desc' }[];
   limit?: number;
-  /** `forecast.runway` only: what is liquid today, and the legs the walk reads. */
-  opening?: number;
+  /**
+   * `forecast.runway` only: what is liquid today, and the legs the walk reads.
+   *
+   * A number, or `{ metric }`: the figure a page's own `Cash now` tile reads, so the walk and the tile
+   * start from one declaration rather than from a balance typed twice.
+   */
+  opening?: number | { metric: string };
   from?: Leg[];
   horizon?: number;
   empty?: string;
@@ -92,7 +100,7 @@ const READS = new Set([
      for as long as every branch below overwrote the refusal list, and it is a false refusal either
      way: they are keys this file wrote. */
   'rows', 'matched', 'readings', 'walk', 'refusals',
-  'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions',
+  'fold', 'icon', 'inherit', 'since', 'first', 'row', 'field', 'versions', 'lead',
   'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
 ]);
 
@@ -112,7 +120,7 @@ export type BlockResult = PageBlock & {
   /** How many the predicate matched, which is what a total is a total OF. */
   matched: number;
   /** A `stat` block's figures, in the order its cells named them. */
-  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal }[];
+  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[] }[];
   /** A `forecast.runway` block's walk. */
   walk?: Runway;
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
@@ -187,6 +195,8 @@ export type PageDeps = {
   sessionsLive?: () => Entry[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
+  /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
+  points?: (series: string, from: string, to: string) => { at: string; value: number }[];
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
@@ -380,7 +390,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.kind === 'stat' || block.cells) {
     return {
       ...base,
-      readings: (block.cells ?? []).map((cell) => {
+      readings: (block.cells ?? []).map(({ trend: window, ...cell }) => {
         const decl = deps.metric(cell.metric.split(':')[0] ?? '');
 
         if (!decl)
@@ -400,7 +410,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         const at = cell.metric.indexOf(':');
         const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
-        if (read.ok) return { ...cell, reading: read.value };
+        const moved = window === undefined ? {} : trendOf(deps, cell.metric, window);
+        if ('refusal' in moved) return { ...cell, reading: read.ok ? read.value : null, refusal: moved.refusal };
+        if (read.ok) return { ...cell, reading: read.value, ...moved };
         return refused(read) ? { ...cell, reading: null, refusal: read.refusal } : { ...cell, reading: null };
       }),
     };
@@ -416,7 +428,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      it reads is DECLARED on the block: a forecast that knew the word "obligations" would be a
      forecast that works for one record. */
   if (block.source === 'forecast.runway') {
-    if (typeof block.opening !== 'number' || !Array.isArray(block.from))
+    const opened = openingOf(deps, block.opening);
+    if (opened.refusal) return { ...base, refusals: also(opened.refusal) };
+    if (opened.value === null || !Array.isArray(block.from))
       return {
         ...base,
         refusals: also({
@@ -431,9 +445,19 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
        away, not an edit away. `SOURCE_UNKNOWN` at the bottom of this function is the other answer,
        for a word no document publishes at all. Both said `UNIMPLEMENTED` once and a person could not
        tell "wait" from "you made this up". */
-    const walk = deps.runway(block.opening, block.from, block.horizon);
+    const walk = deps.runway(opened.value, block.from, block.horizon);
     if (!walk)
       return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
+    /* A BALANCE IN ONE CURRENCY AND MOVEMENTS IN ANOTHER ARE NOT ONE WALK. */
+    if (opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency)
+      return {
+        ...base,
+        refusals: also({
+          code: 'MIXED_CURRENCY',
+          fix: `The opening balance is in ${opened.unit} and the movements are in ${walk.currency}. A cash walk adds them, so they need one currency.`,
+          at: 'opening',
+        }),
+      };
     return { ...base, walk, matched: walk.steps.length, refusals: also(...walk.refusals) };
   }
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
@@ -534,6 +558,49 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
   };
+}
+
+/**
+ * What a cash walk starts from: a number written on the block, or the reading of a declared figure.
+ *
+ * `{ metric }` IS THE ONE THAT CANNOT DRIFT. A page that leads with Cash now and walks from a typed
+ * opening says two things about one balance, and only one of them moves when an account is updated.
+ */
+function openingOf(deps: PageDeps, opening: PageBlock['opening']): { value: number | null; unit: string | null; refusal?: Refusal } {
+  if (typeof opening === 'number') return { value: opening, unit: null };
+  if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
+  const decl = deps.metric(opening.metric);
+  if (!decl)
+    return {
+      value: null,
+      unit: null,
+      refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${opening.metric} for the walk to start from.`, at: 'opening' },
+    };
+  const read = deps.read(decl);
+  if (!read.ok) return { value: null, unit: null, ...(refused(read) ? { refusal: read.refusal } : {}) };
+  if (read.value.refusals.length) return { value: null, unit: null, refusal: read.value.refusals[0]! };
+  return { value: read.value.value ?? 0, unit: read.value.unit };
+}
+
+/**
+ * How a figure moved over a window, one value a day from its series, a day with no point a gap.
+ *
+ * A GAP AND NOT A ZERO: a day the snapshot did not run is a day nothing is known about, and a dip to
+ * zero would say the balance was zero. Today is not in it, because today's point is written tomorrow.
+ */
+function trendOf(deps: PageDeps, metric: string, window: string): { trend?: (number | null)[] } | { refusal: Refusal } {
+  const span = windowMs(window);
+  if (span === null)
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `trend: ${window} is not a window. Write 12w, 90d or 3m.`, at: 'trend' } };
+  if (!deps.points) return {};
+  const DAY = 86_400_000;
+  const days = Math.max(1, Math.round(span / DAY));
+  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const last = deps.ctx.nowMs - DAY;
+  const from = at(last - (days - 1) * DAY);
+  const by = new Map(deps.points(metric, from, at(last)).map((p) => [p.at, p.value]));
+  const trend = Array.from({ length: days }, (_, i) => by.get(at(last - (days - 1 - i) * DAY)) ?? null);
+  return trend.some((v) => v !== null) ? { trend } : {};
 }
 
 /* ── where a row applies ─────────────────────────────────────────────────── */
@@ -910,6 +977,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const at = cell.metric.indexOf(':');
       add(metric?.(at < 0 ? cell.metric : cell.metric.slice(0, at))?.source);
     }
+    /* A WALK THAT STARTS FROM A FIGURE READS THAT FIGURE'S LIST. */
+    if (block.opening && typeof block.opening === 'object') add(metric?.(block.opening.metric)?.source);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
     if (block.when?.metric) {

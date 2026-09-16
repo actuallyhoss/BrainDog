@@ -491,3 +491,27 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     ],
   },
 };
+
+/* ── how cash has moved ──────────────────────────────────────────────────── */
+
+/**
+ * Ninety days of `cash-now`, one point a day, as the daily snapshot would have written them.
+ *
+ * WORKED BACK FROM THE ROWS, NOT INVENTED. Each day's balance is today's cash less every payment
+ * settled after that day, in and out, so the line moves on the days the paid rows say money moved and
+ * nowhere else. A live record has no such history to show: its snapshot starts on the day the figure
+ * is declared, and its line grows from there.
+ */
+export function cashSeries(days = 90): { at: string; value: number }[] {
+  const liquid = ACCOUNTS.filter((a) => a.liquid === true).reduce((n, a) => n + (a.balance as { amount: number }).amount, 0);
+  const paid = OBLIGATIONS.filter((o) => o.state === 'paid' && typeof o.settled === 'string');
+  const out: { at: string; value: number }[] = [];
+  for (let offset = -days; offset <= -1; offset++) {
+    const at = day(offset);
+    const since = paid
+      .filter((o) => (o.settled as string) > at)
+      .reduce((n, o) => n + (o.direction === 'owed_to_me' ? 1 : -1) * (o.amount as { amount: number }).amount, 0);
+    out.push({ at, value: liquid - since });
+  }
+  return out;
+}

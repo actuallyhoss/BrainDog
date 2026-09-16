@@ -394,3 +394,30 @@ test('a tile over a quantity is drawn as the quantity, and only a currency as mo
   );
   assert.deepEqual(stat.metrics?.map((m) => m.value), ['150 kg', '12.5 h', 'GBP 1,299.00']);
 });
+
+test('A LEAD FIGURE AND ITS TREND COME THROUGH FROM THE RECORD, and reach the dialect as a form and a fourth cell', () => {
+  const stat = blockOf(
+    {
+      kind: 'stat',
+      lead: true,
+      cells: [{ metric, trend: '6d' }, { metric }],
+      readings: [
+        { metric, reading: { value: 300_000, unit: 'GBP', rows: 2, met: true, refusals: [] }, trend: [500_000, 450_000, null, 400_000, 350_000, 300_000] },
+        { metric, reading: { value: 3, unit: null, rows: 3, met: null, refusals: [] }, trend: ['not', 'a', 'day'] },
+      ],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    AT,
+  );
+  assert.deepEqual(stat.metrics?.[0]?.trend, [500_000, 450_000, null, 400_000, 350_000, 300_000]);
+  assert.equal(stat.metrics?.[1]?.trend, undefined, 'a trend that is not numbers and gaps is not drawn');
+  const [segment] = toSegments(stat);
+  assert.equal(segment?.type, 'block');
+  const block = segment as Extract<typeof segment, { type: 'block' }>;
+  assert.equal(block.form, 'lead');
+  assert.equal(block.rows[0]?.cells[3], '5000 4500 - 4000 3500 3000', 'whole pounds, a gap as a dash');
+  assert.equal(block.rows[1]?.cells.length, 3);
+});

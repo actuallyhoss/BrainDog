@@ -27,7 +27,7 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, crossPack, firstPartyDocument, firstPartyManifest, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, OBLIGATIONS } from './modules/money.ts';
+export { ACCOUNTS, OBLIGATIONS, cashSeries } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';

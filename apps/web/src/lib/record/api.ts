@@ -44,6 +44,7 @@ import {
   REGISTERS,
   ROWS,
   NEWS,
+  SERIES,
   VAULT,
 } from './data.ts';
 /* Type only, and there is no cycle: `remote.ts` reads the declaration and the sample, never this file. */
@@ -53,7 +54,7 @@ import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { STALE_MS, findingsFrom, isStale } from '@braindog/kernel';
-import { meetsTarget, read, targetLine, withParam } from './metrics.ts';
+import { meetsTarget, read, targetLine, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -99,6 +100,25 @@ export const homeCurrency = (): string | null =>
  * ONE DECLARATION, READ BY BOTH. The tile and the block were two walks over two openings, and the
  * only way two figures about one future stay in step is for there to be one of them.
  */
+/**
+ * What a cash walk starts from, as the record reads it: a typed number, or a declared figure's reading.
+ *
+ * `{ metric }` keeps the walk and the Cash now tile on one declaration. A figure that cannot be read
+ * leaves the walk with no opening and says why, rather than walking from zero.
+ */
+export function openingOf(opening: PageBlock['opening']): { value: number | null; unit: string | null; refusal?: string } {
+  if (typeof opening === 'number') return { value: opening, unit: null };
+  if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
+  const decl = METRICS[opening.metric];
+  if (!decl) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
+  const reading = read(decl);
+  if (reading.refusals.length) return { value: null, unit: null, refusal: reading.refusals[0]! };
+  return { value: reading.value ?? 0, unit: currencyOfFormat(decl.format) };
+}
+
+/** `money.GBP` is sterling; any other format is not a currency. */
+const currencyOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
+
 const declaredWalk = (): PageBlock | null => {
   for (const decl of Object.values(PAGES)) for (const b of decl.blocks) if (b.source === 'forecast.runway') return b;
   return null;
@@ -957,6 +977,8 @@ export function backlinks(register: string, seq: number, show = 5): Backlink[] {
 export type Metric = {
   id: string;
   label: string;
+  /** How the figure moved, one value a day, oldest first; `null` is a day nothing was recorded. */
+  trend?: (number | null)[] | undefined;
   value: string;
   note: string;
   tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
@@ -1005,7 +1027,7 @@ export function metric(id: string): Metric {
      the note says the figure it starts from. */
   if (id === 'runway') {
     const block = declaredWalk();
-    const walk = runway(block?.opening ?? 0, block?.from ?? []);
+    const walk = runway(openingOf(block?.opening).value ?? 0, block?.from ?? []);
     /* AND A WALK OVER NOTHING IS NOT A RUNWAY OF OVER 180 DAYS. `tone: 'good'` is hard-coded on this
        branch, so a record with no money in it and nothing dated to spend reported the one figure in
        the product that is about the future as fine — out of an opening balance of zero and an empty
@@ -1556,7 +1578,8 @@ function runwayBlock(b: PageBlock): BlockResult {
      
      It mattered the moment the block started stating its total: "12 of 58" where 58 was movements
      inside a window derived from a row count. */
-  const walk = runway(b.opening ?? 0, b.from ?? [], b.horizon);
+  const opened = openingOf(b.opening);
+  const walk = runway(opened.value ?? 0, b.from ?? [], b.horizon);
   /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
      produces a crossing day that looks real and is invented.
 
@@ -1567,8 +1590,12 @@ function runwayBlock(b: PageBlock): BlockResult {
      sentence instead. "Nothing is coming" and "this walk could not be made" are different facts and
      one of them is the reason for the other. */
   const refusals = [
+    ...(opened.refusal ? [opened.refusal] : []),
     ...walk.refusals,
     ...(walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : []),
+    ...(opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency
+      ? [`The opening balance is in ${opened.unit} and the movements are in ${walk.currency}. A cash walk adds them, so they need one currency.`]
+      : []),
   ];
   return {
     ...b,
@@ -1707,6 +1734,8 @@ const READS = new Set([
   'since', 'first', 'row', 'field', 'versions',
   /* A block that reads its project's rows and the ones it inherits from everywhere. */
   'inherit',
+  /* A stat whose first figure is the screen's hero. */
+  'lead',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1862,9 +1891,30 @@ export function readBlock(b: PageBlock): BlockResult {
       total: matched.length,
       drawn: b.drawn ?? drawnWhen(b),
       stale_at: new Date(NOW).toISOString(),
-      metrics: b.cells?.map((c) => ({ ...metric(c.metric), label: c.label })),
+      metrics: b.cells?.map((c) => {
+        const trend = c.trend === undefined ? undefined : trendOf(c.metric, c.trend);
+        return { ...metric(c.metric), label: c.label, ...(trend ? { trend } : {}) };
+      }),
     };
   }
+}
+
+/**
+ * How a figure moved over a window, one value a day from its series, as the record's `trendOf` reads it.
+ *
+ * A day with no point is a gap and never a zero, and today is not in it, because today's point is
+ * written tomorrow. Nothing recorded at all is no trend, so no line is drawn from nothing.
+ */
+export function trendOf(metricId: string, window: string, now: number = NOW): (number | null)[] | undefined {
+  const span = windowMs(window);
+  if (span === null) return undefined;
+  const DAY = 86_400_000;
+  const days = Math.max(1, Math.round(span / DAY));
+  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const last = now - DAY;
+  const by = new Map((SERIES[metricId] ?? []).map((p) => [p.at, p.value]));
+  const trend = Array.from({ length: days }, (_, i) => by.get(at(last - (days - 1 - i) * DAY)) ?? null);
+  return trend.some((v) => v !== null) ? trend : undefined;
 }
 
 /** The mock's stand-in for a compiled `where:`. The real one is one JSON tree, seven consumers. */

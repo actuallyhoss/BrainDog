@@ -2394,6 +2394,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return out.ok ? out.value : null;
     },
     ctx: evalContext(),
+    points: (series, from, to) =>
+      sql.all<{ at: string; value: number }>(
+        "SELECT at, value FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
+        series,
+        from,
+        to,
+      ),
     scopeOf: (register) => {
       const f = scopeFieldOf(registers.get(register)?.fields ?? []);
       return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;

@@ -47,6 +47,13 @@ import type {
 export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 
 /**
+ * The sample's daily series, as a record's snapshots would hold them: ninety days of `cash-now`,
+ * worked back from the paid rows (`@braindog/seed`'s `cashSeries`).
+ */
+export const SERIES: Record<string, readonly { at: string; value: number }[]> = { 'cash-now': cashSeries() };
+import { cashSeries } from '@braindog/seed';
+
+/**
  * The pages the record ships with. They live in the seed, because a page is a document it holds.
  *
  * THE AGENTS PACK'S PAGES ARE HERE BECAUSE ITS REGISTERS ARE: `/p/agents`, a page per skill, and the
