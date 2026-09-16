@@ -5,9 +5,14 @@
   Nothing here is rendered through the markdown renderer. An `inbox_raw` body is untrusted text from
   outside the record, and the quarantine is structural rather than a sanitiser: it is drawn as plain
   text nodes, never parsed (50 §8).
+
+  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD (DESIGN-SYSTEM appendix D). `j` and `k` move a cursor,
+  Enter opens the one under it, `e` files it in the chosen list, Delete archives it, `x` selects it so
+  several are filed or archived at once, and Esc clears the selection. A row leads with its subject,
+  then who sent it and the first words of what they said, then when (rule 7).
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { titleOf } from '$lib/title.ts';
@@ -15,7 +20,9 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { DOM_CAP, INBOX as SAMPLE, NOW, SOURCES } from '$lib/record/api.ts';
+  import { AGENTS_REGISTERS } from '@braindog/seed';
   import type { InboxItem } from '$lib/record/schema.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -27,7 +34,7 @@
   /**
    * ON A LIVE RECORD THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed
    * into it. Until the page arrives the screen draws no rows and no empty state, and a refusal is
-   * the record's own sentence: the inbox is an owner's, so anybody else is told so by the record.
+   * the record's own sentence.
    *
    * `sampled` IS A LIVE SHELL WHOSE READ FOUND NO RECORD, which draws the sample as before.
    * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, so the sample would be a lie about
@@ -39,14 +46,16 @@
   let sampled = $state(false);
   const fromRecord = $derived(route.data.live && !sampled);
   const INBOX = $derived(fromRecord ? (live?.items ?? []) : SAMPLE);
+  const shown = $derived(INBOX.slice(0, DOM_CAP));
   const clock = $derived(fromRecord ? Date.now() : NOW);
   const answered = $derived(!fromRecord || live !== null);
 
   let open = $state<string | null>(route.data.live ? null : (SAMPLE[0]?.id ?? null));
 
   $effect(() => {
-    if (!route.data.live) return;
-    /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
+    /* UNTRACKED, ALL OF IT. The effect read `route.data.live`, so the `invalidateAll` after every filing re-ran the
+       read and put the open row and the cursor back on the first arrival. And it reads the pending count it writes. */
+    if (!untrack(() => route.data.live)) return;
     const at = untrack(opened);
     let ok = false;
     void import('$lib/record/inbox-live.ts')
@@ -69,9 +78,8 @@
   });
 
   /**
-   * THE PAGE BELOW, WHEN ASKED FOR. An inbox longer than one page says so with a control instead of
-   * stopping at two hundred without a word. What arrives is added under what is drawn, and a refusal
-   * here is said under the list, with the arrivals already drawn left where they are.
+   * THE PAGE BELOW, WHEN ASKED FOR. What arrives is added under what is drawn, and a refusal here is
+   * said under the list, with the arrivals already drawn left where they are.
    */
   let older = $state(false);
   let olderFix = $state<string | null>(null);
@@ -91,56 +99,196 @@
   }
 
   /**
-   * ON A LIVE RECORD THE TWO GESTURES WRITE. Filing puts the arrival in the list picked beside the button, titled by its
-   * subject; archiving keeps its bytes. Either way it leaves the list here and the next one opens. A refusal is the
-   * record's own sentence, and the arrival stays where it is. The sample keeps its toasts.
+   * THE LIST A FILED EMAIL GOES INTO, and the one chosen last time.
+   *
+   * It opened on the first list in the record, which on a live record is Agent runs (DESIGN-SYSTEM
+   * D6), so the likeliest press filed an invoice as an agent's run. The choice is remembered on this
+   * device, as a convenience and nothing more: a browser that forgets it opens on the first list again.
    */
+  const INTO = 'braindog.inbox.into';
   const lists = $derived<readonly { id: string; name: string }[]>(route.data.lists ?? route.data.index?.registers ?? []);
-  let into = $state('');
-  const target = $derived(lists.some((l) => l.id === into) ? into : (lists[0]?.id ?? ''));
+  let into = $state(untrack(() => {
+    try {
+      return localStorage.getItem(INTO) ?? '';
+    } catch {
+      return '';
+    }
+  }));
+  /* AN AGENT'S OWN LISTS ARE NOT WHERE AN EMAIL GOES, so the first list is the first of anybody else's. */
+  const AGENTS = new Set(['session', ...Object.keys(AGENTS_REGISTERS)]);
+  const target = $derived(lists.some((l) => l.id === into) ? into : (lists.find((l) => !AGENTS.has(l.id)) ?? lists[0])?.id ?? '');
+  function choose(id: string) {
+    into = id;
+    try {
+      localStorage.setItem(INTO, id);
+    } catch {
+      /* A browser that stores nothing opens on the first list next time. */
+    }
+  }
+
+  /**
+   * ON A LIVE RECORD THE TWO GESTURES WRITE. Filing puts the arrival in the chosen list, titled by its
+   * subject; archiving keeps its bytes. Either way it leaves the list here, the next one takes its
+   * place under the cursor, and the next one opens if this one was open. A refusal is the record's own
+   * sentence, and the arrival stays where it is. The sample says what would happen.
+   */
   let busy = $state(false);
+
+  /** One arrival through the record: `true` when it left the inbox. */
+  async function write(item: InboxItem, gesture: 'file' | 'archive'): Promise<{ ok: boolean; row?: string }> {
+    const m = await import('$lib/record/inbox-write.ts');
+    const out =
+      gesture === 'file' ? await m.fileArrival(location.origin, item.id, target) : await m.archiveArrival(location.origin, item.id);
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      return { ok: false };
+    }
+    return { ok: true, ...(out.row ? { row: out.row } : {}) };
+  }
+
+  /** Take arrivals off the list here, and keep the cursor and the open row on what comes next. */
+  function leave(ids: ReadonlySet<string>) {
+    const had = live;
+    if (!had) return;
+    const at = shown.findIndex((i) => ids.has(i.id));
+    const items = had.items.filter((i) => !ids.has(i.id));
+    live = { items, cursor: had.cursor };
+    if (open !== null && ids.has(open)) open = items[Math.max(0, at)]?.id ?? items[at - 1]?.id ?? null;
+    if (cursor >= items.length) cursor = items.length - 1;
+  }
+
   async function settle(item: InboxItem, gesture: 'file' | 'archive') {
     if (busy) return;
     if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
+    if (!fromRecord) {
+      toasts.push(gesture === 'file' ? copy.notWritten(copy.inboxFileIt) : copy.notWritten(copy.inboxArchiveIt), gesture === 'file' ? { intent: 'warn' } : {});
+      return;
+    }
     busy = true;
     try {
-      const m = await import('$lib/record/inbox-write.ts');
-      const out =
-        gesture === 'file' ? await m.fileArrival(location.origin, item.id, target) : await m.archiveArrival(location.origin, item.id);
-      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
-      const had = live;
-      if (had) {
-        const at = had.items.findIndex((i) => i.id === item.id);
-        const items = had.items.filter((i) => i.id !== item.id);
-        live = { items, cursor: had.cursor };
-        if (open === item.id) open = items[at]?.id ?? items[at - 1]?.id ?? null;
-      }
-      toasts.push(out.state === 'ignored' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target));
+      const out = await write(item, gesture);
+      if (!out.ok) return;
+      leave(new Set([item.id]));
+      toasts.push(gesture === 'archive' ? copy.inboxArchived : copy.inboxFiled(out.row ?? target));
       /* AND THE RAIL FOLLOWS, as it does after a decision: its Inbox count, and the list a first row just put on it. */
-      if (had) void invalidateAll();
+      void invalidateAll();
+      await focusCursor();
     } finally {
       busy = false;
     }
   }
 
+  /* ── the cursor ──────────────────────────────────────────────────────────── */
+  let cursor = $state(-1);
+
+  async function focusCursor() {
+    await tick();
+    const item = shown[cursor];
+    if (!item) return;
+    const el = document.getElementById(`arrival-${item.id}`);
+    el?.focus({ preventScroll: true });
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function move(to: number) {
+    if (shown.length === 0) return;
+    cursor = Math.max(0, Math.min(to, shown.length - 1));
+    void focusCursor();
+  }
+
+  /* ── a selection ─────────────────────────────────────────────────────────── */
+  let picked = $state(new Set<string>());
+  function toggle(id: string) {
+    const next = new Set(picked);
+    if (!next.delete(id)) next.add(id);
+    picked = next;
+  }
+
+  async function settlePicked(gesture: 'file' | 'archive') {
+    const items = shown.filter((i) => picked.has(i.id));
+    if (busy || items.length === 0) return;
+    if (gesture === 'file' && target === '') return void toasts.push(copy.inboxNoLists, { intent: 'warn' });
+    if (!fromRecord) {
+      toasts.push(copy.notWritten(gesture === 'file' ? copy.inboxWouldFile(items.length) : copy.inboxWouldArchive(items.length)), { intent: 'warn' });
+      picked = new Set();
+      return;
+    }
+    busy = true;
+    const gone = new Set<string>();
+    try {
+      for (const item of items) if ((await write(item, gesture)).ok) gone.add(item.id);
+    } finally {
+      busy = false;
+    }
+    leave(gone);
+    picked = new Set([...picked].filter((id) => !gone.has(id)));
+    if (gone.size) {
+      toasts.push(gesture === 'file' ? copy.inboxBatchFiled(gone.size) : copy.inboxBatchArchived(gone.size));
+      void invalidateAll();
+    }
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    /* A KEY THE SHELL ALREADY TOOK, `g` then a letter, is not this page's too. */
+    if (e.defaultPrevented || covered() || typing()) return;
+    if (e.metaKey || e.ctrlKey || e.altKey || shown.length === 0) return;
+    if (e.key === 'Escape' && picked.size > 0) {
+      e.preventDefault();
+      picked = new Set();
+      return;
+    }
+    const item = shown[cursor];
+    if ((e.key === 'Delete' || e.key === 'Backspace') && item) {
+      e.preventDefault();
+      void settle(item, 'archive');
+      return;
+    }
+    if (silenced(e)) return;
+    if (e.key === 'j') {
+      e.preventDefault();
+      move(cursor + 1);
+    } else if (e.key === 'k') {
+      e.preventDefault();
+      move(cursor < 0 ? 0 : cursor - 1);
+    } else if (e.key === 'e' && item) {
+      e.preventDefault();
+      void settle(item, 'file');
+    } else if (e.key === 'x' && item) {
+      e.preventDefault();
+      toggle(item.id);
+    }
+  }
+
+  /** The first words of what was said, for the row's detail line. */
+  const firstWords = (body: string) => body.replace(/\s+/gu, ' ').trim();
+
   /**
-   * THE SAMPLE COMPUTES ITS CONTENT SYNCHRONOUSLY, AND A LIVE RECORD DOES NOT.
-   *
-   * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. On the sample this claim is true as the screen mounts. On
-   * a live record the read above is bracketed with `opened()` and `closed()`, and a call still out
-   * takes the attribute away whatever this line says, so the claim is only made once the answer is in.
+   * THE SAMPLE COMPUTES ITS CONTENT SYNCHRONOUSLY, AND A LIVE RECORD DOES NOT. On a live record the
+   * read above is bracketed with `opened()` and `closed()`, and a call still out takes the attribute
+   * away whatever this line says, so the claim is only made once the answer is in.
    */
   $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(copy.inbox)}</title></svelte:head>
+<svelte:window {onkeydown} />
 
 <PageHead icon="inbox"
   title={copy.inbox}
   count={answered && !unrouted && !refused ? INBOX.length : undefined}
   atLeast={fromRecord && live !== null && live.cursor !== null}
 />
+
+{#snippet fileInto()}
+  {#if lists.length > 0}
+    <label class="file-into">
+      <span class="file-label">{copy.inboxFileInto}</span>
+      <select class="file-select" value={target} disabled={busy} onchange={(e) => choose(e.currentTarget.value)}>
+        {#each lists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
+      </select>
+    </label>
+  {/if}
+{/snippet}
 
 <div class="page">
   {#if refused}
@@ -152,27 +300,17 @@
     {#if !answered}<Waiting />{/if}
   {:else if INBOX.length === 0}
     <!--
-      AN EMPTY INBOX IS TWO DIFFERENT FACTS AND THIS DREW ONE OF THEM, WRONGLY.
-
-      `<Empty kind="cleared" title="Nothing unmatched." body="Every arrival since you last looked
-      became a row." />`. The check glyph means *you finished*, and it was the day-one state of a
-      record with no connector: nothing had ever come in, nothing could until one existed, and the
-      screen that makes one is `/settings/ingest`, to which this page had no link. So a first-time
-      reader got a green tick and the impression the feature was working.
-
-      The body asserted a history that had not happened, and it said `arrival`, which is the word
-      `copy.ts` argues against directly above the button eight lines below. Both sentences were
-      typed here rather than in `copy.ts`, which is precisely why the rename that produced
-      `archiveArrival` never reached them.
-
-      A LIVE RECORD CANNOT TELL THESE APART FROM THE INBOX ALONE, so it draws the sentence that is
-      true in both, without the tick, and with the door to a connector.
+      AN EMPTY INBOX IS TWO DIFFERENT FACTS. A record with no connector has never had anything arrive,
+      and a record that has one has cleared it. A live record cannot tell these apart from the inbox
+      alone, so it says what is true in both, with the door to a connector; and where something waits
+      on Decide, the door there too.
     -->
-    <!-- THE INBOX'S OWN GLYPH. The kind's default is three rules, which on a screen with no rows reads
-         as a menu button that does nothing. -->
     {#if fromRecord}
       <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxClear} body={copy.inboxClearWhy}>
-        {#snippet actions()}<Button href="/settings/ingest">{copy.inboxConnect}</Button>{/snippet}
+        {#snippet actions()}
+          {#if Number(route.data.open ?? 0) > 0}<Button weight="primary" href="/decide">{copy.inboxOpenDecide}</Button>{/if}
+          <Button href="/settings/ingest">{copy.inboxConnect}</Button>
+        {/snippet}
       </Empty>
     {:else if SOURCES.length === 0}
       <Empty kind="no-data-yet" glyph="inbox" title={copy.inboxNothingYet} body={copy.inboxNothingYetWhy}>
@@ -182,113 +320,58 @@
       <Empty kind="cleared" title={copy.inboxClear} body={copy.inboxClearWhy} />
     {/if}
   {:else}
-    <ul class="ledger">
-      {#each INBOX.slice(0, DOM_CAP) as item (item.id)}
-        <li>
+    <ul class="ledger arrivals" data-picking={picked.size > 0 ? '' : undefined}>
+      {#each shown as item, i (item.id)}
+        <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
+          <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
+               sender's domain led the row in a column of its own and was said again under the
+               subject (DESIGN-SYSTEM D5). -->
           <button
             type="button"
+            id="arrival-{item.id}"
             class="line line-tall"
             aria-expanded={open === item.id}
-            onclick={() => (open = open === item.id ? null : item.id)}
+            onclick={() => {
+              cursor = i;
+              open = open === item.id ? null : item.id;
+            }}
           >
-            <!-- A row that expands should say so. `aria-expanded` told a screen reader and nothing
-                 told anybody else. -->
-            <!-- THE DOMAIN, ELLIPSISED AND CARRYING THE WHOLE OF ITSELF. `.seq` is a twelve-character
-                 column because a spoken id is `#41`; a domain is not, so `fenwick.example.com`
-                 arrived as `fenwick.examp` — hard-cut, with no ellipsis to say it had been. Six
-                 senders in a row, each unreadable and each unreadable in the same way, so the column
-                 said "example" six times and nothing else. An arrival with no address, a webhook
-                 or a paste, shows the channel it came in on. -->
-            <span class="seq" data-open={open === item.id ? '' : undefined} title={item.from}>
-              <Icon name="chevronDown" size="s" /><span class="host">{item.from.split('@')[1] ?? item.from}</span>
-            </span>
             <span class="line-main">
               <span class="line-title">{item.subject}</span>
-              <span class="line-detail">{item.from}</span>
+              <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
             </span>
-            <span class="line-amount"></span>
             <span class="line-when">{since(item.arrived, clock)}</span>
           </button>
+          <button
+            type="button"
+            class="pick"
+            role="checkbox"
+            aria-checked={picked.has(item.id)}
+            aria-label={item.subject}
+            data-on={picked.has(item.id) ? '' : undefined}
+            onclick={() => toggle(item.id)}
+          >{#if picked.has(item.id)}<Icon name="check" size="s" />{/if}</button>
 
           {#if open === item.id}
             <div class="body">
               <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
               <p class="raw">{item.body}</p>
 
-              <!-- THIS ONE FIRST, AND THEN THE NEXT ONE LIKE IT. The rule offer sat above these two, and
-                   its `Make it a rule` was the card's primary: measured at 390 on the first card,
-                   which opens expanded, a filled red button at y 479 and `File it as a row` in the
-                   outline weight at y 600. So the loudest thing on the inbox asked a stranger to
-                   automate a kind of email before they had dealt with one. The comments that put it
-                   there argued about the rule's SENTENCE, that it be read as a sentence and not as
-                   a language; none argued that a standing rule outranks filing the email in front
-                   of you. Filing is the primary now, and the offer follows it at the ordinary
-                   weight, where "would have filed this" reads as the follow-up it is. -->
-              <!-- THE PROSE THAT WAS HERE RESTATED THE TWO BUTTONS BELOW IT, and mismapped one:
-                   "or leave it" reads as doing nothing, and the control it pointed at was `Archive`,
-                   which has a consequence. The buttons are the instruction. -->
-
+              <!-- FILING IS THE PRIMARY, and the rule offer follows it at the ordinary weight. -->
               <div class="actions">
-                {#if fromRecord}
-                  {#if lists.length > 0}
-                    <label class="file-into">
-                      <span class="file-label">{copy.inboxFileInto}</span>
-                      <select class="file-select" value={target} disabled={busy} onchange={(e) => (into = e.currentTarget.value)}>
-                        {#each lists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
-                      </select>
-                    </label>
-                  {/if}
-                  <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
-                  <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
-                {:else}
-                  <Button weight="primary" onclick={() => toasts.push(copy.notWritten(copy.inboxFileIt), { intent: 'warn' })}
-                    >{copy.fileIt}</Button
-                  >
-                  <Button
-                    weight="bare"
-                    onclick={() => toasts.push(copy.notWritten(copy.inboxArchiveIt))}
-                  >{copy.archiveArrival}</Button>
-                {/if}
+                {#if fromRecord}{@render fileInto()}{/if}
+                <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
+                <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
               </div>
 
               <!--
-                THIS BLOCK IS THE SAMPLE'S, AND IT CANNOT BE WIRED UP YET. Said here rather than
-                left to be rediscovered, because the two buttons below look live and are not.
-
-                THE RECORD SUGGESTS NOTHING. A live arrival is an `InboxLine`, and it carries the
-                channel, the sender, the subject, the body and when it came. There is no `suggestion`
-                on it and `itemOf` sets none, so `item.suggestion` is only ever set on the sample
-                rows in `data.ts`: on a real record this block never draws at all. Wiring the
-                buttons would be wiring a control that nothing reaches.
-
-                WHAT IS MISSING, IN ORDER:
-
-                  A PATTERN TO OFFER. Making a rule needs a `when` predicate, and nothing in the
-                  record derives one from an email. "From billing@fenwick.example" is a guess at
-                  which part of the arrival is the pattern — the sender, the subject, an amount in
-                  the body — and the guess would be stored as a rule that files future arrivals
-                  without asking. The sample writes the sentence by hand, which is why it reads well.
-
-                  A PLACE TO PUT IT. A rule is a declaration, so writing one is `setDeclaration`,
-                  which is ADMIN: the inbox is already an owner-only read, so the level is not the
-                  obstacle, but it means the rule goes through the same lint a pack gets and a
-                  refusal has to be drawn here.
-
-                  SOMETHING TO DECLINE. `Not this one` has no write behind it either. There is no
-                  suggestion row on the record to dismiss, so there is nothing to record a decline
-                  against and nothing that would remember it next time.
-
-                The honest half is already live beside this: `File it in` and `Archive` both write,
-                through `fileArrival` and `archiveArrival`.
+                THIS BLOCK IS THE SAMPLE'S, AND IT CANNOT BE WIRED UP YET. A live arrival carries no
+                `suggestion`, so on a real record this never draws. Making a rule needs a pattern the
+                record does not derive yet, a declaration write through the same lint a pack gets, and
+                something to decline against. The honest half is live beside it: filing and archiving.
               -->
               {#if item.suggestion}
                 <div class="pattern">
-                  <!-- IT WAS A DSL STRING UNDER THE HIGHEST-EMPHASIS CONTROL ON THE PAGE.
-                       `services where provider is Fenwick Cloud → set renews`, in a code block, on
-                       day one, beside a red primary button — so the loudest thing on the screen was
-                       a language nobody has been taught. `claimed` and `pattern` are the schema's
-                       words too; what a person is being offered is a rule that files the next one
-                       like this without asking. -->
                   <p class="pattern-head">
                     <Icon name="filter" size="s" />
                     {copy.ruleOffer}
@@ -315,6 +398,17 @@
       </div>
     {/if}
     {#if olderFix}<p class="foot">{olderFix}</p>{/if}
+
+    {#if picked.size > 0}
+      <!-- THE SELECTION'S BAR, stuck to the foot of the view after the list, so opening it moves nothing. -->
+      <div class="batch" role="region" aria-label={copy.inboxSelected(picked.size)}>
+        <span class="batch-n">{copy.inboxSelected(picked.size)}</span>
+        {#if fromRecord}{@render fileInto()}{/if}
+        <Button weight="primary" disabled={busy} onclick={() => settlePicked('file')}>{copy.inboxFileSelected(picked.size)}</Button>
+        <Button disabled={busy} onclick={() => settlePicked('archive')}>{copy.inboxArchiveSelected(picked.size)}</Button>
+        <Button weight="bare" onclick={() => (picked = new Set())}>{copy.clearSelection}</Button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -327,58 +421,99 @@
     max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
   }
 
-  /* The row is a `<button>`, at every width: it opens and closes. Only the TRACKS belong to the
-     desktop, and they are below. */
+  /* An arrival is its row, the box that selects it, and its body when open. */
+  .arrival {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    scroll-margin-block: var(--sp-7);
+  }
+
+  .arrivals > li + li {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .arrivals[data-picking] > li {
+    scroll-margin-block-end: var(--sp-9);
+  }
+
+  /* The row is a `<button>`, at every width: it opens and closes. */
   .line {
     inline-size: 100%;
     border: 0;
+    border-radius: var(--r-sm);
     background: none;
     font: inherit;
     cursor: pointer;
   }
 
-  /**
-   * THE ONE LEDGER SCREEN THAT WAS MISSING ITS WIDTH GUARD.
-   *
-   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about
-   * width, and a component `<style>` is unlayered, so it beat `@layer components` at every size:
-   * the children took their card placements and the parent kept four desktop tracks underneath
-   * them. Every sibling ledger carries this guard with its own measurement beside it, and each
-   * comment says the same thing — `+page.svelte:369`, `audit:474`, `decide:486`, `packs:220`,
-   * `vault:151`. This screen had none.
-   *
-   * Measured against the shipped build at 390, in a 324px row: the tracks computed to
-   * `144px 63px 0px 81px`. The card places `.line-main` across all four and `.line-when` in
-   * column 2, so **the third and fourth tracks hold nothing at all: 81px of a 324px row, plus the
-   * 12px gap that goes with them, is dead** — and the sender's domain, which is what this screen's
-   * first column exists for, is held to 144px while it sits there. With the guard the card's own
-   * `minmax(0, 1fr) auto` applies and the domain gets 275.8px, which is 92% more of the row for
-   * the only thing on it a person is scanning.
-   *
-   * It never overflowed either. A collapsed track and an unoccupied one both stay inside the
-   * viewport, and `layout.mjs` counts a right edge.
-   */
-  @media (width >= 640px) {
-    /* WIDER THAN A SPOKEN ID, because what is in it is a domain. Sixteen characters is most of them
-       and the rest ellipsise, which is a truncation somebody can see. */
-    .line {
-      grid-template-columns: 16ch minmax(0, 1fr) auto 9ch;
+  /* SUBJECT AND DETAIL, THEN WHEN. The `seq` column the rows share held the sender's domain here. */
+  .arrival .line {
+    grid-template-columns: minmax(0, 1fr) 9ch;
+  }
+
+  .arrival[data-open] .line-title {
+    font-weight: 500;
+  }
+
+  /* THE CURSOR IS THE FOCUS RING, and only while it is the keyboard's. */
+  .arrival .line:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+  }
+
+  .from {
+    color: var(--ink2);
+  }
+
+  .gist::before {
+    content: '·';
+    margin-inline: var(--sp-2);
+  }
+
+  /* THE SELECTION BOX, at the trailing edge, where it is wanted and keeping its space where it is not. */
+  .pick {
+    display: grid;
+    place-items: center;
+    inline-size: 16px;
+    block-size: 16px;
+    margin: var(--sp-3) var(--sp-3) 0 0;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    cursor: pointer;
+    visibility: hidden;
+  }
+
+  .pick[data-on] {
+    background: var(--accent);
+    border-color: var(--accent-edge);
+  }
+
+  .arrival:hover .pick,
+  .arrival[data-cursor] .pick,
+  .pick:focus-visible,
+  .arrivals[data-picking] .pick {
+    visibility: visible;
+  }
+
+  @media (pointer: coarse) {
+    .pick {
+      display: none;
+    }
+
+    .arrival {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
+  /* THE BODY SITS UNDER THE SUBJECT, on the page's own ground: space opens it, not a slab. */
   .body {
-    padding: 0 var(--sp-4) var(--sp-4) calc(16ch + var(--sp-4) * 2);
-    background: var(--s1);
-  }
-
-  /* AND IT SHRINKS. A grid child's floor is its content unless it is told otherwise, so without this
-     the column kept the widest domain's width and the ellipsis never applied — the parent clipped
-     instead, which is a cut with nothing to say it happened. */
-  .host {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    grid-column: 1 / -1;
+    padding: 0 var(--sp-3) var(--sp-5);
   }
 
   .raw {
@@ -392,12 +527,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* THE RULE OFFER, AS A FOLLOW-UP UNDER A HAIRLINE, and not a bordered box inside a slab (rule 6). */
   .pattern {
-    margin-block-start: var(--sp-3);
-    padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    max-inline-size: var(--measure);
+    margin-block-start: var(--sp-4);
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line-soft);
   }
 
   .pattern-head {
@@ -408,13 +543,7 @@
     font-size: var(--t-xs);
   }
 
-  /* Ink, not the accent. This is the rule the record is offering to write — a thing to READ and
-     agree with. The accent was spent on the button beside it, which was argued as the part that is
-     actually a decision; it is spent on `File it as a row` now, and the markup says why.
-
-     AND NOT MONOSPACE EITHER. It was a `<code>` block carrying `services where provider is Fenwick
-     Cloud → set renews`: a language, set in the face this product reserves for ids, under the
-     loudest control on the screen, on day one. What it says is a sentence, so it is set as one. */
+  /* A sentence, set as one: ink, not the accent and not monospace. */
   .pattern-said {
     display: block;
     margin-block: var(--sp-2);
@@ -423,10 +552,6 @@
     line-height: 1.55;
   }
 
-  /* THEY WRAP. `.ledger` is `overflow: hidden`, so a row of actions that does not fit is CUT rather
-     than scrolled: at 320 "Leave it for another rule" ended at x=381 in a 320px viewport and read
-     `Leave it for ano`. Half the inbox's verbs, on the screen that asks you to make a standing rule.
-     At 390 it still spilled 8px past its own card. */
   /* The list a filed email goes into sits beside the button that files it, at the height of every control here. */
   .file-into {
     display: inline-flex;
@@ -437,12 +562,20 @@
   .file-label {
     color: var(--dim);
     font-size: var(--t-xs);
+    white-space: nowrap;
   }
 
+  /* THE HOUSE FIELD, not the system's grey box. */
   .file-select {
     min-block-size: var(--ctl-h);
     max-inline-size: 100%;
+    padding: 0 var(--sp-2);
+    background: var(--s1);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--ink);
     font: inherit;
+    font-size: var(--t-ui);
   }
 
   @media (pointer: coarse) {
@@ -451,12 +584,39 @@
     }
   }
 
+  /* THEY WRAP. A row of actions that does not fit is wrapped, never cut. */
   .pattern-actions,
   .actions {
     flex-wrap: wrap;
+    align-items: center;
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  .batch {
+    position: sticky;
+    inset-block-end: var(--sp-4);
+    z-index: var(--z-raise);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin-inline-start: auto;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--e2);
+  }
+
+  .batch-n {
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   /* The page below is one control, the height every control is on this pointer. */
@@ -480,41 +640,34 @@
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .body {
-      padding-inline-start: var(--sp-4);
+    .batch {
+      inset-block-end: calc(var(--tabbar) + var(--sp-3));
     }
   }
 
-  /**
-   * ON A CARD THE TIME SITS BESIDE THE SENDER, WHERE IT HAD A LINE OF ITS OWN.
-   *
-   * `rows.css` puts `.line-when` in row 3 of a card, under the title and its detail, because on a
-   * register the first line is the id and the amount. Here row 1's second cell is the empty
-   * `.line-amount` this screen draws for the desktop track, so `3h ago` took a third line to say
-   * five characters: measured at 390, the domain at y 182, the subject and sender to y 247, and
-   * the time alone at y 251, in a 111px row. Beside the domain it costs nothing.
-   *
-   * AND THE DOMAIN SHRINKS NOW, because it has a neighbour. The card gives `.seq`
-   * `min-inline-size: max-content` so a spoken id is never cut; a domain is not a spoken id, and
-   * `.host` inside it carries its own ellipsis for exactly this.
-   */
+  /* ON A CARD THE TIME SITS BESIDE THE SUBJECT, where the row's first line has room for it. */
   @media (width < 640px) {
-    .line-when {
+    .arrival .line {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .arrival .line-main {
+      grid-column: 1;
       grid-row: 1;
     }
 
-    .seq {
-      min-inline-size: 0;
+    .arrival .line-when {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
     }
-  }
 
-  /* The chevron turns rather than swapping glyph: one shape, one rotation, and the motion says the
-     row opened even when the content below it is off-screen. */
-  .seq :global(svg) {
-    transition: transform var(--d-state) var(--ease-out);
-  }
-
-  .seq[data-open] :global(svg) {
-    transform: rotate(180deg);
+    .arrival .line-detail {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+    }
   }
 </style>

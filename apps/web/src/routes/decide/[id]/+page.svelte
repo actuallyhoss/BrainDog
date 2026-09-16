@@ -40,11 +40,13 @@
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
+  import Proposed from './Proposed.svelte';
+  import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
-  import { invalidateAll } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
@@ -70,7 +72,8 @@
   async function readLive(id: string) {
     const at = opened();
     client ??= createClient({ base: location.origin });
-    const out = await readOne(client, id);
+    const [out, opens] = await Promise.all([readOne(client, id), client.governance({ status: 'open' })]);
+    queue = opens.ok && Array.isArray(opens.value) ? opens.value.map((r: { id?: unknown }) => String(r.id)) : [];
     /* An answer for a question somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== id) return closed(true, at);
     live = out.from === 'live' ? out.value : null;
@@ -84,6 +87,17 @@
     untrack(() => void readLive(id));
   });
 
+  /**
+   * THE OPEN QUESTIONS IN THE QUEUE'S ORDER, so `j` and `k` and the button after a decision go to the next
+   * one rather than back to the list (DESIGN-SYSTEM D2). Read with the question, and not again after a
+   * decision, so the one just decided keeps its place and the next is the one after it.
+   */
+  let queue = $state<string[]>([]);
+  const openIds = $derived(from === 'live' ? queue : [...QUESTIONS].sort((a, b) => a.rank - b.rank).map((q) => q.id));
+  const here = $derived(openIds.indexOf(String(page.params.id)));
+  const nextId = $derived(here >= 0 ? openIds[here + 1] : openIds[0]);
+  const prevId = $derived(here > 0 ? openIds[here - 1] : undefined);
+
   /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
   const now = $derived(from === 'live' ? Date.now() : NOW);
 
@@ -94,6 +108,9 @@
         ? [...QUESTIONS, ...DECIDED].find((q) => q.id === page.params.id)
         : undefined,
   );
+
+  /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the record. */
+  const preview = $derived(from === 'live' && live?.about ? proposedOf(live.about.kind, live.about.body) : null);
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
   const updates = $derived(
@@ -156,6 +173,15 @@
     /* AND A COMMITTED QUESTION IS AS INERT AS A DECIDED ONE. The guard tested the record and not
        this session, so after a commit the number keys still moved a highlight behind the settled
        block and the commit chord was one field away from firing twice. */
+    /* THE NEXT AND THE PREVIOUS OPEN QUESTION, from anywhere on the gate but a field, decided or not. */
+    if ((e.key === 'j' || e.key === 'k') && !e.metaKey && !e.ctrlKey && !e.altKey && !typing() && !silenced(e)) {
+      const to = e.key === 'j' ? nextId : prevId;
+      if (to && to !== page.params.id) {
+        e.preventDefault();
+        void goto(`/decide/${to}`);
+      }
+      return;
+    }
     if (!question || question.decided || committed || (from === 'live' && live?.closed)) return;
     /* THE COMMIT CHORD KEEPS THE NARROW TEST, AND THE BARE KEYS BELOW DO NOT. This const is read
        two ways: below it gates Mod+Enter, where it must be TRUE, and further down it silences bare
@@ -248,6 +274,7 @@
     if (from !== 'live' || !client) {
       committed = said;
       toasts.push(copy.notWritten(wouldRecord(said)), { intent: 'warn' });
+      setTimeout(() => document.getElementById('next-question')?.focus());
       return;
     }
     /* ON A LIVE RECORD IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
@@ -261,6 +288,7 @@
     committed = said;
     toasts.push(copy.decisionRecorded(a.title, a.question), { intent: 'good' });
     void invalidateAll();
+    setTimeout(() => document.getElementById('next-question')?.focus());
   }
 
   /**
@@ -284,6 +312,7 @@
          `2026-09-17`, the storage spelling, in a sentence about when somebody will next look at a
          decision. `day()` is the one formatter and it was one call away. */
       toasts.push(copy.deferred(day(wake)), { intent: 'warn' });
+      if (nextId && nextId !== page.params.id) void goto(`/decide/${nextId}`);
       return;
     }
     if (!question || sending) return;
@@ -295,6 +324,8 @@
     deferring = false;
     toasts.push(copy.parkedUntil(day(wake)), { intent: 'good' });
     void invalidateAll();
+    /* PARKED, SO IT HAS LEFT THE QUEUE: the next question, as a decision takes you to it. */
+    if (nextId && nextId !== page.params.id) void goto(`/decide/${nextId}`);
   }
 
   /**
@@ -338,6 +369,16 @@
   $effect(() => {
     if (from === 'live' || from === 'sample') drew('ready');
   });
+
+  /* `d` ON THE QUEUE LANDS HERE WITH `?defer`, and opens the defer step it asked for, once per question. */
+  let deferOpened = '';
+  $effect(() => {
+    const id = question?.id;
+    if (!id || deferOpened === id || !page.url.searchParams.has('defer')) return;
+    if (question.decided || (from === 'live' && live?.closed)) return;
+    deferOpened = id;
+    untrack(() => defer());
+  });
 </script>
 
 <svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>
@@ -372,6 +413,15 @@
          so a question decided a moment ago on this screen went on showing the options, the reason
          field and a live commit button, which is the one state where the product has to say plainly
          that it is finished. -->
+    {#if preview && !settled}
+      <section class="changed">
+        <div class="options-head">
+          <h2 class="options-title">{copy.proposalWillAppear}</h2>
+        </div>
+        <Proposed proposed={preview} />
+      </section>
+    {/if}
+
     {#if updates.length}
       <section class="changed">
         <div class="options-head">
@@ -412,6 +462,11 @@
             <Button weight="bare" aria-label={copy.takeItBackOf(question.title)} onclick={takeBack}>
               {copy.takeItBack}
             </Button>
+          </div>
+        {/if}
+        {#if committed && nextId && nextId !== question.id}
+          <div class="settled-next">
+            <Button weight="primary" href="/decide/{nextId}" id="next-question">{copy.decideNext}</Button>
           </div>
         {/if}
       </div>
@@ -527,7 +582,7 @@
           <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
                It had no handler, so the one control that stops a gate being cleared by dismissing
                things did nothing — while `d` on the keyboard opened the same flow correctly. -->
-          <Button weight="bare" tone="info" onclick={defer}>{copy.defer}</Button>
+          <Button onclick={defer}>{copy.defer}</Button>
           <span class="third-note">{copy.deferHint}</span>
         </div>
       {/if}
@@ -821,6 +876,10 @@
   }
 
   /* The chip and the way back, on one line, under the receipt they belong to. */
+  .settled-next {
+    margin-block-start: var(--sp-4);
+  }
+
   .settled-mock {
     display: flex;
     align-items: center;

@@ -99,6 +99,38 @@ if (rows.length < 20) {
 }
 
 const GRID = '/r/obligations';
+
+/* The cursor on the first item of a queue, before the key under test. */
+const onFirst = async (page) => {
+  await page.keyboard.press('j');
+  await page.waitForTimeout(120);
+};
+
+/**
+ * THE GATE'S RECORD HAS NO ARRIVALS, so an inbox key would be pressed on an empty state and read as dead.
+ * Two are handed to the screen in the record's own shape, which is the read the keys act on; nothing is
+ * written. Filing one then asks the record, which refuses an id it does not hold, and says so in a toast.
+ */
+const arrivals = async (page) => {
+  const line = (n) => ({
+    rowid: n,
+    id: `01KEYS${n}`,
+    ts: '2026-09-03T09:00:00.000Z',
+    channel: 'email',
+    from: `someone${n}@example.test`,
+    to: '',
+    subject: `Arrival ${n}`,
+    body: 'Words.',
+    state: 'untriaged',
+    reason: null,
+  });
+  await page.route(/\/api\/inbox(?:\?|$)/u, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, value: { arrivals: [line(1), line(2)], cursor: null } }) }),
+  );
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(200);
+};
+
 const focusFirstCell = async (page) => {
   await page.locator('[role="row"] .td').first().click();
 };
@@ -128,7 +160,7 @@ const RECIPES = {
    * the chord map left the gate reporting **18 checked, 0 dead**. Two of the seven letters could not
    * fail, on the gate written to make exactly that impossible.
    *
-   * `/decide` binds nothing bare, so a change there is the navigation and nothing else.
+   * `/decide` binds bare keys of its own now, and each stands down on a key the shell already took (`defaultPrevented`), so a change there is still the navigation and nothing else.
    */
   goto: {
     runs: ['h', 'd', 'i', 's', 'v', 'p', ','].map((letter) => ({ route: '/decide', press: ['g', letter] })),
@@ -212,6 +244,19 @@ const RECIPES = {
      seeded record's Kiln licensing question (the sample's SG31): open, with three options. */
   'gate-highlight': { route: '/decide/SG5', press: ['2'] },
   'gate-defer': { route: '/decide/SG5', press: ['d'] },
+  /* SG5 is not the last open question, so `j` has a next one to go to. */
+  'gate-next': { route: '/decide/SG5', press: ['j'] },
+
+  /* THE QUEUES. The cursor starts on nothing, so a first `j` is the change for `decide-move`; every other
+     key is pressed with the cursor already placed by `setup`, or the `j` would be what changed the page. */
+  'decide-move': { route: '/decide', press: ['j'] },
+  'decide-answer': { route: '/decide', setup: onFirst, press: ['1'] },
+  'decide-approve': { route: '/decide', setup: onFirst, press: ['a'] },
+  'decide-defer': { route: '/decide', setup: onFirst, press: ['d'] },
+  'decide-select': { route: '/decide', setup: onFirst, press: ['x'] },
+  'inbox-move': { route: '/inbox', setup: arrivals, press: ['j'] },
+  'inbox-file': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['e'] },
+  'inbox-select': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['x'] },
 };
 
 const server = createServer(async (req, res) => {

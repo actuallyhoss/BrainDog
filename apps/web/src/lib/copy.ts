@@ -448,7 +448,7 @@ export const copy = {
   defer: 'Defer the question',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
-  noQuestions: 'Nothing to decide.',
+  noQuestions: 'Nothing waits on you',
   lastDecided: 'The last one was decided',
   /* A LIVE RECORD: what `decide` answered, and the two words a proposal that is not a choice takes. */
   acceptIt: 'Accept',
@@ -736,7 +736,7 @@ export const copy = {
   inboxNothingYetWhy:
     'The inbox holds email that came in and matched no rule, so you can file it yourself or make the rule that files the next one like it. A connector is what brings it in.',
   inboxConnect: 'Set up a connector',
-  inboxClear: 'Nothing unmatched.',
+  inboxClear: 'Nothing waits in the inbox',
   inboxClearWhy: 'Anything that comes in without a rule to file it waits here.',
   /* WHAT THE VERSION IS FOR, rather than what it is. Every change moves it by one, so it names a
      moment — which is the only thing anybody does with it. */
@@ -1518,6 +1518,8 @@ export const copy = {
   scopeBoard: 'On a board',
   scopePage: 'On a page',
   scopeGate: 'At the gate',
+  scopeDecide: 'In Decide',
+  scopeInbox: 'In the inbox',
   scopePalette: 'In the palette',
   scopeNav: 'In the sidebar',
 
@@ -1787,6 +1789,50 @@ export const copy = {
   /* Phase 1's last reads: what a question found by `/search` on a record says beside its title. */
   searchOpenQuestion: 'Open question',
   searchDecided: 'Decided',
+  /* DECIDE AND THE INBOX AS QUEUES (DESIGN-SYSTEM appendix D): the cursor, a selection, and what a
+     proposal would put on the screen. No sentence here assumes what kind of record it is. */
+  proposalWillAppear: 'What will appear',
+  fromSpark: 'From Spark',
+  proposalKind: (kind: string): string =>
+    ({ page: 'Page', register: 'List', ingest: 'Rule for what comes in', theme: 'Look', metric: 'Measure', digest: 'Summary', rule: 'Rule', block: 'Block' })[kind] ??
+    kind.charAt(0).toUpperCase() + kind.slice(1),
+  proposalInSidebar: 'In the sidebar',
+  proposalUnder: (section: string) => `Under ${section}`,
+  proposalNotInSidebar: 'Not in the sidebar, reached by its link',
+  proposalShows: 'Shows',
+  proposalReads: 'Reads from',
+  proposalFields: 'Fields',
+  proposalComesFrom: 'Comes from',
+  proposalEvery: 'How often',
+  proposalFilesInto: 'Files into',
+  proposalAccent: 'Accent',
+  proposalScheme: 'Scheme',
+  proposalSamples: (n: number) => `Drawn from ${n} ${n === 1 ? 'thing' : 'things'} that came in`,
+  decideRows: (n: number, list: string) => `Changes ${n} ${n === 1 ? 'row' : 'rows'} in ${list}`,
+  decideGroup: 'Group',
+  decideGroupNone: 'One list',
+  decideGroupList: 'By what it is about',
+  decideGroupElse: 'Everything else',
+  decideSelected: (n: number) => `${n} selected`,
+  decideAnswerSuggested: (n: number) => `Answer ${n} with what is suggested`,
+  decideNoneSuggested: 'None of these has a suggested answer. Answer each one.',
+  decideBatchReason: 'One reason for all of them',
+  decideBatchDone: (n: number) => `${n} answered.`,
+  clearSelection: 'Clear the selection',
+  decideDecided: (option: string) => `Decided: ${option}`,
+  decideToSend: 'sends it',
+  decideToLeave: 'goes back to the list',
+  decideNext: 'Next question',
+  decideOpenInbox: 'Open the inbox',
+  inboxOpenDecide: 'Open Decide',
+  inboxSelected: (n: number) => `${n} selected`,
+  inboxFileSelected: (n: number) => `File ${n}`,
+  inboxArchiveSelected: (n: number) => `Archive ${n}`,
+  inboxBatchFiled: (n: number) => `${n} filed. They have left the inbox.`,
+  inboxBatchArchived: (n: number) => `${n} archived. They are kept, and they have left the inbox.`,
+  inboxWouldFile: (n: number) => `${n} ${n === 1 ? 'row' : 'rows'} would be created from these`,
+  inboxWouldArchive: (n: number) => `${n} would be archived, and their bytes kept`,
+  decideWouldAnswer: (n: number) => `${n} would be answered with what is suggested`,
 } as const;
 
 export type Copy = typeof copy;

@@ -5,37 +5,36 @@
   one nobody has needed to answer. Ranking by what deciding late costs puts the expensive one first
   and makes the order arguable, which is the point (19 §2).
 
-  AND THE OPTIONS ON A CARD ARE NOW THE ANSWER, WHICH FOR A LONG TIME THEY ONLY LOOKED LIKE.
+  THE OPTIONS ON A CARD ARE THE ANSWER. One press records it, and the reason is asked for after it.
+  A card cannot hold a button inside its link, so the anchor and the verbs are SIBLINGS under one
+  item, as `RowCards.svelte` does for the register.
 
-  This screen printed every option as one `<span class="q-options">` reading "Per seat · Per product ·
-  One studio price", inside the card's own link. Nine printed answers across the queue, none of them
-  pressable, every one of them landing on `/decide/<id>` with nothing selected. Answering meant a
-  second screen, a choice, and then a paragraph of prose before the commit button would turn on.
-  `loop/research-friction.md` §6 ranks that ninth of the ten things that cost a person the most.
-
-  A CARD CANNOT HOLD A BUTTON INSIDE ITS LINK, so the shape had to change first: a button inside an
-  anchor is invalid HTML and an ambiguous target. `RowCards.svelte` had already answered this for the
-  register: the anchor and the row's verbs are SIBLINGS under one card. This follows it rather
-  than inventing a second answer.
+  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD (DESIGN-SYSTEM appendix D). A cursor moves with `j`
+  and `k`; a number answers with that option, `a` with the suggested one, `d` defers on the gate, `x`
+  selects for one answer to several, and Enter opens the question. Inside a reason, `⌘↵` sends it and
+  Esc goes back to the list. A question decided here stays in its place as one line.
 
   `/decide/<id>` KEEPS EVERYTHING IT HAD. It is where a decision is examined: the cost, the option
   bodies, the recommendation, the defer with its wake date, and a commit that takes a named decider
-  and a written reason and cannot be edited afterwards. What changed is that the common case no
-  longer has to go there.
+  and a written reason and cannot be edited afterwards.
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { tick, untrack } from 'svelte';
+  import { page as route } from '$app/state';
+  import { goto, invalidateAll } from '$app/navigation';
   import { since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
   import { ROWSETS } from '$lib/record/data.ts';
   import Changes from './[id]/Changes.svelte';
+  import Proposed from './[id]/Proposed.svelte';
   import { updatesOf } from './[id]/changes.ts';
+  import { proposedOf } from './[id]/proposed.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
-  import { invalidateAll } from '$app/navigation';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import type { Question } from '$lib/record/schema.ts';
@@ -47,6 +46,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
@@ -86,8 +86,22 @@
   /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
   const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
   const target = metric('open-questions');
+
+  /**
+   * DECIDED HERE, ON A LIVE RECORD, AND DRAWN WHERE IT WAS.
+   *
+   * A written answer used to read the whole queue again, so every card under it moved at once and
+   * focus fell to the document (DESIGN-SYSTEM D3). The record has the decision; the queue keeps the
+   * question in its place as one line saying what was decided, and the cursor moves to the next one.
+   * Coming back to the screen reads the queue without it.
+   */
+  let settledHere = $state(new Map<string, string>());
+  const waiting = $derived(open.filter((q) => !settledHere.has(q.id)));
+
   /* The same aim on a live record, with its tone taken from the record's own count. */
-  const aimTone = $derived(from === 'live' ? (open.length > 3 ? ('warn' as const) : ('good' as const)) : target.tone);
+  const aimTone = $derived(from === 'live' ? (waiting.length > 3 ? ('warn' as const) : ('good' as const)) : target.tone);
+
+  const rowsetOf = (q: Question) => (from === 'live' ? live?.rowsets[q.id] : ROWSETS[q.id]);
 
   /* THE ROWS A PROPOSAL WOULD CHANGE, drawn on its card, because one press here answers it. One drawing
      for both: the live record's rows and declarations, or the sample's. */
@@ -102,6 +116,50 @@
     ),
   );
 
+  /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the
+     record rather than a row in it (DIRECTION §11: this is where Spark's proposals land). */
+  const previews = $derived(
+    new Map(
+      open.map((q) => {
+        const about = live?.about?.[q.id];
+        return [q.id, from === 'live' && about ? proposedOf(about.kind, about.body) : null];
+      }),
+    ),
+  );
+
+  /* THE LISTS BY NAME, for the line that says what a question is about. */
+  const lists = $derived(
+    new Map<string, string>(((route.data.lists ?? route.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
+  );
+  const listName = (register: string) => lists.get(register) ?? copy.valueWord(register);
+
+  /** What a question is about: its entity, or the list its rows are in. Empty when it is about neither. */
+  function aboutOf(q: Question): string {
+    if (q.entity) return q.entity;
+    const set = rowsetOf(q);
+    return set ? listName(set.register) : '';
+  }
+
+  /* GROUPED BY WHAT IT IS ABOUT, when asked. The rank still orders the groups, by their first question,
+     and the questions about nothing in particular come last. */
+  let grouping = $state<'none' | 'about'>('none');
+  const groups = $derived.by(() => {
+    if (grouping === 'none') return [{ key: '', name: '', items: open }];
+    const out = new Map<string, Question[]>();
+    for (const q of open) {
+      const k = aboutOf(q);
+      out.set(k, [...(out.get(k) ?? []), q]);
+    }
+    return [...out]
+      .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : 0))
+      .map(([key, items]) => ({ key, name: key || copy.decideGroupElse, items }));
+  });
+  const order = $derived(groups.flatMap((g) => g.items));
+
+  /** What a question takes without a choice: its suggested option, or accepting a change. */
+  const approveKey = (q: Question): string | null =>
+    q.options.find((o) => o.recommended)?.key ?? (q.options.some((o) => o.key === 'accept') ? 'accept' : null);
+
   /** What `decide` refused on each card, in the record's own sentence, and the card being sent. */
   let fixes = $state(new Map<string, string>());
   let sending = $state<string | null>(null);
@@ -109,8 +167,8 @@
   /**
    * SENDING AN ANSWER, on a live record. `decide` takes no answer without its reason, so the press picks
    * and this sends. A refusal stays on the card and is said as a warning; a conflict reads the queue
-   * again, because a row the proposal changes has moved; a decision leaves the queue, which is read
-   * again, and the shell reads `boot` again so the rail's count follows.
+   * again, because a row the proposal changes has moved; a decision stays in its place as a line, the
+   * cursor moves on, and the shell reads `boot` again so the rail's count follows.
    */
   async function commit(q: Question, a: Answer) {
     if (!client || sending !== null) return;
@@ -127,23 +185,13 @@
     next.delete(q.id);
     fixes = next;
     answers = withdraw(answers, q.id);
+    settledHere = new Map(settledHere).set(q.id, a.title);
     toasts.push(copy.decisionRecorded(a.title, q.id), { intent: 'good' });
-    await readLive();
     void invalidateAll();
+    await advanceFrom(q);
   }
 
-  /**
-   * SENTENCES THAT BELONG IN `copy.ts` AND ARE NOT THERE YET.
-   *
-   * `50 §3` gives that file the job of being the one place a sentence is typed, so the
-   * no-over-explaining rule is reviewable in one read. These six are local only because `copy.ts`
-   * was being edited elsewhere on the day this landed, and moving them is a rename rather than a
-   * redesign. Everything already in `copy.ts` is used from there: `reasonHint` is the field's
-   * placeholder and `markNotWritten` is the chip, both unchanged.
-   */
-  /* THE SENTENCES MOVED TO `copy.ts`, WHERE EVERY OTHER UI LITERAL IN THIS PRODUCT LIVES. They were
-     local because the file that owns them was being edited elsewhere at the same time; `19 §9`'s
-     rule is one place, so a word cannot be changed on one screen and not on another. */
+  /* THE SENTENCES LIVE IN `copy.ts`, WHERE EVERY OTHER UI LITERAL IN THIS PRODUCT LIVES. */
   const SAY = {
     answered: copy.answeredOption,
     putBack: copy.takeItBack,
@@ -158,55 +206,27 @@
    *
    * A `Map` rather than a field on the question, because the seed is the record and this screen has
    * no business editing it. Re-assigned rather than mutated on every change: Svelte 5 proxies
-   * objects and arrays and not `Map`, which is the same reason the register grid writes
-   * `receipts = new Map(receipts).set(…)`.
+   * objects and arrays and not `Map`.
    *
-   * IT DOES NOT SURVIVE LEAVING THE SCREEN, and that is deliberate rather than unfinished. An
-   * answer here is not a write, so carrying it across a navigation would be this screen remembering
-   * something the record does not know, which is the defect this repository hunts hardest.
+   * IT DOES NOT SURVIVE LEAVING THE SCREEN, and that is deliberate. An answer here is not a write, so
+   * carrying it across a navigation would be this screen remembering something the record does not know.
    */
   let answers = $state(new Map<string, Answer>());
 
   /**
-   * ONE PRESS ANSWERS THE QUESTION, AND THE REASON IS ASKED FOR AFTERWARDS. The decision, and why.
+   * ONE PRESS ANSWERS THE QUESTION, AND THE REASON IS ASKED FOR AFTERWARDS.
    *
-   * What was here before: the reason was REQUIRED, on a second screen, before the commit button
-   * would turn on, and the requirement was satisfied by ONE CHARACTER, at which point the product
-   * asked "That will not mean anything in six weeks. Keep it anyway?". Every part of that argument
-   * is correct except where it was made. Put in front of the answer it is an obstacle, and an
-   * obstacle a single keystroke clears is not protecting the record from anything: it buys typing,
-   * not a reason.
-   *
-   * SO THE DEMAND MOVED TO WHERE ITS VALUE IS, WHICH IS AFTER THE PRESS AND FOR AS LONG AS IT GOES
-   * UNANSWERED. The answer costs one press. The card then holds an open field with the six-week
-   * argument standing under it, and an answer with no prose behind it keeps saying so, on the card,
-   * where the person who made it can see the gap they left. The reason is the whole subject of this
-   * queue and it is asked for every time; it is not allowed to stop the queue moving.
-   *
-   * `/decide/<id>` STILL REQUIRES IT, and that is not an inconsistency. Going there is choosing the
-   * ceremony: the option bodies, the reasoning behind the recommendation, a named decider and a row
-   * that cannot be edited afterwards. Two screens, two acts. This one is answering a question you
-   * have already thought about, and the receipt says exactly which of the two it was.
-   *
-   * THE RECOMMENDATION IS MARKED HERE NOW, AND IT WAS HIDDEN. The argument was that with the answer
-   * one press away, a badge beside a button makes rubber-stamping the machine the cheapest thing on
-   * the screen. It treated showing the recommendation as choosing it, and `19 §4` and `20 §3` keep
-   * those apart: displayed, never pre-selected, a label and not an order. Nor did hiding it hide
-   * anything. Home prints "Recommends …" under three of the four questions in this queue, one tap
-   * before this screen, so a reader arrived having been told and found it gone from the one screen
-   * whose job is choosing. What the hiding bought was having to remember it.
-   *
-   * WHAT KEEPS IT A SUGGESTION is everything the mark does not touch: every option is the same
-   * weight, in the record's order, one press each, and nothing is filled or focused on arrival. The
-   * word sits inside the control, so it is read with the option's name, and it is drawn the way the
-   * gate's `.card-rec` is, so one fact looks the same on both screens.
+   * The reason is the whole subject of this queue and it is asked for every time; it is not allowed to
+   * stop the queue moving. `/decide/<id>` still requires it before the press, because going there is
+   * choosing the ceremony. The recommendation is a word inside its option, never filled, moved first or
+   * focused, so it is found rather than chosen (`19 §4`, `20 §3`).
    */
   async function take(q: Question, key: string) {
     const a = answerFor(q, key, new Date(now).toISOString());
-    /* A key this question does not offer answers nothing. It cannot happen from these buttons; it
-       is the guard for the day something else presses. */
+    /* A key this question does not offer answers nothing. */
     if (!a) return;
     answers = record(answers, a);
+    cursor = order.findIndex((x) => x.id === q.id);
 
     /* ON A LIVE RECORD THE PRESS PICKS AND THE REASON SENDS IT, so focus goes to the reason. */
     if (from === 'live') {
@@ -215,48 +235,195 @@
       return;
     }
 
-    /**
-     * THE UNDO IS OFFERED IMMEDIATELY, WHICH IS ONLY HONEST BECAUSE NOTHING IS OUT.
-     *
-     * `loop/REWORK.md` §4's rule is that the inverse waits for the write to land, because a stack
-     * entry for something that has not happened would write the old value over a record the server
-     * never moved. This app is a synchronous mock over `@braindog/seed`: there is no request, so
-     * there is no window in which that could be true. The day there is one, this offer moves into
-     * the response and the chip below becomes the pending state.
-     */
+    /* THE UNDO IS OFFERED IMMEDIATELY, WHICH IS ONLY HONEST BECAUSE NOTHING IS OUT: the sample sends no
+       request, so there is no window in which the inverse could race a write. */
     toasts.push(copy.notWritten(wouldRecord(a)), {
       intent: 'warn',
       undo: () => (answers = withdraw(answers, q.id)),
     });
 
-    /* THE PRESSED CONTROL IS GONE, SO FOCUS HAS TO BE PUT SOMEWHERE. Without this it falls to the
-       document and a keyboard user is at the top of the page with no idea what happened. It lands
-       on the inverse of what they just did, which is the one control they might want next. */
+    /* THE PRESSED CONTROL IS GONE, SO FOCUS HAS TO BE PUT SOMEWHERE: on its inverse. */
     await tick();
     document.getElementById(`undo-${q.id}`)?.focus();
   }
 
-  /**
-   * AND TAKING IT BACK PUTS THE FOCUS BACK TOO, on the option that was pressed.
-   *
-   * The same hole as `take`, in the other direction: this time the control that disappears is the
-   * undo, and without this the round trip ends with focus on the document and the card somewhere
-   * above. It lands on the button they chose rather than the first one, because that is the one they
-   * were looking at and it is now pressable again.
-   *
-   * The toast's own undo does not come through here. It is pressed from the toast stack, where
-   * focus is already somewhere else, and every undo in this product behaves the same way from there.
-   */
+  /** And taking it back puts the focus on the option that was pressed. */
   async function putBack(q: Question, option: string) {
     answers = withdraw(answers, q.id);
     await tick();
     document.getElementById(`opt-${q.id}-${option}`)?.focus();
   }
 
+  /* ── the cursor ────────────────────────────────────────────────────────────
+     One question at a time is the keyboard's, as a row is in a list. It starts on nothing, so the first
+     `j` is a change a person can see and a pointer reader never meets a highlight they did not ask for. */
+  let cursor = $state(-1);
+
+  async function place(at: number) {
+    if (order.length === 0) return;
+    cursor = Math.max(0, Math.min(at, order.length - 1));
+    await tick();
+    const el = document.getElementById(`q-${order[cursor]!.id}`);
+    el?.focus({ preventScroll: true });
+    el?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** After a decision: the next question still waiting below it, or above it when it was the last. */
+  async function advanceFrom(q: Question) {
+    const at = order.findIndex((x) => x.id === q.id);
+    const below = order.findIndex((x, i) => i > at && !settledHere.has(x.id));
+    const above = order.findLastIndex((x, i) => i < at && !settledHere.has(x.id));
+    const next = below >= 0 ? below : above;
+    if (next >= 0) await place(next);
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    /* A KEY THE SHELL ALREADY TOOK is not this page's too: `g` then `d` goes to Decide, and must not
+       also defer the question under the cursor. */
+    if (e.defaultPrevented || covered()) return;
+    if (from !== 'live' && from !== 'sample') return;
+    const mod = e.metaKey || e.ctrlKey;
+
+    /* INSIDE A REASON: the chord sends it on a live record, and Esc goes back to the list with the
+       answer kept. */
+    const field = e.target instanceof HTMLTextAreaElement ? e.target.dataset.why : undefined;
+    if (field !== undefined) {
+      const q = open.find((x) => x.id === field);
+      if (!q) return;
+      if (mod && e.key === 'Enter') {
+        e.preventDefault();
+        const a = answers.get(q.id);
+        if (from === 'live' && a && a.reason.trim()) void commit(q, a);
+        else if (from !== 'live') void advanceFrom(q);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        void place(order.findIndex((x) => x.id === q.id));
+      }
+      return;
+    }
+
+    if (typing() || mod || e.altKey) return;
+    if (e.key === 'Escape' && picked.size > 0) {
+      e.preventDefault();
+      picked = new Set();
+      return;
+    }
+    if (silenced(e)) return;
+
+    if (e.key === 'j') {
+      e.preventDefault();
+      void place(cursor + 1);
+      return;
+    }
+    if (e.key === 'k') {
+      e.preventDefault();
+      void place(cursor < 0 ? 0 : cursor - 1);
+      return;
+    }
+
+    const q = order[cursor];
+    if (!q || settledHere.has(q.id)) return;
+    if (e.key === 'Enter') {
+      /* ENTER ON A CONTROL IS THAT CONTROL'S. */
+      if ((e.target as Element | null)?.closest?.('button, a, summary, input, [role^="menuitem"]')) return;
+      e.preventDefault();
+      void goto(`/decide/${q.id}`);
+      return;
+    }
+    if (e.key === 'x') {
+      e.preventDefault();
+      toggle(q.id);
+      return;
+    }
+    if (e.key === 'd') {
+      e.preventDefault();
+      void goto(`/decide/${q.id}?defer`);
+      return;
+    }
+    if (answers.has(q.id)) return;
+    const n = Number(e.key);
+    if (Number.isInteger(n) && n >= 1 && n <= 9) {
+      const option = q.options[n - 1];
+      if (option) {
+        e.preventDefault();
+        void take(q, option.key);
+      }
+      return;
+    }
+    if (e.key === 'a') {
+      const key = approveKey(q);
+      if (key) {
+        e.preventDefault();
+        void take(q, key);
+      }
+    }
+  }
+
+  /* ── a selection, and one answer to all of it ───────────────────────────── */
+  let picked = $state(new Set<string>());
+  let batchReason = $state('');
+  let batching = $state(false);
+
+  function toggle(id: string) {
+    const next = new Set(picked);
+    if (!next.delete(id)) next.add(id);
+    picked = next;
+  }
+
+  const chosen = $derived(order.filter((q) => picked.has(q.id) && !settledHere.has(q.id)));
+  const approvable = $derived(chosen.filter((q) => approveKey(q) !== null && !answers.has(q.id)));
+
+  /**
+   * EVERY SELECTED QUESTION WITH A SUGGESTED ANSWER, ANSWERED WITH IT, AND ONE REASON FOR ALL.
+   *
+   * A question with no suggestion is left for its own press, and the button's count says how many it
+   * will answer. On a live record each is sent in turn; one that is refused keeps the record's
+   * sentence on its card and the rest carry on.
+   */
+  async function answerPicked() {
+    if (batching || approvable.length === 0) return;
+    const at = new Date(now).toISOString();
+    const reason = batchReason.trim();
+    if (from !== 'live') {
+      const had = answers;
+      let next = answers;
+      for (const q of approvable) {
+        const a = answerFor(q, approveKey(q)!, at);
+        if (a) next = setReason(record(next, a), q.id, reason);
+      }
+      answers = next;
+      toasts.push(copy.notWritten(copy.decideWouldAnswer(approvable.length)), { intent: 'warn', undo: () => (answers = had) });
+      picked = new Set();
+      batchReason = '';
+      return;
+    }
+    if (reason === '' || !client) return;
+    batching = true;
+    let done = 0;
+    const settled = new Map(settledHere);
+    const refused = new Map(fixes);
+    for (const q of approvable) {
+      const a = answerFor(q, approveKey(q)!, at);
+      if (!a) continue;
+      const out = await answerQuestion(location.origin, q.id, a.option, reason);
+      if (out.from === 'written') {
+        settled.set(q.id, a.title);
+        refused.delete(q.id);
+        done++;
+      } else refused.set(q.id, out.fix);
+    }
+    batching = false;
+    settledHere = settled;
+    fixes = refused;
+    picked = new Set();
+    batchReason = '';
+    if (done) toasts.push(copy.decideBatchDone(done), { intent: 'good' });
+    void invalidateAll();
+  }
+
   /**
    * DRAWN ONCE THE FIRST READ HAS ANSWERED, live or the sample. The read is bracketed by `opened()` and
-   * `closed()`, so a call still out takes `data-screen` away whatever this says; `Empty` says `refused`
-   * for the state it draws.
+   * `closed()`, so a call still out takes `data-screen` away whatever this says.
    */
   $effect(() => {
     if (from === 'live' || from === 'sample') drew('ready');
@@ -264,11 +431,132 @@
 </script>
 
 <svelte:head><title>{titleOf(copy.decide)}</title></svelte:head>
+<svelte:window {onkeydown} />
 
-<!-- NO COUNT IN THE HEAD, AND IT HAD ONE. It printed the same 4 that `Open questions` prints one line
-     lower, for the same list, and at 390 it wrapped onto a line of its own: the head measured 91px
-     there against 59 at 1440, so the first thing under the title on a phone was a lone number. -->
+<!-- NO COUNT IN THE HEAD: `Open questions` prints it one line lower, for the same list. -->
 <PageHead icon="decide" title={copy.decide} />
+
+{#snippet card(q: Question)}
+  {@const said = answers.get(q.id)}
+  {@const updates = changed.get(q.id) ?? []}
+  {@const preview = previews.get(q.id)}
+  {@const about = aboutOf(q)}
+  {@const set = rowsetOf(q)}
+  {@const decidedHere = settledHere.get(q.id)}
+  <li
+    class="q"
+    id="q-{q.id}"
+    tabindex="-1"
+    aria-labelledby="q-{q.id}-title"
+    data-cursor={order[cursor]?.id === q.id ? '' : undefined}
+    data-done={decidedHere !== undefined ? '' : undefined}
+  >
+    {#if decidedHere !== undefined}
+      <!-- DECIDED HERE: one line in the question's place, and the way to the decision it became. -->
+      <a class="q-receipt" href="/decide/{q.id}">
+        <span class="q-tick"><Icon name="check" size="s" /></span>
+        <span class="q-title" id="q-{q.id}-title">{q.title}</span>
+        <span class="q-said">{copy.decideDecided(decidedHere)}</span>
+      </a>
+    {:else}
+      <div class="q-top">
+        <a class="q-open" href="/decide/{q.id}">
+          <span class="q-body">
+            <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. -->
+            <span class="q-title" id="q-{q.id}-title">{q.title}</span>
+            {#if q.cost}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
+            <span class="q-head">
+              {#if set && updates.length}
+                <span class="q-entity">{copy.decideRows(updates.length, listName(set.register))}</span>
+              {:else if about && grouping === 'none'}
+                <span class="q-entity">{about}</span>
+              {/if}
+              {#if live?.about?.[q.id]?.by === 'spark'}<span class="q-entity">{copy.fromSpark}</span>{/if}
+              <span class="q-age">opened {since(q.opened, now)}</span>
+              <span class="q-id">{q.id}</span>
+            </span>
+          </span>
+        </a>
+        <button
+          type="button"
+          class="pick"
+          role="checkbox"
+          aria-checked={picked.has(q.id)}
+          aria-label={q.title}
+          data-on={picked.has(q.id) ? '' : undefined}
+          onclick={() => toggle(q.id)}
+        >{#if picked.has(q.id)}<Icon name="check" size="s" />{/if}</button>
+      </div>
+
+      {#if preview}
+        <section class="q-changes" aria-label={copy.proposalWillAppear}><Proposed proposed={preview} /></section>
+      {:else if updates.length}
+        <div class="q-changes"><Changes {updates} compact /></div>
+      {/if}
+
+      <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT: above it opens the question, below it answers it. -->
+      <div class="q-act">
+        {#if said}
+          {@const state = reasonState(said.reason)}
+          <div class="said">
+            <!-- NOT SAVED, SAID ON THE CARD, on the sample, where nothing is. -->
+            {#if from !== 'live'}<Chip label={copy.markNotWritten} tone="warn" />{/if}
+            <span class="said-what">{SAY.answered(said.title)}</span>
+            <!-- THE ROW STAYS AND OFFERS THE WAY BACK (REWORK §1, §4). -->
+            <Button
+              weight="bare"
+              id="undo-{q.id}"
+              aria-label={SAY.putBackOf(q.title)}
+              onclick={() => putBack(q, said.option)}
+            >{SAY.putBack}</Button>
+          </div>
+
+          <div class="why">
+            <label class="why-label" for="why-{q.id}">{SAY.whyLabel}</label>
+            <textarea
+              id="why-{q.id}"
+              data-why={q.id}
+              class="why-field"
+              rows="2"
+              placeholder={copy.reasonHint}
+              spellcheck="true"
+              aria-describedby={state === 'written' ? undefined : `why-note-${q.id}`}
+              value={said.reason}
+              oninput={(e) => (answers = setReason(answers, q.id, e.currentTarget.value))}
+            ></textarea>
+            <!-- THE ARGUMENT, STANDING RATHER THAN BLOCKING, until there is a sentence worth reading. -->
+            {#if state !== 'written'}
+              <p class="why-note" id="why-note-{q.id}">
+                {state === 'missing' ? (from === 'live' ? copy.reasonRequired : SAY.reasonMissing) : SAY.reasonThin}
+              </p>
+            {/if}
+            <!-- A LIVE RECORD SENDS IT, from the button or from the field. -->
+            {#if from === 'live'}
+              <div class="send">
+                <Button weight="primary" disabled={!said.reason.trim() || sending !== null} onclick={() => commit(q, said)}>
+                  {copy.commit}
+                </Button>
+                <span class="keys"><Kbd keys="⌘↵" />{copy.decideToSend}<Kbd keys="Esc" />{copy.decideToLeave}</span>
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject. -->
+          <div class="q-options" role="group" aria-labelledby="q-{q.id}-title">
+            {#each optionsOf(q) as o (o.key)}
+              <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
+                {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
+              </Button>
+            {/each}
+          </div>
+        {/if}
+        {#if fixes.get(q.id)}
+          <p class="why-fix" role="status" data-intent="bad">{fixes.get(q.id)}</p>
+        {/if}
+      </div>
+    {/if}
+  </li>
+{/snippet}
 
 <div class="page">
   {#if from === 'reading'}
@@ -279,149 +567,105 @@
       {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if open.length === 0}
+    <!-- ALL CLEAR, with the last decision's age, and the other queue when something waits in it. -->
     <Empty
       kind="cleared"
       title={copy.noQuestions}
       body={DECIDED[0] ? `${copy.lastDecided} ${since(DECIDED[0].decided?.at ?? '', now)}.` : undefined}
-    />
+    >
+      {#snippet actions()}
+        {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+      {/snippet}
+    </Empty>
   {:else}
-    <!-- THE COUNTS DO NOT MOVE WHEN A CARD IS ANSWERED, and they are right not to. Nothing was
-         written, so nothing left the queue: a heading that counted down would be this screen
-         claiming a state the record has never heard of. -->
-    <Section title={copy.openQuestions} count={open.length}>
-      <!-- THE AIM, AS A SENTENCE WITH ITS TONE, AND IT WAS A FRAGMENT. The metric's note sat alone at
-           the end of this row, `no more than 3`, grey, beside a count of 4 it was failing. The
-           metric already knew it was failing (`tone: 'warn'` above three) and nothing drew it.
-           `Chip` draws the tone with its glyph, so over the aim reads ⚠ and not only amber (13 §5.1). -->
+    <!-- THE COUNT IS WHAT STILL WAITS. On the sample nothing is written, so nothing leaves it. -->
+    <Section title={copy.openQuestions} count={waiting.length}>
       {#snippet aside()}
-        <Chip label={copy.aimFor(target.note)} tone={aimTone} />
+        <div class="head-aside">
+          <div class="segmented" role="group" aria-label={copy.decideGroup}>
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={grouping === 'none'}
+              data-on={grouping === 'none' ? '' : undefined}
+              onclick={() => (grouping = 'none')}>{copy.decideGroupNone}</button
+            >
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={grouping === 'about'}
+              data-on={grouping === 'about' ? '' : undefined}
+              onclick={() => (grouping = 'about')}>{copy.decideGroupList}</button
+            >
+          </div>
+          <Chip label={copy.aimFor(target.note)} tone={aimTone} />
+        </div>
       {/snippet}
 
-      <ol class="queue">
-        {#each open as q (q.id)}
-          {@const said = answers.get(q.id)}
-          {@const updates = changed.get(q.id) ?? []}
-          <li class="q">
-            <a class="q-open" href="/decide/{q.id}">
-              <span class="q-body">
-                <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. It led with `SG34` in the id
-                     face, which Home took out of its leading column because `SG` is expanded
-                     nowhere. It stays, because the feed says "Opened SG31" and a reader looking for
-                     that question should find it here; it no longer comes first. -->
-                <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-                {#if q.cost}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
-                <span class="q-head">
-                  {#if q.entity}<span class="q-entity">{q.entity}</span>{/if}
-                  <span class="q-age">opened {since(q.opened, now)}</span>
-                  <span class="q-id">{q.id}</span>
-                </span>
-              </span>
-            </a>
+      {#each groups as g (g.key)}
+        <div class="group" data-picking={picked.size > 0 ? '' : undefined}>
+          {#if grouping !== 'none'}<h3 class="group-head">{g.name}<span class="group-n">{g.items.length}</span></h3>{/if}
+          <ol class="queue">
+            {#each g.items as q (q.id)}{@render card(q)}{/each}
+          </ol>
+        </div>
+      {/each}
 
-            {#if updates.length}
-              <div class="q-changes"><Changes {updates} /></div>
-            {/if}
+      {#if waiting.length === 0}
+        <Empty kind="cleared" compact title={copy.noQuestions}>
+          {#snippet actions()}
+            {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+          {/snippet}
+        </Empty>
+      {/if}
 
-            <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT. One card, two regions, separated by a
-                 rule so the boundary is visible rather than inferred: above it opens the question,
-                 below it answers it. -->
-            <div class="q-act">
-              {#if said}
-                {@const state = reasonState(said.reason)}
-                <div class="said">
-                  <!-- NOT SAVED, SAID ON THE CARD. `Chip` is what draws it, because the tone comes
-                       with its glyph and there is no way in this app to render an intent without one
-                       (13 §5.1). An answered card that only went amber says nothing at all to a
-                       screen reader and nothing to anybody who does not see amber. -->
-                  <Chip label={copy.markNotWritten} tone="warn" />
-                  <span class="said-what">{SAY.answered(said.title)}</span>
-                  <!-- THE ROW STAYS AND OFFERS THE WAY BACK. Of eighty-five human writes over
-                       thirteen days in the record this product is modelled on, thirteen reversed the
-                       write immediately before them and twelve landed inside five seconds, because
-                       the row vanished and the only way to check you had hit the right one was to do
-                       the opposite and look. There is no confirmation dialog in this product for the
-                       same reason: it asks before anything has happened, when the reader knows the
-                       least they ever will (REWORK §1, §4). -->
-                  <Button
-                    weight="bare"
-                    id="undo-{q.id}"
-                    aria-label={SAY.putBackOf(q.title)}
-                    onclick={() => putBack(q, said.option)}
-                  >{SAY.putBack}</Button>
-                </div>
-
-                <div class="why">
-                  <label class="why-label" for="why-{q.id}">{SAY.whyLabel}</label>
-                  <textarea
-                    id="why-{q.id}"
-                    class="why-field"
-                    rows="2"
-                    placeholder={copy.reasonHint}
-                    spellcheck="true"
-                    aria-describedby={state === 'written' ? undefined : `why-note-${q.id}`}
-                    value={said.reason}
-                    oninput={(e) => (answers = setReason(answers, q.id, e.currentTarget.value))}
-                  ></textarea>
-                  <!-- THE ARGUMENT, STANDING RATHER THAN BLOCKING. It says nothing once there is a
-                       sentence worth reading in six weeks: a note that never goes away is a note
-                       nobody reads, and the reader has already done the thing it asks for. -->
-                  {#if state !== 'written'}
-                    <p class="why-note" id="why-note-{q.id}">
-                      {state === 'missing' ? (from === 'live' ? copy.reasonRequired : SAY.reasonMissing) : SAY.reasonThin}
-                    </p>
-                  {/if}
-                  <!-- A LIVE RECORD SENDS IT, and a refusal stays under the button in the record's words. -->
-                  {#if from === 'live'}
-                    <div class="send">
-                      <Button weight="primary" disabled={!said.reason.trim() || sending !== null} onclick={() => commit(q, said)}>
-                        {copy.commit}
-                      </Button>
-                    </div>
-                    {#if fixes.get(q.id)}
-                      <p class="why-fix" role="status" data-intent="bad">{fixes.get(q.id)}</p>
-                    {/if}
-                  {/if}
-                </div>
-              {:else}
-                <!-- Named by the question, because "Per seat" repeated down a queue of nine is
-                     three words with no subject. -->
-                <div class="q-options" role="group" aria-labelledby="q-{q.id}-title">
-                  <!-- THE HOUSE CONTROL, not a button styled to look like one. `Button` carries the
-                       invisible 44 x 44 hit box, the press state and a fill whose contrast against
-                       its own label is already solved; an option button hand-rolled here would be a
-                       second control with the same job and its own drift. -->
-                  <!-- THE RECOMMENDATION, AS A WORD INSIDE ITS OPTION. Not filled, not moved first,
-                       not focused: the same weight as its neighbours and in the record's order, so it
-                       is found rather than chosen. The argument is over `take`. -->
-                  {#each optionsOf(q) as o (o.key)}
-                    <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
-                      {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
-                    </Button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          </li>
-        {/each}
-      </ol>
+      {#if picked.size > 0}
+        <!-- THE SELECTION'S BAR, stuck to the foot of the view and drawn after the list, so opening it
+             moves nothing above it. -->
+        <div class="batch" role="region" aria-label={copy.decideSelected(chosen.length)}>
+          <span class="batch-n">{copy.decideSelected(chosen.length)}</span>
+          {#if approvable.length > 0}
+            <input
+              class="batch-why"
+              type="text"
+              placeholder={copy.decideBatchReason}
+              aria-label={copy.decideBatchReason}
+              bind:value={batchReason}
+              onkeydown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void answerPicked();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  picked = new Set();
+                }
+              }}
+            />
+            <Button weight="primary" disabled={batching || (from === 'live' && !batchReason.trim())} onclick={answerPicked}>
+              {copy.decideAnswerSuggested(approvable.length)}
+            </Button>
+          {:else}
+            <span class="batch-note">{copy.decideNoneSuggested}</span>
+          {/if}
+          <Button weight="bare" onclick={() => (picked = new Set())}>{copy.clearSelection}</Button>
+        </div>
+      {/if}
     </Section>
   {/if}
 
   {#if DECIDED.length}
-    <Section title="Decided" count={DECIDED.length}>
+    <Section title={copy.searchDecided} count={DECIDED.length}>
       <ul class="ledger">
         {#each DECIDED.slice(0, DOM_CAP) as q}
           <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
-          {@const chose = q.options.find((o) => o.key === q.decided?.option)?.title}
+          {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
           <li>
-            <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. `SG31` in the
-                 leading column was a code expanded nowhere; the question is what tells these rows
-                 apart, and the id stays, dim, for whoever meets "Decided SG31" in the log. -->
+            <!-- A TICK LEADS AND THE ID ENDS THE LINE, the order the queue above keeps. -->
             <a class="line" href="/decide/{q.id}">
               <span class="seq"><Icon name="check" size="s" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
-                <span class="line-detail">{#if chose}<span class="decided-choice">{chose}</span> {/if}{q.decided?.reason}</span>
+                <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
               </span>
               <span class="line-when">{since(q.decided?.at ?? '', now)}<span class="decided-id">{q.id}</span></span>
             </a>
@@ -442,6 +686,34 @@
     max-inline-size: var(--page-max);
   }
 
+  .head-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .group + .group {
+    margin-block-start: var(--sp-5);
+  }
+
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-1);
+    color: var(--ink2);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .group-n {
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
   .queue {
     display: flex;
     flex-direction: column;
@@ -452,16 +724,17 @@
 
   /**
    * A QUESTION IS A SECTION OF THE LIST, NOT A CARD. Space and a soft divider separate one from the
-   * next; a box, a border and a shadow round each made a queue of four read as four forms. The link
-   * is the top of the item and the answers sit under it as siblings, because a button may not live
-   * inside a link.
+   * next. The link is the top of the item and the answers sit under it as siblings, because a button
+   * may not live inside a link.
    */
   .q {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
     padding-block: var(--sp-5);
     border-block-end: 1px solid var(--line-soft);
+    scroll-margin-block: var(--sp-7);
   }
 
   .q:first-child {
@@ -472,9 +745,56 @@
     border-block-end: 0;
   }
 
-  /* NO CHEVRON. One sat at the far edge of every question, 500px from the words it pointed at, on a
-     list whose title already underlines under the pointer and whose whole block is the link. It was
-     a mark repeated five times that said nothing the title did not. */
+  /* THE CURSOR IS THE FOCUS RING, drawn round the question with room to breathe, and only while it is
+     the keyboard's. A pointer reader never sees it. */
+  .q:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: var(--sp-2);
+    border-radius: var(--r-sm);
+  }
+
+  /* A DECIDED QUESTION IS ONE LINE, and the rule under it stays so the list keeps its rhythm. */
+  .q[data-done] {
+    padding-block: var(--sp-3);
+  }
+
+  .q-receipt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-ui);
+    text-decoration: none;
+  }
+
+  .q-receipt .q-title {
+    min-inline-size: 0;
+    color: var(--ink2);
+    font-weight: 400;
+  }
+
+  .q-tick {
+    align-self: center;
+    color: var(--earn);
+  }
+
+  .q-said {
+    color: var(--dim);
+  }
+
+  .q-said::before {
+    content: '·';
+    margin-inline-end: var(--sp-2);
+  }
+
+  .q-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
   .q-open {
     display: block;
     color: var(--ink);
@@ -520,8 +840,7 @@
     color: var(--ink2);
   }
 
-  /* The identifier ends the line, in the id face and quiet: it is there for whoever meets it in the
-     log, not to be read first. */
+  /* The identifier ends the line, in the id face and quiet. */
   .q-id {
     color: var(--dim);
     font-family: var(--font-id);
@@ -532,6 +851,46 @@
     content: '·';
     margin-inline-end: var(--sp-2);
     color: var(--dim);
+  }
+
+  /* THE SELECTION BOX, at the trailing edge of the title, and only where it is wanted: under the
+     pointer, on the cursor, or once something is selected. It keeps its space when hidden, so showing
+     it moves nothing. A thumb selects nothing here; a phone answers one question at a time. */
+  .pick {
+    display: grid;
+    place-items: center;
+    inline-size: 16px;
+    block-size: 16px;
+    margin-block-start: 2px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--accent-ink);
+    cursor: pointer;
+    visibility: hidden;
+  }
+
+  .pick[data-on] {
+    background: var(--accent);
+    border-color: var(--accent-edge);
+  }
+
+  .q:hover .pick,
+  .q[data-cursor] .pick,
+  .pick:focus-visible,
+  .group[data-picking] .pick {
+    visibility: visible;
+  }
+
+  @media (pointer: coarse) {
+    .pick {
+      display: none;
+    }
+  }
+
+  .q-changes {
+    max-inline-size: var(--measure);
   }
 
   .q-act {
@@ -553,9 +912,7 @@
     }
   }
 
-  /* THE SUGGESTION IS A WORD, IN THE QUIET INK. A green chip beside one answer made the machine's
-     pick the loudest thing in the queue; a word inside the control is read with the option's name
-     and leaves every option the same weight. */
+  /* THE SUGGESTION IS A WORD, IN THE QUIET INK, read with the option's name. */
   .rec {
     color: var(--dim);
     font-weight: 400;
@@ -577,6 +934,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    max-inline-size: var(--measure);
   }
 
   .why-label {
@@ -584,7 +942,8 @@
     font-size: var(--t-xs);
   }
 
-  .why-field {
+  .why-field,
+  .batch-why {
     inline-size: 100%;
     min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-3);
@@ -594,6 +953,9 @@
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-ui);
+  }
+
+  .why-field {
     resize: vertical;
   }
 
@@ -605,6 +967,29 @@
 
   .send {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+  }
+
+  /* The chords, beside the button they stand for. A phone has no keyboard to press them with. */
+  .keys {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .keys :global(.kbd-run + .kbd-run),
+  .keys :global(.kbd-run:not(:first-child)) {
+    margin-inline-start: var(--sp-3);
+  }
+
+  @media (width < 900px), (pointer: coarse) {
+    .keys {
+      display: none;
+    }
   }
 
   .why-fix {
@@ -612,24 +997,55 @@
     font-size: var(--t-ui);
   }
 
-  /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns. */
-  /**
-   * A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO.
-   *
-   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about width,
-   * and it is more specific than the card rule — Svelte compiles `.ledger :global(.line)` to
-   * `.ledger.svelte-xxx .line`, three classes against one — so it won at every size. The children
-   * took their card placements and the parent kept four desktop tracks underneath them: computed at
-   * 390, `144px 63px 0px 81px`, a zero-width track with a nowrap note in it.
-   *
-   * The cost is measurable. The longest note in the audit log was 19% visible — `added a n…` — and
-   * `/decide` lost 227px of a 551px sentence. Eight entries, none readable, on the two screens whose
-   * whole job is to say what changed and why. Every desktop screenshot looked correct.
-   *
-   * `@layer components` alone does NOT fix it: within one layer the more specific rule still wins.
-   * The width query is what makes the two rules describe two different screens instead of arguing
-   * about one.
-   */
+  /* At the trailing edge, as wide as it needs, so a toast at the leading edge and the bar do not meet. */
+  .batch {
+    position: sticky;
+    inset-block-end: var(--sp-4);
+    z-index: var(--z-raise);
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin-inline-start: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: var(--sp-4);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--e2);
+  }
+
+  .batch-n {
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .batch-why {
+    flex: 0 1 18rem;
+    inline-size: 18rem;
+    min-inline-size: 0;
+  }
+
+  /* A question the cursor lands on clears the bar, which stands over the foot of the view. */
+  .group[data-picking] .q {
+    scroll-margin-block-end: var(--sp-9);
+  }
+
+  .batch-note {
+    flex: 1;
+    color: var(--ink2);
+    font-size: var(--t-ui);
+  }
+
+  /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns.
+
+     A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO: `rows.css` turns a row into a two-line
+     card below 640px, and this override is more specific than that rule, so without the width query
+     it won at every size and left a zero-width track holding a nowrap note. */
   @media (width >= 640px) {
     .ledger :global(.line) {
       grid-template-columns: 2ch minmax(0, 1fr) auto;
@@ -637,8 +1053,7 @@
     }
   }
 
-  /* ON A PHONE THE TICK IS A COLUMN, as on Home. `rows.css` gives the leading span a line of its
-     own on a card, and a lone tick over every decided question is a line that says nothing. */
+  /* ON A PHONE THE TICK IS A COLUMN, as on Home. */
   @media (width < 640px) {
     .ledger :global(.line) {
       grid-template-columns: 20px minmax(0, 1fr);
@@ -680,5 +1095,14 @@
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
+
+    .head-aside .segmented {
+      display: none;
+    }
+
+    .batch {
+      inset-block-end: calc(var(--tabbar) + var(--sp-3));
+    }
+
   }
 </style>

@@ -40,13 +40,17 @@ export type Held = { id?: string; register?: string; seq: number | null; version
 /** What a diff is drawn from: each named register's declaration and the rows it would change. */
 export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]> };
 
-export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Record<string, RowsetBody> };
+/** What an open suggestion is, as filed: its kind, its body as the record holds it, and who filed it. The queue groups by
+    `by`, and a `change` or a `pattern` is previewed from `body` (`routes/decide/[id]/proposed.ts`). */
+export type About = { kind: string; body: Row; by: string };
+
+export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Record<string, RowsetBody>; about?: Record<string, About> };
 
 /**
  * `closed` is a question no longer open: a decision, or a suggestion somebody has settled. `calls` is what an open
  * `change` would call out once accepted, from the `egress` the record worked out when it was filed.
  */
-export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean; calls: CallOut[] };
+export type One = Rows & { question: Question | null; rowset: RowsetBody | undefined; closed: boolean; calls: CallOut[]; about?: About };
 
 export const words = {
   /* A settled suggestion whose decision this screen could not find among the ones it reads. */
@@ -140,6 +144,8 @@ async function linkedRow(client: Governor, register: 'suggestion' | 'decision', 
 }
 
 /** The body of a `rowset` suggestion, or nothing. */
+export const aboutOf = (row: Row): About => ({ kind: text(row.body_kind), body: isRow(row.body) ? row.body : {}, by: text(row.opened_by) });
+
 export function rowsetOf(row: Row): RowsetBody | undefined {
   if (row.body_kind !== 'rowset' || !isRow(row.body)) return undefined;
   const { register, rows } = row.body;
@@ -216,6 +222,7 @@ export async function readQueue(client: Governor): Promise<Read<Queue>> {
       open: rows.map((r, i) => questionOf(r, asked.get(String(r.id)), i + 1)),
       decided: all.decisions.map((d) => decisionOf(d, settled.get(String(d.id)))),
       rowsets,
+      about: Object.fromEntries(rows.map((r) => [String(r.id), aboutOf(r)])),
       ...(await heldBy(client, Object.values(rowsets))),
     },
   };
@@ -247,7 +254,7 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
   if (row.status === 'open') {
     const rowset = rowsetOf(row);
     const calls = callsOutOf(isRow(row.body) ? row.body.egress : undefined);
-    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls } };
+    return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls, about: aboutOf(row) } };
   }
   const by = await linkedRow(client, 'decision', row.decision);
   const decided = by ? decisionOf(by).decided : undefined;

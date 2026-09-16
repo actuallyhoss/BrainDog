@@ -15,7 +15,7 @@
  * `keys.svelte.ts` RE-EXPORTS EVERYTHING HERE, so no screen changed and no import moved.
  */
 
-export type Scope = 'document' | 'grid' | 'board' | 'page' | 'gate' | 'palette' | 'nav';
+export type Scope = 'document' | 'grid' | 'board' | 'page' | 'decide' | 'gate' | 'inbox' | 'palette' | 'nav';
 
 
 export type Binding = {
@@ -144,6 +144,24 @@ export const BINDINGS: Binding[] = [
   { id: 'gate-commit', scope: 'gate', key: '⌘↵', label: 'Commit, from inside the reason', bare: false },
   { id: 'gate-defer', scope: 'gate', key: 'd', label: 'Defer: a reason and a wake date', bare: true },
   { id: 'gate-leave', scope: 'gate', key: 'Esc', label: 'Leave. The question stays open', bare: false },
+  { id: 'gate-next', scope: 'gate', key: 'j  k', label: 'The next or the previous open question', bare: true },
+
+  /* THE TWO QUEUES, which bound nothing (DESIGN-SYSTEM D1). A number answers the question under the cursor, as a press on
+     its button does; the gate above is where one is examined, and the queue is where one already thought about is cleared. */
+  { id: 'decide-move', scope: 'decide', key: 'j  k', label: 'The next or the previous question', bare: true },
+  { id: 'decide-open', scope: 'decide', key: '↵', label: 'Open it, with every option and its reasoning', bare: false },
+  { id: 'decide-answer', scope: 'decide', key: '1–9', label: 'Answer with that option', bare: true },
+  { id: 'decide-approve', scope: 'decide', key: 'a', label: 'Answer with the suggested option, or accept the change', bare: true },
+  { id: 'decide-defer', scope: 'decide', key: 'd', label: 'Defer it: a reason and a wake date', bare: true },
+  { id: 'decide-select', scope: 'decide', key: 'x', label: 'Select it, to answer several at once', bare: true },
+  { id: 'decide-send', scope: 'decide', key: '⌘↵  Esc', label: 'From inside a reason: send it, or go back to the list', bare: false },
+
+  { id: 'inbox-move', scope: 'inbox', key: 'j  k', label: 'The next or the previous email', bare: true },
+  { id: 'inbox-open', scope: 'inbox', key: '↵', label: 'Open it or close it', bare: false },
+  { id: 'inbox-file', scope: 'inbox', key: 'e', label: 'File it in the chosen list', bare: true },
+  { id: 'inbox-archive', scope: 'inbox', key: 'Delete', label: 'Archive it, with its bytes kept', bare: false },
+  { id: 'inbox-select', scope: 'inbox', key: 'x', label: 'Select it, to file or archive several', bare: true },
+  { id: 'inbox-clear', scope: 'inbox', key: 'Esc', label: 'Clear the selection', bare: false },
 
   { id: 'palette-move', scope: 'palette', key: '↑  ↓', label: 'Move', bare: false },
   { id: 'palette-run', scope: 'palette', key: '↵', label: 'Run the row', bare: false },
@@ -153,4 +171,4 @@ export const BINDINGS: Binding[] = [
   { id: 'nav-menu', scope: 'nav', key: '⇧F10', label: 'Move up, Move down, Move to top, Hide', bare: false },
 ];
 
-export const SCOPE_ORDER: Scope[] = ['document', 'grid', 'board', 'page', 'gate', 'palette', 'nav'];
+export const SCOPE_ORDER: Scope[] = ['document', 'grid', 'board', 'page', 'decide', 'gate', 'inbox', 'palette', 'nav'];
