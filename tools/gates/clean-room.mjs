@@ -8,13 +8,19 @@
  * This looks for the predecessor's distinctive identifiers. It cannot prove a clean room — the proof
  * is the rule, and the rule is kept by people. What it CAN do is fail loudly the day somebody pastes.
  *
- * Usage:  node tools/gates/clean-room.mjs
+ * Usage:  node tools/gates/clean-room.mjs [root]
  */
 
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
-const ROOT = process.cwd();
+/* A ROOT ON THE COMMAND LINE IS OBEYED RATHER THAN IGNORED. An ignored argument is worse than a
+   refused one, because the count this prints still reads as an answer about the directory you
+   named, so a clean result gets taken for proof about a tree it never once looked at. That is not
+   hypothetical: it is how a sibling gate was misread the day this was written. `process.cwd()`
+   stays the default, since that is how `run.mjs` and `self-test.mjs` both aim this, spawning it
+   with the root as the child's working directory and no argument. */
+const ROOT = resolve(process.argv[2] ?? process.cwd());
 const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'docs', 'loop']);
 
 /**

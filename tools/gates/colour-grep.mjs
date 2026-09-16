@@ -5,17 +5,23 @@
  * up in a `style` attribute. Thirty lines of Node, AND THIS IS THE GATE THAT ACTUALLY FIRES IN
  * PRACTICE (22 §7 gate 2) — the stylesheet is the place people remember to be careful.
  *
- * Usage:  node tools/gates/colour-grep.mjs
+ * Usage:  node tools/gates/colour-grep.mjs [root]
  */
 
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { budget, skipDir } from './lib.mjs';
 
 const C = budget('colourGrep');
 
-const ROOT = process.cwd();
+/* A ROOT ON THE COMMAND LINE IS OBEYED RATHER THAN IGNORED. An ignored argument is worse than a
+   refused one, because the count this prints still reads as an answer about the directory you
+   named, so a clean result gets taken for proof about a tree it never once looked at. That is not
+   hypothetical: it is how a sibling gate was misread the day this was written. `process.cwd()`
+   stays the default, since that is how `run.mjs` and `self-test.mjs` both aim this, spawning it
+   with the root as the child's working directory and no argument. */
+const ROOT = resolve(process.argv[2] ?? process.cwd());
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
 /* `docs` and `loop` are prose about colours rather than colours, and `negative` is this gate's
