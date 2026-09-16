@@ -47,9 +47,10 @@ blocks:
 **That block is the authoring grammar, and there are two forms of this document.** The one above is
 what the kernel accepts and what a pack ships. `columns:`, `cells:` and `order:` are lists of objects
 and have to be: a column carries `label`, `width`, `align`, `link`, `tone_when` and `as`, and
-`declare.ts` refuses a bare name with *"a column names a field"*. **`link` is specified and not
-built**: nothing reads it on either page path, and a row that has somewhere to go is already a link
-in whole, so the worked example above declares a key that does nothing today. `where:` is the one key with two
+`declare.ts` refuses a bare name with *"a column names a field"*. **`link` and `tone_when` are
+specified and not built**: nothing reads either on either page path, a row that has somewhere to go
+is already a link in whole, and the only tone a row wears is the one its register's own declaration
+gives it, so the worked example above declares two keys that do nothing today. `where:` is the one key with two
 legal spellings — the tree above, **and** the sentence `state is sent or part` — because `predicateOf`
 (`kernel/src/metrics.ts`) takes `Predicate | string` and hands a string to `parseWhere`
 ([38-SPEC-WHERE](38-SPEC-WHERE.md)); every page the seed ships is written in the sentence form.
@@ -125,7 +126,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when? (**specified and not built**: no evaluator reads it, and a row's tone comes from its register's state field, not from its block), as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |
@@ -143,7 +144,12 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | *`accepts` names* | on a pack-declared `kind`, the keys its `accepts:` names are legal here, typed `register · metric · number · text` ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.6) | per the block declaration | as the declaration says |
 
 `tone_when` on a column is a `where:` leaf without `field:` — the column supplies it — plus a `tone`,
-evaluated at render like `when`.
+evaluated at render like `when`. **It is specified and not built.** No evaluator reads it: the app's
+declared-page path builds a column from `field`, `label`, `width`, `align` and `as`, deriving
+`truncate` from the register, and the kernel's page layer calls `where.evaluate` only to filter
+`activity`, `actions` and `sessions.live`. A row's tone is `toneOf`'s, from the register's state
+field and its declared deadline field, so a declared page wears the same tone the register's own
+grid draws.
 
 A `cards` block lays one card per row in a grid that fills its container at 17rem a card, one column
 on a narrow one; the title opens the row. A `section` is a full-width heading with a count aside, and

@@ -434,7 +434,9 @@ mechanism 2, amended in §13 D1). Per device — §10.
 4. A block whose `rows.length === 0` renders its `empty:` string in a tight frame in the block's own position —
    never hidden, never centred (19 §6 *Partial*). `values` resolves every `{{path}}` in it; a missing value is `—`.
 5. Column `tone_when` and cell tones are evaluated per row with `where.evaluate(leaf, value, { now, tz })`; an
-   intent reaches the DOM only as `data-intent` plus its glyph (13 §2.3).
+   intent reaches the DOM only as `data-intent` plus its glyph (13 §2.3). **`tone_when` is specified and not
+   built**: no column tone is evaluated today, and a row's intent comes from its register's state field and its
+   declared deadline field (06 §1.1).
 6. Every block carries `id="b-<n>"`, `scroll-margin-block-start: var(--sticky)`, and its source name in the header;
    `o` navigates to `/r/<register>?…` with `encode(block.where, block.order)`; `⇧E` to `?src=1`, which renders
    `declare.toYaml(page)` in a `<pre>`.
