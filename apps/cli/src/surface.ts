@@ -22,10 +22,10 @@ const reachable = <T>(r: Result<T>): Result<T> =>
   refused(r) && r.refusal.code === 'UNREACHABLE' ? { ok: false, refusal: { ...r.refusal, fix: UNREACHABLE_FIX } } : r;
 
 /**
- * The four methods `McpSurface` marks optional. This client routes all four since build step 16; the
+ * The optional methods of `McpSurface` this client routes: the first four since build step 16, and `arrangement` since S12; the
  * probe below stays so that a client built before a route landed gives its tool's own "not yet" sentence.
  */
-const LATER = ['context', 'handoff', 'meet', 'sessionsLive'] as const;
+const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement'] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
   const ask = async <T>(ctx: Ctx, name: string, args: unknown = {}): Promise<Result<T>> =>

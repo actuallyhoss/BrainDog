@@ -266,6 +266,7 @@ test('resources are listed, templated and read, with how long each may be held',
     'braindog:page/{slug}',
     'braindog:metric/{id}',
     'braindog:skill/{name}',
+    'braindog:declaration/{slug}',
   ]);
 
   const read = result<{ contents: { uri: string; text: string }[]; ttlMs: number }>(

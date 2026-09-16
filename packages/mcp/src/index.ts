@@ -66,6 +66,8 @@ export type McpSurface<C> = {
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
   /** Every scheduled action, with its key by label only. READ+, and optional for the same reason as the four above. */
   actions?(ctx: C): Answer;
+  /** How the record is arranged, one page's declaration, or a grammar (`loop/research-spark.md` S12). READ+, optional likewise. */
+  arrangement?(args: { page?: string; grammar?: string }, ctx: C): Answer;
 };
 
 /**
@@ -193,11 +195,11 @@ export const TOOLS: readonly Tool[] = [
     input: obj(
       {
         question: str('What is being asked, in one sentence a person can answer.'),
-        body_kind: str('options, rowset, pattern or change.'),
+        body_kind: str('options, rowset, pattern, change, pack, settings or arrange.'),
         body: {
           type: 'object',
           description:
-            'The body for that kind. options: {"options":[...]}, at least two, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]} changes those rows when accepted; a new skill body raises its rev for you. change: {"to":{"id":"page.x","kind":"page","body":{...}}} installs that declaration, such as a page and its place in the nav.',
+            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"to":{"id":"page.x","kind":"page","body":{...}}}. pack, settings and arrange change what this BrainDog is: read braindog:arrangement and braindog:grammar/proposals first.',
         },
       },
       ['question', 'body_kind', 'body'],
@@ -363,6 +365,9 @@ const TTL = new Map([
   ['digest', MINUTE],
   ['decisions', MINUTE],
   ['actions', MINUTE],
+  ['arrangement', MINUTE],
+  ['declaration', MINUTE],
+  ['grammar', HOUR],
   ['page', MINUTE],
   ['metric', MINUTE],
   ['schema', HOUR],
@@ -389,6 +394,9 @@ const FIXED: readonly Resource[] = [
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
+  resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
+  resource('grammar/page', 'What a page declaration may contain, with one that installs.'),
+  resource('grammar/proposals', 'The bodies that change what this BrainDog is: pack, settings and arrange.'),
 ];
 
 /** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
@@ -397,6 +405,7 @@ export const TEMPLATES = [
   { uriTemplate: 'braindog:page/{slug}', name: 'page', description: 'One page, with every block run: rows and figures, never markup.' },
   { uriTemplate: 'braindog:metric/{id}', name: 'metric', description: 'One figure, with its target and how it compares.' },
   { uriTemplate: 'braindog:skill/{name}', name: 'skill', description: 'The text of one skill, and when to reach for it.' },
+  { uriTemplate: 'braindog:declaration/{slug}', name: 'declaration', description: 'One page as declared, to change and propose back.' },
 ] as const;
 
 /**
@@ -630,6 +639,7 @@ export function tools<C>(surface: McpSurface<C>) {
 
     meet: async (args, ctx) =>
       surface.meet ? surface.meet(args, ctx) : unbuilt('meet', 'If there is a people register, add the person there with create.'),
+
   };
 
   /**
@@ -653,6 +663,13 @@ export function tools<C>(surface: McpSurface<C>) {
     if (head === 'actions' && !rest)
       return surface.actions ? surface.actions(ctx) : unbuilt('actions', 'Nothing else lists scheduled actions yet.');
     if (head === 'digest' && rest === 'today') return surface.digestToday({}, ctx);
+    if (head === 'arrangement' || head === 'grammar' || head === 'declaration') {
+      const arranged = surface.arrangement;
+      if (!arranged) return unbuilt(uri, 'Read braindog:boot instead.');
+      if (head === 'arrangement' && !rest) return arranged({}, ctx);
+      if (head === 'grammar' && (rest === 'page' || rest === 'proposals')) return arranged({ grammar: rest }, ctx);
+      if (head === 'declaration' && NAMED.test(rest)) return arranged({ page: rest }, ctx);
+    }
     const named = NAMED.test(rest);
     if (head === 'schema' && named) return surface.schema({ register: rest }, ctx);
     if (head === 'page' && named) return surface.page({ slug: rest }, ctx);
