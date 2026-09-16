@@ -628,8 +628,31 @@
   const projected = $derived(
     columnsFor(id, decl)
       .filter((c) => !hidden.has(c.field))
-      .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c)),
+      .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c))
+      .map((c) => weighed(c, c.field === decl?.title)),
   );
+
+  /**
+   * THE FREE SPACE GOES WHERE THE WORDS ARE, and it went to the title whatever the title held.
+   *
+   * Every flexible column took `1fr` and the title `3fr`, so Skills gave a name column of
+   * `review-pr` 530px and cut "Before merging a bran…" at 200px beside it, and Keys cut "What it
+   * opens" the same way. A flexible track now takes an `fr` for every ten characters of the longest
+   * value in the rows in hand, from one to four, and the title never less than three. Still a
+   * DECLARED track list, which `Table` needs for `content-visibility`: the rows decide the numbers
+   * once, and layout never measures a cell.
+   */
+  function weighed<C extends { field: string; width: string }>(c: C, isTitle: boolean): C {
+    const track = /^minmax\(([^,]+),\s*[\d.]+fr\)$/.exec(c.width);
+    if (!track) return c;
+    let longest = 0;
+    for (const e of result.entries.slice(0, 200)) {
+      const v = e.fields[c.field];
+      if (typeof v === 'string' && v.length > longest) longest = v.length;
+    }
+    const fr = Math.min(4, Math.max(isTitle ? 3 : 1, Math.ceil(longest / 10)));
+    return { ...c, width: `minmax(${track[1]}, ${fr}fr)` };
+  }
 
   const columns = $derived([
     ...(siftable
