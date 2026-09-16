@@ -925,6 +925,7 @@ function filledWith(pack: Pack, config: Diff['config']): Pack {
 export const FIRST_PARTY_LISTS: ReadonlyMap<string, string> = new Map([
   ['things', 'portfolio'],
   ['people', 'people'],
+  ['accounts', 'money-core'],
   ['obligations', 'money-core'],
   ['services', 'estate'],
   ['tasks', 'work'],
