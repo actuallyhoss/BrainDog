@@ -243,6 +243,17 @@ test('WHEN STDIN ENDS, the calls in flight are answered before the process exits
   assert.ok((await ping).result);
 });
 
+test('AND AFTER A SESSION OF CALLS, ONE AT A TIME, IT STILL EXITS 0 when stdin ends', async (t) => {
+  /* An agent's session is many calls over one keep-alive connection. `process.exit` straight after the
+     last reply aborted Node 24 on Windows with a libuv assertion, every time, once there had been a few. */
+  const host = await stubHost(t);
+  const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  for (let i = 0; i < 6; i++) assert.deepEqual(said(await s.ask('tools/call', { name: 'list', arguments: { register: 'tasks' } })), ROWS);
+  const { code, err } = await s.end();
+  assert.equal(code, 0, err);
+  assert.doesNotMatch(err, /Assertion failed/);
+});
+
 /* ── when it cannot start ──────────────────────────────────────────────── */
 
 test('A STARTUP FAILURE IS ONE LINE ON STDERR, nothing on stdout, and exit 1', async () => {

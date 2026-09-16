@@ -109,9 +109,11 @@ async function mcp(args: string[]): Promise<void> {
   process.stdout.on('error', () => process.exit(0));
   const ms = budgetOf(process.env);
   await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout);
-  /* Every reply is flushed by now. Exiting rather than waiting for the event loop to empty, because an
-     idle keep-alive socket to the host could hold it open. */
-  process.exit(0);
+  /* Every reply is flushed by now. LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive
+     socket to the host holds it open, for the reason `hook` gives: `process.exit` straight after the last
+     reply aborted Node 24 on Windows with a libuv assertion when the client closed standard input. */
+  process.exitCode = 0;
+  setTimeout(() => process.exit(0), 1_000).unref();
 }
 
 /** `braindog login <host> [--vault <scope>]`: one host, and the exit code `login` decides. */
