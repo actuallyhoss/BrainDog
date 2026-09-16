@@ -67,6 +67,32 @@ for (const [name, page] of [['full', FULL], ['minimal', MINIMAL]] as const) {
   });
 }
 
+/**
+ * THE COMMONEST PAGE THERE IS, and the printer used to write it in a form nothing could read back:
+ * `requires: []` for a page that requires nothing, which the kernel refuses because a `requires` that
+ * is written names at least one register. The line is now simply absent, and the file parses.
+ */
+test('a page that requires nothing prints no requires line, and reads back', () => {
+  const printed = dogText(MINIMAL);
+  assert.equal(printed.includes('requires:'), false);
+  const parsed = parseDog(printed);
+  assert.equal(parsed.ok, true, parsed.ok ? '' : parsed.fix);
+  if (!parsed.ok) return;
+  /* UNDEFINED AND NOT `[]`: the value goes on to the kernel as the page's own document, and an empty
+     list there is the refusal this test exists about. */
+  assert.equal(parsed.value.requires, undefined);
+  assert.equal(dogText(parsed.value), printed);
+});
+
+/** Every `.dog` file pulled before the line went away holds the empty form, and still opens. */
+test('the empty requires line an older file holds is read as nothing required', () => {
+  const parsed = parseDog('page: domains\ntitle: Domains\nrequires: []\nblocks:\n  - kind: note');
+  assert.equal(parsed.ok, true, parsed.ok ? '' : parsed.fix);
+  if (!parsed.ok) return;
+  assert.equal(parsed.value.requires, undefined);
+  assert.equal(dogText(parsed.value).includes('requires:'), false);
+});
+
 test('a body with an internal blank line and trailing spaces round-trips exactly', () => {
   const page: DogPage = {
     page: 'notes',

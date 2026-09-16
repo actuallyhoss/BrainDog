@@ -67,7 +67,12 @@ export function dogText(decl: DogPage): string {
     `title: ${decl.title}`,
     decl.for ? `for: { register: ${decl.for.register}${decl.for.where ? `, where: ${decl.for.where}` : ''} }` : '',
     decl.nav ? `nav: { section: ${decl.nav.section}, order: ${decl.nav.order} }` : '',
-    `requires: [${(decl.requires ?? []).join(', ')}]`,
+    /* NO LINE AT ALL WHEN A PAGE REQUIRES NOTHING, which is the commonest page there is. `requires: []`
+       reads to a person as a list somebody forgot to fill in, and it is worse than that downstream: the
+       kernel takes a `requires` that IS written to name at least one register, so a page printed with the
+       empty line could not be read back and installed. The absence of the line is what "requires nothing"
+       honestly looks like, and it is the only form that survives the round trip. */
+    decl.requires?.length ? `requires: [${decl.requires.join(', ')}]` : '',
     '',
     'blocks:',
     ...decl.blocks.flatMap((b) => [
@@ -245,10 +250,16 @@ export function parseDog(text: string): DogParsed {
     i += 1;
   }
 
+  /* OPTIONAL, AND AN EMPTY LIST IS READ AS NO LIST. A page that requires nothing prints no line, so
+     demanding one would refuse this printer's own output. The empty bracket form is still accepted
+     because every file pulled before that change holds it, and it is read back as nothing required
+     rather than as an empty `requires` the kernel would refuse. */
   const requiresLine = /^requires: \[(.*)\]$/.exec(lines[i] ?? '');
-  if (!requiresLine) return no(`${page} has no requires: line, and a page names the registers it reads.`);
-  decl.requires = listOf(requiresLine[1]!);
-  i += 1;
+  if (requiresLine) {
+    const named = listOf(requiresLine[1]!);
+    if (named.length > 0) decl.requires = named;
+    i += 1;
+  }
 
   if ((lines[i] ?? '') !== 'blocks:') return no(`${page} has no blocks: line where one is expected.`);
   i += 1;
