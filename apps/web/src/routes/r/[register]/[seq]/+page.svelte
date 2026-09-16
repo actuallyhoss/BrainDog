@@ -1185,7 +1185,10 @@
     line-height: var(--lh-3xl);
   }
 
-  /* The code in front of the figure at half its size, the way every headline figure sets it. */
+  /* The code in front of the figure at half its size, the way every headline figure sets it — `em`
+     rather than a fixed step, so it stays half of `.lead-figure` (`--t-3xl`) specifically and not
+     a size that happens to look right today. Matches `.cell-figure`/`.cards-figure .amount-code`
+     in blocks.css. */
   .lead-figure :global(.code) {
     font-size: 0.5em;
     font-weight: 600;

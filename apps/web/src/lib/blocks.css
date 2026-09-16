@@ -270,7 +270,12 @@
 
   /* A CURRENCY CODE IN FRONT OF AN AMOUNT, present and quiet. `leadingCode` in `braindog-render`
      decides what counts as one; this is how it looks wherever an amount is drawn, a step smaller
-     than the figure and in the quiet ink, and half the size in front of a headline figure. */
+     than the figure and in the quiet ink, and half the size in front of a headline figure.
+
+     `em` ON PURPOSE, both here and in the override below: `.amount-code` rides whatever figure it
+     is set beside, which is a different `--t-*` step depending on which block draws it. A fixed
+     token would hold the code still while the figure it fronts moved a whole step, which breaks
+     the "a step smaller" relationship this component exists to keep. */
   .amount-code {
     color: var(--dim);
     font-size: 0.85em;
@@ -548,6 +553,8 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* `em`, same reasoning as `.cell-figure .amount-code` above: half the size of whichever figure
+     it fronts, not a fixed step. */
   .cards-figure .amount-code {
     font-size: 0.5em;
     font-weight: 600;
@@ -1081,6 +1088,24 @@
     }
   }
 
+  /* `.item`'s base rule, moved up here from beside `.list` (below) so it sits BEFORE the
+     `@media (width < 400px)` override that follows it. CSS breaks ties on equal specificity by
+     source order, media query or not: a bare rule after a media block beats it regardless of the
+     viewport, so with `.item` declared below, the "narrowest phone" query right under this comment
+     never actually applied — the four-track grid always won. Nothing downstream of 400px has been
+     getting the two-track layout the query below describes; it only ever looked like it did because
+     nobody was testing at 320-390px against a git blame instead of the running app. */
+  .item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, auto) auto;
+    gap: var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-2) var(--sp-3);
+    min-block-size: var(--row-h);
+    font-size: var(--t-ui);
+    border-block-end: 1px solid var(--line);
+  }
+
   /**
    * A `list` ITEM IS FOUR TRACKS, AND FOUR DO NOT FIT ON THE NARROWEST PHONE.
    *
@@ -1322,16 +1347,8 @@
     overflow: hidden;
   }
 
-  .item {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, auto) auto;
-    gap: var(--sp-3);
-    align-items: baseline;
-    padding: var(--sp-2) var(--sp-3);
-    min-block-size: var(--row-h);
-    font-size: var(--t-ui);
-    border-block-end: 1px solid var(--line);
-  }
+  /* `.item`'s own base rule sits above, before the `@media (width < 400px)` block that narrows
+     it to two tracks — see the comment there for why it has to come first. */
 
   .item:last-child {
     border-block-end: 0;
@@ -1922,7 +1939,10 @@
     font-weight: 500;
   }
 
-  /* A hole is an affordance, never a tag: it is the thing that fixes it. */
+  /* A hole is an affordance, never a tag: it is the thing that fixes it. `font: inherit` sits it in
+     the document's own type wherever it renders, and `0.92em` is deliberately relative to that
+     inherited size rather than a fixed step — a `--t-*` token here would win over `font: inherit`
+     for the size half of it and defeat the point of inheriting the rest. */
   .hole {
     padding: 1px var(--sp-2);
     background: none;
@@ -1966,6 +1986,10 @@
     padding-inline-start: var(--sp-4);
   }
 
+  /* Inline code sized off the paragraph it sits in, not a fixed step: prose in this app renders at
+     more than one `--t-*` size depending on where `.document` is mounted, and a monospace face
+     already reads larger than a proportional one at the same size, so `0.9em` of whatever the
+     surrounding text is doing is the relationship that actually wants keeping. */
   .document code {
     padding: 1px 5px;
     background: var(--sunk);

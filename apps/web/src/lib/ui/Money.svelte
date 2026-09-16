@@ -33,6 +33,9 @@
     white-space: nowrap;
   }
 
+  /* `em` on purpose, matching `.amount-code` in blocks.css: `<Money>` renders at whatever size its
+     caller sets, from a table cell to a headline figure, and the code stays "a step smaller than
+     the figure" at every one of them rather than holding still while the figure moves. */
   .code {
     color: var(--dim);
     font-size: 0.85em;

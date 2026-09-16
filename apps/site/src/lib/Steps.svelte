@@ -102,6 +102,12 @@
     block-size: 32px;
   }
 
+  /* Left as a literal on purpose, same reasoning as `apps/web`'s `.block-slot[data-drop]::after`:
+     the app's `--z-*` scale (`--z-sheet --z-palette --z-toast --z-hint` in `tokens.css`) names
+     global overlay tiers, and this is a local stacking need only, the node dot sitting in front of
+     the rail line drawn behind it within one `.step`. None of the four names fit a "above my own
+     background, nothing else" case, so this stays a plain `1` rather than borrowing a tier that
+     means something else. */
   .n {
     position: relative;
     z-index: 1;

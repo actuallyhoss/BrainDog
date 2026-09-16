@@ -31,6 +31,12 @@
 
   .glyph {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    /* Left as a literal on purpose: the type scale's floor is `--t-xs` at 12px, and this one glyph
+       is drawn at 9px so it reads as a mark beside the name rather than a second word. Rounding up
+       to `--t-xs` would grow it a third again, which is a real, visible size change on the one
+       thing in this component with no name beside it to lean on — not a fix this gate should make
+       silently. Route to a design decision: either the type scale grows a step below `--t-xs`, or
+       this stays a spec carve-out. */
     font-size: 9px;
     line-height: 1;
     flex: none;
@@ -58,6 +64,6 @@
   }
 
   .thing[data-size='md'] .glyph {
-    font-size: 12px;
+    font-size: var(--t-xs);
   }
 </style>

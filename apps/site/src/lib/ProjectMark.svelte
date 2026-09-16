@@ -16,11 +16,21 @@
   } as const;
 </script>
 
-<svg class="pm" viewBox="0 0 12 12" width="10" height="10" style="--h: {hue}" aria-hidden="true">
+<svg class="pm" data-size="s" viewBox="0 0 12 12" style="--h: {hue}" aria-hidden="true">
   <path d={SHAPES[mark]} />
 </svg>
 
 <style>
+  /* Sized off the icon scale, `Icon.svelte`'s own `.icon[data-size]` pattern, rather than a literal
+     width/height on the tag: this used to be a fixed 10px with no name behind it. `--icon-s` is
+     12px, the scale's own floor, and the nearest step to what was there — a 2px difference on a
+     12-unit viewBox, not a change worth a second size variant for a mark that is only ever drawn
+     at one size today. */
+  .pm[data-size='s'] {
+    inline-size: var(--icon-s);
+    block-size: var(--icon-s);
+  }
+
   .pm {
     display: block;
     flex: none;

@@ -164,7 +164,10 @@
   .head {
     position: sticky;
     inset-block-start: 0;
-    z-index: 2;
+    /* `--z-sheet`, the same token `TabBar.svelte` uses for its own fixed chrome: this is sticky
+       page chrome that has to stay above the content scrolling under it, the identical need a
+       sheet-covering bottom bar has, just spelled `position: sticky` instead of `fixed`. */
+    z-index: var(--z-sheet);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);

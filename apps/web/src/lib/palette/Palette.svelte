@@ -1130,7 +1130,9 @@
      map and the only place an intent becomes a colour; with no tone declared the figure is ordinary
      text, which is right, because a number with no verdict on it is not news. */
   /* The glyph rides the value's own colour and sits tight against it: it is one reading, not a
-     figure with a badge next to it. */
+     figure with a badge next to it. Sized in `em` for the same reason it inherits the colour — it
+     is a slightly quieter mark on `.p-value`'s own size, not a fixed size of its own, and
+     `.p-value` itself is not fixed to one `--t-*` step everywhere this row renders. */
   .p-glyph {
     margin-inline-end: 3px;
     font-size: 0.9em;

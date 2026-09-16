@@ -689,7 +689,7 @@
     border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 17px;
+    font-size: var(--t-md);
     font-weight: 600;
     letter-spacing: -0.018em;
     transition:
@@ -751,7 +751,10 @@
     border-radius: var(--r-sm);
     color: var(--accent-text);
     font-family: var(--font-display);
-    font-size: 11px;
+    /* `--t-xs`, the same step `Face.svelte` and `.cards-mark`/`.cards-face` in blocks.css use for
+       every other letter-in-a-tile mark in the app, 28px tiles included — one step covers the
+       whole range down to this 20px tile too. */
+    font-size: var(--t-xs);
     font-weight: 700;
     line-height: 1;
   }
@@ -797,7 +800,11 @@
     border-radius: var(--r-md);
     color: var(--accent-text);
     font-family: var(--font-display);
-    font-size: 14px;
+    /* 14px sat exactly between `--t-sm` (13) and `--t-base` (15) with no house rule to break the
+       tie either way, so this follows the other 28px letter-in-a-tile marks in the app
+       (`Face.svelte`, `.cards-mark`/`.cards-face` in blocks.css) onto `--t-xs`, the step they all
+       already use for this exact tile size. */
+    font-size: var(--t-xs);
     font-weight: 700;
     line-height: 1;
   }
