@@ -173,15 +173,18 @@ test('an achromatic seed is refused, not silently substituted', () => {
   );
 });
 
-test('the accent is not the mark, and the mark is still the brand red', () => {
-  // The reversal, held. The controls moved to an indigo because a red primary on every screen read
-  // as an alarm; the logo did not move, and `theme.mjs` still paints it from `BRAND_RED`. If the
-  // accent drifts back to the mark's hue this fails, and so does the danger-versus-brand test above
-  // in spirit: red is meant to mean one thing.
+test('the accent is in the brand red family, and is not the alarm', () => {
+  // 2026-09-16, the owner's call, reversing the indigo: production's accent is reddish again. What
+  // keeps it from reading as a warning is held here. It sits within 45 degrees of the mark, at least
+  // 15 degrees cooler than `danger`, and at lower chroma than the mark, so the brand is the loudest
+  // red and the alarm is its own hue. Neither `danger` nor the accent is ever colour alone.
   const mark = rgbToLch(parseColour(BRAND_RED));
   for (const scheme of ['dark', 'light'] as const) {
     const accent = rgbToLch(parseColour(HOUSE.schemes[scheme].accent));
-    assert.ok(hueGap(accent.H, mark.H) >= 90, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees from the mark`);
+    const danger = rgbToLch(parseColour(HOUSE.schemes[scheme].danger));
+    assert.ok(hueGap(accent.H, mark.H) <= 45, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees from the mark`);
+    assert.ok(hueGap(accent.H, danger.H) >= 15, `the ${scheme} accent is ${hueGap(accent.H, danger.H).toFixed(0)} degrees from danger`);
+    assert.ok(accent.C < mark.C, `the ${scheme} accent is as saturated as the mark`);
   }
 });
 
