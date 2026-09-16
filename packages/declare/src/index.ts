@@ -34,6 +34,9 @@ import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fill
 export const egressOf = (decl: { kind: string; body: unknown }): Egress | null => (decl.kind === 'ingest' ? egressOfBody(decl.body) : null);
 export type { Egress };
 
+/* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
+export { AUDIENCES, MODULES, VOICE_KEYS, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type UseCase, type VoiceKey } from './usecase.ts';
+
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
 const PACK_ID = /^[a-z][a-z0-9-]{1,63}$/;
