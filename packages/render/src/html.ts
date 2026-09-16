@@ -16,7 +16,7 @@
 
 import { KINDS, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING, leadingCode } from './format.ts';
+import { MISSING, leadingCode, symbolFigure, symbolText } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -175,7 +175,7 @@ function grid(b: Block, o: RenderOptions): string {
       (r) =>
         `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num">${
           r.cells[1] ? renderInline(inline(r.cells[1], o), o) : MISSING
-        }</span>${cell('cell-note', r.cells[2], o)}${toneGlyph(r.tone)}</div>`,
+        }</span>${cell('cell-note', r.cells[2] && symbolText(r.cells[2]), o)}${toneGlyph(r.tone)}</div>`,
     )
     .join('');
   return `<div class="grid" style="--cells:${b.rows.length}">${body}</div>`;
@@ -325,8 +325,13 @@ function media(b: Block): string {
 
 /* ── two kinds with a drawer of their own ─────────────────────────────────── */
 
-/** An amount leads with its currency code, present and quiet, as `Grid.svelte` draws a stat's figure. */
+/**
+ * An amount, drawn with its currency's symbol where it has one (`£4,800.00`), and otherwise with its
+ * code in front, present and quiet, as `Grid.svelte` draws a stat's figure.
+ */
 function amount(value: string, o: RenderOptions): string {
+  const symbol = symbolFigure(value);
+  if (symbol) return escape(symbol);
   const coded = leadingCode(value);
   return coded
     ? `<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest, o), o)}`

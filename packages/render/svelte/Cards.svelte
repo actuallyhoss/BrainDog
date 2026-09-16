@@ -17,6 +17,7 @@
     inline,
     isQuiet,
     leadingCode,
+    symbolFigure,
     markOf,
     ringDash,
     ringOf,
@@ -47,6 +48,7 @@
     {#each rows as r}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
+      {@const symbol = L.figure >= 0 ? symbolFigure(r.cells[L.figure] ?? '') : null}
       {@const coded = L.figure >= 0 ? leadingCode(r.cells[L.figure] ?? '') : null}
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
@@ -64,7 +66,7 @@
             {#if L.figure >= 0}
               <span class="cards-figure"
                 ><span class="cards-value num"
-                  >{#if !r.cells[L.figure]}{MISSING}{:else if coded}<span class="amount-code">{coded.currency}</span>
+                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span>
                     <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text nodes={nodes(r, L.figure)} {opts} />{/if}</span
                 >{@render labelled(L.figure)}</span
               >

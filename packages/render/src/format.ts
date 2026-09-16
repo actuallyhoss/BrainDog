@@ -69,6 +69,35 @@ export function leadingCode(text: string): { currency: string; rest: string } | 
 }
 
 /**
+ * A figure `money` wrote, as a person writes it: `GBP 28,320.00` drawn `£28,320.00`.
+ *
+ * DISPLAY ONLY. `money` still writes the code first and everything that reads figures back out of
+ * text reads that; this is what a screen sets in its place. The symbol is the one British English
+ * gives with `currencyDisplay: 'symbol'`, which is unambiguous by design (`US$`, `A$`, `CA$`), so
+ * two currencies in one column never look alike. A currency with no symbol of its own (`EGP`, `CHF`)
+ * comes back `null`, and the caller keeps drawing its code.
+ */
+export function symbolFigure(text: string): string | null {
+  const coded = leadingCode(text);
+  if (!coded) return null;
+  let symbol: string | undefined;
+  try {
+    symbol = new Intl.NumberFormat('en-GB', { style: 'currency', currency: coded.currency, currencyDisplay: 'symbol' })
+      .formatToParts(0)
+      .find((p) => p.type === 'currency')?.value;
+  } catch {
+    return null;
+  }
+  if (!symbol || symbol.toUpperCase() === coded.currency) return null;
+  const minus = /^[\u2212-]/u.exec(coded.rest)?.[0] ?? '';
+  return `${minus}${symbol}${coded.rest.slice(minus.length)}`;
+}
+
+/** A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one. */
+export const symbolText = (text: string): string =>
+  text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => symbolFigure(hit) ?? hit);
+
+/**
  * ONE MINUS SIGN, in all four of them.
  *
  * `money` and `pct` prepended `MINUS` over `Math.abs`; `integer` and `quantity` returned

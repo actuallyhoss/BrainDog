@@ -17,7 +17,7 @@
   import { onDestroy, tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { MISSING, type Tone } from 'braindog-render';
+  import { MISSING, symbolFigure, type Tone } from 'braindog-render';
   import { Table } from 'braindog-render/svelte';
   import { declaredValue } from '$lib/record/where.ts';
   import { copy } from '$lib/copy.ts';
@@ -2573,7 +2573,7 @@
                 control per cell is four thousand tab stops. The keyboard path is `e`, which the `?`
                 sheet has advertised since the grid was written.
               -->
-              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{value}{/if}<button
+              <span class="cell-said">{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{symbolFigure(value) ?? value}{/if}<button
                   type="button"
                   class="cell-pen"
                   tabindex="-1"
@@ -2583,7 +2583,7 @@
                     openEditor(seq, column.field);
                   }}
                 ><Icon name="edit" size="s" /></button></span>
-            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{value}{/if}{/if}
+            {:else}{#if isTitle}{@render ownMark(seq)}{/if}{#if isEnum}<span class="enum">{value}</span>{:else}{symbolFigure(value) ?? value}{/if}{/if}
           {/snippet}
         </Table>
       </div>

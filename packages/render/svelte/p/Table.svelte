@@ -26,7 +26,7 @@
 <script lang="ts">
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
-  import { leadingCode, TONES } from '../../src/index.ts';
+  import { leadingCode, symbolFigure, TONES } from '../../src/index.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
 
   let {
@@ -240,7 +240,7 @@
 {#snippet cellBody(row: TableRow, column: Column, value: string | null)}
   {#if cellSnippet}{@render cellSnippet(row, column, value)}
   {:else if value === null}<span class="missing">—</span>
-  {:else}{@const coded = leadingCode(value)}{#if coded}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{value}{/if}{/if}
+  {:else}{@const symbol = symbolFigure(value)}{@const coded = leadingCode(value)}{#if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{value}{/if}{/if}
 {/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}

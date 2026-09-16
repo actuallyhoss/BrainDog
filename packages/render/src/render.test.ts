@@ -10,7 +10,7 @@ import { lanes } from './board.ts';
 import { ringDash, ringOf, trendOf } from './cards.ts';
 import { diffPlan, diffRows, lineDiff } from './diff.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
-import { leadingCode, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
+import { leadingCode, symbolFigure, symbolText, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING } from './format.ts';
 
 const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
@@ -1068,11 +1068,11 @@ test('a ring is a proportion or nothing: 3/5 and 60% draw an arc, a word keeps i
   assert.equal(ringDash(0.6), '60 100');
 });
 
-test('the figure keeps its currency code quiet, and a missing figure is the missing mark', () => {
+test('the figure is drawn with its currency symbol, and a missing figure is the missing mark', () => {
   const html = toHTML(
     onPage('```cards\ntitle | figure: Owed | trend: Weekly | ring: Done\nKiln | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | nearly\n```'),
   );
-  assert.match(html, /<span class="cards-value num"><span class="amount-code">GBP<\/span> 4,800.00<\/span><span class="cards-label">Owed<\/span>/u);
+  assert.match(html, /<span class="cards-value num">£4,800.00<\/span><span class="cards-label">Owed<\/span>/u);
   assert.match(html, /<span class="cards-value num">—<\/span>/u);
   assert.match(html, /role="img" aria-label="Weekly: 18, 20, no value, 24"/u);
   assert.match(html, /stroke-dasharray="60 100"/u);
@@ -1517,4 +1517,19 @@ test('A LEADING CURRENCY CODE is split from the amount money() wrote, and nothin
   assert.deepEqual(leadingCode('USD -5.00'), { currency: 'USD', rest: '-5.00' });
   for (const not of ['VAT quarter to 31 Aug', 'GBP', 'Over 30 days', 'gbp 5.00', 'GBPX 5.00', ''])
     assert.equal(leadingCode(not), null, not);
+});
+
+test('a figure is drawn with a symbol where its currency has one, and keeps its code where it has none', () => {
+  assert.equal(symbolFigure(money(2_832_000, 'GBP')), '£28,320.00');
+  assert.equal(symbolFigure(money(-129_900, 'GBP')), '−£1,299.00');
+  assert.equal(symbolFigure(money(480_000, 'USD')), 'US$4,800.00', 'a dollar never reads as another dollar');
+  assert.equal(symbolFigure(money(129_900, 'EGP')), null, 'no symbol of its own, so the code stays');
+  assert.equal(symbolFigure('Kiln'), null);
+  assert.equal(money(2_832_000, 'GBP'), 'GBP 28,320.00', 'the written text is unchanged');
+});
+
+test('a sentence has its figures drawn with symbols and keeps its words', () => {
+  assert.equal(symbolText('no more than GBP 20,000.00 · not enough history'), 'no more than £20,000.00 · not enough history');
+  assert.equal(symbolText('EGP 1,573.00 and GBP −14.00'), 'EGP 1,573.00 and −£14.00');
+  assert.equal(symbolText('SG31 is open'), 'SG31 is open');
 });

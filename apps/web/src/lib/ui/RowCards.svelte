@@ -25,7 +25,7 @@
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { leadingCode, TONES } from 'braindog-render';
+  import { leadingCode, symbolFigure, TONES } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { NOW, REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
@@ -103,10 +103,11 @@
   const selectedLabel = copy.selected;
 </script>
 
-<!-- An amount sets its currency code quiet, the way every other figure in the product does. -->
+<!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
 {#snippet amount(said: string)}
+  {@const symbol = symbolFigure(said)}
   {@const coded = leadingCode(said)}
-  {#if coded}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{said}{/if}
+  {#if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{said}{/if}
 {/snippet}
 
 {#if decl}

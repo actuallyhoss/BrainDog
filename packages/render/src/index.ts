@@ -93,4 +93,6 @@ export {
   yesno,
   type TypedForm,
   leadingCode,
+  symbolFigure,
+  symbolText,
 } from './format.ts';
