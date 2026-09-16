@@ -1,11 +1,16 @@
 name: gates
 
-# THE WHOLE NINETEEN, AND WHEN THEY RUN.
+# THE WHOLE TWENTY SIX, AND WHEN THEY RUN.
+#
+# It said nineteen until 16 September 2026, which was the count when this was written. The
+# registry in `run.mjs` holds twenty six. The minute figures below are the browser time as it was
+# last measured and have NOT been taken again since the count grew, so treat them as the shape of
+# the argument rather than as a current measurement.
 #
 # `pnpm gates` is about nineteen minutes, and nearly all of it is two gates driving a headless
 # browser over a built app: `layout` is 627 page-runs (every route, at both sides of every
 # breakpoint the stylesheets declare, plus three floor widths) and `a11y` is 212 axe audits (every
-# route, two schemes, two widths, plus the site). The other seventeen are seconds.
+# route, two schemes, two widths, plus the site). The other twenty four are seconds.
 #
 # THE CHOICE, MADE EXPLICITLY: on a weekly schedule, on demand, and on a pull request only when
 # it carries the `full-gates` label. It ran on every merge to master until 16 September 2026.
@@ -130,7 +135,7 @@ jobs:
       # that has drifted from its generator passes the one check written to catch it.
       - run: git diff --exit-code
 
-      # ALL NINETEEN. No `--only`, no `--except`, no `--allow-skip`: this is the job that has every
+      # ALL TWENTY SIX. No `--only`, no `--except`, no `--allow-skip`: this is the job that has every
       # prerequisite, so a skip here is a fact about the build above and is correctly red.
       # `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference between "this job
       # does not ask" and "this job asks and accepts one answer". 52 §5 writes it this way on
