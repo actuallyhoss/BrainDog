@@ -221,7 +221,7 @@ export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order 
 export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export type { Bars, SeriesLine } from './series.ts';
-export { BODY_KINDS, GOVERNANCE } from './govern.ts';
+export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS } from './govern.ts';
 export { MET_CAP, PEOPLE } from './people.ts';
 export type { MeetArgs, Met } from './people.ts';
 export { SCOPES, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
@@ -230,7 +230,7 @@ export type { Member } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { Minted, Scope, TokenRow, Verified } from './token.ts';
-export type { Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
+export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';

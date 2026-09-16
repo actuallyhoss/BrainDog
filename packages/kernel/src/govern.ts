@@ -31,9 +31,34 @@ import { sparkMayWrite } from './spark.ts';
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
 export type GovernRegister = (typeof GOVERNANCE)[number];
 
-/** The four bodies of `33-CONTRACTS` §2. A fifth, `query`, is Spark's palette answer and is never filed. */
-export const BODY_KINDS = ['options', 'pattern', 'rowset', 'change'] as const;
+/**
+ * The bodies a suggestion carries: the four of `33-CONTRACTS` §2, and the three that arrange a BrainDog.
+ *
+ * `pack`, `settings` AND `arrange` ARE HOW AN AGENT OR SPARK CHANGES WHAT A RECORD IS (`loop/research-spark.md`
+ * S12, `DIRECTION.md` §11). Installing a pack and changing a pack's settings are an owner's, in a browser, and
+ * no token of any scope reaches them. A proposal is the one way an agent asks for either, and the owner's
+ * press is what applies it. `arrange` is several of them, and pages, as one reviewable question.
+ *
+ * A fifth of the original kind, `query`, is Spark's palette answer and is never filed.
+ */
+export const BODY_KINDS = ['options', 'pattern', 'rowset', 'change', 'pack', 'settings', 'arrange'] as const;
 export type BodyKind = (typeof BODY_KINDS)[number];
+
+/** The kinds applied by the caller after the gate says yes, because installing is asynchronous. */
+export const ARRANGING = ['pack', 'settings', 'arrange'] as const;
+export type Arranging = (typeof ARRANGING)[number];
+const arranging = (kind: string): kind is Arranging => (ARRANGING as readonly string[]).includes(kind);
+
+/** What a `pack` proposal asks for. Exactly one, naming one pack. */
+export const PACK_VERBS = ['install', 'enable', 'disable'] as const;
+
+/** Spark's own ceiling (`research-spark.md` §3.2, ADR-051): more open arrangements than this is a queue nobody reads. */
+export const OPEN_ARRANGEMENTS = 3;
+
+/** A pack id as `normalise` takes one. */
+const PACK_ID = /^[a-z][a-z0-9-]{0,63}$/;
+/** At most this many packs, pages or settings changes in one arrangement. Past it, it is a rebuild. */
+const ARRANGE_CEILING = 12;
 
 export type Suggestion = {
   id: string;
@@ -307,6 +332,8 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
     return checkUpdates(deps, register, rows as Record<string, unknown>[]);
   }
 
+  if (arranging(kind)) return checkArranging(deps, kind, body);
+
   if (kind === 'pattern') {
     if (!body.ingest || typeof body.ingest !== 'object') return missing('ingest');
     /* AND THE SAMPLES IT WAS DRAWN FROM. 45 §5.4 puts `samples: [raw_id…]` in the body, and 07 §4's
@@ -332,6 +359,141 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
     const wrong = checkPrediction(body.prediction);
     if (wrong) return wrong;
   }
+  return null;
+}
+
+const isMap = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+/**
+ * The shape of a `pack`, `settings` or `arrange` body.
+ *
+ * STRUCTURE ONLY, AND THE RECORD DOES THE REST. Whether a pack exists, what installing it would add, and
+ * whether a setting takes a value are the record's to work out, from its catalogue and its packs, before the
+ * body reaches here. What is held here is what the gate needs to apply it: one pack per verb, settings that
+ * are a map of values, and an arrangement that changes something and says why.
+ */
+function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, unknown>): Refusal | null {
+  const packId = (v: unknown, at: string): Refusal | null =>
+    typeof v === 'string' && PACK_ID.test(v)
+      ? null
+      : {
+          code: 'VALUE_MALFORMED',
+          fix: `${JSON.stringify(v ?? null)} is not a pack id. A pack id is lower-case letters, digits and dashes, such as usecase-student.`,
+          at,
+        };
+
+  const settings = (s: unknown, at: string): Refusal | null => {
+    if (!isMap(s)) return { code: 'VALUE_MALFORMED', fix: 'A settings change is {"pack":"<id>","values":{"<setting>":<value>}}.', at };
+    const bad = packId(s.pack, `${at}.pack`);
+    if (bad) return bad;
+    const values = s.values;
+    if (!isMap(values) || Object.keys(values).length === 0)
+      return {
+        code: 'REQUIRED_MISSING',
+        fix: 'A settings change names at least one setting and its new value; null puts one back to its default.',
+        at: `${at}.values`,
+      };
+    for (const [key, v] of Object.entries(values))
+      if (v !== null && typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')
+        return { code: 'VALUE_MALFORMED', fix: `The setting ${key} takes text, a number, true or false, or null for its default.`, at: `${at}.values.${key}` };
+    return null;
+  };
+
+  if (kind === 'pack') {
+    const verbs = PACK_VERBS.filter((v) => body[v] !== undefined);
+    if (verbs.length !== 1)
+      return {
+        code: 'REQUIRED_MISSING',
+        fix: 'A pack proposal names one pack under one of install, enable or disable, such as {"install":"work"}.',
+        at: 'body.install',
+        allowed: PACK_VERBS,
+      };
+    const verb = verbs[0]!;
+    const bad = packId(body[verb], `body.${verb}`);
+    if (bad) return bad;
+    if (body.doc !== undefined && (verb !== 'install' || !isMap(body.doc)))
+      return { code: 'VALUE_MALFORMED', fix: 'doc is the pack document to install, and only install carries one.', at: 'body.doc' };
+    return null;
+  }
+
+  if (kind === 'settings') return settings(body, 'body');
+
+  /* AN ARRANGEMENT SAYS WHY. It is the one proposal that changes the shape of the whole record, and a
+     person asked to accept one is owed the reasons in words: the phrases heard, or the rows it read. */
+  const why = body.why;
+  if (!Array.isArray(why) || why.length === 0 || why.length > ARRANGE_CEILING)
+    return {
+      code: 'REQUIRED_MISSING',
+      fix: `An arrangement says why, as one to ${ARRANGE_CEILING} short reasons: {"why":["They added four assignments this week."]}.`,
+      at: 'body.why',
+    };
+  for (const [i, w] of why.entries()) {
+    const text = isMap(w) ? w.text : w;
+    if (typeof text !== 'string' || !text.trim())
+      return { code: 'VALUE_MALFORMED', fix: 'A reason is a sentence, or {"text":"...","at":"tasks#4"} when it cites a row.', at: `body.why[${i}]` };
+  }
+
+  let changes = 0;
+  if (body.packs !== undefined) {
+    if (!isMap(body.packs))
+      return { code: 'VALUE_MALFORMED', fix: 'packs is {"install":[...],"enable":[...],"disable":[...]}, each a list of pack ids.', at: 'body.packs' };
+    for (const [verb, ids] of Object.entries(body.packs)) {
+      if (!(PACK_VERBS as readonly string[]).includes(verb))
+        return { code: 'FIELD_UNKNOWN', fix: `packs takes ${PACK_VERBS.join(', ')}.`, at: `body.packs.${verb}`, allowed: PACK_VERBS };
+      if (!Array.isArray(ids) || ids.length > ARRANGE_CEILING)
+        return { code: 'VALUE_MALFORMED', fix: `packs.${verb} is a list of at most ${ARRANGE_CEILING} pack ids.`, at: `body.packs.${verb}` };
+      for (const [i, id] of ids.entries()) {
+        const bad = packId(id, `body.packs.${verb}[${i}]`);
+        if (bad) return bad;
+      }
+      changes += ids.length;
+    }
+  }
+  if (body.pages !== undefined) {
+    if (!Array.isArray(body.pages) || body.pages.length > ARRANGE_CEILING)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `pages is a list of at most ${ARRANGE_CEILING} page declarations, each {"id":"page.<slug>","kind":"page","body":{...}}.`,
+        at: 'body.pages',
+      };
+    for (const [i, d] of body.pages.entries())
+      if (!isMap(d) || typeof d.id !== 'string' || !d.id.startsWith('page.') || d.kind !== 'page' || !isMap(d.body))
+        return {
+          code: 'VALUE_MALFORMED',
+          fix: 'A page is {"id":"page.<slug>","kind":"page","body":{...}}. Read the page grammar for what a body holds.',
+          at: `body.pages[${i}]`,
+        };
+    changes += body.pages.length;
+  }
+  if (body.settings !== undefined) {
+    if (!Array.isArray(body.settings) || body.settings.length > ARRANGE_CEILING)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `settings is a list of at most ${ARRANGE_CEILING} changes, each {"pack":"<id>","values":{...}}.`,
+        at: 'body.settings',
+      };
+    for (const [i, s] of body.settings.entries()) {
+      const bad = settings(s, `body.settings[${i}]`);
+      if (bad) return bad;
+    }
+    changes += body.settings.length;
+  }
+  if (changes === 0)
+    return {
+      code: 'REQUIRED_MISSING',
+      fix: 'An arrangement changes something: packs to install, enable or disable, pages, or settings such as the voice.',
+      at: 'body',
+    };
+
+  const open = deps.sql
+    .all<{ id: string }>("SELECT id FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' ORDER BY rowid")
+    .map((r) => r.id);
+  if (open.length >= OPEN_ARRANGEMENTS)
+    return {
+      code: 'OUT_OF_BOUNDS',
+      fix: `${open.join(', ')} already wait on the person, and ${OPEN_ARRANGEMENTS} open arrangements is the most. Wait until one is answered, then propose again.`,
+      at: 'body_kind',
+    };
   return null;
 }
 
@@ -450,6 +612,11 @@ export type Decided = {
   wrote: string[];
   /** A declaration an accepted `pattern` or `change` asks the caller to install. */
   install?: Record<string, unknown>;
+  /**
+   * An accepted `pack`, `settings` or `arrange`, for the caller to apply. Installing a pack is asynchronous,
+   * like a `change`, so the gate hands the body back, and the caller reopens the question if it will not land.
+   */
+  apply?: { kind: Arranging; body: Record<string, unknown> };
 };
 
 export type Verdict =
@@ -544,7 +711,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       });
   }
 
-  /* AND THE OTHER THREE KINDS TAKE ONE OF TWO WORDS. `Accept` with a capital, or `yes`, used to
+  /* AND EVERY OTHER KIND TAKES ONE OF TWO WORDS. `Accept` with a capital, or `yes`, used to
      fall past the `accept` branch and resolve the question having done nothing — the gate silently
      answering yes and applying none of it. */
   if (row.body_kind !== 'options' && option !== 'accept' && option !== 'reject')
@@ -555,6 +722,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   const wrote: string[] = [];
   let install: Record<string, unknown> | undefined;
+  let apply: Decided['apply'];
 
   if (option === 'accept') {
     if (row.body_kind === 'rowset') {
@@ -572,6 +740,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         if (!made.ok) return made as Result<Decided>;
         wrote.push(made.value.id);
       }
+    } else if (arranging(row.body_kind)) {
+      apply = { kind: row.body_kind, body };
     } else if (row.body_kind === 'pattern' || row.body_kind === 'change') {
       install = (row.body_kind === 'pattern' ? body.ingest : body.to) as Record<string, unknown>;
       if (!install || typeof install !== 'object')
@@ -619,7 +789,14 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved }));
   event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason);
 
-  return ok({ decision, suggestion: id, status: 'resolved', wrote, ...(install === undefined ? {} : { install }) });
+  return ok({
+    decision,
+    suggestion: id,
+    status: 'resolved',
+    wrote,
+    ...(install === undefined ? {} : { install }),
+    ...(apply === undefined ? {} : { apply }),
+  });
 }
 
 /**
@@ -747,10 +924,10 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
      transaction, so it is the only acceptance that can fail after the question was resolved. An
      accepted `rowset` wrote its rows in that transaction — reopening it would let a decision made
      once be applied twice, and the second copy of forty rows is not a thing anybody undoes by hand. */
-  if (row.body_kind !== 'pattern' && row.body_kind !== 'change')
+  if (row.body_kind !== 'pattern' && row.body_kind !== 'change' && !arranging(row.body_kind))
     return no<null>('TRANSITION_ILLEGAL', `A ${row.body_kind} was applied when it was accepted, and does not come back.`, {
       at: 'body_kind',
-      allowed: ['pattern', 'change'],
+      allowed: ['pattern', 'change', ...ARRANGING],
     });
 
   /* AND THE DEFERRAL GOES WITH IT. A reopened suggestion carrying a `defer_until` from last year

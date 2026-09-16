@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 7, format: 1, applied: [1, 2, 3, 4, 5, 6, 7] });
+  assert.deepEqual(result.value, { kernel: 8, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -51,9 +51,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 7);
+  assert.equal(sql.all('SELECT version FROM migration').length, 8);
   sql.close();
 });
 
@@ -114,7 +114,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -242,6 +242,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '1a851bda87fb1f20a5d1d2005feebad7efcd6d88b54f4f91e3e97a4aca6e1b4b',
     'a8e547ecac71bd29c0359924239c99a0414d8e893c0af70751f2a9950ea5d5b8',
     '9027fe08841cd4ec7b557552c2143c367c442bef231acfbdbdf7f7967a2948dc',
+    'fdfaa4045a9f31b003ffc58c85376525be9c9f1628761c532ff970466296fdbd',
   ]);
 });
 
@@ -262,7 +263,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },

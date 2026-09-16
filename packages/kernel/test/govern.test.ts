@@ -914,3 +914,69 @@ test('A CHANGE THAT WOULD NOT INSTALL IS REFUSED WHEN IT IS PROPOSED, so the own
   value(await k.install([out.install as Declaration]));
   sql.close();
 });
+
+/* ── the three bodies that arrange a BrainDog (`loop/research-spark.md` S12) ─────────────────────── */
+
+test('A PACK, A SETTINGS CHANGE AND AN ARRANGEMENT ARE FILED, AND ACCEPTING ONE CHANGES NOTHING BY ITSELF', async () => {
+  /* The gate hands the body back for the record to apply, as it does a `change`: installing is
+     asynchronous, and a decision that resolved before its change landed would be a lie. */
+  const { k, sql } = await record();
+  const bodies = [
+    { question: 'Add Work?', body_kind: 'pack' as const, body: { install: 'work' } },
+    { question: 'Say Today on Home?', body_kind: 'settings' as const, body: { pack: 'usecase-student', values: { voice_home: 'Today' } } },
+    {
+      question: 'Arrange this BrainDog for studies?',
+      body_kind: 'arrange' as const,
+      body: { why: ['Four assignments were added this week.'], packs: { install: ['usecase-student'] }, settings: [{ pack: 'usecase-student', values: { voice_home: 'Today' } }] },
+    },
+  ];
+  for (const p of bodies) {
+    const made = value<{ id: string }>(k.propose(p, 'S1'));
+    const before = sql.all('SELECT id FROM declaration').length;
+    const out = value<{ apply?: { kind: string; body: unknown }; install?: unknown }>(
+      k.decide(made.id, { decide: { option: 'accept', reason: 'yes' } }, 'p_owner'),
+    );
+    assert.equal(out.apply?.kind, p.body_kind);
+    assert.deepEqual(out.apply?.body, p.body);
+    assert.equal(out.install, undefined);
+    assert.equal(sql.all('SELECT id FROM declaration').length, before, 'the gate installed something itself');
+    /* AND IT COMES BACK when what was accepted will not land. */
+    value(k.reopen(made.id, 'The pack would not install.'));
+    assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
+  }
+  sql.close();
+});
+
+test('EACH REFUSAL SAYS WHAT TO SEND INSTEAD, at the key that was wrong', async () => {
+  const { k, sql } = await record();
+  const at = (body_kind: string, body: Record<string, unknown>) => refusal(k.propose({ question: 'x?', body_kind: body_kind as never, body }, 'S1'));
+
+  const none = at('pack', {});
+  assert.equal(none.code, 'REQUIRED_MISSING');
+  assert.deepEqual(none.allowed, ['install', 'enable', 'disable']);
+  assert.equal(at('pack', { install: 'work', enable: 'people' }).code, 'REQUIRED_MISSING');
+  assert.equal(at('pack', { install: 'Work Pack' }).at, 'body.install');
+  assert.equal(at('pack', { enable: 'work', doc: {} }).at, 'body.doc');
+
+  assert.equal(at('settings', { pack: 'usecase-student' }).at, 'body.values');
+  assert.equal(at('settings', { pack: 'usecase-student', values: { voice_home: ['a'] } }).at, 'body.values.voice_home');
+
+  assert.equal(at('arrange', { packs: { install: ['work'] } }).at, 'body.why');
+  assert.equal(at('arrange', { why: ['x'] }).at, 'body');
+  assert.equal(at('arrange', { why: ['x'], packs: { add: ['work'] } }).code, 'FIELD_UNKNOWN');
+  assert.equal(at('arrange', { why: ['x'], pages: [{ id: 'studies', kind: 'page', body: {} }] }).at, 'body.pages[0]');
+  assert.equal(at('arrange', { why: [''], packs: { install: ['work'] } }).at, 'body.why[0]');
+  sql.close();
+});
+
+test('AT MOST THREE ARRANGEMENTS WAIT AT ONCE, and the fourth names the three', async () => {
+  const { k, sql } = await record();
+  const arrange = { question: 'Arrange it?', body_kind: 'arrange' as const, body: { why: ['x'], packs: { enable: ['work'] } } };
+  const ids = [1, 2, 3].map(() => value<{ id: string }>(k.propose(arrange, 'S1')).id);
+  const fourth = refusal(k.propose(arrange, 'S1'));
+  assert.equal(fourth.code, 'OUT_OF_BOUNDS');
+  for (const id of ids) assert.ok(fourth.fix.split(/[ ,]+/).includes(id), id);
+  value(k.decide(ids[0]!, { resolved_as: 'wont-fix', reason: 'not now' }, 'p_owner'));
+  value(k.propose(arrange, 'S1'));
+  sql.close();
+});
