@@ -12,7 +12,7 @@
 
 import { day as fmtDay, diffRows, money, relative, since, integer, MISSING } from 'braindog-render';
 
-import { amountOf, currencyOf, mixedFix } from './money.ts';
+import { amountOf, currencyOf, homeOf, mixedFix } from './money.ts';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { answers, terms, tokensOf, why } from './find.ts';
 import { PATHS, type IconName } from '../ui/icons.ts';
@@ -76,6 +76,9 @@ export function currencyFor(register: string, field: string): string | null {
   }
   return [...seen][0] ?? null;
 }
+
+/** The currency most of this record's money is in, which a screen writes with its symbol alone. */
+export const HOME_CURRENCY = homeOf(Object.values(ROWS).flatMap((rows) => rows.flatMap((e) => Object.values(e.fields))));
 
 /**
  * The cash the walk starts from, in minor units.

@@ -301,9 +301,13 @@ export const copy = {
   reasonMissing: 'No reason yet. The answer is kept either way, and in six weeks it will say what was chosen and not why.',
   reasonThinNudge: 'That will not mean much in six weeks. It is kept either way.',
 
-  /* What the record would do, on the row, so "what needs you" shows its thinking rather than four
-     questions and none. The word is a verb because the record is the one recommending. */
-  recommends: 'Recommends',
+  /* What the record would do, appended to a decision's second line on Home, so "what needs you"
+     shows its thinking rather than four questions and none. */
+  suggestedAnswer: 'Suggested:',
+  /* Which way an obligation runs, on the second line of its row on Home. */
+  owedToYou: 'Owed to you',
+  youOwe: 'You owe',
+  toDecide: 'to decide',
 
   rowActions: 'What you can do here',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,

@@ -1,30 +1,34 @@
 <!--
   An amount.
 
-  The currency code comes FIRST and is always present, because money is an integer in minor units
-  with its own currency beside it and a column of figures with the code stripped off is a column
-  that can be summed wrongly. But eight repetitions of GBP down one column is eight shouts, so the
-  code is set in the quiet ink and the figure in the loud one. The information is identical; only
-  the emphasis moves.
+  The record's home currency is written the way a person writes it, `£28,320.00`, at the size and in
+  the ink of the figure. Any other currency keeps its symbol and puts its ISO code after the figure,
+  small and quiet, `$4,800.00 USD`, so two currencies never read alike in one column. The text
+  `money()` writes is unchanged; only the drawing is.
 
-  Tabular figures on the PROPORTIONAL face — never mono. A monospace face gives the thousands
-  separator a full cell, so GBP 2,869 renders as GBP 2 , 869 at display size, and the comma floats
-  in the middle of the number (13 §3.2).
+  Tabular figures on the PROPORTIONAL face, never mono. A monospace face gives the thousands
+  separator a full cell, and the comma floats in the middle of the number (13 §3.2).
 -->
 <script lang="ts">
   import { integer, money } from 'braindog-render';
+  import { HOME_CURRENCY } from '$lib/record/api.ts';
+  import { drawn } from '$lib/record/money.ts';
 
-  let { minor, currency, weight = 'normal' }: { minor: number; currency: string; weight?: 'normal' | 'strong' } = $props();
+  let {
+    minor,
+    currency,
+    weight = 'normal',
+    home = HOME_CURRENCY,
+  }: { minor: number; currency: string; weight?: 'normal' | 'strong'; home?: string | null } = $props();
 
-  /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE. `money(n, '')` renders a leading space where
-     the code belongs, which reads as a code that failed to load rather than as a figure that never
-     had one — and the honest state of a money field with no currency is the second thing. */
+  /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE, which is the honest state of a money field
+     with no currency. A figure `money()` could not state (`drawn` is null) prints as it was written. */
   const text = $derived(currency ? money(minor, currency) : integer(minor));
-  const split = $derived(currency ? text.indexOf(' ') : 0);
+  const parts = $derived(currency ? drawn(text, home) : null);
 </script>
 
-<span class="money" data-weight={weight}>
-  <span class="code">{text.slice(0, split)}</span><span class="amount num">{text.slice(split)}</span>
+<span class="money num" data-weight={weight}>
+  {#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.code}<span class="code">{parts.code}</span>{/if}{:else}<span class="amount">{text}</span>{/if}
 </span>
 
 <style>
@@ -33,10 +37,10 @@
     white-space: nowrap;
   }
 
-  /* `em` on purpose, matching `.amount-code` in blocks.css: `<Money>` renders at whatever size its
-     caller sets, from a table cell to a headline figure, and the code stays "a step smaller than
-     the figure" at every one of them rather than holding still while the figure moves. */
+  /* `em` on purpose: `<Money>` renders at whatever size its caller sets, and the code stays a step
+     smaller than the figure at every one of them. */
   .code {
+    margin-inline-start: 0.3em;
     color: var(--dim);
     font-size: 0.85em;
     letter-spacing: 0;

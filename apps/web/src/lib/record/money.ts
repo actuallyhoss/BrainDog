@@ -101,3 +101,77 @@ export function merge(totals: readonly Total[]): Total {
   const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen].sort() : [];
   return { amount, currency: mixed.length ? null : ([...seen][0] ?? null), mixed, n };
 }
+
+/* ── drawing an amount ──────────────────────────────────────────────────── */
+
+/**
+ * The symbol a currency is written with, or `null` when the runtime knows none beyond its code.
+ *
+ * A DRAWING DECISION. `money()` in `braindog-render` still writes `GBP 28,320.00`, code first, and
+ * everything that reads figures back out of text reads that. What changes is only the glyphs a
+ * screen sets: the record's home currency is written the way a person writes it, `£28,320.00`, and
+ * any other currency keeps its code beside the symbol so two currencies never look alike.
+ */
+export function symbolOf(currency: string): string | null {
+  try {
+    const part = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0)
+      .find((p) => p.type === 'currency')?.value;
+    return part && part.toUpperCase() !== currency.toUpperCase() ? part : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The currency most of a record's money is in, or `null` when it holds no money.
+ *
+ * Read from the values rather than set as a constant, because a constant pinned to sterling is the
+ * bug `currencyFor` was written to remove. A tie goes to the code first in alphabetical order, so
+ * the answer does not depend on the order rows were read in.
+ */
+export function homeOf(values: Iterable<unknown>): string | null {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const c = currencyOf(value);
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  for (const [c, n] of [...counts].sort(([a], [b]) => a.localeCompare(b)))
+    if (best === null || n > counts.get(best)!) best = c;
+  return best;
+}
+
+/**
+ * An amount in parts: the whole and the fraction apart, so a figure can set its pence quieter, and
+ * `code` present only when the currency is not the home one or has no symbol.
+ *
+ * `text` is the output of `money()`. Anything that is not a figure `money()` wrote comes back `null`.
+ */
+export type Drawn = { lead: string; whole: string; fraction: string; code: string | null };
+
+const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
+
+export function drawn(text: string, home: string | null): Drawn | null {
+  const m = WRITTEN.exec(text);
+  if (!m) return null;
+  const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
+  const symbol = symbolOf(currency);
+  const foreign = currency !== home || symbol === null;
+  return {
+    lead: `${minus}${symbol ?? ''}`,
+    whole,
+    fraction: fraction ?? '',
+    code: foreign ? currency : null,
+  };
+}
+
+/** A sentence with every figure `money()` wrote in it redrawn the same way, as plain text. */
+export function symbolText(text: string, home: string | null): string {
+  return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
+    const d = drawn(hit, home);
+    if (!d) return hit;
+    if (d.lead.replace('−', '') === '') return hit;
+    return `${d.lead}${d.whole}${d.fraction}${d.code ? ` ${d.code}` : ''}`;
+  });
+}

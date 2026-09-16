@@ -18,7 +18,7 @@ import { currencyFor, display, page } from './api.ts';
 import { PAGES } from './data.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
-import { amountOf, currencyOf, merge, total } from './money.ts';
+import { amountOf, currencyOf, drawn, homeOf, merge, symbolText, total } from './money.ts';
 import { read, type MetricDecl } from './metrics.ts';
 import { METRICS } from './declared.ts';
 import { runway } from './forecast.ts';
@@ -205,4 +205,25 @@ test('and a money value renders in its OWN currency wherever it appears', () => 
   assert.equal(display('obligations', 'amount', eur(480_000)), 'EUR 4,800.00');
   // The exponent comes from the runtime's currency data, never assumed to be two.
   assert.equal(display('obligations', 'amount', { amount: 4_800, currency: 'JPY' }), 'JPY 4,800');
+});
+
+/* ── drawing an amount ──────────────────────────────────────────────────── */
+
+test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other keeps its code after it', () => {
+  assert.deepEqual(drawn('GBP 28,320.00', 'GBP'), { lead: '£', whole: '28,320', fraction: '.00', code: null });
+  assert.deepEqual(drawn('USD −4,800.00', 'GBP'), { lead: '−$', whole: '4,800', fraction: '.00', code: 'USD' });
+  assert.deepEqual(drawn('JPY 1,299', 'GBP'), { lead: '¥', whole: '1,299', fraction: '', code: 'JPY' });
+  assert.equal(drawn('about 12', 'GBP'), null, 'text money() did not write is not redrawn');
+});
+
+test('a sentence redraws its figures, and a currency with no symbol keeps its code in front', () => {
+  assert.equal(symbolText('no more than GBP 20,000.00', 'GBP'), 'no more than £20,000.00');
+  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4.00 EUR');
+  assert.equal(symbolText('costs ZZZ 12.00', 'GBP'), 'costs ZZZ 12.00');
+});
+
+test('the home currency is the one most of the money is in, and none when there is none', () => {
+  assert.equal(homeOf([gbp(1), eur(1), gbp(2)]), 'GBP');
+  assert.equal(homeOf([1, 'x']), null);
+  assert.equal(homeOf([eur(1), gbp(1)]), 'EUR');
 });
