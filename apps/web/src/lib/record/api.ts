@@ -383,21 +383,31 @@ export function display(
  */
 export type Identity = { mark: string; hue: number; name: string; retired: boolean };
 
-export function identityOf(register: string, field: string, value: unknown): Identity | null {
-  const f = decl(register, field);
-  if (!f || f.type !== 'ref' || !f.to) return null;
-  const target = REGISTERS[f.to];
+/** One row's identity, from its own fields, when its register declares one. The sample's rows and a record's are read alike. */
+export function identityOfRow(register: string, fields: Readonly<Record<string, unknown>>): Identity | null {
+  const target = REGISTERS[register];
   if (!target?.identity) return null;
-  const row = (ROWS[f.to] ?? []).find((e) => e.seq === Number(value));
-  if (!row) return null;
-  const lane = target.state ? String(row.fields[target.state] ?? '') : '';
+  const lane = target.state ? String(fields[target.state] ?? '') : '';
   return {
-    mark: String(row.fields[target.identity.mark] ?? '●'),
-    hue: Number(row.fields[target.identity.accent] ?? 0),
-    name: String(row.fields[target.title] ?? ''),
+    mark: String(fields[target.identity.mark] ?? '●'),
+    hue: Number(fields[target.identity.accent] ?? 0),
+    name: String(fields[target.title] ?? ''),
     // A retired row is achromatic. It still has a mark; it no longer has a claim on a hue.
     retired: lane === 'retired' || lane === 'parked',
   };
+}
+
+/**
+ * `names` IS WHAT SAYS THE ROW CAME FROM A RECORD, as it is for `display`. Given, it is the only source: a ref the
+ * record did not name has no mark, rather than the mark and name the built-in sample gives that number.
+ */
+export function identityOf(register: string, field: string, value: unknown, names?: Names): Identity | null {
+  const f = decl(register, field);
+  if (!f || f.type !== 'ref' || !f.to) return null;
+  if (!REGISTERS[f.to]?.identity) return null;
+  if (names) return names.marks?.get(`${f.to}#${value}`) ?? null;
+  const row = (ROWS[f.to] ?? []).find((e) => e.seq === Number(value));
+  return row ? identityOfRow(f.to, row.fields) : null;
 }
 
 /**
@@ -425,10 +435,10 @@ export function identityOf(register: string, field: string, value: unknown): Ide
  * none, and a pack may ship a register that belongs to nothing. A row with no thing behind it gets
  * no glyph, which is the honest drawing of "this row is not about a project".
  */
-export function identityFor(register: string, fields: Readonly<Record<string, unknown>>): Identity | null {
+export function identityFor(register: string, fields: Readonly<Record<string, unknown>>, names?: Names): Identity | null {
   for (const f of REGISTERS[register]?.fields ?? []) {
     if (f.type !== 'ref' || !f.to) continue;
-    const found = identityOf(register, f.id, fields[f.id]);
+    const found = identityOf(register, f.id, fields[f.id], names);
     if (found) return found;
   }
   return null;
@@ -696,7 +706,8 @@ export function applyFilters(register: string, entries: Entry[], filters: Filter
   return out;
 }
 
-export function sortRows(register: string, entries: Entry[], field: string, dir: 'asc' | 'desc'): Entry[] {
+/** `names` is a live record's, as `display` takes it: a ref column on a record sorts by the record's names. */
+export function sortRows(register: string, entries: Entry[], field: string, dir: 'asc' | 'desc', names?: Names): Entry[] {
   const sign = dir === 'asc' ? 1 : -1;
   return [...entries].sort((a, b) => {
     if (field === 'seq') return (a.seq - b.seq) * sign;
@@ -724,8 +735,8 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
      */
     const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
     if (decl?.type === 'ref') {
-      const sx = display(register, field, x) ?? '';
-      const sy = display(register, field, y) ?? '';
+      const sx = display(register, field, x, NOW, names) ?? '';
+      const sy = display(register, field, y, NOW, names) ?? '';
       return sx.localeCompare(sy, LOCALE) * sign;
     }
 

@@ -27,7 +27,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { columnsFor, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
-  import type { Names } from '$lib/record/remote.ts';
+  import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
@@ -405,7 +405,7 @@
       pages = [...pages, next.value.entries];
       /* A LATER PAGE MAY NAME ROWS THE FIRST ONE DID NOT, and it must not take away the names the
          rows already on screen are drawn with. The two are added together, newest last. */
-      named = next.value.names === null ? named : new Map([...(named ?? []), ...next.value.names]);
+      named = next.value.names === null ? named : joinNames(named, next.value.names);
       cursor = next.value.cursor;
       return true;
     });
@@ -2273,7 +2273,7 @@
 
       <div class="body-slot" bind:this={body}>
       {#if rowsAsCards()}
-      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} {now} picked={selected}>
+      <RowCards register={id} entries={result.entries.slice(0, DOM_CAP)} {now} names={result.names ?? undefined} picked={selected}>
         {#snippet action(e)}
           <!--
             THE RECEIPT, ON THE ARM THAT IS THE ONLY ONE A PHONE EVER SEES.
@@ -2363,7 +2363,7 @@
           the shape and not the thing.
         -->
         {#snippet ownMark(seq: number)}
-          {@const own = identityFor(id, rowAt(seq)?.fields ?? {})}
+          {@const own = identityFor(id, rowAt(seq)?.fields ?? {}, result.names ?? undefined)}
           <!-- THE MARK ON A ROW THAT HAS JUST ARRIVED, and it is drawn whether or not the register has an
                identity: `ownMark` renders on every title cell and the project's glyph only on some, so hanging
                this off that one would have marked new rows on Money and on nothing else. It is `aria-hidden`
@@ -2401,7 +2401,7 @@
         >
           {#snippet cellSnippet(row, column, value)}
             {@const seq = Number(row.key.split('#')[1])}
-            {@const ident = identityOf(id, column.field, rowAt(seq)?.fields[column.field])}
+            {@const ident = identityOf(id, column.field, rowAt(seq)?.fields[column.field], result.names ?? undefined)}
             {@const isTitle = column.field === decl.title}
             {@const isEnum = fieldOf(column.field)?.type === 'enum'}
             {#if column.field === 'select'}

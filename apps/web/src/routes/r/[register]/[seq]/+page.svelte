@@ -643,8 +643,8 @@
                     <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />
                   {:else if f.id === decl.state}
                     <Chip label={String(value).replace(/_/g, ' ')} {tone} />
-                  {:else if identityOf(id, f.id, value)}
-                    <IdentityMark identity={identityOf(id, f.id, value)!} size="md" />
+                  {:else if identityOf(id, f.id, value, names)}
+                    <IdentityMark identity={identityOf(id, f.id, value, names)!} size="md" />
                   {:else if f.type === 'day'}
                     {display(id, f.id, value, clock, names)}
                     <span class="rel">{relative(String(value), clock)}</span>

@@ -125,7 +125,7 @@ test('a live search finds the record\'s questions and pages too, asked once for 
   const find = searcher(BASE, routed);
   const out = await find.find('rent');
   assert.equal(out.from, 'live');
-  if (out.from === 'refused') return;
+  if (out.from !== 'live') return;
   assert.deepEqual(
     out.value.groups.map((g) => [g.kind, g.hits.map((h) => [h.title, h.href, h.detail])]),
     [

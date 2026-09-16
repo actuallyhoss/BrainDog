@@ -146,9 +146,10 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     if (!out.ok) return out;
     const rows = out.value.rows as RecordRow[];
     let entries = rows.map((r) => entryOf(register, r, refs.value));
+    const names = namesOf(refs.value);
     if (a.sort && out.value.cursor === null && entries.length === out.value.matched)
-      entries = sortRows(register, entries, a.sort.field, a.sort.dir);
-    return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor, names: namesOf(refs.value) } };
+      entries = sortRows(register, entries, a.sort.field, a.sort.dir, names);
+    return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor, names } };
   }
 
   return {

@@ -13,6 +13,7 @@
  * known cost of moving one screen at a time (`loop/research-phase1-steps5-6.md`, risk 9).
  */
 
+import { identityOfRow, type Identity } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter } from './schema.ts';
@@ -24,10 +25,17 @@ export type RefMap = {
   idOf: ReadonlyMap<number, string>;
   /** The name a person says for each row, from the register's own declared title. */
   titleOf: ReadonlyMap<number, string>;
+  /** The mark and hue each row carries, for a register that declares an identity; empty for every other. */
+  markOf: ReadonlyMap<number, Identity>;
 };
 
-/** Every ref target's title, keyed `<register>#<seq>`: what a ref is DRAWN as on a live record. */
-export type Names = ReadonlyMap<string, string>;
+/**
+ * Every ref target's title, keyed `<register>#<seq>`: what a ref is DRAWN as on a live record.
+ *
+ * `marks` IS THE SAME WALK'S IDENTITIES, keyed alike. A ref into a register with an identity is drawn as a mark as
+ * well as a name, and both have to come from the record, or a live row wears the sample's project beside its own.
+ */
+export type Names = ReadonlyMap<string, string> & { readonly marks?: ReadonlyMap<string, Identity> };
 
 /** A `RefMap` for each register a ref field on the asked register points at. */
 export type Refs = ReadonlyMap<string, RefMap>;
@@ -68,6 +76,7 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const seqOf = new Map<string, number>();
   const idOf = new Map<number, string>();
   const titleOf = new Map<number, string>();
+  const markOf = new Map<number, Identity>();
   const title = REGISTERS[register]?.title;
   for (const r of rows) {
     if (r.seq === null) continue;
@@ -75,8 +84,10 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
     idOf.set(r.seq, r.id);
     const said = title === undefined ? undefined : r.fields?.[title];
     if (typeof said === 'string' && said !== '') titleOf.set(r.seq, said);
+    const mark = identityOfRow(register, r.fields ?? {});
+    if (mark) markOf.set(r.seq, mark);
   }
-  return { seqOf, idOf, titleOf };
+  return { seqOf, idOf, titleOf, markOf };
 }
 
 /**
@@ -89,8 +100,25 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
  */
 export function namesOf(refs: Refs): Names {
   const out = new Map<string, string>();
-  for (const [register, map] of refs) for (const [seq, title] of map.titleOf) out.set(`${register}#${seq}`, title);
-  return out;
+  const marks = new Map<string, Identity>();
+  for (const [register, map] of refs) {
+    for (const [seq, title] of map.titleOf) out.set(`${register}#${seq}`, title);
+    for (const [seq, mark] of map.markOf ?? []) marks.set(`${register}#${seq}`, mark);
+  }
+  return withMarks(out, marks);
+}
+
+/* NOT ENUMERABLE, so a `Names` still compares and spreads as the map of titles it always was. */
+const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identity>): Names =>
+  Object.defineProperty(names, 'marks', { value: marks, enumerable: false });
+
+/**
+ * Two answers' names as one, the later winning: a list that loads a second page keeps the names the first one gave.
+ * A `new Map` over both would keep the titles and drop the marks.
+ */
+export function joinNames(first: Names | null | undefined, next: Names): Names {
+  const out = new Map([...(first ?? []), ...next]);
+  return withMarks(out, new Map([...(first?.marks ?? []), ...(next.marks ?? [])]));
 }
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();

@@ -29,6 +29,7 @@
   import { copy } from '$lib/copy.ts';
   import { NOW, REGISTERS, dirOf, display, identityFor, toneOf } from '$lib/record/api.ts';
   import type { Entry } from '$lib/record/schema.ts';
+  import type { Names } from '$lib/record/remote.ts';
 
   let {
     register,
@@ -38,6 +39,7 @@
     action,
     note,
     now = NOW,
+    names,
   }: {
     register: string;
     entries: readonly Entry[];
@@ -57,6 +59,8 @@
     note?: Snippet<[Entry]>;
     /** The record's instant, which dates each card's tone and bands. The seed's, where nobody says. */
     now?: number;
+    /** The record's own names and marks for the refs on these rows. Absent on the sample, which names them from its own rows. */
+    names?: Names | undefined;
   } = $props();
 
   const decl = $derived(REGISTERS[register]);
@@ -94,7 +98,7 @@
    *
    * IT SITS IN FRONT OF THE TITLE, as it does in the grid, so the colour is where the eye starts.
    */
-  const markFor = (e: Entry) => identityFor(register, e.fields);
+  const markFor = (e: Entry) => identityFor(register, e.fields, names);
 
   /* A declared value is set in sentence case by the stylesheet, as the filter pills are. */
   const isEnum = (field: string) => decl?.fields.find((f) => f.id === field)?.type === 'enum';
@@ -113,7 +117,7 @@
 {#if decl}
   <ul class="cards">
     {#each entries as e (e.seq)}
-      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now)}
+      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
@@ -147,10 +151,10 @@
             {#if e.seq >= 0}#{e.seq}{/if}
           </span>
           <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]], now) ?? '')}
+            {@render amount(display(register, decl.mobile[1], e.fields[decl.mobile[1]], now, names) ?? '')}
           </span>
           <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
-            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]], now) ?? '')}
+            {@render amount(display(register, decl.mobile[2], e.fields[decl.mobile[2]], now, names) ?? '')}
           </span>
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
