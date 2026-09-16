@@ -397,7 +397,7 @@
              reported as serious on two hundred page-runs. The glyph sits INSIDE the figure so the
              collapsed rail's `text-indent` and `overflow` swallow it with the digits, and the dot
              on the corner of the icon is unchanged. -->
-        {#if open}<span class="tally num" data-intent="warn">{open}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
+        {#if open}<span class="tally num" data-waiting aria-label={`${open} ${copy.openQuestions}`}>{open}</span>{/if}
       </a>
     </li>
     <li>
@@ -823,8 +823,10 @@
 
   /* Indented to where a glyph would be, so the name lines up with the names above it and the row
      reads as belonging to the one before it rather than following it. */
-  .view {
-    padding-inline-start: calc(var(--sp-3) + 20px + var(--sp-3));
+  /* `.item.view` AND NOT `.view`: `.item` is declared further down with `padding: 0 var(--sp-3)` at
+     the same specificity, so the indent lost and every saved view sat flush against the rail edge. */
+  .item.view {
+    padding-inline-start: calc(var(--sp-3) + 20px + 10px);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
@@ -875,9 +877,15 @@
     margin-block-start: var(--sp-2);
     padding-block-end: var(--sp-4);
     overflow-y: auto;
+    /* A THIN BAR IN THE RAIL'S OWN INK. Without these Windows draws the classic 17px scrollbar with
+       arrow buttons down the middle of the navigation. */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
+    /* The covers are the RAIL's ground, `--sunk`. They were `--bg`, a different colour, so the edges
+       of the scroller drew visible bands across the rows instead of hiding the shadows. */
     background:
-      linear-gradient(var(--bg) 30%, transparent) top / 100% 20px no-repeat local,
-      linear-gradient(transparent, var(--bg) 70%) bottom / 100% 20px no-repeat local,
+      linear-gradient(var(--sunk) 30%, transparent) top / 100% 20px no-repeat local,
+      linear-gradient(transparent, var(--sunk) 70%) bottom / 100% 20px no-repeat local,
       linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), transparent) top / 100% 8px no-repeat scroll,
       linear-gradient(transparent, color-mix(in srgb, var(--ink) 10%, transparent)) bottom / 100% 8px no-repeat scroll;
   }
@@ -943,6 +951,9 @@
     gap: 10px;
     min-block-size: 32px;
     padding: 0 var(--sp-3);
+    /* `blocks.css` draws a rule under every `.item` for its own lists, and that class name reaches
+       this rail too, so rows followed by a saved view grew a line. The rail draws no rules. */
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink2);
     font-size: var(--t-ui);
@@ -1013,6 +1024,13 @@
     color: var(--tone, var(--dim));
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Questions waiting on you: the same quiet figure, in full ink and weight, so it is noticed
+     without a glyph or a colour standing in for the meaning. */
+  .tally[data-waiting] {
+    color: var(--ink);
+    font-weight: 600;
   }
 
   .item[aria-current='page'] .tally {
