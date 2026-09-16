@@ -30,6 +30,13 @@
  * `Cache-Control: no-cache` ON EVERY FETCH (52 §439). Without it the gate is a measurement of a
  * CDN edge rather than of the deploy, and the one time that matters is the one time it is wrong.
  *
+ * AND THAT HEADER DOES LESS THAN THE LINE ABOVE CLAIMS, which is worth knowing before trusting it.
+ * `Cache-Control` sent by a client is a request directive; Cloudflare does not honour it as a purge
+ * and answered `CF-Cache-Status: HIT` on both compared paths while this was being investigated. The
+ * header is kept because it is correct to send and costs nothing, not because it guarantees the
+ * origin. What actually defends this gate against measuring a stale edge is the settle window
+ * below: an edge that is behind catches up, and one that is wrong stays wrong.
+ *
  * WHAT IT DOES NOT DO: read a secret, or reach an authenticated route. 52 §650 makes that a rule
  * for the whole directory, and this is the only gate with the opportunity to break it. All three
  * paths are public.
@@ -80,8 +87,6 @@ if (!host || !local) {
   process.exit(3);
 }
 
-const findings = [];
-
 /** One fetch, uncached, with the budget's own ceiling rather than the runtime's default of none. */
 const fetchOnce = (path) =>
   fetch(`https://${host}${path}`, {
@@ -97,45 +102,86 @@ const get = async (path) => {
   return out;
 };
 
-for (const path of PATHS) {
-  try {
-    const out = await get(path);
-    const live = sha256(Buffer.from(await out.arrayBuffer()));
-    const built = sha256(local.get(path));
-    if (live !== built) {
-      findings.push(`live ${path} differs: host serves ${live.slice(0, 12)}, build is ${built.slice(0, 12)}`);
-    }
-  } catch (err) {
-    findings.push(`live ${path} differs: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-/* AND THE WORKER'S OWN ANSWER. The two hashes above can both match while the code serving them is
-   last week's, because assets and code are one version only if the version is the one deployed. */
 const BUILD = '/.well-known/braindog-build';
 
-try {
-  /* WHATEVER COMES BACK IS READ, INCLUDING A REFUSAL, which is why this one does not go through
-     `get`. A host still serving the version before this route existed answers the router's 404 here,
-     and the code in that body is a far more useful sentence than the status alone. */
-  const out = await fetchOnce(BUILD);
-  const said = await out.json();
-  const app = typeof said?.app === 'string' ? said.app : '';
-  /* A REFUSAL IS NOT A FAILED DEPLOY, and printing it as one sends whoever is on call to the wrong
-     place entirely. Read as an absent tuple, a refusal is word for word what a deploy which never
-     landed looks like, and it is the more alarming of the two readings. The gate cannot tell you the
-     deploy is good in this case, and it must not imply the opposite. This path takes no credential,
-     so the refusal to expect here is a host whose version predates the route rather than one asking
-     for a bearer, and the two are told apart by the code the host itself names. */
-  const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
-  if (refused) findings.push(`live app tuple went unread: the host refused ${BUILD} with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
-  else if (!out.ok) findings.push(`live app tuple is unreadable: ${out.status} from https://${host}${BUILD}`);
-  else if (!expected) findings.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
-  else if (app !== expected) findings.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
-} catch (err) {
-  findings.push(`live app tuple is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+/** Everything this gate asks the host, once. Returns the findings of that single look. */
+const look = async () => {
+  const seen = [];
+
+  for (const path of PATHS) {
+    try {
+      const out = await get(path);
+      const live = sha256(Buffer.from(await out.arrayBuffer()));
+      const built = sha256(local.get(path));
+      if (live !== built) {
+        seen.push(`live ${path} differs: host serves ${live.slice(0, 12)}, build is ${built.slice(0, 12)}`);
+      }
+    } catch (err) {
+      seen.push(`live ${path} differs: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /* AND THE WORKER'S OWN ANSWER. The two hashes above can both match while the code serving them is
+     last week's, because assets and code are one version only if the version is the one deployed. */
+  try {
+    /* WHATEVER COMES BACK IS READ, INCLUDING A REFUSAL, which is why this one does not go through
+       `get`. A host still serving the version before this route existed answers the router's 404
+       here, and the code in that body is a far more useful sentence than the status alone. */
+    const out = await fetchOnce(BUILD);
+    const said = await out.json();
+    const app = typeof said?.app === 'string' ? said.app : '';
+    /* A REFUSAL IS NOT A FAILED DEPLOY, and printing it as one sends whoever is on call to the wrong
+       place entirely. Read as an absent tuple, a refusal is word for word what a deploy which never
+       landed looks like, and it is the more alarming of the two readings. The gate cannot tell you
+       the deploy is good in this case, and it must not imply the opposite. This path takes no
+       credential, so the refusal to expect here is a host whose version predates the route rather
+       than one asking for a bearer, and the two are told apart by the code the host itself names. */
+    const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
+    if (refused) seen.push(`live app tuple went unread: the host refused ${BUILD} with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
+    else if (!out.ok) seen.push(`live app tuple is unreadable: ${out.status} from https://${host}${BUILD}`);
+    else if (!expected) seen.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
+    else if (app !== expected) seen.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
+  } catch (err) {
+    seen.push(`live app tuple is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  return seen;
+};
+
+/* THE SETTLE WINDOW, AND WHY ASKING ONCE WAS WRONG.
+   `wrangler deploy` returning is not the host being consistent. The deploy of `c96a962` uploaded
+   correctly and this gate, asking one second later, was handed the previous version's bytes and
+   called a good deploy broken. Both paths matched the build exactly when asked again a few minutes
+   afterwards, so the first failure this gate ever reported against production was its own timing.
+
+   A HOST THAT HAS NOT PROPAGATED YET AND A HOST SERVING STALE BYTES FOREVER ARE THE SAME PICTURE AT
+   ONE SECOND. Only the second is the failure this gate was written to catch, and the only thing that
+   tells them apart is elapsed time. So the gate asks until the answer settles or the window closes.
+   It still goes red if the host never catches up, which is the entire point of it, and a deploy that
+   needed the wait says so in its output rather than passing silently, because a host that takes a
+   minute to serve what it was given is worth knowing about even when it gets there. */
+const WINDOW_MS = 120_000;
+const GAP_MS = 10_000;
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+const startedAt = Date.now();
+let findings = await look();
+let settled = 0;
+
+while (findings.length > 0 && Date.now() - startedAt + GAP_MS < WINDOW_MS) {
+  await sleep(GAP_MS);
+  findings = await look();
+  settled = Math.round((Date.now() - startedAt) / 1000);
 }
 
 for (const what of findings) console.log(`  ${what}`);
+
+if (findings.length > 0) {
+  console.log(`  none of this settled in the ${Math.round(WINDOW_MS / 1000)}s allowed, so it is the deploy rather than propagation`);
+} else if (settled > 0) {
+  console.log(`  the host needed ${settled}s to serve what it was given, which is slow but correct`);
+}
+
 console.log(`  deploy-parity: ${host}, ${PATHS.length + 1} path(s), ${findings.length} finding(s)`);
 if (findings.length > 0) process.exitCode = 1;
