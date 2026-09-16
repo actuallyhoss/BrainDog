@@ -598,6 +598,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         where: 'state is open or part, direction is owed by me, due before +31d',
         columns: [{ field: 'category' }, { field: 'amount' }],
         limit: 6,
+        unset: 'Uncategorised',
         empty: 'Nothing to pay in the next 30 days.',
       },
       {
@@ -650,7 +651,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'due', dir: 'asc' }],
         empty: 'Nothing is coming in or going out.',
-        limit: 50,
+        /* THE NEXT DOZEN BY DATE, so the charts after it stay near; the list holds the rest. */
+        limit: 12,
       },
       {
         /* WHERE THE LAST YEAR'S MONEY WENT, from the rows that say when they were paid. */
