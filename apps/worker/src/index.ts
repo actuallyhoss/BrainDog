@@ -32,6 +32,7 @@ import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsag
 
 import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
+import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
@@ -135,6 +136,8 @@ const serveMcp = (request: Request, api: RecordApi, ctx: CallContext): Promise<R
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
+  /** Set by `deleteRecord`, and never cleared: every door this object has answers as a deleted record from then on. */
+  #gone = false;
 
   /**
    * The `Scheduler` port over this object's own alarm. One per customer, and this is the one.
@@ -155,6 +158,7 @@ export class Record$ extends DurableObject<Env> {
    * is a record that returns rows nobody can interpret.
    */
   #record(): Promise<RecordApi> {
+    if (this.#gone) return Promise.reject(new Error(DELETED.fix));
     /* AND A REJECTED PROMISE IS NOT A CACHED ANSWER. `??=` stored whatever the opener returned,
        including a rejection — so one transient failure at cold start (a queue hiccup in the tail, a
        storage read that timed out) was remembered as this record's permanent state, and every
@@ -190,6 +194,17 @@ export class Record$ extends DurableObject<Env> {
         delivers: DELIVERS,
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
+        /* DELETION, `51 §5.13`. The record has checked the owner, the sign-in and the typed name; this is the alarm,
+           the bytes and the names, with no request answered in between. */
+        destroy: async () => {
+          const id = api.kernel.identity()?.id ?? null;
+          const directory = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+          await this.ctx.blockConcurrencyWhile(async () => {
+            this.#gone = true;
+            this.#api = null;
+            await destroyRecord(this.ctx.storage, (record) => directory.close(record), id);
+          });
+        },
       });
 
       /* ARM FROM WHAT THE RECORD ALREADY HOLDS, INSIDE THE BLOCK. An object is evicted between
@@ -219,6 +234,7 @@ export class Record$ extends DurableObject<Env> {
    * alarm is set to now and the next fire drains the rest.
    */
   override async alarm(): Promise<void> {
+    if (this.#gone) return;
     const api = await this.#record();
     await api.kernel.drain(this.#alarm);
     await this.#act(api);
@@ -263,6 +279,7 @@ export class Record$ extends DurableObject<Env> {
    * key, and `ADR-062` is the argument for why it must not.
    */
   async lease(n = 10): Promise<OutboxRow[]> {
+    if (this.#gone) return [];
     const api = await this.#record();
     return api.kernel.leaseOutbox(DELIVERS, n);
   }
@@ -275,6 +292,7 @@ export class Record$ extends DurableObject<Env> {
    * anywhere else would be a search across every customer.
    */
   async verify(bearer: string, surface: string): Promise<{ id: string; person_id: string; scope: string } | null> {
+    if (this.#gone) return null;
     const api = await this.#record();
     const out = await api.kernel.verifyToken(bearer, surface);
     return out.ok ? out.value : null;
@@ -289,6 +307,7 @@ export class Record$ extends DurableObject<Env> {
   async access(
     person: string,
   ): Promise<{ level: string | null; registers: string[] | null; levels: Record<string, string> } | null> {
+    if (this.#gone) return null;
     const api = await this.#record();
     return api.kernel.access(person);
   }
@@ -302,6 +321,7 @@ export class Record$ extends DurableObject<Env> {
    * not itself.
    */
   async switcherRow(person: string): Promise<{ level: string | null; name: string | null }> {
+    if (this.#gone) return { level: null, name: null };
     const api = await this.#record();
     return { level: api.kernel.access(person)?.level ?? null, name: api.kernel.identity()?.name ?? null };
   }
@@ -414,6 +434,7 @@ export class Record$ extends DurableObject<Env> {
    * rule stated 130 lines down, broken in the two places the sentence did not reach.
    */
   override async fetch(request: Request): Promise<Response> {
+    if (this.#gone) return json({ ok: false, refusal: DELETED }, 503);
     const api = await this.#record();
 
     const refused = api.kernel.refused();
@@ -510,6 +531,12 @@ export class Directory$ extends DurableObject<Env> {
   name(slug: string, email: string, record: string): Refusal | null {
     const named = this.#directory().provision({ slug, email, record });
     return named.ok ? null : refusalOf(named);
+  }
+
+  /** A deleted record's names, released. `null` is released; a refusal is a record the Directory does not hold. */
+  close(record: string): Refusal | null {
+    const out = this.#directory().close(record);
+    return out.ok ? null : refusalOf(out);
   }
 
   /** Whether a record's scheduled action may run now: `null`, or until when it waits and why. A record's alarm asks before each run. */
