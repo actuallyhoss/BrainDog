@@ -47,7 +47,7 @@
     pen,
     record,
     records = [],
-    live = false,
+    refused,
     registers,
     open = 0,
     inbox = 0,
@@ -58,8 +58,8 @@
     pen: PageDecl[];
     record: string;
     records?: { slug: string; name: string; level: string }[];
-    /** Whether the rail was drawn from a record rather than from the built-in sample. */
-    live?: boolean | undefined;
+    /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
+    refused?: string | undefined;
     registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string }[] }[];
     open?: number | undefined;
     inbox?: number | undefined;
@@ -335,15 +335,16 @@
         </button>
       {/each}
       <!--
-        AND ON A REAL RECORD THE MENU SAYS WHY IT IS ONE ROW LONG.
+        AND WHEN THE LIST COULD NOT BE READ, THE MENU SAYS SO IN THE HOST'S OWN WORDS.
 
-        `boot` names the record you are in and no other, and the record's surface has no method that
-        answers which records a person can reach: `whoami` says who you are on THIS one. So a live
-        switcher can only ever list the record you are already in, and a control called "Switch
-        record" that silently offers nothing to switch to is the shape this app's own rule is
-        written about. It says the fact instead, and the sample keeps the rows and the toast it had.
+        The rows come from the account, which is the only thing that knows there is more than one
+        record: `boot` names the one you are in and `whoami` says who you are on it. When that read
+        is refused the switcher still holds the record you are inside, and a menu one row long with
+        nothing to explain it reads as a product that holds one business. A signed-out session is
+        the common case and the sentence for it is "sign in again", which is something a reader can
+        act on.
       -->
-      {#if live}<p class="mi-note">{copy.recordsUnlisted}</p>{/if}
+      {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href="/settings/identity"><Icon name="settings" size="s" />{copy.recordSettings}</a>
       <a class="mi" role="menuitem" href="/start"><Icon name="plus" size="s" />{copy.newRecord}</a>

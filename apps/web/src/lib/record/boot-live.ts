@@ -34,6 +34,15 @@ type Sample = ReturnType<typeof boot>;
  */
 export type Shell = Omit<Sample, 'me'> & {
   me: { person: string; level: string; owner: boolean; records: { slug: string; name: string; level: string }[] };
+  /**
+   * Why the records this person can reach could not be listed, when they could not.
+   *
+   * THE SWITCHER OWES A READER THE REASON. A menu that quietly holds the one record you are already
+   * in reads as a product with one record in it, which is a different claim from "this list could
+   * not be read just now". The root layout fills it from `/account/records`, and it is absent on
+   * every shell that could list them.
+   */
+  recordsRefused?: string | undefined;
   inbox: number;
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
@@ -96,8 +105,11 @@ export const newsOf = (events: readonly EventLine[], me: string | null): NewsIte
 /**
  * The record's `boot` in the shape the shell draws.
  *
- * WHAT THE RECORD DOES NOT SEND IS EMPTY, NOT SAMPLED. Saved views, the pen of unplaced pages, the people with access and
- * the second record in the switcher are not in `boot`, so a live shell has none of them rather than the sample's.
+ * WHAT THE RECORD DOES NOT SEND IS EMPTY, NOT SAMPLED. Saved views, the pen of unplaced pages and the people with access
+ * are not in `boot`, so a live shell has none of them rather than the sample's.
+ *
+ * THE SWITCHER STARTS AT THE RECORD YOU ARE IN, and the root layout replaces that row with the account's own list. `boot`
+ * names this record and no other, so one row is the most this function can honestly claim.
  */
 export function layoutOf(b: Boot): Shell {
   const record = b.record ?? null;

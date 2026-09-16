@@ -323,7 +323,7 @@
           pen={data.pen}
           record={data.index.name}
           records={data.me.records}
-          live={data.live}
+          refused={data.recordsRefused}
           registers={data.index.registers}
           open={data.open}
           inbox={data.inbox}

@@ -1859,12 +1859,13 @@
             </li>
           {/each}
         </ul>
-        <!-- AND THE HEADING SAYS WHAT IT CAN AND CANNOT COUNT. On a record this list is the one
-             record you are inside, because nothing in the record's surface answers which others you
-             can reach — `boot` names this one and `whoami` says who you are on it. A section called
-             "Records you can open" that quietly holds one row reads as a product with one record in
-             it, which is a different claim from the true one. -->
-        {#if shell.live}<p class="hint">{copy.recordsUnlisted}</p>{/if}
+        <!-- AND THE HEADING SAYS WHAT IT COULD NOT COUNT. The rows are the account's answer, so when
+             that read is refused this section holds the record you are inside and nothing else. A
+             section called "Records you can open" that quietly holds one row reads as a product with
+             one record in it, which is a different claim from the true one. The rail's switcher
+             reports the same sentence, because two surfaces offering one fact must not answer it
+             two ways. -->
+        {#if shell.recordsRefused}<p class="hint">{shell.recordsRefused}</p>{/if}
       </Section>
     {:else if area === 'agents'}
       <!--

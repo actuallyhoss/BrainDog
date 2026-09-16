@@ -6,18 +6,29 @@
  * the whole synthetic record, and `boot-live.ts` carries the client's route table; either one in the
  * entry chunk pushes it over its budget, which the bundle gate would be right to report.
  *
- * ONE REQUEST. The two imports are fetched together, and then the record's `boot` is the only call
- * the shell waits on, kept for the tab once it has answered, so a navigation costs nothing here.
+ * ONE REQUEST EACH, AND BOTH ARE KEPT. The three imports are fetched together; the record's `boot`
+ * and the account's list of records are the only calls the shell waits on, and each is kept for the
+ * tab once it has answered, so a navigation costs nothing here.
  */
 import { redirect } from '@sveltejs/kit';
 
 import type { Shell } from '$lib/record/boot-live.ts';
+import type { Answer, SwitcherRow } from '$lib/record/switcher.ts';
 
 export const ssr = false;
 export const prerender = false;
 
-export async function load({ url }): Promise<Shell> {
-  const [{ boot, INBOX }, live] = await Promise.all([import('$lib/record/api.ts'), import('$lib/record/boot-live.ts')]);
+/* Kept for the tab for the reason `readBoot` is kept: this load runs on every navigation and the
+   switcher is the same answer every time it does. A refusal is dropped rather than kept, because it
+   is about this moment and not about which records exist. */
+let reach: Promise<Answer<SwitcherRow[]>> | null = null;
+
+export async function load({ url, fetch }): Promise<Shell> {
+  const [{ boot, INBOX }, live, { readRecordsForSwitcher }] = await Promise.all([
+    import('$lib/record/api.ts'),
+    import('$lib/record/boot-live.ts'),
+    import('$lib/record/switcher.ts'),
+  ]);
   const booted = await live.readBoot(url.origin);
 
   /* NO RECORD HERE, AND THE SAMPLE IS DRAWN EXACTLY AS BEFORE. A refusal of any other kind is the
@@ -49,6 +60,26 @@ export async function load({ url }): Promise<Shell> {
     booted.from === 'live' ? booted.boot.registers.length : booted.from === 'sample' ? shell.index.registers.length : null;
   const spared = url.pathname === '/start' || url.pathname === '/signin' || url.pathname === '/invite' || url.pathname.startsWith('/s/');
   if (declared === 0 && !spared) redirect(307, '/start');
+
+  /* AND THE RECORDS THIS PERSON CAN REACH, WHICH `boot` CANNOT ANSWER: it names the record you are
+     in and no other, so the account is the only thing with the list. Asked on a live record only.
+     The sample's switcher already carries the sample's rows, and a static host answers this with its
+     404 page, which would put a sentence about signing in under a record nobody signed in to.
+
+     A REFUSAL IS CARRIED RATHER THAN SWALLOWED. The switcher keeps the row `boot` named and says why
+     the rest are absent, in the host's own words. Saying nothing leaves a menu one row long, which
+     reads as a product that holds one business.
+
+     AN EMPTY LIST IS NOT AN ANSWER ABOUT THIS RECORD EITHER. Somebody is inside one, so a switcher
+     with no rows in it would be the rail contradicting the screen beside it. */
+  if (booted.from === 'live') {
+    reach ??= readRecordsForSwitcher(fetch, url.origin);
+    const listed = await reach;
+    if (!listed.ok) {
+      reach = null;
+      shell.recordsRefused = listed.refusal.fix;
+    } else if (listed.value.length > 0) shell.me = { ...shell.me, records: listed.value };
+  }
 
   return shell;
 }
