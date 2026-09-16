@@ -102,15 +102,12 @@
     block-size: 32px;
   }
 
-  /* Left as a literal on purpose, same reasoning as `apps/web`'s `.block-slot[data-drop]::after`:
-     the app's `--z-*` scale (`--z-sheet --z-palette --z-toast --z-hint` in `tokens.css`) names
-     global overlay tiers, and this is a local stacking need only, the node dot sitting in front of
-     the rail line drawn behind it within one `.step`. None of the four names fit a "above my own
-     background, nothing else" case, so this stays a plain `1` rather than borrowing a tier that
-     means something else. */
+  /* `--z-raise`, the same step `apps/web`s drop line takes. This is a local stacking need only,
+     the node dot sitting in front of the rail line drawn behind it within one `.step`, and none
+     of the overlay tiers describe that. The token does. */
   .n {
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raise);
     display: grid;
     place-items: center;
     inline-size: 32px;

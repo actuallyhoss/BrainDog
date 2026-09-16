@@ -966,17 +966,15 @@
      outline-style pseudo-element so it sits over the block's own border rather than moving it —
      a border that appears on hover reflows the grid under the pointer, which makes a drag feel
      like it is fighting you. `inset-inline` / `inset-block` so it mirrors under rtl for free. */
-  /* Left as a literal on purpose: the four `--z-*` names in `tokens.css` (`--z-sheet --z-palette
-     --z-toast --z-hint`) are the app's global overlay scale, one name per thing that has to beat
-     everything under it on the whole page. This is neither — it is a pseudo-element that only has
-     to clear its own sibling, `.block-slot`'s border, inside a single local stacking context.
-     Reaching for `--z-sheet` here would put a drag-and-drop hairline at the same tier as an actual
-     bottom sheet, which is the wrong claim to make about it. No token in the scale means "above my
-     own sibling and nothing else," so this stays a plain `1`. */
+  /* `--z-raise`, WHICH IS THE STEP THIS NEEDED AND DID NOT HAVE. It was a bare 1, because the
+     four names under it are a global overlay ORDER and this is not one: it is a pseudo-element
+     clearing its own sibling, `.block-slot`s border, inside one local stacking context. Naming
+     it `--z-sheet` would have put a drag-and-drop hairline at the tier of an actual bottom
+     sheet. The token now says what it is, above its own sibling and below every overlay. */
   .block-slot[data-drop]::after {
     content: '';
     position: absolute;
-    z-index: 1;
+    z-index: var(--z-raise);
     background: var(--accent);
     border-radius: 999px;
     pointer-events: none;

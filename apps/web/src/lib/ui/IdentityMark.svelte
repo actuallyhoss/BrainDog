@@ -31,13 +31,11 @@
 
   .glyph {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    /* Left as a literal on purpose: the type scale's floor is `--t-xs` at 12px, and this one glyph
-       is drawn at 9px so it reads as a mark beside the name rather than a second word. Rounding up
-       to `--t-xs` would grow it a third again, which is a real, visible size change on the one
-       thing in this component with no name beside it to lean on — not a fix this gate should make
-       silently. Route to a design decision: either the type scale grows a step below `--t-xs`, or
-       this stays a spec carve-out. */
-    font-size: 9px;
+    /* SIZED FROM THE MARK FAMILY, not from the type scale. This was a bare 9px, and the reason no
+       token fitted is that it is not type: it is a mark, drawn beside the name so it reads as a
+       mark and not as a second word, and `aria-hidden` so nothing reads it. The scale floors at
+       `--t-xs` on purpose, and rounding up to it would have grown this glyph by a third. */
+    font-size: var(--mark-t);
     line-height: 1;
     flex: none;
   }

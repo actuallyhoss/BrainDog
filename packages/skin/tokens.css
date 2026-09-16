@@ -81,6 +81,15 @@
     /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
        among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
        in what it says and how it is arranged (13 §7). */
+    /* THE MARK IS NOT A STEP ON THE READING SCALE, and that is why nothing on the scale fitted it.
+       `IdentityMark` draws a coloured glyph beside a name at 9px so it reads as a mark rather than
+       as a second word, and it is `aria-hidden`, so nobody reads it as text at all. The scale
+       floors at `--t-xs` deliberately (see the note below it), and growing a step under that for
+       one decorative glyph would invite the rest of the app through the same gap. It is authored
+       here and not beside `--mark-l` and `--mark-c`, because those are solved per theme and live
+       in a generated file: a size is a constant, not a palette output. */
+    --mark-t: 9px;
+
     --t-xs: 12px;
     --t-sm: 13px;
     --t-base: 15px;
@@ -194,6 +203,12 @@
 
     /* Every positive z-index in the app is one of these four names. A number that matches no rule
        is how an overlay ends up under the thing it covers. */
+    /* ABOVE MY OWN SIBLING, AND BELOW EVERY OVERLAY. The four steps below this one are an overlay
+       ORDER and start at 10, so an element that only has to clear the border or the rail drawn
+       beside it had nothing to name and used a bare 1. Borrowing `--z-sheet` would have said it
+       competes with the sheet, which is the wrong claim to make about a hairline. */
+    --z-raise: 1;
+
     --z-sheet: 10;
     --z-palette: 20;
     --z-toast: 30;
