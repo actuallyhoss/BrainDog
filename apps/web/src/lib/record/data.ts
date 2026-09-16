@@ -1063,8 +1063,15 @@ export const AUTH_METHODS = { passkey: true, magic: true } as const;
  *
  * A PUBLIC KEY IS THE ONE KEY THAT BELONGS ON A SCREEN, and this product's first promise makes that
  * worth saying out loud: the vault indexes what a key OPENS and never the key, and the rule is about
- * secrets. Publishing this one is the mechanism — it is served at
- * `GET /.well-known/braindog-key` to anybody who asks.
+ * secrets. Publishing this one is the mechanism, and the design puts it at
+ * `GET /.well-known/braindog-key`.
+ *
+ * NOTHING SERVES THAT PATH TODAY, and this sentence used to say it did. The Worker matches
+ * `/.well-known/braindog-build` and nothing else, and `apps/worker/test/build.test.ts` asserts the
+ * key path is refused, so the public half reaches a person from this screen and from nowhere on
+ * the network. The paragraph above hedges correctly with "when the hosts serve it", and this one
+ * contradicted it four lines later, which is worse than either sentence alone: a reader believes
+ * whichever they read second.
  *
  * `03 §4`: raw 32-byte Ed25519 in base64url; `key_id` is the first 16 hex characters of SHA-256 over
  * the public key. Both are shown, because `48 §5.6`'s pin check compares `key_id` and that is the
