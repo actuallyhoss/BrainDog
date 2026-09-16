@@ -290,6 +290,19 @@ test('GOVERNANCE LISTS EACH QUESTION WITHOUT ITS BODY, and one by id is whole', 
   sql.close();
 });
 
+test('A CHANGE TAKES ITS declaration_id FROM to, so an agent can propose a page and its place in the nav', async () => {
+  const { mcp, api, sql } = await agent();
+  const proposer: CallContext = { principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' } };
+  const page = { page: 'studies', title: 'Studies', nav: { section: 'Studies', order: 10 }, requires: ['register.obligations'], blocks: [{ kind: 'table', heading: 'Open', source: 'register.obligations', columns: [{ field: 'what', label: 'What' }] }] };
+  const asked = value<{ id: string }>(
+    await mcp.call('propose', { question: 'Add a Studies page?', body_kind: 'change', body: { to: { id: 'page.studies', kind: 'page', body: page } } }, proposer),
+  ).id;
+  assert.equal(value<{ body: { declaration_id: string } }>(await mcp.call('governance', { id: asked }, owner)).body.declaration_id, 'page.studies');
+  value(await api.decide({ id: asked, decide: { option: 'accept', reason: 'Yes.' } }, owner));
+  assert.ok(value<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'studies'));
+  sql.close();
+});
+
 test('A ROWSET NAMES ITS REGISTER FROM at, AND A NEW SKILL BODY RAISES rev, so sync takes it', async () => {
   const { surface, calls } = stub({
     get: async () => ({ ok: true, value: { id: 'x', register: 'skills', seq: 3, version: 2, fields: { rev: 4 } } }),

@@ -143,7 +143,7 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'get',
-    description: 'One row, by the id a person says out loud: obligations#41, S42 or LN7. A ref field holds a row id, and get takes that too.',
+    description: 'One row, by the id a person says out loud: tasks#41, S42 or LN7. A ref field holds a row id, and get takes that too.',
     input: obj({ spoken: str('register#number, a prefixed id such as S42, or a row id from a ref field.') }, ['spoken']),
     writes: false,
   },
@@ -197,7 +197,7 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'The body for that kind. options: {"options":[...]}, at least two, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]} changes those rows when accepted. A new skill body raises its rev for you.',
+            'The body for that kind. options: {"options":[...]}, at least two, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]} changes those rows when accepted; a new skill body raises its rev for you. change: {"to":{"id":"page.x","kind":"page","body":{...}}} installs that declaration, such as a page and its place in the nav.',
         },
       },
       ['question', 'body_kind', 'body'],
@@ -250,7 +250,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'meet',
     description:
-      'Someone you came across in the work: a commit author, a sender, a client. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
+      'Someone you came across in the work, such as a commit author, the sender of a message, a client or a classmate. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
     input: obj(
       {
         name: str('As written in the work.'),
@@ -264,7 +264,7 @@ export const TOOLS: readonly Tool[] = [
   },
 ];
 
-/** `obligations#41`, the way a person says a row. */
+/** `tasks#41`, the way a person says a row. */
 const QUALIFIED = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
 /** `S42`, `LN7`: a register's own prefix and number. The record knows which register owns a prefix. */
 const PREFIXED = /^[A-Z]{1,4}[1-9][0-9]*$/;
@@ -277,7 +277,7 @@ const parse = (spoken: unknown): { register: string; seq: number } | null => {
   return m ? { register: m[1]!, seq: Number(m[2]) } : null;
 };
 
-const ROW_OR_ID = 'A row is addressed as register#number, like obligations#41, or by its prefixed id, like S42.';
+const ROW_OR_ID = 'A row is addressed as register#number, like tasks#41, or by its prefixed id, like S42.';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -474,6 +474,13 @@ export function tools<C>(surface: McpSurface<C>) {
     return { ...body, ...(register === undefined ? {} : { register }), rows: out };
   };
 
+  /**
+   * A change as the record takes it. `declaration_id` IS THE ID OF WHAT IT INSTALLS, so it is taken from `to`
+   * when left out: the record refused "A change proposal needs declaration_id" to a body whose `to` named it.
+   */
+  const change = (body: Record<string, unknown>): Record<string, unknown> =>
+    body.declaration_id === undefined && isObject(body.to) && typeof body.to.id === 'string' ? { ...body, declaration_id: body.to.id } : body;
+
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
     /**
      * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
@@ -567,8 +574,16 @@ export function tools<C>(surface: McpSurface<C>) {
      * a tool for it could only ever refuse, and a tool that always refuses is a tool an agent spends
      * its turns discovering.
      */
-    propose: async (args, ctx) =>
-      surface.propose((args.body_kind === 'rowset' && isObject(args.body) ? { ...args, body: await rowset(args.body, ctx) } : args) as never, ctx),
+    propose: async (args, ctx) => {
+      const body = !isObject(args.body)
+        ? args.body
+        : args.body_kind === 'rowset'
+          ? await rowset(args.body, ctx)
+          : args.body_kind === 'change'
+            ? change(args.body)
+            : args.body;
+      return surface.propose({ ...args, ...(body === undefined ? {} : { body }) } as never, ctx);
+    },
 
     create: (args, ctx) =>
       surface.create(
