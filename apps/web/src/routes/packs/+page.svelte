@@ -11,6 +11,7 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -112,7 +113,9 @@
   onMount(() => {
     void read(async () => {
       client = createClient({ base: location.origin });
-      const chosen = await choose(client);
+      /* WHICH RECORD THIS IS IS THE SHELL'S ANSWER TO `boot`, not a second reading of this screen's
+         own first call. See `choose`. */
+      const chosen = await choose(client, !page.data.live);
       source = chosen.source;
       live = !chosen.source.sample;
       if (!chosen.first.ok) {

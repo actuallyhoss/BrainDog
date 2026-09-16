@@ -172,22 +172,30 @@ export async function installPlanned(
   return fresh.ok ? { ok: false, fix: out.refusal.fix, again: fresh.value } : { ok: false, fix: fresh.refusal.fix, again: null };
 }
 
-/** The two answers that mean there is no record here, the same two `data/record.ts` falls back on. */
-const SAMPLE_WHEN: ReadonlySet<string> = new Set(['UNREACHABLE', 'UNAUTHORIZED']);
-
-/** Which source this screen reads, decided by its first `packs` call. A record that says no is drawn as saying no. */
-export async function choose(client: Caller): Promise<{ source: Source; first: Answer<PackState[]> }> {
-  const first = said(await client.packs());
-  if (first.ok || !SAMPLE_WHEN.has(first.refusal.code)) return { source: live(client), first };
-  const source = sample();
+/**
+ * Which source these screens read, and IT IS NOT DECIDED HERE ANY MORE.
+ *
+ * `sampled` IS THE SHELL'S ANSWER, WHICH IS `boot`'s. The root layout asks `readBoot` once for the
+ * tab and hands every screen the result as `data.live`. This module used to ask its own first call
+ * the same question, against its own copy of the two refusals that mean there is no record here, so
+ * there were two answers in the product to one question about one record. Nothing had to be broken
+ * for them to differ: a single transient `UNREACHABLE` on `packs` was enough for `/start` to believe
+ * it was on the demo while the list that draws its rows was live, and a row typed against one is not
+ * a row the other will show.
+ *
+ * A REFUSAL IS STILL THE RECORD'S OWN, AND NOW ALL OF THEM ARE. On a record the first answer is
+ * whatever the record said, `UNREACHABLE` included, because the shell has already established that
+ * there is a record there to refuse. Falling back to the sample on that code would be this module
+ * overruling the one call that is entitled to decide it.
+ */
+export async function choose(client: Caller, sampled: boolean): Promise<{ source: Source; first: Answer<PackState[]> }> {
+  const source = sampled ? sample() : live(client);
   return { source, first: await source.packs() };
 }
 
-/** The same choice for one add-on's settings, decided by its first `packConfig` call. */
-export async function openSettings(client: Caller, id: string): Promise<{ source: Source; first: Answer<PackConfig> }> {
-  const first = said(await client.packConfig({ id })) as Answer<PackConfig>;
-  if (first.ok || !SAMPLE_WHEN.has(first.refusal.code)) return { source: live(client), first };
-  const source = sample();
+/** The same source for one add-on's settings, from the same answer and never from a second probe. */
+export async function openSettings(client: Caller, id: string, sampled: boolean): Promise<{ source: Source; first: Answer<PackConfig> }> {
+  const source = sampled ? sample() : live(client);
   return { source, first: await source.config(id) };
 }
 

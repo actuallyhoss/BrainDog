@@ -139,7 +139,7 @@ test('EVERY OTHER REFUSAL IS READ AS WHAT THE SCREEN CAN SAY', () => {
   assert.deepEqual(blocked('work', { code: 'FORBIDDEN', fix: 'Only an owner.' }), { kind: 'other', id: 'work', fix: 'Only an owner.' });
 });
 
-test('WITH NO RECORD TO ASK THE SCREEN DRAWS THE SAMPLE, AND A RECORD THAT SAYS NO IS DRAWN SAYING NO', async () => {
+test('THE SHELL SAYS WHICH RECORD THIS IS, AND EVERY ANSWER AFTER THAT IS THAT SOURCE’S', async () => {
   const sent: unknown[] = [];
   const caller = (packs: Awaited<ReturnType<Caller['packs']>>): Caller => ({
     packs: async () => packs,
@@ -150,15 +150,26 @@ test('WITH NO RECORD TO ASK THE SCREEN DRAWS THE SAMPLE, AND A RECORD THAT SAYS 
     uninstallPack: async (args) => (sent.push(args), { ok: true, value: { id: args.id } }),
   });
 
-  const none = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }));
+  /* THE SHELL SAID THERE IS NO RECORD HERE, SO NOTHING IS ASKED OF ONE. */
+  let asked = 0;
+  const counting: Caller = { ...caller({ ok: true, value: [] }), packs: async () => ((asked += 1), { ok: true, value: [] }) };
+  const none = await choose(counting, true);
   assert.equal(none.source.sample, true);
   assert.ok(none.first.ok);
+  assert.equal(asked, 0, 'a record the shell said was not there was asked anyway');
 
-  const no = await choose(caller({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner.' } }));
+  /* AND ON A RECORD EVERY ANSWER IS THE RECORD'S, INCLUDING THE ONE THAT USED TO MEAN "NO RECORD".
+     The shell has already established that there is a record here to refuse, and falling back to
+     the sample on a transient failure is what let this screen and the list disagree. */
+  const gone = await choose(caller({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'x' } }), false);
+  assert.equal(gone.source.sample, false);
+  assert.equal(gone.first.ok ? '' : gone.first.refusal.code, 'UNREACHABLE');
+
+  const no = await choose(caller({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner.' } }), false);
   assert.equal(no.source.sample, false);
   assert.equal(no.first.ok ? '' : no.first.refusal.code, 'FORBIDDEN');
 
-  const yes = await choose(caller({ ok: true, value: [{ id: 'agents', version: '1.0.0', disabled_at: null, registers: ['skills'] }] }));
+  const yes = await choose(caller({ ok: true, value: [{ id: 'agents', version: '1.0.0', disabled_at: null, registers: ['skills'] }] }), false);
   assert.equal(yes.source.sample, false);
   await yes.source.disable('portfolio');
   await yes.source.disable('portfolio', ['work']);
@@ -248,18 +259,18 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
     uninstallPack: async (args) => (sent.push({ name: 'uninstallPack', args }), session),
   });
 
-  const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core');
+  const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core', true);
   assert.equal(none.source.sample, true);
   assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 7);
 
   const live: PackConfig = { id: 'ledger', version: '1.0.0', config: { cadence: { type: 'enum', values: ['weekly', 'monthly'] } }, values: { cadence: 'monthly' } };
-  const yes = await openSettings(caller({ ok: true, value: live }), 'ledger');
+  const yes = await openSettings(caller({ ok: true, value: live }), 'ledger', false);
   assert.equal(yes.source.sample, false);
   const refused = await yes.source.setConfig('ledger', { cadence: 'weekly' });
   assert.deepEqual(sent.at(-1), { name: 'setPackConfig', args: { id: 'ledger', values: { cadence: 'weekly' } } });
   assert.ok(!refused.ok && signInFor(refused.refusal));
 
-  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger');
+  const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger', false);
   assert.equal(no.source.sample, false);
   assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');
 });
@@ -281,7 +292,7 @@ test('UNINSTALLING ON THE SAMPLE SAYS WHAT WOULD GO AND KEEPS IT; ON A RECORD IT
     setPackConfig: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'x' } }),
     uninstallPack: async (args) => (sent.push(args), { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner can take an add-on out.' } }),
   };
-  const { source } = await choose(caller);
+  const { source } = await choose(caller, false);
   const refused = await source.uninstall('work');
   assert.deepEqual(sent, [{ id: 'work' }]);
   assert.equal(refused.ok ? '' : refused.refusal.fix, 'Only an owner can take an add-on out.');

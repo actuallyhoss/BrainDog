@@ -55,6 +55,17 @@
      claims can be checked against the rest of it in one pass rather than found in a component. */
   const CHOICES = firstRun.firstChoices;
 
+  /**
+   * WHETHER THERE IS A RECORD BEHIND THIS SCREEN, AND THE SHELL IS WHAT SAYS SO.
+   *
+   * `data.live` is the root layout's one answer to `boot`, asked once and kept for the tab. It is
+   * the same signal the list draws its waiting rows against and the shell counts them with, so
+   * reading it here is what makes the screen that TAKES a row and the screen that SHOWS it one
+   * record. This screen used to ask `packs` and work the answer out again from that call's own
+   * refusal, which is a second answer to a question that has one.
+   */
+  const sampled = $derived(!page.data.live);
+
   let picked = $state<string | null>(null);
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
      true rather than answering a press with a toast. */
@@ -280,7 +291,7 @@
     making = true;
     try {
       const client = createClient({ base: location.origin });
-      const chosen = await recordOrSample(client);
+      const chosen = await recordOrSample(client, sampled);
       const installed = chosen.first.ok ? chosen.first.value : [];
       const out: Outcome = { made: [], on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample };
 
@@ -407,7 +418,7 @@
     const now = heard;
     if (!now?.name) return;
     const client = createClient({ base: location.origin });
-    const chosen = await recordOrSample(client);
+    const chosen = await recordOrSample(client, sampled);
     const packs = chosen.first.ok ? chosen.first.value : null;
     if (chosen.source.sample) {
       const asked = introduce(now, null, packs);
@@ -546,8 +557,14 @@
    * the row waits in `pending` and wears `Not saved` on the list, which is what that half of this
    * function has always said and is still the truth about it.
    *
-   * WHICH ONE IS `recordOrSample`, the source `make` and `remember` already read, so the three
-   * presses on this screen agree about what they are looking at rather than each deciding.
+   * WHICH ONE IS THE SHELL'S ANSWER, AND IT USED TO BE THIS SCREEN'S OWN. `recordOrSample` asked
+   * `packs` and read "there is no record here" out of that call's refusal, while every other screen
+   * reads it out of `boot`. One transient `UNREACHABLE` on either call was then enough for the
+   * screen that TAKES the row and the list that DRAWS it to disagree, with nothing broken and no
+   * state flipped: the row waited against the sample under a live list, which holds none of the
+   * sample's rows, and the sentence below said it was at the top of a list it was not on. `sampled`
+   * is the shell's one answer, so the three presses here and every screen after them read the same
+   * record.
    */
   async function commit(event: SubmitEvent) {
     event.preventDefault();
@@ -560,7 +577,7 @@
     writing = true;
     try {
       const client = createClient({ base: location.origin });
-      const chosen = await recordOrSample(client);
+      const chosen = await recordOrSample(client, sampled);
       if (chosen.source.sample) {
         /**
          * AND THE ROW IS THE ROW THEY THEN SEE, which it was not.

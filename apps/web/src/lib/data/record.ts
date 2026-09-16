@@ -14,7 +14,7 @@
 import { createClient, type Boot } from '@braindog/client';
 
 import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
-import { readBoot } from '../record/boot-live.ts';
+import { readBoot, type Booted } from '../record/boot-live.ts';
 import { entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
@@ -227,24 +227,45 @@ const SAMPLE: Source = {
 
 /* ───────────────────────────────────── end of the sample ───────────────────────────────────── */
 
-let chosen: Promise<Source> | null = null;
+/** The source this tab reads, beside the answer it was built from. See `open`. */
+let chosen: { from: Promise<Booted>; source: Promise<Source> } | null = null;
 
 /**
- * Which source this tab reads, decided by asking the record for `boot` once.
+ * Which source this tab reads, taken from the shell's own answer to `boot`.
  *
- * KEPT FOR THE TAB WHEN IT WAS DECIDED: a record that answered, or no record at all. A record that
- * answered with some other refusal is asked again by the next screen, because that answer is about
- * the record's state rather than about whether there is one.
+ * THERE IS SOMETHING WORTH KEEPING HERE, WHICH IS WHY THIS IS A MEMO AT ALL. `remote` walks a
+ * register to the end of its cursor to learn what the refs on a list point at, and keeps each
+ * declaration it has read; rebuilding it per call would pay for every row of the target list again
+ * on every page, count and filter. So the source is held.
+ *
+ * IT WAS HELD FOR THE WHOLE LIFE OF THE TAB, AND THAT IS THE BUG THIS SHAPE FIXES. `forget()` drops
+ * `boot-live.ts`'s kept answer after a write, and could not reach this one: a tab that read the
+ * sample once went on drawing the sample on `/r/<register>` for as long as it was open, even after
+ * the record had become reachable. That is the same disagreement `/start` had, standing still
+ * instead of arriving.
+ *
+ * KEYING THE MEMO ON THE ANSWER ITSELF IS WHAT PUTS IT RIGHT, rather than a second thing for
+ * `forget()` to remember. `readBoot` hands back the same promise while its answer is kept and a new
+ * one once it has been forgotten or refused, so this rebuilds exactly when the shell re-asks and
+ * never otherwise. Nothing has to be cleared from anywhere else, which matters because the three
+ * writers that call `forget()` do it from screens that may never have loaded this module.
  */
 export function open(): Promise<Source> {
-  chosen ??= (async (): Promise<Source> => {
-    /* THE SHELL'S OWN ANSWER, not a second probe. The layout asked `boot` before this screen drew, and
-       `boot-live.ts` kept it for the tab under the same two refusals that mean there is no record. */
-    const booted = await readBoot(location.origin);
-    if (booted.from === 'live') return remote(createClient({ base: location.origin }), booted.boot);
-    if (booted.from === 'sample') return SAMPLE;
-    chosen = null;
-    return refusing({ code: booted.code, fix: booted.fix });
-  })();
-  return chosen;
+  /* THE SHELL'S OWN ANSWER, not a second probe. The layout asked `boot` before this screen drew, and
+     `boot-live.ts` kept it for the tab under the same two refusals that mean there is no record. */
+  const from = readBoot(location.origin);
+  if (chosen?.from !== from) {
+    chosen = {
+      from,
+      source: (async (): Promise<Source> => {
+        const booted = await from;
+        if (booted.from === 'live') return remote(createClient({ base: location.origin }), booted.boot);
+        if (booted.from === 'sample') return SAMPLE;
+        /* A refusal is not kept by `readBoot` either, so the next screen asks the record again and
+           lands here with a different promise in hand. */
+        return refusing({ code: booted.code, fix: booted.fix });
+      })(),
+    };
+  }
+  return chosen.source;
 }

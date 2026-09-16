@@ -78,7 +78,7 @@
     signin = false;
     drafts = {};
     const at = opened();
-    const chosen = await openSettings(createClient({ base: location.origin }), want);
+    const chosen = await openSettings(createClient({ base: location.origin }), want, !page.data.live);
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== want) return closed(true, at);
     source = chosen.source;
