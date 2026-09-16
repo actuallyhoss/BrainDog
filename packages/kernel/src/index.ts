@@ -598,7 +598,7 @@ function sortCursor(order: string, values: unknown[]): string {
 function readSortCursor(cursor: string, order: string): Param[] | null {
   try {
     const bin = atob(cursor.slice(SORTED_CURSOR.length).replace(/-/g, '+').replace(/_/g, '/'));
-    const said = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))) as {
+    const said = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))) as {
       o?: unknown;
       k?: unknown;
     };
