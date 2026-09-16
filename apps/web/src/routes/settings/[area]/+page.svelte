@@ -1520,7 +1520,7 @@
                     <ul class="exceptions">
                       {#each p.scoped as ex}
                         <li>
-                          <span class="ex-list">{REGISTERS[ex.register]?.name ?? ex.register}</span>
+                          <span class="ex-list">{lists.find((l) => l.id === ex.register)?.name ?? REGISTERS[ex.register]?.name ?? ex.register}</span>
                           <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone — the
                                same sentence the record level one line up already shows — so you could
                                not see at a glance whether an exception was above or below it, which is
