@@ -28,6 +28,7 @@ import { ok, refused } from '@braindog/ports';
 import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
+import { exponentOf } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
@@ -442,7 +443,9 @@ export function fill(template: string, row: Entry, nowMs = Date.now()): string {
     if (value === null || value === undefined || value === '') return '—';
 
     if (kind === 'money' || (!kind && isMoney(value)))
-      return isMoney(value) ? `${value.currency} ${(value.amount / 100).toFixed(2)}` : String(value);
+      /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
+         was written `JPY 1299.00` and KWD 1.500 was `KWD 15.00`, into patches, notes and questions. */
+      return isMoney(value) ? `${value.currency} ${(value.amount / 10 ** exponentOf(value.currency)).toFixed(exponentOf(value.currency))}` : String(value);
     if (kind === 'quantity' && isQuantity(value)) return `${value.value} ${value.unit}`;
     if (kind === 'until' || kind === 'ago') {
       const at = Date.parse(`${String(value).slice(0, 10)}T12:00:00Z`);

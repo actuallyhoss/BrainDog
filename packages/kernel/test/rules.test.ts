@@ -1044,3 +1044,8 @@ test('AND A SPAN THIS RECORD CANNOT READ DOES NOT INSTALL', async () => {
   assert.match((out as { refusal: { fix: string } }).refusal.fix, /write 14d/);
   sql.close();
 });
+
+test('a rule writes an amount in its currency\'s own decimals', () => {
+  const row = { id: 'e_1', register: 'bills', seq: 1, fields: { yen: { amount: 129_900, currency: 'JPY' }, dinar: { amount: 1_500, currency: 'KWD' }, pounds: { amount: 129_900, currency: 'GBP' } } } as unknown as Entry;
+  assert.equal(fillTemplate('{{money:yen}} {{dinar}} {{pounds}}', row), 'JPY 129900 KWD 1.500 GBP 1299.00');
+});
