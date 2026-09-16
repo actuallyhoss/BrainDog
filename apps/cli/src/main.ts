@@ -24,6 +24,7 @@ import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { installInto, profilesOf } from './install.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
+import { page as pageCommand } from './page.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
 import { skills } from './skills.ts';
 import { serveStdio } from './stdio.ts';
@@ -56,6 +57,12 @@ const usage = () =>
     '  Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is deposited, and only its name is recorded.',
     'braindog tools write [--scope user|project] [--dry-run]',
     "  Show the Claude Code entries the record's tools become, and apply one scope only when it is named. No entry holds a key.",
+    'braindog page pull <slug> [--host <host>] [--out <file>]',
+    "  Fetch a page's declaration and write it as <page>.dog: one page, one file, in the source view's dialect.",
+    'braindog page push <file> [--host <host>]',
+    '  Read a .dog file and set it as the page. An owner in the app only — a token is refused, this CLI included.',
+    'braindog page check <file>',
+    '  Validate a .dog file against the authoring grammar, locally. Nothing is sent.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
@@ -156,8 +163,8 @@ async function keysCommand(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog skills|tools`, over the real terminal, and the exit code the command decides. */
-async function agentCommand(which: 'skills' | 'tools', args: string[]): Promise<void> {
+/** `braindog skills|tools|page`, over the real terminal, and the exit code the command decides. */
+async function agentCommand(which: 'skills' | 'tools' | 'page', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -172,7 +179,7 @@ async function agentCommand(which: 'skills' | 'tools', args: string[]): Promise<
     },
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
-  const code = which === 'skills' ? await skills(args, io) : await tools(args, { ...io, cli });
+  const code = which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : await pageCommand(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -245,7 +252,7 @@ try {
   if (command === 'mcp') await mcp(rest);
   else if (command === 'login') await signIn(rest);
   else if (command === 'keys') await keysCommand(rest);
-  else if (command === 'skills' || command === 'tools') await agentCommand(command, rest);
+  else if (command === 'skills' || command === 'tools' || command === 'page') await agentCommand(command, rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@braindog/client": "workspace:*",
+    "@braindog/dog": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/seed": "workspace:*",
     "@braindog/theme": "workspace:*",

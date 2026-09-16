@@ -30,6 +30,12 @@ importers:
       '@braindog/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@braindog/dog':
+        specifier: workspace:*
+        version: link:../../packages/dog
+      '@braindog/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
       '@braindog/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -95,6 +101,9 @@ importers:
       '@braindog/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@braindog/dog':
+        specifier: workspace:*
+        version: link:../../packages/dog
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
@@ -175,6 +184,8 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+
+  packages/dog: {}
 
   packages/host:
     dependencies:

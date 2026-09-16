@@ -8,6 +8,8 @@
   "engines": { "node": ">=24.13" },
   "devDependencies": {
     "@braindog/client": "workspace:*",
+    "@braindog/dog": "workspace:*",
+    "@braindog/kernel": "workspace:*",
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*"
   },

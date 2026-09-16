@@ -89,13 +89,14 @@ devDependency is an edge — a build-time import is an import.
 | 14 | `connect` | 2, 9, 11 *(unbuilt)* |
 | 15 | `host` | 2, 11 — platform-neutral ([ADR-064](16-DECISIONS.md)) |
 | 16 | `client` | 2, 15 — the typed client, and the third way into the route table |
-| 17 | `web` | 1, 4, 5, 7, 10 — `render` and `skin` at build time, `seed` for the demonstration record |
-| 18 | `site` | 5 — the marketing site is the same design system with fewer screens, and imports nothing else |
-| 19 | `cli` | 1, 2, 3, 7, 8, 12, 13, 16. The manifest holds 2, 12 and 16 today: `braindog mcp` runs the MCP core (`12`) over stdio and reaches the record through the typed client (`16`). The others arrive with the commands that need them, and `13` is for `@braindog/spark/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
-| 20 | `worker` | 2, 7, 11, 12, 15. `12` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
-| 21 | `selfhost` | 2, 7, 11, 12, 15, 16. `12` serves `POST /mcp`, as on the Worker. `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
+| 17 | `dog` | — the printed form of a page, and the parser that reads one back. It depends on nothing, so the app that prints a page and the command line that reads one can each hold it without holding the other |
+| 18 | `web` | 1, 4, 5, 7, 10 — `render` and `skin` at build time, `seed` for the demonstration record |
+| 19 | `site` | 5 — the marketing site is the same design system with fewer screens, and imports nothing else |
+| 20 | `cli` | 1, 2, 3, 7, 8, 12, 13, 16. The manifest holds 2, 12 and 16 today: `braindog mcp` runs the MCP core (`12`) over stdio and reaches the record through the typed client (`16`). The others arrive with the commands that need them, and `13` is for `@braindog/spark/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
+| 21 | `worker` | 2, 7, 11, 12, 15. `12` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
+| 22 | `selfhost` | 2, 7, 11, 12, 15, 16. `12` serves `POST /mcp`, as on the Worker. `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
 
-**Sixteen workspaces in the tree today, twenty-one at platform.** The
+**Eighteen workspaces in the tree today, twenty-two at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had
 no `spark` package, then no `connect` row and no `host`; and it placed `mcp` below `record`, which
 put the wrapper under the thing it wraps — iteration 2 swapped them, [ADR-064](16-DECISIONS.md).)*
