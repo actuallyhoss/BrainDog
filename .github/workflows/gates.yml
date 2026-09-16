@@ -124,7 +124,12 @@ jobs:
 
       # ALL NINETEEN. No `--only`, no `--except`, no `--allow-skip`: this is the job that has every
       # prerequisite, so a skip here is a fact about the build above and is correctly red.
-      - run: pnpm gates
+      # `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference between "this job
+      # does not ask" and "this job asks and accepts one answer". 52 §5 writes it this way on
+      # purpose: the gate still runs here, still prints the sentence naming what it lacks, and is
+      # still red if it fails for any reason other than having no live host to measure. Excluding it
+      # would also hide the day it stops being able to run at all.
+      - run: pnpm gates -- --allow-skip deploy-parity
 
       # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log` — the per-route, per-scheme detail
       # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an

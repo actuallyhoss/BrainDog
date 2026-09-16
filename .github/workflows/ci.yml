@@ -78,7 +78,9 @@ jobs:
       # NEEDS `--except`, which `run.mjs` does not have on master. The patch is beside this file at
       # `tools/gates/run.mjs`; without it this step runs all nineteen gates, reports five skips, and
       # is red under CI.
-      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y
+      # `deploy-parity` joins the excluded list for a different reason than the other five: they
+      # need a build this job does not do, and it needs a LIVE HOST, which only `deploy.yml` has.
+      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,deploy-parity
 
   build:
     # A SECOND JOB RATHER THAN FIVE MORE STEPS, because it answers a different question and can

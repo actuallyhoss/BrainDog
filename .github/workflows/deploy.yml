@@ -1,0 +1,93 @@
+name: deploy
+
+# 52 §2's `deploy.yml`, which the corpus has specified since the operations spec was written and
+# which did not exist until now. `53 §5.2` reads "from `deploy.yml`, never by hand for a forward
+# deploy", and every deploy to date has been by hand — so the procedure that was written down was
+# not the procedure being followed, which is the failure mode a written procedure exists to prevent.
+#
+# IT RUNS OFF `ci`'s COMPLETION RATHER THAN OFF THE PUSH. `workflow_run` is the only trigger that
+# can say "master is green, now deploy it": a `push` trigger races the checks it is supposed to
+# wait for. The guard below is the other half of that — `workflow_run` fires on failure too.
+#
+# WHAT IT DOES NOT WAIT FOR IS `gates`, AND THAT IS A DECISION. `gates` is nineteen minutes of
+# browser work; `ci` is five. Blocking the deploy on both means master sits undeployed for twenty
+# minutes after every commit, and the two gates that take the time — `layout` and `a11y` — measure
+# rendering rather than correctness. A contrast regression reaching production for the length of
+# one fix is the cheaper of the two prices, and it is the same trade `gates.yml` already argues for
+# at the top of its own file. `deploy-parity` at step 6 is what actually guards this deploy.
+#
+# ONE AT A TIME, AND NEVER CANCELLED. `cancel-in-progress: true` on a deploy is a `wrangler deploy`
+# killed between uploading a version and activating it. The queue is the correct behaviour here
+# even though it is the wrong behaviour for `ci`.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # `workflow_run` FIRES ON FAILURE, CANCELLATION AND TIMEOUT TOO, so without this the workflow
+    # that exists to deploy green masters deploys every master.
+    if: github.event.workflow_run.conclusion == 'success'
+
+    # THE ENVIRONMENT IS WHERE THE TOKEN LIVES, and naming it here is what scopes the secret to
+    # this job rather than to the repository. It is also the place a required reviewer goes if this
+    # ever needs to stop being automatic.
+    environment: production
+
+    # Pinned for the reason `ci.yml` gives: `ubuntu-latest` rolls silently, and a deploy is the
+    # worst place to learn that the image changed.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      # AT THE COMMIT `ci` MEASURED, not at the head of master. Between `ci` starting and this
+      # running, master may have moved; deploying the head would ship a commit nothing has checked
+      # and attribute the result to the one that was.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: ./.github/actions/setup
+
+      # THE BUILD TUPLE IS THE WHOLE POINT OF STEP 6. `33 §407` has `/api/version` answer an `app`
+      # field, and `deploy-parity` compares it against this exact string — so the build and the
+      # check have to be given the same value, which is why it is computed once here and read from
+      # the environment twice below rather than recomputed.
+      - name: The build id this deploy is
+        run: echo "BRAINDOG_BUILD=$(date -u +%Y.%m.%d)+$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build the shell
+        run: pnpm --filter ./apps/web build
+
+      # `51`'s `assets` CARRIES `apps/web/build` INTO THE WORKER VERSION, so this one command ships
+      # the shell and the code as one thing. That is what lets step 6 compare a live byte against a
+      # local one and mean it: two deploys could differ for a minute and the gate would be
+      # measuring a race.
+      #
+      # `--env production` BECAUSE `apps/worker/wrangler.jsonc` SPLITS `alpha` AND `production`.
+      # 52 §96 writes this step as a bare `wrangler deploy`, which predates that split; a bare
+      # deploy against a file with named environments does not deploy either of them.
+      - name: Deploy
+        run: pnpm --filter ./apps/worker exec wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      # AND THEN ASK THE INTERNET WHETHER ANY OF THAT LANDED. `wrangler deploy` exits 0 while the
+      # host serves the previous version's assets; 51 §5.17 records three occasions. No
+      # `--allow-skip` here: this is the one job where the gate skipping means the deploy went
+      # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
+      - name: Parity
+        run: pnpm gates -- --only deploy-parity
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}

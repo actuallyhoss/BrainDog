@@ -116,6 +116,12 @@ const GATES = [
   // Last two because they are the slow ones: a real browser over every route.
   ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
+  /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
+     (52 §3; 51 §5.17). The twenty-four above ask whether the tree is right; this asks whether the
+     tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
+     ask — so everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
+     reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
+  ['deploy-parity', ['node', [join(here, 'deploy-parity.mjs')]]],
 ];
 
 /**
