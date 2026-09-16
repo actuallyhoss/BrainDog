@@ -1064,6 +1064,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }));
   };
 
+  /**
+   * A suggestion with its question, which is its `suggest` event rather than a column.
+   *
+   * WITHOUT IT A QUEUE IS A LIST OF BODIES NOBODY CAN READ: `governance` answered each open suggestion
+   * with its options and not what they were options for, so an agent reading the queue saw "Block it"
+   * and "Keep it open" and had to go to `context` to learn what was being asked.
+   */
+  const asked = <T>(register: string, row: T): T =>
+    register === 'suggestion' && row !== null && typeof row === 'object' && typeof (row as { id?: unknown }).id === 'string'
+      ? ({ ...row, question: kernel.question((row as unknown as { id: string }).id) ?? '' } as T)
+      : row;
+
   /** Whether the caller reads the record as a whole, rather than the registers they were invited to. */
   const wholeRecord = (ctx: CallContext): boolean =>
     ctx.principal.kind === 'system' ||
@@ -2016,7 +2028,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            and the ids are sequential — `SG1`, `SG2` — so one extra query parameter walked the whole
            queue. A row you may not see does not exist, which is the same answer a missing id gets. */
         const row = kernel.governanceRow(register, String(args.id));
-        return ok(row && holds(ctx, row) ? null : row);
+        return ok(row && holds(ctx, row) ? null : asked(register, row));
       }
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
@@ -2031,13 +2043,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          that register, `boot` hides it, and the digest was taught the same lesson one commit
          earlier; the gate is the last read that had not been. */
       const kept = rows.value.filter((r) => !holds(ctx, r));
-      if (kept.length === rows.value.length) return ok(kept);
+      if (kept.length === rows.value.length) return ok(kept.map((r) => asked(register, r)));
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
       const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true });
       if (!every.ok) return every;
-      return ok(every.value.filter((r) => !holds(ctx, r)).slice(0, rows.value.length));
+      return ok(every.value.filter((r) => !holds(ctx, r)).slice(0, rows.value.length).map((r) => asked(register, r)));
     },
 
     /**
@@ -2072,6 +2084,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'decide');
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which suggestion?', { at: 'id' });
+      /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
+         resolve branch and was refused "undefined is not a way to resolve one". */
+      if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
+        return no(
+          'REQUIRED_MISSING',
+          'Say what to do with it: decide with an option and a reason, defer with a date and why, or resolved_as wont-fix or incorrect with a reason.',
+          { at: 'decide' },
+        );
 
       const verdict = (
         args.decide ? { decide: args.decide } : args.defer ? { defer: args.defer } : { resolved_as: args.resolved_as, reason: args.reason }

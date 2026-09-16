@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REFUSAL_CODES } from '@braindog/ports';
+import { REFUSAL_CODES, codeOf } from '@braindog/ports';
 
 import { allows, createRecordApi, reaches, type CallContext, type Level, type Scope } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -459,6 +459,25 @@ test('AN AGENT MAY ASK AND MAY NOT ANSWER, and that is not a scope anybody can b
   const done = await api.decide({ id, decide: { option: 'accept', reason: 'both are ours' } }, person('decide'));
   assert.ok(done.ok, done.ok ? '' : (done as { refusal: { fix: string } }).refusal.fix);
   assert.equal(api.kernel.count('obligations'), 1);
+  sql.close();
+});
+
+test('THE QUEUE SAYS WHAT EACH SUGGESTION ASKS, and an answer with no verdict says which verdicts there are', async () => {
+  const { api, sql } = await record();
+  const made = await api.propose(PROPOSAL, token('propose'));
+  const id = (made as { value: { id: string } }).value.id;
+
+  const open = value<{ id: string; question: string }[]>(await api.governance({}, token('read')));
+  assert.equal(open.find((r) => r.id === id)?.question, PROPOSAL.question);
+  assert.equal(value<{ question: string }>(await api.governance({ id }, owner)).question, PROPOSAL.question);
+
+  const empty = await api.decide({ id } as never, owner);
+  assert.equal(codeOf(empty), 'REQUIRED_MISSING');
+  const fix = (empty as { refusal: { fix: string } }).refusal.fix;
+  assert.doesNotMatch(fix, /undefined/);
+  assert.match(fix, /decide/);
+  assert.match(fix, /defer/);
+  assert.match(fix, /resolved_as/);
   sql.close();
 });
 
