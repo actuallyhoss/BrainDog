@@ -1346,8 +1346,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             allowed: addressable(schema),
           });
         const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
-        parts.push(`${fieldSqlIn(schema, o.field)} ${dir}`);
-        keys.push({ expr: fieldSqlIn(schema, o.field), asc: dir === 'ASC' });
+        /* AN ENUM WITH LABELS SORTS BY THE LABEL, which is what the column shows: `owed_by_me` is Money out,
+           and ordered by the stored word it came before Money in. The browser's list sorts the same way. */
+        const labels = Object.hasOwn(schema.fields, o.field) ? schema.fields[o.field]?.labels : undefined;
+        const quote = (v: string) => `'${v.replaceAll("'", "''")}'`;
+        const expr = labels && Object.keys(labels).length
+          ? `(CASE ${fieldSqlIn(schema, o.field)} ${Object.entries(labels).map(([v, l]) => `WHEN ${quote(v)} THEN ${quote(l)}`).join(' ')} ELSE ${fieldSqlIn(schema, o.field)} END)`
+          : fieldSqlIn(schema, o.field);
+        parts.push(`${expr} ${dir}`);
+        keys.push({ expr, asc: dir === 'ASC' });
       }
       keys.push({ expr: 'id', asc: false });
 

@@ -61,3 +61,24 @@ test('A LABEL THAT READS AS ANOTHER VALUE IS REFUSED, because a filter saying it
   const blank = await k.install([money({ owed_to_me: '  ' })]);
   assert.equal(blank.ok, false);
 });
+
+test('A LABELLED ENUM SORTS BY THE LABEL THE COLUMN SHOWS, and pages the same way', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok((await k.install([money(LABELS)])).ok);
+  for (const [what, direction] of [['Rent', 'owed_by_me'], ['Invoice', 'owed_to_me'], ['Tax', 'owed_by_me'], ['Retainer', 'owed_to_me']] as const)
+    assert.ok(k.create('money', { what, direction }, OWNER).ok);
+  const order = (dir: 'asc' | 'desc') => {
+    const out = k.list({ register: 'money', order: [{ field: 'direction', dir }], limit: 10 });
+    assert.ok(out.ok, JSON.stringify(out));
+    return out.value.rows.map((r) => r.fields.direction);
+  };
+  assert.deepEqual(order('asc'), ['owed_to_me', 'owed_to_me', 'owed_by_me', 'owed_by_me'], 'Money in comes before Money out');
+  assert.deepEqual(order('desc'), ['owed_by_me', 'owed_by_me', 'owed_to_me', 'owed_to_me']);
+
+  /* PAGED TWO AT A TIME, the cursor compares the label too, so no row is lost or repeated. */
+  const first = k.list({ register: 'money', order: [{ field: 'direction', dir: 'asc' }], limit: 2 });
+  assert.ok(first.ok && first.value.cursor);
+  const second = k.list({ register: 'money', order: [{ field: 'direction', dir: 'asc' }], limit: 2, cursor: first.value.cursor! });
+  assert.ok(second.ok, JSON.stringify(second));
+  assert.deepEqual([...first.value.rows, ...second.value.rows].map((r) => r.fields.what).sort(), ['Invoice', 'Rent', 'Retainer', 'Tax']);
+});
