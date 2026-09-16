@@ -226,7 +226,9 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       for (const { day, at } of recurs.of) {
         /* CLAMPED TO TODAY, not dropped. The walk stays in order and a balance that is already gone
            is gone at the top of it; the label says which rows those are. */
-        const late = at < deps.ctx.nowMs;
+        /* BY THE DAY, NOT BY NOON UTC. `at < now` made a bill due today overdue from 12:00 UTC, while
+           `due before today` on the same record still excluded it: two answers about one row. */
+        const late = day < iso(deps.ctx.nowMs);
         movements.push({
           at: late ? deps.ctx.nowMs : at,
           step: {

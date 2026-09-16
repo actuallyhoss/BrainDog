@@ -386,3 +386,16 @@ test('A RECURRING ROW DOES NOT CHARGE ITS PAST CYCLES AGAIN TODAY, because they 
   assert.equal(walk.crossed, null);
   sql.close();
 });
+
+test('A BILL DUE TODAY IS NOT OVERDUE IN THE AFTERNOON', async () => {
+  /* `late` compared noon UTC on the due day with the clock, so a bill due today read overdue from
+     12:00 UTC while `due before today` still excluded it. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(Date.UTC(2026, 8, 16, 15)));
+  assert.ok((await k.install([OBLIGATIONS, SERVICES])).ok);
+  assert.ok(k.create('obligations', { what: 'Rent', direction: 'owed_by_me', amount: gbp(100_000), due: '2026-09-16', state: 'open' }, { actor: 'p_1' }).ok);
+  const walk = value<Runway>(k.runway(500_000, [LEGS[0]!], 30));
+  assert.equal(walk.steps[0]?.label, 'Rent');
+  assert.equal(walk.steps[0]?.day, '2026-09-16');
+  sql.close();
+});

@@ -260,7 +260,9 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
         /* AN OVERDUE MOVEMENT IS STILL A MOVEMENT, clamped to today rather than dropped: the walk
            stays in order, a balance that is already gone is gone at the top of it, and the label
            says which rows those are. Dropping them read 116 days where the truth was 93. */
-        const late = r.at < NOW;
+        /* BY THE DAY, as the kernel: noon UTC against the clock made a bill due today overdue in the
+           afternoon, while `due before today` still excluded it. */
+        const late = r.day < iso(NOW);
         movements.push({
           at: late ? NOW : r.at,
           step: {

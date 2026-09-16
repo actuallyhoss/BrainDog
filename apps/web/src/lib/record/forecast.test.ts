@@ -440,3 +440,19 @@ test('A RECURRING ROW DOES NOT CHARGE ITS PAST CYCLES AGAIN TODAY, because they 
     assert.ok(own.length > 0 && own.length <= 3, `${row.fields.name} charged ${own.length} times in 60 days`);
   }
 });
+
+test('A BILL DUE TODAY IS NOT OVERDUE, whatever the hour', () => {
+  /* `late` compared noon UTC on the due day with the clock, so a bill due today read overdue from
+     12:00 UTC while `due before today` still excluded it. */
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const rows = ROWS.obligations!;
+  const row = { ...rows[0]!, seq: 9_999, fields: { ...rows[0]!.fields, what: 'Due today', due: today, state: 'open' } };
+  rows.push(row);
+  try {
+    const leg: Leg = { register: 'obligations', on: 'due', amount: 'amount', where: 'state is open' };
+    const mine = runway(0, [leg], 30).steps.find((s) => s.href === '/r/obligations/9999');
+    assert.equal(mine?.label, 'Due today');
+  } finally {
+    rows.pop();
+  }
+});
