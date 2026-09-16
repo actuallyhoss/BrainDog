@@ -2408,7 +2408,7 @@
             {#if column.field === 'select'}
               <button
                 type="button"
-                class="pick"
+                class="pick tap"
                 tabindex="-1"
                 data-on={selected.has(seq) ? '' : undefined}
                 aria-label="{selected.has(seq) ? copy.deselect : copy.select} {display(id, decl.title, rowAt(seq)?.fields[decl.title]) ?? `#${seq}`}"
@@ -2522,7 +2522,7 @@
                 <span class="verbs">
                   <button
                     type="button"
-                    class="verb icon"
+                    class="verb icon tap"
                     tabindex="-1"
                     aria-label={copy.archiveRow(name)}
                     onmousedown={(e) => e.preventDefault()}
@@ -2532,7 +2532,7 @@
                     }}><Icon name="archive" size="s" /></button>
                   <button
                     type="button"
-                    class="verb icon"
+                    class="verb icon tap"
                     tabindex="-1"
                     aria-label={copy.moreOn(name)}
                     onclick={(e) => {
@@ -3382,6 +3382,17 @@
   .cell-pen:focus-visible {
     color: var(--ink);
     opacity: 1;
+  }
+
+  /* A 44px HIT BOX UNDER A THUMB, ONLY ONCE THE PENCIL IS SHOWING. Measured at 768 on a tablet it
+     was 12px wide. Always on, the box would lie invisibly over the cell's words and turn a tap on
+     the row into an edit, so it arrives with the pencil: when the cell holds focus. */
+  @media (pointer: coarse) {
+    :global(.td):focus-within .cell-pen::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
   }
 
   /**

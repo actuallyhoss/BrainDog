@@ -1641,6 +1641,14 @@
     overflow: auto;
   }
 
+  /* AND NEVER UNDER 44 UNDER A THUMB. A tablet at 768 draws the table, not the cards, and measured
+     40px rows: a row is the target that opens the row. Density still moves it above the floor. */
+  @media (pointer: coarse) {
+    .table-region {
+      --tr-h: max(var(--table-row-h), var(--tap));
+    }
+  }
+
   .table {
     min-inline-size: 100%;
     font-size: var(--t-ui);

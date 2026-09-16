@@ -173,7 +173,10 @@
     /* One gutter for the head and the content under it (DESIGN-SYSTEM 3.1), so a title and its
        list share a left edge. It was 24 here and 32 on every page. */
     padding: var(--sp-5) var(--gutter) var(--sp-3);
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    /* 92, NOT 82. At 82 the words scrolling under a phone's two-line head read through it between
+       the buttons ("system" under Edit the row), which is noise, not depth. The blur still softens
+       what passes under. */
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter: blur(12px);
     /* Transparent rather than absent, so the head does not grow a pixel when the rule appears. */
     border-block-end: 1px solid transparent;

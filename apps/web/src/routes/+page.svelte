@@ -158,7 +158,7 @@
       <!-- NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE: a count of nothing, as a link to a page
            whose empty state is the same answer, is noise. `/decide` stays in the rail and on `g d`. -->
       {#if data.open > 0}
-        <a class="to-decide" href="/decide">
+        <a class="to-decide tap" href="/decide">
           <span class="to-decide-n num">{data.open}</span>
           <span>{copy.toDecide}</span>
         </a>
