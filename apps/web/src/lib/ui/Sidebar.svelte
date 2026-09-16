@@ -909,7 +909,7 @@
      sections in plain words and lets weight and space do the separating, and so does this. */
   .section {
     margin: var(--sp-4) 0 var(--sp-1);
-    color: var(--faint);
+    color: var(--dim);
     font-family: var(--font-ui);
     font-size: var(--t-xs);
     font-weight: 500;
@@ -978,7 +978,7 @@
   }
 
   .item :global(.icon) {
-    color: var(--faint);
+    color: var(--dim);
     transition: color var(--d-state) var(--ease-out);
   }
 
@@ -1111,7 +1111,7 @@
     place-items: center;
     min-block-size: var(--ctl-h);
     border-radius: var(--r-sm);
-    color: var(--faint);
+    color: var(--dim);
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
