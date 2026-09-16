@@ -246,7 +246,7 @@ test('EVERY block counts what it is showing, in the unit its total is in', () =>
 });
 
 test('and the walk counts steps, not the opening balance beside them', () => {
-  const walk = (page('money')?.blocks ?? []).find((b) => b.source === 'forecast.runway');
+  const walk = (page('money')?.blocks ?? []).find((b) => b.source === 'forecast.runway' && b.kind === 'table');
   assert.ok(walk, 'the money page no longer draws a cash walk, so this proves nothing');
   /* The opening row is drawn and is not a step: `rows` is one longer than `shown`, deliberately. */
   assert.equal(walk.rows.length, walk.shown + 1, 'the walk lost its opening row, or started counting it');

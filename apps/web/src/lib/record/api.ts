@@ -1216,7 +1216,7 @@ export function values(): Record<string, string> {
     'obligations.count': String((ROWS.obligations ?? []).length),
     'services.count': String((ROWS.services ?? []).length),
     ...Object.fromEntries(
-      ['owed-to-you', 'due-30d', 'overdue', 'renews-30d', 'estate-year', 'lapsing'].map((id) => [id, metric(id).value]),
+      ['owed-to-you', 'due-30d', 'overdue', 'late-in', 'renews-30d', 'estate-year', 'lapsing'].map((id) => [id, metric(id).value]),
     ),
   };
 }
@@ -1608,7 +1608,8 @@ function runwayBlock(b: PageBlock): BlockResult {
     matched: [],
     refusals,
     ...(refusals.length ? {} : { walk }),
-    ...walkTable(walk, b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
+    /* A BRIDGE ADDS UP THE WHOLE WALK, so it shows every movement it read rather than a slice of them. */
+    ...walkTable(walk, b.kind === 'bridge' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
     drawn: b.drawn ?? drawnWhen(b),
     stale_at: new Date(NOW).toISOString(),
     metrics: undefined,

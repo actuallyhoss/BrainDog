@@ -426,7 +426,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         tone: 'warn',
         heading: 'Late to you',
         span: 12,
-        body: 'Money you are owed has gone past its date. The oldest is {{ago:obligations.oldest_overdue}}.',
+        body: 'Money you are owed has gone past its date: {{late-in}} in all.',
         when: { metric: 'late-in', gt: 0 },
       },
       {
@@ -434,7 +434,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         tone: 'bad',
         heading: 'Late to pay',
         span: 12,
-        body: 'Something you owe went past its terms {{ago:obligations.oldest_unpaid}}. Statutory interest may be due; the terms are in the contract.',
+        body: 'Money you owe has gone past its date: {{overdue}} in all. Statutory interest may be due; the terms are in the contract.',
         when: { metric: 'overdue', gt: 0 },
       },
       {

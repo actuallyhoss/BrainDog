@@ -118,8 +118,8 @@ function bridgeRows(block: BlockResult): string[] {
   const end = walk.steps.at(-1)?.balance ?? walk.from;
   return [
     `${escapeCell(copy.bridgeStart)} | ${money(walk.from, currency)} | `,
-    `${escapeCell(copy.bridgeIn)} | ${money(sum(ins), currency)} | ${escapeCell(copy.bridgeCount(ins.length))}`,
-    `${escapeCell(copy.bridgeOut)} | ${money(sum(outs), currency)} | ${escapeCell(copy.bridgeCount(outs.length))}`,
+    `${escapeCell(copy.bridgeIn)} | ${money(sum(ins), currency)} | `,
+    `${escapeCell(copy.bridgeOut)} | ${money(sum(outs), currency)} | `,
     `${escapeCell(copy.bridgeEnd(block.horizon ?? 180))} | ${money(end, currency)} | `,
   ];
 }

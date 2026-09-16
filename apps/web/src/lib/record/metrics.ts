@@ -157,7 +157,9 @@ function operand(e: Entry, op: Operand): number | null {
   const [field, { lookup, by }] = op.product;
   const base = operand(e, field);
   const factor = LOOKUPS[lookup]?.[String(e.fields[by] ?? '')];
-  return base === null || factor === undefined ? null : base * factor;
+  /* ROUNDED PER ROW, as the record rounds it: minor units are integers, and a third of a penny per row
+     summed in one engine and rounded in the other put the two a penny apart on one tile. */
+  return base === null || factor === undefined ? null : Math.round(base * factor);
 }
 
 /**

@@ -760,3 +760,9 @@ test('A SUM, AVERAGE, MINIMUM OR MAXIMUM OF A DAY OR A WORD IS REFUSED, as the r
   for (const value of [{ count: day }, { distinct: word }, { sum: number }, { min: number }] as MetricDecl['value'][])
     assert.deepEqual(read({ ...METRICS.overdue!, value }).refusals, [], JSON.stringify(value));
 });
+
+test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, so the two engines agree to the penny', () => {
+  /* `every-month-out` takes a third of a quarterly bill and a twelfth of a yearly one. Summed then
+     rounded it read £10,416.17 here and £10,416.16 on a record. */
+  assert.equal(metric('every-month-out').value, 'GBP 10,416.16');
+});

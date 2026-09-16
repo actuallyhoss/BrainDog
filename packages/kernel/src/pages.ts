@@ -202,6 +202,16 @@ export type PageDeps = {
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
 const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions']);
 
+/**
+ * The kinds that add their rows up, whose `limit:` cuts the GROUPS they draw and never the rows they read.
+ *
+ * A sum over the first six rows is a wrong number rather than a short list, and the app will not draw
+ * a reducing block that was handed less than the whole answer. So these read as many rows as a list
+ * read hands back at once, and a register past that says it cannot be drawn rather than adding up part.
+ */
+const REDUCES = new Set(['bar', 'chips', 'gauge', 'split']);
+const READ_WHOLE = 200;
+
 /** The register `sessions.live` reads, whose fields its `where` and columns name. */
 const SESSION = 'session';
 
@@ -512,7 +522,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
      a block declaring it wanted no rows and getting one is a block nobody can write. */
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  const limit = REDUCES.has(block.kind) ? READ_WHOLE : block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
   /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
      sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in

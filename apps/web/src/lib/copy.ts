@@ -579,7 +579,6 @@ export const copy = {
   bridgeIn: 'Coming in',
   bridgeOut: 'Going out',
   bridgeEnd: (days: number) => `In ${days} days`,
-  bridgeCount: (n: number) => (n === 1 ? '1 payment' : `${n} payments`),
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
   aboutTheSame: 'about the same',
   /* THE FIVE STATES, ON THE FOUR SCREENS THAT COULD NOT DRAW ANY OF THEM. `grep -c "<Empty"` was

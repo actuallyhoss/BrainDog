@@ -18,7 +18,8 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { NOW, REGISTERS, heldBy, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
+  import { NOW, REGISTERS, heldBy, homeCurrency, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
+  import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
@@ -128,8 +129,10 @@
       ),
       { intent: 'warn' },
     );
+  /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
+  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency()));
   const optsFor = (block: LiveBlock) => ({
-    resolve: live ? resolverOf(block.values) : (path: string) => sampleValues[path] ?? null,
+    resolve: live ? (path: string) => said(resolverOf(block.values)(path)) : (path: string) => said(sampleValues[path] ?? null),
     now: live ? live.now : NOW,
     ...(live ? {} : { hole: pressHole }),
   });
@@ -1175,6 +1178,15 @@
     .block-slot :global(.grid:has(> .cell) .cell-figure) {
       font-size: var(--t-lg);
       white-space: nowrap;
+    }
+
+    /* THE LEAD FIGURE STAYS THE SCREEN'S HERO on a phone, a step above the figures beside it. */
+    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child) {
+      grid-column: 1 / -1;
+    }
+
+    .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child .cell-figure) {
+      font-size: var(--t-2xl);
     }
   }
 </style>
