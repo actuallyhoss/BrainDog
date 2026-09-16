@@ -324,6 +324,15 @@ export const copy = {
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   markNotWritten: 'Not saved',
+  /* AND THE SAME FACT, WHEREVER YOU ARE STANDING. A row typed on the first run and left behind is
+     unwritten, and the only screen that said so was the list it belongs to, which is the one screen
+     the person has already walked away from. The shell says how many there are and where they are.
+
+     IT IS GONE AT ZERO, and that is the honest part: a nought drawn here would be the shell
+     reporting on a thing that has not happened. */
+  unsavedRows: (n: number) => (n === 1 ? 'One row you typed has not been saved.' : `${n} rows you typed have not been saved.`),
+  unsavedRowsWhy:
+    'Each one is at the top of the list it was typed into, marked Not saved, and it lasts until this tab is closed or reloaded.',
   markNeeds: (fields: string) => `Needs ${fields}`,
   undoRow: 'Put back',
   /* WHAT A ROW IS CALLED WHEN IT HAS NO NAME YET. `undoRowOf` puts the row's title in the control's

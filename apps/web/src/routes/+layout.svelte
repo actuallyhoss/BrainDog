@@ -45,6 +45,11 @@
   import TopBar from '$lib/ui/TopBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  /* `pending-held` AND NOT `pending`, AND THE DIFFERENCE IS 27 KB. `pending.svelte.ts` stamps a row
+     with the sample's clock, so importing it here would put the whole synthetic record in the
+     shell's chunk, which is the thing the comment above and `+layout.ts` both refuse to do. The rows
+     and the count live in a file that imports types and nothing else. */
+  import { anyPending } from '$lib/record/pending-held.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette reads the whole sample record to rank what it lists, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
@@ -185,6 +190,11 @@
     sampleSaid = true;
     pref.write({ sampleSaid: true });
   }
+
+  /* HOW MANY ROWS ARE WAITING, ANYWHERE. A row typed on the first run and left behind was known only
+     to the list it belongs to, which is the one screen the person is no longer on. This is the read
+     that makes it true from every other one, and it tracks because the rows are in a `SvelteMap`. */
+  const unsaved = $derived(anyPending());
 
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
@@ -381,6 +391,18 @@
             <a class="sample-go" href="/start">{copy.sampleStart}</a>
             <button type="button" class="sample-away" onclick={putSampleAway}>{copy.samplePutAway}</button>
           </span>
+        </aside>
+      {/if}
+      <!-- AND WHAT IS WAITING, WHEREVER YOU ARE. It sits under the sample bar rather than above it
+           because that bar is read once and dismissed, and this is a fact about the last thing the
+           person did. It is a note and never an alarm: no intent colour, no control, and nothing is
+           broken. Only the one screen it belongs to can put it right, and it says which. -->
+      {#if unsaved > 0}
+        <aside class="unsaved" role="note">
+          <p class="unsaved-said">
+            <strong>{copy.unsavedRows(unsaved)}</strong>
+            <span class="unsaved-why">{copy.unsavedRowsWhy}</span>
+          </p>
         </aside>
       {/if}
       {@render children()}
@@ -651,6 +673,34 @@
     align-items: center;
   }
 
+  /* THE SAME TREATMENT THE REGISTER SCREEN GIVES WHAT THE RECORD NOTICED: a line, not a wash, and no
+     intent colour. The day a standing note looks like an error is the day it is dismissed unread,
+     and this one stands on every screen for as long as the rows are unwritten. */
+  .unsaved {
+    margin: var(--sp-4) var(--sp-6) 0;
+    padding: var(--sp-2) var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .unsaved-said {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.55;
+  }
+
+  .unsaved-said strong {
+    color: var(--ink);
+  }
+
+  @media (width < 640px) {
+    .unsaved {
+      margin: var(--sp-3) var(--sp-4) 0;
+      padding: var(--sp-2) var(--sp-3);
+    }
+  }
+
   /* `--ctl-h`, WHICH IS 44 ON A COARSE POINTER AND 32 ON A FINE ONE. `05 §6` and `13 §7`: density
      follows the POINTER and never the width. These were `padding` alone and measured 122x38 and
      102x36 on a phone, on every screen in the product at once, which is the only reason the number
@@ -882,7 +932,8 @@
 
     /* The sample bar is the first thing at the top of a phone, which is where that button floats,
        so it ends before it, as the page head already does. */
-    .sample {
+    .sample,
+    .unsaved {
       margin-inline-end: calc(var(--sp-3) + 40px + var(--sp-2));
     }
   }
