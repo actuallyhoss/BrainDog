@@ -76,9 +76,12 @@
     <Empty kind="no-data-yet" heading title={words.noLedger} />
   </div>
 {:else if from === 'ready' && view}
-  <PageHead icon="observe" kicker={words.usageFor(monthWords(view.month))} title={words.usage} />
+  <!-- THE MONTH NAMES THE FIRST SECTION, NOT THE HEAD. Above the title it read as the page's parent,
+       which is what that line means on every other screen, and the section under it said "This
+       month" without saying which. -->
+  <PageHead icon="observe" title={words.usage} />
   <div class="page">
-    <Section title={words.total}>
+    <Section title={words.usageFor(monthWords(view.month))}>
       {#each view.records as r (r.name)}
         <div class="usage-record">
           {#if view.records.length > 1}<p class="usage-name">{r.name}</p>{/if}

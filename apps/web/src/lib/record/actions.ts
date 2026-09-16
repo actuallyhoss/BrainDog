@@ -186,7 +186,6 @@ export const words = {
   byAction: 'By action',
   overTime: 'Runs by week',
   records: 'Records',
-  total: 'This month',
   requests: 'requests',
   failures: (n: number) => (n === 1 ? '1 failure' : `${n.toLocaleString('en-GB')} failures`),
   noUsage: 'Nothing has run this month.',
