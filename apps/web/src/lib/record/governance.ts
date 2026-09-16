@@ -105,40 +105,38 @@ export function decisionOf(row: Row, settled?: Row): Question {
 /**
  * Which suggestion each decision settled, by decision id.
  *
- * THE RECORD DOES NOT SAY. A decision row keeps the question's words and the option's id, and a
- * suggestion row keeps neither its question nor its decision, so the pair is read from what both do
- * keep: a suggestion no longer open, opened before the decision, that offers the option it recorded.
- * Oldest decision first, each suggestion taken once, and a suggestion named as the question or an
- * `options` body naming that option before an accept or a reject, which any proposal offers.
+ * THE RECORD SAYS, AND THIS READS IT. A decision row names the suggestion it settled (`suggestion`) and a
+ * suggestion names the decision that settled it (`decision`), from the two events `decide` writes together.
+ * This used to pair them by the option offered and the order they were opened, which two questions worded
+ * alike and answered in the same instant defeat. A decision that names none, or names one this screen did
+ * not read, has no suggestion here, and its option is drawn by its id.
  */
 export function pairs(decisions: readonly Row[], suggestions: readonly Row[]): Map<string, Row> {
+  const byId = new Map(suggestions.map((s) => [String(s.id), s]));
   const out = new Map<string, Row>();
-  const taken = new Set<string>();
-  const by = (key: string) => (a: Row, b: Row) => (text(a[key]) < text(b[key]) ? -1 : text(a[key]) > text(b[key]) ? 1 : 0);
-  /* The record lists newest first, so reversed, a tie on the instant keeps the order they were filed in. */
-  const settled = [...suggestions].reverse().filter((s) => s.status !== 'open').sort(by('opened_at'));
-  for (const d of [...decisions].reverse().sort(by('ts'))) {
-    const answer = text(d.answer);
-    const fits = settled.filter(
-      (s) => !taken.has(String(s.id)) && text(s.opened_at) <= text(d.ts) && questionOf(s, undefined, 0).options.some((o) => o.key === answer),
-    );
-    const s = fits.find((f) => String(f.id) === text(d.question)) ?? fits.find((f) => f.body_kind === 'options') ?? fits[0];
-    if (!s) continue;
-    taken.add(String(s.id));
-    out.set(String(d.id), s);
+  for (const d of decisions) {
+    const s = typeof d.suggestion === 'string' ? byId.get(d.suggestion) : undefined;
+    if (s) out.set(String(d.id), s);
   }
   return out;
 }
 
 const listed = (out: Wire<unknown>): Row[] => (out.ok && Array.isArray(out.value) ? out.value.filter(isRow) : []);
 
-/** Every suggestion and every decision this screen reads, for `pairs`. */
+/** Every suggestion and every decision the queue reads, for `pairs`. */
 async function everything(client: Governor): Promise<{ suggestions: Row[]; decisions: Row[] }> {
   const [suggestions, decisions] = await Promise.all([
     client.governance({ register: 'suggestion', status: 'all', limit: 200 }),
     client.governance({ register: 'decision', limit: 200 }),
   ]);
   return { suggestions: listed(suggestions), decisions: listed(decisions) };
+}
+
+/** The one row a link names, or nothing when there is no link or the record does not give the row. */
+async function linkedRow(client: Governor, register: 'suggestion' | 'decision', id: unknown): Promise<Row | undefined> {
+  if (typeof id !== 'string' || id === '') return undefined;
+  const got = await client.governance({ register, id });
+  return got.ok && isRow(got.value) ? got.value : undefined;
 }
 
 /** The body of a `rowset` suggestion, or nothing. */
@@ -241,9 +239,8 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
   const row = got.value;
 
   if (decision) {
-    const all = await everything(client);
-    const settled = pairs(all.decisions.some((d) => d.id === row.id) ? all.decisions : [...all.decisions, row], all.suggestions);
-    return { from: 'live', value: { question: decisionOf(row, settled.get(id)), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
+    const settled = await linkedRow(client, 'suggestion', row.suggestion);
+    return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
   }
 
   const drawn = questionOf(row, questionsAsked(booted).get(id), 1);
@@ -252,9 +249,7 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
     const calls = callsOutOf(isRow(row.body) ? row.body.egress : undefined);
     return { from: 'live', value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls } };
   }
-  const all = await everything(client);
-  const settled = pairs(all.decisions, all.suggestions);
-  const by = all.decisions.find((d) => settled.get(String(d.id))?.id === row.id);
+  const by = await linkedRow(client, 'decision', row.decision);
   const decided = by ? decisionOf(by).decided : undefined;
   const question = by ? { ...drawn, title: text(by.question) || id, ...(decided ? { decided } : {}) } : drawn;
   return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };

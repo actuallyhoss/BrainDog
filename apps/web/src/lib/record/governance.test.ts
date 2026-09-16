@@ -24,7 +24,7 @@ function client(over: Partial<Governor> = {}, calls: Calls = []): Governor {
     governance: async (args) => {
       calls.push({ name: 'governance', args });
       if (args.register === 'decision') {
-        const decisions = [{ id: 'D1', question: 'Which registrar?', answer: 'nordhaven', reason: 'Registry lock.', decided_by: 'sam', ts: '2026-09-01T10:00:00Z' }];
+        const decisions = [{ id: 'D1', question: 'Which registrar?', answer: 'nordhaven', reason: 'Registry lock.', decided_by: 'sam', ts: '2026-09-01T10:00:00Z', suggestion: 'SG1' }];
         return { ok: true, value: args.id ? decisions.find((d) => d.id === args.id) ?? null : decisions };
       }
       if (args.id === 'SG3') return { ok: true, value: null };
@@ -46,7 +46,7 @@ function client(over: Partial<Governor> = {}, calls: Calls = []): Governor {
           },
         },
         { id: 'SG2', body_kind: 'options', status: 'open', opened_by: 'sam', opened_at: '2026-09-10T09:00:00Z', body: { options: [{ id: 'seat', label: 'Per seat', because: 'Predictable.' }, { id: 'product', label: 'Per product', because: 'Matches use.', recommended: true }] } },
-        { id: 'SG1', body_kind: 'options', status: 'resolved', opened_by: 'sam', opened_at: '2026-08-30T09:00:00Z', body: { options: [{ id: 'nordhaven', label: 'Nordhaven Registry', because: 'Lock.' }, { id: 'cove', label: 'Cove Domains', because: 'Cheaper.' }] } },
+        { id: 'SG1', body_kind: 'options', status: 'resolved', opened_by: 'sam', opened_at: '2026-08-30T09:00:00Z', body: { options: [{ id: 'nordhaven', label: 'Nordhaven Registry', because: 'Lock.' }, { id: 'cove', label: 'Cove Domains', because: 'Cheaper.' }] }, decision: 'D1' },
       ];
       if (args.id) return { ok: true, value: rows.find((r) => r.id === args.id) ?? null };
       return { ok: true, value: args.status === 'all' ? rows : rows.filter((r) => r.status === (args.status ?? 'open')) };
@@ -131,24 +131,17 @@ test('a suggestion no longer open is drawn settled: what was decided, by whom, w
   assert.equal(d.value.question?.options.find((o) => o.key === 'nordhaven')?.title, 'Nordhaven Registry');
 });
 
-test('decisions pair with the suggestions they settled, oldest first, each suggestion once', () => {
-  const s = (id: string, opened_at: string, body_kind = 'rowset', status = 'resolved') => ({ id, body_kind, status, opened_at, body: {} });
-  const d = (id: string, ts: string, answer: string) => ({ id, ts, answer, question: 'Anything?' });
+test('decisions pair with the suggestions they name, and one that names none or an unread one pairs with nothing', () => {
+  const s = (id: string) => ({ id, body_kind: 'rowset', status: 'resolved', opened_at: '2026-09-01', body: {} });
   const paired = pairs(
-    [d('D2', '2026-09-03', 'accept'), d('D1', '2026-09-02', 'accept'), d('D3', '2026-09-04', 'seat')],
     [
-      s('SG3', '2026-09-01'),
-      s('SG2', '2026-09-01'),
-      s('SG1', '2026-09-01'),
-      s('SG9', '2026-09-01', 'rowset', 'open'),
-      { id: 'SG5', body_kind: 'options', status: 'resolved', opened_at: '2026-09-01', body: { options: [{ id: 'seat', label: 'Per seat' }] } },
+      { id: 'D3', answer: 'accept', suggestion: 'SG1' },
+      { id: 'D2', answer: 'accept', suggestion: null },
+      { id: 'D1', answer: 'accept', suggestion: 'SG9' },
     ],
+    [s('SG2'), s('SG1')],
   );
-  assert.deepEqual([...paired].map(([k, v]) => [k, v.id]), [
-    ['D1', 'SG1'],
-    ['D2', 'SG2'],
-    ['D3', 'SG5'],
-  ]);
+  assert.deepEqual([...paired].map(([k, v]) => [k, v.id]), [['D3', 'SG1']]);
 });
 
 test('no record here is the sample, and any other refusal is the record’s own sentence', async () => {
@@ -223,4 +216,42 @@ test('an open change that calls out carries its lines, from the egress the recor
 
   const plain = await readOne(client(), 'SG2');
   assert.ok(plain.from === 'live' && plain.value.calls.length === 0);
+});
+
+test('A DECISION IS PAIRED BY THE SUGGESTION IT NAMES, not guessed from its option and its instant', async () => {
+  /* Two questions worded alike, offering the same option ids, answered by one person at one instant and
+     out of order. Only the record's link tells them apart, and the labels say which one the screen chose. */
+  const opts = (label: string) => ({ options: [{ id: 'yes', label }, { id: 'no', label: 'No' }] });
+  const at = '2026-09-02T10:00:00Z';
+  const suggestions = [
+    { id: 'SG2', body_kind: 'options', status: 'resolved', opened_at: '2026-09-01T09:00:00Z', body: opts('Yes, the second'), decision: 'D1' },
+    { id: 'SG1', body_kind: 'options', status: 'resolved', opened_at: '2026-09-01T09:00:00Z', body: opts('Yes, the first'), decision: 'D2' },
+  ];
+  const decisions = [
+    { id: 'D2', question: 'Same words?', answer: 'yes', reason: 'this one', decided_by: 'sam', ts: at, suggestion: 'SG1' },
+    { id: 'D1', question: 'Same words?', answer: 'yes', reason: 'not this one', decided_by: 'sam', ts: at, suggestion: 'SG2' },
+  ];
+  const linked = client({
+    governance: async (args) => {
+      const rows = args.register === 'decision' ? decisions : suggestions;
+      if (args.id) return { ok: true, value: (rows as Record<string, unknown>[]).find((r) => r.id === args.id) ?? null };
+      return { ok: true, value: args.status === 'open' ? [] : rows };
+    },
+  });
+
+  const label = (q: { options: { key: string; title: string }[]; decided?: { option: string } } | null | undefined) =>
+    q?.options.find((o) => o.key === q.decided?.option)?.title;
+
+  const queue = await readQueue(linked);
+  assert.ok(queue.from === 'live');
+  assert.deepEqual(queue.value.decided.map((q) => [q.id, label(q)]), [['D2', 'Yes, the first'], ['D1', 'Yes, the second']]);
+
+  const d1 = await readOne(linked, 'D1');
+  assert.ok(d1.from === 'live');
+  assert.equal(label(d1.value.question), 'Yes, the second');
+
+  const sg1 = await readOne(linked, 'SG1');
+  assert.ok(sg1.from === 'live');
+  assert.equal(sg1.value.question?.decided?.reason, 'this one');
+  assert.equal(label(sg1.value.question), 'Yes, the first');
 });
