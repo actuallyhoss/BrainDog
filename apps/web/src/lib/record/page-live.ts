@@ -19,7 +19,6 @@
 import { createClient, type ClientOptions } from '@braindog/client';
 import { isStale } from '@braindog/kernel';
 import { MISSING, integer, money } from 'braindog-render';
-import type { Column } from 'braindog-render/svelte';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
@@ -45,12 +44,41 @@ type Reading = { value: number | null; unit: string | null; rows: number; met: b
 
 type Row = RecordRow & { updated_at?: string };
 
-/** A block as the record's `page` answers it: the declaration, with what the kernel read on it. */
+/**
+ * A block as the record's `page` answers it: the declaration, with what the kernel read on it.
+ *
+ * WHAT THE RECORD CHECKS AND WHAT IT MERELY CARRIES ARE DIFFERENT THINGS, and this type is where that
+ * difference is written down rather than cast away. `declare.ts` checks a block's `kind`, `span`,
+ * `limit`, `tone`, `fold`, `icon`, `source`, `cells`, `when`, `columns` and `order` when a declaration
+ * is installed, so those arrive at the shapes it admits. It does not look at `heading`, `empty`,
+ * `body`, `target` or `authored` AT ALL, and `pages.ts` forwards them because they are keys a block
+ * may carry. Each of those is `unknown` here and is narrowed once, by the code that puts it on a
+ * block, because the app's own `PageBlock` promises a shape nobody checked.
+ *
+ * THE SAMPLE CANNOT REACH THIS. Its blocks are typed literals in `data.ts`, written in this repo and
+ * checked by the compiler. A live block is JSON from a record, and a pack is a thing a stranger
+ * wrote, so this path is the only one where a declaration can be a shape the app did not expect.
+ */
 type Answered = {
-  kind: string;
   source?: string;
+  span?: number;
+  limit?: number;
+  tone?: PageBlock['tone'];
+  fold?: boolean;
+  icon?: string;
   columns?: { field: string; label?: string; width?: string; align?: 'start' | 'end'; as?: string }[];
   cells?: { metric: string; label?: string }[];
+  /* THE SIX THE RECORD NEVER CHECKED. `blocks.ts` draws the first five through `escapeCell`, which is
+     `c.replaceAll(…)`, and the last through `r.cells.map(escapeCell)`. Anything that is not the shape
+     the app's type promises is a TypeError inside the page's own render rather than a block saying it
+     cannot be drawn, and a block that throws takes the whole page with it. */
+  kind?: unknown;
+  where?: unknown;
+  heading?: unknown;
+  empty?: unknown;
+  body?: unknown;
+  target?: unknown;
+  authored?: unknown;
   rows?: Row[];
   matched?: number;
   readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Said }[];
@@ -110,15 +138,36 @@ function registerOf(b: Answered): string | null {
   return b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
 }
 
-const columnsOf = (b: Answered): Column[] =>
-  (b.columns ?? []).map((c) => ({
-    field: c.field,
-    label: c.label ?? c.field,
-    width: c.width ?? 'minmax(12ch,1fr)',
-    align: c.align ?? 'start',
-    truncate: c.field === 'amount' || c.field === 'cost' ? 'never' : 'end',
-    ...(c.as === undefined || c.as === 'scope' ? {} : { as: c.as }),
-  })) as Column[];
+/** A string the record did not have to check, or nothing. */
+const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/**
+ * The roles a DECLARATION may give a column, which is the eight `declare.ts` admits.
+ *
+ * `braindog-render`'s own `CARD_ROLES` has a ninth, `quiet`, and its comment says why it is not one of
+ * these: the evaluator writes `quiet` from the record's clock, and a declaration does not name it.
+ * `scope` is not a role either. It says what the cell HOLDS, which this file settles from `scopes`
+ * before anything is drawn, so it is not carried onto the column.
+ *
+ * A WORD THAT IS NEITHER IS DROPPED RATHER THAN ASSERTED. The record refuses one at install, so this
+ * is the second half of a check rather than the only one, and `as Column[]` was the app promising a
+ * closed set about a string it had not looked at.
+ */
+const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark'] as const;
+const roleOf = (v: unknown): (typeof ROLES)[number] | undefined => ROLES.find((r) => r === v);
+
+const columnsOf = (b: Answered) =>
+  (b.columns ?? []).map((c) => {
+    const as = roleOf(c.as);
+    return {
+      field: c.field,
+      label: c.label ?? c.field,
+      width: c.width ?? 'minmax(12ch,1fr)',
+      align: c.align ?? 'start',
+      truncate: c.field === 'amount' || c.field === 'cost' ? ('never' as const) : ('end' as const),
+      ...(as === undefined ? {} : { as }),
+    };
+  });
 
 /**
  * One figure of a `stat` block, as a tile.
@@ -170,12 +219,101 @@ export function actionOf(fields: Record<string, unknown>): ActionRow {
   };
 }
 
+/** The four intents a row may carry, as `schema.ts` spells them and `05 §7.4` publishes them. */
+const TONE_WORDS = ['good', 'warn', 'bad', 'info'] as const;
+
+/**
+ * The rows somebody WROTE on a block, when they are rows a renderer can draw.
+ *
+ * `05 §2` makes authored rows the norm in the dialect, and `declare.ts` does not check them: a pack
+ * declaring `authored: "two"`, or one row of it without a `cells` list, installs cleanly and reaches
+ * `r.cells.map(escapeCell)`. A row that is not the shape the app's type promises is left out, so the
+ * block draws the rows that ARE rows instead of the page failing on the one that is not.
+ */
+function authoredOf(v: unknown): PageBlock['authored'] {
+  if (!Array.isArray(v)) return undefined;
+  const rows = v.flatMap((r) => {
+    const said = r !== null && typeof r === 'object' ? (r as { cells?: unknown; tone?: unknown }) : null;
+    if (!Array.isArray(said?.cells)) return [];
+    const cells = said.cells.filter((c): c is string => typeof c === 'string');
+    if (cells.length !== said.cells.length) return [];
+    const tone = TONE_WORDS.find((t) => t === said.tone);
+    return [{ cells, ...(tone === undefined ? {} : { tone }) }];
+  });
+  return rows.length ? rows : undefined;
+}
+
 /** One answered block as the page draws it. */
 export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number): LiveBlock {
-  const { rows: got = [], matched = 0, readings, scopes, inherited, refusals = [], values, drawn, walk: _walk, feed: _feed, seen: _seen, history: _history, ...decl } = b;
-  /* THE DECLARATION'S COLUMNS ARE REPLACED BY DRAWN ONES, which the intersection type cannot say. */
-  const shell = {
-    ...(decl as unknown as PageBlock),
+  const {
+    kind: _kind,
+    where: _where,
+    heading: _heading,
+    empty: _empty,
+    body: _body,
+    target: _target,
+    authored: _authored,
+    cells: _cells,
+    columns: _columns,
+    /* THE KEYS THE RECORD DOES CHECK, taken by name so each is present only when it has a value.
+       `exactOptionalPropertyTypes` draws the distinction the spread of an optional key erases: a
+       `tone` that is absent and a `tone` that is explicitly `undefined` are different objects, and
+       only the first is what `heading?: string` means. */
+    source,
+    span,
+    limit,
+    tone,
+    fold,
+    icon,
+    rows: got = [],
+    matched = 0,
+    readings,
+    scopes,
+    inherited,
+    refusals = [],
+    values,
+    drawn,
+    walk: _walk,
+    feed: _feed,
+    seen: _seen,
+    history: _history,
+    ...rest
+  } = b;
+
+  /* NARROWED ONCE, HERE, because the record does not check any of these and the app's type says it
+     does. A key that is not what it claims to be is left off the block rather than put on it: the
+     page then draws a block that is missing a heading, which is visible, instead of throwing inside
+     the renderer, which takes every other block on the page with it. */
+  const kind = str(b.kind) ?? '';
+  const heading = str(b.heading);
+  const where = str(b.where);
+  const empty = str(b.empty);
+  const body = str(b.body);
+  const target = typeof b.target === 'number' && Number.isFinite(b.target) ? b.target : undefined;
+  const authored = authoredOf(b.authored);
+  /* A FIGURE'S LABEL IS THE RECORD'S OR ITS OWN NAME. The record checks that a cell names a metric
+     and does not check that it carries a label, and the app's type says every cell has one. */
+  const cells = b.cells?.map((c) => ({ metric: c.metric, label: c.label ?? c.metric }));
+
+  /* THE DECLARATION'S COLUMNS ARE REPLACED BY DRAWN ONES, and everything the record sent that this
+     file does not name rides through untouched, so a key a later kernel adds is carried rather than
+     dropped. */
+  const shell: LiveBlock = {
+    ...rest,
+    kind,
+    ...(source === undefined ? {} : { source }),
+    ...(span === undefined ? {} : { span }),
+    ...(limit === undefined ? {} : { limit }),
+    ...(tone === undefined ? {} : { tone }),
+    ...(fold === undefined ? {} : { fold }),
+    ...(icon === undefined ? {} : { icon }),
+    ...(heading === undefined ? {} : { heading }),
+    ...(where === undefined ? {} : { where }),
+    ...(empty === undefined ? {} : { empty }),
+    ...(body === undefined ? {} : { body }),
+    ...(target === undefined ? {} : { target }),
+    ...(authored === undefined ? {} : { authored }),
+    ...(cells === undefined ? {} : { cells }),
     register: undefined,
     columns: columnsOf(b),
     entries: [],
@@ -188,11 +326,11 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     stale_at: new Date(now).toISOString(),
     metrics: undefined,
     ...(values ? { values } : {}),
-  } as unknown as LiveBlock;
+  };
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
-  if (b.kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map(tileOf) };
+  if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map(tileOf) };
   if (!b.source) return shell;
   if (b.source === 'actions') {
     const actions = got.map((r) => actionOf(r.fields));
@@ -202,9 +340,9 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const register = registerOf(b);
   /* A WALK, A FEED AND A DIFF ARE NOT ROWS OF A REGISTER, and a register the seed does not declare has
      no labels to draw with. Each says so rather than drawing half an answer. */
-  if (!register || b.kind === 'diff' || !REGISTERS[register]) return cannot;
+  if (!register || kind === 'diff' || !REGISTERS[register]) return cannot;
   /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer. */
-  const reduces = REDUCES.has(b.kind);
+  const reduces = REDUCES.has(kind);
   if (reduces && got.length < matched) return cannot;
 
   const live = b.source === 'sessions.live';

@@ -12,6 +12,7 @@ import { MISSING } from 'braindog-render';
 
 import { METRICS } from './declared.ts';
 import { ROWS } from './api.ts';
+import { toSegments } from './blocks.ts';
 import { liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
@@ -175,6 +176,55 @@ test("a page's own keys are the record's, and an expanded page wears the colour 
      title the template expanded from. The sample builds both from one pair (`pages.ts`), so a live
      project page that dropped it was the same page in a different colour. */
   assert.deepEqual(out.page.page.identity, { register: 'projects', seq: 4 });
+});
+
+test('a declaration the record never checked is narrowed before it reaches the renderer', async () => {
+  /* EVERY DECLARATION KEY HERE IS ONE `declare.ts` DOES NOT LOOK AT, so a pack may carry it in any
+     shape and the record forwards it as a key a block may have. `blocks.ts` draws the strings with
+     `escapeCell`, which is `c.replaceAll(…)`, and the authored rows with `r.cells.map(escapeCell)`,
+     so the shape the app's type promises is the difference between a block that draws and a
+     TypeError inside the render that takes every other block on the page with it. */
+  const answered = {
+    page: 'desk',
+    title: 'Desk',
+    blocks: [
+      { kind: 'comparison', heading: 12, empty: { said: 'nothing' }, body: ['a'], target: 'soon', authored: 'two', rows: [], matched: 0, refusals: [] },
+      {
+        kind: 'table',
+        source: 'register.obligations',
+        columns: [{ field: column, as: 'sideways' }, { field: column, as: 'title' }, { field: column, as: 'scope' }],
+        authored: [{ cells: ['one', 'two'], tone: 'good' }, { cells: 'no' }, { cells: ['fine'], tone: 'purple' }],
+        rows: [],
+        matched: 0,
+        refusals: [],
+      },
+    ],
+  };
+  const { io } = host((method) => (method === 'page' ? json(200, { ok: true, value: answered }) : refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.')));
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [written, table] = out.page.blocks;
+
+  /* A KEY THAT IS NOT WHAT IT CLAIMS TO BE IS LEFT OFF, so the block draws without a heading rather
+     than throwing while drawing one. */
+  assert.equal(written!.heading, undefined);
+  assert.equal(written!.empty, undefined);
+  assert.equal(written!.body, undefined);
+  assert.equal(written!.target, undefined);
+  assert.equal(written!.authored, undefined);
+  assert.doesNotThrow(() => toSegments(written!));
+
+  /* THE ROWS THAT ARE ROWS SURVIVE. A row whose cells are not a list of strings is left out, and a
+     tone that is not one of the four is dropped while the row it was on is kept. */
+  assert.deepEqual(table!.authored, [{ cells: ['one', 'two'], tone: 'good' }, { cells: ['fine'] }]);
+  assert.doesNotThrow(() => toSegments(table!));
+
+  /* AND A ROLE THIS APP DOES NOT DRAW IS DROPPED RATHER THAN ASSERTED INTO A CLOSED TYPE. `scope`
+     says what a cell HOLDS, which is settled from `scopes` before a column is built. */
+  assert.equal(table!.columns[0]?.as, undefined);
+  assert.equal(table!.columns[1]?.as, 'title');
+  assert.equal(table!.columns[2]?.as, undefined);
 });
 
 test('a page the record lacks says so, with the pages it has', async () => {
