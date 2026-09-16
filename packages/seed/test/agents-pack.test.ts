@@ -224,6 +224,19 @@ test('A SKILL IN USE HAS A PAGE: its trigger, then its versions; a retired one h
   sql.close();
 });
 
+test('TWO SKILLS OF ONE NAME ARE TWO PAGES A READER CAN TELL APART: the global one at its name, a project’s at its name and project', async () => {
+  const { k, sql } = await seeded();
+  const pages = k.pages();
+  const slugs = pages.map((p) => p.slug);
+  assert.ok(slugs.includes('review-pr') && slugs.includes('review-pr-kiln'), slugs.join(', '));
+  assert.ok(!slugs.some((slug) => /^review-pr-[0-9]+$/.test(slug)), slugs.join(', '));
+  const global = ROWS.skills!.find((r) => r.name === 'review-pr' && r.project === null)!;
+  const kiln = ROWS.skills!.find((r) => r.name === 'review-pr' && r.project !== null)!;
+  assert.equal(opened(k, 'review-pr')[0]?.body, global.trigger);
+  assert.equal(opened(k, 'review-pr-kiln')[0]?.body, kiln.trigger);
+  sql.close();
+});
+
 test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then the ones from everywhere', async () => {
   const { k, sql } = await seeded();
   const blocks = opened(k, 'kiln');

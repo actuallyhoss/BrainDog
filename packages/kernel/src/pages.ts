@@ -338,10 +338,38 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       continue;
     }
 
-    for (const row of listed.value.rows) {
-      const name = String(row.fields[title] ?? '');
-      out.push({ slug: claim(name, decl.for.register, row.seq), decl: fill(decl, row) as PageDecl, row });
+    /* TWO ROWS OF ONE NAME, IN TWO PLACES, ARE TELLABLE APART BY THE PLACE. A project's skill hides the global one of
+       its name (`32 §2.1`, nearer wins), so both are real and both have pages; numbering the second gave
+       `review-pr` and `review-pr-1`, which says nothing about which is which, and which of them took the bare
+       name turned on the order the rows were listed in. So the row that applies everywhere keeps the name, and a
+       row scoped to a place is named for it too: `review-pr-kiln`. */
+    const rows = listed.value.rows;
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const base = slugify(String(row.fields[title] ?? ''));
+      counts.set(base, (counts.get(base) ?? 0) + 1);
     }
+    const scope = deps.scopeOf?.(decl.for.register) ?? null;
+    let places: Map<string, string> | null = null;
+    const placeOf = (row: Entry): string | null => {
+      const at = scope ? row.fields[scope.field] : undefined;
+      if (!scope || typeof at !== 'string') return null;
+      if (!places) {
+        const named = deps.titleOf(scope.to);
+        const held = deps.list({ register: scope.to, limit: 200 });
+        places = new Map(held.ok && named ? held.value.rows.map((r) => [r.id, String(r.fields[named] ?? '')]) : []);
+      }
+      return places.get(at) || null;
+    };
+    const slugs = new Map<Entry, string>();
+    const shared = [...counts.values()].some((n) => n > 1);
+    const everywhereFirst = shared ? [...rows].sort((x, y) => Number(placeOf(x) !== null) - Number(placeOf(y) !== null)) : rows;
+    for (const row of everywhereFirst) {
+      const name = String(row.fields[title] ?? '');
+      const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
+      slugs.set(row, claim(place === null ? name : `${name} ${place}`, decl.for.register, row.seq));
+    }
+    for (const row of rows) out.push({ slug: slugs.get(row)!, decl: fill(decl, row) as PageDecl, row });
   }
   return out;
 }
