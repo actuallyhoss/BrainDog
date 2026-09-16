@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { INVITE_GONE, ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
@@ -35,7 +35,7 @@ import { alarmScheduler } from './alarm.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { drained, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
+import { copyAsked, copyRefusal, drained, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
@@ -459,6 +459,13 @@ export class Record$ extends DurableObject<Env> {
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */
     if (servesMcp(new URL(request.url).pathname)) return serveMcp(request, api, ctx);
+
+    /* A KEPT COPY'S DOOR ANSWERS AS THE LIST DOES, and not `ROUTE_UNKNOWN`. See `copyAsked`. */
+    const copy = copyAsked(request.method, new URL(request.url).pathname);
+    if (copy !== null) {
+      const out = await copyRefusal(copy, () => api.snapshots(ctx));
+      return json(out, httpStatus(out));
+    }
 
     return serveApi(request, handlersFor(api), ctx);
   }

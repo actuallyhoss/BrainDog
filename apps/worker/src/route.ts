@@ -20,6 +20,7 @@
  */
 
 import { ROUTES, sessionOf, withSession } from '@braindog/host';
+import type { Result, Snapshot } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 
 /** The address half of a bearer. Checked as a shape, never as a credential — that is the record's. */
@@ -84,6 +85,26 @@ export const servesMcp = (pathname: string): boolean => /^\/+mcp\/*$/.test(pathn
  * because it looks like a working endpoint (`apps/worker/wrangler.jsonc`).
  */
 export const servesBuild = (pathname: string): boolean => /^\/+\.well-known\/+braindog-build\/*$/.test(pathname);
+
+/**
+ * `GET /api/snapshots/<id>`: one kept copy as a file, which is the self-host's door (`49 §5.13`). The id, or `null`.
+ *
+ * THE WORKER KEEPS NO COPIES, AND IT SAYS SO HERE AS IT DOES ON THE LIST. Without this the path fell through to the
+ * method router and answered `ROUTE_UNKNOWN`, while `snapshot`, `snapshots` and `restore` on the same record answer
+ * `NOT_IN_THIS_BUILD`, so one question had two answers depending on which door it was asked at.
+ */
+export const copyAsked = (method: string, pathname: string): string | null =>
+  method === 'GET' ? (/^\/+api\/+snapshots\/+([^/]+)\/*$/.exec(pathname)?.[1] ?? null) : null;
+
+/**
+ * What a copy's door answers where no file can be streamed: the list's own refusal, which on a Worker is
+ * `NOT_IN_THIS_BUILD`, or, should a list ever answer, that this id is not one of its copies.
+ */
+export async function copyRefusal(id: string, list: () => Promise<Result<Snapshot[]>>): Promise<Result<Snapshot[]>> {
+  const listed = await list();
+  if (!listed.ok) return listed;
+  return { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `${id} is not one of the copies this record keeps.`, at: 'id' } };
+}
 
 /** Whether a string has the shape of a record id. A shape and not a record: nothing is asked. */
 export const isRecordId = (x: string): boolean => REC_ID.test(x);
