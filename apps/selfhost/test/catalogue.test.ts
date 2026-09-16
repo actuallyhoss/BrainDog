@@ -24,7 +24,7 @@ test('EVERY PACK AND USE CASE ON OFFER FILES AS A PROPOSAL ON A FRESH RECORD, mo
     const filed = await api.propose({ question: `Install ${entry.id}?`, body_kind: 'pack', body: { install: entry.id } } as never, agent);
     assert.ok(filed.ok, `${entry.id}: ${JSON.stringify(filed)}`);
     const row = await api.governance({ id: (filed as { value: { id: string } }).value.id }, agent);
-    const body = (row as { value: { body: { packs: { install: string[] } } } }).value.body;
+    const body = (row as unknown as { value: { body: { packs: { install: string[] } } } }).value.body;
     assert.equal(body.packs.install.at(-1), entry.id);
     sql.close();
   }
