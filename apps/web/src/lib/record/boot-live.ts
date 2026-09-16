@@ -105,6 +105,18 @@ function packText(e: EventLine): string | null {
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
 
+/**
+ * AN EXPORT'S NOTE IS THE KERNEL'S, not a sentence: "snapshot 2026-09-16T20-14-56Z-now 786432 bytes" and
+ * "sections header, data, grants redacted" reached Home word for word. The record's own two shapes, said plainly.
+ */
+function exportText(e: EventLine): string | null {
+  if (e.kind !== 'export' || !e.note) return null;
+  if (/^snapshot /u.test(e.note)) return 'Took a copy of the record';
+  if (/^sections all(?:,|$)/u.test(e.note)) return 'Exported the whole record';
+  if (/^sections /u.test(e.note)) return 'Exported part of the record';
+  return null;
+}
+
 /** One line of the log in the words the feed draws. */
 function textOf(e: EventLine): string {
   if (e.register !== null) {
@@ -114,7 +126,7 @@ function textOf(e: EventLine): string {
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
   if (e.kind === 'decide' && e.title) return `Decided: ${e.title}`;
-  const pack = packText(e);
+  const pack = packText(e) ?? exportText(e);
   if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
 }

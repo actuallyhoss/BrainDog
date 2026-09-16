@@ -99,6 +99,13 @@ test('a line of the log becomes a feed item in words, and the reader is "you"', 
   assert.equal(newsOf([line({ kind: 'export' })] as never, null)[0]?.href, '/audit');
 });
 
+test("an export's note is said as a sentence, not in the kernel's words", () => {
+  const at = (note: string) => newsOf([line({ kind: 'export', note })] as never, null)[0]?.text;
+  assert.equal(at('snapshot 2026-09-16T20-14-56Z-now 786432 bytes'), 'Took a copy of the record');
+  assert.equal(at('sections all, grants redacted'), 'Exported the whole record');
+  assert.equal(at('sections header, data, grants redacted'), 'Exported part of the record');
+});
+
 test('a pack install names the list it brought, not the bare verb', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ actor: 'system', target_kind: 'pack', ...over })] as never, null)[0]?.text;
   assert.equal(at({ kind: 'install', target: 'pack:estate' }), 'Added the Services list');
