@@ -16,8 +16,8 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 
 /* ── the closed sets ──────────────────────────────────────────────────────── */
 
-test('twenty kinds over eight primitives, and every kind names one that exists', () => {
-  assert.equal(Object.keys(KINDS).length, 20);
+test('twenty-one kinds over eight primitives, and every kind names one that exists', () => {
+  assert.equal(Object.keys(KINDS).length, 21);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))
@@ -289,7 +289,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-one kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
@@ -1543,4 +1543,57 @@ test('a stored value is drawn as a word: a lane head starts with a capital, a ch
   const html = toHTML(parse('```chips\nglyph | 6 | saas\n```\n\n```board\nopen | Chase Halden\n```'));
   assert.match(html, /<span class="pill-word">SaaS<\/span>/);
   assert.match(html, /<h4 class="board-head">Open<\/h4>/);
+});
+
+/* ── stat's trend and lead, and sparkline ─────────────────────────────────── */
+
+test('A STAT ROW TAKES A FOURTH CELL, THE TREND, and a three-cell row with a tone keeps its tone', () => {
+  const [block] = parse('```stat | H\nCash | GBP 12.00 | 2 accounts | 18 20 19 24 | good\nIn | 3 | n | warn\nOut | 4 | n\n```');
+  assert.equal(block?.type, 'block');
+  if (block?.type !== 'block') return;
+  assert.deepEqual(block.rows[0]?.cells, ['Cash', 'GBP 12.00', '2 accounts', '18 20 19 24']);
+  assert.equal(block.rows[0]?.tone, 'good');
+  assert.deepEqual(block.rows[1]?.cells, ['In', '3', 'n']);
+  assert.equal(block.rows[1]?.tone, 'warn', 'the tone right after three cells is still the tone');
+  assert.equal(block.rows[2]?.tone, undefined);
+});
+
+test('a stat trend draws a line named by its numbers under the figure, and a row without one draws none', () => {
+  const html = toHTML(parse('```stat\nCash | 12 | n | 18 20 - 24\nIn | 3 | n\n```'));
+  assert.match(html, /<span class="cell-figure num">12<\/span><svg class="cell-trend" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Cash: 18, 20, no value, 24">/u);
+  assert.equal(html.match(/<svg/gu)?.length, 1);
+  assert.doesNotMatch(html, /style="[^"]*(?<!--cells:\d)"/u);
+});
+
+test('a word in the trend cell degrades, as a fourth cell always did', () => {
+  const [seg] = parse('```stat | H\nA | 1 | n | banana\n```');
+  assert.equal(seg?.type === 'degraded' && seg.code, 'DIALECT_ARITY');
+  assert.match(seg?.type === 'degraded' ? seg.fix : '', /run of numbers/u);
+});
+
+test('THE LEAD FORM IS A WORD AFTER THE KIND, carried on the figure, and any other word degrades naming the form', () => {
+  const [lead] = parse('```stat lead | Money\nCash | 12 | n\n```');
+  assert.equal(lead?.type === 'block' && lead.form, 'lead');
+  assert.equal(lead?.type === 'block' && lead.heading, 'Money');
+  assert.equal(parse('```stat lead\nCash | 12 | n\n```')[0]?.type, 'block', 'the heading is optional');
+  assert.match(toHTML(parse('```stat lead\nA | 1 | n\n```')), /<figure class="block block-grid" data-kind="stat" data-form="lead"/u);
+  assert.doesNotMatch(toHTML(parse('```stat\nA | 1 | n\n```')), /data-form/u);
+
+  const big = parse('```stat big | H\nA | 1 | n\n```')[0];
+  assert.equal(big?.type === 'degraded' && big.code, 'DIALECT_KIND_UNKNOWN');
+  assert.match(big?.type === 'degraded' ? big.fix : '', /Write "stat" or "stat lead"/u);
+  const code = parse('```code ts\nx\n```')[0];
+  assert.match(code?.type === 'degraded' ? code.fix : '', /takes no word after it/u);
+});
+
+test('A SPARKLINE ROW IS A LABEL, A LINE AND ITS FIGURE, and under two points it is the figure only', () => {
+  const html = toHTML(parse('```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```'));
+  assert.match(
+    html,
+    /<div class="spark-row" data-intent="good"><span class="spark-label">Cash<\/span><svg class="spark-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Cash: 18, 20, 19, 24"><path class="trend-line" d="M0 [\d.]+ L[^"]+" vector-effect="non-scaling-stroke"><\/path><path class="trend-end" d="M1000 [\d.]+h0" vector-effect="non-scaling-stroke"><\/path><\/svg><span class="spark-figure num">GBP 24.00<\/span><span class="glyph"/u,
+  );
+  assert.match(html, /<span class="spark-label">Lonely<\/span><span class="spark-figure num">7<\/span>/u, 'one point is the figure only');
+  assert.match(html, /<span class="spark-label">None<\/span><span class="spark-figure num">—<\/span>/u);
+  assert.doesNotMatch(html, /style=/u);
+  assert.equal(parse('```sparkline\nA | 1 2 | 2 | x\n```')[0]?.type, 'degraded', 'a fourth cell that is not a tone is too wide');
 });

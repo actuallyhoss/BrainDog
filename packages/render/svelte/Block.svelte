@@ -62,6 +62,7 @@
 <figure
   class="block block-{spec.primitive}"
   data-kind={block.kind}
+  data-form={block.form}
   data-primitive={spec.primitive}
   data-intent={block.tone}
 >

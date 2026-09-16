@@ -67,30 +67,30 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds — twenty
+### Kinds, twenty-one
 
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` · `bar` · `gauge` · `chips` |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
 | Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it. All three **page-only** |
 
-Twenty, counted: the sixteen of v1 and the four kinds of the agent path
-(`loop/research-agent-path.md` steps 20 and 21), which sit on existing primitives so
+Twenty-one, counted: the sixteen of v1, the four kinds of the agent path
+(`loop/research-agent-path.md` steps 20 and 21) and `sparkline` (`loop/research-modules.md` S9), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
-arbitrary SVG — `sparkline`, `series` and `forecast` are **post-v1**, and everything after them
+arbitrary SVG — `series` and `forecast` are **post-v1**, and everything after them
 arrives as a pack, which is the whole reason for the primitive layer.
 
 ### 2.1 · Row shape per kind — the grammar, stated
 
 The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of it:
 
-- The info string is `^(?<kind>[a-z]+)(\s*\|\s*(?<heading>.*))?$`. The heading half is row-split like a row, and a trailing tone word there is the block's tone — `note | Kicker | bad` (36 §13 D6).
+- The info string is `^(?<kind>[a-z]+)(\s+(?<form>[a-z]+))?(\s*\|\s*(?<heading>.*))?$`. A form is a word the kind names: `stat lead` is the only one. Any other word after the kind degrades under `DIALECT_KIND_UNKNOWN`, naming the forms there are. The heading half is row-split like a row, and a trailing tone word there is the block's tone — `note | Kicker | bad` (36 §13 D6).
 - A row is split on `|` **after** unescaping — `\|` is a literal pipe, `\\` a literal backslash.
 - A trailing cell that is a tone word — `good` `warn` `bad` `info`, an alias from §7.4, or `hole` on a `bar` — is the tone. Anything else in that position is a cell.
 - `{{path}}` is substituted **per cell, after splitting**, and a substituted value is never re-parsed, so a value containing `|` cannot add a column.
@@ -100,7 +100,8 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 |---|---|
 | `note` | heading = kicker; body lines are markdown, no cells |
 | `quote` | text \| attribution |
-| `stat` | label \| figure \| note \| *tone* — six rows at most |
+| `stat` | label \| figure \| note \| *trend* \| *tone* — six rows at most. The trend is optional, a run of numbers (`18 20 19 24`) drawn as a small line under the figure; a word there with no number degrades under `DIALECT_ARITY`. A tone straight after three cells is still the tone. `stat lead` draws the first figure as the screen's one hero figure, at `--t-2xl` |
+| `sparkline` | label \| run of numbers \| figure \| *tone*. A 120 by 28 line in `--dim` with a dot on the last point, no axes; under two points, the figure only |
 | `bar` | label \| number \| note \| *tone* |
 | `gauge` | label \| value \| target \| *tone* |
 | `chips` | glyph \| figure \| word \| *tone* — one row is one run |

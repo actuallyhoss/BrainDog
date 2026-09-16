@@ -196,6 +196,7 @@ export const copy = {
     section: 'Section heading',
     feed: 'What happened',
     diff: 'Before and after',
+    sparkline: 'Small trend line',
   } as Record<string, string>,
 
   kinds: {
@@ -217,6 +218,7 @@ export const copy = {
     stat: 'two or three figures across the top',
     feed: 'what agents, rules and you did since you last looked',
     diff: 'how a text changed, line by line',
+    sparkline: 'a figure with the run of numbers that led to it',
   } as Record<string, string>,
   arrangedNotSaved: (title: string) =>
     `${title} rearranged here. Nothing was saved yet.`,

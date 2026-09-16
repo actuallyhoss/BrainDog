@@ -1,5 +1,8 @@
 <!--
-  `proportional` — rows whose number drives a drawn magnitude. Kinds: `bar`, `gauge`.
+  `proportional` — rows whose number drives a drawn magnitude. Kinds: `bar`, `gauge`, `sparkline`.
+
+  A `sparkline` row is a label, a small line in the quiet ink ending in a dot, and the figure it ends
+  at. Fewer than two points draw no line, and the figure is still said.
 
   `bar` scales to its largest NON-HOLE row; `gauge` to value / target, clamped at 1. A row whose
   value is not a number keeps its words and loses its bar, because a bar at zero claims the value IS
@@ -13,6 +16,7 @@
 <script lang="ts">
   import { inline, magnitudeOfCell, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
+  import Trend from '../Trend.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -39,7 +43,18 @@
 </script>
 
 <div class="prop">
-  {#if block.kind === 'gauge'}
+  {#if block.kind === 'sparkline'}
+    {#each block.rows as row}
+      <div class="spark-row" data-intent={row.tone}>
+        <span class="spark-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
+        <Trend cls="spark-line" label={row.cells[0] ?? ''} value={row.cells[1] ?? ''} {opts} />
+        <span class="spark-figure num"><Text nodes={inline(row.cells[2] || MISSING, opts)} {opts} /></span>
+        {#if row.tone}
+          <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
+        {/if}
+      </div>
+    {/each}
+  {:else if block.kind === 'gauge'}
     {@const row = block.rows[0] ?? { cells: [] }}
     <div class="prop-row" data-intent={row.tone}>
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>

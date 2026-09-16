@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty kinds, and the four intent words.
+ * The eight primitives, the twenty-one kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -84,6 +84,17 @@ export type KindSpec = {
   primitive: Primitive;
   /** How many cells a row takes, before the optional trailing tone word. */
   cells: number;
+  /**
+   * How many of those cells, counted from the end, a row may leave off. A tone word is read from
+   * the first cell past the required ones, so a `stat` row of three cells and a tone keeps its tone
+   * while a fourth cell, the trend, is still room the row has.
+   */
+  optional?: number;
+  /**
+   * The words a fence may put after the kind, before the heading: ` ```stat lead | Cash ` is the
+   * `lead` form of `stat`. Any other word degrades, naming the forms there are.
+   */
+  forms?: readonly string[];
   /** Whether a trailing tone word is read as the row's tone. */
   tone: boolean;
   /** A row cap. Over it, the block degrades under DIALECT_ARITY — there is no DIALECT_ROWS. */
@@ -133,7 +144,7 @@ export type KindSpec = {
 };
 
 /**
- * Twenty, counted. `diagram`, `sparkline`, `series` and `forecast` are post-v1 and arrive as a
+ * Twenty-one, counted. `diagram`, `series` and `forecast` are post-v1 and arrive as a
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * The table is written `as const satisfies` so the KEYS derive the `Kind` union and every entry is
@@ -147,10 +158,14 @@ const TABLE = {
   quote: { primitive: 'panel', cells: 2, tone: false, rows: 1, minSpan: 4, purpose: 'say' },
 
   /* Figures */
-  stat: { primitive: 'grid', cells: 3, tone: true, rows: 6, minSpan: 4, purpose: 'figure' },
+  /* A stat row is `label | figure | note | trend`, the trend a run of numbers and optional. The
+     `lead` form draws the first figure as the screen's one hero figure. */
+  stat: { primitive: 'grid', cells: 4, optional: 1, forms: ['lead'], tone: true, rows: 6, minSpan: 4, purpose: 'figure' },
   bar: { primitive: 'proportional', cells: 3, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
   gauge: { primitive: 'proportional', cells: 3, tone: true, rows: 1, minSpan: 4, purpose: 'figure' },
   chips: { primitive: 'inline', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
+  /* `label | 18 20 19 24 | figure`: a small line and the figure it ends at (`src/cards.ts`'s `trendOf`). */
+  sparkline: { primitive: 'proportional', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
 
   /* Rows — `spec` is the workhorse: 194 of 7,138 rendered lines in the predecessor's census, and
      no writing guide said so (05 §7.4). */

@@ -62,6 +62,8 @@
   .prop-label,
   .prop-value,
   .prop-note,
+  .spark-label,
+  .spark-figure,
   .quote-text,
   .quote-by,
   .row-label,
@@ -325,6 +327,59 @@
      under the figure says why; a red number is the loudest thing on a page and says the least. */
   .cell[data-intent] .cell-figure {
     color: var(--ink);
+  }
+
+  /* A STAT'S TREND sits under its figure, a small line in the quiet ink with a dot on the last
+     point. The row it takes exists only in a cell that has one, so a strip where one figure has a
+     trend and three do not keeps its figures on one line and its notes under them. */
+  .cell:has(> .cell-trend) {
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'trend trend'
+      'note note';
+  }
+
+  .cell-trend {
+    grid-area: trend;
+    inline-size: 100%;
+    max-inline-size: 120px;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`). */
+  .trend-line {
+    fill: none;
+    stroke: var(--dim);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .trend-end {
+    stroke: var(--ink2);
+    stroke-width: 5px;
+    stroke-linecap: round;
+  }
+
+  /* `stat lead`: the first figure is the screen's one hero figure (DESIGN-SYSTEM 2.2). The others
+     stay the size they are, so the lead reads as the answer and the rest as its detail. */
+  .block[data-form='lead'] .cell:first-child .cell-figure {
+    font-size: var(--t-2xl);
+    letter-spacing: -0.025em;
+  }
+
+  /* FOUR FIGURES OR MORE GO TWO BY TWO IN A NARROW BLOCK. The block is its own container, so a stat
+     in a narrow column of a wide page answers its own width, not the viewport's. */
+  .block[data-kind='stat'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size < 30rem) {
+    .grid:has(> .cell:nth-child(4)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .board-col {
@@ -1320,6 +1375,43 @@
     .prop-track {
       grid-column: 1;
     }
+  }
+
+  /* ── sparkline: a label, a small line, the figure it ends at ─────────────
+     The line is 120 by 28 in a fixed column, so the lines of several rows share a left edge and a
+     row with fewer than two points keeps its figure in the figure's column. */
+  .spark-row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 20ch) 120px minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-1) var(--sp-2);
+    min-block-size: var(--row-h);
+  }
+
+  .spark-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .spark-line {
+    grid-column: 2;
+    inline-size: 120px;
+    block-size: 28px;
+    overflow: visible;
+  }
+
+  .spark-figure {
+    grid-column: 3;
+    justify-self: end;
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .spark-row > .glyph {
+    grid-column: 4;
   }
 
   /* ── inline: chips ──────────────────────────────────────────────────────── */

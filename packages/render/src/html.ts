@@ -152,6 +152,17 @@ function panel(b: Block, o: RenderOptions): string {
   return `<div class="panel measure">${body}</div>`;
 }
 
+/**
+ * A run of numbers as a small line, named by the numbers it was drawn from, or nothing when the run
+ * has fewer than two. `stat`'s trend cell and `sparkline` draw it; `Trend.svelte` is its twin.
+ */
+function trendSvg(cls: string, label: string, value: string, o: RenderOptions): string {
+  const t = trendOf(plain(inline(value, o)));
+  if (!t) return '';
+  const name = `${plain(inline(label, o)) || TREND}: ${t.said.join(', ')}`;
+  return `<svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(name)}"><path class="trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`;
+}
+
 function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'cards') return cards(b, o);
   if (b.kind === 'board') {
@@ -174,8 +185,10 @@ function grid(b: Block, o: RenderOptions): string {
     .map(
       (r) =>
         `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num">${
-          r.cells[1] ? renderInline(inline(r.cells[1], o), o) : MISSING
-        }</span>${cell('cell-note', r.cells[2] && symbolText(r.cells[2]), o)}${toneGlyph(r.tone)}</div>`,
+          /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
+             code at full size, and the two trees differed on every stat with an amount in it. */
+          r.cells[1] ? amount(r.cells[1], o) : MISSING
+        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2]), o)}${toneGlyph(r.tone)}</div>`,
     )
     .join('');
   return `<div class="grid" style="--cells:${b.rows.length}">${body}</div>`;
@@ -208,6 +221,16 @@ function proportional(b: Block, o: RenderOptions): string {
      (05 §7.4). Both readings come out of `magnitudeOfCell`, which is also what the Svelte primitive
      uses; two copies of it gave two answers for the same cell. */
   const numeric = (r: Row) => magnitudeOfCell(String(r.cells[1] ?? ''), o);
+
+  /* `sparkline`: a label, a small line in the quiet ink ending in a dot, and the figure it ends at.
+     Fewer than two points draw no line, and the figure is still said. */
+  if (b.kind === 'sparkline')
+    return `<div class="prop">${b.rows
+      .map(
+        (r) =>
+          `<div class="spark-row"${toneAttrs(r.tone)}>${cell('spark-label', r.cells[0], o)}${trendSvg('spark-line', r.cells[0] ?? '', r.cells[1] ?? '', o)}<span class="spark-figure num">${drawn(r.cells[2] || MISSING)}</span>${toneGlyph(r.tone)}</div>`,
+      )
+      .join('')}</div>`;
 
   if (b.kind === 'gauge') {
     const r = b.rows[0] ?? { cells: [] };
@@ -497,7 +520,8 @@ function block(b: Block, o: RenderOptions): string {
   const cap = captioned(b)
     ? `<figcaption class="block-head"${toneAttrs(b.tone)}>${toneGlyph(b.tone)}${renderInline(inline(b.heading ?? '', o), o)}</figcaption>`
     : '';
-  return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}" data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${draw(b as never, o)}</figure>`;
+  const form = b.form ? ` data-form="${escape(b.form)}"` : '';
+  return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}"${form} data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${draw(b as never, o)}</figure>`;
 }
 
 /**

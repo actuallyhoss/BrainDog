@@ -17,6 +17,7 @@
   import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
+  import Trend from '../Trend.svelte';
 
   let {
     block,
@@ -386,6 +387,7 @@
               {opts}
             />{/if}
         </span>
+        <Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} />
         <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? ''), opts)} {opts} /></span>
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

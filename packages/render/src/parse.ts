@@ -42,6 +42,8 @@ export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean
 export type Block = {
   type: 'block';
   kind: Kind;
+  /** The word after the kind in the fence, one of `KINDS[kind].forms`: ` ```stat lead ` is `lead`. */
+  form?: string;
   heading?: string;
   tone?: Tone;
   rows: Row[];
@@ -78,7 +80,7 @@ const FENCE = /^(`{3,}|~{3,})(.*)$/;
  * looking for the thing they had already done. When the author is an agent the visible fence is
  * the only feedback channel there is, which makes the sentence the whole value of a degradation.
  */
-const INFO = /^(?<kind>[A-Za-z]+)(?:\s*\|\s*(?<heading>.*))?$/;
+const INFO = /^(?<kind>[A-Za-z]+)(?:\s+(?<form>[A-Za-z]+))?(?:\s*\|\s*(?<heading>.*))?$/;
 
 /** Split on `|` AFTER unescaping, so `\|` is a literal pipe and `\\` a literal backslash. */
 export function splitRow(line: string): string[] {
@@ -104,8 +106,8 @@ export function splitRow(line: string): string[] {
  * a refusal — an unknown word in the tone slot is data, and treating it as an error would make
  * every write-up a minefield (13 §2.3).
  */
-function takeTone(cells: string[], spec: { cells: number; tone: boolean; hole?: boolean }) {
-  if (!spec.tone || cells.length <= spec.cells) return { cells, tone: undefined, hole: false };
+function takeTone(cells: string[], spec: { cells: number; tone: boolean; hole?: boolean; optional?: number }) {
+  if (!spec.tone || cells.length <= spec.cells - (spec.optional ?? 0)) return { cells, tone: undefined, hole: false };
   const last = cells[cells.length - 1]!.toLowerCase();
   if (spec.hole && last === BAR_HOLE) return { cells: cells.slice(0, -1), tone: 'warn' as Tone, hole: true };
   const tone = Object.hasOwn(TONES, last) ? (last as Tone) : TONE_ALIAS[last];
@@ -267,7 +269,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         type: 'degraded',
         code: 'DIALECT_KIND_UNKNOWN',
         fix: written
-          ? `"${written}" is not one of the twenty kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the twenty-one kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -332,6 +334,27 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
       continue;
     }
 
+    /* A FORM IS A WORD THE KIND NAMES, and any other word degrades with the forms there are. Before
+       forms existed a second word matched nothing and was told the fence had no kind; `code ts`
+       still degrades, now saying where the heading goes. */
+    const form = parsed?.groups?.form;
+    const forms = KINDS[kind].forms ?? [];
+    if (form !== undefined && !forms.includes(form)) {
+      out.push({
+        type: 'degraded',
+        code: 'DIALECT_KIND_UNKNOWN',
+        fix: forms.length
+          ? `"${form}" is not a form of ${kind}. Write ${[kind, ...forms.map((f) => `${kind} ${f}`)].map((w) => `"${w}"`).join(' or ')}. The block is shown as you wrote it.`
+          : `"${kind}" takes no word after it, and a heading goes after a "|". The block is shown as you wrote it.`,
+        raw,
+        info,
+        start,
+        end,
+      });
+      i = close;
+      continue;
+    }
+
     // The heading half is row-split like a row, so a trailing tone word there is the BLOCK's tone.
     const headingCells = splitRow(parsed?.groups?.heading ?? '');
     const headTone = takeTone(headingCells, { cells: 1, tone: true });
@@ -359,7 +382,12 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const card = kind === 'cards' ? cardFault(rows[0]?.cells ?? []) : null;
     const feed = kind === 'feed' ? feedFault(rows.map((r) => r.cells)) : null;
     const diff = kind === 'diff' ? diffFault(rows.map((r) => r.cells[0] ?? '')) : null;
-    const fault = card
+    /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
+       line with no points: before the trend it was a fifth cell and degraded, and it still does. */
+    const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
+    const fault = trend
+      ? `A stat row's fourth cell is a trend, a run of numbers like "18 20 19 24", and "${trend.cells[3]}" has none.`
+      : card
       ? `A cards block has ${card}. A card takes one figure and at most three facts.`
       : feed
         ? `A feed block has ${feed}.`
@@ -387,6 +415,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     out.push({
       type: 'block',
       kind,
+      ...(form ? { form } : {}),
       ...(heading ? { heading } : {}),
       ...(headTone.tone ? { tone: headTone.tone } : {}),
       rows: ordered,

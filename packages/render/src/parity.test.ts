@@ -96,6 +96,9 @@ const SHAPES: Record<string, string> = {
     [...Array.from({ length: 9 }, (_, i) => `  line ${i + 1}`), '- line 10', '+ line ten', ...Array.from({ length: 10 }, (_, i) => `  line ${i + 11}`)].join('\n') +
     '\n```',
   'a diff with no change': '```diff\n  same\n  again\n```',
+  'a lead stat with trends and a tone':
+    '```stat lead | Money\nCash now | GBP 12,400.00 | in 2 accounts · as of 2 Sep | 18 20 - 24 | good\nComing in | GBP 4,800.00 | 5 invoices, 2 late\nGoing out | GBP 1,300.00 | 7 bills | 3 | warn\nEvery month | EGP 900.00 |  | 1 2 3 4\n```',
+  'sparklines, with one point and none': '```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {

@@ -136,16 +136,17 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, twenty, counted:
+`KINDS`, twenty-one, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
 | `note` | panel | — body is markdown | 0 | yes | — | |
 | `quote` | panel | text · attribution | 2 | no | 1 | |
-| `stat` | grid | label · figure · note | 3 | yes | 6 | |
+| `stat` | grid | label · figure · note · trend (optional) | 4 | yes | 6 | forms `lead` |
 | `bar` | proportional | label · number · note | 3 | yes | — | hole |
 | `gauge` | proportional | label · value · target | 3 | yes | 1 | |
 | `chips` | inline | glyph · figure · word | 3 | yes | — | |
+| `sparkline` | proportional | label · run of numbers · figure | 3 | yes | — | |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |
 | `todo` | list | title · detail | 2 | no | — | marker |
@@ -373,6 +374,7 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `quote` | `<blockquote><p>text</p></blockquote><p class="attribution">attribution</p>` |
 | `stat` | `<ul class="cells" style="--cells:N"><li class="cell[ tone-x]">glyph? <span class="label"> <span class="figure"> <span class="note"></li>…</ul>` — N = row count, declared, never inferred (05 §4) |
 | `bar` | `<ul class="bars"><li class="bar[ tone-x]" style="--magnitude:0.42"><span class="label"> <span class="figure"> <span class="note"></li>…</ul>`; a number that does not parse → no `style` — the row keeps its words and loses its bar (05 §7.4); the `hole` row is drawn **last**: `<li class="bar hole tone-warn"><button type="button" data-hole="label">glyph label figure note</button></li>` |
+| `sparkline` | `<div class="prop"><div class="spark-row"[ data-intent]><span class="spark-label"> <svg class="spark-line" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="label: 18, 20, 19, 24"><path class="trend-line"><path class="trend-end"></svg> <span class="spark-figure num"> glyph?</div>…</div>`; under two points there is no `svg`. A stat row's trend is the same `svg` with `class="cell-trend"`, after the figure. `stat lead` puts `data-form="lead"` on the `figure` |
 | `gauge` | `<div class="gauge[ tone-x]" style="--magnitude:0.70"><span class="label"> <span class="figure">value</span> <span class="target">target</span></div>` |
 | `chips` | `<ul class="chips"><li class="chip[ tone-x]"><span class="glyph" data-glyph="G" aria-hidden="true"></span><span class="figure"> <span class="word"></li>…</ul>`; a row with an empty figure or an empty word is not drawn (05 §7.4) |
 | `spec` · `params` | `<dl><div class="row"><dt>label</dt><dd class="value">value</dd><dd class="note">note</dd></div>…</dl>` |
