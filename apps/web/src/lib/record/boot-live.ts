@@ -74,6 +74,15 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   return kept;
 }
 
+/**
+ * Whether anybody signs in on the host that answered `boot`.
+ *
+ * ONLY A HOST THAT SAID NO IS ONE WITHOUT SIGN-IN. A self-host started without a key answers `/account/records`
+ * 401 on every load, the same answer an ended session gets, so the host says so in `boot` and the app stops
+ * asking. A host older than the field says nothing, and is asked as before.
+ */
+export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).signIn !== false;
+
 /** Drop the kept answer, so the next screen asks the record again. */
 export function forget(): void {
   kept = null;

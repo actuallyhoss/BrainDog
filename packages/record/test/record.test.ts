@@ -1637,6 +1637,14 @@ test('A HOST WITH NO SIGN-IN MINTS NO LINK, and says why in its own words', asyn
   assert.deepEqual(value(await worker.api.invitations(owner)), []);
 });
 
+test('BOOT SAYS WHETHER ANYBODY SIGNS IN, from the answer invitations already gives', async () => {
+  /* An open self-host answered /account/records 401 on every load, which is what an ended session says,
+     and the switcher offered a sign-in on a host with none. */
+  assert.equal(value<{ signIn: boolean }>(await (await inviting()).api.boot(owner)).signIn, false, 'a host that never said is one without sign-in');
+  assert.equal(value<{ signIn: boolean }>(await (await inviting(() => 'Sign-in needs SESSION_SECRET.')).api.boot(owner)).signIn, false);
+  assert.equal(value<{ signIn: boolean }>(await (await inviting(() => null)).api.boot(owner)).signIn, true);
+});
+
 test('MINT, LOOK, ACCEPT, AND THE LINK IS SPENT: the whole of an invitation through the record', async () => {
   const { api } = await inviting(() => null);
   const minted = value<{ invitation: { id: string; email: string }; token: string }>(

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { forget, layoutOf, newsOf, readBoot, type Fetch } from './boot-live.ts';
+import { forget, layoutOf, newsOf, readBoot, signsIn, type Fetch } from './boot-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -89,6 +89,12 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
   assert.equal(shell.sinceCapped, true);
   assert.deepEqual(shell.pen, []);
   assert.deepEqual(shell.people, []);
+});
+
+test('only a host that says nobody signs in is spared the account read', () => {
+  assert.equal(signsIn({ ...BOOT, signIn: false } as never), false);
+  assert.equal(signsIn({ ...BOOT, signIn: true } as never), true);
+  assert.equal(signsIn(BOOT as never), true, 'a host older than the field stopped being asked');
 });
 
 test('a line of the log becomes a feed item in words, and the reader is "you"', () => {

@@ -297,7 +297,9 @@ test('A BAD COOKIE ON AN OPEN SELF-HOST IS A 401 AND IS CLEARED, never the owner
     assert.equal(bad.status, 401);
     assert.deepEqual(bad.body?.refusal, NOT_YOU);
     assert.deepEqual(bad.cookies, ['bd_s=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax']);
-    assert.equal((await s.call('/api/boot')).status, 200, 'open mode stopped answering the owner');
+    const booted = await s.call('/api/boot');
+    assert.equal(booted.status, 200, 'open mode stopped answering the owner');
+    assert.equal((booted.body?.value as { signIn?: unknown } | undefined)?.signIn, false, 'boot did not say nobody signs in here');
     assert.equal((await s.call('/auth/token', { body: { serverKey: 'anything' } })).status, 404);
   } finally {
     await s.close();

@@ -439,6 +439,16 @@ export type Boot = {
   counts: { decide: number; inbox: number | null };
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
+  /**
+   * Whether anybody signs in on this host.
+   *
+   * THE HOST KNOWS AND THE APP COULD NOT TELL. A self-host started without a key, or a Worker with no
+   * `SESSION_SECRET`, answers `/account/records` 401 on every load, which is exactly what an ended
+   * session answers, so the switcher said "Sign in again" where there is nowhere to sign in. Read off
+   * the same answer `invitations` gives: an invitation is spent by signing in, so a host that cannot take
+   * one has no sign-in. `false` when the host never said, as `invitations` is off when absent.
+   */
+  signIn: boolean;
 };
 
 /** One line of the log as a caller sees it: the event, and what it is about when they may read that. */
@@ -1406,6 +1416,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           sessions: readable(ctx, SESSION) ? [] : live(ctx),
           waiting: waitingFor(ctx),
           ...shellFor(ctx),
+          signIn: invitations !== undefined && invitations() === null,
         });
       });
     },

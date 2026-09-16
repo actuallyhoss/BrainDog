@@ -71,8 +71,11 @@ export async function load({ url, fetch }): Promise<Shell> {
      reads as a product that holds one business.
 
      AN EMPTY LIST IS NOT AN ANSWER ABOUT THIS RECORD EITHER. Somebody is inside one, so a switcher
-     with no rows in it would be the rail contradicting the screen beside it. */
-  if (booted.from === 'live') {
+     with no rows in it would be the rail contradicting the screen beside it.
+
+     AND NOT WHERE NOBODY SIGNS IN. A self-host started without a key answers this 401 on every load,
+     and the switcher then said "Sign in again" on a host with no sign-in. `boot` says which host this is. */
+  if (booted.from === 'live' && live.signsIn(booted.boot)) {
     reach ??= readRecordsForSwitcher(fetch, url.origin);
     const listed = await reach;
     if (!listed.ok) {
