@@ -81,6 +81,15 @@
      groups win wherever there are any and the sample keeps the screen it always had. */
   let linked = $state<Linked | null>(null);
   let links: LinkReader | null = null;
+  /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS, NOT ITS NUMBER (DESIGN-SYSTEM rule 7, appendix C7). The
+     relation arrives with `#` first; the column and every row's cell at that index move to the end. */
+  const idLast = <R extends { columns: { field: string }[]; rows: { cells: string[] }[] }>(rel: R): R => {
+    const at = rel.columns.findIndex((c) => c.field === 'seq');
+    if (at < 0) return rel;
+    const moved = <T,>(list: readonly T[]): T[] => [...list.slice(0, at), ...list.slice(at + 1), list[at]!];
+    return { ...rel, columns: moved(rel.columns), rows: rel.rows.map((r) => ({ ...r, cells: moved(r.cells) })) };
+  };
+
   const incoming = $derived(
     linked?.from === 'live' ? linked.groups : row && !live ? backlinks(id, seq) : [],
   );
@@ -716,7 +725,7 @@
           </article>
         {/each}
 
-        {#each incoming as rel}
+        {#each incoming.map(idLast) as rel}
           <!-- One section per RELATION, not per register: two fields of one register can point at
                the same place and mean different things — an update's `track` is what it is about
                and its `supersedes` is what it replaces. -->

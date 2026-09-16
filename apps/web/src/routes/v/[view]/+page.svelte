@@ -41,7 +41,10 @@
   const key = $derived(page.params.view ?? '');
   const view = $derived(VIEWS[key]);
   const decl = $derived(view ? REGISTERS[view.register] : undefined);
-  const columns = $derived(view ? columnsFor(view.register) : []);
+  /* The spoken id ends the row, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
+  const columns = $derived(
+    view ? [...columnsFor(view.register).filter((c) => c.field !== 'seq'), ...columnsFor(view.register).filter((c) => c.field === 'seq')] : [],
+  );
 
   /**
    * THE REST OF THE URL, WHICH THIS ROUTE USED TO THROW AWAY WITHOUT SAYING SO.
