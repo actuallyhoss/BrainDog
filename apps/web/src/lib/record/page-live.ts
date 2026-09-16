@@ -301,6 +301,12 @@ function barsOf(v: unknown): Bars | null {
   return { bucket: v.bucket, current: v.current, keys: v.keys, states: v.states, values: v.values, unit: typeof v.unit === 'string' ? v.unit : null };
 }
 
+/** A forecast's remembered points, when they are points: a day and a number each. Anything else is none. */
+function pastOf(v: unknown): { at: string; value: number }[] | null {
+  if (!Array.isArray(v)) return null;
+  return v.filter((p): p is { at: string; value: number } => isObject(p) && typeof p.at === 'string' && typeof p.value === 'number' && Number.isFinite(p.value));
+}
+
 /** A `forecast.runway` block's `walk`, when it is one. The record builds it; a record on another build may not have. */
 function walkOf(v: unknown): Walk | null {
   if (!isObject(v) || !Array.isArray(v.steps) || !v.steps.every(isStep) || !Number.isFinite(v.from)) return null;
@@ -369,6 +375,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     seen: mark,
     history: versions,
     bars: barred,
+    past: remembered,
     ...rest
   } = b;
 
@@ -438,7 +445,15 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
      did not send, or sent in a shape this cannot read, says it cannot be drawn rather than drawing empty. */
   if (b.source === 'forecast.runway') {
     const walk = walkOf(walked);
-    return walk ? { ...shell, walk, ...walkTable(walk, kind === 'bridge' ? walk.steps.length : limit, new Date(now).toISOString().slice(0, 10), false) } : cannot;
+    const past = pastOf(remembered);
+    return walk
+      ? {
+          ...shell,
+          walk,
+          ...(past ? { past } : {}),
+          ...walkTable(walk, kind === 'bridge' || kind === 'forecast' ? walk.steps.length : limit, new Date(now).toISOString().slice(0, 10), false),
+        }
+      : cannot;
   }
   if (b.source === 'activity') {
     const feed = feedOf(fed);

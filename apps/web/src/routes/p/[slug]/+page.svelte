@@ -135,6 +135,8 @@
     resolve: live ? (path: string) => said(resolverOf(block.values)(path)) : (path: string) => said(sampleValues[path] ?? null),
     now: live ? live.now : NOW,
     ...(live ? {} : { hole: pressHole }),
+    /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
+    scenario: true,
   });
 
   /**

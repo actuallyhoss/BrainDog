@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, page, pages, type Filter } from './api.ts';
+import { applyFilters, page, pages, readBlock, type Filter } from './api.ts';
 import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
 import { draw } from './blocks.ts';
 import { fill, resolvePages, slugify } from './pages.ts';
@@ -246,8 +246,10 @@ test('EVERY block counts what it is showing, in the unit its total is in', () =>
 });
 
 test('and the walk counts steps, not the opening balance beside them', () => {
-  const walk = (page('money')?.blocks ?? []).find((b) => b.source === 'forecast.runway' && b.kind === 'table');
-  assert.ok(walk, 'the money page no longer draws a cash walk, so this proves nothing');
+  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'forecast');
+  assert.ok(decl, 'the money page no longer draws a cash walk, so this proves nothing');
+  /* The page draws the walk as a forecast, which shows every step; read as a table it is cut to twelve. */
+  const walk = readBlock({ ...decl, kind: 'table', limit: 12, knobs: undefined, recorded: undefined } as never);
   /* The opening row is drawn and is not a step: `rows` is one longer than `shown`, deliberately. */
   assert.equal(walk.rows.length, walk.shown + 1, 'the walk lost its opening row, or started counting it');
   assert.ok(walk.total > walk.shown, 'the seeded walk no longer runs past its limit');

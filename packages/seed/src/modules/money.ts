@@ -441,6 +441,38 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         ],
       },
       {
+        /* HOW LONG THE MONEY LASTS: cash remembered up to today, then the walk from Cash now, a repeating row
+           spent every time it comes round. A reader can ask what if clients pay later, what if there is
+           spending the record does not know, or what if a large movement does not happen; the answer is
+           arithmetic over the same walk, and nothing is written. Every movement is in the fold under it. */
+        kind: 'forecast',
+        heading: 'Cash ahead',
+        span: 12,
+        source: 'forecast.runway',
+        opening: { metric: 'cash-now' },
+        recorded: 'cash-now',
+        from: [
+          {
+            register: 'obligations',
+            on: 'due',
+            amount: 'amount',
+            where: 'state is open or part',
+            incoming: { field: 'direction', is: 'owed_to_me' },
+            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+          },
+          {
+            register: 'services',
+            on: 'renews',
+            amount: 'cost',
+            where: 'state is not cancelled',
+            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+          },
+        ],
+        horizon: 365,
+        knobs: ['horizon', 'late', 'spend', 'leave'],
+        empty: 'Nothing dated in the next twelve months.',
+      },
+      {
         /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
            that lands. It walks the same legs as the table below, over a shorter horizon. */
         kind: 'bridge',
@@ -511,36 +543,6 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         span: 12,
         body: 'Money you owe has gone past its date: {{overdue}} in all. Statutory interest may be due; the terms are in the contract.',
         when: { metric: 'overdue', gt: 0 },
-      },
-      {
-        /* WHAT IS COMING, IN ORDER, WITH THE BALANCE AFTER EACH. The walk starts from Cash now, and a
-           repeating row is spent every time it comes round. */
-        kind: 'table',
-        heading: 'What is coming',
-        span: 12,
-        columns: [{ field: 'day' }, { field: 'what' }, { field: 'delta' }, { field: 'balance' }],
-        source: 'forecast.runway',
-        opening: { metric: 'cash-now' },
-        from: [
-          {
-            register: 'obligations',
-            on: 'due',
-            amount: 'amount',
-            where: 'state is open or part',
-            incoming: { field: 'direction', is: 'owed_to_me' },
-            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
-          },
-          {
-            register: 'services',
-            on: 'renews',
-            amount: 'cost',
-            where: 'state is not cancelled',
-            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
-          },
-        ],
-        horizon: 180,
-        limit: 12,
-        empty: 'Nothing dated in the next six months.',
       },
       {
         kind: 'table',

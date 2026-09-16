@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { runway, trend, type Leg } from './forecast.ts';
 import { NOW, PAGES, ROWS } from './data.ts';
-import { openingOf, page, trendOf } from './api.ts';
+import { openingOf, page, readBlock, trendOf } from './api.ts';
 import { magnitudeOf } from 'braindog-render';
 
 /**
@@ -125,34 +125,24 @@ test('the crossing is ONE row, and the rest of the year is not the same colour',
   // here is an emergency", which is both true and useless: the eye has nothing to land on, and the
   // one row worth acting on looks like all the others.
   //
-  // The block is widened for the length of the test because its heading is "What is coming" and
-  // twelve movements is what that heading promises — the crossing at day 116 is named by the Runway
-  // tile, not by this table. What is under test is the mapping, so the window has to reach it.
-  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'table');
+  // The Money page draws its walk as a forecast now, whose fold is this table; the walk is read here
+  // as the table it also is, over the same declaration, with a window wide enough to reach the crossing.
+  const decl = PAGES.money?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'forecast');
   assert.ok(decl, 'the money page has no cash walk');
-  const before = decl.limit;
-  decl.limit = 60;
-  try {
-    const block = page('money')?.blocks.find((b) => b.source === 'forecast.runway' && b.kind === 'table');
-    assert.ok(block);
-    const at = block.rows.findIndex((r) => r.tone === 'bad');
-    assert.ok(at >= 0, 'the widened window does not reach the crossing, so nothing is being tested');
-    assert.equal(block.rows.filter((r) => r.tone === 'bad').length, 1, 'more than one row is drawn as the crossing');
-    /* `warn` is STILL UNDER, not "after the crossing" — the balance recovers when a receivable
-       lands, and a row back in the black is not a warning. Read from the drawn balance column, so
-       what is asserted is what somebody sees. */
-    block.rows.forEach((r, i) => {
-      if (i === at) return;
-      const balance = magnitudeOf(r.cells[3] ?? '');
-      assert.equal(r.tone, balance < 0 ? 'warn' : undefined, `row ${i} (${r.cells[1]}) carries the wrong tone`);
-    });
-    assert.ok(block.rows.some((r) => magnitudeOf(r.cells[3] ?? '') < 0), 'no row is under, so nothing is tested');
-  } finally {
-    // Put it back exactly as it was, including not being set: an optional property assigned
-    // `undefined` is not an absent one.
-    if (before === undefined) delete (decl as { limit?: number }).limit;
-    else decl.limit = before;
-  }
+  const { knobs: _knobs, recorded: _recorded, ...walk } = decl;
+  const block = readBlock({ ...walk, kind: 'table', limit: 60 });
+  const at = block.rows.findIndex((r) => r.tone === 'bad');
+  assert.ok(at >= 0, 'the widened window does not reach the crossing, so nothing is being tested');
+  assert.equal(block.rows.filter((r) => r.tone === 'bad').length, 1, 'more than one row is drawn as the crossing');
+  /* `warn` is STILL UNDER, not "after the crossing" — the balance recovers when a receivable
+     lands, and a row back in the black is not a warning. Read from the drawn balance column, so
+     what is asserted is what somebody sees. */
+  block.rows.forEach((r, i) => {
+    if (i === at) return;
+    const balance = magnitudeOf(r.cells[3] ?? '');
+    assert.equal(r.tone, balance < 0 ? 'warn' : undefined, `row ${i} (${r.cells[1]}) carries the wrong tone`);
+  });
+  assert.ok(block.rows.some((r) => magnitudeOf(r.cells[3] ?? '') < 0), 'no row is under, so nothing is tested');
 });
 
 /* ── the fit ─────────────────────────────────────────────────────────────── */

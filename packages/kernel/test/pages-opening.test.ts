@@ -159,3 +159,32 @@ test('a figure with no points has no trend, and a trend that is not a window is 
   assert.equal(bad.readings?.[0]?.refusal?.code, 'DECLARATION_INVALID');
   assert.equal(bad.readings?.[0]?.refusal?.at, 'trend');
 });
+
+/* ── a forecast's remembered half ────────────────────────────────────────── */
+
+test('A FORECAST DRAWS THE OPENING FIGURE AS IT WAS REMEMBERED, and only that figure', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([ACCOUNTS, BILLS, CASH]));
+  value(k.create('accounts', { name: 'Current', balance: { amount: 300_000, currency: 'GBP' } }, OWNER));
+  const put = (at: string, v: number) =>
+    sql.exec(
+      "INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES ('cash-now', 'day', ?, ?, 'GBP', 1, 'register.accounts', ?)",
+      at,
+      v,
+      '2026-09-03T00:05:00Z',
+    );
+  put('2026-05-01', 1);
+  put('2026-08-31', 280_000);
+  put('2026-09-02', 300_000);
+  put('2026-09-03', 999);
+  const forecast = { ...walk({ metric: 'cash-now' }), kind: 'forecast', recorded: 'cash-now', knobs: ['horizon', 'late'] };
+  const out = k.block(forecast);
+  assert.deepEqual(out.refusals, []);
+  assert.deepEqual(out.past?.map((p) => ({ at: p.at, value: p.value })), [{ at: '2026-08-31', value: 280_000 }, { at: '2026-09-02', value: 300_000 }], 'ninety days before today, and not today');
+  assert.equal(out.walk?.from, 300_000);
+
+  assert.equal(k.block({ ...forecast, recorded: 'series.cash-now' }).refusals.length, 0, 'the series spelling is the same series');
+  assert.equal(k.block({ ...forecast, recorded: 'overdue' }).refusals[0]?.at, 'recorded', 'another figure would join two measures at today');
+  assert.equal(k.block({ ...forecast, knobs: ['weather'] }).refusals[0]?.at, 'knobs');
+});

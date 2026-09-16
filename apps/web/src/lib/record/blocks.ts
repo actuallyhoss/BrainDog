@@ -125,6 +125,29 @@ function bridgeRows(block: BlockResult): string[] {
 }
 
 /**
+ * A forecast as the dialect writes it: the opening, the balance remembered before today, every movement
+ * of the walk, the horizon, and the knobs a reader may move.
+ *
+ * THE WALK IS THE ONE THE TABLE AND THE BRIDGE READ, so the line, the bars of the next thirty days and
+ * the figures beside them cannot disagree about where the money goes.
+ */
+function forecastRows(block: BlockResult): string[] {
+  const walk = block.walk;
+  if (!walk) return [];
+  const currency = walk.currency ?? homeCurrency() ?? null;
+  const said = (minor: number) => (currency ? money(minor, currency) : String(minor));
+  /* THE DAY THE BLOCK WAS READ, which is the record's clock on a live page and the sample's here. */
+  const today = block.stale_at.slice(0, 10);
+  return [
+    `opening | ${today} | ${escapeCell(copy.bridgeStart)} | ${said(walk.from)}`,
+    ...(block.past ?? []).map((p) => `past | ${p.at} |  | ${said(p.value)}`),
+    ...walk.steps.map((s) => `step | ${s.day} | ${escapeCell(s.label)} | ${said(s.delta)}`),
+    `horizon | ${block.horizon ?? 180} |  | `,
+    ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
+  ];
+}
+
+/**
  * A series as the dialect writes it: a header naming each line in or out, then a row a bucket.
  *
  * THE LABEL IS THE BUCKET AS A PERSON SAYS IT, `Apr 2026` rather than `2026-04`, and a figure is money
@@ -454,6 +477,8 @@ export function toSegments(block: BlockResult) {
         ? bridgeRows(block)
       : block.kind === 'series'
         ? seriesRows(block)
+      : block.kind === 'forecast' && block.source === 'forecast.runway'
+        ? forecastRows(block)
       : block.kind === 'chips'
         ? chipsRows(block)
       : block.kind === 'gauge'

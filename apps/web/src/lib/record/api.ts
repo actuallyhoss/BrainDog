@@ -1547,6 +1547,8 @@ export type BlockResult = PageBlock & {
   walk?: Walk;
   /** A `series` block's buckets and each line's value in them, as the record's `barsOf` lines them up. */
   bars?: Bars;
+  /** A forecast's `recorded:` series over the ninety days before today, oldest first. */
+  past?: readonly { at: string; value: number }[];
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1595,8 +1597,10 @@ function runwayBlock(b: PageBlock): BlockResult {
      that recurs past the cap — came back to a block that drew an empty table under its own `empty:`
      sentence instead. "Nothing is coming" and "this walk could not be made" are different facts and
      one of them is the reason for the other. */
+  const recorded = recordedOf(b);
   const refusals = [
     ...(opened.refusal ? [opened.refusal] : []),
+    ...(typeof recorded === 'string' ? [recorded] : []),
     ...walk.refusals,
     ...(walk.mixed.length ? [`The cash walk needs one currency: ${mixedFix(walk.mixed)}.`] : []),
     ...(opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency
@@ -1610,8 +1614,9 @@ function runwayBlock(b: PageBlock): BlockResult {
     matched: [],
     refusals,
     ...(refusals.length ? {} : { walk }),
-    /* A BRIDGE ADDS UP THE WHOLE WALK, so it shows every movement it read rather than a slice of them. */
-    ...walkTable(walk, b.kind === 'bridge' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
+    ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: recorded }),
+    /* A BRIDGE ADDS UP THE WHOLE WALK, and a forecast draws it, so each shows every movement it read rather than a slice of them. */
+    ...walkTable(walk, b.kind === 'bridge' || b.kind === 'forecast' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
     drawn: b.drawn ?? drawnWhen(b),
     stale_at: new Date(NOW).toISOString(),
     metrics: undefined,
@@ -1658,6 +1663,27 @@ function seriesBlock(b: PageBlock): BlockResult {
 
 /** The currency a `money.<CUR>` format names, or `null`. */
 const unitOfFormat = (format: string | undefined): string | null => (format?.startsWith('money.') ? format.slice('money.'.length) : null);
+
+/** The knobs a forecast may offer: the kernel's `KNOBS`. */
+const KNOBS = ['horizon', 'late', 'spend', 'leave'];
+
+/**
+ * A forecast's remembered balance before today, as the record's `recordedOf` reads it, or the sentence that stops it.
+ *
+ * The series is the opening figure's own, over the ninety days before today, a day with no point absent.
+ */
+function recordedOf(b: PageBlock): readonly { at: string; value: number }[] | string | null {
+  if (b.knobs !== undefined && (!Array.isArray(b.knobs) || b.knobs.some((k) => !KNOBS.includes(k)))) return `knobs is a list of ${KNOBS.join(', ')}.`;
+  if (b.recorded === undefined) return null;
+  const id = typeof b.recorded === 'string' ? b.recorded.replace(/^series\./u, '') : '';
+  const opening = b.opening !== null && typeof b.opening === 'object' ? b.opening.metric : null;
+  if (!id || id !== opening) return `recorded: names the series its opening figure is remembered in, which is ${opening ?? 'a figure this walk does not open from'}.`;
+  const DAY = 86_400_000;
+  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const from = at(NOW - 90 * DAY);
+  const to = at(NOW - DAY);
+  return (SERIES[id] ?? []).filter((p) => p.at >= from && p.at <= to);
+}
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
 export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string };
@@ -1787,6 +1813,8 @@ const READS = new Set([
   'lead',
   /* A series's lines and its reach. */
   'series', 'back', 'ahead', 'net',
+  /* A forecast's remembered figure and its knobs. */
+  'recorded', 'knobs',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {

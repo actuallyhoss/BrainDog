@@ -298,6 +298,10 @@ export type PageBlock = {
   ahead?: number;
   /** A `series`'s: draw what was left, in minus out, as a line. */
   net?: boolean;
+  /** A `forecast`'s: the series its opening figure is remembered in, drawn before today. */
+  recorded?: string;
+  /** A `forecast`'s: which knobs a reader may move. */
+  knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
 };
 
 export type PageDecl = {

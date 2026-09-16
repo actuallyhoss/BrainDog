@@ -981,3 +981,22 @@ test('THE MONEY PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each l
   assert.ok(months.some((r) => /^£[\d,]+\.\d\d$/u.test(r.cells[1] ?? '')), 'money in the home currency');
   assert.deepEqual(months.slice(-4).map((r) => r.cells[3]), ['partial', 'ahead', 'ahead', 'ahead']);
 });
+
+test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety days remembered, every movement, and its knobs', async () => {
+  const { draw } = await import('./blocks.ts');
+  const forecast = page('money')!.blocks.find((b) => b.kind === 'forecast')!;
+  assert.deepEqual(forecast.refusals, []);
+  const drawn = draw(forecast);
+  assert.equal(drawn.refusal, null);
+  const [segment] = drawn.segments;
+  assert.equal(segment?.type, 'block');
+  if (segment?.type !== 'block') return;
+  assert.equal(segment.kind, 'forecast');
+  const marks = segment.rows.map((r) => r.cells[0]);
+  assert.equal(marks[0], 'opening');
+  assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
+  assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '365']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend leave']);
+  assert.equal(forecast.shown, forecast.total, 'a forecast is never a slice');
+});

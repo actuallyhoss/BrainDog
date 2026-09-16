@@ -85,6 +85,13 @@ export type PageBlock = {
   ahead?: number;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */
   net?: boolean;
+  /**
+   * A `forecast`'s: the series its opening figure is remembered in, so the line draws how cash moved
+   * before today (`08 §3`: the recorded half and the projected half read the same figure).
+   */
+  recorded?: string;
+  /** A `forecast`'s: which of its knobs a reader may move. */
+  knobs?: string[];
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -111,6 +118,8 @@ const READS = new Set([
   'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
   /* A `series`'s lines and reach, and the bars it answers with. */
   'series', 'back', 'ahead', 'net', 'bars',
+  /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
+  'recorded', 'knobs', 'past',
 ]);
 
 export type PageDecl = {
@@ -147,6 +156,8 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `series` block's buckets and each line's value in them. */
   bars?: Bars;
+  /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
+  past?: { at: string; value: number }[];
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
@@ -485,7 +496,9 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
           at: 'opening',
         }),
       };
-    return { ...base, walk, matched: walk.steps.length, refusals: also(...walk.refusals) };
+    const recorded = recordedOf(deps, block);
+    if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
+    return { ...base, walk, ...recorded, matched: walk.steps.length, refusals: also(...walk.refusals) };
   }
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
@@ -607,6 +620,33 @@ function openingOf(deps: PageDeps, opening: PageBlock['opening']): { value: numb
   if (!read.ok) return { value: null, unit: null, ...(refused(read) ? { refusal: read.refusal } : {}) };
   if (read.value.refusals.length) return { value: null, unit: null, refusal: read.value.refusals[0]! };
   return { value: read.value.value ?? 0, unit: read.value.unit };
+}
+
+/** The knobs a `forecast` may offer. */
+export const KNOBS = ['horizon', 'late', 'spend', 'leave'] as const;
+
+/** How far back a forecast draws what was recorded. */
+const RECORDED_DAYS = 90;
+
+/**
+ * A walk's remembered balance before today, when it names the series, and its knobs checked.
+ *
+ * `recorded:` NAMES THE FIGURE THE OPENING IS, or the line would join two measures at today: the
+ * opening is a reading of one figure, and what came before has to be that figure remembered, which is
+ * why a series other than the opening's is refused rather than drawn.
+ */
+function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; value: number }[] } | { refusal: Refusal } {
+  if (block.knobs !== undefined && (!Array.isArray(block.knobs) || block.knobs.some((k) => !(KNOBS as readonly unknown[]).includes(k))))
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `knobs is a list of ${KNOBS.join(', ')}.`, at: 'knobs', allowed: [...KNOBS] } };
+  if (block.recorded === undefined) return {};
+  const id = typeof block.recorded === 'string' ? block.recorded.replace(/^series\./u, '') : '';
+  const opening = block.opening !== null && typeof block.opening === 'object' ? block.opening.metric : null;
+  if (!id || id !== opening)
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `recorded: names the series its opening figure is remembered in, which is ${opening ?? 'a figure this walk does not open from'}.`, at: 'recorded' } };
+  if (!deps.points) return {};
+  const DAY = 86_400_000;
+  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  return { past: deps.points(id, at(deps.ctx.nowMs - RECORDED_DAYS * DAY), at(deps.ctx.nowMs - DAY)) };
 }
 
 /**
