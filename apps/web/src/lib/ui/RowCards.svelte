@@ -107,6 +107,15 @@
 
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
+
+  /* A FIGURE IS A QUANTITY, and the first of the card's two fields that is one ends the title's line. */
+  const FIGURES = new Set(['money', 'int', 'decimal']);
+  const figure = $derived(decl?.mobile.slice(1).find((f) => FIGURES.has(decl.fields.find((d) => d.id === f)?.type ?? '')));
+  /* The rest is the detail line, in the declared order. */
+  const detail = $derived(decl ? decl.mobile.slice(1).filter((f) => f !== figure) : []);
+  /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a mark or a tone: the mark in it on the
+     first line, the tone on the second, and the words of both lines start at one x. */
+  const slotted = $derived(entries.some((e) => markFor(e) !== null || toneFor(e) !== undefined));
 </script>
 
 <!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
@@ -123,11 +132,10 @@
       <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
         <a class="card" href={to(e)} data-intent={toneFor(e) ?? undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
-               what the row is before its number. The tone and the project lead it. -->
-          <span class="card-title" dir={dirOf(register, decl.mobile[0])}>
-            {#if toneFor(e)}
-              <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
-            {/if}
+               what the row is before its number. ONE THING LEADS IT, the project's mark, in a slot
+               every card keeps when any card in the list has one, so the titles share an edge. The
+               tone and the mark both led it once, two dots before a word. -->
+          <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined}>
             {#if markFor(e)}
               {@const it = markFor(e)!}
               <span
@@ -142,6 +150,22 @@
                  first line would read as a card that failed to draw. -->
             {#if title === null}<span class="card-missing">Not set</span>{:else}{title}{/if}
           </span>
+          <!-- THE FIGURE ENDS THE FIRST LINE, where the eye goes down a list of amounts. `#1` held
+               this slot and pushed the amount to the second line (rule 7). -->
+          {#if figure}
+            <span class="card-figure" dir={dirOf(register, figure)}>
+              {@render amount(display(register, figure, e.fields[figure], now, names) ?? '')}
+            </span>
+          {/if}
+          <!-- THE TONE QUALIFIES THE DETAIL, at its head: a due date or a status is what it is about. -->
+          <span class="card-b" data-slot={slotted ? '' : undefined}>
+            {#if toneFor(e)}
+              <span class="glyph" role="img" aria-label={TONES[toneFor(e)!].label}>{TONES[toneFor(e)!].glyph}</span>
+            {/if}
+            {#each detail.map((f) => [f, worded(f, display(register, f, e.fields[f], now, names) ?? '')] as const).filter(([, said]) => said) as [field, said], i (field)}
+              {#if i > 0}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, field)} data-enum={isEnum(field) ? '' : undefined}>{@render amount(said)}</span>
+            {/each}
+          </span>
           <span class="card-seq">
             {#if picked?.has(e.seq)}
               <!-- A GLYPH, NOT A TINT. `13 §5.1`: colour never carries meaning alone, and "this row
@@ -152,12 +176,6 @@
                  somebody typed can never collide with one the record has; `#-1` is that sentinel
                  with a minus sign in front of it, and it was going straight to the screen. -->
             {#if e.seq >= 0}#{e.seq}{/if}
-          </span>
-          <span class="card-b" dir={dirOf(register, decl.mobile[1])} data-enum={isEnum(decl.mobile[1]) ? '' : undefined}>
-            {@render amount(worded(decl.mobile[1], display(register, decl.mobile[1], e.fields[decl.mobile[1]], now, names) ?? ''))}
-          </span>
-          <span class="card-c" dir={dirOf(register, decl.mobile[2])} data-enum={isEnum(decl.mobile[2]) ? '' : undefined}>
-            {@render amount(worded(decl.mobile[2], display(register, decl.mobile[2], e.fields[decl.mobile[2]], now, names) ?? ''))}
           </span>
         </a>
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
@@ -265,15 +283,6 @@
       text-decoration: none;
     }
 
-    .card-seq {
-      grid-column: 2;
-      grid-row: 1;
-      color: var(--dim);
-      font-family: var(--font-id);
-      font-size: var(--t-xs);
-      text-align: end;
-    }
-
     /* THE TITLE WRAPS ON THE NARROWEST PHONE, because there is nothing else on its line to protect.
        At 390 the column is wide enough that nothing truncates; at 320 nine of the thirty-eight
        obligation cards lost their end — `Invoice 2026-041 — brand` — and the row number beside it,
@@ -289,8 +298,26 @@
       font-weight: 500;
     }
 
-    .card-title .glyph {
-      margin-inline-end: var(--sp-1);
+    /* The slot is the mark's width and its gap, and what sits in it hangs there, so a title that
+       wraps keeps its edge and a line with nothing in the slot keeps it too. */
+    [data-slot] {
+      position: relative;
+      padding-inline-start: calc(8px + var(--sp-2));
+    }
+
+    .card-title .card-mark {
+      position: absolute;
+      inset-inline-start: 0;
+      inset-block-start: calc((1lh - 8px) / 2);
+      margin: 0;
+    }
+
+    .card-b .glyph {
+      position: absolute;
+      inset-inline-start: 1px;
+      /* The detail is one line, so the middle of the box is the middle of the line. */
+      inset-block-start: 50%;
+      translate: 0 -50%;
     }
 
     .card-missing {
@@ -306,27 +333,50 @@
       }
     }
 
+    .card-figure {
+      grid-column: 2;
+      grid-row: 1;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+      text-align: end;
+      white-space: nowrap;
+    }
+
+    /* A card with no figure gives its title the whole first line. */
+    .card-title[data-whole] {
+      grid-column: 1 / -1;
+    }
+
     .card-b {
       grid-column: 1;
       grid-row: 2;
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       color: var(--dim);
       font-size: var(--t-sm);
       font-variant-numeric: tabular-nums;
     }
 
-    .card-c {
+    /* The spoken id ends the detail line, quiet, in the id face. */
+    .card-seq {
       grid-column: 2;
       grid-row: 2;
+      align-self: center;
       color: var(--dim);
-      font-size: var(--t-sm);
-      font-variant-numeric: tabular-nums;
+      font-family: var(--font-id);
+      font-size: var(--t-xs);
       text-align: end;
     }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a
        screen reader. */
-    .card-b[data-enum]::first-letter,
-    .card-c[data-enum]::first-letter {
+    .card-b [data-enum] {
+      display: inline-block;
+    }
+
+    .card-b [data-enum]::first-letter {
       text-transform: uppercase;
     }
   }
