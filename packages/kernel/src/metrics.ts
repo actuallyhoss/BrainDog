@@ -528,7 +528,9 @@ function read(
     /* A ZERO DENOMINATOR IS NOT A NUMBER. Never `0`, never infinity, never `NaN` — the em dash, and
        the numerator is still on the row behind it. */
     const value = a === null || b === null ? null : 'ratio' in decl.value ? (b === 0 ? null : a / b) : a - b;
-    return ok({ value, unit: 'ratio' in decl.value ? null : of.value.unit, rows: of.value.rows, refusals: [] });
+    /* EITHER HALF'S UNIT, because the two agree or the check above refused. It was the first half's,
+       so nothing received less GBP 50.00 paid read a bare -5000 with no currency. */
+    return ok({ value, unit: 'ratio' in decl.value ? null : (of.value.unit ?? per.value.unit), rows: of.value.rows, refusals: [] });
   }
 
   return one(sql, schema, decl.value, where, params, lookups);

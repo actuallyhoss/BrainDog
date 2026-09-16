@@ -942,3 +942,32 @@ test('A DELTA OVER A NEGATIVE PRIOR KEEPS ITS DIRECTION', async () => {
   assert.equal(deltaFrom(-48_000, -24_000), 0.5);
   assert.equal(deltaFrom(48_000, 72_000), 0.5);
 });
+
+test('A DIFF WHOSE FIRST HALF READ NOTHING KEEPS THE OTHER HALF\'S CURRENCY', async () => {
+  /* The unit was the first half's alone, so nothing received and GBP 50.00 paid read
+     `{ value: -5000, unit: null }`: a bare number an agent could not tell was money. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const LEDGER: Declaration = {
+    id: 'register.ledger',
+    kind: 'register',
+    body: {
+      id: 'ledger',
+      name: 'Ledger',
+      title: 'what',
+      fields: [
+        { id: 'what', type: 'text', required: true },
+        { id: 'got', type: 'money' },
+        { id: 'paid', type: 'money' },
+      ],
+    } as never,
+  };
+  assert.ok((await k.install([LEDGER])).ok);
+  assert.ok(k.create('ledger', { what: 'Hosting', paid: gbp(5_000) }, { actor: 'p_1' }).ok);
+  const net = value<Reading>(
+    k.metric({ metric: 'net', name: 'Net', source: 'register.ledger', value: { diff: { of: { sum: 'got' }, per: { sum: 'paid' } } }, format: 'money', target: { gte: 0 }, window: '30d' } as never),
+  );
+  assert.equal(net.value, -5_000);
+  assert.equal(net.unit, 'GBP', 'a diff whose first half read nothing lost its currency');
+  sql.close();
+});
