@@ -1651,6 +1651,9 @@ export const copy = {
    * cannot report it yet, which is a fact about this build and not about the person's access.
    */
   recordsUnlisted: 'This record cannot list the other records you can reach yet.',
+  /* Lane O: the page's source as a file. The name is on the button because the name is the point —
+     one page, one file, called what the declaration's first line calls it. */
+  pageSourceSave: (file: string) => `Download ${file}`,
 } as const;
 
 export type Copy = typeof copy;

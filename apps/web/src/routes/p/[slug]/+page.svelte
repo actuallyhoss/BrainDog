@@ -23,6 +23,7 @@
   import { registerHref } from '$lib/record/where.ts';
   import type { PageBlock, PageDecl } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
+  import { dogName, dogText, saveDog, type DogPage } from '$lib/dog/source.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -435,18 +436,31 @@
   }
 
   /**
-   * THE DECLARATION, WHICH IS THE TEMPLATE AND NOT THE RESULT OF IT.
+   * THE DECLARATION THE RECORD HOLDS, AND THE APP'S ONLY WHERE THERE IS NO RECORD.
    *
-   * This printed `result.page` — the RESOLVED page — so a project's source view showed six
-   * predicates with `Kiln` typed into them and no `for:` anywhere: exactly the shape that was
-   * deleted when the four project pages became one declaration. An agent reading this to learn the
-   * dialect would copy back the thing the record no longer has.
+   * This read `PAGES` — the web app's own built-in declarations — for every page, so somebody
+   * opening "How this is built" on their own record was shown the demo's copy of it. A page the
+   * record has and the app does not fell through to the resolved answer; a page they had both of
+   * printed ours. Either way the screen labelled "source" was not the source of the page they have.
    *
-   * And it printed seven keys of a block. `cells`, `columns`, `order`, `target`, `body` and
-   * `authored` were all dropped, so the same agent would copy a `stat` with no metrics and a `code`
-   * block with no code — a page of empty blocks, from a screen labelled "source".
+   * SO A LIVE PAGE PRINTS THE RECORD'S ANSWER, which carries the declaration's own keys on the page
+   * and on every block — `cells`, `columns`, `order`, `target`, `body` and `authored` included,
+   * which is why printing `result.page` alone once dropped them.
+   *
+   * A PER-ROW PAGE IS STILL THE RECORD'S TEMPLATE. The record answers one page per row of the
+   * register the template walks, so `for:` comes back with it and the `{{field}}`s arrive filled
+   * with the row this page is about. That is the record's own declaration, read from the record;
+   * the app's copy of the same template is not, and this no longer reaches for it.
+   *
+   * THE FALLBACK IS FOR A RECORD THAT GENUINELY HAS NONE: the sample, where `PAGES` IS the record,
+   * and a live answer with nothing declared on it.
    */
-  const source = $derived(result ? (result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? result.page : undefined);
+  const recorded = $derived<DogPage | undefined>(
+    live && live.page.blocks.length ? ({ ...live.page.page, blocks: live.page.blocks } as unknown as DogPage) : undefined,
+  );
+  const source = $derived<DogPage | undefined>(
+    recorded ?? (result ? ((result.page.param ? PAGES[templateOf(result.page)] : PAGES[result.page.page]) ?? result.page) : undefined),
+  );
 
   /** Which declaration a resolved page came from: the one template whose expansion produced it. */
   function templateOf(page: PageDecl): string {
@@ -455,41 +469,16 @@
     return page.page;
   }
 
-  const line = (indent: string, key: string, value: unknown): string =>
-    value === undefined || value === null || value === '' ? '' : `${indent}${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`;
+  const declaration = $derived(source ? dogText(source) : '');
 
-  const declaration = $derived(
-    source
-      ? [
-          `page: ${source.page}`,
-          `title: ${source.title}`,
-          source.for
-            ? `for: { register: ${source.for.register}${source.for.where ? `, where: ${source.for.where}` : ''} }`
-            : '',
-          source.nav ? `nav: { section: ${source.nav.section}, order: ${source.nav.order} }` : '',
-          `requires: [${source.requires.join(', ')}]`,
-          '',
-          'blocks:',
-          ...source.blocks.flatMap((b) => [
-            `  - kind: ${b.kind}`,
-            line('    ', 'heading', b.heading),
-            b.span && b.span !== 12 ? `    span: ${b.span}` : '',
-            line('    ', 'source', b.source),
-            line('    ', 'where', b.where),
-            b.columns?.length ? `    columns: [${b.columns.map((c) => c.field).join(', ')}]` : '',
-            b.cells?.length ? `    cells: [${b.cells.map((c) => c.metric).join(', ')}]` : '',
-            b.order?.length ? `    order: [${b.order.map((o) => `${o.field} ${o.dir}`).join(', ')}]` : '',
-            line('    ', 'target', b.target),
-            line('    ', 'limit', b.limit),
-            b.empty ? `    empty: "${b.empty}"` : '',
-            b.authored?.length ? `    authored: ${b.authored.length} rows` : '',
-            b.body ? `    body: |\n${b.body.split('\n').map((l) => `      ${l}`).join('\n')}` : '',
-          ]),
-        ]
-          .filter(Boolean)
-          .join('\n')
-      : '',
-  );
+  /** One page, one file, named as its first line names it. */
+  const dogFile = $derived(source ? dogName(source.page) : '');
+
+  /** The same bytes the screen is showing, as a file somebody can keep, diff, send and edit. */
+  function saveSource() {
+    saveDog(dogFile, declaration);
+    toasts.push(copy.exported(dogFile), { intent: 'good' });
+  }
 
 
   /**
@@ -591,6 +580,16 @@
       <!-- The declaration as diffable text. A page is a row, so this is the row (19 §2). -->
       <!-- `tabindex="0"`: it is a long scrolling code block, and a scrolling box a keyboard cannot
            focus is a box a keyboard cannot read. Named, so tabbing into it says what it is. -->
+      <!-- THE SOURCE IS A FILE, not a box to read. A format nobody can hold is a viewer: this text
+           could not be saved, diffed, sent to somebody or edited and applied, so the one thing a
+           person could do with the page they wrote was look at it. The file is named as the
+           declaration's own first line names it, and it is the same bytes the block below shows. -->
+      <div class="source-file">
+        <Button weight="quiet" onclick={saveSource}>
+          <Icon name="download" size="s" />
+          {copy.pageSourceSave(dogFile)}
+        </Button>
+      </div>
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <pre class="source" tabindex="0" aria-label={copy.declarationOf(result.page.title)}><code
           >{declaration}</code></pre>
@@ -901,6 +900,16 @@
   .block-where-lead {
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* The file sits above its own text, on the leading edge of nothing else, so it reads as an action
+     ON the source rather than as part of the page the source describes. Full width for the reason
+     the `pre` below it is: neither is a block and neither has a declared span. */
+  .source-file {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    min-inline-size: 0;
   }
 
   .source {
