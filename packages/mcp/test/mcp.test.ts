@@ -114,10 +114,10 @@ test('record_index says what the record holds, with the version as a number', as
 
 test('a row is addressed the way a person says it, and made and read and changed', async () => {
   const { mcp, sql } = await agent();
-  const made = value<{ seq: number; version: number }>(
+  const made = value<{ spoken: string; version: number }>(
     await mcp.call('create', { register: 'obligations', fields: { what: 'Invoice 41', state: 'open' }, note: 'From the PDF' }, owner),
   );
-  assert.equal(made.seq, 1);
+  assert.equal(made.spoken, 'obligations#1');
 
   const read = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
   assert.equal(read.fields.what, 'Invoice 41');
@@ -221,10 +221,90 @@ test('an address that is not one says what an address looks like', async () => {
   const { mcp, sql } = await agent();
   for (const spoken of ['41', 'obligations', 'Obligations#41', 'obligations#0', 's42', 'S0', 'S42x', undefined, 42])
     assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number.*S42/, String(spoken));
-  /* The tools that change a row, or read its history, take the qualified form only. */
-  for (const name of ['history', 'update', 'log'])
-    assert.match(refusal(await mcp.call(name, { spoken: 'S42', patch: {}, note: 'x' }, owner)).fix, /register#number/, name);
+  /* The tools that change a row, or read its history, take a prefixed id too, and one that names no row says so. */
+  for (const name of ['history', 'update', 'log']) {
+    assert.match(refusal(await mcp.call(name, { spoken: 'obligations', patch: {}, note: 'x' }, owner)).fix, /register#number/, name);
+    assert.match(refusal(await mcp.call(name, { spoken: 'S42', patch: {}, note: 'x' }, owner)).fix, /no row S42/, name);
+  }
   sql.close();
+});
+
+test('A ROW IS COMPACT: its spoken id, version, state and fields, and never the columns no tool takes back', async () => {
+  const { mcp, sql } = await agent();
+  const made = value<Record<string, unknown>>(await mcp.call('create', { register: 'obligations', fields: { what: 'a', state: 'open' } }, owner));
+  assert.deepEqual(Object.keys(made).sort(), ['fields', 'spoken', 'state', 'updated_at', 'version']);
+  const page = value<{ rows: Record<string, unknown>[]; matched: number }>(await mcp.call('list', { register: 'obligations' }, owner));
+  assert.equal(page.rows[0]?.spoken, 'obligations#1');
+  assert.equal(page.rows[0]?.id, undefined);
+  assert.equal(page.matched, 1);
+
+  /* AND A CONFLICT'S ROW IS THE SAME SHAPE, so the retry reads it the way it read the first copy. */
+  value(await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'b' } }, owner));
+  const stale = await mcp.call('update', { spoken: 'obligations#1', patch: { what: 'c' }, version: 1 }, owner);
+  assert.ok(conflicted(stale));
+  assert.equal((stale.conflict.current as { spoken: string }).spoken, 'obligations#1');
+  sql.close();
+});
+
+test('A REF IS FOLLOWED: get takes the row id a ref field holds', async () => {
+  const { mcp, api, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
+  const id = (api.kernel.get('obligations#1') as { id: string }).id;
+  assert.equal(value<{ spoken: string }>(await mcp.call('get', { spoken: id }, owner)).spoken, 'obligations#1');
+  sql.close();
+});
+
+test('A PREFIXED ID IS WRITTEN TO, as context names it: update, log and history take S1', async () => {
+  const { mcp, api, sql } = await agent();
+  const token: CallContext = { principal: { kind: 'token', id: 't', scope: 'write', person: 'p_1', level: 'owner' }, session: { client_id: 'c-1' } };
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, token));
+  const run = value<{ version: number }>(await mcp.call('get', { spoken: 'S1' }, owner));
+  value(await mcp.call('log', { spoken: 'S1', note: 'Looked at from the app.' }, owner));
+  assert.ok(value<unknown[]>(await mcp.call('history', { spoken: 'S1' }, owner)).length >= 2);
+  const moved = await mcp.call('update', { spoken: 'S1', patch: { doing: 'Checking the gates' }, version: run.version + 1 }, token);
+  assert.equal(value<{ spoken: string }>(moved).spoken, 'session#1');
+  sql.close();
+});
+
+test('record_index IS THE REGISTERS AND THE VERSION, not the whole first screen', async () => {
+  const { mcp, sql } = await agent();
+  const index = value<Record<string, unknown>>(await mcp.call('record_index', {}, owner));
+  for (const key of ['sessions', 'waiting', 'pages', 'whatsNew', 'me']) assert.equal(index[key], undefined, key);
+  sql.close();
+});
+
+test('GOVERNANCE LISTS EACH QUESTION WITHOUT ITS BODY, and one by id is whole', async () => {
+  const { mcp, sql } = await agent();
+  const asked = value<{ id: string }>(
+    await mcp.call(
+      'propose',
+      { question: 'File this?', body_kind: 'options', body: { options: [{ id: 'a', label: 'Yes', because: 'one' }, { id: 'b', label: 'No', because: 'two' }] } },
+      owner,
+    ),
+  );
+  const listed = value<Record<string, unknown>[]>(await mcp.call('governance', {}, owner));
+  assert.equal(listed[0]?.question, 'File this?');
+  assert.equal(listed[0]?.body, undefined);
+  assert.ok(!Object.values(listed[0] ?? {}).includes(null), 'an empty field cost tokens');
+  assert.ok(value<{ body: unknown }>(await mcp.call('governance', { id: asked.id }, owner)).body);
+  sql.close();
+});
+
+test('A ROWSET NAMES ITS REGISTER FROM at, AND A NEW SKILL BODY RAISES rev, so sync takes it', async () => {
+  const { surface, calls } = stub({
+    get: async () => ({ ok: true, value: { id: 'x', register: 'skills', seq: 3, version: 2, fields: { rev: 4 } } }),
+  });
+  const ctx: Ctx = { who: 'agent' };
+  value(
+    await tools(surface).call(
+      'propose',
+      { question: 'Take it?', body_kind: 'rowset', body: { rows: [{ at: 'skills#3', version: 2, patch: { body: 'New text' } }] } },
+      ctx,
+    ),
+  );
+  const sent = calls.find((c) => c.method === 'propose')?.args as { body: { register: string; rows: { patch: { rev: number } }[] } };
+  assert.equal(sent.body.register, 'skills');
+  assert.equal(sent.body.rows[0]?.patch.rev, 5);
 });
 
 test('a stale write comes back as a conflict, with the row and the actor an agent needs to retry', async () => {
@@ -378,9 +458,9 @@ test('search finds a row by any of its searchable fields, and the words are pref
   ]);
   value(await mcp.call('create', { register: 'people', fields: { name: 'Halden Studio' } }, owner));
 
-  const hits = value<{ register: string; seq: number; title: string }[]>(await mcp.call('search', { q: 'hal' }, owner));
+  const hits = value<{ spoken: string; title: string }[]>(await mcp.call('search', { q: 'hal' }, owner));
   assert.equal(hits.length, 1);
-  assert.equal(hits[0]?.register, 'people');
+  assert.equal(hits[0]?.spoken, 'people#1');
   assert.equal(hits[0]?.title, 'Halden Studio', 'a hit that does not say what it is makes the agent fetch it to find out');
   sql.close();
 });

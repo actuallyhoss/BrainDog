@@ -143,14 +143,14 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'get',
-    description: 'One row, by the id a person says out loud: obligations#41, S42 or LN7.',
-    input: obj({ spoken: str('register#number, or a prefixed id such as S42.') }, ['spoken']),
+    description: 'One row, by the id a person says out loud: obligations#41, S42 or LN7. A ref field holds a row id, and get takes that too.',
+    input: obj({ spoken: str('register#number, a prefixed id such as S42, or a row id from a ref field.') }, ['spoken']),
     writes: false,
   },
   {
     name: 'list',
     description:
-      'Rows of one register, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}.',
+      'Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}. Each row says its spoken id.',
     input: obj(
       {
         register: str('A register id.'),
@@ -171,13 +171,13 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'history',
     description: 'The writes that made one row, in order, each with who and when.',
-    input: obj({ spoken: str('register#number.') }, ['spoken']),
+    input: obj({ spoken: str('register#number, or a prefixed id such as LN7.') }, ['spoken']),
     writes: false,
   },
   {
     name: 'governance',
     description:
-      'What has been proposed and not yet answered, what was decided and why, and what was predicted. Open suggestions unless you ask for more.',
+      'What has been proposed and not yet answered, what was decided and why, and what was predicted. Open suggestions unless you ask for more. A list gives each question; ask by id for its body.',
     input: obj({
       register: str('suggestion (the default), decision, or prediction.'),
       id: str('One row, by its SG or D number.'),
@@ -197,7 +197,7 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'The body for that kind. options needs at least two, each with id, label and because. A rowset row with at (skills#3), version and patch changes that row when accepted.',
+            'The body for that kind. options: {"options":[...]}, at least two, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]} changes those rows when accepted. A new skill body raises its rev for you.',
         },
       },
       ['question', 'body_kind', 'body'],
@@ -218,7 +218,7 @@ export const TOOLS: readonly Tool[] = [
     description: 'Change a row. Send the version you read; a stale write is refused rather than merged, so read it again and reapply.',
     input: obj(
       {
-        spoken: str('register#number.'),
+        spoken: str('register#number, or a prefixed id such as LN7.'),
         patch: { type: 'object', description: 'Field ids to values. null clears a field.' },
         version: int("The row's version when you read it."),
         note: str('One sentence a person reads in six weeks.'),
@@ -230,7 +230,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     description: 'Append one note to a row, changing nothing about it. One sentence, for the next reader.',
-    input: obj({ spoken: str('register#number.'), note: str('One sentence.') }, ['spoken', 'note']),
+    input: obj({ spoken: str('register#number, or a prefixed id such as LN7.'), note: str('One sentence.') }, ['spoken', 'note']),
     writes: true,
   },
   {
@@ -269,13 +269,55 @@ const QUALIFIED = /^([a-z][a-z0-9_]{0,31})#([1-9][0-9]*)$/;
 /** `S42`, `LN7`: a register's own prefix and number. The record knows which register owns a prefix. */
 const PREFIXED = /^[A-Z]{1,4}[1-9][0-9]*$/;
 
+/** A row's own id, the ULID a ref field holds. The record reads one as it reads a spoken id. */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
 const parse = (spoken: unknown): { register: string; seq: number } | null => {
   const m = typeof spoken === 'string' ? QUALIFIED.exec(spoken.trim()) : null;
   return m ? { register: m[1]!, seq: Number(m[2]) } : null;
 };
 
-const ROW = 'A row is addressed as register#number, like obligations#41.';
 const ROW_OR_ID = 'A row is addressed as register#number, like obligations#41, or by its prefixed id, like S42.';
+
+const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+
+/** A row as the record answers it, before it is made compact. */
+type Entry = { id: string; register: string; seq: number | null; version: number; state?: string | null; fields: Record<string, unknown> };
+const isEntry = (x: unknown): x is Entry =>
+  isObject(x) && typeof x.id === 'string' && typeof x.register === 'string' && typeof x.version === 'number' && isObject(x.fields);
+
+/**
+ * A row as an agent reads it: its spoken id, its version, its state and its fields.
+ *
+ * THE SPOKEN ID IS THE ONE THING AN AGENT NEEDS AND THE RECORD'S ROW DID NOT SAY. It carried `register`
+ * and `seq` apart, and the id, `created_at` and `deleted_at` beside them, so every row cost a hundred
+ * bytes of what no tool takes back, and the address every tool does take had to be put together by the
+ * model. `register#number` is accepted by every tool, for every register, prefixed or not.
+ */
+export function compact(row: Entry): Record<string, unknown> {
+  const extra = row as Entry & { updated_at?: unknown; deleted_at?: unknown };
+  return {
+    spoken: row.seq === null ? row.id : `${row.register}#${String(row.seq)}`,
+    version: row.version,
+    ...(row.state === null || row.state === undefined ? {} : { state: row.state }),
+    ...(typeof extra.updated_at === 'string' ? { updated_at: extra.updated_at } : {}),
+    ...(typeof extra.deleted_at === 'string' ? { deleted_at: extra.deleted_at } : {}),
+    fields: row.fields,
+  };
+}
+
+/** A row, or a page of rows, made compact; anything else as it came. */
+const compacted = (value: unknown): unknown => {
+  if (isEntry(value)) return compact(value);
+  if (isObject(value) && Array.isArray(value.rows)) return { ...value, rows: value.rows.map((r) => (isEntry(r) ? compact(r) : r)) };
+  return value;
+};
+
+const shaped = (r: Result<unknown>): Result<unknown> => {
+  if (r.ok) return { ok: true, value: compacted(r.value) };
+  const conflict = (r as { conflict?: { current?: unknown } }).conflict;
+  return conflict && isEntry(conflict.current) ? ({ ...r, conflict: { ...conflict, current: compact(conflict.current) } } as Result<unknown>) : r;
+};
 const badSpoken = (fix: string): Result<never> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'spoken' } });
 
 /**
@@ -365,14 +407,95 @@ export const TEMPLATES = [
  * to keep in step, and the one that drifted would be the one an agent reads.
  */
 export function tools<C>(surface: McpSurface<C>) {
+  /**
+   * Where a row is, from any way an agent says it: `register#number` as it is, and a prefixed id such as
+   * `LN7` asked of the record, which alone knows which register owns a prefix.
+   *
+   * `context` NAMES ROWS BY PREFIX, so a tool that took only `register#number` refused the id the briefing
+   * had just handed over: `update LN8` was "a row is addressed as register#number".
+   */
+  const locate = async (spoken: unknown, ctx: C): Promise<Result<{ register: string; seq: number }>> => {
+    const at = parse(spoken);
+    if (at) return { ok: true, value: at };
+    const said = typeof spoken === 'string' ? spoken.trim() : '';
+    if (!PREFIXED.test(said)) return badSpoken(ROW_OR_ID);
+    const found = await surface.get({ spoken: said }, ctx);
+    if (!found.ok) return found;
+    const row = found.value as { register?: unknown; seq?: unknown } | null;
+    return row && typeof row.register === 'string' && typeof row.seq === 'number'
+      ? { ok: true, value: { register: row.register, seq: row.seq } }
+      : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: `There is no row ${said} that you can read.`, at: 'spoken' } };
+  };
+
+  /**
+   * A rowset as the record takes it, from the shape the description teaches.
+   *
+   * THE REGISTER IS THE ONE EVERY ROW'S `at` NAMES, when the body leaves it out: `at` already says it, and
+   * the record refused "A rowset proposal needs register" to a body whose every row named `skills`.
+   *
+   * AND A SKILL'S NEW TEXT IS ITS NEXT `rev`. `skills sync` rewrites a synced file only when `rev` rises, so
+   * an accepted change to `body` that left `rev` alone reached the record and no session's files.
+   */
+  const rowset = async (body: Record<string, unknown>, ctx: C): Promise<Record<string, unknown>> => {
+    if (!Array.isArray(body.rows)) return body;
+    const rows = body.rows as unknown[];
+    const read = new Map<string, Promise<Result<unknown>>>();
+    const target = (at: string): Promise<Result<unknown>> => {
+      let got = read.get(at);
+      if (!got) {
+        got = surface.get(parse(at) ?? { spoken: at.trim() }, ctx);
+        read.set(at, got);
+      }
+      return got;
+    };
+    let register = body.register;
+    if (register === undefined) {
+      const named = new Set<string | undefined>();
+      for (const r of rows) {
+        const at = isObject(r) && typeof r.at === 'string' ? r.at : undefined;
+        if (at === undefined) named.add(undefined);
+        else {
+          const got = await target(at);
+          named.add(got.ok && isEntry(got.value) ? got.value.register : undefined);
+        }
+      }
+      const [only] = [...named];
+      if (named.size === 1 && only !== undefined) register = only;
+    }
+    const out = await Promise.all(
+      rows.map(async (r) => {
+        if (register !== 'skills' || !isObject(r) || typeof r.at !== 'string' || !isObject(r.patch)) return r;
+        if (!Object.hasOwn(r.patch, 'body') || Object.hasOwn(r.patch, 'rev')) return r;
+        const got = await target(r.at);
+        const rev = got.ok && isEntry(got.value) ? got.value.fields.rev : undefined;
+        return typeof rev === 'number' ? { ...r, patch: { ...r.patch, rev: rev + 1 } } : r;
+      }),
+    );
+    return { ...body, ...(register === undefined ? {} : { register }), rows: out };
+  };
+
   const run: Record<string, (args: Args, ctx: C) => Answer> = {
+    /**
+     * THE REGISTERS AND THE VERSION, AND NOTHING ELSE `boot` CARRIES. `boot` is the app's first screen in one
+     * round trip: live sessions, waiting questions, pages and the whole of what is new, 34 kilobytes on the
+     * seeded record. The description promised "the cheap way to learn register names", and `context` is
+     * where the rest is for an agent.
+     */
     record_index: async (_args, ctx) => {
       const boot = await surface.boot(ctx);
       if (!boot.ok) return boot;
       const version = await surface.version(ctx);
+      const { record } = boot.value as { record?: unknown };
       /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. An
          agent holding the object as its cursor would send it back and get a range scan from nothing. */
-      return { ok: true, value: { ...boot.value, version: version.ok ? version.value.version : null } };
+      return {
+        ok: true,
+        value: {
+          ...(record === undefined ? {} : { record }),
+          registers: boot.value.registers,
+          version: version.ok ? version.value.version : null,
+        },
+      };
     },
 
     context: async (_args, ctx) =>
@@ -389,7 +512,8 @@ export function tools<C>(surface: McpSurface<C>) {
       const at = parse(args.spoken);
       if (at) return surface.get(at, ctx);
       const said = typeof args.spoken === 'string' ? args.spoken.trim() : '';
-      return PREFIXED.test(said) ? surface.get({ spoken: said }, ctx) : badSpoken(ROW_OR_ID);
+      /* A ROW ID TOO, because a ref field holds one: `thing: 01M2...` was a value no tool could follow. */
+      return PREFIXED.test(said) || ROW_ID.test(said) ? surface.get({ spoken: said }, ctx) : badSpoken(ROW_OR_ID);
     },
 
     list: (args, ctx) =>
@@ -403,22 +527,48 @@ export function tools<C>(surface: McpSurface<C>) {
         ctx,
       ),
 
-    search: (args, ctx) =>
-      surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx),
-
-    history: async (args, ctx) => {
-      const at = parse(args.spoken);
-      return at ? surface.history(at, ctx) : badSpoken(ROW);
+    /* A HIT IS ITS SPOKEN ID AND ITS TITLE. `rank` is a float the order already says. */
+    search: async (args, ctx) => {
+      const found = await surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx);
+      if (!found.ok || !Array.isArray(found.value)) return found;
+      return {
+        ok: true,
+        value: found.value.map((hit: unknown) =>
+          isObject(hit) && typeof hit.register === 'string' && typeof hit.seq === 'number'
+            ? { spoken: `${hit.register}#${String(hit.seq)}`, title: hit.title }
+            : hit,
+        ),
+      };
     },
 
-    governance: (args, ctx) => surface.governance(args as never, ctx),
+    history: async (args, ctx) => {
+      const at = await locate(args.spoken, ctx);
+      return at.ok ? surface.history(at.value, ctx) : at;
+    },
+
+    /**
+     * A LIST IS EACH QUESTION WITHOUT ITS BODY, and one by id is whole. A `rowset` body carries every field it
+     * would write, and the seeded queue's one proposal to change a page's note was four kilobytes of
+     * markdown in a list an agent reads to learn what is waiting. Empty fields go too.
+     */
+    governance: async (args, ctx) => {
+      const out = await surface.governance(args as never, ctx);
+      if (!out.ok || args.id !== undefined || !Array.isArray(out.value)) return out;
+      return {
+        ok: true,
+        value: out.value.map((row: unknown) =>
+          isObject(row) ? Object.fromEntries(Object.entries(row).filter(([k, v]) => k !== 'body' && v !== null)) : row,
+        ),
+      };
+    },
 
     /**
      * AND THERE IS NO `decide` TOOL, deliberately. `decide` is a rung no token reaches (ADR-060), so
      * a tool for it could only ever refuse, and a tool that always refuses is a tool an agent spends
      * its turns discovering.
      */
-    propose: (args, ctx) => surface.propose(args as never, ctx),
+    propose: async (args, ctx) =>
+      surface.propose((args.body_kind === 'rowset' && isObject(args.body) ? { ...args, body: await rowset(args.body, ctx) } : args) as never, ctx),
 
     create: (args, ctx) =>
       surface.create(
@@ -431,11 +581,11 @@ export function tools<C>(surface: McpSurface<C>) {
       ),
 
     update: async (args, ctx) => {
-      const at = parse(args.spoken);
-      if (!at) return badSpoken(ROW);
+      const at = await locate(args.spoken, ctx);
+      if (!at.ok) return at;
       return surface.update(
         {
-          ...at,
+          ...at.value,
           patch: (args.patch ?? {}) as Args,
           ...(args.version === undefined ? {} : { version: Number(args.version) }),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
@@ -450,12 +600,12 @@ export function tools<C>(surface: McpSurface<C>) {
      * lands in the same history.
      */
     log: async (args, ctx) => {
-      const at = parse(args.spoken);
-      if (!at) return badSpoken(ROW);
       const note = String(args.note ?? '').trim();
       if (!note)
         return { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } };
-      return surface.update({ ...at, patch: {}, note }, ctx);
+      const at = await locate(args.spoken, ctx);
+      if (!at.ok) return at;
+      return surface.update({ ...at.value, patch: {}, note }, ctx);
     },
 
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
@@ -498,7 +648,7 @@ export function tools<C>(surface: McpSurface<C>) {
       const found = await surface.list({ register: 'skills', where: { field: 'name', is: rest }, limit: 1 }, ctx);
       if (!found.ok) return found;
       const row = found.value.rows[0];
-      return row ? { ok: true, value: row } : nowhere(uri);
+      return row ? { ok: true, value: compacted(row) } : nowhere(uri);
     }
     return nowhere(uri);
   };
@@ -592,7 +742,11 @@ export function tools<C>(surface: McpSurface<C>) {
           ok: false,
           refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no tool called ${name}.`, allowed: TOOLS.map((t) => t.name) },
         };
-      return tool(args, ctx);
+      /* The rows a tool answers with, and the row a conflict carries, as an agent reads them. */
+      return SHAPED.has(name) ? shaped(await tool(args, ctx)) : tool(args, ctx);
     },
   };
 }
+
+/** The tools whose answer is a row or a page of rows. */
+const SHAPED = new Set(['get', 'list', 'create', 'update', 'log', 'handoff']);
