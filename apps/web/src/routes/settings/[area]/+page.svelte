@@ -299,6 +299,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
+  import Actions from '../../p/[slug]/Actions.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   /* Twelve rows with a glyph each, because this rail's own CSS says it "IS the same thing" as the
@@ -2071,8 +2072,13 @@
         only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
         receipts and the schedule row.
       -->
-      <Section title={copy.sources} count={SOURCES.length}>
+      <Section title={copy.sources} {...shell.live ? {} : { count: SOURCES.length }}>
         <p class="hint">{copy.sourcesHow}</p>
+        <!-- A LIVE RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write. The
+             connectors below are the sample's, and their buttons only say what would happen. -->
+        {#if shell.live}
+          <Actions project={null} />
+        {:else}
         <!-- AND THE HINT ABOVE IS ABOUT MEMBERS OF THIS SET. "A figure fed by one of these shows a
              gap…" is a sentence about connectors, on a screen with none — so the state has to say
              there are none before that line makes sense. -->
@@ -2141,6 +2147,7 @@
         <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
              shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
              it were today's is the failure that actually costs somebody money." -->
+        {/if}
         <p class="hint">{copy.staleShows}</p>
       <!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
              screen without one, because a source is a declaration and arrives the way every
@@ -2492,7 +2499,12 @@
          nothing, which is how a reader learns to skip it on the nine where it means something. -->
     <!-- Not under the live passkeys: adding and removing one there is really kept, by the host. -->
     <!-- Nor on Agents: a live record keeps what is done there, and the demo says in its own sentence that nothing can be. -->
-    {#if !REPORTS.has(area) && area !== 'agents' && !(area === 'recovery' && livePasskeys)}
+    <!-- Nor anywhere on a live record: People, Backups, Ingest, Export and Delete write to it, and the one
+         control that still only says what it would do (checking a file on Export) says so in its own toast.
+         Recovery keeps it where the host offers no passkeys, because that screen is still the sample's. -->
+    {#if shell.live && !(area === 'recovery' && !livePasskeys)}
+      {#if KEEPS.has(area)}<p class="mock">{copy.keptOnDevice}</p>{/if}
+    {:else if !REPORTS.has(area) && area !== 'agents' && !(area === 'recovery' && livePasskeys)}
       <p class="mock">{KEEPS.has(area) ? copy.mockNoticeSome : copy.mockNotice}</p>
     {/if}
   </div>

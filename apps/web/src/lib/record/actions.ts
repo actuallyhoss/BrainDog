@@ -266,10 +266,13 @@ export const whatOf = (row: ActionRow): string =>
  *
  * MATCHED BY NAME, as the "Runs on" blocks above it match `project is {{name}}`, and case-blind, because
  * a declaration typed `kiln` and a project called Kiln are the same project to a person.
+ *
+ * `null` is no project: Settings, ingest lists every action as its own, none of them faint.
  */
-export function forProject(rows: readonly ActionRow[], project: string): { own: ActionRow[]; everywhere: ActionRow[] } {
+export function forProject(rows: readonly ActionRow[], project: string | null): { own: ActionRow[]; everywhere: ActionRow[] } {
   const name = (r: ActionRow) => r.ingest;
   const by = (a: ActionRow, b: ActionRow) => name(a).localeCompare(name(b));
+  if (project === null) return { own: [...rows].sort(by), everywhere: [] };
   const want = project.trim().toLowerCase();
   return {
     own: rows.filter((r) => r.project !== null && r.project.trim().toLowerCase() === want).sort(by),

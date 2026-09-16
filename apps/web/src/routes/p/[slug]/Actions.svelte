@@ -23,9 +23,11 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import { closed, opened } from '../../../lib/ui/screen.svelte.ts';
 
-  let { project }: { project: string } = $props();
+  /* `null` lists every action, for Settings, ingest, and says so when there are none. */
+  let { project }: { project: string | null } = $props();
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<ActionRow[]>([]);
@@ -132,6 +134,8 @@
     <h3 class="actions-h" id="actions-h">{words.heading}</h3>
     <p class="action-fix" role="status">{fix}</p>
   </section>
+{:else if from === 'ready' && project === null && rows.length === 0}
+  <Empty kind="no-data-yet" title={copy.noSources} body={copy.noSourcesWhy} agentPrompt={copy.ingestPrompt} />
 {:else if from === 'ready' && split.own.length + split.everywhere.length > 0}
   <section class="actions" aria-labelledby="actions-h">
     <h3 class="actions-h" id="actions-h">{words.heading}</h3>

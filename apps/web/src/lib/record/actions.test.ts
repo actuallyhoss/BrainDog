@@ -136,6 +136,13 @@ test('a project gets its own actions, matched by name without case, and the glob
   assert.deepEqual(split.everywhere.map((r) => r.ingest), ['g']);
 });
 
+test('no project lists every action as its own, by name, with nothing faint', () => {
+  const rows = [row({ ingest: 'b', project: 'kiln' }), row({ ingest: 'g', project: null }), row({ ingest: 'a', project: 'Portage' })];
+  const split = forProject(rows, null);
+  assert.deepEqual(split.own.map((r) => r.ingest), ['a', 'b', 'g']);
+  assert.deepEqual(split.everywhere, []);
+});
+
 test('no sentence this screen says carries an em dash', () => {
   const said = Object.values(words).flatMap((w) => (typeof w === 'function' ? [(w as (...a: unknown[]) => string)('x', 'y', 'z')] : typeof w === 'string' ? [w] : Object.values(w)));
   for (const s of said) assert.ok(!String(s).includes('—'), String(s));

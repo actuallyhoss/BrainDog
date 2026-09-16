@@ -1503,6 +1503,8 @@ export const copy = {
    * not to trust the half that works.
    */
   mockNoticeSome: 'The settings above are kept on this device. Nothing else here is saved yet.',
+  /* On a live record the rest of Settings writes to it, so only the device half is said. */
+  keptOnDevice: 'The settings above are kept on this device.',
 
   /* ── the front door · `/signin` ───────────────────────────────────────────────────────────────
 
