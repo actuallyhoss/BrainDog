@@ -2549,11 +2549,34 @@
     border-block-start: 1px solid var(--line);
   }
 
+  /* THE NAME, WHAT IS KNOWN ABOUT IT UNDER THE NAME, AND THE CONTROL AT THE END OF BOTH. The head was
+     a wrapping line, so the facts and the button landed wherever the name's length left room, and a
+     row with a reach sentence pushed its Revoke onto a line of its own. */
   .who-head {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 2px var(--sp-2);
+  }
+
+  .who-head > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .who-head > .who-name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .who-head > .who-detail {
+    grid-column: 2;
+  }
+
+  .who-head > .who-do {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    margin-inline-start: var(--sp-2);
   }
 
   .who-name {
@@ -2566,7 +2589,6 @@
      instead of truncating an email address in the middle, which is where they stop being
      recognisable. */
   .who-detail {
-    flex: 1 1 24ch;
     color: var(--dim);
     font-size: var(--t-sm);
   }
@@ -2580,7 +2602,6 @@
 
      `--ink2` rather than `--dim`: the row's other clauses are context and this one is the question. */
   .who-reach {
-    flex: 1 1 100%;
     color: var(--ink2);
   }
 
@@ -2883,6 +2904,12 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* THE BUTTON IS THE FIELD'S HEIGHT, so the two read as one control and not a tall box beside a
+     short one. */
+  .code-row :global(.btn) {
+    min-block-size: var(--tap);
   }
 
   /* SIX DIGITS AND NO MORE ROOM THAN SIX DIGITS NEED. A field stretched across the panel invites a

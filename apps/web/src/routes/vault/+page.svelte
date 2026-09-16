@@ -501,11 +501,44 @@
     list-style: none;
   }
 
+  /* A KEY IS ONE ROW WITH ITS ACTIONS AT THE END. It was four stacked lines, the name, what it
+     opens, and a row of buttons under both, so six keys filled two screens. The name line and what
+     it opens stack on the left; the actions sit at the trailing edge, centred on both. */
   .who {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px var(--sp-4);
     padding-block: var(--sp-3);
+  }
+
+  .who > :not(.who-do) {
+    grid-column: 1;
+  }
+
+  .who > .who-do {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .who > .shown {
+    grid-column: 1 / -1;
+    margin-block: var(--sp-2);
+  }
+
+  /* ON A PHONE THE ACTIONS STAY AT THE END and sit level with the name, so a key is still one block
+     beside its button rather than a button on a line of its own. */
+  @media (width < 640px) {
+    .who {
+      align-items: start;
+      column-gap: var(--sp-3);
+    }
+
+    .who > .who-do {
+      grid-row: 1 / span 3;
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
 
   .who + .who {
@@ -525,7 +558,7 @@
   }
 
   .who-detail {
-    flex: 1 1 24ch;
+    flex: 1 1 auto;
     color: var(--dim);
     font-size: var(--t-sm);
   }
@@ -560,6 +593,12 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* THE BUTTON IS THE FIELD'S HEIGHT, so the two read as one control and not a tall box beside a
+     short one. */
+  .code-row :global(.btn) {
+    min-block-size: var(--tap);
   }
 
   .code-input {
