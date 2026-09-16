@@ -107,3 +107,29 @@ jobs:
         run: pnpm gates -- --only deploy-parity
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+
+      # AND THE MARKETING SITE, WHICH NOTHING HERE HAS EVER DEPLOYED. `apps/site` is the one surface
+      # that is not a property of the Worker version: `apps/worker/wrangler.jsonc` carries
+      # `apps/web/build` into the Worker, so `app.brain.dog` ships with the code, while `brain.dog`
+      # and `alpha.brain.dog` are a separate static deployment with their own file. Until this step
+      # existed that deployment was only ever made by hand, which is why on the day it was written
+      # the apex was serving a build an hour older than the app and nobody had been told.
+      #
+      # AFTER THE PARITY CHECK RATHER THAN BEFORE IT. The Worker is the critical path and the gate
+      # above is the thing that proves it landed. If the app did not deploy, publishing a new
+      # marketing site that describes it is the wrong order, and a site failure from here costs the
+      # apex one update and nothing else.
+      #
+      # THE SITE HAS NO PARITY CHECK OF ITS OWN, and that is a debt rather than an oversight.
+      # `deploy-parity` compares the live host against `apps/web/build`, which is the Worker's asset
+      # directory and not this one, so checking the apex needs the gate to take the build directory
+      # it measures as an argument. Until it does, this step trusts `wrangler`, which `51 §5.17`
+      # records three occasions of being wrong.
+      - name: Build the marketing site
+        run: pnpm --filter ./apps/site build
+
+      - name: Deploy the marketing site
+        run: pnpm --filter ./apps/site exec wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
