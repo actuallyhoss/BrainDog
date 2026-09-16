@@ -508,8 +508,10 @@ const END = new Set(['money', 'day', 'instant', 'int', 'decimal', 'duration']);
  * changes which side of that switch a column starts on, and the switch has been there since the
  * screen was written.
  */
-export function columnsFor(register: string): Column[] {
-  const r = REGISTERS[register];
+export function columnsFor(register: string, declared?: RegisterDecl): Column[] {
+  /* THE BUILT-IN DECLARATION FIRST, then the one the record sent: a list a pack brought, or one somebody made, is not in
+     `REGISTERS`, and without its own declaration here it drew rows with no cells in them. */
+  const r = REGISTERS[register] ?? declared;
   if (!r) return [];
   const wanted = new Set<string>([r.title, ...r.mobile, ...(r.state ? [r.state] : [])]);
   for (const f of r.fields) if (f.deadline) wanted.add(f.id);

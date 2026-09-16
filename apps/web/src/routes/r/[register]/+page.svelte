@@ -626,7 +626,7 @@
   /* The register's own projection, with its state marked as the column that carries the row's
      tone, so `⊘ open` reads as one thing rather than a mark in one column and a word in another. */
   const projected = $derived(
-    columnsFor(id)
+    columnsFor(id, decl)
       .filter((c) => !hidden.has(c.field))
       .map((c) => (c.field === decl?.state ? { ...c, tone: true } : c)),
   );

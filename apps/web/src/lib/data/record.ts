@@ -15,7 +15,7 @@ import { createClient, type Boot } from '@braindog/client';
 
 import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
-import { entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
+import { declOf, entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 
@@ -160,7 +160,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
       if (kept) return { ok: true, value: kept };
       const out = said(await client.schema(register));
       if (!out.ok) return out;
-      const decl = out.value as RegisterDecl;
+      const decl = declOf(out.value as RegisterDecl);
       declared.set(register, decl);
       return { ok: true, value: decl };
     },

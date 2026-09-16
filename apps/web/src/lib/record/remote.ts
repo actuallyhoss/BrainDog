@@ -16,7 +16,7 @@
 import { identityOfRow, type Identity } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { searchable, terms } from './find.ts';
-import type { Entry, Fields, Filter } from './schema.ts';
+import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue } from './where.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
@@ -236,3 +236,21 @@ export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
 export const orderOf = (
   sort: { field: string; dir: 'asc' | 'desc' } | undefined,
 ): { field: string; dir: 'asc' | 'desc' }[] | undefined => (sort ? [{ field: sort.field, dir: sort.dir }] : undefined);
+
+/**
+ * A register as the record declares it, with the two words and the card a screen draws always there.
+ *
+ * THE RECORD DOES NOT REQUIRE THEM. `one` and `mobile` are optional in a declaration, and a pack or a list somebody
+ * made may leave both out; the list screen read `decl.one` straight into a sentence and threw, so a list the built-in
+ * sample does not know never drew past its loading bars. The noun falls back to the name made singular, and the card to
+ * the title and the next fields declared.
+ */
+export function declOf(raw: RegisterDecl): RegisterDecl {
+  const name = typeof raw.name === 'string' && raw.name !== '' ? raw.name : raw.id;
+  const one = typeof raw.one === 'string' && raw.one !== '' ? raw.one : name.toLowerCase().replace(/ies$/, 'y').replace(/([^s])s$/, '$1');
+  const fields = Array.isArray(raw.fields) ? raw.fields : [];
+  const others = fields.map((f) => f.id).filter((id) => id !== raw.title && id !== raw.state);
+  const picked = [raw.title, raw.state ?? others[0], raw.state ? others[0] : others[1]].map((id) => id ?? raw.title) as [string, string, string];
+  const mobile = Array.isArray(raw.mobile) && raw.mobile.length === 3 ? raw.mobile : picked;
+  return { ...raw, name, one, fields, mobile };
+}

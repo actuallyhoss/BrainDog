@@ -22,7 +22,7 @@ import { list, REGISTERS, ROWS } from './api.ts';
 import { DECIDED, QUESTIONS, ROWSETS } from './data.ts';
 import { questionOf, rowsetOf } from './governance.ts';
 import { projected, terms } from './find.ts';
-import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type Refs } from './remote.ts';
+import { declOf, entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type Refs } from './remote.ts';
 import type { Filter } from './schema.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
@@ -338,4 +338,14 @@ test('THE SEED FILES THE SAMPLE’S QUESTIONS, so /decide on the gates’ record
     assert.ok(row, `the record has no decision on "${q.title}" (${q.id})`);
     assert.deepEqual([row.answer, row.reason], [q.decided?.option, q.decided?.reason], `${q.id}'s answer differs`);
   }
+});
+
+test('A LIST A PACK DECLARED WITHOUT ITS NOUN OR ITS CARD STILL HAS BOTH, so the list screen can say what one row is', () => {
+  const bare = declOf({ id: 'suppliers', name: 'Suppliers', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'city', type: 'text' }] } as never);
+  assert.equal(bare.one, 'supplier');
+  assert.deepEqual(bare.mobile, ['name', 'city', 'name']);
+  assert.equal(declOf({ id: 'x', name: 'Companies', title: 't', fields: [] } as never).one, 'company');
+  assert.equal(declOf({ id: 'x', name: 'Address', title: 't', fields: [] } as never).one, 'address');
+  const told = declOf({ ...REGISTERS.tasks! });
+  assert.deepEqual([told.one, told.mobile], [REGISTERS.tasks!.one, REGISTERS.tasks!.mobile], 'a declared noun was replaced');
 });

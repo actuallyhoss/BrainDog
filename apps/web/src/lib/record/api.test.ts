@@ -916,3 +916,13 @@ test('A MONEY COLUMN IS ONE THE REGISTER DECLARES AS MONEY, NOT ONE CALLED amoun
   const authored = readBlock({ kind: 'table', columns: [{ field: 'amount' }] });
   assert.equal(cols(authored)[0]?.truncate, 'end', 'a column is not a figure because of what it is called');
 });
+
+test('A LIST THE BUILT-IN SAMPLE DOES NOT KNOW TAKES ITS COLUMNS FROM THE DECLARATION THE RECORD SENT, and draws cells', () => {
+  assert.deepEqual(columnsFor('suppliers'), [], 'an unknown list with no declaration grew columns');
+  const declared = {
+    id: 'suppliers', name: 'Suppliers', one: 'Supplier', title: 'name', mobile: ['name', 'city', 'name'] as const,
+    fields: [{ id: 'name', type: 'text' as const }, { id: 'city', type: 'text' as const }, { id: 'notes', type: 'text' as const }],
+  };
+  assert.deepEqual(columnsFor('suppliers', declared as never).map((c) => c.field), ['seq', 'name', 'city']);
+  assert.deepEqual(columnsFor('tasks', declared as never), columnsFor('tasks'), 'a built-in list took a declaration over its own');
+});
