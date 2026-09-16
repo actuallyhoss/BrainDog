@@ -200,9 +200,14 @@
     white-space: nowrap;
   }
 
+  /* A BLOCK, SO THE ELLIPSIS IS AT THE END. `rows.css` makes this cell a flex row packed to the end,
+     and a sentence longer than the column overflowed out of its START: a skill's trigger read
+     ". It adds the outline and kerning checks", with its first half cut off and no mark that it was. */
   .hit :global(.line-when) {
+    display: block;
     max-inline-size: 36ch;
     overflow: hidden;
+    text-align: end;
     text-overflow: ellipsis;
   }
 
@@ -226,7 +231,7 @@
     .hit :global(.line-when) {
       grid-column: 2;
       grid-row: 2;
-      justify-content: flex-start;
+      text-align: start;
     }
   }
 
