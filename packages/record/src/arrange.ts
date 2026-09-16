@@ -115,8 +115,15 @@ export function arranger(d: ArrangeDeps) {
       packs: packs.map((p) => ({ id: p.id, ...(p.version === null ? {} : { version: p.version }), ...(p.disabled_at === null ? {} : { off: true }) })),
       offer: catalogue
         .filter((e) => !held.has(e.id))
-        .map((e) => ({ id: e.id, kind: e.kind, title: e.title, summary: e.summary, ...(e.modules.length === 0 ? {} : { modules: e.modules }) })),
-      voice: { pack: voicePack, keys: VOICE_KEYS, said },
+        /* A PACK IS ITS ID AND ONE LINE; a use case says so, and its title, because that is what a person is offered. */
+        .map((e) => ({
+          id: e.id,
+          ...(e.kind === 'usecase' ? { usecase: e.title } : {}),
+          summary: e.summary,
+          ...(e.modules.length === 0 ? {} : { modules: e.modules }),
+        })),
+      /* THE KEYS ARE IN braindog:grammar/proposals, read once; here is only what this record says. */
+      voice: { pack: voicePack, said },
       ...(Object.keys(settings).length === 0 ? {} : { settings }),
       pages: pages.map((p) => ({ slug: p.slug, title: p.title })),
       waiting: waiting(),

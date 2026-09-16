@@ -104,7 +104,7 @@ const accept = (id: string) => ({ id, decide: { option: 'accept', reason: 'yes' 
 
 test('AN AGENT READS HOW THE RECORD IS ARRANGED IN ONE COMPACT ANSWER, and the grammar it proposes in', async () => {
   const { api, sql } = await record();
-  const seen = value<{ packs: unknown[]; offer: { id: string; modules?: string[] }[]; voice: { pack: string | null; keys: string[] }; pages: unknown[]; waiting: string[] }>(
+  const seen = value<{ packs: unknown[]; offer: { id: string; modules?: string[] }[]; voice: { pack: string | null }; pages: unknown[]; waiting: string[] }>(
     await api.arrangement({}, agent),
   );
   assert.deepEqual(seen.packs, []);
