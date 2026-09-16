@@ -89,8 +89,9 @@ export type GovernDeps = {
    * What a `change` would send out of the record, if it declares or changes a scheduled action.
    *
    * ONE PROPOSAL, ONE PRESS (`loop/research-scheduled-actions.md` step 13). The record lints the declarations the change
-   * carries and works out, from them alone, every host they call, how often, the key by label and the fields sent. It
-   * answers `null` when the change sends nothing new, and a refusal when the declarations would not install.
+   * carries, with the checks the install runs when it is accepted, and works out, from them alone, every host they call,
+   * how often, the key by label and the fields sent. It answers a refusal when the declarations would not install, and
+   * otherwise `null` when the change sends nothing new.
    */
   review?: (to: Record<string, unknown>) => Result<{ egress: Egress[]; approve: string[] } | null>;
 };

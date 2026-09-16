@@ -2905,6 +2905,8 @@ export async function installDeclarations(
  * would then refuse is a question answered for nothing, so the same checks run when it is filed.
  */
 export function lintBatch(sql: Sql, batch: readonly Declaration[]): Refusal | null {
+  const off = disabledPackFault(sql, batch);
+  if (off) return off;
   const known = knownTo(sql, batch);
   const owners = ownersTo(sql, batch);
   for (const decl of batch) {

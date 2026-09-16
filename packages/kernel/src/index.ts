@@ -2669,13 +2669,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           d !== null && typeof d === 'object' && typeof (d as Declaration).id === 'string' && typeof (d as Declaration).kind === 'string' && (d as Declaration).body !== null && typeof (d as Declaration).body === 'object',
       );
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
+      /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
+         sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
+      const fault = unreadable(batch) ?? lintBatch(sql, batch);
+      if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         const out = d.kind === 'ingest' ? egressOf(d.body) : null;
         return out === null ? [] : [out];
       });
       if (egress.length === 0) return ok(null);
-      const fault = lintBatch(sql, batch);
-      if (fault) return { ok: false as const, refusal: fault };
       const changed = egress.filter((e) => {
         const was = actionDecl(e.ingest);
         const before = was === null ? null : egressOf(was.decl);

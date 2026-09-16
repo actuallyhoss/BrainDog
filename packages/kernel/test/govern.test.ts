@@ -883,3 +883,34 @@ test('A DECISION NAMES THE QUESTION IT SETTLED, and the question names its decis
   assert.equal(k.governanceRow('decision', d1)?.suggestion, first.id);
   sql.close();
 });
+
+test('A CHANGE THAT WOULD NOT INSTALL IS REFUSED WHEN IT IS PROPOSED, so the owner is not the one who finds out', async () => {
+  const { k, sql } = await record();
+  const page = (blocks: unknown[]) => ({
+    question: 'Add an Invoicing page?',
+    body_kind: 'change' as const,
+    body: {
+      declaration_id: 'page.invoicing',
+      to: {
+        id: 'page.invoicing',
+        kind: 'page',
+        body: { page: 'invoicing', title: 'Invoicing', requires: ['register.obligations'], blocks },
+      },
+    },
+  });
+
+  const empty = refusal(k.propose(page([]), 'S1'));
+  assert.equal(empty.code, 'DECLARATION_INVALID');
+  const unknown = refusal(
+    k.propose(page([{ kind: 'table', heading: 'Open', span: 12, source: 'register.nothing', columns: [{ field: 'what' }], limit: 50, empty: 'None.' }]), 'S1'),
+  );
+  assert.notEqual(unknown.code, undefined);
+  assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'a change that would not install was filed');
+
+  /* The same page with a block the install takes is filed, and installs when accepted. */
+  const good = page([{ kind: 'table', heading: 'Open', span: 12, source: 'register.obligations', columns: [{ field: 'what' }], limit: 50, empty: 'Nothing outstanding.' }]);
+  const made = value<{ id: string }>(k.propose(good, 'S1'));
+  const out = value<{ install?: unknown }>(k.decide(made.id, { decide: { option: 'accept', reason: 'it reads well' } }, 'p_owner'));
+  value(await k.install([out.install as Declaration]));
+  sql.close();
+});
