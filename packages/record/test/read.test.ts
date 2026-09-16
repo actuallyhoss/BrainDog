@@ -508,3 +508,16 @@ test('BOOT IS ONE READ, so a write from another connection lands wholly before i
   other.close();
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('THE DECIDE COUNT IS EVERY OPEN QUESTION, past two hundred, and what waits is not crowded out by what the caller cannot see', async () => {
+  const { api, sql } = await record();
+  value(await api.propose({ question: 'File Invoice 1?', body_kind: 'rowset', body: { register: 'obligations', rows: [{ what: 'Invoice 1' }] } }, owner));
+  for (let i = 0; i < 205; i++)
+    value(await api.propose({ question: `Note ${i}?`, body_kind: 'rowset', body: { register: 'diary', rows: [{ body: `Note ${i}` }] } }, owner));
+
+  assert.equal(value<Boot>(await api.boot(owner)).counts.decide, 206, 'the rail stopped counting at a page');
+  const scoped = value<Boot>(await api.boot(project));
+  assert.equal(scoped.counts.decide, 1, 'a question the token may see went uncounted behind ones it may not');
+  assert.equal(scoped.waiting.length, 1, 'the one question the token may see was crowded out of what waits');
+  sql.close();
+});

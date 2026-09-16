@@ -137,12 +137,13 @@ const ORDER: Record<GovernRegister, string> = {
 export function listGovernance(
   deps: Pick<GovernDeps, 'sql' | 'nowMs'>,
   register: GovernRegister,
-  opts: { status?: string | undefined; limit?: number | undefined } = {},
+  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined } = {},
 ): Result<Record<string, unknown>[]> {
   if (!(GOVERNANCE as readonly string[]).includes(register))
     return no('REGISTER_UNKNOWN', `${register} is not a governance register.`, { at: 'register', allowed: GOVERNANCE });
 
-  const limit = Math.min(Math.max(1, Math.floor(opts.limit ?? 50)), 200);
+  /* `every` IS THE RECORD'S OWN, for a count held to the caller: a count read off one page stops at the page. */
+  const limit = opts.every ? -1 : Math.min(Math.max(1, Math.floor(opts.limit ?? 50)), 200);
   const where: string[] = [];
   const params: (string | number)[] = [];
   if (register === 'suggestion' && opts.status !== 'all') {

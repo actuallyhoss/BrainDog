@@ -1036,10 +1036,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `governance({ id })` away.
    */
   const waitingFor = (ctx: CallContext): Waiting[] => {
-    const rows = kernel.governance('suggestion', { status: 'open', limit: 20 });
+    /* FILTERED, THEN TRIMMED. Twenty newest and then filtered left a scoped caller nothing when the
+       twenty newest were all about registers it cannot see. */
+    const rows = kernel.openSuggestions();
     if (!rows.ok) return [];
     return rows.value
       .filter((row) => !holds(ctx, row))
+      .slice(0, 20)
       .map((row) => ({
         id: String(row.id),
         body_kind: String(row.body_kind),
@@ -1136,7 +1139,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
-    const open = kernel.governance('suggestion', { status: 'open', limit: 200 });
+    /* EVERY OPEN QUESTION, NOT A PAGE OF THEM: a count read off two hundred rows said 200 to a queue of 206. */
+    const open = kernel.openSuggestions();
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale } : null,
       me: {

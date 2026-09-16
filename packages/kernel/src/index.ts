@@ -3599,6 +3599,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     governance: (register: GovernRegister, opts: { status?: string; limit?: number } = {}) =>
       listGovernance({ sql, nowMs: clock.now() }, register, opts),
 
+    /** Every open suggestion, uncapped, for a count or a list the record filters to its caller before it trims. */
+    openSuggestions: () => listGovernance({ sql, nowMs: clock.now() }, 'suggestion', { status: 'open', every: true }),
+
     /** One governance row, or `null` — a missing one is a value, not a refusal. */
     governanceRow: (register: GovernRegister, id: string) => getGovernance(sql, register, id),
 
