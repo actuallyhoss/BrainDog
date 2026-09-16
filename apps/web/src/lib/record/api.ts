@@ -1742,7 +1742,15 @@ export function readBlock(b: PageBlock): BlockResult {
           label: c.label ?? c.field,
           width: c.width ?? 'minmax(12ch,1fr)',
           align: c.align ?? 'start',
-          truncate: c.field === 'amount' || c.field === 'cost' ? ('never' as const) : ('end' as const),
+          /* A FIGURE NEVER TRUNCATES, AND WHICH COLUMNS ARE FIGURES IS THE REGISTER'S TO SAY.
+             This asked the field's NAME and matched `amount` or `cost`, so `revenue` and `rate`,
+             both declared money, were drawn as ordinary text, and a text field called `cost_centre`
+             would have been drawn as a figure. The declared type is already in scope here: the same
+             function reads `REGISTERS[register].fields` twelve lines above to name a column the
+             register does not have, and `columnsFor` has asked the type since it was written
+             (13 §4.2: a truncated figure is not shortened, it is wrong). A column over no register
+             has no declared type to ask, so it truncates as the text it is being drawn as. */
+          truncate: decl(register ?? '', c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
           /* A card's role for this column. Without it every cards block fell back to the guessed roles.
              `scope` is not a role the renderer draws: it says what the cell holds, which is settled here. */
           ...(c.as === undefined || c.as === 'scope' ? {} : { as: c.as }),

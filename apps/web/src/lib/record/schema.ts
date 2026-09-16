@@ -177,7 +177,6 @@ export type PageBlock = {
     label?: string;
     width?: string;
     align?: 'start' | 'end';
-    link?: boolean;
     /**
      * What the column is on a `cards` block (05 §2). One figure and three facts at most. `scope`, on
      * any other kind, draws where the row applies: its project, or Everywhere.

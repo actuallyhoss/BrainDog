@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, packDiff, page, readableFields, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, packDiff, page, readableFields, readBlock, search, toRows } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -26,6 +26,7 @@ import { seedBlock } from './seed.ts';
 import { hrefFor } from './metrics.ts';
 import { AUDIT, JOB, NEWS, NOW, PACKS, PAGES, REGISTERS, ROWS, VAULT } from './data.ts';
 import type { Entry } from './schema.ts';
+import type { Column } from 'braindog-render/svelte';
 
 /* ── money ───────────────────────────────────────────────────────────────── */
 
@@ -890,4 +891,28 @@ test('A ROW SAYS WHICH THING IT BELONGS TO, and every list was grey because noth
 
   /* AND A REF THAT POINTS AT NO ROW IS NOT A GLYPH. A row can name a thing that was deleted. */
   assert.equal(identityFor('obligations', { ...first('obligations'), thing: 9999 }), null);
+});
+
+/* -- a figure never truncates, and the register says which columns are figures -- */
+
+/* The evaluator hands a block the renderer's columns; the declaration's own column type is the
+   other half of that intersection and does not carry `truncate`, so the read is named once here. */
+const cols = (b: { columns: unknown }): readonly Column[] => b.columns as readonly Column[];
+
+test('A MONEY COLUMN IS ONE THE REGISTER DECLARES AS MONEY, NOT ONE CALLED amount', () => {
+  /* Which columns never truncate was decided by the field NAME, matching `amount` or `cost`.
+     `things.revenue` and `people.rate` are declared money and are called neither, so a block
+     naming one drew a figure that its column was free to cut off at the ellipsis. 13 section 4.2:
+     a truncated figure is not shortened, it is wrong. */
+  const things = readBlock({ kind: 'table', source: 'register.things', columns: [{ field: 'revenue' }, { field: 'name' }] });
+  assert.equal(cols(things).find((c) => c.field === 'revenue')?.truncate, 'never', 'revenue is money and its column did not say so');
+  assert.equal(cols(things).find((c) => c.field === 'name')?.truncate, 'end', 'a name is text and truncates like text');
+
+  const people = readBlock({ kind: 'table', source: 'register.people', columns: [{ field: 'rate' }] });
+  assert.equal(cols(people)[0]?.truncate, 'never', 'a rate is money');
+
+  /* AND THE NAME ALONE BUYS NOTHING. A block over no register has no declared type to ask, so a
+     column called `amount` is drawn as the text it is being drawn as rather than as a figure. */
+  const authored = readBlock({ kind: 'table', columns: [{ field: 'amount' }] });
+  assert.equal(cols(authored)[0]?.truncate, 'end', 'a column is not a figure because of what it is called');
 });

@@ -47,7 +47,9 @@ blocks:
 **That block is the authoring grammar, and there are two forms of this document.** The one above is
 what the kernel accepts and what a pack ships. `columns:`, `cells:` and `order:` are lists of objects
 and have to be: a column carries `label`, `width`, `align`, `link`, `tone_when` and `as`, and
-`declare.ts` refuses a bare name with *"a column names a field"*. `where:` is the one key with two
+`declare.ts` refuses a bare name with *"a column names a field"*. **`link` is specified and not
+built**: nothing reads it on either page path, and a row that has somewhere to go is already a link
+in whole, so the worked example above declares a key that does nothing today. `where:` is the one key with two
 legal spellings — the tree above, **and** the sentence `state is sent or part` — because `predicateOf`
 (`kernel/src/metrics.ts`) takes `Predicate | string` and hands a string to `parseWhere`
 ([38-SPEC-WHERE](38-SPEC-WHERE.md)); every page the seed ships is written in the sentence form.
@@ -123,7 +125,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `source` | `register.<id>` · `metric.<id>` · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6 | every row | no |
 | `when` | `{ metric: <id>, <op>: v }` — evaluated at render, never compiled | always drawn | no |
-| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool, tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
+| `columns` | `[{ field, label?, width?, align?: start \| end, link?: bool (**specified and not built**: no evaluator reads it, and a row that has somewhere to go is already a link in whole), tone_when?, as? }]`. `as` is the column's role on a `cards` block: `title \| figure \| fact \| trend \| ring \| who \| when \| mark`, one figure and at most three facts. Absent, the first text column is the title, the first figure that never truncates is the figure, and the rest are facts. On a `table` or a `cards` block, `as: scope` on the register's scope field draws where the row applies instead: the project's name, or Everywhere | — | `table`, `cards` |
 | `inherit` | bool. On a block over a register with a scope field ([02-DATA-MODEL](02-DATA-MODEL.md) §5), the rows of the project its `where` names, then the rows that apply everywhere. A project's row hides a global row of the same title where the field says `same: nearer`; otherwise both show. The project is named in `where` as `project is {{name}}` | `false` | no |
 | `order` | `[{ field, dir: asc \| desc }]` | the first indexed date descending, else `seq` descending ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5) | no |
 | `limit` | int | 50, at most 500 | no |

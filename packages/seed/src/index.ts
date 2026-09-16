@@ -1066,7 +1066,7 @@ export const PAGES: Record<string, SeedPage> = {
            types its own word makes one field two words. The worst of them was `tasks.by`,
            which the register calls Due and this called By, over a right-aligned column of
            dates on a page whose block two above it already said Due. */
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
           { field: 'party', label: 'Who', width: 'minmax(12ch,20ch)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
@@ -1133,7 +1133,7 @@ export const PAGES: Record<string, SeedPage> = {
         source: 'register.obligations',
         where: 'direction is owed by me, state is open or part',
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
         ],
@@ -1238,7 +1238,7 @@ export const PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.services',
         columns: [
-          { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)', link: true },
+          { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)' },
           { field: 'provider', label: 'Provider', width: 'minmax(12ch,18ch)' },
           { field: 'kind', label: 'Type', width: '13ch' },
           { field: 'cost', label: 'Cost', width: '13ch', align: 'end' },
@@ -1355,7 +1355,7 @@ export const PAGES: Record<string, SeedPage> = {
            `what` already links to the row, and a direction the reader cannot see is worse than a
            number they cannot say out loud. */
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(18ch,1fr)' },
           { field: 'direction', label: 'Which way', width: '13ch' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
           { field: 'due', label: 'Due', width: '15ch', align: 'end' },
@@ -1444,7 +1444,7 @@ export const PAGES: Record<string, SeedPage> = {
            register-and-kind inside the reader, and a heading is not evaluated. */
         where: 'state is not done or dropped',
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(20ch,1fr)', link: true },
+          { field: 'what', label: 'Description', width: 'minmax(20ch,1fr)' },
           /* `Project` AND `Status`, AND THEY WERE `Thing` AND `State`. Every one of the five
              registers that carries a `thing` ref labels it Project and `things` labels its own
              lane Status, and this table — authored by hand rather than derived, so no rename
