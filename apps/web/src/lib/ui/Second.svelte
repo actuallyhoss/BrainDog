@@ -134,11 +134,6 @@
     background: var(--s2);
   }
 
-  .one:focus-visible {
-    outline: var(--s1) solid var(--accent);
-    outline-offset: 2px;
-  }
-
   .label {
     color: var(--ink);
     font-weight: 500;

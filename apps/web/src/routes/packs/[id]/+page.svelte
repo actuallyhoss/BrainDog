@@ -18,7 +18,8 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { PACKS } from '$lib/record/api.ts';
+  import { PACKS, PAGES, REGISTERS, pages } from '$lib/record/api.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import {
     UNITS,
     changesOf,
@@ -306,6 +307,36 @@
           <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{fix && !besideField ? fix : ''}</p>
         </form>
       </Section>
+    {:else}
+      <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
+           where somebody comes to find out what they were. -->
+      <Empty kind="no-data-yet" glyph="settings" title={copy.packNothingToSet} body={copy.packNothingToSetWhy} />
+    {/if}
+    {#if pack && (pack.registers.length || pack.pages.length)}
+      <Section title={copy.installDiff} count={pack.registers.length + pack.pages.length}>
+        <ul class="ledger ledger-glyph">
+          {#each pack.registers as r (r)}
+            <li>
+              <a class="line" href="/r/{r}">
+                <span class="seq"><Icon name="rows" size="s" /></span>
+                <span class="line-main"><span class="line-title">{REGISTERS[r]?.name ?? r}</span></span>
+                <span class="line-amount"></span>
+                <span class="line-when"></span>
+              </a>
+            </li>
+          {/each}
+          {#each pack.pages as p (p)}
+            <li>
+              <a class="line" href="/p/{p}">
+                <span class="seq"><Icon name="doc" size="s" /></span>
+                <span class="line-main"><span class="line-title">{pages()[p]?.title ?? PAGES[p]?.title ?? p}</span></span>
+                <span class="line-amount"></span>
+                <span class="line-when"></span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </Section>
     {/if}
   </div>
 {/if}
@@ -412,56 +443,7 @@
   }
 
   /* A SWITCH, AND ITS TARGET IS THE CONTROL'S HEIGHT ON BOTH AXES: 44px on a coarse pointer. */
-  .switch {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-block-size: var(--ctl-h);
-    min-inline-size: var(--ctl-h);
-    padding: 0;
-    background: none;
-    border: 0;
-    cursor: pointer;
-  }
-
-  .switch-track {
-    position: relative;
-    display: block;
-    inline-size: 40px;
-    block-size: 24px;
-    background: var(--sunk);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-pill);
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .switch-track::after {
-    content: '';
-    position: absolute;
-    inset-block-start: 2px;
-    inset-inline-start: 2px;
-    inline-size: 18px;
-    block-size: 18px;
-    background: var(--dim);
-    border-radius: var(--r-pill);
-    transition: translate var(--d-state) var(--ease-out);
-  }
-
-  .switch[aria-checked='true'] .switch-track {
-    background: var(--accent);
-    border-color: var(--accent);
-  }
-
-  .switch[aria-checked='true'] .switch-track::after {
-    translate: 16px 0;
-    background: var(--s1);
-  }
-
-  @media (pointer: coarse) {
-    .switch {
-      min-inline-size: var(--tap);
-    }
-  }
+  /* The switch is the shared one in `controls.css`. */
 
   @media (width < 640px) {
     .setting {

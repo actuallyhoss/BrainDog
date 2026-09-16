@@ -1,5 +1,5 @@
 <!--
-  A writer, as a face: a disc with the initial, and you in the accent.
+  A writer, as a face: a disc with the initial, and you in ink.
 
   A FACE, NOT A NAME TAG in the identifier font, so a list of agents and people reads as somebody
   passing through rather than as a log file. One component, so a person is drawn one way wherever
@@ -42,8 +42,10 @@
     block-size: 22px;
   }
 
+  /* YOU ARE THE INK DISC, NOT THE ACCENT ONE. The brand colour is kept for a short list of places
+     (DESIGN-SYSTEM 1.3), and a face repeated down a log is a badge, which is not one of them. */
   .face[data-you] {
-    background: var(--accent-wash);
-    color: var(--accent-text);
+    background: var(--ink2);
+    color: var(--bg);
   }
 </style>

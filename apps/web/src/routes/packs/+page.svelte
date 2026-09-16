@@ -256,6 +256,15 @@
             <h3 class="pack-name">{nameOf(state.id)}</h3>
             {#if off}<span class="pack-off">{copy.packTurnedOff}</span>{/if}
             {#if state.version}<span class="pack-version">{state.version}</span>{/if}
+            <button
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked={!off}
+              aria-label={copy.packSwitch(nameOf(state.id))}
+              disabled={busy !== null}
+              onclick={() => turn(state.id, off)}
+            ><span class="switch-track"></span></button>
           </header>
           {#if pack}<p class="pack-blurb">{pack.blurb}</p>{/if}
           <ul class="pack-gives">
@@ -266,10 +275,6 @@
             {#each state.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
             {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
-          <div class="segmented" role="group" aria-label={copy.packSwitch(nameOf(state.id))}>
-            <button type="button" class="segment" aria-pressed={!off} data-on={off ? undefined : ''} disabled={busy !== null} onclick={() => off && turn(state.id, true)}>{copy.on}</button>
-            <button type="button" class="segment" aria-pressed={off} data-on={off ? '' : undefined} disabled={busy !== null} onclick={() => !off && turn(state.id, false)}>{copy.off}</button>
-          </div>
           <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
           {#if block}
             <p class="pack-said" role="status">
@@ -479,25 +484,30 @@
     padding: var(--sp-4);
     background: var(--s1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--raise);
-    transition: border-color var(--d-state) var(--ease-out);
-  }
-
-  .pack:hover {
-    border-color: var(--edge);
+    border-radius: var(--r-lg);
   }
 
   .pack-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-2);
   }
 
   .pack-name {
     font-family: var(--font-ui);
-    font-size: var(--t-md);
-    font-weight: 500;
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  /* The switch sits at the end of the head line and pulls in so its track, not its hit area, lines
+     up with the card's edge. */
+  .pack-head .switch {
+    margin-block: calc(var(--sp-2) * -1);
+    margin-inline-end: calc(var(--sp-2) * -1);
+  }
+
+  .pack-name {
+    margin-inline-end: auto;
   }
 
   /* OFF, AND STILL HERE. The contents dim; the switch and what stopped it do not, because they are
@@ -507,15 +517,12 @@
   }
 
   .pack-off {
-    margin-inline-start: auto;
     color: var(--dim);
     font-size: var(--t-xs);
     font-weight: 600;
   }
 
-  .pack-off + .pack-version {
-    margin-inline-start: 0;
-  }
+
 
   .pack-said {
     display: flex;
@@ -528,10 +535,9 @@
   }
 
   .pack-version {
-    margin-inline-start: auto;
     color: var(--dim);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
   }
 
   .pack-blurb {
@@ -648,6 +654,7 @@
 
   .pack-refused {
     margin: 0 0 var(--sp-2);
+    padding-inline: var(--sp-3);
     color: var(--dim);
     font-size: var(--t-sm);
   }
