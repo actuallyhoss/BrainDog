@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
-import { LOOKUPS, NOW, ORDER, installSeed } from '@braindog/seed';
+import { NOW, ORDER, installSeed } from '@braindog/seed';
 
 import { list, REGISTERS, ROWS } from './api.ts';
 import { DECIDED, QUESTIONS, ROWSETS } from './data.ts';
@@ -65,7 +65,7 @@ function rowsOf(k: Kernel, register: string): RecordRow[] {
 
 /** The seed in a real kernel, once for the file, with the ULID-to-number map for every register. */
 const seeded = (async () => {
-  const k = await openRecord(openSqlite(), { now: () => NOW }, { lookups: LOOKUPS });
+  const k = await openRecord(openSqlite(), { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, JSON.stringify(out));
   const refs: Refs = new Map(ORDER.map((r) => [r, refMapOf(r, rowsOf(k, r))] as const));

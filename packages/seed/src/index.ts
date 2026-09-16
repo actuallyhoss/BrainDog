@@ -798,6 +798,8 @@ export type SeedMetric = {
   target?: { lte: number } | { gte: number };
   window?: string;
   compare?: 'previous' | 'none';
+  /** The factor tables a `product` reads, carried with the figure so a pack installs them with it. */
+  lookups?: Record<string, Record<string, number>>;
 };
 
 /** Everything not settled, in either direction. The four states a register declares, minus two. */
@@ -905,6 +907,7 @@ export const METRICS: Record<string, SeedMetric> = {
     where: 'state is not cancelled',
     /* The row-level product 08 §2.5 describes: `cost` is per cycle, and the cycle is the factor. */
     value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
+    lookups: { per_year: LOOKUPS.per_year! },
     format: 'money.GBP',
     /* 300_000, not 30_000. The target was once written a zero short, so a GBP 2,906.80 estate was
        measured against GBP 300.00 and the tile read `warn` for a reason nobody could act on. */
@@ -949,6 +952,7 @@ export const METRICS: Record<string, SeedMetric> = {
     source: 'register.services',
     where: 'thing is {{it}}, state is not cancelled',
     value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
+    lookups: { per_year: LOOKUPS.per_year! },
     format: 'money.GBP',
     target: { lte: 120_000 },
     window: '90d',

@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { isStale, openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
-import { AGENTS_PAGES, LOOKUPS, NOW, RUNS_ON, installSeed } from '@braindog/seed';
+import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
 import type { PageBlock } from './schema.ts';
@@ -90,7 +90,7 @@ function depsOf(k: Kernel): PageDeps {
 }
 
 const seeded = (async () => {
-  const k = await openRecord(openSqlite(), { now: () => NOW }, { lookups: LOOKUPS });
+  const k = await openRecord(openSqlite(), { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, JSON.stringify(out));
   return depsOf(k);

@@ -19,7 +19,7 @@ import { openRecord, slugify, type Kernel, type PageResult } from '@braindog/ker
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { LOOKUPS, NOW, PAGES, REGISTERS, RUNS, THINGS, installSeed } from '../src/index.ts';
+import { NOW, PAGES, REGISTERS, RUNS, THINGS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -52,7 +52,7 @@ function openSqlite(): Sql & { close(): void } {
 
 async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
+  const k = await openRecord(sql, { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   return { k, sql };

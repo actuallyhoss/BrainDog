@@ -78,7 +78,34 @@ export type MetricDecl = {
   compare?: 'previous' | 'year_ago' | 'none' | undefined;
   /** `money.GBP`, `int`, `pct`, `days`. It says how to WRITE the figure, never what it is of. */
   format?: string | undefined;
+  /**
+   * The factor tables this figure's `product` reads, by name: `{ per_year: { monthly: 12, yearly: 1 } }`.
+   *
+   * CARRIED BY THE DECLARATION, SO IT TRAVELS WITH THE PACK. The tables used to be handed to the kernel
+   * by whoever opened the record, and no host ever handed one in: every real record answered
+   * `LOOKUP_UNKNOWN` for a figure its own pack had installed, while every test passed the seed's table
+   * and read the right number. A table in the body is installed, versioned, exported and uninstalled
+   * with the figure that multiplies by it, which is the property the `fx` register of `08 §2.5` has.
+   */
+  lookups?: Lookups | undefined;
 };
+
+/** Named factor tables: a table's name, then each `by` value's factor. */
+export type Lookups = Record<string, Record<string, number>>;
+
+/**
+ * The tables a metric installed before it could carry its own was written against.
+ *
+ * READ ONLY FOR A BODY WITH NO `lookups` KEY AT ALL, the way `group_by` below is still looked for on a
+ * body installed before `declare` refused one. Declaration rows are never edited (`02 §1`), so a
+ * record whose figure was installed by an earlier build keeps that body until its pack is installed
+ * again, and until then this is the side that reads it. `per_year` is the only table a build ever
+ * named without carrying, and a new declaration is refused at install unless it carries its own.
+ */
+const UNCARRIED: Lookups = { per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 } };
+
+/** The factor tables a metric reads: its own, or for a body from before it could carry them, `UNCARRIED`. */
+export const tablesOf = (decl: Pick<MetricDecl, 'lookups'>): Lookups => decl.lookups ?? UNCARRIED;
 
 export type Reading = {
   value: number | null;
@@ -168,8 +195,6 @@ export type EvalContext = {
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
   refByTitle?: ((register: string, title: string) => string | null) | undefined;
-  /** The named factor tables a `product` reads. Absent means a `lookup` cannot be resolved. */
-  lookups?: Record<string, Record<string, number>> | undefined;
 };
 
 /**
@@ -343,7 +368,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
         if (id !== 'id' && !Object.hasOwn(schema.fields, id)) at('FIELD_UNKNOWN', `${register} has no field called ${id}`, 'value');
       if (!AGGREGATIONS.includes(f.kind as (typeof AGGREGATIONS)[number]))
         at('NOT_IN_THIS_BUILD', `${f.kind} is not an aggregation this build reads`, 'value');
-      if (f.lookup && !ctx.lookups?.[f.lookup]) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
+      if (f.lookup && !Object.hasOwn(tablesOf(decl), f.lookup)) at('LOOKUP_UNKNOWN', `there is no factor table called ${f.lookup}`, 'value');
       if (f.lookup && f.kind !== 'sum') at('NOT_IN_THIS_BUILD', `a product is summed, and ${f.kind} is not a sum`, 'value');
       const said = unaggregatable(f.kind, f.field, schema);
       if (said) at('VALUE_MALFORMED', said, 'value');
@@ -355,7 +380,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
-  const now = read(sql, said.predicate, schema, decl, ctx.lookups);
+  const now = read(sql, said.predicate, schema, decl, tablesOf(decl));
   if (!now.ok) return now;
 
   /**
@@ -401,7 +426,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     const moveTo = decl.compare === 'year_ago' ? yearBefore(ctx.nowMs) : ctx.nowMs - shift;
     const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
-    const before = read(sql, shifted.predicate, schema, decl, ctx.lookups);
+    const before = read(sql, shifted.predicate, schema, decl, tablesOf(decl));
 
     if (!before.ok) why = fixOf(before);
     else if (!moved) {

@@ -54,7 +54,7 @@ function openSqlite(): Sql & { close(): void } {
 
 async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
+  const k = await openRecord(sql, { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   return { k, sql };

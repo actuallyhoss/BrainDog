@@ -90,6 +90,11 @@ export type MetricDecl = {
    * drift cost.
    */
   compare?: 'previous' | 'year_ago' | 'none';
+  /**
+   * The factor tables the declaration carries, which the record reads. The sample reads the seed's own `LOOKUPS`, which
+   * is where the seed's declarations copy theirs from, so the two cannot name different factors.
+   */
+  lookups?: Record<string, Record<string, number>>;
 };
 
 /* ── evaluating one ──────────────────────────────────────────────────────── */
@@ -438,7 +443,7 @@ export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').incl
 const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 
 /** Every key a metric document may carry here, so one it may not is named rather than ignored. */
-const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare']);
+const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups']);
 
 /** The formats this build writes. A format it does not know printed the bare number. */
 const READS_FORMAT = ['int', 'pct', 'days', 'decimal'];

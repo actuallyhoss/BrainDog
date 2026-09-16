@@ -22,7 +22,7 @@ import { parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { AGENTS_PAGES, LOOKUPS, METRICS, NOW, PAGES, REGISTERS, ROWS, installSeed } from '../src/index.ts';
+import { AGENTS_PAGES, METRICS, NOW, PAGES, REGISTERS, ROWS, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -55,7 +55,7 @@ function openSqlite(): Sql & { close(): void } {
 
 async function seeded(): Promise<{ k: Kernel; sql: Sql & { close(): void } }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, { now: () => NOW }, { lookups: LOOKUPS });
+  const k = await openRecord(sql, { now: () => NOW });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   return { k, sql };

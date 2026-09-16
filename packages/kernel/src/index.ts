@@ -245,7 +245,7 @@ export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
-export type { Aggregation, EvalContext, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
+export type { Aggregation, EvalContext, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -549,13 +549,10 @@ export type Kernel = ReturnType<typeof makeKernel>;
 /**
  * What a record is opened with, beyond its storage and its clock.
  *
- * THE FACTOR TABLES ARE HANDED IN rather than stored, because `08` §2.5's mechanism is an `fx`
- * REGISTER — rows in the record, read by a lookup — and a named literal table is the small version
- * of that for the cases where a handful of constants is the whole truth. A ninth declaration kind
- * would have been a departure from the eight the specification names.
+ * NO FACTOR TABLES. They were handed in here, and no host handed one in, so a figure that multiplies
+ * by one failed on every real record. A metric carries its own now (`MetricDecl.lookups`).
  */
 export type RecordOptions = {
-  lookups?: Record<string, Record<string, number>> | undefined;
   /**
    * The outbox kinds this deployment can deliver. Absent is all of them.
    *
@@ -2344,7 +2341,6 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /** What the evaluator needs beyond SQL: the clock, and the shape of a register. */
   const evalContext = (): EvalContext => ({
     nowMs: clock.now(),
-    lookups: opts.lookups ?? {},
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
        The title field is the register's own, so the lookup is one indexed read per name. */

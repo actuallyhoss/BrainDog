@@ -795,7 +795,7 @@ test('AN OPERAND CARRYING ITS OWN where: WAS ACCEPTED, AND THE FIGURE WAS THE OU
 
   // And the control installs, so this refuses a dropped key rather than the combinator.
   assert.equal(refusedWith(metric({ value: { ratio: { of: { sum: 'amount' }, per: { count: 'id' } } } })), null);
-  assert.equal(refusedWith(metric({ value: { ratio: { of: { sum: { product: ['hours', { lookup: 'rates', by: 'party' }] } }, per: { count: 'id' } } } })), null);
+  assert.equal(refusedWith(metric({ value: { ratio: { of: { sum: { product: ['hours', { lookup: 'rates', by: 'party' }] } }, per: { count: 'id' } } }, lookups: { rates: { Halden: 1 } } })), null);
 });
 
 test('and a comparison is one of the three the evaluator has an arm for', () => {

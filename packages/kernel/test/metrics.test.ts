@@ -340,9 +340,9 @@ test('a shape this build does not read is named rather than answered as the ungr
   for (const value of [{ last: 'amount' }, { median: 'amount' }, { group_by: 'party' }])
     assert.equal(refusal(k.metric({ ...OVERDUE, value: value as never })).code, 'NOT_IN_THIS_BUILD');
 
-  // A product naming a table the record was not given is named too, rather than read as factor one.
+  // A product naming a table the metric does not carry is named too, rather than read as factor one.
   assert.equal(
-    refusal(k.metric({ ...OVERDUE, value: { sum: { product: ['amount', { lookup: 'per_year', by: 'state' }] } } })).code,
+    refusal(k.metric({ ...OVERDUE, value: { sum: { product: ['amount', { lookup: 'per_week', by: 'state' }] } } })).code,
     'LOOKUP_UNKNOWN',
   );
 
@@ -664,9 +664,9 @@ const CYCLES: Declaration = {
   } as never,
 };
 
-async function services(lookups?: Record<string, Record<string, number>>) {
+async function services() {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW), { lookups: lookups ?? { per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 } } });
+  const k = await openRecord(sql, fixedClock(NOW));
   assert.ok((await k.install([CYCLES])).ok);
   for (const row of [
     { name: 'Object storage', cost: gbp(4_100), cycle: 'monthly' },
@@ -682,6 +682,7 @@ const ANNUAL: MetricDecl = {
   name: 'Estate, a year',
   source: 'register.services',
   value: { sum: { product: ['cost', { lookup: 'per_year', by: 'cycle' }] } },
+  lookups: { per_year: { monthly: 12, yearly: 1, two_yearly: 0.5 } },
   target: { lte: 100_000 },
   window: '90d',
   compare: 'none',
@@ -706,11 +707,34 @@ test('A COST PER CYCLE IS ANNUALISED PER ROW, before the sum', async () => {
 test('A ROW THE TABLE HAS NO FACTOR FOR IS EXCLUDED AND NAMED, never multiplied by one', async () => {
   // Factor one is the answer that made this 9.25 times too low. A figure missing one row is a
   // refusal; a figure with one row counted wrongly is a number nobody can spot.
-  const { k, sql } = await services({ per_year: { monthly: 12, yearly: 1 } });
-  const out = refusal(k.metric(ANNUAL));
+  const { k, sql } = await services();
+  const out = refusal(k.metric({ ...ANNUAL, lookups: { per_year: { monthly: 12, yearly: 1 } } }));
   assert.equal(out.code, 'LOOKUP_MISSING');
   assert.match(out.fix, /two_yearly/);
   assert.deepEqual(out.allowed, ['monthly', 'yearly']);
+  sql.close();
+});
+
+test('THE TABLE IS INSTALLED WITH THE FIGURE, and a figure that does not carry it is refused at install', async () => {
+  /* The tables were handed to the kernel by the host, no host handed one in, and every real record
+     read "cannot be worked out yet" for the pack's own Cost per year while every test passed. */
+  const { k, sql } = await services();
+  const { lookups: _, ...bareBody } = ANNUAL;
+  const installed = await k.install([{ id: 'metric.estate-year', kind: 'metric', body: ANNUAL as never }]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  assert.equal(value<Reading>(k.metric(k.metricDecl('estate-year')!)).value, 4_100 * 12 + 1_400 + 1_500);
+
+  const bare = await k.install([{ id: 'metric.bare-year', kind: 'metric', body: { ...bareBody, metric: 'bare-year' } as never }]);
+  assert.equal(!bare.ok && 'refusal' in bare ? bare.refusal.code : null, 'LOOKUP_UNKNOWN');
+  sql.close();
+});
+
+test('A BODY FROM BEFORE A METRIC COULD CARRY ITS TABLE still reads per_year, because declaration rows are never edited', async () => {
+  const { k, sql } = await services();
+  const { lookups, ...legacy } = ANNUAL;
+  assert.equal(value<Reading>(k.metric(legacy)).value, 4_100 * 12 + 1_400 + 1_500);
+  // A body that carries tables gets only its own.
+  assert.equal(refusal(k.metric({ ...legacy, lookups: { other: { monthly: 1 } } })).code, 'LOOKUP_UNKNOWN');
   sql.close();
 });
 

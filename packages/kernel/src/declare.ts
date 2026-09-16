@@ -277,6 +277,17 @@ const COMPARE = ['previous', 'year_ago', 'none'] as const;
 /** `08 §2.1`, and only ever beside a date `group_by`. */
 const BUCKETS = ['day', 'week', 'month', 'quarter', 'year'] as const;
 
+/** Every `{ lookup: name }` inside a metric's value, however deep the operand sits. */
+function lookupsNamed(value: unknown, out = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) for (const v of value) lookupsNamed(v, out);
+  else if (value !== null && typeof value === 'object')
+    for (const [key, v] of Object.entries(value)) {
+      if (key === 'lookup' && typeof v === 'string') out.add(v);
+      else lookupsNamed(v, out);
+    }
+  return out;
+}
+
 /**
  * A metric declaration, checked against `08 §2`.
  *
@@ -301,6 +312,7 @@ function metricBody(decl: Declaration): Refusal | null {
     compare?: unknown;
     group_by?: unknown;
     bucket?: unknown;
+    lookups?: unknown;
   };
   const id = decl.id;
 
@@ -315,6 +327,25 @@ function metricBody(decl: Declaration): Refusal | null {
 
   if (body.value === null || typeof body.value !== 'object')
     return bad('DECLARATION_INVALID', `${id} has no value, so there is nothing to compute.`, 'value');
+
+  /* THE FACTOR TABLES TRAVEL IN THE BODY (`metrics.ts`, `MetricDecl.lookups`), so a figure that
+     multiplies by one is refused here when it does not carry it. Installed without, it read
+     `LOOKUP_UNKNOWN` on every record whose host had no table to hand in, which was all of them. */
+  const tables = body.lookups;
+  if (tables !== undefined) {
+    if (tables === null || typeof tables !== 'object' || Array.isArray(tables))
+      return bad('DECLARATION_INVALID', `${id}'s lookups are named tables: { per_year: { monthly: 12, yearly: 1 } }.`, 'lookups');
+    const named = Object.entries(tables as Record<string, unknown>);
+    if (named.length > 8) return bad('DECLARATION_INVALID', `${id} carries ${named.length} factor tables, and a figure reads at most 8.`, 'lookups');
+    for (const [name, table] of named) {
+      const rows = table !== null && typeof table === 'object' && !Array.isArray(table) ? Object.entries(table as Record<string, unknown>) : null;
+      if (!/^[a-z][a-z0-9_]{0,31}$/u.test(name) || !rows || rows.length === 0 || rows.length > 64 || rows.some(([key, n]) => key.length > 64 || typeof n !== 'number' || !Number.isFinite(n)))
+        return bad('DECLARATION_INVALID', `${id}'s lookup ${name} is a name, then up to 64 values each with a number as its factor.`, 'lookups');
+    }
+  }
+  for (const name of lookupsNamed(body.value))
+    if (!(tables !== null && typeof tables === 'object' && Object.hasOwn(tables, name)))
+      return bad('LOOKUP_UNKNOWN', `${id} multiplies by ${name} and carries no table of that name. Add it under lookups.`, 'lookups');
 
   /**
    * AN OPERAND'S OWN `where:` OR `source:` WAS DROPPED, AND THE FIGURE CAME BACK AS THE OUTER ONE.
