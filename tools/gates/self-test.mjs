@@ -58,7 +58,7 @@ const CASES = [
      crafted so it trips EXACTLY the rule under test and nothing else — a fixture that also fires
      `unknown-property` on an incidental `var()` would assert a count that means something else. */
   { gate: 'css-rules-colour', run: 'css-rules', expect: /never a colour/, findings: 1 },
-  { gate: 'css-rules-font-size', run: 'css-rules', expect: /escapes it the same way/, findings: 1 },
+  { gate: 'css-rules-font-size', run: 'css-rules', expect: /escapes the type scale/, findings: 1 },
   { gate: 'css-rules', expect: /resolves to nothing/, findings: 1 },
   { gate: 'css-rules-outline', run: 'css-rules', expect: /focus-ok/, findings: 1 },
   { gate: 'css-rules-physical', run: 'css-rules', expect: /breaks under dir="rtl"/, findings: 1 },

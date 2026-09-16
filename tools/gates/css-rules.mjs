@@ -364,7 +364,19 @@ for (const file of files) {
          sized from the same scale — assumes the ladder holds. `TabBar.svelte:99` was a `10px` this
          rule would have caught the day it was written; it carried no `font` string for this gate to
          match on at all, because the check did not exist. */
-      if (d.prop === 'font-size' && /^[0-9.]/.test(d.value))
+      /* A SIZE IN `em` DERIVES FROM THE SCALE. A SIZE IN `px` ESCAPES IT. This rule could not tell
+         them apart, because it reds on any value starting with a digit, and that is most of what it
+         found the first time it ran: `0.5em` on a code span that is half of whichever figure it
+         fronts, where the figure is a different step in different blocks. There is no fixed token
+         that is half of a thing that varies, so pinning those would have changed what a reader sees
+         in order to satisfy a rule about not changing what a reader sees.
+
+         `rem` IS ON THE FORBIDDEN SIDE ON PURPOSE, and it is the one that looks wrong. It is
+         relative to the root and not to the parent, so it is fixed wherever it is used, which is
+         the defect this rule exists for wearing a relative unit's clothes. Viewport units are
+         refused for the same reason, and nothing in the tree uses one for type today. */
+      const derived = /^[0-9.]+(em|ex|ch|lh|%)$/i;
+      if (d.prop === 'font-size' && /^[0-9.]/.test(d.value) && !derived.test(d.value.trim()))
         findings.push({ where, rule: 'font-size-literal', text: `${d.prop}: ${d.value}` });
 
       /* `52 §5.2` ROW 6. Zero and negative are not this rule's business — `z-index: -1` is a
@@ -487,7 +499,7 @@ const RULES = {
   'outline-none': 'the focus ring is not removable without a `focus-ok:` reason beside it',
   'faint-on-text': 'faint clears the large-text floor only; not below 24px',
   'ellipsis-on-flex': 'text-overflow does nothing on a flex or grid container — put it on the child that holds the text',
-  'font-size-literal': 'the type scale has a step for this — a literal escapes it the same way a hardcoded colour does',
+  'font-size-literal': 'a size in px or rem is fixed wherever it lands, so it escapes the type scale. A size in em rides the step around it, and is not this',
   'z-index-literal': 'a positive stacking order is a `--z-*` token or it is a fight the next literal wins',
   'icon-size': 'an icon grows to a name from the scale, not a number — s, m, l or xl',
   'identifier-display-size': 'the identifier role is small and quiet by design; a display size on it is the two roles colliding',
