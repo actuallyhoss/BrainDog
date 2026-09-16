@@ -1190,5 +1190,26 @@
     .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child .cell-figure) {
       font-size: var(--t-2xl);
     }
+
+    /* A LEAD AND THREE OR MORE FIGURES: the rest are rows under it, the label on the left and the figure
+       at the right edge with its note beneath, so the last of them is not left alone on a row of its own
+       and none of them wraps its label to fit a third of a phone. */
+    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4))) {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--sp-3);
+    }
+
+    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child)) {
+      grid-template-areas:
+        'label glyph figure'
+        'note note figure';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+      column-gap: var(--sp-2);
+    }
+
+    .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child) .cell-figure) {
+      font-size: var(--t-md);
+      text-align: end;
+    }
   }
 </style>
