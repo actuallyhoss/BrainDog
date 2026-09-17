@@ -13,7 +13,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { words as vaultWords } from '$lib/record/vault.ts';
-  import { installable, nothingElse, relabelled, type SharedPlan } from './sharing.ts';
+  import { installable, moduleTitle, nothingElse, relabelled, type SharedPlan } from './sharing.ts';
 
   let {
     plan,
@@ -52,14 +52,14 @@
   <dl class="diff">
     {#if plan.enable.length > 0}
       <dt>{copy.shareTurnsOn}</dt>
-      <dd>{plan.enable.join(', ')}</dd>
+      <dd>{plan.enable.map(moduleTitle).join(', ')}</dd>
     {/if}
     {#if modules.length > 0}
       <dt>{copy.shareInstallsFirst}</dt>
       <dd>
         <ul class="diff-adds">
           {#each modules as m (m.id)}
-            <li><Icon name="packs" size="s" /><span class="diff-name">{m.id}</span><span class="diff-detail">{m.adds.map((a) => a.name).join(', ')}</span></li>
+            <li><Icon name="packs" size="s" /><span class="diff-name">{m.title}</span><span class="diff-detail">{m.adds.map((a) => a.name).join(', ')}</span></li>
           {/each}
         </ul>
       </dd>
@@ -69,7 +69,7 @@
       <dd>
         <label class="voice-pick">
           <input type="checkbox" bind:checked={relabel} disabled={busy} />
-          <span>{copy.shareRelabel(updates.map((m) => m.id), plan.usecase.title)}</span>
+          <span>{copy.shareRelabel(updates.map((m) => m.title), plan.usecase.title)}</span>
         </label>
         {#if updates.some((m) => m.changes.length > 0)}<span class="diff-detail">{updates.flatMap((m) => m.changes).join(', ')}</span>{/if}
       </dd>

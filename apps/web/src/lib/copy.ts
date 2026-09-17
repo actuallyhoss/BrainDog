@@ -991,6 +991,8 @@ export const copy = {
   shareConflict: (name: string, pack: string) => `${name} is already held by ${pack}, so this cannot be installed beside it.`,
   shareStale: 'Something changed since the plan was read, so it has been read again. Look it over, then install.',
   sharePlanTitle: (title: string, version: string) => `${title} ${version}`,
+  /** A page drawn once for every row of a list, whose title is the row's own. */
+  sharePageEach: (one: string) => `A page for each ${one}`,
   shareBy: (author: string) => `By ${author}`,
   shareInstallsFirst: 'Installs first',
   shareTurnsOn: 'Turns on',

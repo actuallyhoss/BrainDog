@@ -19,6 +19,7 @@ import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
+import { PACKS } from '../../lib/record/data.ts';
 
 type Body = Record<string, unknown>;
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
@@ -130,6 +131,8 @@ export async function readAddress(address: string, fetcher: typeof fetch = fetch
 
 export type SharedPack = {
   id: string;
+  /** The name a person knows the pack by: Money for `money-core`, the use case's title for its own pack. */
+  title: string;
   role: 'module' | 'usecase';
   version: string;
   installedVersion: string | null;
@@ -155,6 +158,18 @@ export type SharedPlan = {
   approve: string[];
 };
 
+/** One row of a list, as a page for each is said: Organisations reads organisation, Studies reads study. */
+export const oneOf = (list: string): string => {
+  const lower = list.trim().toLowerCase().replace(/_/gu, ' ');
+  if (/ies$/u.test(lower)) return `${lower.slice(0, -3)}y`;
+  if (/(ss|us)$/u.test(lower)) return lower;
+  if (/(ss|x|ch|sh)es$/u.test(lower)) return lower.slice(0, -2);
+  return lower.replace(/s$/u, '');
+};
+
+/** A pack by the name a person knows it by: this build's name for a module, else its id in words. */
+export const moduleTitle = (id: string): string => PACKS.find((p) => p.id === id)?.name ?? copy.valueWord(id.replace(/^usecase-/u, '').replace(/[_-]+/gu, ' '));
+
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
   const decls = Array.isArray(doc.declarations) ? (doc.declarations as Body[]) : [];
@@ -174,6 +189,11 @@ function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; 
     }
     if (kind === 'page') {
       const d = decls.find((x) => x.page === bare);
+      /* A PAGE FOR EACH ROW is titled by the row, `{{name}}`, which names nothing until a row is chosen: said by its list. */
+      if (typeof d?.title === 'string' && /\{\{(?!config:)/u.test(d.title) && isMap(d.for) && typeof d.for.register === 'string') {
+        const list = decls.find((x) => x.register === (d.for as Body).register && x.page === undefined);
+        return { kind: 'page', name: copy.sharePageEach(oneOf(typeof list?.name === 'string' ? filled(list.name) : String((d.for as Body).register))) };
+      }
       return { kind: 'page', name: typeof d?.title === 'string' ? filled(d.title) : bare };
     }
     /* A FIGURE OR A RULE IS SAID BY ITS OWN NAME, "Going out, 30 days", not `out-30d`. */
@@ -190,9 +210,11 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
   for (const raw of value.packs) {
     if (!isMap(raw) || typeof raw.id !== 'string' || !isMap(raw.doc)) return null;
     const name = namesIn(raw.doc);
+    const role = raw.role === 'module' ? 'module' : 'usecase';
     packs.push({
       id: raw.id,
-      role: raw.role === 'module' ? 'module' : 'usecase',
+      title: role === 'usecase' ? String(u.title ?? raw.id) : moduleTitle(raw.id),
+      role,
       version: String(raw.version ?? ''),
       installedVersion: typeof raw.installed_version === 'string' ? raw.installed_version : null,
       direction: (['install', 'upgrade', 'downgrade', 'reinstall'] as const).find((d) => d === raw.direction) ?? 'install',
@@ -200,7 +222,7 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
       changes: strings(raw.changes).map((id) => name(id).name),
       retires: strings(raw.retires).map((id) => name(id).name),
       conflicts: (Array.isArray(raw.conflicts) ? raw.conflicts : []).flatMap((c) =>
-        isMap(c) && typeof c.id === 'string' ? [copy.shareConflict(name(c.id).name, String(c.pack ?? ''))] : [],
+        isMap(c) && typeof c.id === 'string' ? [copy.shareConflict(name(c.id).name, moduleTitle(String(c.pack ?? '')))] : [],
       ),
       examples: typeof raw.examples === 'number' ? raw.examples : 0,
       calls: callsOutOf(raw.calls_out),

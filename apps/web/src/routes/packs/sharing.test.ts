@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, nothingElse, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, moduleTitle, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -314,4 +314,27 @@ test('A FIGURE IN A PLAN IS SAID BY ITS NAME, and one the document does not name
   const plan = sharedPlanOf({ ...ANSWER, packs: [{ ...ANSWER.packs[0], adds: ['metric.out-30d', 'metric.nameless'], changes: ['metric.out-30d'], doc }] })!;
   assert.deepEqual(plan.packs[0]?.adds.map((a) => a.name), ['Going out, 30 days', 'nameless']);
   assert.deepEqual(plan.packs[0]?.changes, ['Going out, 30 days']);
+});
+
+test('A PLAN NAMES A MODULE BY ITS TITLE AND A PAGE FOR EACH ROW BY ITS LIST, never money-core or {{name}}', () => {
+  const doc = {
+    declarations: [
+      { register: 'organisations', name: 'Organisations', title: 'name', fields: [] },
+      { page: 'organisation', title: '{{name}}', for: { register: 'organisations' }, blocks: [] },
+      { page: 'home-founder', title: '{{config:voice_home}}', blocks: [] },
+    ],
+    config: { voice_home: { type: 'text', default: 'Today' } },
+  };
+  const plan = sharedPlanOf({
+    ...ANSWER,
+    packs: [
+      { ...ANSWER.packs[0], id: 'money-core', role: 'module', installed_version: null, adds: [], doc: {} },
+      { ...ANSWER.packs[0], adds: ['register.organisations', 'page.organisation', 'page.home-founder'], doc },
+    ],
+  })!;
+  assert.equal(plan.packs[0]?.title, 'Money');
+  assert.equal(plan.packs[1]?.title, plan.usecase.title);
+  assert.deepEqual(plan.packs[1]?.adds.map((a) => a.name), ['Organisations', 'A page for each organisation', 'Today']);
+  assert.equal(moduleTitle('no-such-module'), 'No such module');
+  assert.deepEqual(['Studies', 'Organisations', 'Classes', 'Status', 'Steps'].map(oneOf), ['study', 'organisation', 'class', 'status', 'step']);
 });
