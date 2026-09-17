@@ -21,6 +21,7 @@ import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { labelsOf, laterVersion, normalise, packIdOf, plan, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
+import type { FormSpec, NextSpec } from './spark.ts';
 
 /**
  * One thing a host offers to install: a pack, or a use case and the modules it builds on.
@@ -65,6 +66,13 @@ export type CatalogueEntry = {
    * (`spark.ts` `growsDrafts`). A guide whose idea stage is over grows into Projects and Work. Nothing is taken away.
    */
   grows?: Grows | undefined;
+  /**
+   * WHAT A USE CASE FORMS AROUND WHAT THE PERSON SAID, when a model is configured: the lists and limits of a first plan, which
+   * Spark asks the model for and files on Decide as rows (`spark.ts` `formedRows`, the record's `sparkForm`).
+   */
+  forms?: FormSpec | undefined;
+  /** What moves on when a row of a use case's list is reached, asked once on Decide or done as its setting says (`NextSpec`). */
+  next?: NextSpec | undefined;
 };
 
 /** One test of a figure the use case declares, as a page block's `when:` is written. */
@@ -613,6 +621,13 @@ export function arranger(d: ArrangeDeps) {
       settings.push(one.value);
     }
 
+    const rows: Body[] = [];
+    if (body.rows !== undefined) {
+      const checked = rowsOf(body.rows);
+      if (!checked.ok) return checked;
+      rows.push(...checked.value);
+    }
+
     const names = namesFor(planned.value, lead ?? speakerNow() ?? order.value.install.find((id) => id.startsWith(USE_CASE)) ?? null);
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
@@ -627,8 +642,38 @@ export function arranger(d: ArrangeDeps) {
       ...((approve) => (approve.length === 0 ? {} : { approve }))([...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id))])]),
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
+      ...(rows.length === 0 ? {} : { rows }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
     });
+  }
+
+  /**
+   * THE ROWS A PLAN IS MADE OF (`spark.ts` `formedRows`), checked against the lists as they are: each list is here, each field
+   * is one it declares, and a link is a ref field pointing at the list of the earlier row it names. Whether a value is valid
+   * is the write path's, when the arrangement is accepted, as it is for a rowset.
+   */
+  function rowsOf(raw: unknown): Result<Body[]> {
+    if (!Array.isArray(raw)) return refuse('VALUE_MALFORMED', 'rows is a list of rows, each {"register":"<id>","fields":{...}}.', 'body.rows');
+    const out: Body[] = [];
+    for (const [i, r] of raw.entries()) {
+      const at = `body.rows[${i}]`;
+      if (!isMap(r) || typeof r.register !== 'string' || !isMap(r.fields)) return refuse('VALUE_MALFORMED', 'A row is {"register":"<id>","fields":{...}}.', at);
+      const decl = kernel.register(r.register);
+      if (!decl) return refuse('REGISTER_UNKNOWN', `There is no list called ${r.register} here.`, `${at}.register`);
+      const fields = new Map(decl.fields.map((f) => [f.id, f]));
+      for (const id of Object.keys(r.fields))
+        if (!fields.has(id)) return refuse('FIELD_UNKNOWN', `${r.register} has no field ${id}.`, `${at}.fields.${id}`, [...fields.keys()]);
+      const links: Record<string, number> = {};
+      for (const [id, to] of Object.entries(isMap(r.links) ? r.links : {})) {
+        const field = fields.get(id);
+        const target = typeof to === 'number' && Number.isInteger(to) && to >= 0 && to < i ? (raw[to] as Body | undefined) : undefined;
+        if (!field || field.type !== 'ref' || !target || field.to !== target.register)
+          return refuse('VALUE_MALFORMED', `${id} points at an earlier row of the list it links to, by its position from 0.`, `${at}.links.${id}`);
+        links[id] = to as number;
+      }
+      out.push({ register: r.register, fields: { ...r.fields }, ...(Object.keys(links).length === 0 ? {} : { links }) });
+    }
+    return ok(out);
   }
 
   /* ── applying, after the owner's press ───────────────────────────────── */
@@ -646,12 +691,13 @@ export function arranger(d: ArrangeDeps) {
   }
 
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string): Promise<Result<Body>> {
-    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[] } = {
+    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; rows: string[] } = {
       installed: [],
       enabled: [],
       disabled: [],
       pages: [],
       settings: [],
+      rows: [],
     };
     const stopped = <T>(r: Result<T>): Result<Body> => {
       const refusal = (r as { refusal?: Refusal }).refusal ?? { code: 'VALUE_MALFORMED' as const, fix: 'It would not apply.' };
@@ -732,7 +778,43 @@ export function arranger(d: ArrangeDeps) {
       if (!set.ok) return stopped(set);
       done.settings.push(String(s.pack));
     }
+    /* THE ROWS, ALL OR NONE, in order, each written as the owner who accepted, with a link set to the row it points at. */
+    const rows = kind === 'arrange' && Array.isArray(body.rows) ? (body.rows as Body[]) : [];
+    if (rows.length > 0) {
+      const wrote = writeRows(rows, actor);
+      if (!wrote.ok) return stopped(wrote);
+      done.rows.push(...wrote.value);
+    }
     return ok(Object.fromEntries(Object.entries(done).filter(([, v]) => v.length > 0)));
+  }
+
+  function writeRows(rows: readonly Body[], actor: string): Result<string[]> {
+    const batch = ulids(() => Date.now())();
+    const halted: { refusal: Refusal | null } = { refusal: null };
+    const made: { spoken: string; id: string }[] = [];
+    try {
+      kernel.transaction(() => {
+        for (const [i, r] of rows.entries()) {
+          const register = String(r.register);
+          const fields: Record<string, unknown> = { ...(r.fields as Body) };
+          for (const [field, to] of Object.entries(isMap(r.links) ? r.links : {})) {
+            const target = made[Number(to)];
+            if (target) fields[field] = target.spoken;
+          }
+          const out = kernel.create(register, fields as never, { actor, batch, note: 'Added from a plan accepted on Decide.' });
+          if (!out.ok) {
+            const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE' as const, fix: 'The record moved while the plan was written. Accept it again.' };
+            halted.refusal = { ...refusal, at: `body.rows[${i}]${refusal.at ? `.${refusal.at}` : ''}` };
+            throw halted;
+          }
+          made.push({ spoken: `${register}#${out.value.seq}`, id: out.value.id });
+        }
+      });
+    } catch (e) {
+      if (e !== halted) throw e;
+      return { ok: false, refusal: halted.refusal! };
+    }
+    return ok(made.map((m) => m.spoken));
   }
 
   return { overview, declaration, prepare, apply };

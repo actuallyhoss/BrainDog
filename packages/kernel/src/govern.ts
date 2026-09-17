@@ -59,6 +59,8 @@ export const OPEN_ARRANGEMENTS = 3;
 const PACK_ID = /^[a-z][a-z0-9-]{0,63}$/;
 /** At most this many packs, pages or settings changes in one arrangement. Past it, it is a rebuild. */
 const ARRANGE_CEILING = 12;
+/** At most this many rows in one arrangement: a plan, not an import. */
+const ARRANGE_ROWS = 60;
 
 export type Suggestion = {
   id: string;
@@ -505,6 +507,27 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
       if (bad) return bad;
     }
     changes += body.settings.length;
+  }
+  /* ROWS A PLAN IS MADE OF, written in order when the arrangement is accepted. A row may point one ref field at a row
+     before it in the same list of rows, by its position, because none of them has a sequence until it is written. */
+  if (body.rows !== undefined) {
+    if (!Array.isArray(body.rows) || body.rows.length === 0 || body.rows.length > ARRANGE_ROWS)
+      return {
+        code: 'VALUE_MALFORMED',
+        fix: `rows is a list of one to ${ARRANGE_ROWS} rows, each {"register":"<id>","fields":{...},"links":{"<field>":<position of an earlier row>}}.`,
+        at: 'body.rows',
+      };
+    for (const [i, r] of body.rows.entries()) {
+      if (!isMap(r) || typeof r.register !== 'string' || !isMap(r.fields))
+        return { code: 'VALUE_MALFORMED', fix: 'A row is {"register":"<id>","fields":{...}}.', at: `body.rows[${i}]` };
+      if (r.links !== undefined) {
+        if (!isMap(r.links)) return { code: 'VALUE_MALFORMED', fix: 'links maps a field to the position of an earlier row.', at: `body.rows[${i}].links` };
+        for (const [field, to] of Object.entries(r.links))
+          if (typeof to !== 'number' || !Number.isInteger(to) || to < 0 || to >= i)
+            return { code: 'VALUE_MALFORMED', fix: `A link points at an earlier row of the same arrangement, by its position from 0, and ${JSON.stringify(to)} is not one.`, at: `body.rows[${i}].links.${field}` };
+      }
+    }
+    changes += body.rows.length;
   }
   if (changes === 0)
     return {

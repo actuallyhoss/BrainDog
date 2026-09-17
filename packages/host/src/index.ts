@@ -152,6 +152,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'spark', group: 'ADMIN', writes: false, what: 'What Spark noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
   { name: 'sparkPropose', group: 'ADMIN', writes: true, what: "Put Spark's proposals on Decide, through propose's checks. It changes nothing until the owner accepts one." },
   { name: 'sparkDaily', group: 'ADMIN', writes: true, what: 'Whether Spark looks once a day on its own and puts what it finds on Decide. On unless the owner turns it off.' },
+  { name: 'sparkForm', group: 'ADMIN', writes: true, what: "Ask Spark's model for a first plan from what the owner said a project is, and put it on Decide as rows. Nothing is made until the owner accepts it.",
+    takes: { usecase: 'text', said: 'text' } },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
@@ -395,6 +397,7 @@ export type RecordSurface = {
   spark(args: never, ctx: never): Promise<Result<unknown>>;
   sparkPropose(args: never, ctx: never): Promise<Result<unknown>>;
   sparkDaily(args: never, ctx: never): Promise<Result<unknown>>;
+  sparkForm(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -480,6 +483,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     spark: (a, ctx) => api.spark(a as never, ctx as never),
     sparkPropose: (a, ctx) => api.sparkPropose(a as never, ctx as never),
     sparkDaily: (a, ctx) => api.sparkDaily(a as never, ctx as never),
+    sparkForm: (a, ctx) => api.sparkForm(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),

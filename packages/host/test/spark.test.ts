@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { answerOf, endpointModel, SPARK_INSTRUCTIONS } from '../src/spark.ts';
+import { answerOf, endpointModel, SPARK_INSTRUCTIONS, SPARK_PLAN_INSTRUCTIONS } from '../src/spark.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const FAKE_KEY = 'fake-key-for-tests-only';
@@ -43,6 +43,18 @@ test('A DRAFT IS ASKED OF A CHAT-COMPLETIONS ENDPOINT, with the key asked for on
   const bare = endpoint(() => completion('{"drafts":[]}'));
   await endpointModel({ url: 'http://localhost:8080/v1/chat/completions', send: bare.send }).draft(INPUT);
   assert.equal((bare.sent[0]!.init.headers as Record<string, string>).authorization, undefined);
+});
+
+test('A FIRST PLAN IS ASKED WITH ITS OWN INSTRUCTIONS, handed only the sentence and the lists, with the key kept out of both', async () => {
+  const net = endpoint(() => completion('{"plan":{"milestones":[{"what":"Pick a name","stage":"idea"}]}}'));
+  const model = endpointModel({ url: 'http://localhost:11434/v1/chat/completions', key: async () => FAKE_KEY, send: net.send });
+  const input = { what: 'A plan.', said: 'I want to start a podcast', today: '2026-09-17', lists: [{ register: 'milestones', least: 1, most: 3, fields: { what: { text: 80 } } }] };
+  assert.deepEqual(await model.form!(input), { plan: { milestones: [{ what: 'Pick a name', stage: 'idea' }] } });
+  const body = JSON.parse(String(net.sent[0]!.init.body)) as { messages: { role: string; content: string }[] };
+  assert.equal(body.messages[0]!.content, SPARK_PLAN_INSTRUCTIONS);
+  assert.deepEqual(JSON.parse(body.messages[1]!.content), input);
+  assert.ok(!String(net.sent[0]!.init.body).includes(FAKE_KEY));
+  assert.ok(!SPARK_PLAN_INSTRUCTIONS.includes('—'), 'no dash as punctuation in what the model is told');
 });
 
 test('AN ANSWER IS READ INSIDE A FENCE OR AS A BARE BODY, and a failing endpoint throws without the key in its sentence', async () => {

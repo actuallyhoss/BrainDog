@@ -11,7 +11,7 @@
  * NO RUNTIME HERE, like `actions.ts`: no bare `fetch`, so both hosts import it and pass their own `send`.
  */
 
-import type { SparkModel, SparkModelInput } from '@braindog/record';
+import type { SparkFormInput, SparkModel, SparkModelInput } from '@braindog/record';
 
 /** How long a draft may take before Spark's own rules speak instead. */
 export const SPARK_TIMEOUT_MS = 30_000;
@@ -28,6 +28,18 @@ export const SPARK_INSTRUCTIONS = [
   'pack bodies: {"install":"<offered id>"}, {"enable":"<id>"}, {"disable":"<id>"}. settings: {"pack":"<id>","values":{...}} or {"voice":{"home":"..."}}. arrange: {"why":["..."],"usecase"?,"packs"?,"pages"?,"settings"?,"voice"?}.',
   'Tone is settings too: the words the speaking use case declares are in usage.tone.settings (voice_* lines, label_* words), and only those names may be set, as {"pack":"<usage.tone.pack>","values":{"label_tickets":"Issues"}}, with the reason drawn from how the record is used.',
   'Never name a figure that is not in the reading. Write plainly and warmly, with no dashes used as punctuation. If nothing would help, answer {"drafts":[]}.',
+].join('\n');
+
+/**
+ * What the model is told when it forms a first plan (`SparkModel.form`). It is handed only the sentence the owner typed, what
+ * the plan is, today, and each list's limits; the answer is checked row by row (`formedRows`) and filed on Decide, never written.
+ */
+export const SPARK_PLAN_INSTRUCTIONS = [
+  'You are Spark, the manager of one BrainDog. Its owner has just said what they are starting, in `said`. Form a first plan for it, in the lists given in `lists`, which the owner reads on Decide before anything is made.',
+  '`what` says what the plan is. Each list gives its register, the least and most rows, and the fields a row may have: {"text":n} is text of at most n characters, {"one":[...]} is one of those values, {"link":"<register>"} is the position from 0 of a row of that list in your plan, and {"days":n} is a whole number of days from today, at most n. A field marked required must be given. Give no other field and no other list.',
+  'Answer only JSON: {"plan":{"<register>":[{"<field>":...}]}}, with the lists in the order given, so a link points at a row already listed.',
+  'Make it specific to what was said: concrete, small steps a person can take this week, milestones in the order they are reached, the real choices this kind of project faces, and the kinds of help worth finding.',
+  'Never write a web address, an email address, a price you were not told, a name of a real person, or anything that looks like a key or a password. Write plainly and warmly, in short sentences, with no dashes used as punctuation.',
 ].join('\n');
 
 export type EndpointModelOptions = {
@@ -48,28 +60,31 @@ export type EndpointModelOptions = {
 export function endpointModel(options: EndpointModelOptions): SparkModel {
   const url = new URL(options.url);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('A Spark endpoint is an http or https address.');
+  /* ONE REQUEST SHAPE FOR BOTH ASKS: what differs is what the model is told and what it is handed. */
+  const ask = async (instructions: string, input: unknown): Promise<unknown> => {
+    const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
+    const key = options.key ? await options.key() : null;
+    if (key) headers.authorization = `Bearer ${key}`;
+    const body = JSON.stringify({
+      ...(options.model ? { model: options.model } : {}),
+      temperature: 0,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: instructions },
+        { role: 'user', content: JSON.stringify(input) },
+      ],
+    });
+    const res = await options.send(url, { method: 'POST', headers, body, redirect: 'error', signal: AbortSignal.timeout(options.timeoutMs ?? SPARK_TIMEOUT_MS) });
+    /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. */
+    if (!res.ok) throw new Error(`The Spark endpoint answered ${res.status}.`);
+    const text = await res.text();
+    if (text.length > ANSWER_BYTES) throw new Error('The Spark endpoint answered more than Spark reads.');
+    return answerOf(text);
+  };
   return {
     name: options.name ?? 'endpoint',
-    async draft(input: SparkModelInput): Promise<unknown> {
-      const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
-      const key = options.key ? await options.key() : null;
-      if (key) headers.authorization = `Bearer ${key}`;
-      const body = JSON.stringify({
-        ...(options.model ? { model: options.model } : {}),
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SPARK_INSTRUCTIONS },
-          { role: 'user', content: JSON.stringify(input) },
-        ],
-      });
-      const res = await options.send(url, { method: 'POST', headers, body, redirect: 'error', signal: AbortSignal.timeout(options.timeoutMs ?? SPARK_TIMEOUT_MS) });
-      /* THE STATUS AND NOTHING ELSE. An error body can echo the request, and the request can carry the key. */
-      if (!res.ok) throw new Error(`The Spark endpoint answered ${res.status}.`);
-      const text = await res.text();
-      if (text.length > ANSWER_BYTES) throw new Error('The Spark endpoint answered more than Spark reads.');
-      return answerOf(text);
-    },
+    draft: (input: SparkModelInput): Promise<unknown> => ask(SPARK_INSTRUCTIONS, input),
+    form: (input: SparkFormInput): Promise<unknown> => ask(SPARK_PLAN_INSTRUCTIONS, input),
   };
 }
 

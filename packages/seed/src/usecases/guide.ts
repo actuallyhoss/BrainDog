@@ -15,6 +15,10 @@
  * steps, choices and what helps. Blocks about something that has not happened yet (a blocked step, an agent's work)
  * appear when it does.
  *
+ * THE NEXT MILESTONE IS ASKED ABOUT, NOT TAKEN (1.2.0). When a milestone is reached and none is underway, Decide asks once
+ * whether to start the next one in order; the setting `start_next_milestone` starts it instead (`GUIDE_NEXT`). Where a model
+ * is configured, onboarding asks it for a first plan made for what was said, which waits on Decide as rows (`GUIDE_FORMS`).
+ *
  * IT GROWS INTO A RUNNING PROJECT. Once every milestone of the idea stage is reached, Spark asks on Decide whether to add
  * Projects and Work beside the guide (`GUIDE_GROWS`). Nothing is taken away and no row moves.
  */
@@ -38,7 +42,7 @@ const count = (metric: string, name: string, source: string, where?: string) => 
 
 export const GUIDE = {
   usecase: 'guide',
-  version: '1.1.0',
+  version: '1.2.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -521,6 +525,73 @@ export const GUIDE = {
     ],
   },
 };
+
+/** The guide's own setting, beside its voice and labels: off, so reaching a milestone asks before the next one starts. */
+export const GUIDE_SETTINGS = {
+  start_next_milestone: { type: 'bool', label: 'Start the next milestone when one is reached, without asking', default: false },
+} as const;
+
+/**
+ * WHAT MOVES ON WHEN A MILESTONE IS REACHED: the first milestone not started, by order, once none is underway. Asked once on
+ * Decide, or started directly when `start_next_milestone` is on (`@braindog/record` `NextSpec`).
+ */
+export const GUIDE_NEXT = {
+  register: 'milestones',
+  field: 'state',
+  from: 'not_started',
+  to: 'underway',
+  order: 'order',
+  setting: 'start_next_milestone',
+  question: 'You reached "{reached}". Start "{next}" next?',
+  note: 'Started the next milestone, as the guide is set to.',
+} as const;
+
+const STAGES = ['idea', 'plan', 'build', 'launch', 'grow'] as const;
+
+/**
+ * THE PLAN A MODEL MAY FORM for what somebody said they are starting (`@braindog/record` `FormSpec`): the guide's four lists,
+ * the fields a model may fill in each, how many rows, and how long each text may be. Links point only at milestones in the
+ * same plan. A resource carries no link field here: an address a model wrote is not one anybody checked.
+ */
+export const GUIDE_FORMS = {
+  what: 'A first plan for a new project: the milestones it passes in order from the idea to keeping it going (each at a stage: idea, plan, build, launch or grow), the first small steps toward them, the choices it has to make, and what helps along the way.',
+  question: 'Spark drafted a first plan for your project from what you said. Add its milestones, steps, choices and what helps?',
+  why: 'Drafted by Spark from what you said the project is.',
+  lists: [
+    {
+      register: 'milestones',
+      least: 3,
+      most: 8,
+      fields: { what: { text: 80, required: true }, stage: { one: STAGES, required: true }, why: { text: 280 } },
+      first: { state: 'underway' },
+      rest: { state: 'not_started' },
+      position: 'order',
+    },
+    {
+      register: 'steps',
+      least: 1,
+      most: 12,
+      fields: { what: { text: 120, required: true }, milestone: { link: 'milestones', required: true }, by: { days: 90 }, how: { text: 400 } },
+      first: { state: 'to_do' },
+      rest: { state: 'to_do' },
+      position: 'order',
+    },
+    {
+      register: 'choices',
+      least: 0,
+      most: 6,
+      fields: { question: { text: 120, required: true }, options: { text: 300 }, milestone: { link: 'milestones' } },
+      first: { state: 'open' },
+      rest: { state: 'open' },
+    },
+    {
+      register: 'resources',
+      least: 0,
+      most: 8,
+      fields: { name: { text: 100, required: true }, kind: { one: ['guide', 'tool', 'person', 'example', 'other'] }, milestone: { link: 'milestones' }, note: { text: 280 } },
+    },
+  ],
+} as const;
 
 /**
  * WHAT THE GUIDE GROWS INTO: once the idea stage is over, Projects and Work, so the project can be run as well as guided.

@@ -15,7 +15,7 @@ import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';
 import { BUSINESS } from './business.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER } from './founder.ts';
-import { GUIDE } from './guide.ts';
+import { GUIDE, GUIDE_SETTINGS } from './guide.ts';
 import { PERSONAL } from './personal.ts';
 import { STUDENT } from './student.ts';
 import { EARLIER_TICKETS, TEAM } from './team.ts';
@@ -51,8 +51,14 @@ export const useCaseDocument = (id: string, today: string = dayOf(Date.now()), h
   /* A LIST AN OLDER VERSION DECLARED IS KEPT FOR A RECORD THAT HOLDS IT, so an update leaves no row without its list. */
   const kept = (KEPT[u!.usecase] ?? []).filter((d) => holds?.includes(String(d.register)));
   if (kept.length > 0) doc.declarations = [...((doc.declarations as unknown[] | undefined) ?? []), ...kept];
+  /* A SETTING OF THE USE CASE'S OWN beside its voice and labels, such as whether the guide starts the next milestone itself. */
+  const own = SETTINGS[u!.usecase];
+  if (own) doc.config = { ...((doc.config as Record<string, unknown> | undefined) ?? {}), ...own };
   return dated(doc, today);
 };
+
+/** The settings a use case's pack declares beside its voice and labels, by use case. */
+const SETTINGS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { guide: GUIDE_SETTINGS };
 
 /** The lists each use case's older versions declared and its current one does not, by use case. */
 const KEPT: Readonly<Record<string, readonly Record<string, unknown>[]>> = { team: [EARLIER_TICKETS] };

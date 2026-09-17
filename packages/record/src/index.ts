@@ -77,18 +77,19 @@ import {
   isUlid,
   slugify,
   SPARK,
+  looksLikeCredential,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
+import { catalogueDrafts, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
-export { fromModel, growsDrafts, noticeUsage, readUsage, SPARK_OPEN_CAP, type CatalogueOffer, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
+export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SPARK_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SparkDraft, type SparkFormInput, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
@@ -737,8 +738,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * to think about.
    */
   const tail = async <T>(out: T): Promise<T> => {
+    moveOn();
     if (scheduler) await kernel.tail(scheduler);
     return out;
+  };
+
+  /**
+   * THE NEXT MILESTONE, NEVER BY ITSELF (`CatalogueEntry.next`). After a write, for each use case on that names what moves on:
+   * when a row of its list is in a done state, none is in `to`, and a row waits in `from`, the first of those by order is the
+   * next. It is asked once on Decide, as Spark's rowset that updates that one row, or, when the owner turned the use case's
+   * setting on, marked `to` directly, signed by whoever last changed the row that was reached. Each next row is moved on at most
+   * once, so a person who sets it back is not overruled.
+   */
+  const NEXT_DONE = 'next.done';
+  const moveOn = (): void => {
+    const specs = (deps.catalogue ?? []).filter((e) => e.next !== undefined);
+    if (specs.length === 0 || kernel.refused()) return;
+    try {
+      for (const e of specs) {
+        const n = e.next!;
+        if (!kernel.packStates().some((p) => p.id === e.id && p.disabled_at === null)) continue;
+        const decl = kernel.register(n.register);
+        const done = decl?.done ?? [];
+        if (!decl || done.length === 0) continue;
+        const rows = sql
+          .all<{ id: string; seq: number; version: number; fields: string; updated_at: string }>(
+            'SELECT id, seq, version, fields, updated_at FROM entry WHERE register = ? AND deleted_at IS NULL AND seq IS NOT NULL',
+            n.register,
+          )
+          .map((r) => ({ ...r, f: JSON.parse(r.fields) as Record<string, unknown> }));
+        if (rows.some((r) => r.f[n.field] === n.to)) continue;
+        const reached = rows
+          .filter((r) => done.includes(String(r.f[n.field])))
+          .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : b.seq - a.seq))[0];
+        const orderOf = (r: { f: Record<string, unknown> }) => (typeof r.f[n.order] === 'number' ? (r.f[n.order] as number) : Number.MAX_SAFE_INTEGER);
+        const next = rows.filter((r) => r.f[n.field] === n.from).sort((a, b) => orderOf(a) - orderOf(b) || a.seq - b.seq)[0];
+        if (!reached || !next) continue;
+        const key = `${n.register}:${next.id}`;
+        const prefs = kernel.prefsOf(SPARK);
+        const moved = Array.isArray(prefs[NEXT_DONE]) ? (prefs[NEXT_DONE] as unknown[]).map(String) : [];
+        if (moved.includes(key)) continue;
+        kernel.setPref(SPARK, NEXT_DONE, [...moved, key].slice(-200));
+        const title = (r: { f: Record<string, unknown> }) => String(r.f[decl.title] ?? '').slice(0, 100);
+        const config = kernel.packConfig(e.id);
+        if (config.ok && config.value.values[n.setting] === true) {
+          const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND actor != 'spark' ORDER BY rowid DESC LIMIT 1", `entry:${reached.id}`)?.actor;
+          if (by) kernel.update(n.register, `${n.register}#${next.seq}`, { [n.field]: n.to }, { actor: by, version: next.version, cascade: false, note: n.note });
+          continue;
+        }
+        const question = n.question.replaceAll('{reached}', title(reached)).replaceAll('{next}', title(next)).slice(0, 280);
+        kernel.propose(
+          { question, body_kind: 'rowset', body: { register: n.register, rows: [{ at: `${n.register}#${next.seq}`, version: next.version, patch: { [n.field]: n.to } }] } },
+          SPARK,
+        );
+      }
+    } catch {
+      /* MOVING ON IS A COURTESY, never a reason a write that landed reads as failed. */
+    }
   };
   /**
    * The binding a report key carries, or `null` for any other caller (`report.ts`).
@@ -1276,6 +1332,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             : undefined;
     /* AND IT IS THE LEVEL, NOT ONLY THE CEILING. This asked `reaches`, so a `rowset` over a register
        somebody may only append to came back to them with every field value in it. */
+    /* A PLAN'S ROWS name their lists one row at a time, and the whole question is held back when any is out of reach. */
+    if (row.body_kind === 'arrange' && Array.isArray(body?.rows))
+      return (body.rows as { register?: unknown }[]).some((r) => typeof r?.register === 'string' && readable(ctx, r.register) !== null);
     return typeof named === 'string' && named !== '' && readable(ctx, named) !== null;
   };
 
@@ -2120,6 +2179,58 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * A FIRST PLAN FROM WHAT THE OWNER SAID, formed by the model and put on Decide as rows (`CatalogueEntry.forms`).
+     *
+     * A SEPARATE PATH FROM SPARK'S LOOK AT USE. That waits two weeks before it reads habits; this is the owner asking, at the
+     * moment they say what the project is, so it runs on a record of any age. It is asked once per record. Nothing is made: the
+     * plan is an arrangement the owner accepts or dismisses. With no model, a model that fails, or an answer that is not a
+     * plan inside the use case's limits, nothing is filed and `formed` is false, so the caller keeps the use case's own plan.
+     * The model is handed the sentence and the lists' limits, never the record.
+     */
+    async sparkForm(args: { usecase?: unknown; said?: unknown } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'ask Spark to form a plan');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['usecase', 'said']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.usecase !== 'string' || args.usecase === '') return no('REQUIRED_MISSING', 'usecase is the use case the plan is for, such as guide.', { at: 'usecase' });
+      if (typeof args.said !== 'string' || args.said.trim() === '' || args.said.length > FORM_SAID_MOST)
+        return no('VALUE_MALFORMED', `said is what the person said the project is, a sentence of at most ${FORM_SAID_MOST} characters.`, { at: 'said' });
+      const id = args.usecase.startsWith('usecase-') ? args.usecase : `usecase-${args.usecase}`;
+      const spec = (deps.catalogue ?? []).find((e) => e.id === id)?.forms;
+      if (!spec) return no('DECLARATION_UNKNOWN', `${args.usecase} forms no plan here.`, { at: 'usecase' });
+      const not = (why: 'no-model' | 'off' | 'asked' | 'failed' | 'invalid', detail?: string) =>
+        ok({ formed: false as const, why, ...(detail === undefined ? {} : { detail }) });
+      const model = deps.sparkModel;
+      if (!model?.form) return not('no-model');
+      if (!kernel.packStates().some((p) => p.id === id && p.disabled_at === null) || spec.lists.some((l) => !kernel.register(l.register))) return not('off');
+      const key = stableKey({ rows: spec.lists.map((l) => ({ register: l.register })) });
+      const asked = sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'arrange' AND opened_by = ?", SPARK).some((r) => {
+        try {
+          return stableKey(JSON.parse(r.body) as Record<string, unknown>) === key;
+        } catch {
+          return false;
+        }
+      });
+      if (asked) return not('asked');
+      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      let raw: unknown;
+      try {
+        raw = await model.form({ what: spec.what, said: args.said.trim(), today, lists: spec.lists });
+      } catch {
+        return not('failed');
+      }
+      const formed = formedRows(raw, spec, today, looksLikeCredential);
+      if (!formed.ok) return not('invalid', formed.why);
+      const prepared = await arrangement.prepare('arrange', { why: [spec.why], rows: formed.rows });
+      if (!prepared.ok) return not('invalid', 'refusal' in prepared ? prepared.refusal.fix : undefined);
+      const put = kernel.propose({ question: spec.question.slice(0, 280), body_kind: 'arrange', body: prepared.value }, SPARK);
+      if (!put.ok) return not('invalid', 'refusal' in put ? put.refusal.fix : undefined);
+      const counts: Record<string, number> = {};
+      for (const r of formed.rows) counts[r.register] = (counts[r.register] ?? 0) + 1;
+      return tail(ok({ formed: true as const, id: put.value.id, question: spec.question, by: model.name, counts }));
+    },
+
+    /**
      * SPARK'S DAILY RUN, for a host's tick and never routed: once a UTC day at most, unless the owner turned it off. The day
      * is kept before the work, so a run that throws or a model that hangs is not retried until tomorrow. Everything after is
      * the press's own path, so the cap of three and a dismissal holding are the same here.
@@ -2721,6 +2832,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args?.body_kind === 'pack' || args?.body_kind === 'settings' || args?.body_kind === 'arrange') {
         const body = args.body as Record<string, unknown> | undefined;
         if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
+          /* ROWS IN AN ARRANGEMENT ARE SPARK'S PLAN, formed from what the owner said (`sparkForm`). Anybody else proposes rows
+             as a rowset, which is held to the lists the caller reaches. */
+          if (args.body_kind === 'arrange' && body.rows !== undefined)
+            return no('FIELD_UNKNOWN', 'An arrangement you propose carries no rows. Propose rows as body_kind rowset, one list at a time.', { at: 'body.rows' });
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
           return tail(kernel.propose({ ...args, body: filed.value }, writerOf(ctx)));

@@ -15,7 +15,7 @@ import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
-import { GUIDE_GROWS } from './guide.ts';
+import { GUIDE_FORMS, GUIDE_GROWS, GUIDE_NEXT } from './guide.ts';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
 import { moduleDocument } from './install.ts';
 import { carryForward, linkExamples, type CarryIo, type LinkIo } from './links.ts';
@@ -39,10 +39,31 @@ export type SeedCatalogueEntry = {
   skills?: readonly { name: string; trigger: string }[];
   /** What a use case grows into once the figures it names say so, which Spark asks about on Decide (`@braindog/record` `Grows`). */
   grows?: { when: readonly { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number }[]; install: readonly string[]; question: string; why: string };
+  /** The first plan a model may form for what the owner said (`@braindog/record` `FormSpec`). */
+  forms?: {
+    what: string;
+    question: string;
+    why: string;
+    lists: readonly {
+      register: string;
+      least: number;
+      most: number;
+      fields: Readonly<Record<string, ({ text: number } | { one: readonly string[] } | { link: string } | { days: number }) & { required?: boolean }>>;
+      first?: Readonly<Record<string, unknown>>;
+      rest?: Readonly<Record<string, unknown>>;
+      position?: string;
+    }[];
+  };
+  /** What moves on when a row of a use case's list is reached (`@braindog/record` `NextSpec`). */
+  next?: { register: string; field: string; from: string; to: string; order: string; setting: string; question: string; note: string };
 };
 
 /** What each use case grows into, by its id. The guide, once its idea stage is over, into Projects and Work. */
 const GROWS: Readonly<Record<string, NonNullable<SeedCatalogueEntry['grows']>>> = { guide: GUIDE_GROWS };
+
+/** What each use case forms around what the owner said, and what moves on in it, by its id. */
+const FORMS: Readonly<Record<string, NonNullable<SeedCatalogueEntry['forms']>>> = { guide: GUIDE_FORMS };
+const NEXT: Readonly<Record<string, NonNullable<SeedCatalogueEntry['next']>>> = { guide: GUIDE_NEXT };
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -97,6 +118,8 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     carry: (io, from) => carryForward(io, u.usecase, from, today()),
     skills: u.skills,
     ...(GROWS[u.usecase] ? { grows: GROWS[u.usecase] } : {}),
+    ...(FORMS[u.usecase] ? { forms: FORMS[u.usecase] } : {}),
+    ...(NEXT[u.usecase] ? { next: NEXT[u.usecase] } : {}),
   }));
   return [
     ...modules,

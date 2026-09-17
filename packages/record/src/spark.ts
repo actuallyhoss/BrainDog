@@ -605,6 +605,11 @@ export interface SparkModel {
   /** A short name to say who drafted, such as `endpoint` or `own key`. Never a key or an address. */
   readonly name: string;
   draft(input: SparkModelInput): Promise<unknown>;
+  /**
+   * A first plan for what the person said, in the lists a use case forms (`formedRows` checks the answer). OPTIONAL: a model
+   * without it forms nothing, and the use case's own plan stands.
+   */
+  form?(input: SparkFormInput): Promise<unknown>;
 }
 
 export type SparkModelInput = {
@@ -663,9 +668,12 @@ export function stableKey(body: Record<string, unknown>): string {
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([k, v]) => `${k}=${JSON.stringify(v ?? null)}`)
       .join(',')}`;
+  /* A PLAN'S ROWS are what it is about by the lists it fills, so a first plan is asked once. */
+  if (body.register === undefined && Array.isArray(body.rows))
+    return `plan:${[...new Set(body.rows.map((r) => String((r as { register?: unknown })?.register)))].sort().join(',')}`;
   /* A ROW SPARK OFFERS is recognised by its list and its title, so a skill declined is not offered again. */
   if (typeof body.register === 'string' && Array.isArray(body.rows))
-    return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown })?.name ?? (r as { what?: unknown })?.what ?? '')).sort().join(',')}`;
+    return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown; at?: unknown })?.name ?? (r as { what?: unknown })?.what ?? (r as { at?: unknown })?.at ?? '')).sort().join(',')}`;
   if (body.voice && typeof body.voice === 'object') return `voice:${Object.keys(body.voice).sort().join(',')}`;
   if (Array.isArray(body.pages)) return `pages:${body.pages.map((p) => String((p as { id?: unknown })?.id)).sort().join(',')}`;
   /* PACKS ADDED BY AN ARRANGEMENT are what it is about, so a guide asked once to add Projects and Work is not asked again. */
@@ -712,6 +720,134 @@ export function growsDrafts(
   }
   return out;
 }
+
+/* ── a first plan, formed on request ───────────────────────────────────── */
+
+/**
+ * One field of a formed row a model may fill: text of at most `text` characters, one of `one`, the position (from 0) of a
+ * row of the list `link` earlier in the same plan, or a whole number of days from today up to `days`, written as that day.
+ */
+export type FormField = ({ text: number } | { one: readonly string[] } | { link: string } | { days: number }) & { required?: boolean };
+
+/** One list a formed plan fills: how many rows, the fields a model may give, and what every row is given besides. */
+export type FormList = {
+  register: string;
+  least: number;
+  most: number;
+  fields: Readonly<Record<string, FormField>>;
+  /** Set on the first row, and on every other, under what the model gave. */
+  first?: Readonly<Record<string, unknown>>;
+  rest?: Readonly<Record<string, unknown>>;
+  /** A field set to the row's position in its list, from 1. */
+  position?: string;
+};
+
+/**
+ * WHAT A USE CASE FORMS AROUND WHAT THE PERSON SAID (`CatalogueEntry.forms`): the lists in the order they are written, so a
+ * link always points back; what the model is told the plan is; the question Decide asks and its reason. DATA, so the record
+ * names no use case: the New project guide says it forms milestones, steps, choices and resources.
+ */
+export type FormSpec = { what: string; question: string; why: string; lists: readonly FormList[] };
+
+/** What a model is handed to form a plan: the sentence, what the plan is, and the lists with their limits. Nothing of the record. */
+export type SparkFormInput = { what: string; said: string; today: string; lists: readonly FormList[] };
+
+/** The longest sentence a plan is formed from. What somebody says a project is fits in far less. */
+export const FORM_SAID_MOST = 600;
+
+/* A WEB ADDRESS OR AN EMAIL IN A FORMED ROW is refused: a plan points only at its own rows, and nobody checked a model's link. */
+const ADDRESS = /(?:[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|net|org|io|app|dev|co|ai|xyz|me)\b|[a-z0-9._%+-]+@[a-z0-9-]+\.)/iu;
+/* A CHARACTER TEXT DOES NOT HOLD: a control character other than a tab or a line break. */
+const CONTROL = /[\p{Cc}]/u;
+const TEXT_BREAKS = /[\t\n\r]/gu;
+
+type FormedRow = { register: string; fields: Record<string, unknown>; links?: Record<string, number> };
+
+/**
+ * A model's plan as the rows an arrangement carries, or why it is not one. ALL OR NOTHING: a list or a field the spec does
+ * not name, a count outside its bounds, text past its length, a link to a row that is not earlier in the plan, an address,
+ * or anything shaped like a credential, and the whole answer is refused, so the use case's own plan stands instead.
+ *
+ * The answer is `{ "plan": { "<list>": [ { "<field>": ... } ] } }`, or that object bare. PURE.
+ */
+export function formedRows(
+  raw: unknown,
+  spec: FormSpec,
+  today: string,
+  credential: (text: string) => boolean,
+): { ok: true; rows: FormedRow[] } | { ok: false; why: string } {
+  const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+  const no = (why: string) => ({ ok: false as const, why });
+  const plan = isObject(raw) && isObject(raw.plan) ? raw.plan : raw;
+  if (!isObject(plan)) return no('The model did not answer a plan.');
+  const named = new Set(spec.lists.map((l) => l.register));
+  const stray = Object.keys(plan).find((k) => !named.has(k));
+  if (stray !== undefined) return no(`The plan named a list it may not fill: ${stray.slice(0, 40)}.`);
+
+  /* WHERE EACH LIST'S ROWS START in the rows written, so a link by position becomes a position in the whole plan. */
+  const start = new Map<string, number>();
+  let total = 0;
+  for (const list of spec.lists) {
+    const rows = plan[list.register] ?? [];
+    if (!Array.isArray(rows) || rows.length < list.least || rows.length > list.most) return no(`The plan's ${list.register} were not a list of ${list.least} to ${list.most}.`);
+    start.set(list.register, total);
+    total += rows.length;
+  }
+
+  const [y, m, d] = today.split('-').map(Number);
+  const out: FormedRow[] = [];
+  for (const list of spec.lists) {
+    const rows = (plan[list.register] ?? []) as unknown[];
+    for (const [i, row] of rows.entries()) {
+      const where = `${list.register} ${i + 1}`;
+      if (!isObject(row)) return no(`The plan's ${where} was not a row.`);
+      const extra = Object.keys(row).find((k) => !Object.hasOwn(list.fields, k));
+      if (extra !== undefined) return no(`The plan's ${where} gave a field it may not: ${extra.slice(0, 40)}.`);
+      const fields: Record<string, unknown> = { ...(i === 0 ? list.first : list.rest), ...(list.position ? { [list.position]: i + 1 } : {}) };
+      const links: Record<string, number> = {};
+      for (const [id, f] of Object.entries(list.fields)) {
+        const v = row[id];
+        if (v === undefined || v === null || v === '') {
+          if (f.required) return no(`The plan's ${where} had no ${id}.`);
+          continue;
+        }
+        if ('text' in f) {
+          if (typeof v !== 'string') return no(`The plan's ${where} gave ${id} as something other than text.`);
+          const text = v.trim();
+          if (text === '' || text.length > f.text) return no(`The plan's ${where} gave ${id} longer than ${f.text} characters.`);
+          if (CONTROL.test(text.replace(TEXT_BREAKS, ' '))) return no(`The plan's ${where} gave ${id} with characters text does not hold.`);
+          if (ADDRESS.test(text)) return no(`The plan's ${where} gave an address in ${id}, and a plan points only at its own rows.`);
+          if (credential(text)) return no(`The plan's ${where} gave something shaped like a credential in ${id}.`);
+          fields[id] = text;
+        } else if ('one' in f) {
+          if (typeof v !== 'string' || !f.one.includes(v)) return no(`The plan's ${where} gave ${id} a value it does not take.`);
+          fields[id] = v;
+        } else if ('link' in f) {
+          const base = start.get(f.link);
+          const count = Array.isArray(plan[f.link]) ? (plan[f.link] as unknown[]).length : 0;
+          const to = base === undefined || typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v >= count ? -1 : base + v;
+          if (to < 0 || to >= out.length) return no(`The plan's ${where} linked ${id} to a row that is not earlier in the plan.`);
+          links[id] = to;
+        } else {
+          if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > f.days) return no(`The plan's ${where} gave ${id} as a number of days that is not whole or is past ${f.days}.`);
+          fields[id] = new Date(Date.UTC(y!, m! - 1, d! + v)).toISOString().slice(0, 10);
+        }
+      }
+      out.push({ register: list.register, fields, ...(Object.keys(links).length === 0 ? {} : { links }) });
+    }
+  }
+  if (out.length === 0) return no('The plan had no rows.');
+  return { ok: true, rows: out };
+}
+
+/* ── the next milestone, once one is reached ───────────────────────────── */
+
+/**
+ * WHAT MOVES ON WHEN A STEP OF A USE CASE IS REACHED (`CatalogueEntry.next`), as data: in `register`, once a row is in a done
+ * state and none is in `to`, the first row in `from` by `order` is the next. The pack setting `setting` set true marks it
+ * `to` directly; otherwise it is asked once on Decide. `{reached}` and `{next}` in `question` are the two rows' titles.
+ */
+export type NextSpec = { register: string; field: string; from: string; to: string; order: string; setting: string; question: string; note: string };
 
 /* ── a newer version in a catalogue ─────────────────────────────────────── */
 
