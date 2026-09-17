@@ -159,7 +159,7 @@ import {
 } from './vault.ts';
 import { sparkMayWrite } from './spark.ts';
 import { PEOPLE, meet as meetPerson, type MeetArgs, type Met } from './people.ts';
-import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, type Found, type SessionHints } from './session.ts';
+import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, provisionalTitle, type Found, type SessionHints } from './session.ts';
 import {
   deviceApprove,
   deviceList,
@@ -188,7 +188,7 @@ import {
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SPARK, SPARK_KINDS, sparkMayWrite } from './spark.ts';
-export { KERNEL_WRITTEN, STALE_MS, isStale, sessionDeclaration } from './session.ts';
+export { KERNEL_WRITTEN, STALE_MS, isStale, provisionalTitle, sessionDeclaration } from './session.ts';
 export { REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -2330,7 +2330,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   function openRun(w: WriteContext, project: string | null, now: string, note: string): Result<Entry> {
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
-    const opened = writing(SESSION, null, opening(w.session ?? {}), {
+    const fields = opening(w.session ?? {});
+    /* A RUN IS NEVER UNTITLED: until its agent says what it is doing, it is named from where it opened. */
+    if (typeof fields.doing !== 'string') fields.doing = provisionalTitle(w.session ?? {}, project === null ? null : (titleOfRow(project) ?? project), now);
+    const opened = writing(SESSION, null, fields, {
       actor: `${prefix}${seq}`,
       note,
       cascade: false,

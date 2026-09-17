@@ -177,3 +177,20 @@ export function opening(hints: SessionHints): Record<string, Json> {
     if (key !== 'spoken' && typeof value === 'string' && value !== '') out[key] = value;
   return out;
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const AGENT_NAMES: Record<string, string> = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor' };
+
+/**
+ * What a run is called before its agent says, so a new run is never an untitled row.
+ *
+ * FROM WHAT IS KNOWN WHEN IT OPENS: the repository and branch, "braindog on master"; else the project
+ * it was placed in and the day, "Lanternly, 17 Sep"; else the agent and the day, "Claude run, 17 Sep".
+ * It is only a starting title: the agent's `doing`, through `attach` or `handoff`, replaces it.
+ */
+export function provisionalTitle(hints: SessionHints, project: string | null, now: string): string {
+  const day = `${String(Number(now.slice(8, 10)))} ${MONTHS[Number(now.slice(5, 7)) - 1] ?? ''}`.trim();
+  if (hints.repo) return hints.branch ? `${hints.repo} on ${hints.branch}` : hints.repo;
+  if (project) return `${project}, ${day}`;
+  return `${AGENT_NAMES[hints.agent ?? ''] ?? 'Agent'} run, ${day}`;
+}

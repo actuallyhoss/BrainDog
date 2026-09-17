@@ -15,6 +15,7 @@ import {
   isStale,
   jcs,
   openRecord,
+  provisionalTitle,
   sessionDeclaration,
   type Declaration,
   type Entry,
@@ -89,6 +90,23 @@ test('THE LADDER OPENS A RUN for a token write that names none, and the run sign
   );
   assert.deepEqual(events(sql, run.id), [{ actor: 'S1', kind: 'create', field: null, note: 'opened: auto' }]);
   assert.deepEqual(events(sql, task.id).map((e) => e.actor), ['S1'], 'the task is signed by the token’s person, not its run');
+  sql.close();
+});
+
+test('A NEW RUN IS NEVER UNTITLED: named from its repo and branch, else its project or agent and the day, until the agent says', async () => {
+  const { k, sql } = await record();
+  value(k.create('tasks', { what: 'One' }, agent({ host: 'dev-pc', repo: 'braindog', branch: 'master', agent: 'claude' })));
+  assert.equal(k.get('S1')!.fields.doing, 'braindog on master');
+  value(k.create('tasks', { what: 'Two' }, { ...agent({ agent: 'codex' }), principal: { kind: 'token', token: 't_2' } }));
+  assert.equal(k.get('S2')!.fields.doing, 'Codex run, 11 Sep');
+  value(k.create('tasks', { what: 'Three' }, agent({ host: 'dev-pc', repo: 'site', doing: 'Fix the footer' })));
+  assert.equal(k.get('S3')!.fields.doing, 'Fix the footer', 'what the agent said wins over the starting title');
+  value(k.update('session', k.get('S1')!.id, { doing: 'Title the runs' }, agent({ host: 'dev-pc', repo: 'braindog' })));
+  assert.equal(k.get('S1')!.fields.doing, 'Title the runs');
+
+  assert.equal(provisionalTitle({ repo: 'braindog' }, null, '2026-09-03T08:00:00.000Z'), 'braindog');
+  assert.equal(provisionalTitle({}, 'Lanternly', '2026-09-03T08:00:00.000Z'), 'Lanternly, 3 Sep');
+  assert.equal(provisionalTitle({ agent: 'other' }, null, '2026-12-25T08:00:00.000Z'), 'Agent run, 25 Dec');
   sql.close();
 });
 
