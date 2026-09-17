@@ -630,7 +630,8 @@
     </ul>
 
     <div class="utils">
-      {#each [['/audit', copy.audit, 'clock', '/audit'], ['/packs', copy.packs, 'packs', '/packs'], ['/vault', copy.vault, 'vault', '/vault'], ['/settings/appearance', copy.settings, 'settings', '/settings']] as const as [href, label, glyph, at]}
+      <!-- SPARK SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs; its title is its name, as in the palette. -->
+      {#each [['/audit', copy.audit, 'clock', '/audit'], ['/spark', 'Spark', 'star', '/spark'], ['/packs', copy.packs, 'packs', '/packs'], ['/vault', copy.vault, 'vault', '/vault'], ['/settings/appearance', copy.settings, 'settings', '/settings']] as const as [href, label, glyph, at]}
         <a class="util tap" {href} data-label={label} aria-label={label} title={label} aria-current={under(at) ? 'page' : undefined}>
           <Icon name={glyph} size="m" />
         </a>
