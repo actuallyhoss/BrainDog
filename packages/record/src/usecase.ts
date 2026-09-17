@@ -314,6 +314,15 @@ export function useCases(d: UseCaseDeps) {
       const s = states.find((p) => p.id === m);
       if (s) {
         if (s.disabled_at !== null) enable.push(m);
+        /* A MODULE ALREADY HERE MAY BE OFFERED IN THIS USE CASE'S WORDS AND TARGETS, when a document for it is sent: it is
+           planned as an update, and left out of the plan when it would change nothing. The person chooses whether it goes. */
+        const relabelled = s.disabled_at === null ? args.modules?.[m] : undefined;
+        if (!isMap(relabelled)) continue;
+        const pack = await normalise(relabelled, { kind: 'local' });
+        if (!pack.ok) return pack as Result<Body>;
+        if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);
+        const diff = await plan(pack.value, state);
+        if (diff.adds.length + diff.changes.length + diff.retires.length > 0) await step(m, 'module', pack.value, relabelled);
         continue;
       }
       const offered = args.modules?.[m] ?? d.catalogue.find((e) => e.id === m)?.doc({ holds: holds(state), usecase: null }) ?? null;

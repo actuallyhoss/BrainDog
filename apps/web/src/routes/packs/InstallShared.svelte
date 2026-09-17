@@ -18,7 +18,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { packDocument, type PackState } from '$lib/record/packs.ts';
+  import { packDocument, relabelDocument, type PackState } from '$lib/record/packs.ts';
   import SharedPlan from './SharedPlan.svelte';
   import { afterInstall, installShared, keepVoice, planShared, readAddress, readOnHost, speakingStates, useCaseTitle, voiceQuestion, type SharedPlan as Plan } from './sharing.ts';
 
@@ -39,6 +39,7 @@
   /* WHOSE VOICE THE RECORD KEEPS, asked when another use case speaks now (`sharing.ts` `voiceQuestion`). */
   let asked = $state<{ now: string } | null>(null);
   let choice = $state<'speaks' | 'beside'>('beside');
+  let relabel = $state(true);
   let heard: Awaited<ReturnType<typeof speakingStates>> = [];
 
   async function planText(text: string, source: 'local' | 'url', ref?: string) {
@@ -53,7 +54,7 @@
       code = !read.ok && 'refusal' in read ? read.refusal.code : null;
       return;
     }
-    const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held, usecase) => packDocument(id, held, usecase));
+    const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held, usecase) => packDocument(id, held, usecase), (id, held, usecase) => relabelDocument(id, held, usecase));
     if (out.ok) {
       heard = await speakingStates(client, installed);
       const q = out.plan.packs.some((p) => p.role === 'usecase' && p.installedVersion !== null) ? null : voiceQuestion(heard, out.plan.usecase.id);
@@ -98,7 +99,7 @@
     if (!client || !plan || busy) return;
     busy = true;
     try {
-      const out = await installShared(client, plan);
+      const out = await installShared(client, plan, relabel);
       if (out.ok) {
         const after = await afterInstall(client, plan, pref.read().nav ?? []);
         if (asked) await keepVoice(client, heard, plan.usecase.id, choice);
@@ -135,7 +136,7 @@
     </form>
   </div>
   {#if said}<p class="shared-said" role="status">{said}{#if code}<span class="shared-code">{copy.refusalCode(code)}</span>{/if}</p>{/if}
-  {#if plan}<SharedPlan {plan} {busy} voice={asked} bind:choice oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
+  {#if plan}<SharedPlan {plan} {busy} voice={asked} bind:choice bind:relabel oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
 </div>
 
 <style>

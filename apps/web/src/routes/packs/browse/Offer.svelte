@@ -13,7 +13,7 @@
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { packDocument, type PackState } from '$lib/record/packs.ts';
+  import { packDocument, relabelDocument, type PackState } from '$lib/record/packs.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import SharedPlan from '../SharedPlan.svelte';
@@ -42,6 +42,7 @@
   /* WHOSE VOICE THE RECORD KEEPS, asked when another use case speaks now, with the rule's answer picked to begin with. */
   let asked = $state<{ now: string } | null>(null);
   let choice = $state<'speaks' | 'beside'>('beside');
+  let relabel = $state(true);
   let heard: Awaited<ReturnType<typeof speakingStates>> = [];
 
   async function offerInstall() {
@@ -55,7 +56,7 @@
     try {
       const file = builtInFile(u.usecase);
       if (!file) return;
-      const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held, id) => packDocument(m, held, id));
+      const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held, id) => packDocument(m, held, id), (m, held, id) => relabelDocument(m, held, id));
       if (out.ok) {
         heard = await speakingStates(client, states);
         /* AN UPDATE ASKS NOTHING: the use case is already here, speaking or beside, and stays as it was. */
@@ -74,7 +75,7 @@
     const p = plan;
     busy = true;
     try {
-      const out = await installShared(client, p);
+      const out = await installShared(client, p, relabel);
       if (out.ok) {
         const after = await afterInstall(client, p, pref.read().nav ?? []);
         if (asked) await keepVoice(client, heard, p.usecase.id, choice);
@@ -125,7 +126,7 @@
     <p class="refused" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>
   {/if}
   {#if plan}
-    <SharedPlan {plan} {busy} voice={asked} bind:choice oninstall={() => void install()} oncancel={() => (plan = null)} />
+    <SharedPlan {plan} {busy} voice={asked} bind:choice bind:relabel oninstall={() => void install()} oncancel={() => (plan = null)} />
   {/if}
 </div>
 

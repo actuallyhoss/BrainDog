@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, nothingElse, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, nothingElse, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -290,4 +290,21 @@ test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one 
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, direction: 'reinstall' }] })!), false, 'the same version says so in its own words');
   assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, changes: ['register.courses'] }] })!), false);
   assert.equal(copy.shareNothingElse, 'Nothing else changes');
+});
+
+test("A MODULE ALREADY HERE IS OFFERED IN THE ADDED USE CASE'S WORDS, and left as it is when the person says no", async () => {
+  const { client, calls } = stub();
+  const text = JSON.stringify({ usecase: 'study', version: '1.0.1', title: 'Study', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: ['people', 'work'] });
+  const off = { ...state('work'), disabled_at: '2026-09-01T00:00:00.000Z' };
+  await planShared(client, { text, source: 'local' }, [state('people'), off], async (id) => ({ pack: id }), async (id) => ({ pack: id, worded: true }));
+  assert.deepEqual(calls[0]?.[1].modules, { people: { pack: 'people', worded: true } }, 'a module that is off was offered new words, or one that is on was not');
+
+  const base = sharedPlanOf(ANSWER)!;
+  const plan = { ...base, enable: [], packs: [{ ...base.packs[0]!, id: 'money-core', role: 'module' as const, installedVersion: '1.0.0' }, base.packs[0]!] };
+  assert.deepEqual(relabelled(plan).map((p) => p.id), ['money-core']);
+  const no = stub();
+  assert.deepEqual((await installShared(no.client, plan, false)).done, ['usecase-study']);
+  const yes = stub();
+  assert.deepEqual((await installShared(yes.client, plan)).done, ['money-core', 'usecase-study']);
+  assert.equal(copy.shareRelabel(['money-core'], 'Personal'), "Update money-core to Personal's words and targets");
 });

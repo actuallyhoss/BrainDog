@@ -159,6 +159,22 @@ export async function packDocument(id: string, installed?: readonly PackState[],
 }
 
 /**
+ * A module already on this record as the use case being added would install it, with no example rows, or `null` when that
+ * use case gives the module no words or targets of its own (`install.ts` `relabels`). A module installed before a use case
+ * keeps the words it went in with, and this is the update the plan offers for it.
+ */
+export async function relabelDocument(id: string, installed: readonly PackState[], usecase: string): Promise<Record<string, unknown> | null> {
+  const { moduleDocument, relabels, dayOf } = await import('@braindog/seed/usecases/install');
+  const { useCase } = await import('@braindog/seed/usecases');
+  const u = useCase(usecase);
+  if (!u || !relabels(u, id)) return null;
+  const holds = installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers);
+  const doc = moduleDocument(u, id, { today: dayOf(Date.now()), holds });
+  if (doc) delete doc.seeds;
+  return doc;
+}
+
+/**
  * Ask the record what installing a document would do. The plan is what the screen draws, and its `planHash` is what
  * Install sends back, so what installs is what was shown.
  */

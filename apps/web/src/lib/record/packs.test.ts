@@ -350,3 +350,14 @@ test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet:
   assert.equal(figure(bare, 'out-30d')?.target?.lte, 5_000_000, 'with no use case, Money keeps its own');
   assert.equal(figure(await packDocument('money-core', [], 'reading-club'), 'out-30d')?.target?.lte, 5_000_000, 'a use case this build does not know changes nothing');
 });
+
+test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE CASE GIVES IT SOME, and with no example rows", async () => {
+  const { relabelDocument } = await import('./packs.ts');
+  const held = [{ id: 'money-core', version: '1.0.0', disabled_at: null, registers: ['accounts', 'obligations'] }];
+  assert.equal(await relabelDocument('money-core', held, 'student'), null);
+  assert.equal(await relabelDocument('people', held, 'personal'), null);
+  const money = (await relabelDocument('money-core', held, 'personal'))!;
+  assert.equal(money.seeds, undefined, 'an update would write example bills into a record already holding Money');
+  assert.ok(JSON.stringify(money.declarations).includes('Pay comes in late by'));
+  assert.deepEqual((money.config as Record<string, { default: unknown }>).most_out_30d?.default, { amount: 250_000, currency: 'GBP' });
+});

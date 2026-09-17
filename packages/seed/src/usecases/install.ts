@@ -104,3 +104,15 @@ export function carriedDocument(u: UseCase, today: string): Body | null {
 
 /** The example rows a use case gives the modules it names, for a test or a proposal to show. */
 export const moduleExamples = (u: UseCase): readonly Body[] => MODULE_EXAMPLES[u.usecase] ?? [];
+
+/**
+ * Whether a use case gives a module words or targets of its own: a figure the module declares that the use case names or
+ * holds to its own sum. A module installed before the use case keeps the words it went in with, and this is what says the
+ * use case has something to offer it (`/packs`, the plan's "Update for").
+ */
+export function relabels(u: UseCase, id: string): boolean {
+  const own = new Set([...Object.keys(MODULE_NAMES[u.usecase] ?? {}), ...Object.keys(MODULE_TARGETS[u.usecase] ?? {})]);
+  if (own.size === 0) return false;
+  const doc = firstPartyDocument(id);
+  return ((doc?.declarations ?? []) as Body[]).some((d) => typeof d.metric === 'string' && own.has(d.metric));
+}

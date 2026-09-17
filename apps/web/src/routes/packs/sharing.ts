@@ -225,14 +225,16 @@ export async function planShared(
   file: { text: string; source: 'paste' | 'url' | 'local'; ref?: string },
   installed: readonly PackState[],
   moduleDoc: (id: string, installed: readonly PackState[], usecase: string) => Promise<Body | null>,
+  /** A module already here, in the words and targets of the use case being added, or `null` when it gives it none. */
+  relabelDoc: (id: string, installed: readonly PackState[], usecase: string) => Promise<Body | null> = async () => null,
 ): Promise<{ ok: true; plan: SharedPlan } | { ok: false; fix: string; code: string | null }> {
   const { readShared } = await import('@braindog/declare');
   const read = await readShared(file.text, { kind: file.source });
   if (!read.ok) return { ok: false, fix: 'refusal' in read ? read.refusal.fix : copy.writeRaced, code: 'refusal' in read ? read.refusal.code : null };
   const modules: Record<string, unknown> = {};
   for (const m of read.value.usecase.modules) {
-    if (installed.some((p) => p.id === m)) continue;
-    const doc = await moduleDoc(m, installed, read.value.usecase.usecase);
+    const held = installed.find((p) => p.id === m);
+    const doc = held ? (held.disabled_at === null ? await relabelDoc(m, installed, read.value.usecase.usecase) : null) : await moduleDoc(m, installed, read.value.usecase.usecase);
     if (doc) modules[m] = doc;
   }
   const out = await client.planUseCase({
@@ -247,6 +249,9 @@ export async function planShared(
   const plan = sharedPlanOf(out.value, read.value.usecase.nav, read.value.usecase.links);
   return plan ? { ok: true, plan } : { ok: false, fix: copy.writeRaced, code: null };
 }
+
+/** The modules already here that the plan offers in the use case's words and targets, which the person may leave as they are. */
+export const relabelled = (plan: SharedPlan): SharedPack[] => plan.packs.filter((p) => p.role === 'module' && p.installedVersion !== null);
 
 /** Whether a plan can be installed as it stands: nothing in it takes over another pack's list or page. */
 export const installable = (plan: SharedPlan): boolean => plan.packs.every((p) => p.conflicts.length === 0);
@@ -273,7 +278,7 @@ export const nothingElse = (plan: SharedPlan): boolean =>
  * Install the plan that was read, a pack at a time through `planPack` and `installPack`. The modules that are off are
  * turned on first. Answers the packs that went in, and the sentence that stopped it, if one did.
  */
-export async function installShared(client: SharingClient, plan: SharedPlan): Promise<{ ok: boolean; done: string[]; fix: string | null; stale: boolean }> {
+export async function installShared(client: SharingClient, plan: SharedPlan, relabel = true): Promise<{ ok: boolean; done: string[]; fix: string | null; stale: boolean }> {
   const done: string[] = [];
   for (const id of plan.enable) {
     const on = await client.enablePack({ id });
@@ -281,6 +286,8 @@ export async function installShared(client: SharingClient, plan: SharedPlan): Pr
     done.push(id);
   }
   for (const pack of plan.packs) {
+    /* A MODULE ALREADY HERE IS UPDATED ONLY WHEN THE PERSON SAID YES under "Update for". */
+    if (!relabel && relabelled(plan).includes(pack)) continue;
     const planned = await client.planPack({ doc: pack.doc, source: { kind: 'local' } });
     if (!planned.ok) return { ok: false, done, fix: refusalOf(planned).fix, stale: false };
     const diff = isMap(planned.value) && isMap(planned.value.diff) ? planned.value.diff : null;

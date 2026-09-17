@@ -993,6 +993,8 @@ export const copy = {
   shareUpdates: (from: string, to: string) => `Updates from ${from} to ${to}`,
   shareSameVersion: 'This version is already installed, so nothing is added.',
   shareNothingElse: 'Nothing else changes',
+  shareRelabelFor: (title: string) => `Update for ${title}`,
+  shareRelabel: (modules: string[], title: string) => `Update ${list(modules)} to ${title}'s words and targets`,
   shareChanges: 'Changes',
   shareTakesAway: 'Takes away',
   shareInstall: (title: string) => `Install ${title}`,

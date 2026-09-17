@@ -13,7 +13,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { words as vaultWords } from '$lib/record/vault.ts';
-  import { installable, nothingElse, type SharedPlan } from './sharing.ts';
+  import { installable, nothingElse, relabelled, type SharedPlan } from './sharing.ts';
 
   let {
     plan,
@@ -22,6 +22,7 @@
     oncancel,
     voice = null,
     choice = $bindable('beside'),
+    relabel = $bindable(true),
   }: {
     plan: SharedPlan;
     busy: boolean;
@@ -30,10 +31,13 @@
     /** Whose voice the record keeps, asked when another use case speaks now: that use case's title. */
     voice?: { now: string } | null;
     choice?: 'speaks' | 'beside';
+    /** Whether the modules already here that the use case gives words and targets to are updated with it. */
+    relabel?: boolean;
   } = $props();
 
   const own = $derived(plan.packs.find((p) => p.role === 'usecase') ?? null);
-  const modules = $derived(plan.packs.filter((p) => p.role === 'module'));
+  const modules = $derived(plan.packs.filter((p) => p.role === 'module' && p.installedVersion === null));
+  const updates = $derived(relabelled(plan));
   const updating = $derived(own !== null && own.installedVersion !== null);
   const same = $derived(own !== null && own.direction === 'reinstall' && own.adds.length === 0 && own.changes.length === 0 && own.retires.length === 0);
 </script>
@@ -58,6 +62,16 @@
             <li><Icon name="packs" size="s" /><span class="diff-name">{m.id}</span><span class="diff-detail">{m.adds.map((a) => a.name).join(', ')}</span></li>
           {/each}
         </ul>
+      </dd>
+    {/if}
+    {#if updates.length > 0}
+      <dt>{copy.shareRelabelFor(plan.usecase.title)}</dt>
+      <dd>
+        <label class="voice-pick">
+          <input type="checkbox" bind:checked={relabel} disabled={busy} />
+          <span>{copy.shareRelabel(updates.map((m) => m.id), plan.usecase.title)}</span>
+        </label>
+        {#if updates.some((m) => m.changes.length > 0)}<span class="diff-detail">{updates.flatMap((m) => m.changes).join(', ')}</span>{/if}
       </dd>
     {/if}
     {#if own}

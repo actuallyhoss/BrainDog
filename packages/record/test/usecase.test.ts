@@ -325,3 +325,26 @@ test("A TARGET HELD TO A SETTING IS READ LIVE: a person changes it later and the
   assert.equal(refusal(await api.planPack({ doc: wrong('label') }, owner)).code, 'VALUE_MALFORMED');
   sql.close();
 });
+
+test('A MODULE ALREADY HERE IS PLANNED IN THE USE CASE\'S WORDS WHEN ITS DOCUMENT IS SENT, and left out when that changes nothing', async () => {
+  const a = await recordA();
+  const text = JSON.stringify(value<Exported>(await a.api.exportUseCase({ version: '1.0.5' }, owner)).doc);
+  const sql = openSqlite();
+  const b = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  await install(b, PEOPLE);
+
+  /* THE SAME DOCUMENT: nothing to offer, so the module is not in the plan. */
+  const same = value<Planned>(await b.planUseCase({ text, modules: { people: PEOPLE } }, owner));
+  assert.deepEqual(same.packs.map((p) => p.id), ['usecase-study']);
+
+  /* IN THIS USE CASE'S WORDS: planned as an update of what is installed, before the use case's own pack. */
+  const worded = { ...PEOPLE, declarations: [{ ...PEOPLE.declarations[0], name: 'Classmates' }] };
+  const offered = value<Planned>(await b.planUseCase({ text, modules: { people: worded } }, owner));
+  assert.deepEqual(offered.packs.map((p) => [p.id, p.role, p.installed_version]), [['people', 'module', '1.0.0'], ['usecase-study', 'usecase', null]]);
+  assert.deepEqual(offered.packs[0]?.changes, ['register.people']);
+  assert.equal(offered.packs[0]?.examples, 0);
+  for (const p of offered.packs) await install(b, p.doc, p.approve);
+  assert.equal(JSON.parse(b.kernel.declarations().find((d) => d.id === 'register.people')!.body).name, 'Classmates');
+  a.sql.close();
+  sql.close();
+});
