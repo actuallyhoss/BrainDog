@@ -118,6 +118,7 @@ test('a live block the record answered with series draws them, and never its own
   const series = { name: 'Users', unit: '', bucket: 'week', keys, now: [100, null, 140], was: [80, 90, 95], latest: { value: 140, at: day(16), day: '2026-09-16' } };
   const lines = blockOf(answered('lines', 'register.datapoints', FIELDS, [], { measures: [series, { name: 'broken' }] }) as never, new Map(), NOW);
   assert.equal(lines.measures?.length, 1, 'a series in a shape this cannot read is left off');
+  assert.equal(lines.total, lines.shown, "every measure is drawn, so no \"showing some of\" line");
   const [chart] = toSegments(lines).filter((s): s is Block => s.type === 'block');
   assert.equal(chart!.heading, 'Users');
   assert.equal(chart!.rows[0]!.cells.join(' | '), 'Week | Users | was: Previous 3 weeks');

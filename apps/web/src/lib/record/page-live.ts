@@ -547,7 +547,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (kind === 'stat' || kind === 'lines') {
     if (Array.isArray(measured)) {
       const measures = measured.filter(isSeries);
-      return { ...shell, register, measures, shown: measures.length, total: matched };
+      /* EVERY MEASURE IS DRAWN, so nothing is cut: `matched` counts readings, which no tile or chart is one of. */
+      return { ...shell, register, measures, shown: measures.length, total: measures.length };
     }
   }
   /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer. */
