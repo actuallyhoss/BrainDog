@@ -275,3 +275,20 @@ test('A BLOCK THAT READS A USE CASE’S WORDS FROM ITS SETTINGS SAYS THE WORDS, 
   const appears = out?.parts.find((p) => p.part === 'appears');
   assert.deepEqual(appears?.part === 'appears' && appears.appears[0]?.lines.find((l) => l.label === 'Shows'), { label: 'Shows', value: 'Coming up, Table, Sessions' });
 });
+
+test('WHAT AN UPDATE TAKES AWAY is said on its own, with the rows each list keeps', () => {
+  const body = {
+    install: 'usecase-club',
+    kind: 'usecase',
+    title: 'Reading club',
+    packs: { install: ['usecase-club'] },
+    names: { 'register.meetings': 'Meetings' },
+    plan: [{ pack: 'usecase-club', from: '1.0.0', version: '2.0.0', adds: [], retires: [{ id: 'register.meetings', rows: 3 }, { id: 'page.club', rows: 0 }] }],
+    approve: [],
+  };
+  const appears = arrangedOf('pack', body)?.parts.find((p) => p.part === 'appears');
+  const said = JSON.stringify(appears);
+  assert.match(said, /Takes away/u);
+  assert.match(said, /Meetings, whose 3 rows stay/u);
+  assert.doesNotMatch(said, /"Adds"/u);
+});

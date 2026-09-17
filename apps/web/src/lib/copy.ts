@@ -2098,6 +2098,8 @@ export const copy = {
   arrangeAdds: 'Adds',
   /** What an arrangement changes that is already here, apart from what it adds. */
   arrangeChanges: 'Changes',
+  arrangeRetires: 'Takes away',
+  arrangeRetiredRows: (name: string, rows: number) => `${name}, whose ${rows} ${rows === 1 ? 'row stays' : 'rows stay'}`,
   arrangeMany: (kind: string): string =>
     ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Blocks' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),

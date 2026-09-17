@@ -308,6 +308,8 @@ export function arranger(d: ArrangeDeps) {
         version: pack.manifest.version,
         adds: diff.adds.map((a) => a.id),
         ...(diff.changes.length === 0 ? {} : { changes: diff.changes.map((c) => c.id) }),
+        /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. */
+        ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((x) => ({ id: x.id, rows: x.rows })) }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));

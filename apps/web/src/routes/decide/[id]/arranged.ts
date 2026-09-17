@@ -140,9 +140,19 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const drawn: Appears[] = [];
   const named = new Map<string, string[]>();
   const changed = new Map<string, string[]>();
+  const retired = new Map<string, string[]>();
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
   for (const step of Array.isArray(plan) ? plan.filter(isRow) : []) {
     out.examples += typeof step.examples === 'number' ? step.examples : 0;
+    /* WHAT AN UPDATE TAKES AWAY is named on its own, with the rows a list keeps: they stay, and nothing reads them. */
+    for (const gone of Array.isArray(step.retires) ? step.retires.filter(isRow) : []) {
+      const id = text(gone.id);
+      const kind = id.split('.')[0] ?? '';
+      const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? (kind === 'rule' ? ruleName(id) : null) ?? words(id));
+      const rows = typeof gone.rows === 'number' && gone.rows > 0 ? copy.arrangeRetiredRows(title, gone.rows) : title;
+      const label = copy.arrangeMany(kind);
+      retired.set(label, [...(retired.get(label) ?? []), rows]);
+    }
     for (const [ids, fresh] of [
       [strings(step.adds), true],
       [strings(step.changes), false],
@@ -176,6 +186,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const lines = (group: Map<string, string[]>) => [...group].sort(([a], [b]) => first(a) - first(b)).map(([label, names]) => ({ label, value: names.join(', ') }));
   if (named.size) appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: lines(named) });
   if (changed.size) appears.push({ kind: copy.arrangeChanges, title: '', lines: lines(changed) });
+  if (retired.size) appears.push({ kind: copy.arrangeRetires, title: '', lines: lines(retired) });
   return { appears, ...out };
 }
 
