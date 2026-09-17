@@ -103,6 +103,9 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
   const slot = n ? 1000 / n : 1000;
   const span = hi + lo;
   const y = (v: number) => (span ? ((hi - v) / span) * 100 : 50);
+  /* A BAR IS NO WIDER THAN IT IS AT TEN BUCKETS. A new record's weekly count has one week, and its bar filled six tenths of
+     the chart, a green slab rather than a bar. It stays centred in its slot, under its label. */
+  const barWidth = Math.min(slot * 0.6, 60);
   const bars: SeriesBar[] = [];
   if (span > 0)
     body.forEach((r, i) => {
@@ -117,7 +120,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
         if (s.dir === 'in') up += v;
         else down += v;
         const top = y(Math.max(from, to));
-        bars.push({ series: k, dir: s.dir, step: s.step, state, x: at(i * slot + slot * 0.2), y: at(top), width: at(slot * 0.6), height: at(y(Math.min(from, to)) - top) });
+        bars.push({ series: k, dir: s.dir, step: s.step, state, x: at(i * slot + (slot - barWidth) / 2), y: at(top), width: at(barWidth), height: at(y(Math.min(from, to)) - top) });
       });
     });
 
