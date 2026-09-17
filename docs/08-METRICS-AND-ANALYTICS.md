@@ -246,10 +246,29 @@ The rate table is a dated register, as §3 of [02-DATA-MODEL](02-DATA-MODEL.md) 
 already have, with one new key, `as_of`. *(An earlier draft spelled it `asof` and looked rows up by a
 `pair` the register does not have.)*
 
-### What this build reads: a factor table the figure carries
+### What this build reads: dated rates and a home currency (as built, 2026-09-17)
 
-The dated `fx` register and its `as_of` are not built. What is built is the small version of the same
-row-level product: a **named factor table**, where `by` picks a row's factor by the value of one field.
+The dated `fx` register is built, shipped by `money-core` (`currency`, `base`, `rate`, `as_of`, `source`; one
+`currency` is `rate` of `base`), and so is a **home currency**: Money's `home_currency` setting, read each time a
+figure is. The conversion is not declared per figure with `{ lookup: fx, as_of }`; it applies to every money `sum`,
+because a person who holds money in two currencies means every figure when they choose a home one. The arithmetic
+is one module, `packages/kernel/src/fx.ts`, which the browser's reader imports.
+
+| | |
+|---|---|
+| **The currency a figure is added up in** | the home currency when one is set, else the currency its `format` declares |
+| **No home currency** | a sum over rows in another currency, or in several, is `value: null` with `parts: [{ currency, amount }]`, one per currency, and `fx: { into, home: null, missing: [] }`. It is not a refusal, and it is never converted, even when rates would reach the declared currency: nobody chose it |
+| **A home currency, a rate missing** | the same parts, and `fx.missing` names each pair as `USD to EGP`. Nothing is added up from the rows that could be converted |
+| **Every rate there** | each row is converted at the rate as of the day its row is about (the list's first `day` field: an account's `as_of`, an obligation's `due`; today when it has none), rounded once per row, half away from zero, in each currency's own exponent. `unit` is the home currency and `fx.asOf` the newest rate used, which the tile says as "Converted at rates as of <day>" |
+| **Which rate** | the newest on or before the day; else the earliest after it (`fx.forward`); a row quoted the other way round is its inverse; a pair nobody quotes goes through one currency both are quoted against, as old as its older half, because a rates address answers everything against one base |
+| **Groups, series, walks** | every group of a grouped figure is in parts when one is; a `series` in parts answers `bars.split`, one chart a currency; the cash walk converts each movement at its day or names the rate it lacks. A `bar` or `split` over rows gets the home currency and rates beside its rows (`fx`) and is converted, or drawn once per currency under its code |
+| **A target** | is in the declared currency, so a figure converted into another has `met: null` and draws no target line |
+| **Rates by poll** | `ratesPollPack` (`packages/seed/src/packs/rates-poll.ts`) is an ordinary `poll` pack, approved once, that writes one `fx` row a currency from a public rates address |
+| **Not converted** | `avg`, `min`, `max`, `ratio` and `diff` across currencies still refuse `MIXED_CURRENCY` |
+
+### And a factor table the figure carries
+
+The same row-level product with a constant table: a **named factor table**, where `by` picks a row's factor by the value of one field.
 A service's `cost` is per cycle, so a yearly domain and a monthly subscription are two units, and the
 figure that adds them multiplies each row by its cycle first:
 
