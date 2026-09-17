@@ -226,10 +226,12 @@ export type FeedRow = {
   at: string;
   /** What the target is called, where the host could say (a row's title), for a reader who is not handed an id. */
   thing?: string | null;
+  /** On a `setup` row (`feed.ts`), how many example rows the record set itself up with. */
+  rows?: number;
 };
 
 /** One event, as the activity source reads it. */
-export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null };
+export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
 
 /** One event about a row, oldest first. A create carries every field in `to` and `field: null`. */
 export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
@@ -1019,7 +1021,17 @@ export function feedRows(events: readonly ActivityEvent[], first?: number): Feed
     const last = bursts.at(-1);
     if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
     else
-      bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts, ...(e.thing === undefined ? {} : { thing: e.thing }) });
+      bursts.push({
+        by: byOf(e.actor),
+        who: e.actor,
+        count: 1,
+        kind: e.kind,
+        target: e.target,
+        note: e.note,
+        at: e.ts,
+        ...(e.thing === undefined ? {} : { thing: e.thing }),
+        ...(e.rows === undefined ? {} : { rows: e.rows }),
+      });
   }
   if (first === undefined) return bursts;
   const cap = Math.min(50, Math.max(1, Math.floor(first)));

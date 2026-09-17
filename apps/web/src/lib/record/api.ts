@@ -1578,6 +1578,8 @@ export type FeedRow = {
   at: string;
   /** What the target is called, where the record could say: a row's title. */
   thing?: string | null;
+  /** On a `setup` row, how many example rows the record set itself up with. */
+  rows?: number;
 };
 
 /**
@@ -2338,7 +2340,7 @@ const agentNamed = (who: string): string => {
 export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.who === null ? '' : agentNamed(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    cells: [r.who === null ? '' : agentNamed(r.who), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));
@@ -2364,6 +2366,19 @@ export function feedThing(target: string | null): string | null {
   return /^suggestion:(SG\d+)$/u.exec(target)?.[1] ?? target;
 }
 
+/**
+ * A RECORD SETTING ITSELF UP IS ONE LINE (`kernel/src/feed.ts`), on Home and on a feed block alike: the use case it
+ * installed, or the add-on, and how many example rows it added, rather than a line a row.
+ */
+export function setupSaid(target: string | null, rows: number): string {
+  if (rows === 0) return copy.setUpLinked;
+  const id = (target ?? '').replace(/^pack:/u, '');
+  const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
+  if (usecase) return copy.setUpWith(useCaseName(usecase), rows);
+  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  return names.length > 0 ? copy.setUpWith(names.join(', '), rows) : copy.setUpRows(rows);
+}
+
 /** When a feed row happened, in words: a day against today, and an instant as how long ago. */
 const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test(at) ? relative(at, now) : since(at, now));
 
@@ -2377,7 +2392,7 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
 export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : feedWho(r.who, me), String(r.count), agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
+    cells: [r.by, r.who === null ? '' : feedWho(r.who, me), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

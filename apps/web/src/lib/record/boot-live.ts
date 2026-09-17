@@ -16,7 +16,7 @@
 import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, NOW, PACKS, REGISTERS, type boot, type NavEntry } from './api.ts';
+import { iconFor, NOW, PACKS, REGISTERS, setupSaid, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
@@ -169,19 +169,8 @@ function textOf(e: EventLine): string {
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
 }
 
-/**
- * A RECORD SETTING ITSELF UP IS ONE LINE (`kernel/src/feed.ts`): the use case it installed, or the add-on, and how many
- * example rows it added, rather than a line a row.
- */
-function setupText(e: EventLine): string {
-  const rows = typeof e.to === 'number' ? e.to : 0;
-  if (rows === 0) return copy.setUpLinked;
-  const id = (e.target ?? '').replace(/^pack:/u, '');
-  const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
-  if (usecase) return copy.setUpWith(useCaseName(usecase), rows);
-  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
-  return names.length > 0 ? copy.setUpWith(names.join(', '), rows) : copy.setUpRows(rows);
-}
+/** A record setting itself up is one line (`api.ts` `setupSaid`). */
+const setupText = (e: EventLine): string => setupSaid(e.target, typeof e.to === 'number' ? e.to : 0);
 
 /** Where a line goes: the row, the question, or the log for anything that is neither. */
 function hrefOf(e: EventLine): string {

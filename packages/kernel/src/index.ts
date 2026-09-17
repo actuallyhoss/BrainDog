@@ -97,7 +97,8 @@ import {
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 import {
   carryingOf,
   headline,
@@ -2515,20 +2516,49 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * `lineOf` holds them to an owner), and a page is read by whoever may open it, so they are left out here.
      * The read mark is a person's, and the kernel does not know who is reading, so it is `null` here and the record's `page` puts the reader's own in.
      */
-    activity: (limit) => ({
-      events: sql
-        .all<{ ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; note: string | null }>(
-          `SELECT ts, actor, kind, target, target_kind, note FROM event
-            WHERE kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
-              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
-            ORDER BY rowid DESC LIMIT ?`,
-          limit,
-        )
-        .map((e) => {
+    activity: (limit) => {
+      const lines = sql.all<{ rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null }>(
+        `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
+          WHERE kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
+            AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+          ORDER BY rowid DESC LIMIT ?`,
+        limit,
+      );
+      type Line = FeedLine & { ts: string; actor: string; note: string | null; row: Entry | null };
+      /* A RECORD SETTING ITSELF UP IS ONE ROW OF A FEED BLOCK TOO, as it is one line of `whatsNew` (`feed.ts`). */
+      const setup = setupCollapser<Line>((line) => {
+        const tags = line.row?.fields.tags;
+        return Array.isArray(tags) && tags.includes('example');
+      });
+      const said: Line[] = [];
+      for (const e of lines) {
+        const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
+        /* A DELETED ROW IS NAMED BY WHAT IT WAS LAST CALLED: its line read `entry:01K…` once the row was gone. A row purged
+           from the table has no name left to give, so its line says what was done and to nothing. */
+        const row = id === null ? null : byId(id, true);
+        const line: Line = {
+          ts: e.ts,
+          actor: e.actor,
+          kind: e.kind,
+          target: e.target,
+          target_kind: e.target_kind,
+          field: e.field,
+          from: read(e.from_v),
+          to: read(e.to_v),
+          register: row?.register ?? null,
+          seq: row?.seq ?? null,
+          title: null,
+          note: e.note,
+          row,
+        };
+        said.push(...setup.push(line));
+      }
+      said.push(...setup.flush());
+      return {
+        events: said.map((e): ActivityEvent => {
+          if (e.kind === SETUP_KIND) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: null, rows: typeof e.to === 'number' ? e.to : 0 };
           const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
-          /* A DELETED ROW IS NAMED BY WHAT IT WAS LAST CALLED: its line read `entry:01K…` once the row was gone. A row purged
-             from the table has no name left to give, so its line says what was done and to nothing. */
-          const row = id === null ? null : byId(id, true);
+          const row = e.row;
           if (!row) return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note };
           const title = registers.get(row.register)?.title;
           const named = title ? row.fields[title] : undefined;
@@ -2541,8 +2571,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             thing: typeof named === 'string' && named !== '' ? named : `${row.register}#${row.seq}`,
           };
         }),
-      seen: null,
-    }),
+        seen: null,
+      };
+    },
   });
 
   /**
