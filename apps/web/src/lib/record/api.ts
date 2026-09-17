@@ -2820,10 +2820,12 @@ export function signFaults(register: string, columns: PageBlock['columns']): str
   });
 }
 
-/** Who changed a row last and when, in the sample: the newest thing said about it, or who wrote it. */
+/** Who changed a row last and when, in the sample: the newest thing said about it or done to it, or who wrote it. */
 function provenanceOf(register: string, e: Entry): { by: string; at: string } {
   const href = `/r/${register}/${e.seq}`;
-  const said = NEWS.filter((n) => n.href === href).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+  const target = `${register}#${e.seq}`;
+  /* THE LEDGER TOO, because an agent's edit is written there whether or not it made the news. */
+  const said = [...NEWS.filter((n) => n.href === href), ...AUDIT.filter((a) => a.target === target)].sort((a, b) => (a.at < b.at ? 1 : -1))[0];
   return said ? { by: said.by, at: said.at } : { by: e.by, at: e.created };
 }
 

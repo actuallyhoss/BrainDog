@@ -83,6 +83,13 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
   assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
   assert.deepEqual(names(block(overview, 'Not in play').rows), ['Tallow']);
+
+  /* WHO SAID IT: the agent on a project, where it wrote where the project stands, and a person everywhere else. */
+  const queue = block(overview, 'Needs you');
+  const said = Object.fromEntries(queue.rows.map((r, i) => [String(r.fields.name), queue.changes?.[i]?.who]));
+  assert.deepEqual(said, { Kiln: 'agent:claude', Portage: 'p_seed' });
+  const held = block(overview, 'With an agent');
+  assert.deepEqual(held.rows.map((r, i) => [r.fields.name, held.changes?.[i]?.by]), [['Kiln', 'agent'], ['Marlow & Co', 'agent']]);
 });
 
 test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT, and the queue says who did each', async () => {

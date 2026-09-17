@@ -29,7 +29,7 @@ export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, first
 export * from './modules/base.ts';
 export { ACCOUNTS, OBLIGATIONS, cashSeries } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
-export { THINGS } from './modules/portfolio.ts';
+export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
@@ -37,7 +37,7 @@ import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegis
 import { ACCOUNTS, MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
-import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
+import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
@@ -351,9 +351,17 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 
   let rows = 0;
   for (const register of [...ORDER, ...AGENTS_ORDER])
-    for (const entry of ROWS[register] ?? []) {
-      const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, entry), { actor });
+    for (const [i, entry] of (ROWS[register] ?? []).entries()) {
+      /* WHAT AN AGENT SAID ABOUT A PROJECT IS WRITTEN BY THE AGENT, after the row, so its history names it. */
+      const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
+      const planted = said ? Object.fromEntries(Object.entries(entry).filter(([k]) => !said.fields.includes(k))) : entry;
+      const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor });
       if (!out.ok) return out as unknown as Result<Seeded>;
+      if (said) {
+        const patch = Object.fromEntries(said.fields.map((k) => [k, entry[k] as Json]));
+        const wrote = kernel.update('things', `things#${said.things}`, patch as never, { actor: `agent:${said.by}` });
+        if (!wrote.ok) return wrote as unknown as Result<Seeded>;
+      }
       rows++;
     }
 

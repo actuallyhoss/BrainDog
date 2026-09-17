@@ -23,6 +23,7 @@ import {
   targetConfigOf,
   day,
   projectWithRunsOn,
+  PROJECTS_SAID,
   stamp,
 } from '@braindog/seed';
 
@@ -903,6 +904,9 @@ const WRITTEN: AuditEvent[] = [
      `options` body (`33 §2`). */
   { seq: 4160, at: stamp(-31), by: 'codex', kind: 'suggest', target: 'suggestion:SG31', note: 'Kiln licensing model', version: 4160 },
   { seq: 4102, at: stamp(-49), by: 'claude', kind: 'edit', target: 'people#4', note: 'added a note: “Year end is 31 March”', version: 4102 },
+  /* WHAT THE AGENT ON A PROJECT SAID ABOUT WHERE IT STANDS, as the record writes it when the sample is installed, so a
+     project's Changed by names the agent and not you. */
+  ...PROJECTS_SAID.map((s) => ({ seq: 0, at: stamp(s.hours), by: s.by, kind: 'edit' as const, target: `things#${s.things}`, note: s.note, version: 0 })),
   { seq: 4061, at: stamp(-96), by: 'you', kind: 'declare', target: 'page.money', note: 'Added the Overdue stat cell', version: 4061 },
 ];
 

@@ -118,6 +118,16 @@ export const THINGS: Fields[] = [
   { name: 'Tallow', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
 ];
 
+/**
+ * WHAT AGENTS SAID ABOUT THE PROJECTS THEY HOLD, so Changed by names them. The agent on a project keeps where it stands
+ * current, and a record says so in its history: the row goes in without these fields and the agent writes them after.
+ * `hours` is how long ago, for the sample's ledger. `things` is the project's place in `THINGS`, from 1.
+ */
+export const PROJECTS_SAID: readonly { things: number; by: string; hours: number; fields: readonly string[]; note: string }[] = [
+  { things: 1, by: 'claude', hours: -6, fields: ['health', 'next', 'progress'], note: 'said Kiln is at risk until its licensing is settled' },
+  { things: 2, by: 'cursor', hours: -27, fields: ['next', 'progress'], note: 'set the next step on Marlow & Co to the chaser for 2026-041' },
+];
+
 export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
   things: {
     id: 'things',
