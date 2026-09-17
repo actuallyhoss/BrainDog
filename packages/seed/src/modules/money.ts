@@ -230,7 +230,36 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
       { id: 'liquid', label: 'Counts as cash', type: 'bool', default: true },
     ],
   },
+  /**
+   * WHAT ONE CURRENCY IS WORTH IN ANOTHER, AND ON WHICH DAY (`08 §2.5`). Money in more than one currency is added up in the
+   * record's home currency only when there is a rate for every other one, as of the day each amount is about; without one
+   * a figure says one amount per currency and names the rate it lacks. A rate is typed in, written by an agent, or polled
+   * from a public address (`ratesPollPack`). One `currency` is `rate` of `base`, and a row quoted the other way round is
+   * read as its inverse.
+   */
+  fx: {
+    id: 'fx',
+    name: 'Exchange rates',
+    icon: 'money',
+    one: 'rate',
+    holds: 'what one currency is worth in another, and the day that was true',
+    title: 'currency',
+    mobile: ['currency', 'rate', 'as_of'],
+    pack: 'money-core',
+    fields: [
+      { id: 'currency', type: 'text', required: true, index: true, search: true },
+      { id: 'base', label: 'Base currency', type: 'text', required: true, index: true },
+      { id: 'rate', type: 'decimal', required: true },
+      { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
+      { id: 'source', type: 'text' },
+    ],
+  },
 };
+
+/** The Money setting a record adds every currency up in. Read each time a figure is, so a change holds at once. */
+export const MONEY_HOME_SETTING = {
+  home_currency: { type: 'text', label: 'Home currency', note: 'The three-letter code money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
+} as const;
 
 /**
  * THE TARGETS A PERSON CHANGES LATER, AS SETTINGS OF MONEY. A figure's target was fixed the day Money went in, so somebody

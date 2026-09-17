@@ -22,6 +22,7 @@ import {
   type Declaration,
   type Kernel,
   type MetricDecl,
+  type Reading,
 } from '../src/index.ts';
 import { attempt } from '../src/tx.ts';
 import { parseWhere, type Schema } from '@braindog/where';
@@ -99,9 +100,10 @@ test('A DIFF OF TWO CURRENCIES IS REFUSED, not answered in the numerator’s', a
   );
   void out;
 
-  // Two halves with different predicates is where it actually bites; one read, two currencies.
-  const both = refusal(k.metric(METRIC({ value: { sum: 'amount' } })));
-  assert.equal(both.code, 'MIXED_CURRENCY');
+  // One read, two currencies and no rate: not a number, one amount per currency.
+  const both = value<Reading>(k.metric(METRIC({ value: { sum: 'amount' } })));
+  assert.equal(both.value, null);
+  assert.deepEqual(both.parts?.map((p) => p.currency), ['GBP', 'USD']);
   sql.close();
 });
 

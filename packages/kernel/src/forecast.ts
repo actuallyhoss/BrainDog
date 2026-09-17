@@ -23,6 +23,7 @@ import { no } from '@braindog/ports';
 import { compile, resolveDay, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
+import { convertMinor, rateFor } from './fx.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 
 export type Leg = {
@@ -45,6 +46,8 @@ export type Runway = {
   from: number;
   currency: string | null;
   mixed: readonly string[];
+  /** Set when movements in another currency were converted into `currency`: the newest rate's day. */
+  converted?: { asOf: string; forward: boolean };
   steps: Step[];
   /** The first step whose balance goes under, or `null` if none does inside the horizon. */
   crossed: Step | null;
@@ -134,7 +137,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     );
   const until = deps.ctx.nowMs + horizonDays * DAY_MS;
   const refusals: Refusal[] = [];
-  const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
+  const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
 
   for (const leg of legs) {
@@ -231,6 +234,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         const late = day < iso(deps.ctx.nowMs);
         movements.push({
           at: late ? deps.ctx.nowMs : at,
+          currency: isMoney(money) ? money.currency : '',
           step: {
             day: late ? iso(deps.ctx.nowMs) : day,
             label: `${label}${late ? ' · overdue' : ''}`,
@@ -267,8 +271,54 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       });
   }
 
-  const mixed = seen.size > 1 ? [...seen].sort() : [];
-  const currency = mixed.length ? null : ([...seen][0] ?? null);
+  /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, each at the rate as of the day it happens, a day
+     ahead at the newest rate there is (`fx.ts`). A walk that cannot convert one of them says which rate it lacks. */
+  const held = deps.ctx.fx?.() ?? { home: null, rates: [] };
+  let mixed = seen.size > 1 ? [...seen].sort() : [];
+  let currency = mixed.length ? null : ([...seen][0] ?? null);
+  let converted: Runway['converted'];
+  const into = held.home;
+  if (into !== null && seen.size > 0 && (mixed.length || currency !== into)) {
+    const missing = new Set<string>();
+    let asOf = '';
+    let forward = false;
+    for (const m of movements) {
+      if (m.currency === into) continue;
+      const r = rateFor(held.rates, m.currency, into, m.step.day);
+      if (!r) {
+        missing.add(`${m.currency} to ${into}`);
+        continue;
+      }
+      m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, into, r.rate) };
+      if (r.as_of > asOf) asOf = r.as_of;
+      forward ||= r.forward;
+    }
+    if (missing.size === 0) {
+      mixed = [];
+      currency = into;
+      converted = { asOf, forward };
+    }
+    if (missing.size)
+      return {
+        ok: true,
+        value: {
+          from: opening,
+          currency: null,
+          mixed: [...seen].sort(),
+          steps: [],
+          crossed: null,
+          days: null,
+          horizon: horizonDays,
+          refusals: [
+            {
+              code: 'MIXED_CURRENCY',
+              fix: `this walk reads ${[...seen].sort().join(' and ')} and adds it up in ${into}, and there is no rate yet from ${[...missing].sort().map((p) => p.split(' to ')[0]).join(' or ')} to ${into}`,
+              at: 'from',
+            },
+          ],
+        },
+      };
+  }
   if (mixed.length)
     return {
       ok: true,
@@ -283,7 +333,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         refusals: [
           {
             code: 'MIXED_CURRENCY',
-            fix: `this walk reads ${mixed.join(' and ')}, and a crossing day computed across two currencies is a date on which nothing happens`,
+            fix: `this walk reads ${mixed.join(' and ')}, and a crossing day computed across two currencies is a date on which nothing happens. Set a home currency and rates into it to walk them as one`,
             at: 'from',
           },
         ],
@@ -311,6 +361,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
       from: opening,
       currency,
       mixed,
+      ...(converted ? { converted } : {}),
       steps,
       crossed,
       days: crossed ? Math.round((noon(crossed.day) - deps.ctx.nowMs) / DAY_MS) : null,

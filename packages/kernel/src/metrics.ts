@@ -11,9 +11,11 @@
  * definitions of "overdue" that agree until somebody edits one, and then a tile that links to a
  * page contradicting it.
  *
- * TWO CURRENCIES ARE NEVER ADDED. A money sum groups by currency in SQL and refuses when more than
- * one group comes back: a total across two is a number of the right size in the wrong unit, sitting
- * in a tile with a code beside it, and there is no screen on which anybody notices.
+ * TWO CURRENCIES ARE NEVER ADDED AS THEY ARE. A money sum groups by currency in SQL, and when more
+ * than one group comes back, or one in a currency other than the figure's, it is converted into the
+ * home currency at the rates as of each row's day, or answered one amount per currency with the
+ * missing rates named (`fx.ts`, `08 §2.5`). A total across two added as they are is a number of the
+ * right size in the wrong unit, and there is no screen on which anybody notices.
  *
  * WHAT IS NOT HERE IS REFUSED BY NAME. `running`, `trend`, `last` and `median` are published shapes
  * with no consumer in this build. `group_by` and `bucket` are read (`groupsOf`). Reading one and
@@ -26,6 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
+import { across, dayFieldOf, type Part, type Rate } from './fx.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -105,7 +108,23 @@ export type MetricDecl = {
  * `empty` is a bucket nothing fell in, and its value is `null`: a gap, never a zero (`08 §2.1`).
  * `partial` is the bucket the clock is in, or one after it, which is not finished and is drawn faint.
  */
-export type Group = { key: string; value: number | null; rows: number; state: 'empty' | 'partial' | 'full' };
+export type Group = {
+  key: string;
+  value: number | null;
+  rows: number;
+  state: 'empty' | 'partial' | 'full';
+  /** On a figure in more than one currency that is not converted: this part's amount in each, and `value` is `null`. */
+  parts?: Part[];
+};
+
+/**
+ * How a money figure across currencies was read (`fx.ts`).
+ *
+ * `into` is the currency it was added up in, the home currency when the record has one (`home`), else the one the
+ * figure declares. `asOf` is the newest rate a converted figure used, and `missing` each pair with no rate, which is
+ * why a figure came back in `parts`.
+ */
+export type FxRead = { into: string | null; home: string | null; asOf: string | null; forward: boolean; missing: string[] };
 
 /** Named factor tables: a table's name, then each `by` value's factor. */
 export type Lookups = Record<string, Record<string, number>>;
@@ -140,6 +159,13 @@ export type Reading = {
   current?: string;
   /** How many groups past the cap of fifty were left out, the oldest first. */
   more?: number;
+  /**
+   * MONEY IN MORE THAN ONE CURRENCY THAT COULD NOT BE CONVERTED, one amount per currency, and `value` is `null`. It is
+   * not a refusal: the parts are the answer, and `fx.missing` says which rate would add them up.
+   */
+  parts?: Part[];
+  /** Present when the rows were in a currency other than the one the figure is added up in: converted, or in `parts`. */
+  fx?: FxRead;
 };
 
 const WINDOW = /^(\d{1,4})([dwm])$/;
@@ -218,7 +244,15 @@ export type EvalContext = {
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`. Absent means a sentence cannot name one. */
   refByTitle?: ((register: string, title: string) => string | null) | undefined;
+  /**
+   * The record's home currency and its dated rates, read when a money figure meets a second currency. Absent is no
+   * home currency and no rates, so such a figure comes back in parts.
+   */
+  fx?: (() => { home: string | null; rates: readonly Rate[] }) | undefined;
 };
+
+/** What a money sum needs to add across currencies: the currency, the rates, today, and the field that dates a row. */
+type Across = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null };
 
 /**
  * The predicate a declaration meant, whichever form it wrote it in.
@@ -398,7 +432,17 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
-  const now = read(sql, said.predicate, schema, decl, tablesOf(decl));
+  /* THE CURRENCY A MONEY FIGURE IS ADDED UP IN: the record's home currency when it has one, else the figure's own. */
+  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const held = ctx.fx?.() ?? { home: null, rates: [] };
+  const fx: Across = {
+    into: held.home ?? declared,
+    home: held.home,
+    rates: held.rates,
+    today: new Date(ctx.asOfMs ?? ctx.nowMs).toISOString().slice(0, 10),
+    day: dayFieldOf(schema.fields),
+  };
+  const now = read(sql, said.predicate, schema, decl, tablesOf(decl), fx);
   if (!now.ok) return now;
 
   /**
@@ -417,11 +461,12 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * there should not be two engines; while there are, a check that lands on one of them is half a
    * check, and this is the half that was missing.
    */
-  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
-  if (declared && now.value.unit && declared !== now.value.unit)
+  /* A MONEY SUM IS CONVERTED OR SPLIT BY CURRENCY BEFORE IT GETS HERE (`aggregate`), so what is left to disagree is an
+     average, a least or a most over rows in one currency the figure is not added up in. */
+  if (fx.into && declared && now.value.unit && fx.into !== now.value.unit)
     return no<Reading>(
       'MIXED_CURRENCY',
-      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${declared}.`,
+      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${fx.into}.`,
       { at: 'format', allowed: [now.value.unit] },
     );
 
@@ -444,7 +489,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     const moveTo = decl.compare === 'year_ago' ? yearBefore(ctx.nowMs) : ctx.nowMs - shift;
     const shifted = predicateOf(decl.where, schema, { ...ctx, nowMs: moveTo });
     const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
-    const before = read(sql, shifted.predicate, schema, decl, tablesOf(decl));
+    const before = read(sql, shifted.predicate, schema, decl, tablesOf(decl), fx);
 
     if (!before.ok) why = fixOf(before);
     else if (!moved) {
@@ -459,7 +504,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     else delta = deltaFrom(before.value.value, now.value.value);
   }
 
-  const grouped = decl.group_by === undefined ? null : groupsOf(sql, said.predicate, schema, decl, ctx);
+  const grouped = decl.group_by === undefined ? null : groupsOf(sql, said.predicate, schema, decl, ctx, fx);
   if (grouped && !grouped.ok) return grouped;
 
   return ok({
@@ -492,6 +537,7 @@ function groupsOf(
   schema: Schema,
   decl: MetricDecl,
   ctx: EvalContext,
+  fx?: Across,
 ): Result<Pick<Reading, 'groups' | 'current' | 'more'>> {
   const w = compile(predicate, schema);
   if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
@@ -502,11 +548,22 @@ function groupsOf(
   const tables = tablesOf(decl);
   const value = decl.value as Aggregation;
 
-  const part = (clause: string, more: (string | number)[]): Result<{ value: number | null; rows: number }> => {
-    const got = one(sql, schema, value, `${where} AND ${clause}`, [...params, ...more], tables);
+  const units = new Map<string, string | null>();
+  const part = (key: string, clause: string, more: (string | number)[]): Result<{ value: number | null; rows: number; parts?: Part[] }> => {
+    const got = one(sql, schema, value, `${where} AND ${clause}`, [...params, ...more], tables, fx);
     if (!got.ok) return got;
-    return ok({ value: got.value.rows === 0 ? null : got.value.value, rows: got.value.rows });
+    units.set(key, got.value.unit);
+    return ok({ value: got.value.rows === 0 ? null : got.value.value, rows: got.value.rows, ...(got.value.parts ? { parts: got.value.parts } : {}) });
   };
+  /* ONE PART IN PARTS PUTS EVERY PART IN PARTS. A month in one currency beside a month in two is still a figure with no
+     single unit, so its amount is said as the one currency it is in, never as a bare number beside the others. */
+  const inParts = (groups: Group[]): Group[] =>
+    !groups.some((g) => g.parts)
+      ? groups
+      : groups.map((g) => {
+          const unit = units.get(g.key);
+          return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
+        });
 
   if (decl.bucket !== undefined) {
     const bucket = decl.bucket;
@@ -520,11 +577,11 @@ function groupsOf(
     const run = bucketRun(keys[0]!, last, bucket, GROUP_CAP);
     const groups: Group[] = [];
     for (const key of run.keys) {
-      const got = part(`${day} >= ? AND ${day} < ?`, [bucketStart(key, bucket), bucketStart(nextBucket(key, bucket), bucket)]);
+      const got = part(key, `${day} >= ? AND ${day} < ?`, [bucketStart(key, bucket), bucketStart(nextBucket(key, bucket), bucket)]);
       if (!got.ok) return got;
       groups.push({ key, ...got.value, state: bucketState(key, got.value.rows, current, key === run.keys[0] && run.more === 0) });
     }
-    return ok({ groups, current, more: run.more });
+    return ok({ groups: inParts(groups), current, more: run.more });
   }
 
   /* THE LARGEST FIRST, the key breaking a tie, and past fifty the rest are counted rather than drawn
@@ -532,10 +589,11 @@ function groupsOf(
   const values = sql.all<{ v: string | number }>(`SELECT DISTINCT ${field} AS v FROM entry WHERE ${where} AND ${field} IS NOT NULL`, ...params);
   const groups: Group[] = [];
   for (const { v } of values) {
-    const got = part(`${field} = ?`, [v]);
+    const got = part(String(v), `${field} = ?`, [v]);
     if (!got.ok) return got;
     groups.push({ key: String(v), ...got.value, state: 'full' });
   }
+  groups.splice(0, groups.length, ...inParts(groups));
   groups.sort(largestFirst);
   return ok({ groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) });
 }
@@ -565,6 +623,7 @@ function read(
   schema: Schema,
   decl: MetricDecl,
   lookups?: Record<string, Record<string, number>> | undefined,
+  fx?: Across,
 ): Result<Read> {
   const w = compile(predicate, schema);
   if (w.bad.length) return { ok: false, refusal: w.bad[0]! };
@@ -579,10 +638,18 @@ function read(
        checker which half of the union it is holding, and a boolean does not carry that. */
     const ratio = 'ratio' in decl.value;
     const pair = 'ratio' in decl.value ? decl.value.ratio : decl.value.diff;
-    const of = one(sql, schema, pair.of, where, params, lookups);
-    const per = one(sql, schema, pair.per, where, params, lookups);
+    const of = one(sql, schema, pair.of, where, params, lookups, fx);
+    const per = one(sql, schema, pair.per, where, params, lookups, fx);
     if (!of.ok) return of;
     if (!per.ok) return per;
+    /* A HALF IN PARTS IS NOT ONE NUMBER, so a ratio or a diff of it is not one either, and it says which currencies. */
+    const split = of.value.parts ?? per.value.parts;
+    if (split)
+      return no<Read>(
+        'MIXED_CURRENCY',
+        `one half of this figure is in ${split.map((p) => p.currency).join(' and ')}, and two currencies are never subtracted or divided without a rate`,
+        { at: 'value' },
+      );
     /* AND THE TWO HALVES AGAINST EACH OTHER. Each was checked for a mixed currency INSIDE itself and
        neither against the other, so GBP − USD came out as a number labelled GBP — the same failure
        this file's header is written against, arrived at through the guard against it. */
@@ -660,7 +727,7 @@ function read(
     return ok({ value, unit: 'ratio' in decl.value ? null : (of.value.unit ?? per.value.unit), rows: of.value.rows, refusals: [] });
   }
 
-  return one(sql, schema, decl.value, where, params, lookups);
+  return one(sql, schema, decl.value, where, params, lookups, fx);
 }
 
 /** One aggregation, as one SELECT. Money groups by currency; everything else is a scalar. */
@@ -671,6 +738,7 @@ function one(
   where: string,
   params: (string | number)[],
   lookups?: Record<string, Record<string, number>> | undefined,
+  fx?: Across,
 ): Result<Read> {
   const [kind, operand] = Object.entries(agg)[0] as [string, string | Product];
   const product = typeof operand === 'object' && operand !== null ? operand.product : null;
@@ -750,7 +818,7 @@ function one(
     /* ROUNDED PER ROW, because minor units are integers: a half-penny that survives the sum is a
        total that does not match the rows it is a total of. */
     const times = `CAST(round(${expr} * (CASE ${byExpr} ${cases} ELSE NULL END)) AS INTEGER)`;
-    return aggregate(sql, field, type, times, where, params, kind);
+    return aggregate(sql, field, type, times, where, params, kind, 'sum', undefined, fx);
   }
 
   /* MONEY AND QUANTITY CARRY THEIR UNIT INTO THE GROUP BY. The rule is one line — two currencies are
@@ -758,7 +826,7 @@ function one(
      is a figure of the right size in whatever unit happened to be commonest. */
   /* AN AVERAGE DAY IS AVERAGED AS DAYS SINCE 1970, never as text: SQLite reads `2026-07-28` as 2026. */
   if (type === 'day' && kind === 'avg') return aggregate(sql, field, 'decimal', `(julianday(${expr}) - 2440587.5)`, where, params, kind, fn, rows);
-  return aggregate(sql, field, type, expr, where, params, kind, fn, rows);
+  return aggregate(sql, field, type, expr, where, params, kind, fn, rows, fx);
 }
 
 /**
@@ -778,6 +846,7 @@ function aggregate(
   kind: string,
   fn = 'sum',
   known?: number,
+  fx?: Across,
 ): Result<Read> {
   const rows = known ?? Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0);
 
@@ -791,6 +860,20 @@ function aggregate(
        cross a ternary condition carrying a quote, and both arms below are codes it has to see. */
     const money = type === 'money';
     if (groups.length === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: null, rows, refusals: [] });
+    /* A SUM OF MONEY IN A CURRENCY OTHER THAN THE ONE THE FIGURE IS ADDED UP IN is read row by row, each amount with
+       the day its row is about, and converted at the rate as of that day, or said one amount per currency (`fx.ts`). */
+    const foreign = groups.length > 1 || (fx?.into != null && groups[0]!.u !== fx.into);
+    if (money && fx && kind === 'sum' && foreign && groups.every((g) => g.u !== null)) {
+      const dated = fx.day ? `json_extract(fields, '${jsonPath(fx.day)}')` : 'NULL';
+      const amounts = sql
+        .all<{ u: string; v: number; d: string | null }>(`SELECT ${unitExpr} AS u, ${expr} AS v, ${dated} AS d FROM entry WHERE ${where} AND ${expr} IS NOT NULL`, ...params)
+        .map((r) => ({ currency: String(r.u), amount: Number(r.v), day: typeof r.d === 'string' ? r.d : null }));
+      const said = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null);
+      if (said.kind === 'one') return ok({ value: said.amount, unit: said.currency, rows, refusals: [] });
+      if (said.kind === 'converted')
+        return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, missing: [] } });
+      return ok({ value: null, unit: null, rows, refusals: [], parts: said.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: said.missing } });
+    }
     if (groups.length > 1)
       /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
          `quantity` aggregation across units"*, with its own sentence: *"sums consumption across m,

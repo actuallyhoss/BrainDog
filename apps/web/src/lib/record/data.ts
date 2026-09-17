@@ -19,6 +19,7 @@ import {
   ROWS as SEED_ROWS,
   REGISTERS as SEED_REGISTERS,
   METRICS as SEED_METRICS,
+  MONEY_HOME_SETTING,
   targetConfigOf,
   day,
   projectWithRunsOn,
@@ -669,8 +670,8 @@ export const PACKS: PackInfo[] = [
  */
 export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number'; values?: readonly string[]; default?: unknown; label?: string; note?: string }>>> = {
   /* THE SETTINGS MONEY SHIPS WITH, read from the metrics it declares as the record's pack reads them (`targetConfigOf`):
-     the six targets a person changes later, each starting at the figure's own target. */
-  'money-core': targetConfigOf(Object.values(SEED_METRICS) as unknown as Record<string, unknown>[]) as never,
+     the home currency, and the six targets a person changes later, each starting at the figure's own target. */
+  'money-core': { ...MONEY_HOME_SETTING, ...targetConfigOf(Object.values(SEED_METRICS) as unknown as Record<string, unknown>[]) } as never,
 };
 
 /* ── scheduled actions ───────────────────────────────────────────────────── */

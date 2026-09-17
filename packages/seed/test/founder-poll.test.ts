@@ -8,11 +8,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
-import { openRecord, type ActionAnswer, type Kernel } from '@braindog/kernel';
+import { convertMinor, openRecord, type ActionAnswer, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { modulesFor, pollPack, useCase } from '../src/usecases/index.ts';
+import { modulesFor, pollPack, ratesPollPack, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
 const TODAY = dayOf(NOW);
@@ -172,4 +172,44 @@ test('A PUBLIC ADDRESS IS POLLED WITH NO KEY IN THE VAULT, once approved, and ne
   assert.deepEqual({ ran: run.ran, paused: run.paused }, { ran: 1, paused: 0 });
   assert.deepEqual(grants, [null]);
   assert.equal(k.count('datapoints'), before + 2);
+});
+
+test('EXCHANGE RATES ARE POLLED LIKE ANY ADDRESS: approved once, one row of fx a currency, and Cash now converts', async () => {
+  const { k } = await founder();
+  const doc = ratesPollPack({ id: 'open-er', url: 'https://open.er-api.example/v6/latest/USD', every: '1d', base: 'USD', rates: [{ currency: 'EGP', path: 'rates.EGP' }, { currency: 'GBP', path: 'rates.GBP' }] });
+  const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  assert.deepEqual(diff.approve, ['CALLS OUT open.er-api.example · every 1d · grant "none"']);
+  assert.equal((await install(pack, diff, hostFor(k), diff.planHash)).ok, false, 'never without approval');
+  value(await install(pack, diff, hostFor(k), diff.planHash, diff.approve));
+
+  const run = await k.runActions(async () => ({ status: 200, body: '{"base_code":"USD","rates":{"EGP":50,"GBP":0.74}}', bytes: 48, ms: 3, requests: 1 }));
+  assert.equal(run.ran, 1);
+  const rows = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'fx', limit: 10 })).rows;
+  assert.deepEqual(rows.map((r) => [r.fields.currency, r.fields.base, r.fields.rate, r.fields.as_of, r.fields.source]).sort(), [
+    ['USD', 'EGP', 50, TODAY, 'open.er-api.example'],
+    ['USD', 'GBP', 0.74, TODAY, 'open.er-api.example'],
+  ]);
+
+  /* THE OWNER'S TWO ACCOUNTS, the home currency set on Money, and Cash now in pounds at the polled rate. */
+  for (const a of [
+    { name: 'CIB', kind: 'bank', balance: { amount: 5_200_000, currency: 'EGP' }, as_of: TODAY, liquid: true },
+    { name: 'Mercury', kind: 'bank', balance: { amount: 340_000, currency: 'USD' }, as_of: TODAY, liquid: true },
+  ])
+    value(k.create('accounts', a, { actor: 'p_1' }));
+  const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'metric.cash-now')?.body;
+  const decl = typeof held === 'string' ? JSON.parse(held) : held;
+  assert.ok(decl, 'Money declares Cash now');
+  const parts = value<{ value: number | null; parts?: unknown }>(k.metric(decl as never));
+  assert.equal(parts.value, null, 'no home currency yet');
+  const money = k.packs().find((p) => p.id === 'money-core' || p.id.startsWith('money'));
+  assert.ok(money, JSON.stringify(k.packs().map((p) => p.id)));
+  value(k.setPackConfig(money.id, { home_currency: 'EGP' }, { actor: 'p_1' }));
+  const cash = value<{ value: number | null; unit: string | null; fx?: { asOf: string | null } }>(k.metric(decl as never));
+  assert.equal(cash.unit, 'EGP');
+  /* The example account in pounds is read through dollars, which both rates are quoted against. */
+  const pounds = parts.parts as { currency: string; amount: number }[];
+  const example = pounds.find((p) => p.currency === 'GBP')?.amount ?? 0;
+  assert.equal(cash.value, 5_200_000 + 17_000_000 + convertMinor(example, 'GBP', 'EGP', 50 / 0.74));
+  assert.equal(cash.fx?.asOf, TODAY);
 });

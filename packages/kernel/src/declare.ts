@@ -31,6 +31,7 @@ import { checkInterval, type PullDecl } from './pull.ts';
    `date:` form this file accepts is one `day` can read, and there is one list of them. */
 import { ARRIVAL, DATE_FORMATS } from './ingest.ts';
 import { MAP_TYPES } from './map.ts';
+import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -3781,6 +3782,24 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   }
   if (bound === null) return decl;
   return { ...decl, target: { ...target, [typeof target.gte === 'number' ? 'gte' : 'lte']: bound } };
+}
+
+/**
+ * The record's home currency: the `home_currency` setting of whichever enabled pack declares one, first by id.
+ *
+ * READ EACH TIME A MONEY FIGURE IS, like a target's setting, so a currency chosen on the add-on's settings is held at
+ * once. A value that is not a three-letter code is no home currency, and so is a pack that declares none.
+ */
+export function homeCurrency(sql: Sql): string | null {
+  for (const row of sql.all<{ id: string }>('SELECT id FROM pack WHERE disabled_at IS NULL ORDER BY id')) {
+    const m = manifestOf(sql, row.id);
+    if (!m) continue;
+    const { config, values } = settingsOf(m.manifest);
+    if (!config[HOME_CURRENCY_SETTING]) continue;
+    const home = homeFrom(values[HOME_CURRENCY_SETTING]);
+    if (home) return home;
+  }
+  return null;
 }
 
 /**

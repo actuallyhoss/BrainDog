@@ -206,19 +206,24 @@ test('a ratio with a zero denominator is not a number', async () => {
 
 /* ── two currencies are never added ──────────────────────────────────────── */
 
-test('A SUM ACROSS TWO CURRENCIES IS REFUSED, not answered', async () => {
+test('A SUM ACROSS TWO CURRENCIES IS NOT ADDED: it is one amount per currency, with the rate it lacks named', async () => {
   /* One SUM over a column of amounts is a figure of the right size in whatever unit happened to be
-     commonest, in a tile with a code beside it. There is no screen on which anybody notices. */
+     commonest, in a tile with a code beside it. There is no screen on which anybody notices. So with
+     no rate the answer is the parts, and never a refusal that leaves the tile blank either. */
   const { k, sql } = await record();
   assert.ok(
     k.create('obligations', { what: 'Euro one', direction: 'owed_to_me', amount: { amount: 100_000, currency: 'EUR' }, due: day(-1), state: 'open' }, { actor: 'p_1' }).ok,
   );
 
-  const out = refusal(k.metric(OVERDUE));
-  assert.equal(out.code, 'MIXED_CURRENCY');
-  assert.match(out.fix, /EUR and GBP/);
-  assert.match(out.fix, /never added/);
-  assert.deepEqual(out.allowed, ['EUR', 'GBP']);
+  const out = value<Reading>(k.metric(OVERDUE));
+  assert.equal(out.value, null);
+  assert.equal(out.unit, null);
+  assert.deepEqual(out.parts, [
+    { currency: 'EUR', amount: 100_000 },
+    { currency: 'GBP', amount: 720_000 },
+  ]);
+  assert.deepEqual(out.fx, { into: 'GBP', home: null, asOf: null, forward: false, missing: [] });
+  assert.equal(out.met, null, 'a verdict on no one number');
   sql.close();
 });
 
@@ -241,22 +246,28 @@ test('A RATIO OF TWO DIFFERENT UNITS IS A RATE, and it was refused as a mixed cu
   sql.close();
 });
 
-test('A FORMAT THAT CONTRADICTS THE ROWS IS REFUSED, and it used to be printed', async () => {
+test('A FORMAT THAT CONTRADICTS THE ROWS IS NEVER PRINTED UNDER IT: the rows are said in their own currency', async () => {
   /* `format: money.USD` is a declaration about how to WRITE the figure and the rows are what it is a
      figure OF, so when they disagree the declaration is wrong. This side checked neither: a sum of
      sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
      refusal, and every renderer formats from `decl.format`, so it reached a screen as USD 168,794.00
-     over rows that are in pounds. The browser's copy of this evaluator has had the check all along,
-     and a differential pass over the shipped seed is what found the two disagreeing. */
+     over rows that are in pounds. A sum is now the pounds, as a part, with the rate it would need;
+     an average, which is not converted, is still refused. */
   const { k, sql } = await record();
-  const out = k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never);
-  assert.equal(out.ok, false, 'a sterling sum was read under a dollar format');
-  assert.match(fixOf(out) ?? '', /the rows are in GBP and the format says USD/u);
+  const out = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never));
+  assert.equal(out.value, null, 'a sterling sum was read under a dollar format');
+  assert.deepEqual(out.parts, [{ currency: 'GBP', amount: 2_945_000 }]);
+  assert.deepEqual(out.fx?.missing, [], 'no home currency was chosen, so no rate is what is missing');
+
+  const avg = k.metric({ ...OVERDUE, where: undefined, value: { avg: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never);
+  assert.equal(avg.ok, false);
+  assert.match(fixOf(avg) ?? '', /the rows are in GBP and the format says USD/u);
 
   /* AND THE FORMAT THAT AGREES IS UNTOUCHED, so the check is about a contradiction rather than
      about declaring a currency at all. */
-  const fine = k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 99_999_999 } } as never);
-  assert.equal(fine.ok, true, fixOf(fine) ?? '');
+  const fine = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 99_999_999 } } as never));
+  assert.equal(fine.value, 2_945_000);
+  assert.equal(fine.fx, undefined);
   sql.close();
 });
 

@@ -200,12 +200,12 @@ const EVERY_TYPE: PackConfig = {
   values: { heading: 'Money', reminders: 'monthly', chase_overdue: true, late_fee: { amount: 4000, currency: 'GBP' }, year_end: '2027-04-05', lead_time: 604_800 },
 };
 
-test("THE SAMPLE'S MONEY DECLARES THE SIX TARGETS THE REAL PACK DOES, AND THE OTHERS NONE", async () => {
+test("THE SAMPLE'S MONEY DECLARES THE HOME CURRENCY AND THE SIX TARGETS THE REAL PACK DOES, AND THE OTHERS NONE", async () => {
   const s = sample(() => AT);
   const money = value(await s.config('money-core'));
   const doc = firstPartyDocument('money-core') as { config: Record<string, unknown> };
   assert.deepEqual(money.config, doc.config, 'the sample and the pack a record installs declare different settings');
-  assert.deepEqual(Object.keys(money.config).sort(), Object.values(MONEY_TARGET_SETTINGS).map((t) => t.setting).sort());
+  assert.deepEqual(Object.keys(money.config).sort(), ['home_currency', ...Object.values(MONEY_TARGET_SETTINGS).map((t) => t.setting)].sort());
   assert.deepEqual(money.values.most_out_30d, { amount: 5_000_000, currency: 'GBP' });
   assert.equal(money.values.most_days_late, 14);
   assert.deepEqual(value(await s.config('people')).config, {});
@@ -290,7 +290,7 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
 
   const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core', true);
   assert.equal(none.source.sample, true);
-  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 6);
+  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 7);
 
   const live: PackConfig = { id: 'ledger', version: '1.0.0', config: { cadence: { type: 'enum', values: ['weekly', 'monthly'] } }, values: { cadence: 'monthly' } };
   const yes = await openSettings(caller({ ok: true, value: live }), 'ledger', false);

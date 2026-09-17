@@ -334,7 +334,8 @@ export function valueOf(decl: ConfigDecl, draft: Draft, currency: string | null)
       return { ok: true, value: /^-?\d+(\.\d+)?$/u.test(raw) ? Number(raw) : raw };
     }
     default:
-      return { ok: true, value: draft.text };
+      /* AN EMPTY BOX IS NO VALUE, so a setting with no default that nobody filled in has not moved. */
+      return { ok: true, value: draft.text === '' ? null : draft.text };
   }
 }
 

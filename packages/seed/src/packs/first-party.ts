@@ -22,7 +22,7 @@
  */
 
 import { packDocument } from '../index.ts';
-import { targetConfigOf } from '../modules/money.ts';
+import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import type { PackManifest } from './agents.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
@@ -188,10 +188,17 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     requires: { format: 1, primitives: 1, packs: {} },
     declarations: pack.declarations,
     ...(pack.seeds.length > 0 ? { seeds: pack.seeds } : {}),
-    /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later. */
-    ...(Object.keys(targetConfigOf(pack.declarations)).length > 0 ? { config: targetConfigOf(pack.declarations) } : {}),
+    /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later, and Money's
+       home currency. */
+    ...(Object.keys(configOf(id, pack.declarations)).length > 0 ? { config: configOf(id, pack.declarations) } : {}),
   };
 }
+
+/** A first-party pack's settings: its figures' targets, and for Money the currency everything is added up in. */
+const configOf = (id: string, declarations: readonly Body[]): Record<string, unknown> => ({
+  ...(id === 'money-core' ? MONEY_HOME_SETTING : {}),
+  ...targetConfigOf(declarations),
+});
 
 /** The starter's declarations no single first-party pack can hold, because they read more than one. */
 export const crossPack = (): Record<string, unknown>[] => split().cross;

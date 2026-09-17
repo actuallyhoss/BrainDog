@@ -10,6 +10,7 @@
 import type { Refusal } from '@braindog/ports';
 
 import { isBucket, shiftBucket, type Bucket } from './buckets.ts';
+import type { Part } from './fx.ts';
 import type { Group, MetricDecl, Reading } from './metrics.ts';
 
 /** One series on a `series` block: a figure grouped by date, and optionally the figure for buckets still to come. */
@@ -39,6 +40,12 @@ export type Bars = {
   values: (number | null)[][];
   /** The unit every line is in, when they are money. */
   unit: string | null;
+  /**
+   * LINES IN MORE THAN ONE CURRENCY, ONE CHART EACH. Present when a figure could not be added up in one currency: each
+   * entry is every line's values in that currency alone, aligned with `keys`, and `values` and `unit` are the first
+   * entry's. Two currencies are never drawn on one scale, so a renderer draws one chart per entry.
+   */
+  split?: { unit: string; values: (number | null)[][] }[];
 };
 
 /** How far back and ahead a series may reach, in buckets. */
@@ -46,7 +53,7 @@ export const SERIES_BACK = { least: 1, most: 24, fallback: 6 } as const;
 export const SERIES_AHEAD = { least: 0, most: 12, fallback: 0 } as const;
 export const SERIES_LINES = 4;
 
-type Read = (decl: MetricDecl) => { ok: true; value: Pick<Reading, 'groups' | 'current' | 'unit'> & { value?: number | null } } | { ok: false; refusal?: Refusal };
+type Read = (decl: MetricDecl) => { ok: true; value: Pick<Reading, 'groups' | 'current' | 'unit'> & { value?: number | null; parts?: Part[] | undefined } } | { ok: false; refusal?: Refusal };
 
 /**
  * The bars, or the one refusal that stops them.
@@ -75,7 +82,10 @@ export function barsOf(
 
   /* HELD ON AN OBJECT, because each line's reading sets them and a narrowed `let` would not see that. */
   const seen: { bucket: Bucket | null; current: string | null; unit: string | null } = { bucket: null, current: null, unit: null };
-  const parts: { past: Group[]; then: Group[] | null; each: number | null }[] = [];
+  const parts: { past: Group[]; then: Group[] | null; each: number | null; eachParts: Part[] | null; eachUnit: string | null; units: (string | null)[] }[] = [];
+  /* WHETHER ANY LINE CAME BACK IN MORE THAN ONE CURRENCY, OR TWO LINES IN TWO: then the chart is drawn once per currency. */
+  const units = new Set<string>();
+  let split = false;
 
   const one = (id: string): { groups: Group[]; current: string | undefined; unit: string | null } | { refusal: Refusal } => {
     const decl = typeof id === 'string' ? metric(id) : null;
@@ -99,13 +109,17 @@ export function barsOf(
     for (const got of [past, then]) {
       if (!got) continue;
       seen.current ??= got.current ?? null;
+      if (got.groups.some((g) => g.parts)) split = true;
+      for (const g of got.groups) for (const p of g.parts ?? []) units.add(p.currency);
       if (got.unit !== null) {
-        if (seen.unit !== null && got.unit !== seen.unit)
-          return bad('MIXED_CURRENCY', `One line of this series is in ${seen.unit} and another in ${got.unit}, and two currencies are never drawn on one scale.`);
-        seen.unit = got.unit;
+        if (seen.unit !== null && got.unit !== seen.unit) split = true;
+        units.add(got.unit);
+        seen.unit ??= got.unit;
       }
     }
     let each: number | null = null;
+    let eachParts: Part[] | null = null;
+    let eachUnit: string | null = null;
     if (line.each !== undefined) {
       const decl = typeof line.each === 'string' ? metric(line.each) : null;
       if (!decl) return bad('METRIC_UNKNOWN', `There is no metric called ${String(line.each)} for a series to count in every month ahead.`);
@@ -114,28 +128,53 @@ export function barsOf(
       if (seen.bucket !== 'month') return bad('DECLARATION_INVALID', `each: counts a monthly figure, so the series is bucketed by month.`);
       const got = read(decl);
       if (!got.ok) return { refusal: got.refusal ?? { code: 'NOT_IN_THIS_BUILD', fix: `${line.each} could not be read.`, at: 'series' } };
-      if (got.value.unit !== null && seen.unit !== null && got.value.unit !== seen.unit)
-        return bad('MIXED_CURRENCY', `${line.each} is in ${got.value.unit} and the series in ${seen.unit}, and two currencies are never drawn on one scale.`);
-      if (got.value.unit !== null) seen.unit ??= got.value.unit;
+      if (got.value.unit !== null && seen.unit !== null && got.value.unit !== seen.unit) split = true;
+      if (got.value.unit !== null) {
+        units.add(got.value.unit);
+        seen.unit ??= got.value.unit;
+      }
+      if (got.value.parts) {
+        split = true;
+        eachParts = got.value.parts;
+        for (const p of got.value.parts) units.add(p.currency);
+      }
       each = got.value.value ?? null;
+      eachUnit = got.value.unit;
     }
-    parts.push({ past: past.groups, then: then ? then.groups : null, each });
+    parts.push({ past: past.groups, then: then ? then.groups : null, each, eachParts, eachUnit, units: [past.unit, then ? then.unit : null] });
   }
   if (seen.bucket === null || seen.current === null) return bad('DECLARATION_INVALID', 'A series needs figures grouped by a date.');
 
   const b: Bucket = seen.bucket;
   const now: string = seen.current;
   const keys = Array.from({ length: backs + aheads }, (_, i) => shiftBucket(now, b, i - (backs - 1)));
-  const values = parts.map(({ past, then, each }) =>
-    keys.map((key) => {
-      const from = key > now && then ? then : past;
-      const found = from.find((g) => g.key === key)?.value ?? null;
-      /* WHAT REPEATS IS IN EVERY MONTH AHEAD, or in none: never only the month its next due day falls in. */
-      if (key > now && each !== null && each !== 0) return (found ?? 0) + each;
-      return found;
-    }),
-  );
-  const first = keys.findIndex((_, i) => values.some((line) => line[i] !== null));
+  /* ONE CURRENCY'S VALUES: a group in parts gives its amount in that currency, a group in one unit gives its value when
+     that unit is this one, and anything else is a gap. `null` for the whole-record case keeps every value as it is. */
+  const valuesIn = (unit: string | null) =>
+    parts.map(({ past, then, each, eachParts, eachUnit, units: lineUnits }) =>
+      keys.map((key) => {
+        const ahead = key > now && then;
+        const from = ahead ? then : past;
+        const own = ahead ? lineUnits[1] : lineUnits[0];
+        const group = from.find((g) => g.key === key);
+        const found =
+          unit === null
+            ? (group?.value ?? null)
+            : group?.parts
+              ? (group.parts.find((p) => p.currency === unit)?.amount ?? null)
+              : own === unit
+                ? (group?.value ?? null)
+                : null;
+        const repeat = unit === null || !eachParts ? (unit === null || eachUnit === unit ? each : null) : (eachParts.find((p) => p.currency === unit)?.amount ?? null);
+        /* WHAT REPEATS IS IN EVERY MONTH AHEAD, or in none: never only the month its next due day falls in. */
+        if (key > now && repeat !== null && repeat !== 0) return (found ?? 0) + repeat;
+        return found;
+      }),
+    );
+  const tables = split ? [...units].sort().map((unit) => ({ unit, values: valuesIn(unit) })) : null;
+  const values = tables ? (tables[0]?.values ?? parts.map(() => keys.map(() => null))) : valuesIn(null);
+  const all = tables ? tables.flatMap((t) => t.values) : values;
+  const first = keys.findIndex((_, i) => all.some((line) => line[i] !== null));
   const from = first < 0 ? keys.length : Math.min(first, backs - 1);
   const kept = keys.slice(from);
   return {
@@ -145,7 +184,8 @@ export function barsOf(
       keys: kept,
       states: kept.map((key) => (key === now ? 'partial' : key > now ? 'ahead' : '')),
       values: values.map((line) => line.slice(from)),
-      unit: seen.unit,
+      unit: tables ? (tables[0]?.unit ?? null) : seen.unit,
+      ...(tables ? { split: tables.map((t) => ({ unit: t.unit, values: t.values.map((line) => line.slice(from)) })) } : {}),
     },
   };
 }

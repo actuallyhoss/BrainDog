@@ -34,8 +34,8 @@ export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES } from './modules/work.ts';
 
 import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
-import { ACCOUNTS, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
-export { MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
+import { ACCOUNTS, MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
+export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
@@ -251,8 +251,8 @@ export function packDocument(): Record<string, unknown> {
       ...Object.values(METRICS),
       ...Object.values(RULES),
     ],
-    /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later. */
-    config: targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]),
+    /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later, and the currency it adds up in. */
+    config: { ...MONEY_HOME_SETTING, ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]) },
     /* A REGISTER WHOSE REQUIRED FIELD IS A REF CANNOT BE SEEDED BY A PACK. A pack's seeds are one
        row per register with no order between them, so a `ref` in one would resolve against whatever
        happened to be written first — a different row on a different day. `updates` needs a `track`,

@@ -960,6 +960,7 @@ export const FIRST_PARTY_LISTS: ReadonlyMap<string, string> = new Map([
   ['things', 'portfolio'],
   ['people', 'people'],
   ['accounts', 'money-core'],
+  ['fx', 'money-core'],
   ['obligations', 'money-core'],
   ['services', 'estate'],
   ['tasks', 'work'],

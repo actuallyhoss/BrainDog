@@ -24,6 +24,7 @@ import { evaluate } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Json } from './coerce.ts';
+import type { Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
@@ -172,6 +173,8 @@ export type PageDecl = {
 export type BlockResult = PageBlock & {
   /** The rows the block draws, cut to `limit`. */
   rows: Entry[];
+  /** A `bar` or a `split` over rows: the record's home currency and dated rates, when it has either. */
+  fx?: { home: string | null; rates: Rate[] };
   /** How many the predicate matched, which is what a total is a total OF. */
   matched: number;
   /** A `stat` block's figures, in the order its cells named them. */
@@ -781,10 +784,14 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         refusals: also({ code: 'MIXED_CURRENCY', fix: `A row here is in ${other.currency} and ${figure?.id} is in ${unit}, and two currencies are never set against each other. Give the row's ${limitField} in ${unit}, or read a figure in ${other.currency}.`, at: figure?.at ?? 'spent' }),
       };
   }
+  /* A BAR OR A SPLIT ADDS UP ITS ROWS WHERE IT IS DRAWN, so the home currency and the rates travel beside them, and the
+     rows are converted or split by currency with the same arithmetic a figure uses (`fx.ts`). */
+  const held = block.kind === 'bar' || block.kind === 'split' ? deps.ctx.fx?.() : undefined;
   return {
     ...base,
     ...spent,
     rows,
+    ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
     ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
     matched: listed.value.matched,
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
@@ -811,6 +818,20 @@ function openingOf(deps: PageDeps, opening: PageBlock['opening']): { value: numb
   const read = deps.read(decl);
   if (!read.ok) return { value: null, unit: null, ...(refused(read) ? { refusal: read.refusal } : {}) };
   if (read.value.refusals.length) return { value: null, unit: null, refusal: read.value.refusals[0]! };
+  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM, and the walk says which. */
+  const parts = read.value.parts;
+  if (parts) {
+    const missing = read.value.fx?.missing ?? [];
+    return {
+      value: null,
+      unit: null,
+      refusal: {
+        code: 'MIXED_CURRENCY',
+        fix: `${opening.metric} is in ${parts.map((p) => p.currency).join(' and ')}, and a walk starts from one amount. ${missing.length ? `There is no rate yet from ${missing.join(', ')}.` : 'Set a home currency and rates into it.'}`,
+        at: 'opening',
+      },
+    };
+  }
   return { value: read.value.value ?? 0, unit: read.value.unit };
 }
 

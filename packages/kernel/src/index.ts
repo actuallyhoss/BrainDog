@@ -32,6 +32,7 @@ import {
   jcs,
   lintBatch,
   liveTarget,
+  homeCurrency,
   packSettings as declaredPackSettings,
   readPackConfig,
   retireDeclarations,
@@ -203,11 +204,14 @@ export { SCHEDULE_KINDS, drainSchedule, retryHandler } from './schedule.ts';
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
+import { ratesFrom } from './fx.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
+export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, partsOf, rateFor, ratesFrom } from './fx.ts';
+export type { Across, Amount, Part, Rate } from './fx.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export {
   CHANNELS,
@@ -256,7 +260,7 @@ export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
-export type { Aggregation, EvalContext, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
+export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -2421,6 +2425,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
       return row?.id ?? null;
     },
+    /* THE HOME CURRENCY AND THE DATED RATES, read only when a money figure meets a second currency. The rates are the
+       rows of the `fx` list when a pack declares one (`08 §2.5`); a record without it has none. */
+    fx: () => ({
+      home: homeCurrency(sql),
+      rates: registers.has('fx')
+        ? ratesFrom(sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'fx' AND deleted_at IS NULL").map((r) => JSON.parse(r.fields) as Record<string, unknown>))
+        : [],
+    }),
   });
 
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
