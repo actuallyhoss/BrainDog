@@ -402,7 +402,9 @@ export function sample(at: () => string = () => new Date().toISOString()): Sourc
   const declarations = (ids: readonly string[]) => ids.flatMap((id) => (known(id)?.registers ?? []).map((r) => `register.${r}`));
   const unknown = (id: string, where: string) => refuse('DECLARATION_UNKNOWN', `${id} is not a pack this record has installed.`, { at: where });
   /* WHAT SOMEBODY CHOSE IN THIS TAB, by add-on. A setting that is absent holds its default. */
-  const chosen = new Map<string, Record<string, unknown>>();
+  /* AND THE SAMPLE'S MONEY IS STERLING, so its home currency is chosen as sterling rather than reading "None chosen" over a
+     record that adds everything up in pounds. */
+  const chosen = new Map<string, Record<string, unknown>>([['money-core', { home_currency: 'GBP' }]]);
   const settingsOf = (id: string): PackConfig => {
     const config = (PACK_SETTINGS[id] ?? {}) as Record<string, ConfigDecl>;
     const set = chosen.get(id) ?? {};

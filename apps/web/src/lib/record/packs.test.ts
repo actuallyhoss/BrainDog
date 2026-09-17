@@ -208,6 +208,7 @@ test("THE SAMPLE'S MONEY DECLARES THE HOME CURRENCY AND THE SIX TARGETS THE REAL
   assert.deepEqual(Object.keys(money.config).sort(), ['home_currency', ...Object.values(MONEY_TARGET_SETTINGS).map((t) => t.setting)].sort());
   assert.deepEqual(money.values.most_out_30d, { amount: 5_000_000, currency: 'GBP' });
   assert.equal(money.values.most_days_late, 14);
+  assert.equal(money.values.home_currency, 'GBP', "the sample's money is sterling, so its home currency is chosen");
   assert.deepEqual(value(await s.config('people')).config, {});
   const none = await s.config('no-such-pack');
   assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
