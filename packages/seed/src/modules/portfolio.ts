@@ -178,7 +178,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
 const LIVE = 'lane is building or earning';
 
 /** A count of projects, which is all the Overview's figures are. */
-const counted = (metric: string, name: string, where: string, target: Record<string, number> = { gte: 0 }): SeedMetric => ({
+const counted = (metric: string, name: string, where: string, target: SeedMetric['target'] = { gte: 0 }): SeedMetric => ({
   metric,
   name,
   source: 'register.things',
