@@ -358,6 +358,8 @@ export const GUIDE = {
             span: 6,
             source: 'register.steps',
             columns: [{ field: 'milestone' }, { field: 'state' }],
+            /* IN THE ORDER THE STEPS ARE TAKEN, so the milestone you are on comes first. */
+            order: [{ field: 'order', dir: 'asc' }],
             limit: 6,
             empty: 'Give a milestone its steps and how far it is shows here.',
           },

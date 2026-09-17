@@ -149,7 +149,7 @@ function barRows(block: BlockResult): string[] {
  * column is the note. A BUDGET (`spent:`) sets each row's limit, its second column, against the part of the figure whose key is the row's
  * first column as stored, so Groceries is set against what the figure grouped as `groceries`, and a category nothing was
  * spent in is at zero. A COUNT, when the second column is a yes or no, groups the rows by the first and fills each group
- * by how many say yes: a project by its steps done. Otherwise each row is its own track, value against target, and a row
+ * by how many say yes, or how many are in a state the list calls done: a project by its steps done. Otherwise each row is its own track, value against target, and a row
  * with no target has nothing to fill toward and is left out. `limit:` is how many tracks.
  */
 function progressRows(block: BlockResult): string[] {
@@ -186,13 +186,16 @@ function progressRows(block: BlockResult): string[] {
     );
   }
 
-  if (REGISTERS[register]?.fields.find((f) => f.id === value)?.type === 'bool') {
+  /* OR THE LIST'S OWN STATUS, done when it is one of the states the list says are done: a milestone by its steps done. */
+  const decl = REGISTERS[register];
+  const doneStates = decl?.state === value && decl.done && decl.done.length > 0 ? new Set(decl.done) : null;
+  if (doneStates || decl?.fields.find((f) => f.id === value)?.type === 'bool') {
     const groups = new Map<string, { done: number; all: number }>();
     for (const e of block.matched) {
       const key = display(register, label, e.fields[label], NOW, block.names) ?? REST;
       const g = groups.get(key) ?? { done: 0, all: 0 };
       g.all += 1;
-      if (e.fields[value] === true) g.done += 1;
+      if (doneStates ? doneStates.has(String(e.fields[value])) : e.fields[value] === true) g.done += 1;
       groups.set(key, g);
     }
     return cap([...groups].map(([key, g]) => `${escapeCell(key)} | ${g.done} | ${g.all} | `));
