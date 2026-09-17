@@ -67,20 +67,20 @@ an agent gets it right first time because there is nothing to nest. The row shap
 strong, em, code spans and links; a blockquote, a table, an image or raw HTML is text
 ([36-SPEC-RENDER](36-SPEC-RENDER.md) §13 D12).
 
-### Kinds, twenty-six
+### Kinds, twenty-seven
 
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `forecast`, a cash walk as a line, **page-only** |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `lines`, a measure over time with the period before it dashed beside it · `forecast`, a cash walk as a line, **page-only** |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |
 | Register-bound | `table` — rows from a `source:` register with declared `columns:`; bound to a register rather than to authored rows, and **page-only** |
 | Page-bound | `cards` — one card per row of a `source:` register, each column given a role by `as:`; `section` — a heading for the blocks after it, with a count and `fold:`; `feed`, what agents, rules and you did since you last looked, grouped by who did it; `agents`, what each agent did, one group per agent. All four **page-only** |
 
-Twenty-six, counted: the sixteen of v1, the four kinds of the agent path
-(`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), `series` and `forecast` (S13 and S11), and `agents` (`loop/research-spark.md`, Team board's Agent work page), which sit on existing primitives so
+Twenty-seven, counted: the sixteen of v1, the four kinds of the agent path
+(`loop/research-agent-path.md` steps 20 and 21), `sparkline`, `split` and `bridge` (`loop/research-modules.md` S9 and S10), `series` and `forecast` (S13 and S11), `agents` (`loop/research-spark.md`, Team board's Agent work page), and `lines` (the Solo founder's dashboards), which sit on existing primitives so
 `PRIMITIVES_VERSION` does not move. *An earlier draft counted fifteen and left `table` out while every declared page in the
 corpus used it.* `diagram` — a **constrained shape set** of boxes, arrows and lanes, never
 arbitrary SVG — is **post-v1**, and everything after it

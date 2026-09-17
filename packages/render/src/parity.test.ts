@@ -112,6 +112,8 @@ const SHAPES: Record<string, string> = {
   'a series with net, a gap, a partial and an ahead bucket':
     '```series net\nMonth | in: Money in | out: Money out | state\nApr 2026 | £4,800.00 | £2,300.00 | \nMay 2026 |  |  | \nSep 2026 | £1,000.00 | £900.00 | partial\nOct 2026 | £2,000.00 |  | ahead\n```',
   'a series with no numbers at all': '```series | In and out\nMonth | Sales\nApr | \n```',
+  'lines with a comparison, a gap and money': '```lines\nDay | Revenue | was: Previous 30 days\n1 Sep | £4,000.00 | £3,600.00\n2 Sep |  | £3,650.00\n3 Sep | £4,200.00 | £3,900.00\n```',
+  'lines of one plain column with no numbers': '```lines | Users\nDay | Users\n1 Sep | \n```',
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',

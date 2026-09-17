@@ -23,6 +23,7 @@ import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
+import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -274,6 +275,7 @@ function proportional(b: Block, o: RenderOptions): string {
   if (b.kind === 'split') return split(b, o);
   if (b.kind === 'bridge') return bridge(b, o);
   if (b.kind === 'series') return series(b, o);
+  if (b.kind === 'lines') return lines(b, o);
   if (b.kind === 'forecast') return forecast(b, o);
 
   if (b.kind === 'gauge') {
@@ -653,6 +655,51 @@ function diff(b: Block): string {
     )
     .join('');
   return `<div class="diff"><p class="diff-sum">${escape(plan.summary)}</p><div class="diff-lines">${body}</div></div>`;
+}
+
+/**
+ * `lines`: a measure over time as a line and the period before as a dashed one (`src/lines.ts`), the lead
+ * figure with its change, a legend, the point labels, and the numbers as a table in a fold. `Lines.svelte`
+ * is this function's twin; the pointer's readout is the component's alone, because nothing here moves.
+ */
+function lines(b: Block, o: RenderOptions): string {
+  const plan = linesPlan(b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))));
+  const lead = plan.now
+    ? `<p class="lines-lead"><span class="lines-now num">${escape(plan.now)}</span>${
+        plan.change
+          ? `<span class="lines-change num" data-trend="${plan.trend}">${escape(plan.change)}</span><span class="lines-against">${LINES_AGAINST} ${escape(plan.against)}, <span class="num">${escape(plan.then)}</span></span>`
+          : ''
+      }</p>`
+    : '';
+  const legend = `<ul class="lines-legend">${plan.lines
+    .map((l) => `<li class="lines-key"${l.was ? ' data-was=""' : ''} data-step="${l.step}"><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">${escape(l.label)}</span></li>`)
+    .join('')}</ul>`;
+  const paths =
+    plan.lines.filter((l) => l.was && l.d).map((l) => `<path class="lines-line" data-was="" data-step="${l.step}" d="${l.d}" vector-effect="non-scaling-stroke"></path>`).join('') +
+    plan.lines
+      .filter((l) => !l.was)
+      .map(
+        (l) =>
+          `${l.d ? `<path class="lines-line" data-step="${l.step}" d="${l.d}" vector-effect="non-scaling-stroke"></path>` : ''}${l.end ? `<path class="lines-end" data-step="${l.step}" d="${l.end}" vector-effect="non-scaling-stroke"></path>` : ''}`,
+      )
+      .join('');
+  const chart = plan.empty
+    ? `<p class="lines-empty">${escape(LINES_NONE)}</p>`
+    : `<div class="lines-plot">${plan.top ? `<span class="lines-top num" aria-hidden="true">${escape(plan.top)}</span>` : ''}${
+        plan.bottom ? `<span class="lines-bottom num" aria-hidden="true">${escape(plan.bottom)}</span>` : ''
+      }<svg class="lines-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
+        `${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`,
+      )}">${paths}</svg></div><ol class="lines-ticks" aria-hidden="true">${plan.ticks
+        .map((t) => `<li class="lines-tick" style="--at:${t.at}"${t.minor ? ' data-minor=""' : ''}>${escape(t.label)}</li>`)
+        .join('')}</ol>`;
+  const numbers = plan.points.length
+    ? `<details class="lines-numbers"><summary class="lines-toggle">${LINES_NUMBERS}</summary><table class="lines-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.lines
+        .map((l) => `<th scope="col">${escape(l.label)}</th>`)
+        .join('')}</tr></thead><tbody>${plan.points
+        .map((p) => `<tr><th scope="row">${escape(p.label)}</th>${p.values.map((v) => `<td class="num">${escape(v)}</td>`).join('')}</tr>`)
+        .join('')}</tbody></table></details>`
+    : '';
+  return `<div class="prop lines">${lead}${legend}${chart}${numbers}</div>`;
 }
 
 /**

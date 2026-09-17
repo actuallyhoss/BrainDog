@@ -1853,6 +1853,7 @@
 
   /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
   .series-numbers,
+  .lines-numbers,
   .forecast-numbers,
   .bridge-numbers,
   .split-numbers,
@@ -1861,6 +1862,7 @@
   }
 
   .series-toggle,
+  .lines-toggle,
   .forecast-toggle,
   .bridge-toggle,
   .split-toggle,
@@ -1875,6 +1877,7 @@
   }
 
   .series-toggle::-webkit-details-marker,
+  .lines-toggle::-webkit-details-marker,
   .forecast-toggle::-webkit-details-marker,
   .bridge-toggle::-webkit-details-marker,
   .split-toggle::-webkit-details-marker,
@@ -1883,6 +1886,7 @@
   }
 
   .series-toggle:hover,
+  .lines-toggle:hover,
   .forecast-toggle:hover,
   .bridge-toggle:hover,
   .split-toggle:hover,
@@ -1892,6 +1896,7 @@
 
   @media (pointer: coarse) {
     .series-toggle,
+    .lines-toggle,
     .forecast-toggle,
     .bridge-toggle,
     .split-toggle,
@@ -1901,6 +1906,7 @@
   }
 
   .series-table,
+  .lines-table,
   .forecast-table,
   .bridge-table,
   .split-table,
@@ -1912,6 +1918,8 @@
 
   .series-table th,
   .series-table td,
+  .lines-table th,
+  .lines-table td,
   .forecast-table th,
   .forecast-table td,
   .bridge-table th,
@@ -1928,6 +1936,7 @@
   }
 
   .series-table thead th,
+  .lines-table thead th,
   .forecast-table thead th,
   .bridge-table thead th,
   .split-table thead th,
@@ -1937,6 +1946,7 @@
   }
 
   .series-table th:first-child,
+  .lines-table th:first-child,
   .forecast-table th:first-child,
   .bridge-table th:first-child,
   .split-table th:first-child,
@@ -1961,6 +1971,236 @@
 
     .series-tick-short {
       display: inline;
+    }
+  }
+
+/* ── lines: a measure over time, and the period before it ─────────────────
+     The current line is the one accent series; a second current line is the quiet ink; the period before is a
+     dashed line in `dim`, under both. The lead figure sits above in ink with its change beside it, never
+     coloured, because a rise is not a verdict. Every word is HTML, placed along the chart by `--at`. */
+  .block[data-kind='lines'] {
+    container-type: inline-size;
+  }
+
+  .lines {
+    gap: var(--sp-2);
+  }
+
+  .lines-lead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0;
+    margin-inline: var(--sp-2);
+  }
+
+  .lines-now {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .lines-change {
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .lines-against {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .lines-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-4);
+    margin: 0;
+    margin-inline: var(--sp-2);
+    padding: 0;
+    list-style: none;
+    font-size: var(--t-xs);
+  }
+
+  .lines-key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+  }
+
+  .lines-swatch {
+    flex: none;
+    inline-size: 14px;
+    block-size: 0;
+    border-block-start: 2px solid var(--ink2);
+  }
+
+  .lines-key[data-step='0']:not([data-was]) .lines-swatch,
+  .lines-readout-value[data-step='0']:not([data-was]) .lines-swatch {
+    border-block-start-color: var(--accent);
+  }
+
+  .lines-key[data-was] .lines-swatch,
+  .lines-readout-value[data-was] .lines-swatch {
+    border-block-start: 2px dashed var(--dim);
+  }
+
+  .lines-plot {
+    position: relative;
+    margin-block-start: var(--sp-5);
+    margin-inline: var(--sp-2);
+    touch-action: pan-y;
+  }
+
+  .lines-chart {
+    display: block;
+    inline-size: 100%;
+    block-size: 168px;
+    overflow: visible;
+  }
+
+  .lines-line {
+    fill: none;
+    stroke: var(--ink2);
+    stroke-width: 1.5px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .lines-line[data-step='0']:not([data-was]) {
+    stroke: var(--accent);
+    stroke-width: 2px;
+  }
+
+  .lines-line[data-was] {
+    stroke: var(--dim);
+    stroke-width: 1.25px;
+    stroke-dasharray: 4 4;
+  }
+
+  .lines-end {
+    fill: none;
+    stroke: var(--ink2);
+    stroke-width: 7px;
+    stroke-linecap: round;
+  }
+
+  .lines-end[data-step='0'] {
+    stroke: var(--accent);
+  }
+
+  /* THE TOP AND THE BOTTOM OF THE VALUE AXIS: the highest above the chart's near corner, the lowest inside it. */
+  .lines-top,
+  .lines-bottom {
+    position: absolute;
+    inset-inline-start: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .lines-top {
+    inset-block-start: 0;
+    translate: 0 -100%;
+  }
+
+  .lines-bottom {
+    inset-block-end: 0;
+  }
+
+  .lines-rule {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--at) * 100%);
+    inline-size: 1px;
+    background: var(--line);
+    pointer-events: none;
+  }
+
+  .lines-readout {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(var(--at) * 100%);
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 11rem;
+    max-inline-size: 18rem;
+    padding: var(--sp-2) var(--sp-3);
+    margin-inline-start: var(--sp-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--s1);
+    box-shadow: var(--e2);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    pointer-events: none;
+  }
+
+  .lines-readout[data-flip] {
+    translate: calc(-100% - 2 * var(--sp-2)) 0;
+  }
+
+  .lines-readout-day {
+    color: var(--dim);
+  }
+
+  .lines-readout-value {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+  }
+
+  .lines-readout-value .num {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .lines-ticks {
+    position: relative;
+    block-size: 1.5em;
+    margin: 0;
+    margin-block-start: var(--sp-2);
+    margin-inline: var(--sp-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .lines-tick {
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    translate: -50% 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .lines-tick:first-child {
+    translate: 0 0;
+  }
+
+  .lines-tick:last-child {
+    translate: -100% 0;
+  }
+
+  .lines-empty {
+    margin-inline: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  @container (inline-size < 30rem) {
+    .lines-chart {
+      block-size: 128px;
+    }
+
+    .lines-tick[data-minor] {
+      display: none;
     }
   }
 
