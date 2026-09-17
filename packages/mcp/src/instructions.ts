@@ -15,7 +15,7 @@ export const INSTRUCTIONS = [
   'Writes are compare-and-set. On VERSION_STALE, re-read the row and re-apply your change to the new copy. Never resend the copy you held.',
   'An agent never decides. Lay out options with propose; the person chooses in their app. To change something you may not change yourself, such as a skill\'s text or where a key applies, propose it.',
   'A credential never goes in a row, a note or a tool call. Deposit a key with the command braindog keys put <label>, which reads it from standard input.',
-  'Before you stop, call handoff with the one next step. Record each dead end in tried the moment you rule it out.',
+  'Call handoff with doing once you know the task, and before you stop with the one next step. Record each dead end in tried when you rule it out.',
   'Record a learning only when a future session would otherwise get something wrong, and say the failure in because. Most sessions record none.',
   'When you meet a person in the work, such as a commit author, a sender or a client, call meet.',
   'A refusal names the field and the fix. Correct the call; never retry it unchanged.',
