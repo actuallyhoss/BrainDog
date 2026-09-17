@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { labelsOf, laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { labelsOf, laterVersion, normalise, packIdOf, plan, readShared, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -258,7 +258,7 @@ export function arranger(d: ArrangeDeps) {
    * The packs to install and to turn on, dependencies first, for what was asked. Already on is skipped, unless a newer
    * version is offered: of what was asked, or of a module under it, which the shared-file install already plans.
    */
-  function expand(ids: readonly string[], at: string, docs: ReadonlyMap<string, Body>): Result<{ install: string[]; enable: string[] }> {
+  function expand(ids: readonly string[], at: string, docs: ReadonlyMap<string, Body>, sent: ReadonlyMap<string, readonly string[]> = new Map()): Result<{ install: string[]; enable: string[] }> {
     const install: string[] = [];
     const enable: string[] = [];
     const seen = new Set<string>();
@@ -266,7 +266,7 @@ export function arranger(d: ArrangeDeps) {
       const entry = entryOf(asked);
       const target = entry?.id ?? asked;
       if (!entry && !docs.has(target)) return notOffered(asked, `${at}[${i}]`);
-      for (const id of [...(entry?.modules ?? []), target]) {
+      for (const id of [...(entry?.modules ?? sent.get(target) ?? []), target]) {
         if (seen.has(id)) continue;
         seen.add(id);
         const state = stateOf(id);
@@ -468,18 +468,37 @@ export function arranger(d: ArrangeDeps) {
           return refuse('TRANSITION_ILLEGAL', `${id} is already ${verb === 'enable' ? 'on' : 'off'}.`, `body.${verb}`);
         return ok({ [verb]: id, registers: state.registers });
       }
+      /* A SHARED USE-CASE FILE, as `braindog usecase install` sends it. It is read through the door the app and `planUseCase`
+         read one through (`readShared`: the size, a credential, a block kind nothing draws), and becomes the install of its
+         pack with the document it carries and the modules it names. A token files the question; only the owner installs. */
+      let fromFile: { title: string; summary: string; modules: readonly string[] } | null = null;
+      if (body.file !== undefined) {
+        if (typeof body.file !== 'string' && !isMap(body.file))
+          return refuse('VALUE_MALFORMED', 'file is a .usecase.json file, as its text or its document.', 'body.file');
+        const shared = await readShared(body.file, { kind: 'paste' });
+        if (!shared.ok) {
+          const r = 'refusal' in shared ? shared.refusal : ({ code: 'PACK_MALFORMED', fix: 'This is not a use-case file.' } as Refusal);
+          return { ok: false, refusal: { ...r, at: r.at ? `body.file.${r.at}` : 'body.file' } };
+        }
+        const u = shared.value.usecase;
+        if (shared.value.doc === null)
+          return refuse('PACK_MALFORMED', `${u.title} carries no lists or pages of its own, only the modules it names: ${listed(u.modules)}. Propose installing those instead.`, 'body.file');
+        body = { install: packIdOf(u.usecase), doc: shared.value.doc };
+        fromFile = { title: u.title, summary: u.summary, modules: u.modules };
+      }
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;
       const target = entryOf(asked)?.id ?? asked;
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
+      const sent = new Map<string, readonly string[]>(fromFile === null ? [] : [[target, fromFile.modules]]);
       /* AN UPDATE OF A MODULE UNDER IT is an update too: Personal at its version with Money behind is planned for Money. */
-      if (on(target) && ![...(entryOf(asked)?.modules ?? []), target].some((id) => on(id) && updateOf(id, docs)))
+      if (on(target) && ![...(entryOf(asked)?.modules ?? sent.get(target) ?? []), target].some((id) => on(id) && updateOf(id, docs)))
         return refuse(
           'TRANSITION_ILLEGAL',
           `${target} is already installed and on, at ${stateOf(target)?.version ?? 'its version'}, and no newer version is offered. To change what it says, propose body_kind settings.`,
           'body.install',
         );
-      const order = expand([asked], 'body.install', docs);
+      const order = expand([asked], 'body.install', docs, sent);
       if (!order.ok) return order;
       const planned = await planAll(order.value.install, docs);
       if (!planned.ok) return planned;
@@ -490,7 +509,7 @@ export function arranger(d: ArrangeDeps) {
       const names = namesFor(planned.value, keeps ?? (target.startsWith(USE_CASE) && !on(target) ? target : speaker));
       return ok({
         install: target,
-        ...(entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
+        ...(entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : fromFile ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary } : {}),
         ...(keeps === null ? {} : { keeps }),
         packs: { install: order.value.install, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,

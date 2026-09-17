@@ -70,7 +70,7 @@ const PAGE = {
 
 const PROPOSALS = {
   change: '{"to":{"id":"page.<slug>","kind":"page","body":{...}}}: a page, new or changed',
-  pack: '{"install":"<id from offer or updates>"}, {"enable":"<id>"} or {"disable":"<id>"}; install may carry "doc", a pack document the catalogue lacks. A pack on at an older version is updated',
+  pack: '{"install":"<id from offer or updates>"}, {"enable":"<id>"} or {"disable":"<id>"}; install may carry "doc", a pack document the catalogue lacks; {"file":<a .usecase.json document>} installs a shared use case and the modules it names. A pack on at an older version is updated',
   settings: '{"pack":"<id>","values":{"<setting>":<value or null for its default>}}, or {"voice":{"<key>":"<line>"}} for the use case on',
   arrange: {
     shape: '{"why":[...],"usecase"?,"alongside"?:[<usecase>],"packs"?:{"install"?,"enable"?,"disable"?},"pages"?:[<page>],"settings"?:[<settings>],"voice"?:{...}}',

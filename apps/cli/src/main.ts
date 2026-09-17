@@ -68,6 +68,8 @@ const usage = () =>
     "  Save this BrainDog's arrangement as a use-case file: its modules, lists, pages, voice and labels, and only the rows named.",
     'braindog usecase check <file>',
     '  Read a use-case file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
+    'braindog usecase install <file|url> [--host <host>]',
+    '  Ask the owner to install a shared use case: files a proposal and prints its link on Decide. Nothing is installed until they accept it.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',

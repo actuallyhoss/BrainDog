@@ -481,3 +481,43 @@ test('A PROPOSAL IS FILED WITH THE NAMES THE RAIL WILL USE: a list by its label,
   assert.equal(row.body.names['page.work'], 'Work');
   sql.close();
 });
+
+test('A SHARED USE-CASE FILE IS PROPOSED AS A QUESTION: read through readShared, planned with its modules, installed only by the owner', async () => {
+  const { exportUseCase } = await import('@braindog/declare');
+  const built = exportUseCase({
+    usecase: 'club',
+    version: '1.0.0',
+    title: 'Reading club',
+    summary: 'Books and meetings.',
+    author: 'Halden',
+    license: 'MIT',
+    audience: 'other',
+    tone: 'plain',
+    modules: ['work'],
+    voice: { home: 'Club night' },
+    labels: {},
+    declarations: [{ register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] }],
+    examples: [],
+  });
+  assert.ok(built.ok);
+  const { api, sql } = await record();
+  const filed = value<{ id: string }>(await api.propose({ question: 'Install Reading club?', body_kind: 'pack', body: { file: JSON.stringify(built.value) } } as never, agent));
+  const row = value<{ body: Record<string, unknown> & { packs: { install: string[] }; names: Record<string, string> } }>(await api.governance({ id: filed.id }, owner));
+  assert.equal(row.body.install, 'usecase-club');
+  assert.equal(row.body.title, 'Reading club');
+  assert.deepEqual(row.body.packs.install, ['work', 'usecase-club'], 'the module it names goes in first');
+  assert.equal(row.body.names['register.books'], 'Books');
+  assert.equal(row.body.file, undefined, 'the file was filed as sent, beside what the record read from it');
+  assert.equal(api.kernel.packStates().length, 0, 'a proposal installed something');
+  assert.ok(refusal(await api.decide(accept(filed.id), agent)));
+  value(await api.decide(accept(filed.id), owner));
+  assert.deepEqual(api.kernel.packStates().map((p) => p.id), ['usecase-club', 'work']);
+
+  /* A FILE THE APP WOULD REFUSE IS REFUSED HERE TOO, at the file. */
+  const leaky = { ...(built.value as Record<string, unknown>), summary: 'sk_live_4eC39HqLyjWDarjtT1zdp7dc' };
+  const no = refusal(await api.propose({ question: 'Leaky?', body_kind: 'pack', body: { file: leaky } } as never, agent));
+  assert.equal(no.code, 'SECRET_IN_PACK');
+  assert.match(String(no.at), /^body\.file/u);
+  assert.equal(refusal(await api.propose({ question: 'Nothing?', body_kind: 'pack', body: { file: 42 } } as never, agent)).code, 'VALUE_MALFORMED');
+  sql.close();
+});

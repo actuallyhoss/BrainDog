@@ -60,6 +60,8 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
       seen.push({ method, args });
       res.writeHead(200, { 'content-type': 'application/json' });
       if (method === 'context') return res.end(JSON.stringify({ ok: true, value: CONTEXT }));
+      if (url.pathname === '/files/study.usecase.json') return res.end(JSON.stringify(DOC));
+      if (method === 'propose') return res.end(JSON.stringify({ ok: true, value: { id: 'SG3' } }));
       if (method === 'exportUseCase') return res.end(JSON.stringify({ ok: true, value: { file: 'study-1.0.1.usecase.json', doc: DOC, bytes: 400 } }));
       res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } }));
     });
@@ -111,4 +113,30 @@ test('usecase check: reads a good file, and refuses a credential in one, sending
   assert.match(h.said.at(-1) ?? '', /^This setup uses a block this version of BrainDog does not have: iframe\..*\(KIND_UNKNOWN\)$/);
   assert.equal(h.seen.length, 0, 'check sent something');
   assert.equal(await usecase(['install', 'x'], h.io), 1);
+});
+
+test('usecase install: files a pack proposal carrying the file, prints its Decide link, and installs nothing itself', async (t) => {
+  const h = await setup(t);
+  writeFileSync(join(h.dir, 'study.usecase.json'), JSON.stringify(DOC));
+  assert.equal(await usecase(['install', 'study.usecase.json'], h.io), 0, h.said.join('\n'));
+  const asked = h.seen.filter((s) => s.method !== 'context');
+  assert.deepEqual(asked.map((s) => s.method), ['propose'], 'install called something other than propose');
+  assert.equal(asked[0]?.args.body_kind, 'pack');
+  assert.equal(asked[0]?.args.question, 'Install Study 1.0.1?');
+  assert.deepEqual(JSON.parse(String((asked[0]?.args.body as { file: string }).file)), DOC);
+  assert.equal(h.out.at(-1), `Asked the owner to install Study 1.0.1. Nothing is installed until they accept it: ${h.io.env.BRAINDOG_HOST}/decide/SG3`);
+
+  /* FROM AN ADDRESS, read here and sent the same way. */
+  assert.equal(await usecase(['install', `${h.io.env.BRAINDOG_HOST}/files/study.usecase.json`], h.io), 0, h.said.join('\n'));
+  assert.equal(h.seen.filter((s) => s.method === 'propose').length, 2);
+
+  /* A FILE THIS BUILD WOULD REFUSE, OR AN ADDRESS THAT IS NOT https, SENDS NOTHING. */
+  const before = h.seen.length;
+  writeFileSync(join(h.dir, 'bad.usecase.json'), JSON.stringify({ ...DOC, summary: `Uses ${['xoxb', '1234567890', 'abcdefghij'].join('-')}` }));
+  assert.equal(await usecase(['install', 'bad.usecase.json'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /\(SECRET_IN_PACK\)$/);
+  assert.equal(await usecase(['install', 'http://files.example/study.usecase.json'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /is not an https address/);
+  assert.equal(await usecase(['install'], h.io), 1);
+  assert.equal(h.seen.length, before, 'a refused file was sent');
 });

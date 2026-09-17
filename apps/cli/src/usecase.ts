@@ -1,5 +1,5 @@
 /**
- * `braindog usecase export|check`: a BrainDog's arrangement as a file somebody else can install
+ * `braindog usecase export|check|install`: a BrainDog's arrangement as a file somebody else can install
  * (`loop/research-spark.md` S14).
  *
  * EXPORT IS A READ, so a signed-in machine may save one: `exportUseCase` answers the modules, the use case's lists and
@@ -14,8 +14,10 @@
  * CHECK SENDS NOTHING. It runs the file through `readShared`, the door the record and the app read a shared file
  * through, so a file that would be refused (too large, a credential in it, a block kind nothing draws) is found out here.
  *
- * INSTALLING IS NOT HERE. Planning and installing a pack is an owner's in the app (ADR-060); a token is refused, and this
- * command says where to go instead of offering a verb that cannot work.
+ * INSTALL ASKS, IT NEVER INSTALLS. Planning and installing a pack is an owner's in the app (ADR-060), and no token reaches
+ * it. So `install <file|url>` files a `pack` proposal carrying the file, which the record reads through the same door the
+ * app does, plans with the modules it names, and puts in front of the owner on Decide. It prints that link. A file this
+ * build would refuse is refused here first, and nothing is sent.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -28,7 +30,7 @@ import { refused, type Result } from '@braindog/ports';
 import { connect, fixOf, type AgentIo } from './skills.ts';
 
 const USAGE =
-  'braindog usecase takes export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or check <file>.';
+  'braindog usecase takes export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], check <file>, or install <file|url> [--host <host>].';
 
 /** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
@@ -37,10 +39,7 @@ export async function usecase(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'export') return exportFile(rest, io);
   if (verb === 'check') return check(rest, io);
-  if (verb === 'install') {
-    io.say('A shared use case is installed from Add-ons in the app, where the owner reads its plan first. Open /packs and choose Install from a file.');
-    return 1;
-  }
+  if (verb === 'install') return installFile(rest, io);
   io.say(USAGE);
   return 1;
 }
@@ -160,5 +159,85 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   const pages = shared.value.pack?.declarations.filter((d) => d.kind === 'page').length ?? 0;
   const needs = u.modules.length === 0 ? 'no module first' : `${u.modules.join(', ')} first`;
   io.out(`${u.title} ${u.version} reads as a use case: ${lists} lists, ${pages} pages and ${shared.value.pack?.seeds.length ?? 0} example rows, needing ${needs}. Nothing was sent.`);
+  return 0;
+}
+
+/** An address this command reads a file from: https, or http on this machine only. */
+function addressOf(given: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(given);
+  } catch {
+    return null;
+  }
+  if (url.protocol === 'https:') return url;
+  return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? url : null;
+}
+
+/** The text of a use-case file, from a path or an address, or the sentence saying why it could not be read. */
+async function readSource(given: string, io: AgentIo): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
+  if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
+    try {
+      return { ok: true, text: readFileSync(resolve(io.cwd, given), 'utf8') };
+    } catch {
+      return { ok: false, fix: `${given} could not be read.` };
+    }
+  }
+  const url = addressOf(given);
+  if (url === null) return { ok: false, fix: `${given} is not an https address. A use case is read from https, or from http on this machine.` };
+  try {
+    const got = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15_000) });
+    if (!got.ok) return { ok: false, fix: `${url.host} answered ${String(got.status)} for that file.` };
+    return { ok: true, text: await got.text() };
+  } catch {
+    return { ok: false, fix: `${url.host} did not answer with the file.` };
+  }
+}
+
+async function installFile(args: string[], io: AgentIo): Promise<number> {
+  let values: { host?: string | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' } } }));
+  } catch {
+    io.say(USAGE);
+    return 1;
+  }
+  const [given, ...more] = positionals;
+  if (!given || more.length > 0) {
+    io.say('braindog usecase install takes one file or address, as in braindog usecase install reading-club-1.0.0.usecase.json.');
+    return 1;
+  }
+  const read = await readSource(given, io);
+  if (!read.ok) {
+    io.say(read.fix);
+    return 1;
+  }
+  /* REFUSED HERE BEFORE ANYTHING IS SENT, by the door the record will read it through. */
+  const shared = await readShared(read.text);
+  if (!shared.ok) {
+    io.say(saidWithCode(shared));
+    return 1;
+  }
+  const u = shared.value.usecase;
+
+  const at = await connect(values.host, io);
+  if (typeof at === 'number') return at;
+  const answer = await at.client.call<{ id: string }>('propose', {
+    question: `Install ${u.title} ${u.version}?`,
+    body_kind: 'pack',
+    body: { file: read.text },
+  });
+  if (!answer.ok) {
+    io.say(saidWithCode(answer));
+    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+  }
+  const id = (answer.value as { id?: unknown }).id;
+  if (typeof id !== 'string') {
+    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    return 1;
+  }
+  const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
+  io.out(`Asked the owner to install ${u.title} ${u.version}. Nothing is installed until they accept it: ${link}`);
   return 0;
 }
