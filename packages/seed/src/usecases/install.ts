@@ -20,6 +20,7 @@
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
+import { BUSINESS_EXAMPLES } from './business.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
 import { formGuide, GUIDE_KINDS, type FormedPlan } from './guide-kinds.ts';
 import type { ExampleLink } from './links.ts';
@@ -30,7 +31,7 @@ import { useCaseDocument, type UseCase } from './index.ts';
 type Body = Record<string, unknown>;
 
 /** The example rows each use case gives the first-party modules it names. A use case not listed gives none. */
-const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { founder: FOUNDER_EXAMPLES, personal: PERSONAL_EXAMPLES, team: TEAM_EXAMPLES };
+const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: BUSINESS_EXAMPLES, founder: FOUNDER_EXAMPLES, personal: PERSONAL_EXAMPLES, team: TEAM_EXAMPLES };
 
 /** The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. */
 const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };

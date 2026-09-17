@@ -96,11 +96,11 @@ export type UseCase = {
   links: ExampleLink[];
 };
 
-/** One link between two example rows, by their titles. */
-export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
+/** One link between two example rows, by their titles. `list` when the field holds a list of refs. */
+export type ExampleLink = { register: string; title: string; field: string; to: string; target: string; list?: true };
 
 const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills', 'nav', 'links'];
-const LINK_KEYS = ['register', 'title', 'field', 'to', 'target'];
+const LINK_KEYS = ['register', 'title', 'field', 'to', 'target', 'list'];
 const LINK_NAME = /^[a-z][a-z0-9_]{0,63}$/;
 const LINKS_CEILING = 256;
 const LINK_TITLE_BYTES = 200;
@@ -328,6 +328,8 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     for (const key of ['title', 'target'] as const)
       if (!text(link[key], LINK_TITLE_BYTES))
         return no('VALUE_MALFORMED', `${at}.${key} is the title of an example row, a line of at most ${LINK_TITLE_BYTES} bytes.`, { at: `${at}.${key}` });
+    /* A FIELD THAT HOLDS A LIST OF REFS says so, and only that way: the linker writes a list of one where it is set. */
+    if (link.list !== undefined && link.list !== true) return no('VALUE_MALFORMED', `${at}.list is true where the field holds a list of refs, and is left out otherwise.`, { at: `${at}.list` });
   }
 
   const skills = doc.skills ?? [];
@@ -350,7 +352,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     pack,
     skills: (skills as { name: string; trigger: string }[]).map((s) => ({ name: s.name, trigger: s.trigger })),
     nav: [...(nav as string[])],
-    links: (links as ExampleLink[]).map((l) => ({ register: l.register, title: l.title, field: l.field, to: l.to, target: l.target })),
+    links: (links as ExampleLink[]).map((l) => ({ register: l.register, title: l.title, field: l.field, to: l.to, target: l.target, ...(l.list ? { list: true as const } : {}) })),
   });
 }
 

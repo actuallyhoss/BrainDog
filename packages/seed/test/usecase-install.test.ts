@@ -11,7 +11,7 @@ import { SEEDS_PER_REGISTER, install, normalise, plan, type Host, type Installed
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
+import { FIRST_PARTY, NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, homePageOf, moduleDocument, moduleExamples, moduleManifest } from '../src/usecases/install.ts';
 import { linkExamples, type LinkIo } from '../src/usecases/links.ts';
@@ -106,8 +106,11 @@ test('WITH NO USE CASE, A MODULE CARRIES THE SAMPLE ROWS AS IT ALWAYS DID', () =
 
 test('A MODULE EXAMPLE IS FOR A LIST OF A MODULE THE USE CASE NAMES, at most eight per list', () => {
   for (const u of USE_CASES) {
+    /* SMALL BUSINESS NAMES NO MODULE: its modules are whichever the sentence asked for, and the install plants an example
+       only into a list the module it is installing holds, so its examples are read against every first-party list. */
+    const modules = u.modules.length > 0 ? u.modules : (FIRST_PARTY as readonly string[]);
     const lists = new Set(
-      u.modules.flatMap((m) => (m === 'agents' ? [] : firstPartyManifest(m as never).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice(9)))),
+      modules.flatMap((m) => (m === 'agents' ? [] : firstPartyManifest(m as never).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice(9)))),
     );
     const registers = moduleExamples(u).map((e) => String(e.register));
     for (const r of new Set(registers)) assert.ok(registers.filter((x) => x === r).length <= SEEDS_PER_REGISTER, `${u.usecase} gives ${r} more than ${SEEDS_PER_REGISTER} examples`);
