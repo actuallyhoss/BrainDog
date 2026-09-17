@@ -131,6 +131,14 @@ test('THE EXPORT CARRIES THE ARRANGEMENT AND NO ROW THAT WAS NOT PICKED', async 
   /* A TOKEN MAY SAVE THE ARRANGEMENT, as it may read it; it plans nothing. */
   assert.ok(value<Exported>(await api.exportUseCase({}, token)).doc);
   assert.equal(refusal(await api.planUseCase({ doc: out.doc }, token)).code, 'NEEDS_BROWSER_SESSION');
+
+  /* A MEMBER INVITED TO PEOPLE ALONE READ EVERY LIST AND PAGE THIS WAY. `schema` and `pages` hold them to their lists, and
+     the export handed over Courses, its fields and the pages placed by hand, which that member cannot open. */
+  const scoped = { principal: { kind: 'person', id: 'p_2', level: 'read' }, registers: ['people'] } as CallContext;
+  assert.equal(refusal(await api.schema({ register: 'courses' }, scoped)).code !== undefined, true);
+  const held = refusal(await api.exportUseCase({}, scoped));
+  assert.equal(held.code, 'FORBIDDEN');
+  assert.ok(!JSON.stringify(held).includes('Reading'), 'the refusal named a page');
   sql.close();
 });
 

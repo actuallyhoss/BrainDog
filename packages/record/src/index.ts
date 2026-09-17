@@ -1856,6 +1856,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async exportUseCase(args: ExportArgs | undefined, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
+      /* THE WHOLE ARRANGEMENT, SO SOMEBODY WHO READS THE WHOLE RECORD. A member invited to People alone was handed every
+         list's fields and every page placed by hand, which `schema` and `pages` keep from them. */
+      if (!wholeRecord(ctx)) return no('FORBIDDEN', 'A use case is shared by somebody who can read the whole BrainDog.', { at: 'principal' });
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = stray(said, ['usecase', 'title', 'summary', 'version', 'audience', 'author', 'examples', 'step', 'nav', 'signals', 'skills']);
       if (extra) return { ok: false as const, refusal: extra };
