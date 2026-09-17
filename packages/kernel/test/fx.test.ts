@@ -190,7 +190,7 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
   assert.equal(converted.unit, 'EGP');
   assert.equal(converted.parts, undefined);
   assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
-  assert.equal(converted.met, true);
+  assert.equal(converted.met, null, 'the target is in sterling, the figure it declares, so a figure in pounds has no verdict');
 
   /* THE OTHER WAY ROUND, the same rows read in dollars through the inverse. */
   assert.ok(k.setPackConfig('money-core', { home_currency: 'USD' }, { actor: 'p_1' }).ok);

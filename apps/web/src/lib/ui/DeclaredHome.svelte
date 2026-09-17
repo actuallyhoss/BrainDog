@@ -7,7 +7,7 @@
   the rest. Nothing here is arranged: Home is read, and the page itself is where it is arranged.
 -->
 <script lang="ts">
-  import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { copy } from '$lib/copy.ts';
   import { REGISTERS, homeCurrency } from '$lib/record/api.ts';
@@ -60,7 +60,7 @@
         <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
       {:else}
         {#each drawn.segments as segment}
-          {#if segment.type === 'block'}<Block block={segment} opts={optsFor(block)} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+          {#if segment.type === 'block'}<Block block={segment} opts={optsFor(block)} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<Markdown {segment} />{/if}
         {/each}
       {/if}
       {#if !drawn.refusal && !block.cannot && block.total > block.shown}

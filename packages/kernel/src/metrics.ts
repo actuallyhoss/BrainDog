@@ -511,7 +511,8 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     ...now.value,
     delta,
     why,
-    met: now.value.value === null || !decl.target ? null : meets(now.value.value, decl.target),
+    /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency has no verdict. */
+    met: now.value.value === null || !decl.target || (declared !== null && now.value.unit !== null && now.value.unit !== declared) ? null : meets(now.value.value, decl.target),
     ...(grouped ? grouped.value : {}),
   });
 }

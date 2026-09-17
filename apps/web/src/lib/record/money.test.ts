@@ -144,7 +144,7 @@ test('A TILE OVER TWO CURRENCIES SHOWS EACH AMOUNT IN ITS OWN, never the sum and
       { currency: 'EUR', amount: 123_400 },
       { currency: 'GBP', amount: clean.value },
     ]);
-    assert.equal(out.shown, `EUR 1,234.00 · ${clean.shown}`);
+    assert.equal(out.shown, `EUR 1,234.00 · ${clean.shown}`);
     assert.deepEqual(out.refusals, []);
     assert.equal(fxNote(out), copy.figureNoHome);
     /* THE TILE ON THE SCREEN is the parts and the reason. */
@@ -288,7 +288,7 @@ test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other keeps its code
 
 test('a sentence redraws its figures, and a currency with no symbol keeps its code in front', () => {
   assert.equal(symbolText('no more than GBP 20,000.00', 'GBP'), 'no more than £20,000.00');
-  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4.00 EUR');
+  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4.00 EUR', 'the code stays with its amount');
   assert.equal(symbolText('costs ZZZ 12.00', 'GBP'), 'costs ZZZ 12.00');
 });
 

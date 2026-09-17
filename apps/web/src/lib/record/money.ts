@@ -172,6 +172,7 @@ export function symbolText(text: string, home: string | null): string {
     const d = drawn(hit, home);
     if (!d) return hit;
     if (d.lead.replace('−', '') === '') return hit;
-    return `${d.lead}${d.whole}${d.fraction}${d.iso ? ` ${d.iso}` : ''}`;
+    /* THE CODE STAYS WITH ITS AMOUNT, so a line of amounts in several currencies breaks between them and never inside one. */
+    return `${d.lead}${d.whole}${d.fraction}${d.iso ? ` ${d.iso}` : ''}`;
   });
 }

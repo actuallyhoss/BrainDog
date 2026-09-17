@@ -14,7 +14,7 @@
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
   import { titleOf } from '$lib/title.ts';
-  import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -137,7 +137,7 @@
               <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
               {#each drawn.segments as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<Markdown {segment} />{/if}
               {/each}
             {/if}
 

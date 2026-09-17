@@ -13,7 +13,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
-  import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import { Block, Degraded, Markdown, Table } from 'braindog-render/svelte';
   import '$lib/blocks-charts.css';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -787,7 +787,7 @@
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
                     onmove={(row, to) => moveCard(block, row, to)}
                     ontick={(row, done) => tickTask(row, done)}
-                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{/if}
+                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<Markdown {segment} />{/if}
               {/each}
             {/if}
 
@@ -1197,6 +1197,8 @@
 
     .block-slot :global(.block[data-form='lead'] .grid > .cell:first-child .cell-figure) {
       font-size: var(--t-2xl);
+      /* A HERO IN SEVERAL CURRENCIES BREAKS BETWEEN THEM, never inside an amount, which keeps its code on a no-break space. */
+      white-space: normal;
     }
 
     /* A LEAD AND THREE OR MORE FIGURES: the rest are rows under it, the label on the left and the figure

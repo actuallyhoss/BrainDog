@@ -229,13 +229,21 @@ function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
  */
 export function fxNote(r: { parts?: readonly Part[] | undefined; fx?: FxRead | undefined }): string | null {
   if (!r.fx) return null;
-  if (r.parts) return r.fx.home !== null && r.fx.missing.length ? copy.figureNoRate(r.fx.missing.join(', ')) : copy.figureNoHome;
+  if (r.parts) {
+    if (r.fx.home !== null && r.fx.missing.length) return copy.figureNoRate(r.fx.missing.join(', '));
+    /* ONE CURRENCY AND NO HOME CURRENCY IS NOT A PROBLEM TO REPORT: the amount is said in the currency it is in. */
+    return r.parts.length > 1 ? copy.figureNoHome : null;
+  }
   if (r.fx.asOf) return (r.fx.forward ? copy.figureConvertedForward : copy.figureConverted)(longDay(r.fx.asOf));
   return null;
 }
 
+/** Whether a figure came back in a currency other than the one it declares, so its target, which is in that one, does not apply. */
+export const offTarget = (decl: { format?: string | undefined } | undefined, unit: string | null | undefined): boolean =>
+  Boolean(decl?.format?.startsWith('money.') && unit && decl.format.slice('money.'.length) !== unit);
+
 /** Amounts in several currencies as one line of text, each written in its own: `EGP 52,000.00 · USD 3,400.00`. */
-export const partsText = (parts: readonly Part[]): string => parts.map((p) => money(Math.round(p.amount), p.currency)).join(' · ');
+export const partsText = (parts: readonly Part[]): string => parts.map((p) => money(Math.round(p.amount), p.currency)).join(' · ');
 const WINDOW = /^(\d{1,4})([dwm])$/;
 
 /** A window as milliseconds, or `null` when it is not one. */

@@ -1143,6 +1143,7 @@ export const copy = {
   figureNoRate: (pairs: string) => `Not added up yet: there is no rate from ${pairs}. Add one to Exchange rates.`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   figureConvertedForward: (day: string) => `Converted at rates as of ${day}, the first after some of these amounts.`,
+  blockNeedsOneCurrency: 'This needs its money in one currency, and it is in more than one.',
   /** The heading over one currency's chart, when a chart is drawn once per currency. */
   inCurrency: (currency: string) => `In ${currency}`,
   /**

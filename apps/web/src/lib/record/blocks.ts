@@ -936,7 +936,8 @@ export function draw(
       segments: [],
       refusal: {
         kind: 'error',
-        title: 'This block’s filter was not understood, so it matched nothing.',
+        /* A WALK OR A CHART THAT NEEDS ONE CURRENCY says that, not that its filter was misread: the lines name the rate. */
+        title: block.refusals.every((r) => /currenc|a walk starts from one amount/iu.test(r)) ? copy.blockNeedsOneCurrency : 'This block’s filter was not understood, so it matched nothing.',
         lines: block.refusals,
       },
     };

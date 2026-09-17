@@ -41,7 +41,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, fxNote, hrefFor, noteOf, partsText, targetLine, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, offTarget, noteOf, partsText, targetLine, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
@@ -269,7 +269,7 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    note: [said(decl ? targetLine(decl) : ''), across].filter(Boolean).join(' · '),
+    note: [said(decl && !offTarget(decl, r.unit) ? targetLine(decl) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };

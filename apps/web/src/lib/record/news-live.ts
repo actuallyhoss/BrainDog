@@ -18,7 +18,7 @@ import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
-import { format, fxNote, hrefFor, partsText, targetLine } from './metrics.ts';
+import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import type { AuditEvent, NewsItem } from './schema.ts';
 
 /** The three figures Home leads with, in the order it draws them. */
@@ -58,7 +58,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
     id,
     label,
     value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
-    note: [decl ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
+    note: [decl && !offTarget(decl, r.unit) ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };
