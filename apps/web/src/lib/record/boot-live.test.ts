@@ -146,6 +146,11 @@ test('a use case added beside another says so, and "speaks" is said only when th
   ]);
 });
 
+test('what was applied, kept on a decision, is not a line of its own in the feed', () => {
+  const items = newsOf([line({ kind: 'note', target: 'decision:D7', target_kind: 'decision', note: 'Applied what was accepted.' }), line({ kind: 'decide', title: 'Add Personal?' })] as never, null);
+  assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal?']);
+});
+
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
   assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');

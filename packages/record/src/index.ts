@@ -2431,6 +2431,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return tail(applied);
         }
         const { apply: _handed, ...decided } = out.value;
+        /* KEPT ON THE DECISION, so what was applied is read back after a reload and by every other member. */
+        if (decided.decision !== null) kernel.keepApplied(decided.decision, applied.value as Record<string, unknown>, actorOf(ctx));
         return tail(ok({ ...decided, applied: applied.value }));
       }
       if (!out.ok || !out.value.install) return tail(out);

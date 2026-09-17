@@ -132,6 +132,22 @@ test('a suggestion no longer open is drawn settled: what was decided, by whom, w
   assert.equal(d.value.question?.options.find((o) => o.key === 'nordhaven')?.title, 'Nordhaven Registry');
 });
 
+test('what an accepted arrangement did is read back from its decision, for a reload and for every member', async () => {
+  const body = { install: 'usecase-personal', title: 'Personal' };
+  const governance: Governor['governance'] = async (args) => {
+    if (args.register === 'decision')
+      return { ok: true, value: { id: 'D7', question: 'Add Personal?', answer: 'accept', reason: 'Yes.', decided_by: 'sam', ts: '2026-09-17T10:00:00Z', suggestion: 'SG7', applied: { installed: ['usecase-personal'] } } };
+    return { ok: true, value: { id: 'SG7', body_kind: 'pack', status: 'resolved', opened_by: 'spark', opened_at: '2026-09-17T09:00:00Z', body, decision: 'D7' } };
+  };
+  for (const id of ['SG7', 'D7']) {
+    const out = await readOne(client({ governance }), id);
+    assert.ok(out.from === 'live');
+    assert.deepEqual(out.value.applied, { did: { installed: ['usecase-personal'] }, body }, id);
+  }
+  const none = await readOne(client(), 'SG1');
+  assert.ok(none.from === 'live' && none.value.applied === undefined);
+});
+
 test('decisions pair with the suggestions they name, and one that names none or an unread one pairs with nothing', () => {
   const s = (id: string) => ({ id, body_kind: 'rowset', status: 'resolved', opened_at: '2026-09-01', body: {} });
   const paired = pairs(

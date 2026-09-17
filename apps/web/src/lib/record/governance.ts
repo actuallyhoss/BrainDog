@@ -58,7 +58,16 @@ export type One = Rows & {
   about?: About;
   /** An arrangement's changed pages as they stand now, by declaration id, so the gate can say what each shows before and after. */
   pagesNow?: Record<string, Row>;
+  /**
+   * WHAT AN ACCEPTED ARRANGEMENT DID, as the record kept it on the decision, with the body it was read against. Drawn on
+   * a reload and for every member, where it was once only in the tab that pressed accept.
+   */
+  applied?: { did: Row; body: Row };
 };
+
+/** What the record kept on a decision about what its arrangement did, with the question's body, or nothing. */
+const keptApplied = (decision: Row | null | undefined, suggestion: Row | null | undefined): Pick<One, 'applied'> =>
+  decision && isRow(decision.applied) && suggestion && isRow(suggestion.body) ? { applied: { did: decision.applied, body: suggestion.body } } : {};
 
 export const words = {
   /* A settled suggestion whose decision this screen could not find among the ones it reads. */
@@ -269,7 +278,7 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
 
   if (decision) {
     const settled = await linkedRow(client, 'suggestion', row.suggestion);
-    return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
+    return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...keptApplied(row, settled) } };
   }
 
   const drawn = questionOf(row, questionsAsked(booted).get(id), 1);
@@ -285,7 +294,7 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
   const by = await linkedRow(client, 'decision', row.decision);
   const decided = by ? decisionOf(by).decided : undefined;
   const question = by ? { ...drawn, title: text(by.question) || id, ...(decided ? { decided } : {}) } : drawn;
-  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [] } };
+  return { from: 'live', value: { question, rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...keptApplied(by, row) } };
 }
 
 const sentOf = (out: Wire<unknown>): Sent =>

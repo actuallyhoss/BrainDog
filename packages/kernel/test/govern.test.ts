@@ -980,3 +980,15 @@ test('AT MOST THREE ARRANGEMENTS WAIT AT ONCE, and the fourth names the three', 
   value(k.propose(arrange, 'S1'));
   sql.close();
 });
+
+test('WHAT AN ACCEPTED ARRANGEMENT DID IS KEPT ON ITS DECISION, and read back with it', async () => {
+  const { k, sql } = await record();
+  const made = value<{ id: string }>(k.propose(options, 'p_1'));
+  const out = value<{ decision: string }>(k.decide(made.id, { decide: { option: 'accept', reason: 'ours' } }, 'p_2'));
+  assert.equal(k.governanceRow('decision', out.decision)?.applied, null, 'a decision nothing was kept on');
+  value(k.keepApplied(out.decision, { installed: ['usecase-personal'] }, 'p_2'));
+  assert.deepEqual(k.governanceRow('decision', out.decision)?.applied, { installed: ['usecase-personal'] });
+  assert.deepEqual((value<Record<string, unknown>[]>(k.governance('decision'))[0] ?? {}).applied, { installed: ['usecase-personal'] });
+  assert.equal(refusal(k.keepApplied('D99', {}, 'p_2')).code, 'OUT_OF_BOUNDS');
+  sql.close();
+});

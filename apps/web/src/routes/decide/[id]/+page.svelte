@@ -126,6 +126,8 @@
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */
   let applied = $state<string[]>([]);
+  /* WHAT THE RECORD KEPT ON THE DECISION, for a reload and for anybody who did not press accept. */
+  const kept = $derived(from === 'live' && live?.applied ? appliedLines(live.applied.did, live.applied.body) : []);
   let part = $state<Partial | null>(null);
   const sidebarNow = (): Map<string, string> =>
     new Map(((page.data.nav ?? []) as { href: string; title: string }[]).map((n) => [n.href, n.title]));
@@ -496,7 +498,8 @@
         <p class="settled-choice">{settled.title}</p>
         <p class="settled-reason">“{settled.reason}”</p>
         <p class="settled-note">{copy.immutable}</p>
-        {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>{/if}
+        {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
+        {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
         <!-- NOT SAVED, ON THE RECEIPT, and the way back beside it. `Chip` draws it because the tone
              carries its own glyph and nothing in this app renders an intent without one (13 §5.1):
              a receipt that only went amber says nothing to a screen reader. Only for a decision

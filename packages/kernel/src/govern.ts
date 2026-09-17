@@ -153,9 +153,17 @@ const SETTLED =
 const SETTLED_BY =
   "(SELECT substr(d.target, 10) FROM event r JOIN event d ON d.rowid = r.rowid - 1 WHERE r.kind = 'resolve' AND r.target = 'suggestion:' || suggestion.id AND d.kind = 'decide' AND d.target LIKE 'decision:%' ORDER BY r.rowid DESC LIMIT 1) AS decision";
 
+/**
+ * WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`). It was only ever in the answer to the press, so
+ * the tab that accepted said "Installed Personal" and a reload, or anybody else, read the decision without it. The newest
+ * such line wins; a decision with none reads `null`.
+ */
+const APPLIED =
+  "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
+
 const COLUMNS: Record<GovernRegister, string> = {
   suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, ${SETTLED_BY}`,
-  decision: `id, question, answer, reason, decided_by, ts, supersedes, ${SETTLED}`,
+  decision: `id, question, answer, reason, decided_by, ts, supersedes, ${SETTLED}, ${APPLIED}`,
   prediction:
     'id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, observed, met, on_miss',
 };
@@ -213,7 +221,7 @@ export function getGovernance(sql: Sql, register: GovernRegister, id: string): R
 /** The JSON columns come back as objects, because a caller reading `body.register` should not parse. */
 function hydrate(register: GovernRegister, row: Record<string, unknown>): Record<string, unknown> {
   const out = { ...row };
-  for (const key of register === 'suggestion' ? ['body'] : register === 'prediction' ? ['measure'] : [])
+  for (const key of register === 'suggestion' ? ['body'] : register === 'prediction' ? ['measure'] : ['applied'])
     if (typeof out[key] === 'string') {
       try {
         out[key] = JSON.parse(out[key] as string) as unknown;
@@ -939,6 +947,16 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
      and the reopened state — so anybody reading the log saw a suggestion resolved and open at once,
      with no account of how. The `decision` stands: somebody did answer, and this is not an undo. */
   event(deps, instant(deps.nowMs), 'system', 'suggest', `suggestion:${id}`, 'suggestion', 'reopened', why);
+  return ok(null);
+}
+
+/**
+ * Keep what an accepted arrangement did on the decision that accepted it: what was installed, turned on and off, and which
+ * pages and settings were set, as `apply` answered it. One `note` line on the decision, which `APPLIED` reads back.
+ */
+export function keepApplied(deps: GovernDeps, decision: string, applied: Record<string, unknown>, actor: string): Result<null> {
+  if (!deps.sql.one('SELECT id FROM decision WHERE id = ?', decision)) return no<null>('OUT_OF_BOUNDS', `There is no decision called ${decision}.`, { at: 'id' });
+  event(deps, instant(deps.nowMs), actor, 'note', `decision:${decision}`, 'decision', JSON.stringify(applied), 'Applied what was accepted.');
   return ok(null);
 }
 

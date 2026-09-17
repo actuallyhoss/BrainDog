@@ -89,6 +89,7 @@ import {
   listGovernance,
   propose as openSuggestion,
   reopen,
+  keepApplied,
   questionOf,
   type Decided,
   type GovernDeps,
@@ -3921,6 +3922,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
     reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
+
+    /** Keep what an accepted arrangement did on its decision, so a reload and every other reader see it. */
+    keepApplied: (decision: string, applied: Record<string, unknown>, actor: string): Result<null> =>
+      transaction(() => keepApplied(governDeps(), decision, applied, actor)),
 
     /**
      * Someone met in the work: matched by email or handle, or added, and linked to the project of the

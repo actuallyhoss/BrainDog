@@ -253,6 +253,8 @@ function hrefOf(e: EventLine): string {
 export function newsOf(events: readonly EventLine[], me: string | null): NewsItem[] {
   const voice = voiceTexts(events);
   return events.flatMap((e, i) => {
+    /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
+    if (e.kind === 'note' && e.target_kind === 'decision') return [];
     const text = voice.has(i) ? voice.get(i) : textOf(e);
     return text == null ? [] : [{ at: e.ts, by: actorFor(e.actor, me), text, href: hrefOf(e) }];
   });

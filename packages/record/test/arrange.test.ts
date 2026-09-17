@@ -166,6 +166,10 @@ test('A TOKEN PROPOSES INSTALLING A USE CASE, IS SHOWN WHAT IT WOULD DO, AND ONL
 
   const done = value<{ applied: { installed: string[] } }>(await api.decide(accept(filed.id), owner));
   assert.deepEqual(done.applied.installed, ['work', 'usecase-study']);
+  /* KEPT ON THE DECISION, so a reload and every other reader see what was applied, not only the tab that pressed. */
+  const settled = value<{ decision: string }>(await api.governance({ id: filed.id }, owner));
+  const decision = value<{ applied: { installed: string[] } | null }>(await api.governance({ register: 'decision', id: settled.decision } as never, owner));
+  assert.deepEqual(decision.applied?.installed, ['work', 'usecase-study']);
   assert.deepEqual(after, ['courses:0', 'nothing:null']);
   assert.deepEqual(api.kernel.packStates().map((p) => p.id), ['usecase-study', 'work']);
   assert.equal(value<{ status: string }>(await api.governance({ id: filed.id }, owner)).status, 'resolved');
