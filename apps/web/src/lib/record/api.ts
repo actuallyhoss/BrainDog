@@ -1963,18 +1963,21 @@ function drawnWhen(b: PageBlock): boolean {
   const decl = METRICS[b.when.metric];
   if (!decl) return false;
   const reading = read(withParam(decl, b.when.metric));
-  if (reading.value === null) return false;
-
-  const v = reading.value;
-  if (b.when.gt !== undefined) return v > b.when.gt;
-  if (b.when.gte !== undefined) return v >= b.when.gte;
-  if (b.when.lt !== undefined) return v < b.when.lt;
-  if (b.when.lte !== undefined) return v <= b.when.lte;
-  if (b.when.is !== undefined) return v === b.when.is;
-  if (b.when.not !== undefined) return v !== b.when.not;
-  /* A CONDITION WITH NO TEST IN IT IS NOT A CONDITION, and drawing the block would be guessing that
-     the author meant "always". They meant something; the block waits until they say what. */
-  return false;
+  /* A FIGURE IN SEVERAL CURRENCIES MEETS THE CONDITION WHEN ONE OF ITS AMOUNTS DOES, as the record reads it: money late
+     in pounds is late whatever is late in dollars. */
+  const said = reading.parts ? reading.parts.map((p) => p.amount) : reading.value === null ? [] : [reading.value];
+  const when = b.when;
+  return said.some((v) => {
+    if (when.gt !== undefined) return v > when.gt;
+    if (when.gte !== undefined) return v >= when.gte;
+    if (when.lt !== undefined) return v < when.lt;
+    if (when.lte !== undefined) return v <= when.lte;
+    if (when.is !== undefined) return v === when.is;
+    if (when.not !== undefined) return v !== when.not;
+    /* A CONDITION WITH NO TEST IN IT IS NOT A CONDITION, and drawing the block would be guessing that
+       the author meant "always". They meant something; the block waits until they say what. */
+    return false;
+  });
 }
 
 /**

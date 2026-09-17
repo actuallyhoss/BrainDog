@@ -14,7 +14,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { currencyFor, display, metric, page, readBlock } from './api.ts';
+import { currencyFor, display, metric, page, readBlock, values } from './api.ts';
+import { resolverOf } from './page-live.ts';
 import { PAGES } from './data.ts';
 import { toSegments, walkTables } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
@@ -357,4 +358,21 @@ test('A WALK SPLIT BY CURRENCY DRAWS EACH ITS REMEMBERED CASH, AND ONE SET OF KN
     assert.equal(groups[0]![0], groups[1]![0], 'one group');
     assert.deepEqual(groups.map((g) => g[1]), ['EUR', 'GBP']);
   });
+});
+
+test('“LATE TO YOU” DRAWS WHEN WHAT IS LATE IS IN TWO CURRENCIES, and says each amount', () => {
+  const late = (e: Entry) => e.fields.direction === 'owed_to_me' && (e.fields.state === 'open' || e.fields.state === 'part') && String(e.fields.due) < TODAY;
+  withEuro('obligations', 'amount', late, () => {
+    assert.ok(read(METRICS['late-in']!).parts, 'what is late is in parts, so this test is about a note over parts');
+    const block = page('money')?.blocks.find((b) => b.heading === 'Late to you');
+    assert.ok(block, 'the Late to you note is gone; this test is about it');
+    assert.equal(block.drawn, true, 'a note over parts drew nothing');
+    assert.match(values()['late-in'] ?? '', /EUR\s1,234\.00\s·\sGBP/u);
+  });
+});
+
+test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () => {
+  const said = resolverOf({ 'late-in': [{ amount: 123_400, currency: 'EUR' }, { amount: 5_000, currency: 'GBP' }], odd: [{ amount: 1 }] });
+  assert.equal(said('late-in')?.replace(/\s/gu, ' '), 'EUR 1,234.00 · GBP 50.00');
+  assert.equal(said('odd'), null, 'what is not money is not written as money');
 });

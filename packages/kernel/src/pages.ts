@@ -498,15 +498,19 @@ function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
   const at = when.metric.indexOf(':');
   const read = deps.read(at < 0 ? decl : (fill(decl, null, when.metric.slice(at + 1)) as MetricDecl));
   if (!read.ok) return false;
-  const v = read.value.value;
-  if (v === null) return false;
-  if (when.gt !== undefined) return v > when.gt;
-  if (when.gte !== undefined) return v >= when.gte;
-  if (when.lt !== undefined) return v < when.lt;
-  if (when.lte !== undefined) return v <= when.lte;
-  if (when.is !== undefined) return v === when.is;
-  if (when.not !== undefined) return v !== when.not;
-  return false;
+  /* A FIGURE IN SEVERAL CURRENCIES MEETS THE CONDITION WHEN ONE OF ITS AMOUNTS DOES: money late in pounds is late
+     whatever is late in dollars, and "Late to you" is not hidden because two currencies cannot be added. */
+  const parts = read.value.parts;
+  const said = parts ? parts.map((p) => p.amount) : read.value.value === null ? [] : [read.value.value];
+  return said.some((v) => {
+    if (when.gt !== undefined) return v > when.gt;
+    if (when.gte !== undefined) return v >= when.gte;
+    if (when.lt !== undefined) return v < when.lt;
+    if (when.lte !== undefined) return v <= when.lte;
+    if (when.is !== undefined) return v === when.is;
+    if (when.not !== undefined) return v !== when.not;
+    return false;
+  });
 }
 
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
@@ -1547,7 +1551,10 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
   if ('metric' in said) {
     const decl = deps.metric(said.metric);
     const read = decl ? deps.read(decl) : null;
-    if (!read?.ok || read.value.value === null) return undefined;
+    if (!read?.ok) return undefined;
+    /* A FIGURE IN SEVERAL CURRENCIES IS EACH OF ITS AMOUNTS, which the host writes one after another. */
+    if (read.value.parts) return read.value.parts.map((p) => ({ amount: p.amount, currency: p.currency }));
+    if (read.value.value === null) return undefined;
     return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
   }
   const schema = deps.schemaOf(said.register);

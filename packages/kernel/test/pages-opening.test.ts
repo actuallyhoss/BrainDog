@@ -342,3 +342,14 @@ test("A PAGE SAYS WHAT THE RECORD'S CLOCK READ, so a host draws today from the r
   const page = value<{ read_at?: string }>(k.page('desk'));
   assert.equal(page.read_at, new Date(NOW).toISOString());
 });
+
+test('A NOTE OVER A FIGURE IN SEVERAL CURRENCIES draws when one amount meets its condition, and quotes every amount', async () => {
+  const k = await record();
+  value(k.create('accounts', { name: 'Mercury', balance: { amount: 90_000, currency: 'USD' } }, OWNER));
+  const note = (when: Record<string, unknown>) => k.block({ kind: 'note', heading: 'Cash', body: 'Cash is {{cash-now}}.', when: { metric: 'cash-now', ...when } } as never);
+  const drawn = note({ gt: 100_000 });
+  assert.notEqual(drawn.drawn, false, 'sterling is over the line, so the note draws');
+  assert.deepEqual(drawn.values?.['cash-now'], [{ amount: 500_000, currency: 'GBP' }, { amount: 90_000, currency: 'USD' }]);
+  assert.equal(note({ gt: 600_000 }).drawn, false, 'no amount is over it');
+  assert.notEqual(note({ lt: 100_000 }).drawn, false, 'the dollars are under it');
+});

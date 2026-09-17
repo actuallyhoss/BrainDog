@@ -41,7 +41,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, fxNote, hrefFor, noteOf, partsShown, targetSaid, walksNote, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
@@ -655,6 +655,11 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     if (typeof v === 'string') return v;
     if (typeof v === 'number') return Number.isInteger(v) ? integer(v) : String(v);
     if (typeof v === 'boolean') return v ? 'yes' : 'no';
+    /* A FIGURE IN SEVERAL CURRENCIES, one amount a currency, written as a tile writes its parts. */
+    if (Array.isArray(v)) {
+      const parts = v.filter((p): p is { amount: number; currency: string } => isObject(p) && typeof p.amount === 'number' && typeof p.currency === 'string');
+      return parts.length && parts.length === v.length ? partsText(parts) : null;
+    }
     if (v !== null && typeof v === 'object') {
       const { amount, currency } = v as { amount?: unknown; currency?: unknown };
       if (typeof amount === 'number' && typeof currency === 'string') return money(amount, currency);
