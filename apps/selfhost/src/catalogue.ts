@@ -1,6 +1,6 @@
 /**
- * A catalogue of shared use cases served from a folder, read-only: `/catalogue/index.json` and each version's file at
- * `/catalogue/usecases/<id>/<version>.usecase.json` (`@braindog/declare/catalogue`, `loop/research-marketplace.md` §2).
+ * A catalogue of shared use cases and add-ons served from a folder, read-only: `/catalogue/index.json` and each version's
+ * file at `/catalogue/usecases/<id>/<version>.usecase.json` or `/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`, `loop/research-marketplace.md` §2).
  *
  * THE OPERATOR NAMES THE FOLDER (`BRAINDOG_CATALOGUE`), and `braindog usecase publish --to` writes into it. Nothing else
  * in it is reachable: a path is matched whole against the two shapes, so no `..`, no other file and no listing. The files
@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const INDEX = /^\/catalogue\/index\.json$/u;
-const FILE = /^\/catalogue\/usecases\/([a-z][a-z0-9-]{0,62})\/(\d{1,6}\.\d{1,6}\.\d{1,6})\.usecase\.json$/u;
+const FILE = /^\/catalogue\/(?:usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack)\.json$/u;
 
 export type Answer = { status: number; headers: Record<string, string>; body: string };
 
@@ -31,7 +31,7 @@ export function catalogueAnswer(dir: string | undefined, method: string, pathnam
   if (dir === undefined) return refusal(404, 'This BrainDog serves no catalogue. Name a folder with BRAINDOG_CATALOGUE.');
   if (method !== 'GET' && method !== 'HEAD') return refusal(405, 'A catalogue is read with GET.');
   const file = INDEX.test(pathname) ? 'index.json' : FILE.test(pathname) ? pathname.slice('/catalogue/'.length) : null;
-  if (file === null) return refusal(404, 'A catalogue answers index.json and usecases/<id>/<version>.usecase.json.');
+  if (file === null) return refusal(404, 'A catalogue answers index.json, usecases/<id>/<version>.usecase.json and packs/<id>/<version>.pack.json.');
   try {
     return said(200, readFileSync(join(dir, ...file.split('/')), 'utf8'));
   } catch {

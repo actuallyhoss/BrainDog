@@ -17,6 +17,8 @@ test('the index and a version are answered, and any other path in the folder is 
   mkdirSync(join(folder, 'usecases', 'study'), { recursive: true });
   writeFileSync(join(folder, 'index.json'), '{"format":1,"name":"Test","entries":[]}');
   writeFileSync(join(folder, 'usecases', 'study', '1.0.0.usecase.json'), '{"usecase":"study"}');
+  mkdirSync(join(folder, 'packs', 'bookshelf'), { recursive: true });
+  writeFileSync(join(folder, 'packs', 'bookshelf', '1.0.0.pack.json'), '{"pack":"bookshelf"}');
   writeFileSync(join(dir, 'outside.json'), '{"not":"yours"}');
   writeFileSync(join(folder, 'notes.txt'), 'private');
   const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0, catalogue: folder });
@@ -34,7 +36,11 @@ test('the index and a version are answered, and any other path in the folder is 
   assert.equal(file.status, 200);
   assert.equal(await file.text(), '{"usecase":"study"}');
 
-  for (const path of ['/catalogue/notes.txt', '/catalogue/usecases/study/1.0.1.usecase.json', '/catalogue/%2e%2e/outside.json', '/catalogue/usecases/..%2f..%2foutside/1.0.0.usecase.json', '/catalogue/']) {
+  const pack = await get('/catalogue/packs/bookshelf/1.0.0.pack.json');
+  assert.equal(pack.status, 200);
+  assert.equal(await pack.text(), '{"pack":"bookshelf"}');
+
+  for (const path of ['/catalogue/packs/bookshelf/1.0.0.usecase.json', '/catalogue/usecases/study/1.0.0.pack.json', '/catalogue/notes.txt', '/catalogue/usecases/study/1.0.1.usecase.json', '/catalogue/%2e%2e/outside.json', '/catalogue/usecases/..%2f..%2foutside/1.0.0.usecase.json', '/catalogue/']) {
     const res = await get(path);
     assert.equal(res.status, 404, path);
     assert.doesNotMatch(await res.text(), /yours|private/u, path);
