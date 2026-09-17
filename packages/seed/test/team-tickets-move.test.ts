@@ -53,3 +53,26 @@ test('a task somebody typed with the same title as a ticket does not stand in fo
   assert.equal(copied.length, 1);
   assert.equal(copied[0]?.fields.priority, 'urgent');
 });
+
+test('backlogAgain moves back only the copies of backlog tickets, one task per ticket, never a typed task with the title', async () => {
+  const { backlogAgain } = await import('../src/usecases/team.ts');
+  const lists: Record<string, Row[]> = {
+    tickets: [
+      { seq: 1, fields: { what: 'Fix login bug', state: 'backlog', priority: 'urgent', note: 'Seen on Safari' } },
+      { seq: 2, fields: { what: 'Write docs', state: 'backlog' } },
+    ],
+    tasks: [
+      /* Typed by somebody, To do, with a backlog ticket's title and nothing else of it. */
+      { seq: 5, fields: { what: 'Fix login bug', state: 'open' } },
+      /* The 2.0.0 copies. */
+      { seq: 8, fields: { what: 'Fix login bug', state: 'open', priority: 'urgent', note: 'Seen on Safari' } },
+      { seq: 9, fields: { what: 'Write docs', state: 'open' } },
+      /* A second task that says what the Write docs copy says: only one ticket stands behind them. */
+      { seq: 10, fields: { what: 'Write docs', state: 'open' } },
+    ],
+  };
+  const linked: number[] = [];
+  const moved = await backlogAgain({ rows: async (r) => lists[r] ?? [], link: async (_r, seq) => (linked.push(seq), true) });
+  assert.equal(moved, 2);
+  assert.deepEqual(linked, [8, 9]);
+});

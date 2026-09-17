@@ -381,6 +381,9 @@ export type TicketIo = {
 
 const set = (v: unknown): boolean => v !== undefined && v !== null && v !== '';
 
+/** What a task copied from a ticket says, and what a task has to say to be taken as that copy: title, state, priority and note. */
+const copyShape = (f: Record<string, unknown>): string => JSON.stringify([String(f.what ?? ''), String(f.state ?? ''), String(f.priority ?? ''), String(f.note ?? '')]);
+
 /**
  * Copy each ticket of Team 1.x to a task, with its cycle and points on the cycle plan. Answers how many tickets were
  * copied. The tickets stay where they are, under Earlier tickets. A ticket is taken as copied only when a task already
@@ -393,7 +396,7 @@ export async function moveTickets(io: TicketIo): Promise<number> {
   if (tickets.length === 0) return 0;
   const titles = async (): Promise<readonly { seq: number | null; fields: Record<string, unknown> }[]> => (await io.rows('tasks').catch(() => null)) ?? [];
   /* WHAT A COPY SAYS, as a count per shape, so each task already there answers for one ticket and no more. */
-  const shape = (f: Record<string, unknown>): string => JSON.stringify([String(f.what ?? ''), String(f.state ?? ''), String(f.priority ?? ''), String(f.note ?? '')]);
+  const shape = copyShape;
   const had = new Map<string, number>();
   for (const t of await titles()) had.set(shape(t.fields), (had.get(shape(t.fields)) ?? 0) + 1);
   let moved = 0;
@@ -433,13 +436,25 @@ export async function moveTickets(io: TicketIo): Promise<number> {
 /**
  * A RECORD THAT TOOK TEAM 2.0.0 copied its backlog tickets as To do. Each task copied from a ticket still in the backlog,
  * and still To do, goes back to the backlog; one somebody has moved since is left where they put it. Answers how many.
+ *
+ * A TASK IS TAKEN AS A COPY THE WAY `moveTickets` TAKES ONE: it says what the copy said (title, To do, priority and note),
+ * one task for one ticket, earliest first. A task somebody typed with a backlog ticket's title alone is left alone.
  */
 export async function backlogAgain(io: { rows: TicketIo['rows']; link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean> }): Promise<number> {
-  const waiting = new Set(((await io.rows('tickets').catch(() => null)) ?? []).filter((t) => t.fields.state === 'backlog').map((t) => String(t.fields.what ?? '')));
+  const waiting = new Map<string, number>();
+  for (const t of (await io.rows('tickets').catch(() => null)) ?? []) {
+    if (t.fields.state !== 'backlog' || String(t.fields.what ?? '') === '') continue;
+    const copy = copyShape({ what: t.fields.what, state: 'open', priority: set(t.fields.priority) ? t.fields.priority : '', note: set(t.fields.note) ? t.fields.note : '' });
+    waiting.set(copy, (waiting.get(copy) ?? 0) + 1);
+  }
   if (waiting.size === 0) return 0;
   let moved = 0;
-  for (const task of (await io.rows('tasks').catch(() => null)) ?? []) {
-    if (task.seq === null || task.fields.state !== 'open' || !waiting.has(String(task.fields.what ?? ''))) continue;
+  const tasks = [...((await io.rows('tasks').catch(() => null)) ?? [])].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  for (const task of tasks) {
+    if (task.seq === null || task.fields.state !== 'open') continue;
+    const left = waiting.get(copyShape(task.fields)) ?? 0;
+    if (left === 0) continue;
+    waiting.set(copyShape(task.fields), left - 1);
     if (await io.link('tasks', task.seq, 'state', 'backlog').catch(() => false)) moved += 1;
   }
   return moved;

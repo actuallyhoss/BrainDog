@@ -173,7 +173,9 @@ test('A RECORD THAT TOOK TEAM 2.0.0 PUTS ITS BACKLOG TICKETS BACK IN THE BACKLOG
   value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'] })));
   value(await put(k, useCaseDocument('team', TODAY, held(k))));
   /* AS 2.0.0 COPIED THEM: every one To do. Then a person started one of the backlog tickets. */
-  for (const what of ['Groom the backlog', 'Sketch the importer', 'Ship the export']) value(k.create('tasks', { what, state: 'open' }, OWNER));
+  for (const what of ['Groom the backlog', 'Sketch the importer', 'Ship the export']) value(k.create('tasks', { what, state: 'open', priority: 'normal' }, OWNER));
+  /* And somebody typed a To do task with a backlog ticket's title: it is not a copy, and it stays To do. */
+  value(k.create('tasks', { what: 'Groom the backlog', state: 'open', note: 'Before the review' }, OWNER));
   const sketch = rows(k, 'tasks').find((t) => t.fields.what === 'Sketch the importer')!;
   value(k.update('tasks', `tasks#${sketch.seq}`, { state: 'doing' }, OWNER));
 
@@ -189,8 +191,9 @@ test('A RECORD THAT TOOK TEAM 2.0.0 PUTS ITS BACKLOG TICKETS BACK IN THE BACKLOG
   const before = k.count('tasks');
   assert.equal(await carryForward(io, 'usecase-team', '2.0.0', TODAY), 1);
   assert.equal(k.count('tasks'), before, 'no ticket is copied twice');
-  const state = (what: string) => rows(k, 'tasks').find((t) => t.fields.what === what)!.fields.state;
+  const state = (what: string) => rows(k, 'tasks').find((t) => t.fields.what === what && t.fields.note !== 'Before the review')!.fields.state;
   assert.deepEqual([state('Groom the backlog'), state('Sketch the importer'), state('Ship the export')], ['backlog', 'doing', 'open']);
+  assert.equal(rows(k, 'tasks').find((t) => t.fields.note === 'Before the review')!.fields.state, 'open', 'a typed task with the title was moved to the backlog');
   assert.equal(await carryForward(io, 'usecase-team', '2.0.0', TODAY), 0, 'a second run moves nothing');
   sql.close();
 });
