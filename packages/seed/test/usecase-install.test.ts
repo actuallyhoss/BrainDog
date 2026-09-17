@@ -203,7 +203,7 @@ test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOA
   assert.equal(cells.get('budget-each-month'), 30_000 + 8_000 + 6_000 + 5_000 + 4_000 + 5_000);
   assert.equal(cells.get('bills-this-week'), 85_000 + 1_800 + 1_099);
   assert.equal(home[2]!.rows?.length, 3, 'rent, the phone and the streaming subscription are due this week');
-  for (const slug of ['spending', 'goals', 'projects', 'restore-the-old-road-bike']) {
+  for (const slug of ['money', 'spending', 'goals', 'projects', 'restore-the-old-road-bike']) {
     const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
     for (const b of page) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading} was refused`);
   }

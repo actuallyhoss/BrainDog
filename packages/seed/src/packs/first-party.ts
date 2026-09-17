@@ -159,8 +159,20 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
       for (const f of Array.isArray(d.fields) ? (d.fields as Body[]) : [])
         if (links.includes(String(f.id)) && f.to !== d.register && !held.has(String(f.to))) gone.add(String(f.id));
   }
+  /* A WALK'S LEG OVER A LIST THE RECORD WILL NOT HOLD IS LEFT OUT, as a link field is: Money's cash walk reads Estate's
+     services when they are there, and a person's or a founder's record without Estate still has a walk. */
+  const held = options.holds === undefined ? null : new Set(options.holds);
+  const legs = (d: Body): Body =>
+    held === null || !Array.isArray(d.blocks)
+      ? d
+      : {
+          ...d,
+          blocks: (d.blocks as Body[]).map((b) =>
+            Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).filter((leg) => typeof leg.register !== 'string' || held.has(leg.register)) } : b,
+          ),
+        };
   const pack = {
-    declarations: whole.declarations.map((d) => without(d, gone)),
+    declarations: whole.declarations.map((d) => legs(without(d, gone))),
     seeds: (options.seeds ?? whole.seeds).map((s) => ({
       ...s,
       fields: Object.fromEntries(Object.entries(s.fields as Body).filter(([k]) => !gone.has(k))),

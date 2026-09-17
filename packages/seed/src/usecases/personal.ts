@@ -65,6 +65,7 @@ const budgetProgress = (heading: string) => ({
   source: 'register.budgets',
   columns: [{ field: 'category' }, { field: 'limit' }],
   spent: 'spent-this-month-by-category',
+  order: [{ field: 'seq', dir: 'asc' }],
   limit: 10,
   empty: 'No budget yet. Give a category a monthly amount and what you have spent against it shows here.',
 });
@@ -323,7 +324,7 @@ export const PERSONAL = {
               { metric: 'spent-this-month', label: 'Spent this month' },
               { metric: 'budget-each-month', label: 'Monthly budget' },
               { metric: 'bills-this-week', label: 'Bills this week' },
-              { metric: 'cash-now', label: 'In your accounts' },
+              { metric: 'cash-now', label: 'In your accounts', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
             ],
           },
           budgetProgress('Spending against your budget'),
