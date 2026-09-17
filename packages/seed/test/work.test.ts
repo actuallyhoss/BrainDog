@@ -137,3 +137,49 @@ test('WORK NEEDS NO PEOPLE: who holds a task is a link, left out on a record wit
   assert.ok(!tasks.fields!.some((f) => f.id === 'owner'));
   assert.ok(tasks.fields!.some((f) => f.id === 'agent'), 'the agent is the pack’s own field and stays');
 });
+
+test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its pages open and a task is written', async () => {
+  const { install, normalise, plan } = await import('@braindog/declare');
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.deepEqual(firstPartyManifest('work').requires, [], 'Work needs no other module');
+
+  const doc = firstPartyDocument('work', { holds: ['tasks', 'tracks', 'updates'], seeds: [] })!;
+  const packed = await normalise(doc, { kind: 'local' });
+  assert.ok(packed.ok, sayOf(packed));
+  const state = {
+    format: 1,
+    primitives: 1,
+    record_version: k.version(),
+    packs: k.packs(),
+    declarations: k.declarations(),
+    rows: k.census(),
+  } as Parameters<typeof plan>[1];
+  const diff = await plan(packed.value, state);
+  const put = await install(
+    packed.value,
+    diff,
+    {
+      count: (register) => k.count(register),
+      stage: (batch) => k.stageInstall(batch as never),
+      transaction: (fn) => k.transaction(fn),
+      reload: () => k.reload(),
+      retire: (ids) => k.retire(ids),
+      seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+      remember: (row) => k.rememberPack(row),
+      forget: (id) => k.forgetPack(id),
+      claimed: (pack) => k.packClaims(pack),
+    },
+    diff.planHash,
+  );
+  assert.ok(put.ok, sayOf(put));
+
+  const tasks = (doc.declarations as { register?: string; fields?: { id: string }[] }[]).find((d) => d.register === 'tasks')!;
+  assert.ok(!tasks.fields!.some((f) => f.id === 'thing' || f.id === 'owner'), 'no project and no owner on a record without them');
+
+  assert.ok(k.create('tasks', { what: 'Problem set 3', state: 'open', by: TODAY }, { actor: 'p_1' }).ok);
+  const overview = opened(k, 'work');
+  for (const b of overview.blocks) assert.deepEqual(b.refusals, [], `work ${b.heading}`);
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Open work by project'), 'the bar by project is left out, not drawn empty');
+  assert.ok(block(overview, 'Due soon').rows.some((r) => r.fields.what === 'Problem set 3'));
+  for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
+});

@@ -47,9 +47,10 @@ type Body = Record<string, unknown>;
  * was met in, and a record with no Projects still has people: a student's classmates, a founder's accountant.
  * So "Met in" is a link and not a dependency. When the record will not hold the list it points at, the field is
  * left out of the document with every column drawn over it, and the pack installs on its own. Installing the
- * pack again once that list is there puts the field back.
+ * pack again once that list is there puts the field back. Work's tasks and threads say which project they are for and
+ * who holds them the same way, so a homework list installs Work with no Projects and no People.
  */
-const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], work: ['owner'] };
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], work: ['owner', 'thing'] };
 
 /** The id a declaration in a document is filed under: its kind's key. */
 const idOf = (d: Body): string =>
@@ -127,14 +128,26 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
   return { id, version: VERSION, requires: [...needs].sort(), provides: mine.map(idOf).sort(), links };
 }
 
-/** A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. */
-function without(d: Body, gone: ReadonlySet<string>): Body {
+/** The block kinds whose first column is what they group by, so they say nothing once it is gone. */
+const GROUPED = new Set(['bar', 'split']);
+
+/**
+ * A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. A bar grouped by
+ * a field that is gone is left out whole: "Open work by project" on a record with no projects has nothing to group by.
+ */
+function without(d: Body, gone: ReadonlySet<string>): Body | null {
   if (gone.size === 0) return d;
   const out: Body = { ...d };
   if (Array.isArray(d.fields)) out.fields = (d.fields as Body[]).filter((f) => !gone.has(String(f.id)));
   if (Array.isArray(d.mobile)) out.mobile = (d.mobile as unknown[]).filter((f) => !gone.has(String(f)));
+  /* A FIGURE ASKED OF A FIELD THAT IS GONE is left out whole: `project-open` counts a project's tasks, and a record with
+     no projects has none to count. */
+  if (typeof d.metric === 'string' && typeof d.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(d.where as string)))
+    return null;
   if (Array.isArray(d.blocks))
-    out.blocks = (d.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => !gone.has(String(c.field))) } : b));
+    out.blocks = (d.blocks as Body[])
+      .filter((b) => !(GROUPED.has(String(b.kind)) && Array.isArray(b.columns) && gone.has(String((b.columns as Body[])[0]?.field))))
+      .map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => !gone.has(String(c.field))) } : b));
   return out;
 }
 
@@ -173,7 +186,10 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
           ),
         };
   const pack = {
-    declarations: whole.declarations.map((d) => legs(without(d, gone))),
+    declarations: whole.declarations.flatMap((d) => {
+      const kept = without(d, gone);
+      return kept === null ? [] : [legs(kept)];
+    }),
     seeds: (options.seeds ?? whole.seeds).map((s) => ({
       ...s,
       fields: Object.fromEntries(Object.entries(s.fields as Body).filter(([k]) => !gone.has(k))),

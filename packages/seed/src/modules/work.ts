@@ -215,7 +215,7 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
       { id: 'parent', label: 'Part of', type: 'ref', to: 'tasks', index: true },
       /* THE DAY IT WAS FINISHED, set by whoever finishes it, so progress is counted by when work was done. */
       { id: 'done_on', label: 'Done on', type: 'day', index: true },
-      /* A task on no project is global. */
+      /* A task on no project is global. A link, like Owner, so Work installs on a record with no Projects and leaves it out. */
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true, scope: {} },
       { id: 'by', label: 'Due', type: 'day', index: true, deadline: true, remind: ['0d'] },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
