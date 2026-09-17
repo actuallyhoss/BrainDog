@@ -16,7 +16,7 @@
  * ITS OWN FILE, free of `cloudflare:`, so it is tested in Node. Nothing here logs.
  */
 
-import { idempotentCalls, sendAction, type Execute, type OpenKey } from '@braindog/host/actions';
+import { idempotentCalls, readPublic, sendAction, type Execute, type OpenKey, type PublicRead } from '@braindog/host/actions';
 import type { RecordApi } from '@braindog/record';
 
 import { isBound, keyStoreOf, type KekBinding } from './keys.ts';
@@ -87,4 +87,13 @@ export function keyOpener(api: Pick<RecordApi, 'kernel'>, bound: KekBinding | un
 export function actionExecutor(origins: () => readonly string[], options: { openKey: OpenKey | null; send?: Send | undefined }): Execute {
   const send: Send = options.send ?? ((input, init) => fetch(input, init));
   return idempotentCalls(sendAction({ origins, openKey: options.openKey, send: (input, init) => send(input, init) }));
+}
+
+/**
+ * What reads a shared use-case file from an address a person pasted (`fetchUseCase`): the shared `readPublic` with the
+ * platform's `fetch`. No `pin`, for the reason `sendAction` gives: a Worker's `fetch` is not routed to a private address.
+ */
+export function sharedReader(send?: Send): (address: string) => Promise<PublicRead> {
+  const via: Send = send ?? ((input, init) => fetch(input, init));
+  return readPublic({ send: (input, init) => via(input, init) });
 }

@@ -25,7 +25,7 @@ import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 
-import { idempotentCalls, refusedAddress, sendAction, type Execute, type OpenKey, type Pin, type Send as SendVia } from '@braindog/host/actions';
+import { idempotentCalls, readPublic, refusedAddress, sendAction, type Execute, type OpenKey, type Pin, type PublicRead, type Send as SendVia } from '@braindog/host/actions';
 import type { RecordApi } from '@braindog/record';
 
 import { unwrap, type KeyStore } from './keys.ts';
@@ -185,6 +185,15 @@ export function pinFor(resolve: Resolve): Pin<Pinned> {
     }
     return found[0]!;
   };
+}
+
+/**
+ * What reads a shared use-case file from an address a person pasted (`fetchUseCase`): the shared `readPublic`, with this
+ * host's name service and pinned socket, so a name that resolves to a private address is refused before anything is sent.
+ * `send` and `resolve` are for tests.
+ */
+export function sharedReader(options: { send?: Send | undefined; resolve?: Resolve | undefined } = {}): (address: string) => Promise<PublicRead> {
+  return readPublic<Pinned>({ send: options.send ?? pinnedSend, pin: pinFor(options.resolve ?? systemResolve) });
 }
 
 /* ── a retry that is not a second call ──────────────────────────────────── */

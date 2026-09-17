@@ -145,12 +145,14 @@ export const ROUTES: readonly Route[] = [
   { name: 'arrangement', group: 'READ+', writes: false, what: 'How this BrainDog is arranged and what may be proposed about it: packs, the catalogue, voice and pages; one page declaration; or a grammar.',
     takes: { page: 'text', grammar: 'text' } },
   { name: 'exportUseCase', group: 'READ+', writes: false, what: "This BrainDog's arrangement as a use-case file: modules, its own lists and pages, voice and labels, and only the example rows named.",
-    takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json' } },
+    takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json', step: 'text', nav: 'json', signals: 'json', skills: 'json' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
+  { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
+    takes: { url: 'text' } },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
@@ -369,6 +371,7 @@ export type RecordSurface = {
   packs(ctx: never): Promise<Result<unknown>>;
   planPack(args: never, ctx: never): Promise<Result<unknown>>;
   planUseCase(args: never, ctx: never): Promise<Result<unknown>>;
+  fetchUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   exportUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   installPack(args: never, ctx: never): Promise<Result<unknown>>;
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
@@ -447,6 +450,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     packs: (_a, ctx) => api.packs(ctx as never),
     planPack: (a, ctx) => api.planPack(a as never, ctx as never),
     planUseCase: (a, ctx) => api.planUseCase(a as never, ctx as never),
+    fetchUseCase: (a, ctx) => api.fetchUseCase(a as never, ctx as never),
     exportUseCase: (a, ctx) => api.exportUseCase(a as never, ctx as never),
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),

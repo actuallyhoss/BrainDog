@@ -569,8 +569,24 @@ export function createClient(options: ClientOptions) {
     /** What installing a shared use case would do, pack by pack, with the documents to install. A POST, as a file is long. */
     planUseCase: (args: { doc?: unknown; text?: string; source?: { kind: string; ref?: string }; modules?: Record<string, unknown> }) =>
       call<unknown>('planUseCase', args as Record<string, unknown>),
+    /** The text of a shared use-case file at an https address, read by the host, for `planUseCase` to read like a file. */
+    fetchUseCase: (args: { url: string }) => call<unknown>('fetchUseCase', args as Record<string, unknown>),
     /** This BrainDog's arrangement as a use-case file, with only the example rows named by list and number. */
-    exportUseCase: (args: { usecase?: string; title?: string; summary?: string; version?: string; audience?: string; author?: string; examples?: Record<string, number[]> } = {}) =>
+    exportUseCase: (
+      args: {
+        usecase?: string;
+        title?: string;
+        summary?: string;
+        version?: string;
+        audience?: string;
+        author?: string;
+        examples?: Record<string, number[]>;
+        step?: 'patch' | 'minor';
+        nav?: string[];
+        signals?: string[];
+        skills?: number[];
+      } = {},
+    ) =>
       call<unknown>('exportUseCase', args as Record<string, unknown>),
 
     /* THE ADMIN WRITES A SETTINGS SCREEN MAKES, SO A BROWSER SESSION FOR EACH. They were reachable through

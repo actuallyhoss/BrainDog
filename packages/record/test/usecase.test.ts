@@ -188,3 +188,73 @@ test('A FILE PAST THE SIZE, A CREDENTIAL AND A KIND NOTHING DRAWS ARE EACH REFUS
   assert.equal(api.kernel.packStates().length, 0);
   sql.close();
 });
+
+test('THE RAIL ORDER GOES OUT FOR THE PAGES AND LISTS THE FILE CARRIES, AND THE DECLARATIONS FOLLOW IT', async () => {
+  const { api, sql } = await recordA();
+  const out = value<Exported>(await api.exportUseCase({ nav: ['/p/reading', '/p/studies', '/r/people', '/r/courses', '/p/nowhere'] }, owner));
+  assert.deepEqual(out.doc.nav, ['/p/reading', '/p/studies', '/r/courses'], 'a module list and an unknown page are not this file to order');
+  const ordered = out.doc.pack.declarations.map((d) => String(d.register ?? d.page)).filter((id) => id !== 'home-study');
+  assert.deepEqual(ordered, ['reading', 'studies', 'courses']);
+  assert.equal(value<Exported>(await api.exportUseCase({}, owner)).doc.nav, undefined, 'no order given, none written');
+  assert.equal(refusal(await api.exportUseCase({ nav: 'courses' } as never, owner)).at, 'nav');
+  sql.close();
+});
+
+test('A SECOND SHARE COUNTS ON FROM THE VERSION LAST SHARED, BY A PATCH OR A MINOR', async () => {
+  const { api, sql } = await recordA();
+  assert.equal(value<Exported>(await api.exportUseCase({}, owner)).file, 'study-1.0.1.usecase.json');
+  value(await api.setPackConfig({ id: 'usecase-study', values: { shared_version: '1.0.4' } }, owner));
+  assert.equal(value<Exported>(await api.exportUseCase({}, owner)).file, 'study-1.0.5.usecase.json');
+  assert.equal(value<Exported>(await api.exportUseCase({ step: 'minor' }, owner)).file, 'study-1.1.0.usecase.json');
+  assert.equal(value<Exported>(await api.exportUseCase({ version: '3.0.0', step: 'minor' }, owner)).file, 'study-3.0.0.usecase.json', 'a version named wins');
+  assert.equal(refusal(await api.exportUseCase({ step: 'major' } as never, owner)).code, 'ENUM_VALUE_UNKNOWN');
+  sql.close();
+});
+
+test('SIGNALS AND SKILLS GO OUT WHEN TICKED, A SKILL AS ITS NAME AND TRIGGER ONLY, AND ONLY WHOLE-RECORD READERS SHARE THEM', async () => {
+  const { api, sql } = await recordA();
+  const SKILLS = {
+    pack: 'skills-lite',
+    version: '1.0.0',
+    summary: 'Skills.',
+    author: 'BrainDog',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [{ register: 'skills', name: 'Skills', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'trigger', type: 'text', required: true }, { id: 'body', type: 'text' }] }],
+  };
+  await install(api, SKILLS);
+  value(await api.create({ register: 'skills', fields: { name: 'study-planner', trigger: 'when an assignment is added', body: 'The private text of the skill.' } }, owner));
+  /* A ROW CANNOT HOLD A CREDENTIAL IN THE FIRST PLACE (the kernel refuses the write); the file's own check is `declare`'s test. */
+  assert.equal(refusal(await api.create({ register: 'skills', fields: { name: 'deploy', trigger: `run it with ${['sk', 'live', 'Q'.repeat(24)].join('_')}` } }, owner)).code, 'VALUE_MALFORMED');
+  const out = value<Exported>(await api.exportUseCase({ signals: ['homework', 'my courses'], skills: [1] }, owner));
+  assert.deepEqual(out.doc.signals, ['homework', 'my courses']);
+  assert.deepEqual(out.doc.skills, [{ name: 'study-planner', trigger: 'when an assignment is added' }]);
+  assert.ok(!JSON.stringify(out.doc).includes('private text'), "a skill's text went out");
+  assert.equal(refusal(await api.exportUseCase({ skills: [9] }, owner)).code, 'OUT_OF_BOUNDS');
+  assert.equal(refusal(await api.exportUseCase({ skills: [1] }, { principal: { kind: 'token', id: 't_2', scope: 'read', person: 'p_owner', level: 'read' }, registers: ['courses'] } as never)).code, 'FORBIDDEN');
+  sql.close();
+});
+
+test('AN ADDRESS IS READ BY THE HOST FOR AN OWNER, AND REFUSED WHERE THE HOST READS NONE OR THE ADDRESS IS PRIVATE', async () => {
+  const sql = openSqlite();
+  const asked: string[] = [];
+  const api = await createRecordApi({
+    sql,
+    clock: fixedClock(NOW),
+    readAddress: async (address) => {
+      asked.push(address);
+      return address.includes('10.0.0.1') ? { ok: false, fix: '10.0.0.1 is a private or local address, so nothing was read from it.' } : { ok: true, text: '{"usecase":"x"}', bytes: 15 };
+    },
+  });
+  assert.deepEqual(value(await api.fetchUseCase({ url: 'https://files.example.org/study.usecase.json' }, owner)), { url: 'https://files.example.org/study.usecase.json', text: '{"usecase":"x"}', bytes: 15 });
+  const privateOne = refusal(await api.fetchUseCase({ url: 'https://10.0.0.1/a.json' }, owner));
+  assert.equal(privateOne.code, 'PULL_ORIGIN_REFUSED');
+  assert.match(privateOne.fix, /private or local/u);
+  assert.equal(refusal(await api.fetchUseCase({ url: 'https://files.example.org/a.json' }, token)).code, 'NEEDS_BROWSER_SESSION');
+  assert.equal(refusal(await api.fetchUseCase({} as never, owner)).code, 'REQUIRED_MISSING');
+  assert.equal(asked.length, 2, 'a refused caller made the host fetch');
+
+  const bare = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });
+  assert.equal(refusal(await bare.fetchUseCase({ url: 'https://files.example.org/a.json' }, owner)).code, 'PULL_ORIGIN_REFUSED');
+  sql.close();
+});

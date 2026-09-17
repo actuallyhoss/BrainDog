@@ -411,3 +411,68 @@ export function idempotentCalls(execute: Execute): Execute {
     return answer;
   };
 }
+
+/* ── reading a shared file from an address ──────────────────────────────── */
+
+/** The most a shared file is read to, a little over what a shared use case may weigh, so `readShared`'s refusal is the one said. */
+export const PUBLIC_MOST_BYTES = 300 * 1024;
+/** How long reading a shared file may take, the body included. */
+export const PUBLIC_TIMEOUT_MS = 10_000;
+
+/** What reading an address answers: the text, or one sentence saying why nothing was read. */
+export type PublicRead = { ok: true; text: string; bytes: number } | { ok: false; fix: string };
+
+/**
+ * Reads one https address a person pasted to install a use case from, on the host, so a site that sends no CORS
+ * header can still be read (`loop/research-spark.md` S14).
+ *
+ * THE SAME FENCE AS A SCHEDULED ACTION, without the declared origin: https only; never a host written as a private or
+ * local address, and on the self-host never a name that resolves to one (`pin`); redirects three at most, each hop
+ * checked again, to any public host; ten seconds; 300 KB counted as it streams. NOTHING IS SENT WITH IT: no cookie, no
+ * key, no header of the record's. The text goes back to the caller, which reads it through `readShared` like a file.
+ */
+export function readPublic<P extends object | undefined = undefined>(options: { send: Send<P>; pin?: Pin<P> | undefined }): (address: string) => Promise<PublicRead> {
+  return async (address) => {
+    let url: URL;
+    try {
+      url = new URL(address.trim());
+    } catch {
+      return { ok: false, fix: 'That is not a web address. Paste the whole address, starting https://.' };
+    }
+    if (url.protocol !== 'https:') return { ok: false, fix: `${url.host || address} is not an https address, and a shared file is only read over https.` };
+    const signal = AbortSignal.timeout(PUBLIC_TIMEOUT_MS);
+    try {
+      for (let hop = 0; ; hop++) {
+        if (url.protocol !== 'https:') return { ok: false, fix: `The address redirected to ${url.host} without https, so it was not followed.` };
+        if (refusedHost(url) !== null) return { ok: false, fix: `${url.host} is a private or local address, so nothing was read from it.` };
+        const pinned = options.pin ? await within(options.pin(url, signal), signal) : (undefined as P);
+        if (typeof pinned === 'string') return { ok: false, fix: pinned };
+        const response = await options.send(url, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal }, pinned);
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get('location');
+          await response.body?.cancel().catch(() => undefined);
+          if (hop >= REDIRECT_HOPS || location === null) return { ok: false, fix: `${url.host} redirected more than ${REDIRECT_HOPS} times, so nothing was read.` };
+          try {
+            url = new URL(location, url);
+          } catch {
+            return { ok: false, fix: `${url.host} redirected to an address that is not one, so nothing was read.` };
+          }
+          continue;
+        }
+        if (response.status < 200 || response.status >= 300) {
+          await response.body?.cancel().catch(() => undefined);
+          return { ok: false, fix: `${url.host} answered ${response.status}, so there was no file to read.` };
+        }
+        const said = Number(response.headers.get('content-length') ?? '0');
+        const body = said > PUBLIC_MOST_BYTES ? null : await within(readCapped(response, PUBLIC_MOST_BYTES), signal);
+        if (body === null) {
+          await response.body?.cancel().catch(() => undefined);
+          return { ok: false, fix: `The file at ${url.host} is larger than a shared use case may be, so it was not read.` };
+        }
+        return { ok: true, text: new TextDecoder().decode(body), bytes: body.length };
+      }
+    } catch {
+      return { ok: false, fix: signal.aborted ? `${url.host} took longer than ten seconds, so nothing was read.` : `${url.host} could not be reached.` };
+    }
+  };
+}

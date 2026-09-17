@@ -30,7 +30,7 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 
 import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
 
-import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass } from './actions.ts';
+import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
@@ -192,6 +192,8 @@ export class Record$ extends DurableObject<Env> {
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. */
         delivers: DELIVERS,
+        /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
+        readAddress: sharedReader(),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         /* DELETION, `51 §5.13`. The record has checked the owner, the sign-in and the typed name; this is the alarm,

@@ -655,6 +655,12 @@ export type RecordDeps = {
    * pack proposal that carries its own document, and says so when one is asked for by name.
    */
   catalogue?: readonly CatalogueEntry[] | undefined;
+  /**
+   * Reads a shared use case from an https address a person pasted, on the host rather than in their tab, so a site that
+   * sends no CORS header can be read (`@braindog/host/actions` `readPublic`: https, no private address, a size cap and a
+   * timeout). Absent, `fetchUseCase` refuses and says to download the file and choose it instead.
+   */
+  readAddress?: ((address: string) => Promise<{ ok: true; text: string; bytes: number } | { ok: false; fix: string }>) | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -668,7 +674,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue'>) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress'>) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
@@ -1810,8 +1816,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['usecase', 'title', 'summary', 'version', 'audience', 'author', 'examples']);
+      const extra = stray(said, ['usecase', 'title', 'summary', 'version', 'audience', 'author', 'examples', 'step', 'nav', 'signals', 'skills']);
       if (extra) return { ok: false as const, refusal: extra };
+      if (said.step !== undefined && said.step !== 'patch' && said.step !== 'minor')
+        return no('ENUM_VALUE_UNKNOWN', 'step is patch or minor.', { at: 'step', allowed: ['patch', 'minor'] });
+      for (const key of ['nav', 'signals'])
+        if (said[key] !== undefined && (!Array.isArray(said[key]) || !(said[key] as unknown[]).every((x) => typeof x === 'string')))
+          return no('VALUE_MALFORMED', `${key} is a list of text.`, { at: key });
+      if (said.skills !== undefined && (!Array.isArray(said.skills) || !(said.skills as unknown[]).every((x) => Number.isInteger(x))))
+        return no('VALUE_MALFORMED', 'skills is a list of row numbers from Skills.', { at: 'skills' });
+      if (Array.isArray(said.skills) && said.skills.length > 0 && !wholeRecord(ctx))
+        return no('FORBIDDEN', 'Skills are shared by somebody who can read the whole BrainDog.', { at: 'skills' });
       for (const key of ['usecase', 'title', 'summary', 'version', 'audience', 'author'])
         if (said[key] !== undefined && (typeof said[key] !== 'string' || !(said[key] as string).trim()))
           return no('VALUE_MALFORMED', `${key} is a line of text.`, { at: key });
@@ -1826,6 +1841,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const read = kernel.list({ register, limit: 500 });
         return read.ok ? ok(read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : read;
       });
+    },
+
+    /**
+     * The text of a shared use-case file at an https address, read by the host (`RecordDeps.readAddress`). It writes
+     * nothing and plans nothing: the caller reads the text through `readShared` and `planUseCase`, as it would a file.
+     *
+     * ADMIN, AS `planUseCase` IS, because it makes this host fetch an address somebody typed, and only the owner who is
+     * about to install should be able to ask for that. A private or local address is refused as a scheduled action's is.
+     */
+    async fetchUseCase(args: { url: string } | undefined, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['url']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof said.url !== 'string' || said.url.trim() === '' || said.url.length > 2048)
+        return no('REQUIRED_MISSING', 'url is the https address of a .usecase.json file.', { at: 'url' });
+      if (!deps.readAddress)
+        return no('PULL_ORIGIN_REFUSED', 'This host does not read addresses. Download the file, then choose it as a file.', { at: 'url' });
+      const read = await deps.readAddress(said.url);
+      if (!read.ok) return no('PULL_ORIGIN_REFUSED', read.fix, { at: 'url' });
+      return ok({ url: said.url.trim(), text: read.text, bytes: read.bytes });
     },
 
     /**

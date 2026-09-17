@@ -21,7 +21,9 @@ import {
   exampleFields,
   exportUseCase,
   labelsOf,
+  laterVersion,
   nextVersion,
+  SHARED_VERSION,
   packIdOf,
   plan,
   readShared,
@@ -76,6 +78,17 @@ export type ExportArgs = {
   author?: string;
   /** Example rows to share, by list and row number. Nothing is shared that is not named here. */
   examples?: Record<string, number[]>;
+  /** The version step when no version is named: the patch or the minor after the later of the installed and last shared. */
+  step?: 'patch' | 'minor';
+  /**
+   * The rail as the person sees it, as addresses (`/p/<page>`, `/r/<list>`). Only those of the pages and lists this file
+   * carries go out, and the carried declarations are written in that order.
+   */
+  nav?: string[];
+  /** The words the arranger listens for, when the person ticked them. */
+  signals?: string[];
+  /** Rows of the skills list to share, by number, as a name and when to use it. Their text never goes out. */
+  skills?: number[];
 };
 
 /** One pack as `planUseCase` answers: the document to install and what installing it would do. */
@@ -110,14 +123,15 @@ export function useCases(d: UseCaseDeps) {
     const speaking = on.find((s) => s.id.startsWith(USE_CASE)) ?? null;
     const id = args.usecase ?? speaking?.id.slice(USE_CASE.length) ?? 'my-setup';
     if (!ID.test(id)) return refuse('VALUE_MALFORMED', `${id} is not a use case id: lower-case letters, digits and hyphens.`, 'usecase');
-    const version = args.version ?? nextVersion(speaking?.version);
+    const all = kernel.declarations();
+    const settings = speaking ? kernel.packConfig(speaking.id) : null;
+    const values = settings?.ok ? (settings.value.values as Body) : {};
+    const lastShared = typeof values[SHARED_VERSION] === 'string' ? (values[SHARED_VERSION] as string) : null;
+    const version = args.version ?? nextVersion(laterVersion(speaking?.version, lastShared), args.step ?? 'patch');
     if (!SEMVER.test(version)) return refuse('VALUE_MALFORMED', `${version} is not a version. Write 1.0.1.`, 'version');
     if (args.audience !== undefined && !(AUDIENCES as readonly string[]).includes(args.audience))
       return refuse('ENUM_VALUE_UNKNOWN', `${args.audience} is not an audience. It is one of ${AUDIENCES.join(', ')}.`, 'audience');
 
-    const all = kernel.declarations();
-    const settings = speaking ? kernel.packConfig(speaking.id) : null;
-    const values = settings?.ok ? (settings.value.values as Body) : {};
     const config = settings?.ok ? (settings.value.config as Record<string, { default?: unknown }>) : {};
     /* A HEADING THE VOICE FILLED goes out as its placeholder, from the value now or the default it was installed with. */
     const filled = new Map<string, string>();
@@ -128,12 +142,24 @@ export function useCases(d: UseCaseDeps) {
     const own = all.filter((r) => speaking !== null && r.pack_id === speaking.id);
     /* THE PAGES A PERSON PLACED belong to no pack; a page the seed owns by its body names its pack in it. */
     const placed = all.filter((r) => r.pack_id === null && r.kind === 'page' && !('pack' in (JSON.parse(r.body) as Body)));
-    const declarations = [...own, ...placed].map((r) => {
+    const unordered = [...own, ...placed].map((r) => {
       const body = asWritten(r.kind, JSON.parse(r.body) as Body);
       /* A USE CASE'S HOME IS THE PAGE NAMED FOR IT, so it is renamed with the use case. */
       if (speaking && r.kind === 'page' && body.page === `home-${speaking.id.slice(USE_CASE.length)}`) body.page = `home-${id}`;
       return (r.kind === 'page' ? unfilled(body, filled) : body) as Body;
     });
+
+    /* THE RAIL'S ORDER GOES OUT AS THE PERSON SEES IT, and the declarations follow it, since a record keeps no install
+       order of its own. An address that is not one of the carried pages or lists is left out rather than refused: the
+       rail also holds the modules' pages, which are not this file's to order. */
+    const addressOf = (b: Body): string | null => (typeof b.register === 'string' ? `/r/${b.register}` : typeof b.page === 'string' ? `/p/${b.page}` : null);
+    const carried = new Set(unordered.map(addressOf).filter((a): a is string => a !== null));
+    const nav = [...new Set((args.nav ?? []).filter((a) => carried.has(a)))];
+    const rank = new Map(nav.map((a, i) => [a, i]));
+    const slots = unordered.flatMap((b, i) => (rank.has(addressOf(b) ?? '') ? [i] : []));
+    const named = slots.map((i) => unordered[i] as Body).sort((a, b) => (rank.get(addressOf(a) ?? '') ?? 0) - (rank.get(addressOf(b) ?? '') ?? 0));
+    const declarations = [...unordered];
+    slots.forEach((slot, i) => (declarations[slot] = named[i] as Body));
 
     const registers = new Map(declarations.filter((b) => typeof b.register === 'string').map((b) => [String(b.register), b]));
     const examples: { register: string; fields: Body }[] = [];
@@ -154,6 +180,22 @@ export function useCases(d: UseCaseDeps) {
       }
     }
 
+    /* A SKILL GOES OUT AS ITS NAME AND WHEN TO REACH FOR IT, never its text: the text is the owner's and may name
+       anything. The file is read back through `readShared` below, so a trigger holding a credential is refused too. */
+    const skills: { name: string; trigger: string }[] = [];
+    if (args.skills !== undefined && args.skills.length > 0) {
+      const read = rows('skills');
+      if (!read.ok) return read as Result<Body>;
+      for (const seq of args.skills) {
+        const row = read.value.find((r) => r.seq === seq);
+        if (!row) return refuse('OUT_OF_BOUNDS', `Skills has no row ${seq}.`, 'skills');
+        const { name, trigger } = row.fields;
+        if (typeof name !== 'string' || typeof trigger !== 'string')
+          return refuse('VALUE_MALFORMED', `Skill ${seq} has no name or no line saying when to use it, so it cannot be shared.`, 'skills');
+        skills.push({ name, trigger });
+      }
+    }
+
     const modules = (MODULES as readonly string[]).filter((m) => on.some((s) => s.id === m));
     const title = args.title ?? id.charAt(0).toUpperCase() + id.slice(1).replaceAll('-', ' ');
     const built = exportUseCase({
@@ -170,6 +212,9 @@ export function useCases(d: UseCaseDeps) {
       labels: labelsOf(values),
       declarations,
       examples,
+      ...(args.signals === undefined ? {} : { signals: args.signals }),
+      ...(skills.length === 0 ? {} : { skills }),
+      ...(nav.length === 0 ? {} : { nav }),
     });
     if (!built.ok) return built;
     /* THE FILE IS READ BACK THROUGH THE DOOR IT WILL COME IN BY, so a picked row holding a credential is refused here,

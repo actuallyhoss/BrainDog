@@ -45,7 +45,7 @@ import { seedCatalogue } from './catalogue.ts';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { actionExecutor, holding, keyOpener, meterPass, type OpenKey, type Send } from './actions.ts';
+import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type Resolve, type Send } from './actions.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -461,6 +461,11 @@ export async function start(options: {
    * the key store above, and `./actions.ts` says what either may send.
    */
   actions?: { send?: Send | undefined; openKey?: OpenKey | undefined } | undefined;
+  /**
+   * How a shared use-case file is read from an address (`fetchUseCase`). The default is the pinned socket and the
+   * system's name service; a test passes a web of its own so nothing leaves the machine.
+   */
+  shared?: { send?: Send | undefined; resolve?: Resolve | undefined } | undefined;
 } & (
     | {
         /**
@@ -686,6 +691,8 @@ export async function start(options: {
     invitations: () => invitesOff,
     /* WHAT AN AGENT MAY PROPOSE INSTALLING: the first-party packs and the starter use cases (`catalogue.ts`). */
     catalogue: seedCatalogue(),
+    /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
+    readAddress: sharedReader(options.shared),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
