@@ -12,6 +12,7 @@ import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type Catalogue
 import {
   askForVersion,
   catalogueText,
+  catalogueTitles,
   changesSince,
   keepFirstKey,
   KNOWN_KEYS,
@@ -214,4 +215,34 @@ test('updates on offer for what a record holds, with what changed, and a proposa
   const missing = await updatesFor(async () => new Response('', { status: 404 }), index, held);
   assert.equal(missing.updates.length, 0);
   assert.equal(missing.refused.length, 1);
+});
+
+test('browse is named for both kinds it lists, and /packs names a catalogue entry by its title', async () => {
+  const { copy } = await import('../../../lib/copy.ts');
+  const { readFileSync } = await import('node:fs');
+  const at = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  assert.match(copy.browseTitle, /use cases/iu);
+  assert.match(copy.browseTitle, /add-ons/iu);
+  assert.match(copy.browseAll, /use cases/iu);
+  assert.match(copy.browseAll, /add-ons/iu);
+  assert.match(at('./+page.svelte'), /title=\{copy\.browseTitle\}/u);
+  assert.match(at('./[id]/+page.svelte'), /\{copy\.browseAll\}/u);
+  assert.doesNotMatch(at('./[id]/+page.svelte'), /copy\.useCase(s|All)\b/u);
+
+  const key = await newAuthorKey('Halden');
+  const { index } = await servedAddon(key);
+  const study = await served();
+  const titles = await catalogueTitles({ ...index, entries: [...index.entries, ...study.index.entries] });
+  assert.equal(titles.get('bookshelf'), 'Bookshelf');
+  assert.equal(titles.get('usecase-study'), 'Study');
+  assert.equal((await catalogueTitles(null)).size, 0);
+  assert.match(at('../+page.svelte'), /catalogueNames\.get\(id\)/u);
+});
+
+test('a use case on its catalogue page is asked for on Decide, as an add-on is, and never installed from the page', async () => {
+  const { readFileSync } = await import('node:fs');
+  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(detail, /InstallShared/u);
+  assert.doesNotMatch(detail, /entry\.kind === 'pack'\}/u);
+  assert.match(detail, /askForVersion\(/u);
 });

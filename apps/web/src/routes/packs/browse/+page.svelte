@@ -67,9 +67,9 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(copy.useCases)}</title></svelte:head>
+<svelte:head><title>{titleOf(copy.browseTitle)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.useCases} />
+<PageHead icon="packs" title={copy.browseTitle} />
 
 <div class="page">
   <p class="blurb">{copy.useCasesBlurb}</p>

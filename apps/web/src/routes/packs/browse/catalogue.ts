@@ -4,8 +4,7 @@
  *
  * NOTHING HERE INSTALLS. It reads the index, fetches a version's file and holds it to the checksum and signature the index
  * gives, says whether this record holds that entry at that version, and what changed from the version installed. Installing
- * is a proposal on Decide (or, for a use case on browse, the shared file's path in `InstallShared.svelte`): the record plans
- * it and the owner approves it.
+ * either kind is a proposal on Decide: the record plans it and the owner approves it.
  *
  * TRUST ON FIRST USE IS KEPT PER BROWSER: the key ids seen for each author, in `localStorage` under `KNOWN_KEYS`. A page
  * that cannot reach storage still draws; it only cannot say a key was seen before.
@@ -94,6 +93,16 @@ export async function changesSince(fetcher: Fetcher, entry: CatalogueEntry, from
   const { changesBetween, readCatalogueFile } = await import('@braindog/declare/catalogue');
   const [x, y] = await Promise.all([readCatalogueFile(a.text), readCatalogueFile(b.text)]);
   return x.ok && y.ok ? changesBetween(x.value, y.value) : null;
+}
+
+/**
+ * The title a person reads for each entry, by the pack id a record holds it under, so /packs names an installed catalogue
+ * add-on or use case as its catalogue does rather than by its id.
+ */
+export async function catalogueTitles(index: CatalogueIndex | null): Promise<Map<string, string>> {
+  if (!index) return new Map();
+  const { installedIdOf } = await import('@braindog/declare/catalogue');
+  return new Map(index.entries.map((e) => [installedIdOf(e), e.title]));
 }
 
 /* ── signatures and trust on first use ──────────────────────────────────── */

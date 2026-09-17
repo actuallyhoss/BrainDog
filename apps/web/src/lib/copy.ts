@@ -1006,6 +1006,9 @@ export const copy = {
   useCases: 'Use cases',
   useCasesBlurb: 'A use case arranges a BrainDog for one kind of work: its lists, its pages, its rail and its words.',
   browseUseCases: 'Browse use cases',
+  /* BROWSE LISTS BOTH: the built-in use cases, and the use cases and add-ons this BrainDog's catalogue serves. */
+  browseTitle: 'Use cases and add-ons',
+  browseAll: 'All use cases and add-ons',
   shareSetup: 'Share this setup',
   installFromFile: 'Install from a file',
   chooseFile: 'Choose a file',
@@ -1088,7 +1091,6 @@ export const copy = {
   useCaseVoice: 'How it speaks',
   useCaseVoiceHouse: 'In the house voice, unchanged.',
   useCaseSkills: 'Skills it suggests to your agents',
-  useCaseAll: 'All use cases',
   useCaseMissing: 'There is no use case with that name here.',
   /* A CATALOGUE THIS BRAINDOG SERVES (`routes/packs/browse/catalogue.ts`): said as what it is, never as the add-on index. */
   catalogueHeading: "From this BrainDog's catalogue",
@@ -1120,7 +1122,6 @@ export const copy = {
   catalogueBump: { major: 'Takes something away', minor: 'Adds something', patch: 'Changes details' } as Record<string, string>,
   catalogueFirst: 'First version',
   cataloguePublished: (day: string, sum: string) => `Published ${day} · checksum ${sum.slice(0, 12)}`,
-  catalogueReview: 'Review the plan',
   catalogueCurrent: (version: string) => `Version ${version} is installed.`,
   catalogueAhead: (at: string) => `This BrainDog holds ${at}, later than this catalogue's latest.`,
   catalogueOff: 'Installed and turned off. Turn it on from Add-ons.',

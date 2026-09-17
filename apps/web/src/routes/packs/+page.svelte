@@ -31,10 +31,13 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import InstallShared from './InstallShared.svelte';
   import CatalogueUpdates from './CatalogueUpdates.svelte';
+  import { catalogueTitles, readHostCatalogue } from './browse/catalogue.ts';
 
   /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
   const byId = new Map(PACKS.map((p) => [p.id, p]));
-  const nameOf = (id: string) => byId.get(id)?.name ?? id;
+  /* AN ADD-ON FROM THIS BRAINDOG'S CATALOGUE is not in `PACKS`, so its catalogue title names it, and its id only when neither knows it. */
+  let catalogueNames = $state.raw<Map<string, string>>(new Map());
+  const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? id;
 
   let states = $state<PackState[] | null>(null);
   let refused = $state<Refusal | null>(null);
@@ -146,6 +149,9 @@
    * away while `packs` is out, and `drew('ready')` is the claim for when it has come back.
    */
   onMount(() => {
+    void readHostCatalogue(fetch).then(async (got) => {
+      if (got.ok) catalogueNames = await catalogueTitles(got.index);
+    });
     void read(async () => {
       client = createClient({ base: location.origin });
       /* WHICH RECORD THIS IS IS THE SHELL'S ANSWER TO `boot`, not a second reading of this screen's

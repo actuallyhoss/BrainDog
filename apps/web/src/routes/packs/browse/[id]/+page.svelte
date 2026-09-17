@@ -79,16 +79,16 @@
   });
 </script>
 
-<svelte:head><title>{titleOf(u?.title ?? entry?.title ?? copy.useCases)}</title></svelte:head>
+<svelte:head><title>{titleOf(u?.title ?? entry?.title ?? copy.browseTitle)}</title></svelte:head>
 
-<PageHead icon="packs" title={u?.title ?? entry?.title ?? copy.useCases} />
+<PageHead icon="packs" title={u?.title ?? entry?.title ?? copy.browseTitle} />
 
 <div class="page">
-  <Button weight="bare" href="/packs/browse"><Icon name="back" size="s" />{copy.useCaseAll}</Button>
+  <Button weight="bare" href="/packs/browse"><Icon name="back" size="s" />{copy.browseAll}</Button>
 
   {#if !u && entry}
     {#if refused}<Empty kind="error" title={refused} />{/if}
-    <CatalogueDetail {entry} {client} {live} {states} onchanged={reread} />
+    <CatalogueDetail {entry} {client} {live} {states} />
   {:else if !u || !preview || !installs}
     {#if looked || u}<Empty kind="no-results" title={copy.useCaseMissing} />{/if}
   {:else}

@@ -11,9 +11,9 @@
   has seen that key for its author before, and loudly when it is a different key; the key is kept on first use, when the
   person asks for the version, and never written over.
 
-  A USE CASE INSTALLS THROUGH THE SHARED FILE'S PATH: the file is handed to `InstallShared`, where the record plans it and
-  the owner approves it. AN ADD-ON IS ASKED FOR ON DECIDE: the file is fetched and verified again, read, and filed as a
-  proposal the owner accepts there. The sample says what it would ask and files nothing.
+  EITHER KIND IS ASKED FOR ON DECIDE, as an update is: the file is fetched and verified again, read, and filed as a
+  proposal (a use case as its file, an add-on as its id and document) the owner accepts there, where the record's own plan
+  says what it adds and every line it calls out with. The sample says what it would ask and files nothing.
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
@@ -22,7 +22,6 @@
   import type { PackState } from '$lib/record/packs.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import InstallShared from '../../InstallShared.svelte';
   import { moduleTitle } from '../../sharing.ts';
   import { askForVersion, browserStore, catalogueText, changesSince, keepFirstKey, signedWords, standingOf, trustFor, trustWords, type Standing } from '../catalogue.ts';
 
@@ -31,8 +30,7 @@
     client,
     live,
     states,
-    onchanged,
-  }: { entry: CatalogueEntry; client: ReturnType<typeof createClient> | null; live: boolean; states: readonly PackState[]; onchanged: () => Promise<void> } = $props();
+  }: { entry: CatalogueEntry; client: ReturnType<typeof createClient> | null; live: boolean; states: readonly PackState[] } = $props();
 
   const latest = $derived(entry.versions[0]);
   const reach = $derived(latest?.reach);
@@ -41,15 +39,13 @@
 
   let standing = $state<Standing | null>(null);
   let changes = $state<Changes | null>(null);
-  let given = $state<{ text: string; ref: string } | null>(null);
   let refused = $state<{ fix: string; code: string | null } | null>(null);
   let busy = $state(false);
-  let opened = $state(0);
   /** The latest file checked when the page opens: `null` until then. */
   let checked = $state<{ ok: boolean } | null>(null);
   let trust = $state<Trust | null>(null);
   const said = $derived(trust ? trustWords(trust, entry.author) : null);
-  /** An add-on asked for: the proposal id, empty when the record named none. */
+  /** A version asked for: the proposal id, empty when the record named none. */
   let filed = $state<string | null>(null);
   let would = $state<string | null>(null);
 
@@ -102,26 +98,6 @@
     }
   }
 
-  async function review() {
-    if (!latest || busy) return;
-    busy = true;
-    refused = null;
-    try {
-      const got = await catalogueText(fetch, entry, latest);
-      if (got.ok) {
-        given = { text: got.text, ref: `${location.origin}/catalogue/` };
-        opened++;
-      } else refused = { fix: got.fix, code: got.code };
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function installed() {
-    given = null;
-    if (trust) await keepFirstKey(browserStore(), entry.author, trust);
-    await onchanged();
-  }
 </script>
 
 <section class="lead" aria-label={copy.useCaseFor}>
@@ -138,7 +114,7 @@
       <p class="said">{copy.catalogueAhead(standing.at)}</p>
     {:else if standing?.kind === 'off'}
       <p class="said">{copy.catalogueOff}</p>
-    {:else if standing && checked?.ok && entry.kind === 'pack'}
+    {:else if standing && checked?.ok}
       {#if filed !== null}
         <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}</p>
       {:else}
@@ -147,15 +123,8 @@
         </Button>
       {/if}
       {#if would}<p class="said" role="status">{would}</p>{/if}
-    {:else if standing && checked?.ok}
-      <Button weight="primary" disabled={busy} onclick={() => void review()}>
-        {standing.kind === 'update' ? copy.updateTo(entry.latest) : copy.catalogueReview}
-      </Button>
     {/if}
     {#if refused}<p class="said" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>{/if}
-    {#if given}
-      {#key opened}<InstallShared {client} {live} installed={states} given={given} oninstalled={() => void installed()} />{/key}
-    {/if}
   </div>
 </section>
 
