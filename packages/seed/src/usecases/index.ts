@@ -10,7 +10,7 @@
  * loaded only when `SPARK_ENDPOINT` is set. Tiers B and C file the same proposal this answers.
  */
 
-import { normaliseUseCase, packIdOf, useCasePack, voiceWhenAdding, type UseCase } from '@braindog/declare';
+import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';
 
 import { BUSINESS } from './business.ts';
 import { dated, dayOf } from './dates.ts';
@@ -33,7 +33,7 @@ function checked(doc: unknown): UseCase {
 /**
  * In the order a tie is broken: one person's own life first, then the most specific, and the business setup last. Personal
  * leads because a sentence that is as much about a person's budget as their coursework is a person's record with their
- * studies beside it (`alongside`), and the record speaks in the voice of the use-case pack whose id sorts first.
+ * studies beside it (`alongside`), and the record speaks in the voice of the use case proposed, which onboarding writes down.
  */
 export const USE_CASES: readonly UseCase[] = [checked(PERSONAL), checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
 
@@ -93,8 +93,8 @@ export function arrange(said: string, catalogue: readonly UseCase[] = USE_CASES)
  */
 export function alongside(arranged: Arrangement, proposed: UseCase | null): UseCase[] {
   if (!proposed || proposed.audience !== 'individual' || proposed.pack === null) return [];
-  /* A RECORD SPEAKS IN THE VOICE OF ITS FIRST USE-CASE PACK BY ID (`voice.ts` `speaking`), so only a use case whose id
-     sorts after the proposal's goes beside it: the voice the proposal promised is the one the record has. */
+  /* WHICHEVER WAY THE IDS SORT: onboarding writes the voice down (`declare` `voiceWrites`), so the use case proposed keeps
+     the voice it promised with Personal beside Student as much as with Student beside Personal. */
   const ids = (u: UseCase): Set<string> =>
     new Set(((u.pack?.declarations ?? []) as Record<string, unknown>[]).flatMap((d) => [d.register, d.page, d.metric].filter((x): x is string => typeof x === 'string')));
   const taken = ids(proposed);
@@ -102,7 +102,6 @@ export function alongside(arranged: Arrangement, proposed: UseCase | null): UseC
   for (const r of arranged.ranked) {
     const u = r.usecase;
     if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null) continue;
-    if (voiceWhenAdding([{ id: packIdOf(proposed.usecase), disabled_at: null }], u.usecase) !== 'beside') continue;
     const mine = ids(u);
     if ([...mine].some((id) => taken.has(id))) continue;
     for (const id of mine) taken.add(id);

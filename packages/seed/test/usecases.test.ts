@@ -222,7 +222,8 @@ test('STUDIES COME BESIDE A PERSONAL RECORD WHEN THE SENTENCE MENTIONS THEM, and
   const student = useCase('student')!;
   assert.deepEqual(alongside(a, personal).map((u) => u.usecase), ['student']);
   assert.equal(a.pick?.usecase, 'personal', 'as much about a budget as coursework is a person with studies beside');
-  assert.deepEqual(alongside(a, student), [], 'Personal would speak first, so it does not go beside Student');
+  /* WHICHEVER WAY THE IDS SORT: Personal sorts before Student and still goes beside it, because the voice is written down. */
+  assert.deepEqual(alongside(a, student).map((x) => x.usecase), ['personal'], 'a use case whose id sorts first was kept from going beside');
   assert.deepEqual(alongside(arrange('I want to get my money under control and keep track of my side projects and running'), personal), []);
   assert.deepEqual(alongside(arrange('a founder who is also a student'), useCase('founder')!), [], 'a founder is not an individual record');
   assert.deepEqual(alongside(a, null), []);
