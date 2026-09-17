@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { applyFilters, page, pages, readBlock, type Filter } from './api.ts';
 import { NOW, PAGES, REGISTERS, ROWS } from './data.ts';
-import { draw } from './blocks.ts';
+import { draw, toSegments } from './blocks.ts';
 import { fill, resolvePages, slugify } from './pages.ts';
 import { compile, matches, registerHref } from './where.ts';
 import type { PageDecl } from './schema.ts';
@@ -400,4 +400,14 @@ test('a `cells:` entry with no `label:` does not take EVERY page off the rail', 
     assert.ok(!cell.metric.includes('{{'), `${p.page}: the metric was not filled`);
     assert.equal(cell.label, cell.metric, `${p.page}: an unlabelled cell has no name to draw`);
   }
+});
+
+test('A LINK IN A LIST BLOCK READS AS THE ROW IT POINTS AT, as the table beside it does, never as a spoken id', () => {
+  /* A LIVE RECORD'S LINK names a row this tab holds no copy of, so only the evaluator's cell knows its title. */
+  const read = readBlock({ kind: 'steps', source: 'register.obligations', columns: [{ field: 'what' }, { field: 'party' }], limit: 1 } as never);
+  const entry = read.entries[0]!;
+  const block = { ...read, entries: [{ ...entry, fields: { ...entry.fields, party: 'people#999' } }], rows: [{ ...read.rows[0]!, cells: ['', 'Say what it is and who it is for'] }] };
+  const text = JSON.stringify(toSegments(block));
+  assert.doesNotMatch(text, /people#999/u);
+  assert.match(text, /Say what it is and who it is for/u);
 });

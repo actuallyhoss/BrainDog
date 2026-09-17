@@ -372,6 +372,9 @@ function projectRows(block: BlockResult, cells: number): string[] {
          `/r/sessions`, one click away, read `just now · 6 min ago · 3h ago` for the same three rows.
          A block and a register disagreeing about the same field is exactly the split one dispatch is
          for, and the fix is a deletion. */
+      /* A LINK READS AS THE ROW IT POINTS AT, as the evaluator named it and the table beside it shows it: a guide's
+         step drew `milestones#1` where the table drew the milestone's title. */
+      if (REGISTERS[block.register ?? '']?.fields.find((f) => f.id === field)?.type === 'ref' && row.cells[n]) return row.cells[n];
       return display(block.register ?? '', field, entry.fields[field]) ?? '';
     });
     /**
