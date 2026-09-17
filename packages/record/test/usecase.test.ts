@@ -160,13 +160,15 @@ test('RECORD B PLANS THE FILE, INSTALLS IT THROUGH installPack, AND HOLDS WHAT A
 
   /* VERSION TWO ADDS A PAGE. On B, only that page is new, and the module is already there. */
   value(await a.api.setDeclaration({ body: { page: 'terms', title: 'Terms', nav: { section: 'Studies', order: 30 }, requires: ['register.courses'], blocks: [{ kind: 'table', source: 'register.courses', span: 12, empty: 'No terms.' }] } }, owner));
-  const next = value<Exported>(await a.api.exportUseCase({ version: '1.0.2' }, owner));
+  const next = value<Exported>(await a.api.exportUseCase({ version: '1.0.2', examples: { courses: [1] } }, owner));
   const again = value<Planned>(await b.planUseCase({ doc: next.doc }, owner));
   assert.deepEqual(again.packs.map((p) => [p.id, p.direction, p.installed_version]), [['usecase-study', 'upgrade', '1.0.1']]);
   assert.deepEqual(again.packs[0]?.adds, ['page.terms']);
   assert.deepEqual(again.packs[0]?.changes, []);
   assert.deepEqual(again.packs[0]?.retires, []);
+  assert.equal(again.packs[0]?.examples, 0, 'an update writes no example into a list the record already holds');
   await install(b, again.packs[0]!.doc);
+  assert.equal(value<{ rows: unknown[] }>(await b.list({ register: 'courses' }, owner)).rows.length, 1);
   assert.equal(b.kernel.packStates().find((p) => p.id === 'usecase-study')?.version, '1.0.2');
   a.sql.close();
   sqlB.close();

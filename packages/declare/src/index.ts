@@ -865,7 +865,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     changes,
     retires,
     conflicts,
-    seeds: { count: pack.seeds.length, registers: seedRows(pack.seeds) },
+    seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
     approve: calls.flatMap((c) => (c.change === 'same' ? [] : c.key_line === null ? [c.line] : [c.line, c.key_line])),
@@ -886,6 +886,18 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
       jcs({ pack: pack.checksum, base, ...(config.length > 0 ? { config } : {}) } as unknown as Json),
     )}`,
   };
+}
+
+/**
+ * The example rows this install writes: those for a list it adds.
+ *
+ * AN UPDATE DID NOT ASK WHETHER THE LIST WAS ALREADY THERE, so every newer version of a pack wrote its examples again
+ * beside the ones the first install wrote, and a use case updated twice held three copies of each example. A list the
+ * record already holds has had its examples, and a person may have deleted them on purpose.
+ */
+function seedsFor(pack: Pack, adds: readonly { id: string }[]): Seed[] {
+  const added = new Set(adds.map((a) => a.id));
+  return pack.seeds.filter((s) => added.has(`register.${s.register}`));
 }
 
 /* ── settings, and the lists a pack points at ────────────────────────────── */
@@ -1423,7 +1435,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
       /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed the register would refuse is refused here
          rather than becoming a row nothing else in the product could have made. */
-      for (const seed of pack.seeds) {
+      for (const seed of seedsFor(pack, diff.adds)) {
         const made = host.seed(seed.register, seed.fields, seed.note);
         if (!made.ok) throw new Rolled(made);
       }
@@ -1443,7 +1455,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         pack: pack.manifest.pack,
         version: pack.manifest.version,
         declarations: pack.declarations.length,
-        seeds: pack.seeds.length,
+        seeds: seedsFor(pack, diff.adds).length,
         retired: diff.retires.length,
       });
     });
