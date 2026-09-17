@@ -114,8 +114,12 @@ const CASES = [
     /* `50 §4.7`: `text: 'sm' | 'base' | 'md'`, applied before first paint. `13 §7`: it "picks the
        body step" — so the chrome moves and the fixed steps around it do not. */
     values: [{ text: 'sm' }, { text: 'base' }, { text: 'md' }],
+    /* A CELL IN `#main`, AND NEVER THE RAIL. The probe used to take the first of `.line-title, .td,
+       .rail a[data-nav]` in document order, and the rail comes first: its rows are `--t-sm` on
+       purpose (DESIGN-SYSTEM 2, "rail"), a fixed step, so all three settings read 13px off a rail
+       link while the grid moved from 13 to 16. The grid cell is what the setting is for. */
     probe: () => {
-      const el = document.querySelector('.line-title, .td, .rail a[data-nav]');
+      const el = document.querySelector('#main .td') ?? document.querySelector('#main .line-title');
       return el ? getComputedStyle(el).fontSize : 'no element';
     },
   },
@@ -245,6 +249,11 @@ const CASES = [
     /* `undefined` is "not yet put away", which is what a first visit is, so the two values are
        "unset" and `true` rather than `true` and `false`. */
     values: [{}, { sampleSaid: true }],
+    /* ON THE SAMPLE, WHICH IS THE ONLY RECORD THE BAR IS FOR. `214f7b9` hid it on a live record,
+       correctly, and this gate reads a live one, so both values came back 0. The record is taken
+       away for this case: `readBoot` answers a record that cannot be reached with the sample, which
+       is what a static host with no record behind it opens. */
+    sample: true,
     probe: () => String(document.querySelectorAll('#main aside.sample').length),
   },
   {
@@ -393,6 +402,7 @@ for (const test of CASES) {
     await context.addCookies([
       { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
     ]);
+    if (test.sample) await context.route(/\/(?:api|auth)(?:\/|$)/, (route) => route.abort());
     const page = await context.newPage();
     await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
     const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
@@ -407,7 +417,7 @@ for (const test of CASES) {
        tokens the checks read, which is exactly the shape of the bug this gate is named after — a
        preference reaching the cookie and a constant reaching the page — and the run must go red. */
     if (process.env.BRAINDOG_GATE_SEED === 'prefs')
-      await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important}' });
+      await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
     await page.waitForTimeout(120);
     seen.set(JSON.stringify(value), await page.evaluate(test.probe));
     await context.close();

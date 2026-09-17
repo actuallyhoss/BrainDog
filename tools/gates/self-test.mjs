@@ -260,7 +260,7 @@ function seededIntent() {
 /**
  * The prefs gate's negative, and it cannot be a fixture tree either.
  *
- * `BRAINDOG_GATE_SEED=prefs` pins `--row-h` and `--t-ui` to constants — which is precisely what the
+ * `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants — which is precisely what the
  * build shipped for the life of the Text control — and the gate must notice that two settings come
  * back identical.
  */
