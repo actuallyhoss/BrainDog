@@ -26,6 +26,9 @@
     FORECAST_WHEN,
     against,
     baseKnobs,
+    forecastSpendIn,
+    knobsIn,
+    type GroupKnobs,
     forecastAverage,
     forecastDays,
     forecastModel,
@@ -39,18 +42,23 @@
     scenario,
     underNote,
   } from '../src/forecast.ts';
+  import { groupNamed, leaveGroup, type Group } from './forecast-group.svelte.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
   const model = $derived(forecastModel(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts))))));
 
-  let horizon = $state<number | null>(null);
-  let late = $state(0);
-  let spend = $state(0);
-  let leave = $state<string[]>([]);
+  /* A WALK ON ITS OWN HOLDS ITS KNOBS HERE; A WALK OF A GROUP (one a currency) READS THE GROUP'S, so one set of controls,
+     under the walk that names `knobs`, moves every walk of the declaration at once. Spending is held by currency. */
+  const own: GroupKnobs = $state({ horizon: null, late: 0, spend: {}, leave: [] });
+  let group = $state.raw<Group | null>(null);
+  /* THE GROUP'S NAME AND THIS WALK'S KEY AS WORDS, so a walk redrawn with new rows stays in the group it was in. */
+  const groupId = $derived(opts.scenario ? model?.group?.id : undefined);
+  const key = $derived(model?.group?.key ?? '');
+  const held = $derived(group ? group.knobs : own);
   let scrub = $state<number | null>(null);
 
-  const knobs = $derived(model ? { horizon: horizon ?? model.horizon, late, spend, leave } : null);
+  const knobs = $derived(model ? knobsIn(model, held, key) : null);
   const base = $derived(model ? scenario(model, baseKnobs(model)) : null);
   const shown = $derived(model && knobs ? scenario(model, knobs) : null);
   const moved = $derived(model && knobs ? knobsMoved(model, knobs) : false);
@@ -58,17 +66,42 @@
   const knobbed = $derived(Boolean(opts.scenario) && (model?.knobs.length ?? 0) > 0);
   const choices = $derived(model ? horizonChoices(model) : []);
   const heavy = $derived(model ? largest(model) : []);
+  /* THE CONTROLS OF A GROUP OFFER EVERY WALK'S LARGE MOVEMENTS, and spending in each walk's currency. */
+  const members = $derived(group ? Object.entries(group.members).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) : []);
+  const offered = $derived(
+    group ? [...new Map(members.flatMap(([, m]) => m.heavy).map((h) => [h.label, h] as const)).values()] : heavy,
+  );
+  const spends = $derived<[string, string][]>(group ? members.map(([k, m]) => [k, m.template]) : [['', model?.template ?? '']]);
   const soon = $derived(model && shown ? underNote(model, shown) : '');
   const readout = $derived(model && shown && plan && scrub !== null ? readoutAt(model, shown, plan, scrub) : null);
 
+  /* A WALK JOINS ITS GROUP FOR AS LONG AS IT IS DRAWN, and tells the controls how it writes money and what it could leave out. */
+  $effect(() => {
+    const id = groupId;
+    const me = key;
+    if (id === undefined) {
+      group = null;
+      return;
+    }
+    group = groupNamed(id);
+    return () => leaveGroup(id, me);
+  });
+  $effect(() => {
+    if (group && model) group.members[key] = { template: model.template, heavy };
+  });
+
   const reset = () => {
-    horizon = null;
-    late = 0;
-    spend = 0;
-    leave = [];
+    held.horizon = null;
+    held.late = 0;
+    held.spend = {};
+    held.leave = [];
   };
   const toggle = (label: string) => {
-    leave = leave.includes(label) ? leave.filter((l) => l !== label) : [...leave, label];
+    held.leave = held.leave.includes(label) ? held.leave.filter((l) => l !== label) : [...held.leave, label];
+  };
+  const spendOf = (k: string): number => held.spend[k] ?? 0;
+  const setSpend = (k: string, e: Event) => {
+    held.spend = { ...held.spend, [k]: Number((e.currentTarget as HTMLInputElement).value) };
   };
   const track = (e: PointerEvent) => {
     if (!knobbed) return;
@@ -133,7 +166,7 @@
             <span class="forecast-knob-name" aria-hidden="true">{FORECAST_HORIZON}</span>
             <div class="forecast-segs">
               {#each choices as [months, days]}
-                <button type="button" class="forecast-seg" aria-pressed={shown.horizon === days} onclick={() => (horizon = days)}>{forecastMonths(months)}</button>
+                <button type="button" class="forecast-seg" aria-pressed={shown.horizon === days} onclick={() => (held.horizon = days)}>{forecastMonths(months)}</button>
               {/each}
             </div>
           </div>
@@ -141,25 +174,27 @@
         {#if model.knobs.includes('late')}
           <label class="forecast-knob">
             <span class="forecast-knob-name">{model.lateName ?? FORECAST_LATE}</span>
-            <input class="forecast-range" type="range" min="0" max="60" step="5" bind:value={late} />
-            <span class="forecast-knob-value num">{forecastDays(late)}</span>
+            <input class="forecast-range" type="range" min="0" max="60" step="5" bind:value={held.late} />
+            <span class="forecast-knob-value num">{forecastDays(held.late)}</span>
             {#if model.late !== null}<span class="forecast-knob-note">{forecastAverage(model.late)}</span>{/if}
           </label>
         {/if}
         {#if model.knobs.includes('spend')}
-          <label class="forecast-knob">
-            <span class="forecast-knob-name">{FORECAST_SPEND}</span>
-            <input class="forecast-range" type="range" min="0" max="5000" step="100" bind:value={spend} />
-            <span class="forecast-knob-value num">{forecastPerMonth(figureLike(model.template, spend))}</span>
-            <span class="forecast-knob-note">{FORECAST_SPEND_NOTE}</span>
-          </label>
+          {#each spends as [k, template] (k)}
+            <label class="forecast-knob">
+              <span class="forecast-knob-name">{k ? forecastSpendIn(k) : FORECAST_SPEND}</span>
+              <input class="forecast-range" type="range" min="0" max="5000" step="100" value={spendOf(k)} oninput={(e) => setSpend(k, e)} />
+              <span class="forecast-knob-value num">{forecastPerMonth(figureLike(template, spendOf(k)))}</span>
+              <span class="forecast-knob-note">{FORECAST_SPEND_NOTE}</span>
+            </label>
+          {/each}
         {/if}
-        {#if model.knobs.includes('leave') && heavy.length}
+        {#if model.knobs.includes('leave') && offered.length}
           <div class="forecast-knob" role="group" aria-label={FORECAST_LEAVE}>
             <span class="forecast-knob-name" aria-hidden="true">{FORECAST_LEAVE}</span>
             <div class="forecast-chips">
-              {#each heavy as h}
-                <button type="button" class="forecast-chip" aria-pressed={leave.includes(h.label)} onclick={() => toggle(h.label)}
+              {#each offered as h}
+                <button type="button" class="forecast-chip" aria-pressed={held.leave.includes(h.label)} onclick={() => toggle(h.label)}
                   ><span class="forecast-chip-label">{h.label}</span><span class="forecast-chip-amount num">{h.amount}</span></button
                 >
               {/each}
@@ -170,9 +205,10 @@
           <button type="button" class="forecast-reset" onclick={reset}>{FORECAST_RESET}</button>
         {/if}
       </div>
-      {#if moved && base}
-        <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
-      {/if}
+    {/if}
+    <!-- WHAT THE KNOBS CHANGED, under every walk they move: the one with the controls, and each other walk of its group. -->
+    {#if (knobbed || group) && moved && base}
+      <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
     {/if}
     <details class="forecast-numbers">
       <summary class="forecast-toggle">{FORECAST_NUMBERS}</summary>

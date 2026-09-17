@@ -369,6 +369,8 @@ function walkOf(v: unknown): Walk | null {
     currency: typeof v.currency === 'string' ? v.currency : null,
     steps: v.steps,
     crossed: isStep(v.crossed) ? v.crossed : null,
+    /* A WALK OF SEVERAL, one a currency, carries its own remembered cash. */
+    ...(pastOf(v.past) ? { past: pastOf(v.past)! } : {}),
   };
 }
 

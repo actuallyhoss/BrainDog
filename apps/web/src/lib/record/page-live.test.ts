@@ -317,6 +317,28 @@ test('a label that is not text is left off rather than drawn, and the page still
 /* A CASH WALK, A FEED AND A DIFF ARE ANSWERED LIVE BY THE KERNEL, as `walk`, `feed` with `seen`, and
    `history`. This build drew each as "This block cannot be drawn from the record yet". They are now
    shaped into the rows the sample's own blocks carry, so the same renderers draw them. */
+test('A WALK THE RECORD SPLIT BY CURRENCY keeps each walk’s remembered cash, and draws one set of knobs', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const step = (day: string, delta: number, balance: number) => ({ day, label: 'Hosting', delta, balance, source: 'bills', spoken: 'bills#1' });
+  const block = blockOf(
+    {
+      kind: 'forecast', source: 'forecast.runway', heading: 'Cash ahead', horizon: 90, knobs: ['horizon', 'late'], rows: [], matched: 1, refusals: [],
+      walks: [
+        { from: 5000, currency: 'GBP', mixed: [], steps: [], crossed: null, days: null, horizon: 90, refusals: [], past: [{ at: '2026-09-14', value: 4800 }] },
+        { from: 0, currency: 'USD', mixed: [], steps: [step('2026-09-20', -300, -300)], crossed: null, days: null, horizon: 90, refusals: [], past: [] },
+      ],
+      walkFx: { home: null, missing: [] },
+    },
+    new Map(),
+    now,
+  );
+  assert.deepEqual(block.walks?.map((w) => w.past), [[{ at: '2026-09-14', value: 4800 }], []]);
+  const forecasts = toSegments(block).filter((s) => s.type === 'block' && s.kind === 'forecast') as { rows: { cells: string[] }[] }[];
+  const rows = forecasts.map((f) => f.rows.map((r) => r.cells[0]?.trim()));
+  assert.deepEqual(rows.map((r) => r.filter((c) => c === 'past').length), [1, 0]);
+  assert.deepEqual(rows.map((r) => r.includes('knobs')), [false, true]);
+});
+
 test('a cash walk, a feed and a diff the record answered are drawn from its answer', () => {
   const now = Date.UTC(2026, 8, 16, 12);
   const step = (day: string, delta: number, balance: number, spoken: string) => ({ day, label: `Movement ${spoken}`, delta, balance, source: spoken.split('#')[0], spoken });

@@ -197,6 +197,36 @@ test('A FORECAST DRAWS THE OPENING FIGURE AS IT WAS REMEMBERED, and only that fi
   assert.equal(k.block({ ...forecast, knobs: ['weather'] }).refusals[0]?.at, 'knobs');
 });
 
+test('A WALK DRAWN ONCE PER CURRENCY DRAWS EACH ITS REMEMBERED CASH, in the currency the point was written in', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([ACCOUNTS, BILLS, CASH]));
+  value(k.create('accounts', { name: 'Current', balance: { amount: 300_000, currency: 'GBP' } }, OWNER));
+  value(k.create('accounts', { name: 'Mercury', balance: { amount: 90_000, currency: 'USD' } }, OWNER));
+  const put = (at: string, v: number, unit: string) =>
+    sql.exec(
+      "INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES ('cash-now', 'day', ?, ?, ?, 1, 'register.accounts', ?)",
+      at,
+      v,
+      unit,
+      '2026-09-03T00:05:00Z',
+    );
+  put('2026-08-31', 280_000, 'GBP');
+  put('2026-09-01', 70_000, 'EGP');
+  put('2026-09-02', 300_000, 'GBP');
+  const out = k.block({ ...walk({ metric: 'cash-now' }), kind: 'forecast', recorded: 'cash-now', knobs: ['horizon'] });
+  assert.deepEqual(out.refusals, []);
+  assert.equal(out.past, undefined, 'the block has no one line; each walk has its own');
+  assert.deepEqual(
+    out.walks?.map((w) => ({ currency: w.currency, past: w.past })),
+    [
+      { currency: 'GBP', past: [{ at: '2026-08-31', value: 280_000 }, { at: '2026-09-02', value: 300_000 }] },
+      { currency: 'USD', past: [] },
+    ],
+  );
+  assert.equal(k.block({ ...walk({ metric: 'cash-now' }), kind: 'forecast', recorded: 'overdue' }).refusals[0]?.at, 'recorded', 'a split walk checks recorded: too');
+});
+
 test('THE LATE KNOB MARKS A FIGURE, and how near a crossing is said is a number of days', async () => {
   const k = await record();
   value(

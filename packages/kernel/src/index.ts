@@ -2503,8 +2503,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return ok({ readings, latest });
     },
     points: (series, from, to) =>
-      sql.all<{ at: string; value: number }>(
-        "SELECT at, value FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
+      sql.all<{ at: string; value: number; unit: string | null }>(
+        "SELECT at, value, unit FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",
         series,
         from,
         to,

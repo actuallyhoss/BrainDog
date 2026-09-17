@@ -191,7 +191,7 @@ export type BlockResult = PageBlock & {
    * A cash walk over money in several currencies that could not be converted: one walk a currency, each starting from
    * that currency's part of the opening, in code order, and why it is not one walk (`home`, and each `missing` pair).
    */
-  walks?: Runway[];
+  walks?: (Runway & { past?: { at: string; value: number }[] })[];
   walkFx?: { home: string | null; missing: string[] };
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
@@ -307,7 +307,8 @@ export type PageDeps = {
     since: string;
   }) => Result<{ readings: RawReading[]; latest: RawReading[] }>;
   /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
-  points?: (series: string, from: string, to: string) => { at: string; value: number }[];
+  /** `unit` is the currency or unit the point was written in, `''` or absent for none. */
+  points?: (series: string, from: string, to: string) => { at: string; value: number; unit?: string | null }[];
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
@@ -629,12 +630,16 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
               return one ? [one] : [];
             });
         if (walks.length > 0) {
+          const recorded = recordedOf(deps, block);
+          if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
           const late = latenessOf(deps, block);
           if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
           const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();
           return {
             ...base,
-            walks,
+            /* EACH WALK'S REMEMBERED CASH IS THE FIGURE AS IT WAS WRITTEN DOWN IN THAT WALK'S CURRENCY, so a walk in pounds
+               draws the days its opening figure was pounds, and no walk joins a line in another currency at today. */
+            walks: walks.map((w) => (recorded.past ? { ...w, past: pastIn(recorded.past, w.currency) } : w)),
             walkFx: { home, missing },
             ...late,
             matched: walks.reduce((n, w) => n + w.steps.length, 0),
@@ -675,7 +680,14 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
     const late = latenessOf(deps, block);
     if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
-    return { ...base, walk, ...recorded, ...late, matched: walk.steps.length, refusals: also(...walk.refusals) };
+    return {
+      ...base,
+      walk,
+      ...(recorded.past ? { past: pastIn(recorded.past, walk.currency) } : {}),
+      ...late,
+      matched: walk.steps.length,
+      refusals: also(...walk.refusals),
+    };
   }
   /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
@@ -903,7 +915,11 @@ const RECORDED_DAYS = 90;
  * opening is a reading of one figure, and what came before has to be that figure remembered, which is
  * why a series other than the opening's is refused rather than drawn.
  */
-function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; value: number }[] } | { refusal: Refusal } {
+/** Remembered points in one currency, as a walk draws them: a point written in another currency is not this walk's. */
+const pastIn = (points: readonly { at: string; value: number; unit?: string | null }[], currency: string | null): { at: string; value: number }[] =>
+  points.filter((p) => !currency || !p.unit || p.unit === currency).map((p) => ({ at: p.at, value: p.value }));
+
+function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; value: number; unit?: string | null }[] } | { refusal: Refusal } {
   if (block.knobs !== undefined && (!Array.isArray(block.knobs) || block.knobs.some((k) => !(KNOBS as readonly unknown[]).includes(k))))
     return { refusal: { code: 'DECLARATION_INVALID', fix: `knobs is a list of ${KNOBS.join(', ')}.`, at: 'knobs', allowed: [...KNOBS] } };
   if (block.recorded === undefined) return {};

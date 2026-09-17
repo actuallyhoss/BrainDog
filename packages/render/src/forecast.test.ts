@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { against, baseKnobs, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsMoved, largest, readoutAt, scenario, underNote, type ForecastModel } from './forecast.ts';
+import { against, baseKnobs, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, readoutAt, scenario, underNote, type ForecastModel } from './forecast.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -128,4 +128,18 @@ test('the late mark and the under note come from their rows, and the note waits 
   assert.equal(forecastAverage(-3), 'on average so far: on time');
   const src = ['```forecast', ...[...ROWS, ['under', '40', '', '']].map((r) => r.join(' | ')), '```'].join('\n');
   assert.match(toHTML(parse(src, { page: true })), /class="forecast-soon">Cash goes under in 33 days</u);
+});
+
+test('WALKS OF ONE GROUP READ ONE SET OF KNOBS: the horizon, lateness and what is left out shared, spending each its own', () => {
+  assert.equal(model().group, null, 'a walk on its own is in no group');
+  const egp = forecastModel([...ROWS.filter((r) => r[0] !== 'knobs'), ['group', 'cash-ahead', 'EGP', '']])!;
+  const usd = forecastModel([...ROWS, ['group', 'cash-ahead', 'USD', '']])!;
+  assert.deepEqual(egp.group, { id: 'cash-ahead', key: 'EGP' });
+  assert.deepEqual(egp.knobs, [], 'only the walk that draws the knobs names them');
+  assert.deepEqual(usd.knobs, ['horizon', 'late', 'spend', 'leave']);
+  assert.equal(forecastModel([...ROWS, ['group', '', 'USD', '']])!.group, null, 'a group with no id is none');
+  const held = { horizon: 30, late: 10, spend: { USD: 500 }, leave: ['Tax'] };
+  assert.deepEqual(knobsIn(egp, held, 'EGP'), { horizon: 30, late: 10, spend: 0, leave: ['Tax'] });
+  assert.deepEqual(knobsIn(usd, held, 'USD'), { horizon: 30, late: 10, spend: 500, leave: ['Tax'] });
+  assert.equal(knobsIn(usd, { ...held, horizon: null }, 'USD').horizon, 60, 'no horizon chosen is the walk’s own');
 });

@@ -1603,6 +1603,8 @@ export type BlockResult = PageBlock & {
   /** A walk over several currencies that could not be converted: one walk a currency, and why it is not one. */
   walks?: Walk[] | undefined;
   walkNote?: string | null;
+  /** One walk of a walk drawn once per currency: the group its knobs are shared in, and its key there. */
+  walkGroup?: { id: string; key: string } | undefined;
   /** A `series` block's buckets and each line's value in them, as the record's `barsOf` lines them up. */
   bars?: Bars;
   /** A `stat` or `lines` over readings: one series a measure, as the record's `measureSeries` works them out. */
@@ -1658,7 +1660,7 @@ function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks
   if (lacking.length) {
     const main = runway(opened.value!, legs, b.horizon, { except: lacking });
     const walks = [{ ...main, currency: main.currency ?? home }, ...lacking.map((c) => runway(0, legs, b.horizon, c))];
-    return { walks, note: walksNote(home, whole!.missing!, walks.length) };
+    return { walks: remembered(b, walks), note: walksNote(home, whole!.missing!, walks.length) };
   }
   const apart =
     opened.parts !== undefined ||
@@ -1672,7 +1674,13 @@ function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks
   const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c));
   if (walks.length === 0) return null;
   const missing = [...new Set([...(opened.missing ?? []), ...(moving.missing ?? [])])].sort();
-  return { walks, note: walksNote(home, missing, walks.length) };
+  return { walks: remembered(b, walks), note: walksNote(home, missing, walks.length) };
+}
+
+/** Each walk of a split walk with the opening figure remembered in its currency, when the block names the series. */
+function remembered<W extends ReturnType<typeof runway>>(b: PageBlock, walks: W[]): (W & { past?: { at: string; value: number }[] })[] {
+  const points = recordedOf(b);
+  return typeof points === 'string' || points === null ? walks : walks.map((w) => ({ ...w, past: pastIn(b, points, w.currency) }));
 }
 
 /**
@@ -1703,12 +1711,13 @@ function runwayBlock(b: PageBlock): BlockResult {
   const split = splitWalks(opened, b);
   if (split) {
     const late = latenessOf(b);
+    const recorded = recordedOf(b);
     return {
       ...b,
       register: undefined,
       entries: [],
       matched: [],
-      refusals: [...(typeof late === 'string' ? [late] : []), ...split.walks.flatMap((w) => w.refusals)],
+      refusals: [...(typeof recorded === 'string' ? [recorded] : []), ...(typeof late === 'string' ? [late] : []), ...split.walks.flatMap((w) => w.refusals)],
       walks: split.walks,
       walkNote: split.note,
       ...(typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
@@ -1747,7 +1756,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     matched: [],
     refusals,
     ...(refusals.length ? {} : { walk }),
-    ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: recorded }),
+    ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: pastIn(b, recorded, walk.currency) }),
     ...(refusals.length || typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
     /* A BRIDGE ADDS UP THE WHOLE WALK, and a forecast draws it, so each shows every movement it read rather than a slice of them. */
     ...walkTable(walk, b.kind === 'bridge' || b.kind === 'forecast' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
@@ -1816,6 +1825,16 @@ const KNOBS = ['horizon', 'late', 'spend', 'leave'];
  *
  * The series is the opening figure's own, over the ninety days before today, a day with no point absent.
  */
+/**
+ * Remembered points in one currency, as the record's `pastIn` draws them. The sample's points carry no unit, so each is in
+ * the currency its figure's format names.
+ */
+function pastIn(b: PageBlock, points: readonly { at: string; value: number }[], currency: string | null): { at: string; value: number }[] {
+  const id = typeof b.recorded === 'string' ? b.recorded.replace(/^series\./u, '') : '';
+  const unit = currencyOfFormat(METRICS[id]?.format);
+  return !currency || !unit || unit === currency ? [...points] : [];
+}
+
 function recordedOf(b: PageBlock): readonly { at: string; value: number }[] | string | null {
   if (b.knobs !== undefined && (!Array.isArray(b.knobs) || b.knobs.some((k) => !KNOBS.includes(k)))) return `knobs is a list of ${KNOBS.join(', ')}.`;
   if (b.recorded === undefined) return null;
@@ -1847,7 +1866,14 @@ function latenessOf(b: PageBlock): number | null | string | undefined {
 export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string };
 
 /** A cash walk, with only the keys the table reads. The record's `crossed` arrives as a copy of a step, not the step. */
-export type Walk = { from: number; currency: string | null; steps: readonly WalkStep[]; crossed: WalkStep | null };
+export type Walk = {
+  from: number;
+  currency: string | null;
+  steps: readonly WalkStep[];
+  crossed: WalkStep | null;
+  /** On a walk drawn once per currency: the opening figure remembered in this walk's currency, oldest first. */
+  past?: readonly { at: string; value: number }[] | undefined;
+};
 
 /** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */
 function stepHref(s: WalkStep): string | undefined {

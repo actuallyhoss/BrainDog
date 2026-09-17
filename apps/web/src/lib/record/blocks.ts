@@ -276,6 +276,8 @@ function forecastRows(block: BlockResult): string[] {
     ...walk.steps.map((s) => `step | ${s.day} | ${escapeCell(s.label)} | ${said(s.delta)}`),
     `horizon | ${block.horizon ?? 180} |  | `,
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
+    /* ONE WALK OF SEVERAL, which moves with the others under the knobs the last of them draws. */
+    ...(block.walkGroup ? [`group | ${escapeCell(block.walkGroup.id)} | ${escapeCell(block.walkGroup.key)} | `] : []),
     /* HOW LATE MONEY HAS COME IN, in whole days, which the late knob marks; and how near a crossing is said. */
     /* AND WHAT THE KNOB IS CALLED, the figure's name as the record holds it, so a person's record says it in their words. */
     ...(typeof block.lateness === 'number' && Number.isFinite(block.lateness)
@@ -620,10 +622,20 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
   if (block.walks && block.walks.length > 0) {
     const today = block.stale_at.slice(0, 10);
     const whole = block.kind === 'forecast' || block.kind === 'bridge';
+    /* EACH WALK DRAWS ITS OWN REMEMBERED CASH, AND ONE SET OF KNOBS MOVES THEM ALL, under the last walk (`group`). */
+    const walks = block.walks;
+    const id = `${block.heading ?? block.source ?? 'walk'}:${walks.map((w) => w.currency ?? '').join(',')}`;
     return {
-      charts: block.walks.map((walk) => ({
+      charts: walks.map((walk, i) => ({
         currency: walk.currency,
-        block: { ...block, walk, walks: undefined, ...walkTable(walk, whole ? walk.steps.length : block.limit, today, false) },
+        block: {
+          ...block,
+          walk,
+          walks: undefined,
+          ...(walk.past ? { past: walk.past } : {}),
+          ...(walks.length > 1 ? { walkGroup: { id, key: walk.currency ?? String(i) }, ...(i === walks.length - 1 ? {} : { knobs: [] }) } : {}),
+          ...walkTable(walk, whole ? walk.steps.length : block.limit, today, false),
+        },
       })),
       converted: null,
       note: block.walkNote ?? null,

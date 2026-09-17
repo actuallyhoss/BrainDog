@@ -43,7 +43,23 @@ export type ForecastModel = {
   lateName: string | null;
   /** How near a crossing is said under the chart, in days, or `null` when it is never said. */
   under: number | null;
+  /**
+   * One walk of several drawn from one declaration, one a currency (`group | id | key`), or `null` for a walk on its own.
+   * The walks of a group move together under one set of knobs, which the walk that names `knobs` draws.
+   */
+  group: { id: string; key: string } | null;
 };
+
+/** What a group of walks holds between them: the knobs every walk reads, and spending by each walk's key. */
+export type GroupKnobs = { horizon: number | null; late: number; spend: Record<string, number>; leave: string[] };
+
+/** One walk's knobs, read from what its group holds. */
+export const knobsIn = (model: ForecastModel, held: GroupKnobs, key: string): Knobs => ({
+  horizon: held.horizon ?? model.horizon,
+  late: held.late,
+  spend: held.spend[key] ?? 0,
+  leave: held.leave,
+});
 
 export type Knobs = { horizon: number; late: number; spend: number; leave: readonly string[] };
 
@@ -101,7 +117,15 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
     lateName: rows.find((r) => r[0]?.trim() === 'late')?.[2]?.trim() || null,
     under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
+    group: groupOf(rows.find((r) => r[0]?.trim() === 'group')),
   };
+}
+
+/** A `group` row's id and this walk's key in it, or `null` when either is blank. */
+function groupOf(row: readonly string[] | undefined): ForecastModel['group'] {
+  const id = row?.[1]?.trim() ?? '';
+  const key = row?.[2]?.trim() ?? '';
+  return id && key ? { id, key } : null;
 }
 
 /** The knobs untouched: the walk as the host made it. */
@@ -332,6 +356,8 @@ export const forecastNow = (day: string): string => `Now goes under on ${day}`;
 export const forecastMonths = (n: number): string => `${n} months`;
 export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
+/** Spending the record does not know in one currency of a walk drawn once per currency. */
+export const forecastSpendIn = (key: string): string => `${FORECAST_SPEND}, in ${key}`;
 export const forecastRecorded = (day: string, figure: string): string => `recorded from ${day}, when it was ${figure}`;
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);

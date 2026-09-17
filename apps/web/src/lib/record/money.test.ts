@@ -338,3 +338,23 @@ test('A TABLE OVER A CASH WALK IN TWO CURRENCIES IS ONE TABLE A CURRENCY, not th
     assert.equal(walkTables(forecast), null, 'a forecast is drawn through the dialect');
   });
 });
+
+test('A WALK SPLIT BY CURRENCY DRAWS EACH ITS REMEMBERED CASH, AND ONE SET OF KNOBS under the last walk moves them all', () => {
+  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
+  withEuro('accounts', 'balance', liquid, () => {
+    const block = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
+    assert.ok(block, 'the Cash ahead forecast is gone; this test is about it');
+    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
+    assert.deepEqual(block.walks?.[0]?.past, [], 'the remembered cash is sterling, so the euro walk has none');
+    assert.ok((block.walks?.[1]?.past?.length ?? 0) > 0, 'the sterling walk draws the cash remembered in sterling');
+    const forecasts = toSegments(block).filter((s) => s.type === 'block' && s.kind === 'forecast') as { rows: { cells: string[] }[] }[];
+    assert.equal(forecasts.length, 2);
+    const kinds = forecasts.map((f) => f.rows.map((r) => r.cells[0]?.trim()));
+    assert.deepEqual(kinds.map((k) => k.includes('knobs')), [false, true], 'the knobs are drawn once, under the last walk');
+    assert.deepEqual(kinds.map((k) => k.includes('group')), [true, true], 'and both walks read them');
+    assert.deepEqual(kinds.map((k) => k.includes('past')), [false, true]);
+    const groups = forecasts.map((f) => f.rows.find((r) => r.cells[0]?.trim() === 'group')!.cells.slice(1, 3).map((c) => c.trim()));
+    assert.equal(groups[0]![0], groups[1]![0], 'one group');
+    assert.deepEqual(groups.map((g) => g[1]), ['EUR', 'GBP']);
+  });
+});
