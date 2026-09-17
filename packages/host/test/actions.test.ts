@@ -244,13 +244,24 @@ test('EVERY PRIVATE, LOCAL AND SPECIAL RANGE IS REFUSED, in both families and in
     ['::ffff:a9fe:a9fe', 'link-local'],
     ['::127.0.0.1', 'loopback'],
     ['64:ff9b::a9fe:a9fe', 'link-local'],
+    /* READ THROUGH THE FORMS THAT CARRY AN IPv4 ADDRESS ELSEWHERE, and the IPv4 blocks nothing public is at. A shared file's
+       address of https://[2002:7f00:1::]/ was read. */
+    ['2002:7f00:1::', 'loopback'],
+    ['2002:a00:1::1', 'private'],
+    ['::ffff:0:7f00:1', 'loopback'],
+    ['::ffff:0:a00:1', 'private'],
+    ['64:ff9b:1::a00:1', 'private'],
+    ['100::1', 'reserved'],
+    ['198.18.0.1', 'reserved'],
+    ['198.19.255.255', 'reserved'],
+    ['192.0.0.1', 'reserved'],
     ['not an address', 'unreadable'],
     ['01.2.3.4', 'unreadable'],
     ['1:2:3:4:5:6:7:8:9', 'unreadable'],
   ];
   for (const [address, why] of refused) assert.equal(refusedAddress(address), why, address);
 
-  for (const address of ['203.0.113.10', '8.8.8.8', '172.32.0.1', '172.15.255.255', '100.128.0.1', '100.63.255.255', '192.169.0.1', '169.253.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', 'fec0::1'])
+  for (const address of ['203.0.113.10', '8.8.8.8', '172.32.0.1', '172.15.255.255', '100.128.0.1', '100.63.255.255', '192.169.0.1', '169.253.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', 'fec0::1', '2002:808:808::1', '198.20.0.1', '198.17.255.255', '192.0.1.1'])
     assert.equal(refusedAddress(address), null, address);
 });
 
