@@ -20,6 +20,7 @@ import { STUDENT } from './student.ts';
 import { TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
+export { pollPack, type PolledMeasure, type PollSpec } from './founder-poll.ts';
 export { VOICE_KEYS, labelsOf, voiceOf } from '@braindog/declare';
 
 function checked(doc: unknown): UseCase {
