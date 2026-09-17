@@ -241,3 +241,22 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
   assert.ok(Object.keys(METRICS).length >= 9);
   sql.close();
 });
+
+test('COST PER YEAR READS ON A REAL RECORD, from the declaration the seed installed and nothing the host hands in', async () => {
+  /* The September 16th QA pass saw every real record answer LOOKUP_UNKNOWN for estate-year: the
+     tests read the seed's bodies, and a record reads the row it installed. So this reads the row. */
+  const { k, sql } = await seeded();
+  const multiplied = Object.keys(METRICS).filter((m) => {
+    const body = JSON.stringify(METRICS[m]);
+    return body.includes('"lookup"') && !body.includes('{{it}}');
+  });
+  assert.ok(multiplied.includes('estate-year'), 'Cost per year no longer multiplies by a table');
+  for (const id of multiplied) {
+    const decl = k.metricDecl(id);
+    assert.ok(decl, `${id} was not installed`);
+    const read = k.metric(decl);
+    assert.ok(read.ok, `${id}: ${sayOf(read)}`);
+    assert.equal(typeof (read.value as Reading).value, 'number', `${id} read no number`);
+  }
+  sql.close();
+});
