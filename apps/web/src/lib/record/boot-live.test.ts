@@ -187,6 +187,7 @@ test('THE REASON A QUESTION WAS ACCEPTED FOR IS PART OF ITS DECISION LINE, never
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
   assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');
+  assert.equal(at({ actor: 'p_1', target: 'person:p_1', target_kind: 'person', field: '*', to: 'owner' }), 'Started this record as its owner', 'the owner made the record, nobody was let in');
   assert.equal(at({ target_kind: 'member', field: 'obligations', to: 'read' }), 'Gave someone read access on Money');
   assert.equal(at({ kind: 'access.revoke', target_kind: 'member', field: '*', from: 'write', to: null }), "Took away someone's write access to this record");
   assert.equal(at({ target_kind: 'token', to: 'propose', note: 'Claude on the laptop' }), 'Made a key that can read and propose: Claude on the laptop');
