@@ -426,9 +426,13 @@ export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Re
  */
 export async function readUsage(io: Fetch, now: number, base = '', sampleNow: number = now): Promise<UsageRead> {
   const range = monthRange(now);
-  const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
-  if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month, range.to) };
-  if (!ledger.notFound && !SAMPLE_WHEN.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
+  /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
+     the browser logs that as an error; `/auth/methods` says so without one. A host that cannot say is asked as before. */
+  if (!(await nobodySignedIn(io, base))) {
+    const ledger = await send<AccountUsage>(io, `${base}/account/usage?from=${range.from}&to=${range.to}`);
+    if (ledger.ok) return { ok: true, view: usageFromLedger(ledger.value, range.month, range.to) };
+    if (!ledger.notFound && !SAMPLE_WHEN.has(ledger.refusal.code)) return { ok: false, refusal: ledger.refusal };
+  }
 
   const events = await live(io, base).actions();
   if (events.ok) return { ok: true, view: usageFromActions(events.value, range.month, 'events', range.to) };
@@ -436,6 +440,12 @@ export async function readUsage(io: Fetch, now: number, base = '', sampleNow: nu
   if (!SAMPLE_WHEN.has(events.refusal.code)) return { ok: false, refusal: events.refusal };
   const sample = monthRange(sampleNow);
   return { ok: true, view: usageFromActions(ACTION_SAMPLE(), sample.month, 'sample', sample.to) };
+}
+
+/** Whether `/auth/methods` answers that nobody is signed in here. `false` when it cannot say. */
+async function nobodySignedIn(io: Fetch, base: string): Promise<boolean> {
+  const said = await send<{ me?: unknown }>(io, `${base}/auth/methods`);
+  return said.ok && typeof said.value === 'object' && said.value !== null && said.value.me === null;
 }
 
 /** Counts as a person reads them in one row: `142 runs · 1,204 requests · 3.1 MB`, and failures when there are any. */

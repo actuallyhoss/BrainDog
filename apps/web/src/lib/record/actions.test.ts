@@ -229,7 +229,7 @@ test('THE LEDGER FIRST: this month against the allowance, and waiting said when 
   const read = await readUsage(io, NOW_MS);
   assert.ok(read.ok === true);
   assert.equal(read.view.from, 'ledger');
-  assert.equal(sent[0]?.url, '/account/usage?from=2026-09-01&to=2026-09-15');
+  assert.ok(sent.some((x) => x.url === '/account/usage?from=2026-09-01&to=2026-09-15'));
   assert.deepEqual(read.view.records, [{ name: 'studio', used: 150, allowance: 15_000, resets: '1 October', waiting: false }]);
   assert.deepEqual(read.view.projects.map((p) => [p.name, p.faint]), [['Kiln', false], [words.everywhere, true]]);
 
@@ -263,6 +263,19 @@ test('no host at all draws the sample usage; a ledger refusal is its sentence; a
     NOW_MS,
   );
   assert.deepEqual(neither, { ok: 'none' });
+});
+
+test('NOBODY SIGNED IN, AS ON AN OPEN SELF-HOST, asks no ledger and reads the record’s events; a signed-in person is asked', async () => {
+  const methods = (me: unknown) => () => json(200, { ok: true, value: { passkey: false, magic: false, key: false, open: me === null, demo: false, me } });
+  const actions = () => json(200, { ok: true, value: [row({ days: [{ day: '2026-09-02', ...totals, runs: 5 }] })] });
+  const open = host({ '/auth/methods': methods(null), '/api/actions': actions });
+  const read = await readUsage(open.io, NOW_MS);
+  assert.ok(read.ok === true && read.view.from === 'events');
+  assert.ok(!open.sent.some((x) => x.url.startsWith('/account/usage')), 'the ledger was asked with nobody signed in');
+
+  const signed = host({ '/auth/methods': methods({ person: 'p_1', email: 'owner@example.test', record: 'studio', provedAt: 0 }), '/account/usage': () => json(200, { ok: true, value: ledger(0) }) });
+  const mine = await readUsage(signed.io, NOW_MS);
+  assert.ok(mine.ok === true && mine.view.from === 'ledger');
 });
 
 test('a month is five weeks at most, from the first, and every day lands in one', () => {
