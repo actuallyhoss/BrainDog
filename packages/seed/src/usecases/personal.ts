@@ -74,7 +74,7 @@ const budgetProgress = (heading: string) => ({
 
 export const PERSONAL = {
   usecase: 'personal',
-  version: '1.0.0',
+  version: '1.1.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -98,12 +98,21 @@ export const PERSONAL = {
     lists: 'My lists',
   },
   /* A PERSON'S WORDS OVER MONEY, PROJECTS AND PEOPLE, and over this pack's own lists so a shared copy can rename them.
-     Money's categories are not relabelled here: a value label on `obligations.category` is longer than a setting name
-     may be, so a bill's category keeps Money's words, and a person's own categories live on Spending. */
+     A bill's category is one of Money's closed values, so each value a person's bills fall in is given a person's word:
+     rent and energy are Home, a phone and streaming are Subscriptions, the gym is Health, pay is Pay. Those keys are
+     longer than a setting name, and are kept by their hash (`labelSetting`). */
   labels: {
     obligations: 'Bills',
     'obligations:one': 'bill',
     'obligations:holds': 'your bills, subscriptions and pay days, each with a date and how often it comes round',
+    'obligations.category.premises': 'Home',
+    'obligations.category.contractors': 'Transport',
+    'obligations.category.production': 'Food',
+    'obligations.category.software': 'Subscriptions',
+    'obligations.category.professional': 'Health',
+    'obligations.category.events': 'Fun',
+    'obligations.category.client_work': 'Pay',
+    'obligations.category.licensing': 'Other income',
     things: 'Projects',
     'things:one': 'project',
     'things:holds': 'the things you make and do for the love of it, and how each one is going',
@@ -578,14 +587,14 @@ export const PERSONAL_EXAMPLES = [
   { register: 'accounts', fields: { name: 'Current account', kind: 'bank', balance: gbp(124_056), as_of: '0d', liquid: true } },
   { register: 'accounts', fields: { name: 'Savings account', kind: 'bank', balance: gbp(242_000), as_of: '-2d', liquid: true } },
   { register: 'accounts', fields: { name: 'Credit card', kind: 'card', balance: gbp(-18_640), as_of: '-1d', liquid: false } },
-  { register: 'obligations', fields: { what: 'Rent', direction: 'owed_by_me', amount: gbp(85_000), due: '+6d', state: 'open', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Phone contract', direction: 'owed_by_me', amount: gbp(1_800), due: '+3d', state: 'open', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Streaming subscription', direction: 'owed_by_me', amount: gbp(1_099), due: '+2d', state: 'open', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Gym membership', direction: 'owed_by_me', amount: gbp(3_200), due: '+12d', state: 'open', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Energy bill', direction: 'owed_by_me', amount: gbp(9_600), due: '+18d', state: 'open', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Rent', direction: 'owed_by_me', amount: gbp(85_000), due: '+6d', state: 'open', category: 'premises', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Phone contract', direction: 'owed_by_me', amount: gbp(1_800), due: '+3d', state: 'open', category: 'software', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Streaming subscription', direction: 'owed_by_me', amount: gbp(1_099), due: '+2d', state: 'open', category: 'software', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Gym membership', direction: 'owed_by_me', amount: gbp(3_200), due: '+12d', state: 'open', category: 'professional', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Energy bill', direction: 'owed_by_me', amount: gbp(9_600), due: '+18d', state: 'open', category: 'premises', repeats: 'monthly' } },
   { register: 'obligations', fields: { what: 'Contents insurance', direction: 'owed_by_me', amount: gbp(850), due: '+21d', state: 'open', category: 'insurance', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Council tax', direction: 'owed_by_me', amount: gbp(14_200), due: '+25d', state: 'open', category: 'tax', repeats: 'monthly' } },
-  { register: 'obligations', fields: { what: 'Pay day', direction: 'owed_to_me', amount: gbp(245_000), due: '+10d', state: 'open', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Council tax', direction: 'owed_by_me', amount: gbp(14_200), due: '+25d', state: 'open', category: 'premises', repeats: 'monthly' } },
+  { register: 'obligations', fields: { what: 'Pay day', direction: 'owed_to_me', amount: gbp(245_000), due: '+10d', state: 'open', category: 'client_work', repeats: 'monthly' } },
   { register: 'things', fields: { name: OLD_BIKE, lane: 'building', since: '-40d' } },
   { register: 'things', fields: { name: STORIES, lane: 'building', since: '-90d' } },
   { register: 'things', fields: { name: 'Balcony vegetable garden', lane: 'parked', since: '-200d' } },

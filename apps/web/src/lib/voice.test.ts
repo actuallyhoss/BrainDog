@@ -7,10 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack } from '@braindog/seed/usecases';
+import { labelSetting as labelSettingOfPack, useCasePack } from '@braindog/declare';
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, homePageOf, labelsOf, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, labelSetting, labelsOf, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -59,10 +60,13 @@ test('LABELS ARE READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM (S8)', (
   };
   assert.deepEqual(labelsOf(values), labelsOfPack(values));
   assert.deepEqual(labelsOf(values), { tickets: 'Issues', 'people.role.collaborator': 'Teammate', 'tickets:one': 'issue', 'tickets:holds': 'every issue the team has' });
-  const settingOf = (k: string): string => (/:(one|holds)$/.test(k) ? `${k.split(':')[1]}_${k.split(':')[0]}` : `label_${k.split('.').join('__')}`);
   for (const u of USE_CASES) {
-    const settings = Object.fromEntries(Object.entries(u.labels).map(([k, v]) => [settingOf(k), v]));
-    assert.deepEqual(labelsOf(settings), u.labels, u.usecase);
+    const pack = useCasePack(u);
+    const config = (pack?.config ?? {}) as Record<string, { label?: string; default?: unknown }>;
+    const settings = Object.fromEntries(Object.entries(u.labels).map(([k, v]) => [labelSetting(k), v]));
+    for (const setting of Object.keys(settings)) assert.equal(labelSettingOfPack(Object.keys(u.labels).find((k) => labelSetting(k) === setting)!), setting);
+    assert.deepEqual(labelsOf(settings, config), u.labels, u.usecase);
+    assert.deepEqual(labelsOf(settings, config), labelsOfPack(settings, config), u.usecase);
   }
 });
 

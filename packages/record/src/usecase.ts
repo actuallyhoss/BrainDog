@@ -132,7 +132,7 @@ export function useCases(d: UseCaseDeps) {
     if (args.audience !== undefined && !(AUDIENCES as readonly string[]).includes(args.audience))
       return refuse('ENUM_VALUE_UNKNOWN', `${args.audience} is not an audience. It is one of ${AUDIENCES.join(', ')}.`, 'audience');
 
-    const config = settings?.ok ? (settings.value.config as Record<string, { default?: unknown }>) : {};
+    const config = settings?.ok ? (settings.value.config as Record<string, { default?: unknown; label?: unknown }>) : {};
     /* A HEADING THE VOICE FILLED goes out as its placeholder, from the value now or the default it was installed with. */
     const filled = new Map<string, string>();
     for (const key of Object.keys(config))
@@ -209,7 +209,7 @@ export function useCases(d: UseCaseDeps) {
       tone: 'as its owner arranged it',
       modules,
       voice: voiceOf(values),
-      labels: labelsOf(values),
+      labels: labelsOf(values, config),
       declarations,
       examples,
       ...(args.signals === undefined ? {} : { signals: args.signals }),

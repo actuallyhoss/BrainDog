@@ -203,7 +203,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `seeds` | `[{ register: Id, fields: object, note? }]`, at most eight per register | no | `[]` | — |
 | `provides` | `[DeclId]` — **derived**; written out, it must equal the derived set (`PROVIDES_MISMATCH`) | no | derived | — |
 | `note` | text ≤ 280 — 21 §11: a note is data, not a YAML comment. Legal on every declaration, field, block, section and action below | no | — | — |
-| `config` | up to 32 settings, `{ <key>: { type, values?, default?, label?, note? } }`, checked by the kernel's `readConfig`; on the manifest only when it holds a setting, so a pack without one keeps its checksum. A body reads one as `{{config:<key>}}`, filled by `plan` and `install` from the chosen value, else the default; every placeholder names a declared setting with a default | no | none | text, enum, bool, money, day, duration |
+| `config` | up to 64 settings, `{ <key>: { type, values?, default?, label?, note? } }`, checked by the kernel's `readConfig`; on the manifest only when it holds a setting, so a pack without one keeps its checksum. A body reads one as `{{config:<key>}}`, filled by `plan` and `install` from the chosen value, else the default; every placeholder names a declared setting with a default | no | none | text, enum, bool, money, day, duration |
 
 `requires` here is a map; on a page it is a list (§4.5). Any key not in a table: `FIELD_UNKNOWN`, naming it.
 

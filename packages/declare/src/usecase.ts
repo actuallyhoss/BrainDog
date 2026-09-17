@@ -17,6 +17,12 @@
  * the line saying what it holds are words too, `list:one` and `list:holds`, kept as `one_<list>` and `holds_<list>`,
  * because a field may be called `one` and a label key names fields after the dot.
  *
+ * A NAME TOO LONG FOR A SETTING IS KEPT BY ITS HASH. A setting name is at most 32 characters, and
+ * `label_obligations__category__client_work` is 40, so a use case could not rename a value of Money's categories. Such a
+ * label is kept as `lk_<hash>`, and the setting's own title (`Label: obligations, category, client work`) says the key
+ * again, exactly, so a reader holding the pack's declared settings reads it back; the hash is checked against it. Every
+ * name that fits keeps the form it always had, so no setting a record already holds is renamed.
+ *
  * THE KEYS ARE CLOSED. A voice key is a slot the display promises to read, so a use case cannot put a
  * sentence anywhere on screen; it can only replace one the house voice already says.
  *
@@ -103,7 +109,7 @@ const LABEL_PREFIX = 'label_';
 /** Settings are named in lower case with underscores, at most 32; the dots of a label key are written `__`. */
 const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 /** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share with `shared_version`. */
-const SETTINGS_CEILING = 32;
+const SETTINGS_CEILING = 64;
 
 /**
  * THE VERSION THIS ARRANGEMENT WAS LAST SHARED AS, kept as a setting of the pack a use case carries, so a second share
@@ -121,10 +127,41 @@ export const LIST_WORD_KEY = new RegExp(`^(${SEGMENT}):(${LIST_WORDS.join('|')})
 /** A description line is a sentence's worth, where every other label is a word or a few. */
 const HOLDS_BYTES = 280;
 
-/** The setting a label is stored under: `label_people__role__collaborator`, or `one_tickets` for `tickets:one`. */
+/** A long label's setting: `lk_` and eight hex digits of the key's FNV-1a hash. */
+const HASHED_PREFIX = 'lk_';
+const HASHED = /^lk_[0-9a-f]{8}$/;
+const fnv = (s: string): string => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0');
+};
+
+/**
+ * The setting a label is stored under: `label_people__role__collaborator`, or `one_tickets` for `tickets:one`, or
+ * `lk_<hash>` for a key whose name would be longer than a setting's.
+ */
 export const labelSetting = (key: string): string => {
   const word = LIST_WORD_KEY.exec(key);
-  return word ? `${word[2]}_${word[1]}` : `${LABEL_PREFIX}${key.split('.').join('__')}`;
+  const name = word ? `${word[2]}_${word[1]}` : `${LABEL_PREFIX}${key.split('.').join('__')}`;
+  return SETTING_NAME.test(name) ? name : `${HASHED_PREFIX}${fnv(key)}`;
+};
+
+/**
+ * The label key a long label's setting holds, read from the title `labelTitle` gave it (`Label: obligations, category,
+ * client work`) and checked against the setting's hash, or `null`.
+ */
+export const labelKeyOf = (setting: string, title: unknown): string | null => {
+  if (!HASHED.test(setting) || typeof title !== 'string') return null;
+  const under = (s: string): string => s.replace(/ /g, '_');
+  const one = /^Label: one of (.+)$/.exec(title);
+  const holds = /^Label: what (.+) holds$/.exec(title);
+  const plain = /^Label: (.+)$/.exec(title);
+  const candidates = [
+    one ? `${under(one[1] ?? '')}:one` : null,
+    holds ? `${under(holds[1] ?? '')}:holds` : null,
+    plain ? (plain[1] ?? '').split(', ').map(under).join('.') : null,
+  ];
+  return candidates.find((k): k is string => k !== null && (LABEL_KEY.test(k) || LIST_WORD_KEY.test(k)) && labelSetting(k) === setting) ?? null;
 };
 
 /**
@@ -172,8 +209,8 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     for (const [key, word] of Object.entries(doc.labels)) {
       const at = `labels.${key}`;
       const listWord = LIST_WORD_KEY.exec(key);
-      if ((!LABEL_KEY.test(key) && !listWord) || !SETTING_NAME.test(labelSetting(key)))
-        return no('VALUE_MALFORMED', `${key} is not a label key: a list, list.field, list.field.value, list:one or list:holds, short enough to be a setting.`, { at });
+      if (!LABEL_KEY.test(key) && !listWord)
+        return no('VALUE_MALFORMED', `${key} is not a label key: a list, list.field, list.field.value, list:one or list:holds.`, { at });
       const most = listWord?.[2] === 'holds' ? HOLDS_BYTES : VOICE_BYTES;
       if (!text(word, most)) return no('VALUE_MALFORMED', `${at} is ${most === VOICE_BYTES ? 'a word or a few' : 'a line'}, of at most ${most} bytes.`, { at });
       labels[key] = word;
@@ -268,12 +305,18 @@ export function voiceOf(values: Readonly<Record<string, unknown>>): Partial<Reco
 /**
  * The labels held in a use-case pack's settings, by label key: each `label_<list>[__<field>[__<value>]]`, `one_<list>`
  * and `holds_<list>` whose value is a non-empty line. The display reads a list's, a field's or a value's word from here and
- * falls back to the declaration's own.
+ * falls back to the declaration's own. A long label's `lk_<hash>` is read back through `config`, the pack's declared
+ * settings, whose title says the key; without them it is left out.
  */
-export function labelsOf(values: Readonly<Record<string, unknown>>): Record<string, string> {
+export function labelsOf(values: Readonly<Record<string, unknown>>, config: Readonly<Record<string, { label?: unknown } | undefined>> = {}): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [setting, word] of Object.entries(values)) {
     if (typeof word !== 'string' || word.trim() === '') continue;
+    if (HASHED.test(setting)) {
+      const key = labelKeyOf(setting, config[setting]?.label);
+      if (key !== null) out[key] = word;
+      continue;
+    }
     const listWord = LIST_WORDS.find((w) => setting.startsWith(`${w}_`));
     if (listWord) {
       const key = `${setting.slice(listWord.length + 1)}:${listWord}`;

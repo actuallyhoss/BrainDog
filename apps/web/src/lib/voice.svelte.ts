@@ -56,10 +56,11 @@ export async function listen(boot: object | null, base: string): Promise<void> {
     return;
   }
   const settings = await client.packConfig({ id });
-  const values = settings.ok ? ((settings.value as { values?: Record<string, unknown> }).values ?? {}) : {};
+  const read = settings.ok ? (settings.value as { values?: Record<string, unknown>; config?: Record<string, { label?: unknown }> }) : {};
+  const values = read.values ?? {};
   if (heardFor !== boot) return;
   state.voice = voiceOf(values);
   state.pack = id;
   /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES (S8), read by the list reader and the rail. */
-  await hear(labelsOf(values));
+  await hear(labelsOf(values, read.config ?? {}));
 }

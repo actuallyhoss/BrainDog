@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { VOICE_KEYS, labelSetting, labelsOf, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
+import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
 
 const DOC = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   usecase: 'reading',
@@ -64,11 +64,10 @@ test('EACH WRONG PART IS REFUSED AT ITS OWN PATH', () => {
     [{ colour: 'red' }, 'FIELD_UNKNOWN', 'colour'],
     [{ labels: { 'Books': 'Shelf' } }, 'VALUE_MALFORMED', 'labels.Books'],
     [{ labels: { 'books.state.read.twice': 'x' } }, 'VALUE_MALFORMED', 'labels.books.state.read.twice'],
-    [{ labels: { 'books.reading_status.finished_reading': 'Done' } }, 'VALUE_MALFORMED', 'labels.books.reading_status.finished_reading'],
     [{ labels: { books: '' } }, 'VALUE_MALFORMED', 'labels.books'],
     [{ labels: 'Shelf' }, 'PACK_MALFORMED', 'labels'],
     [{ voice: undefined, pack: null, labels: { books: 'Shelf' } }, 'PACK_MALFORMED', 'labels'],
-    [{ labels: Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`list${i}`, 'x'])) }, 'VALUE_MALFORMED', 'labels'],
+    [{ labels: Object.fromEntries(Array.from({ length: 63 }, (_, i) => [`list${i}`, 'x'])) }, 'VALUE_MALFORMED', 'labels'],
   ];
   for (const [over, code, at] of cases) {
     const r = refused(normaliseUseCase(DOC(over)));
@@ -113,6 +112,22 @@ test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY K
   assert.equal(labelSetting('people.role.collaborator'), 'label_people__role__collaborator');
   assert.deepEqual(labelsOf({ label_books: ' ', label_people: 3, voice_home: 'x', label_: 'y' }), {});
   assert.deepEqual(value<UseCase>(normaliseUseCase(DOC())).labels, {});
+});
+
+test('A LABEL WHOSE SETTING NAME WOULD BE TOO LONG IS KEPT BY ITS HASH, AND READ BACK THROUGH ITS TITLE', async () => {
+  const labels = { 'obligations.category.client_work': 'Pay', 'obligations.category.premises': 'Home', books: 'Shelf', 'a_very_long_list_name_for_books:holds': 'what is kept' };
+  const u = value<UseCase>(normaliseUseCase(DOC({ labels })));
+  const pack = value<{ manifest: { config?: Record<string, { default?: unknown; label?: string }> } }>(await normalise(useCasePack(u)!));
+  const config = pack.manifest.config ?? {};
+  const long = labelSetting('obligations.category.client_work');
+  assert.match(long, /^lk_[0-9a-f]{8}$/);
+  assert.notEqual(long, labelSetting('obligations.category.premises'));
+  assert.equal(labelSetting('books'), 'label_books', 'a name that fits keeps its form, so nothing a record holds is renamed');
+  assert.equal(config[long]?.label, 'Label: obligations, category, client work');
+  const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
+  assert.deepEqual(labelsOf(defaults, config), labels);
+  assert.deepEqual(labelsOf(defaults), { books: 'Shelf' }, 'without the declared settings a hashed label is left out');
+  assert.equal(labelKeyOf(long, 'Label: obligations, category, premises'), null, 'a title that is not the hashed key is not read');
 });
 
 test("A LIST'S SINGULAR AND ITS DESCRIPTION LINE ARE LABELS TOO, as one_<list> and holds_<list>", async () => {

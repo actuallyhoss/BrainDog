@@ -64,14 +64,47 @@ const LABEL_KEY = new RegExp(`^${SEGMENT}(?:[.]${SEGMENT}){0,2}$`);
 const LIST_WORDS = ['one', 'holds'] as const;
 const LIST_WORD_KEY = new RegExp(`^${SEGMENT}:(?:${LIST_WORDS.join('|')})$`);
 
+/** A setting name, at most 32 characters; a label whose name would be longer is kept as `lk_` and its key's hash. */
+const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+const HASHED = /^lk_[0-9a-f]{8}$/;
+const fnv = (s: string): string => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0');
+};
+
+/** The setting a label key is kept under, as `@braindog/declare` `labelSetting` names it. */
+export const labelSetting = (key: string): string => {
+  const word = /^(.+):(one|holds)$/.exec(key);
+  const name = word ? `${word[2]}_${word[1]}` : `label_${key.split('.').join('__')}`;
+  return SETTING_NAME.test(name) ? name : `lk_${fnv(key)}`;
+};
+
+/** A long label's key, from the title its setting was declared with and checked against the hash, or `null`. */
+function hashedKey(setting: string, title: unknown): string | null {
+  if (typeof title !== 'string') return null;
+  const under = (s: string): string => s.replace(/ /g, '_');
+  const one = /^Label: one of (.+)$/.exec(title);
+  const holds = /^Label: what (.+) holds$/.exec(title);
+  const plain = /^Label: (.+)$/.exec(title);
+  const candidates = [one ? `${under(one[1] ?? '')}:one` : null, holds ? `${under(holds[1] ?? '')}:holds` : null, plain ? (plain[1] ?? '').split(', ').map(under).join('.') : null];
+  return candidates.find((k): k is string => k !== null && (LABEL_KEY.test(k) || LIST_WORD_KEY.test(k)) && labelSetting(k) === setting) ?? null;
+}
+
 /**
  * The labels held in a use-case pack's settings: each `label_<list>[__<field>[__<value>]]`, `one_<list>` and
- * `holds_<list>` that is a line of text.
+ * `holds_<list>` that is a line of text, and each long label's `lk_<hash>`, read back through the pack's declared
+ * settings in `config`.
  */
-export function labelsOf(values: Readonly<Record<string, unknown>>): Record<string, string> {
+export function labelsOf(values: Readonly<Record<string, unknown>>, config: Readonly<Record<string, { label?: unknown } | undefined>> = {}): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [setting, word] of Object.entries(values)) {
     if (typeof word !== 'string' || word.trim() === '') continue;
+    if (HASHED.test(setting)) {
+      const key = hashedKey(setting, config[setting]?.label);
+      if (key !== null) out[key] = word;
+      continue;
+    }
     const listWord = LIST_WORDS.find((w) => setting.startsWith(`${w}_`));
     if (listWord) {
       const key = `${setting.slice(listWord.length + 1)}:${listWord}`;

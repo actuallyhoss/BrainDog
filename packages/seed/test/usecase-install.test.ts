@@ -141,7 +141,10 @@ test('A PERSONAL RECORD HOLDS ROWS OF A PERSON: accounts, bills, spending, a bud
   const { k, sql } = await made('personal');
   const rows = everyRow(k);
   assert.ok(!rows.some((r) => STUDIO.test(JSON.stringify(r.fields))), 'a studio row reached a personal record');
-  assert.ok(!rows.some((r) => /client|invoice|runway|contractor/iu.test(JSON.stringify(r.fields))), 'a business word reached a personal record');
+  /* A CATEGORY IS AN ID (`client_work`), drawn as the person's word the use case gives it, so only the words are read. */
+  assert.ok(!rows.some((r) => /client|invoice|runway|contractor/iu.test(JSON.stringify({ ...r.fields, category: null }))), 'a business word reached a personal record');
+  const bills = value<{ rows: Row[] }>(k.list({ register: 'obligations', limit: 100 })).rows;
+  assert.ok(bills.length > 0 && bills.every((r) => typeof r.fields.category === 'string'), 'every example bill has a category');
   const counts = Object.fromEntries(['accounts', 'obligations', 'things', 'spending', 'budgets', 'savings_goals', 'goals', 'project_steps', 'people'].map((l) => [l, k.count(l)]));
   assert.deepEqual(counts, { accounts: 3, obligations: 8, things: 3, spending: 8, budgets: 6, savings_goals: 3, goals: 4, project_steps: 7, people: 0 });
   sql.close();

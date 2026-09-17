@@ -69,9 +69,9 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     for (const id of modulesFor(u)) if (id !== 'agents') value(await put(k, firstPartyDocument(id)));
     value(await put(k, doc));
     for (const list of listsOf(u)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
-    const settings = value<{ values: Record<string, unknown> }>(k.packConfig(`usecase-${u.usecase}`));
+    const settings = value<{ values: Record<string, unknown>; config: Record<string, { label?: string }> }>(k.packConfig(`usecase-${u.usecase}`));
     assert.deepEqual(voiceOf(settings.values), u.voice, `${u.usecase}: the record holds the voice`);
-    assert.deepEqual(labelsOf(settings.values), u.labels, `${u.usecase}: the record holds the labels`);
+    assert.deepEqual(labelsOf(settings.values, settings.config), u.labels, `${u.usecase}: the record holds the labels`);
     sql.close();
   }
 });

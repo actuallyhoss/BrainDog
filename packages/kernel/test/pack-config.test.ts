@@ -82,7 +82,7 @@ test('THE REST OF THE SHAPE IS CHECKED: the map, the names, the keys, an enum, a
   assert.equal(code(['heading']), 'PACK_MALFORMED');
   assert.equal(code({ 'Heading-One': { type: 'text' } }), 'PACK_MALFORMED');
   assert.equal(code({ heading: 'text' }), 'PACK_MALFORMED');
-  assert.equal(code(Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`setting_${i}`, { type: 'bool' }]))), 'OUT_OF_BOUNDS');
+  assert.equal(code(Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`setting_${i}`, { type: 'bool' }]))), 'OUT_OF_BOUNDS');
   assert.equal(code({ heading: { type: 'text', widget: 'wide' } }), 'FIELD_UNKNOWN');
   assert.equal(code({ heading: { type: 'text', values: ['a'] } }), 'FIELD_UNKNOWN');
   assert.equal(code({ cadence: { type: 'enum' } }), 'VALUE_MALFORMED');

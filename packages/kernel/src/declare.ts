@@ -3557,7 +3557,7 @@ export type PackConfig = { id: string; version: string | null; config: Record<st
 
 const CONFIG_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const CONFIG_KEYS = ['type', 'values', 'default', 'label', 'note'];
-const CONFIG_CEILING = 32;
+const CONFIG_CEILING = 64;
 const CONFIG_TEXT_BYTES = 1024;
 const CONFIG_VALUES_CEILING = 64;
 
