@@ -245,9 +245,14 @@ export async function choose(client: Caller, sampled: boolean): Promise<{ source
 }
 
 /** The same source for one add-on's settings, from the same answer and never from a second probe. */
-export async function openSettings(client: Caller, id: string, sampled: boolean): Promise<{ source: Source; first: Answer<PackConfig> }> {
+export async function openSettings(client: Caller, id: string, sampled: boolean): Promise<{ source: Source; first: Answer<PackConfig>; alone: boolean }> {
   const source = sampled ? sample() : live(client);
-  return { source, first: await source.config(id) };
+  const first = await source.config(id);
+  /* WHETHER THIS USE CASE IS THE ONLY ONE ON, because "Speaks for this BrainDog" is only written down once two are
+     (`voice.ts` `voiceWrites`), and drawn off it said the opposite of what the rail says. */
+  const held = await source.packs().catch(() => null);
+  const on = held?.ok ? held.value.filter((p) => /^usecase-/u.test(p.id) && p.disabled_at === null) : [];
+  return { source, first, alone: on.length === 1 && on[0]?.id === id };
 }
 
 /* ── the settings form ──────────────────────────────────────────────────── */
@@ -260,6 +265,7 @@ export const words = {
   reset: 'Reset',
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
   changed: (names: readonly string[]) => `${names.join(', ')} changed`,
+  speaksAlone: 'It is the only use case on, so the record speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',
   units: { days: 'days', hours: 'hours', minutes: 'minutes', seconds: 'seconds' },
 } as const;

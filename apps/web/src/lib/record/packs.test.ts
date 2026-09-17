@@ -305,6 +305,15 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
   assert.deepEqual(sent.at(-1), { name: 'setPackConfig', args: { id: 'ledger', values: { cadence: 'weekly' } } });
   assert.ok(!refused.ok && signInFor(refused.refusal));
 
+  /* THE ONE USE CASE ON IS ALONE, so its settings screen says its words are the record's. */
+  const held = (ids: string[]): Caller => ({
+    ...caller({ ok: true, value: live }),
+    packs: async () => ({ ok: true, value: ids.map((id) => ({ id, version: '1.0.0', disabled_at: null, registers: [] })) as never }),
+  });
+  assert.equal((await openSettings(held(['usecase-founder', 'work']), 'usecase-founder', false)).alone, true);
+  assert.equal((await openSettings(held(['usecase-founder', 'usecase-student']), 'usecase-founder', false)).alone, false);
+  assert.equal((await openSettings(held(['usecase-founder']), 'work', false)).alone, false);
+
   const no = await openSettings(caller({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix: 'ledger is not a pack this record has installed.' } }), 'ledger', false);
   assert.equal(no.source.sample, false);
   assert.equal(no.first.ok ? '' : no.first.refusal.fix, 'ledger is not a pack this record has installed.');

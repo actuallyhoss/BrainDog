@@ -49,6 +49,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { moduleName } from '@braindog/seed/usecases/names';
+  import { SPEAKS } from '$lib/voice.ts';
 
   const id = $derived(String(page.params.id));
   const pack = $derived(PACKS.find((p) => p.id === id));
@@ -60,6 +61,8 @@
   /** The record does not hold this add-on at all, which is an address and not a failure. */
   let unknown = $state(false);
   let settings = $state<PackConfig | null>(null);
+  /** Whether this use case is the only one on, so its voice is the record's whatever `speaks` says. */
+  let alone = $state(false);
   let drafts = $state<Record<string, Draft>>({});
   let source: Source | null = null;
 
@@ -93,6 +96,7 @@
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== want) return closed(true, at);
     source = chosen.source;
+    alone = chosen.alone;
     if (chosen.first.ok) {
       show(chosen.first.value);
       from = 'ready';
@@ -212,6 +216,8 @@
             {@const label = labelOf(key, decl)}
             {@const why = pending.wrong[key] ?? (besideField && fixAt === key ? fix : '')}
             {@const segmented = decl.type === 'enum' && (decl.values?.length ?? 0) <= 4}
+            <!-- THE ONE USE CASE ON SPEAKS whatever `speaks` holds, which is written down only once two are on. -->
+            {@const only = key === SPEAKS && alone}
             {#if d}
               <div class="setting">
                 {#if decl.type === 'bool' || segmented}
@@ -222,13 +228,16 @@
 
                 <div class="setting-control">
                   {#if decl.type === 'bool'}
+                    <!-- THE ONE USE CASE ON SPEAKS, and the switch says so rather than sitting off beside a rail in its
+                         words. There is nothing to choose between until a second use case is on. -->
                     <button
                       type="button"
                       class="switch"
                       role="switch"
                       id="set-{key}"
-                      aria-checked={d.on ? 'true' : 'false'}
+                      aria-checked={only || d.on ? 'true' : 'false'}
                       aria-labelledby="set-{key}-label"
+                      disabled={only}
                       onclick={() => (d.on = !d.on)}
                     ><span class="switch-track"></span></button>
                   {:else if segmented}
@@ -333,6 +342,7 @@
                   {/if}
                 </div>
 
+                {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
                 {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
                 {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad">{why}</p>{/if}
               </div>

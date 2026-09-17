@@ -365,7 +365,7 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
   const config: Record<string, { type: 'text'; label: string; default: string }> = {};
   for (const key of VOICE_KEYS) {
     const line = u.voice[key];
-    if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: `Voice: ${key.replace(/_/g, ' ')}`, default: line };
+    if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: VOICE_TITLES[key], default: line };
   }
   for (const [key, word] of Object.entries(u.labels))
     config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
@@ -384,6 +384,22 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     config: settings,
   };
 }
+
+/**
+ * What each voice setting is called at `/packs/<id>`: what the line does, not the key it is stored under. It read
+ * "Voice: home" and "Voice: nothing needs you", which are the schema's spelling of a box holding the word "Overview".
+ */
+const VOICE_TITLES: Readonly<Record<VoiceKey, string>> = {
+  home: 'What Home is called',
+  decide: 'What Decide is called',
+  inbox: 'What the Inbox is called',
+  lists: 'What the lists are called together',
+  right_now: 'The heading over what is happening now',
+  needs_you: 'The heading over what needs you',
+  nothing_needs_you: 'The line when nothing needs you',
+  since_away: 'The heading over what changed while you were away',
+  nothing_new: 'The line when nothing has changed',
+};
 
 /** What a label's setting is called at `/packs/<id>`: "Label: people, role", "Label: one of tickets", "Label: what tickets holds". */
 function labelTitle(key: string): string {
