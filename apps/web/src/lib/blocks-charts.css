@@ -434,6 +434,14 @@
     fill-opacity: 0.45;
   }
 
+  /* THE CURRENT BUCKET WITH MONEY STILL DUE IN IT: faint as so far, inside the dashed edge of what is expected. */
+  .series-bar[data-state='due'] {
+    fill-opacity: 0.45;
+    stroke: var(--dim);
+    stroke-width: 1px;
+    stroke-dasharray: 3 2;
+  }
+
   /* A BUCKET STILL TO COME keeps its colour as a wash inside a dashed edge, so in and out still read apart. */
   .series-bar[data-state='ahead'] {
     fill-opacity: 0.3;

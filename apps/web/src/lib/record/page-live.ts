@@ -336,9 +336,23 @@ function barsOf(v: unknown): Bars | null {
   const n = v.keys.length;
   const cell = (x: unknown) => x === null || (typeof x === 'number' && Number.isFinite(x));
   if (!Array.isArray(v.values) || !v.values.every((line) => Array.isArray(line) && line.length === n && line.every(cell))) return null;
-  if (!Array.isArray(v.states) || v.states.length !== n || !v.states.every((s) => s === '' || s === 'partial' || s === 'ahead')) return null;
+  if (!Array.isArray(v.states) || v.states.length !== n || !v.states.every((s) => s === '' || s === 'partial' || s === 'due' || s === 'ahead')) return null;
   if (!isBucket(v.bucket) || typeof v.current !== 'string') return null;
-  return { bucket: v.bucket, current: v.current, keys: v.keys, states: v.states, values: v.values, unit: typeof v.unit === 'string' ? v.unit : null };
+  /* ONE CHART A CURRENCY, when the record lined the lines up once per currency: each as long as the keys, or none. */
+  const split = Array.isArray(v.split)
+    ? v.split.filter((t): t is { unit: string; values: (number | null)[][] } =>
+        isObject(t) && typeof t.unit === 'string' && Array.isArray(t.values) && t.values.every((line) => Array.isArray(line) && line.length === n && line.every(cell)),
+      )
+    : [];
+  return {
+    bucket: v.bucket,
+    current: v.current,
+    keys: v.keys,
+    states: v.states,
+    values: v.values,
+    unit: typeof v.unit === 'string' ? v.unit : null,
+    ...(split.length > 0 ? { split } : {}),
+  };
 }
 
 /** A forecast's remembered points, when they are points: a day and a number each. Anything else is none. */

@@ -4,7 +4,8 @@
  * A series is bars by bucket: money in stands up from a zero rule and money out hangs under it, on
  * one scale, so a month that took more than it brought is visibly longer below the line. The `net`
  * form draws what was left, in minus out, as one line. The current bucket is `partial` and drawn
- * faint; a bucket still to come is `ahead` and drawn as an outline. A missing value is a gap and
+ * faint, or `due` when it also holds money due later in it, drawn faint inside a dashed edge; a bucket
+ * still to come is `ahead` and drawn as an outline. A missing value is a gap and
  * never a zero, because a zero is a claim.
  *
  * The cells arrive as plain text, already drawn, so both renderers hand this the same strings and
@@ -19,7 +20,7 @@ import { figureLike } from './figure.ts';
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 
 export type SeriesDir = 'in' | 'out';
-export type SeriesState = '' | 'partial' | 'ahead';
+export type SeriesState = '' | 'partial' | 'due' | 'ahead';
 
 /** At most this many series draw; a fifth column is left out of the drawing and the numbers alike. */
 export const SERIES_MOST = 4;
@@ -67,7 +68,7 @@ export const seriesValue = (cell: string): number | null => {
 
 const stateOf = (cell: string | undefined): SeriesState => {
   const t = (cell ?? '').trim().toLowerCase();
-  return t === 'partial' || t === 'ahead' ? t : '';
+  return t === 'partial' || t === 'due' || t === 'ahead' ? t : '';
 };
 
 /**
@@ -146,7 +147,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
       label,
       short: label.split(/\s+/u)[0] ?? label,
       state,
-      said: state === 'partial' ? SERIES_PARTIAL : state === 'ahead' ? SERIES_AHEAD : '',
+      said: state === 'partial' ? SERIES_PARTIAL : state === 'due' ? SERIES_DUE : state === 'ahead' ? SERIES_AHEAD : '',
       values: series.map((_, k) => (values[i]![k] === null ? MISSING : (r[k + 1] ?? '').trim())),
       net: v === null ? MISSING : figureLike(template, v),
     };
@@ -180,4 +181,6 @@ export const SERIES_NONE = 'Nothing to draw yet: every bucket here is empty or z
 export const SERIES_NET = 'Net';
 export const SERIES_PARTIAL = 'so far';
 export const SERIES_AHEAD = 'expected';
+/** The current bucket when it counts money due later in it beside what was paid so far. */
+export const SERIES_DUE = 'so far, and due';
 export const SERIES_NUMBERS = 'The numbers';

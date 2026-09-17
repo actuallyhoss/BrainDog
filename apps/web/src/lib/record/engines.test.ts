@@ -310,7 +310,7 @@ test('THE MONEY PAGE’S BARS BY MONTH are the same buckets and the same figures
   assert.deepEqual(w.refusals, []);
   assert.ok(k.bars && k.bars.keys.length >= 6, `the kernel drew ${k.bars?.keys.length} buckets`);
   assert.deepEqual(w.bars, k.bars);
-  assert.deepEqual(k.bars.states.slice(-4), ['partial', 'ahead', 'ahead', 'ahead'], 'this month so far, then three months due');
+  assert.deepEqual(k.bars.states.slice(-4), ['due', 'ahead', 'ahead', 'ahead'], 'this month so far with what is still due in it, then three months due');
   assert.ok(k.bars.values.every((line) => line.some((v) => v !== null)), 'a line with nothing in it');
   /* WHAT REPEATS IS IN EVERY MONTH AHEAD: the sample repeats costs, so no month ahead is left blank beside one that is not. */
   const ahead = k.bars.states.flatMap((s, i) => (s === 'ahead' ? [i] : []));

@@ -16,7 +16,10 @@ import type { Group, MetricDecl, Reading } from './metrics.ts';
 /** One series on a `series` block: a figure grouped by date, and optionally the figure for buckets still to come. */
 export type SeriesLine = {
   metric: string;
-  /** The figure that answers the buckets after the current one: money due, where `metric` is money paid. */
+  /**
+   * The figure that answers the buckets after the current one: money due, where `metric` is money paid. In the current
+   * bucket it is added to what was paid so far, so money due later this month is in this month, and the bucket says so.
+   */
   then?: string;
   /**
    * A monthly figure counted in every bucket after the current one: what repeats, at its share of a month, where `then`
@@ -34,8 +37,11 @@ export type Bars = {
   bucket: Bucket;
   current: string;
   keys: string[];
-  /** `partial` for the bucket the clock is in, `ahead` for one after it, `''` for a finished one. */
-  states: ('' | 'partial' | 'ahead')[];
+  /**
+   * `partial` for the bucket the clock is in, `due` for that bucket when it also holds money due later in it (a line's
+   * `then`), `ahead` for one after it, `''` for a finished one.
+   */
+  states: ('' | 'partial' | 'due' | 'ahead')[];
   /** One row per line, aligned with `keys`. */
   values: (number | null)[][];
   /** The unit every line is in, when they are money. */
@@ -150,21 +156,28 @@ export function barsOf(
   const keys = Array.from({ length: backs + aheads }, (_, i) => shiftBucket(now, b, i - (backs - 1)));
   /* ONE CURRENCY'S VALUES: a group in parts gives its amount in that currency, a group in one unit gives its value when
      that unit is this one, and anything else is a gap. `null` for the whole-record case keeps every value as it is. */
+  /* WHETHER ANY LINE ADDED MONEY DUE LATER THIS BUCKET TO WHAT WAS PAID IN IT, which the current bucket then says. */
+  let dueNow = false;
   const valuesIn = (unit: string | null) =>
     parts.map(({ past, then, each, eachParts, eachUnit, units: lineUnits }) =>
       keys.map((key) => {
         const ahead = key > now && then;
-        const from = ahead ? then : past;
-        const own = ahead ? lineUnits[1] : lineUnits[0];
-        const group = from.find((g) => g.key === key);
-        const found =
-          unit === null
+        const valueOf = (groups: readonly Group[], own: string | null | undefined): number | null => {
+          const group = groups.find((g) => g.key === key);
+          return unit === null
             ? (group?.value ?? null)
             : group?.parts
               ? (group.parts.find((p) => p.currency === unit)?.amount ?? null)
               : own === unit
                 ? (group?.value ?? null)
                 : null;
+        };
+        const paid = valueOf(ahead ? then : past, ahead ? lineUnits[1] : lineUnits[0]);
+        /* THE CURRENT BUCKET IS WHAT WAS PAID SO FAR AND WHAT IS STILL DUE IN IT: an invoice due on the 28th is this month's
+           money on the 17th, and a chart of only what was paid said the month was short by it. */
+        const dueHere = key === now && then ? valueOf(then, lineUnits[1]) : null;
+        if (dueHere !== null && dueHere !== 0) dueNow = true;
+        const found = dueHere !== null && dueHere !== 0 ? (paid ?? 0) + dueHere : paid;
         const repeat = unit === null || !eachParts ? (unit === null || eachUnit === unit ? each : null) : (eachParts.find((p) => p.currency === unit)?.amount ?? null);
         /* WHAT REPEATS IS IN EVERY MONTH AHEAD, or in none: never only the month its next due day falls in. */
         if (key > now && repeat !== null && repeat !== 0) return (found ?? 0) + repeat;
@@ -182,7 +195,7 @@ export function barsOf(
       bucket: b,
       current: now,
       keys: kept,
-      states: kept.map((key) => (key === now ? 'partial' : key > now ? 'ahead' : '')),
+      states: kept.map((key) => (key === now ? (dueNow ? 'due' : 'partial') : key > now ? 'ahead' : '')),
       values: values.map((line) => line.slice(from)),
       unit: tables ? (tables[0]?.unit ?? null) : seen.unit,
       ...(tables ? { split: tables.map((t) => ({ unit: t.unit, values: t.values.map((line) => line.slice(from)) })) } : {}),

@@ -420,3 +420,31 @@ test('A CASH WALK OVER TWO CURRENCIES WITH NO RATE IS ONE WALK A CURRENCY, each 
   assert.equal(one.walk?.from, 5_200_000 + 17_502_500);
   sql.close();
 });
+
+test('THE CURRENT MONTH IS WHAT WAS PAID SO FAR AND WHAT IS STILL DUE IN IT, and says so; a month with nothing due is so far', () => {
+  const decl = (metric: string) => ({ metric, bucket: 'month', group_by: 'settled' }) as unknown as MetricDecl;
+  const groups: Record<string, { key: string; value: number | null; rows: number; state: 'full' | 'partial' | 'empty' }[]> = {
+    paid: [
+      { key: '2026-08', value: 100_000, rows: 1, state: 'full' },
+      { key: '2026-09', value: 40_000, rows: 1, state: 'partial' },
+    ],
+    due: [
+      { key: '2026-09', value: 25_000, rows: 1, state: 'partial' },
+      { key: '2026-10', value: 60_000, rows: 1, state: 'partial' },
+    ],
+    none: [{ key: '2026-10', value: 60_000, rows: 1, state: 'partial' }],
+  };
+  const read = (d: MetricDecl) => ({ ok: true as const, value: { groups: groups[d.metric] ?? [], current: '2026-09', unit: 'GBP' } });
+  const bars = (then: string) => {
+    const got = barsOf([{ metric: 'paid', then, label: 'In' }], 2, 1, decl, read);
+    assert.ok('bars' in got, JSON.stringify(got));
+    return got.bars;
+  };
+  const due = bars('due');
+  assert.deepEqual(due.keys, ['2026-08', '2026-09', '2026-10']);
+  assert.deepEqual(due.values, [[100_000, 65_000, 60_000]]);
+  assert.deepEqual(due.states, ['', 'due', 'ahead']);
+  const none = bars('none');
+  assert.deepEqual(none.values, [[100_000, 40_000, 60_000]]);
+  assert.deepEqual(none.states, ['', 'partial', 'ahead']);
+});

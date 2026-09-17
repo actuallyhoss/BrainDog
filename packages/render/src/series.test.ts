@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SERIES_AHEAD, SERIES_PARTIAL, seriesPlan, seriesValue } from './series.ts';
+import { SERIES_AHEAD, SERIES_DUE, SERIES_PARTIAL, seriesPlan, seriesValue } from './series.ts';
 import { figureLike } from './figure.ts';
 
 const HEAD = ['Month', 'in: Money in', 'out: Money out', 'state'];
@@ -45,6 +45,14 @@ test('the net is in minus out, written like the cells, and the states are said',
   assert.equal(plan.buckets[0]!.short, 'Sep');
   assert.match(plan.sentence, /Sep 2026 so far, Money in £1,000.00, Money out £1,900.00, Net −£900.00/u);
   assert.equal((plan.netDots.match(/h0/gu) ?? []).length, 2);
+});
+
+test('the current bucket with money still due in it is marked due, on its bars and in words', () => {
+  const plan = seriesPlan([HEAD, ['Sep 2026', '£1,500.00', '£900.00', 'due']]);
+  assert.equal(plan.buckets[0]!.state, 'due');
+  assert.equal(plan.buckets[0]!.said, SERIES_DUE);
+  assert.ok(plan.bars.every((b) => b.state === 'due'));
+  assert.match(plan.sentence, /Sep 2026 so far, and due, Money in £1,500.00/u);
 });
 
 test('nothing but gaps and zeroes is a sentence, not a chart', () => {

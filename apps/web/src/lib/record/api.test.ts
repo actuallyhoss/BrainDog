@@ -979,7 +979,7 @@ test('THE MONEY PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each l
   assert.equal(months.length, series.bars!.keys.length);
   assert.match(months[0]!.cells[0]!, /^[A-Z][a-z]{2} \d{4}$/u, 'a month as a person says it');
   assert.ok(months.some((r) => /^£[\d,]+\.\d\d$/u.test(r.cells[1] ?? '')), 'money in the home currency');
-  assert.deepEqual(months.slice(-4).map((r) => r.cells[3]), ['partial', 'ahead', 'ahead', 'ahead']);
+  assert.deepEqual(months.slice(-4).map((r) => r.cells[3]), ['due', 'ahead', 'ahead', 'ahead'], 'this month holds money still due in it, and says so');
 });
 
 test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety days remembered, every movement, and its knobs', async () => {
