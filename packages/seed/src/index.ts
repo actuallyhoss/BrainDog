@@ -518,7 +518,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
     },
     {
       sample: 'SG34',
-      question: `The backup on ${new Date(`${day(0)}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })} did not run`,
+      question: `The backup on ${Number(day(0).slice(8, 10))} ${'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[Number(day(0).slice(5, 7)) - 1]} did not run`,
       body_kind: 'options',
       body: {
         options: [

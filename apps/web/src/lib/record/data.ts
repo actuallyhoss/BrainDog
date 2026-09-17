@@ -254,7 +254,7 @@ const FAILED_NIGHTS = SNAPSHOTS.filter((s) => s.failed !== null);
  * backup is made rather than a second name for it.
  */
 /** A day as a person says it, "3 Sep", never `2026-09-03`. The seed says the same question the same way. */
-const spokenDay = (d: string): string => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const spokenDay = (d: string): string => `${Number(d.slice(8, 10))} ${'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[Number(d.slice(5, 7)) - 1]}`;
 
 const nightsSince = (snap: Snapshot): string => {
   const kept = SNAPSHOTS.filter((s) => s.failed === null && s.at < snap.at).map((s) => s.at).sort();
