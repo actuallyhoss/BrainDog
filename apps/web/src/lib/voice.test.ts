@@ -11,7 +11,7 @@ import { labelSetting as labelSettingOfPack, speakingPack as speakingPackOf, use
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, homePageOf, labelSetting, labelsOf, voiceWhenAdding, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, homeSlugOf, labelSetting, labelsOf, voiceWhenAdding, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -137,4 +137,12 @@ test('A USE CASE CHOSEN TO SPEAK SPEAKS, and one chosen not to is passed over, b
   for (const packs of cases) assert.equal(speaking(packs), speakingPackOf(packs), JSON.stringify(packs));
   assert.deepEqual(cases.map((c) => speaking(c)), ['usecase-student', 'usecase-student', 'usecase-personal', 'usecase-personal', 'usecase-student']);
   assert.equal(voiceWhenAdding(cases[0]!, 'guide'), voiceWhenAddingPack(cases[0]!, 'guide'));
+});
+
+test('HOME ASKS ONLY FOR A PAGE THE RECORD HOLDS: the use case\'s, else the house one, else none', () => {
+  assert.equal(homeSlugOf('home-student', ['home-student', 'home', 'studies']), 'home-student');
+  assert.equal(homeSlugOf('home-reading-club', ['meetings', 'home']), 'home', 'a use case with no Home page was asked for one');
+  assert.equal(homeSlugOf('home-reading-club', ['meetings']), null);
+  assert.equal(homeSlugOf(null, ['home']), 'home');
+  assert.equal(homeSlugOf(null, []), null);
 });

@@ -69,6 +69,7 @@ test("the record's boot is drawn in the shell's shape, with nothing of the sampl
   const shell = layoutOf(BOOT as never);
   assert.equal(shell.live, true);
   assert.equal(shell.index.name, 'The Studio');
+  assert.deepEqual(shell.pages, ['money', 'loose'], 'a page with no place in the rail was left out of what Home may ask for');
   assert.deepEqual(
     shell.index.registers.map((r) => [r.id, r.count, r.views.length]),
     [['obligations', 3, 0]],

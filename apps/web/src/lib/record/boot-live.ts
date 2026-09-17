@@ -53,6 +53,11 @@ export type Shell = Omit<Sample, 'me'> & {
    * first client nor give a bookkeeper access to it: the one way to fill a list was hidden until it was full.
    */
   lists: { id: string; name: string }[];
+  /**
+   * THE SLUG OF EVERY PAGE THIS CALLER MAY OPEN, in the rail or not, from `boot`. Home asks for its use case's page only when
+   * the record holds it, so a use case with no Home page is not asked for one on every load. Empty for the sample.
+   */
+  pages: string[];
   inbox: number;
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
@@ -224,6 +229,7 @@ export function layoutOf(b: Boot): Shell {
         .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: [] })),
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
+    pages: (b.pages ?? []).map((p) => p.slug),
     nav,
     pen: [],
     me: { person: person ?? '', level, owner: level === 'owner', records: record ? [{ slug: record.slug, name: record.name, level }] : [] },
@@ -250,6 +256,7 @@ export const refusedShell = (): Shell => layoutOf({ registers: [], now: new Date
 export const sampleShell = (sample: Sample, inbox: number): Shell => ({
   ...sample,
   lists: Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name })),
+  pages: [],
   inbox,
   open: sample.questions.length,
   now: NOW,

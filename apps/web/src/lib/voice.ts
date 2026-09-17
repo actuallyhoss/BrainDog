@@ -47,6 +47,14 @@ export const lineOf = (voice: Voice, key: VoiceKey): string => voice[key] ?? VOI
 /** The page a use case declares as its Home: `usecase-student` answers `home-student`. The seed's `homePageOf` agrees. */
 export const homePageOf = (pack: string): string => `home-${pack.replace(/^usecase-/u, '')}`;
 
+/**
+ * The page Home draws on a live record: the use case's own Home page when the record holds it, else the house one, `home`,
+ * when that is held, else `null`. Only a page the record names is ever asked for, so a use case with no Home page is not
+ * refused on every load.
+ */
+export const homeSlugOf = (useCasePage: string | null, pages: readonly string[]): string | null =>
+  [useCasePage, 'home'].find((slug): slug is string => slug !== null && pages.includes(slug)) ?? null;
+
 /** A use-case pack as the voice rule reads it, with its `speaks` setting when that was read (`@braindog/declare` `SpeakingState`). */
 export type SpeakingState = { id: string; disabled_at: string | null; speaks?: boolean | null };
 

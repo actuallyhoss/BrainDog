@@ -16,6 +16,7 @@
   import { MISSING, relative, since } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { homePage, said } from '$lib/voice.svelte.ts';
+  import { homeSlugOf } from '$lib/voice.ts';
   import * as pref from '$lib/pref.ts';
   import { homeCurrency, identityFor, NOW, ROWS, actorOf, metric, type Metric } from '$lib/record/api.ts';
   import type { News } from '$lib/record/news-live.ts';
@@ -79,10 +80,12 @@
    * student's record for three figures it refuses. A record with no use case draws the house Home's own page, `home`,
    * which Money declares. `null` is the sample, which draws the Home below unchanged; a record that holds neither page
    * draws the Home below too. Nothing is drawn in its place until the record has said which.
+   *
+   * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
+   * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
+   * page is asked for when it is there, then the house one when that is, and otherwise none.
    */
-  /** The house Home's page, declared by Money (`packages/seed/src/modules/money.ts`). */
-  const HOUSE_HOME = 'home';
-  const declares = $derived(data.live ? (homePage() ?? HOUSE_HOME) : null);
+  const declares = $derived(data.live ? homeSlugOf(homePage(), data.pages) : null);
   let declared = $state<{ blocks: LiveBlock[]; now: number } | null>(null);
   let asking = $state(false);
   const news = $derived(data.live ? (feed ?? { items: data.whatsNew, upTo: data.upTo, sinceCapped: data.sinceCapped }) : null);
