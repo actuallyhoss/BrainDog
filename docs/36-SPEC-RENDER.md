@@ -151,6 +151,7 @@ interface KindSpec {
 | `bridge` | proportional | label · ±amount · note | 3 | no | — | |
 | `series` | proportional | the header row's count: bucket · up to four series (`in:` or `out:`) · `state` (optional) | n | no | — | header, forms `net` |
 | `lines` | proportional | the header row's count: point · up to four lines, a `was:` line being the same measure over the period before, dashed | n | no | — | header; the first current line is the one accent series, and the lead is its last value with the change against the first `was:` line at the same point |
+| `progress` | proportional | label · value · target · note (optional) | 4 | yes | — | forms `budget`; a goal is `good` once reached, a budget `warn` from 90% and `bad` past its limit, the part over marked; a tone written on the row wins |
 | `forecast` | proportional | mark (`opening` `past` `step` `horizon` `knobs`) · day · label · amount | 4 | no | — | page-only; knobs and scrub only with `RenderOptions.scenario` |
 | `spec` | rows | label · value · note | 3 | no | — | |
 | `params` | rows | label · value · note | 3 | no | — | |

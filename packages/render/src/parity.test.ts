@@ -113,6 +113,9 @@ const SHAPES: Record<string, string> = {
     '```series net\nMonth | in: Money in | out: Money out | state\nApr 2026 | £4,800.00 | £2,300.00 | \nMay 2026 |  |  | \nSep 2026 | £1,000.00 | £900.00 | partial\nOct 2026 | £2,000.00 |  | ahead\n```',
   'a series with no numbers at all': '```series | In and out\nMonth | Sales\nApr | \n```',
   'lines with a comparison, a gap and money': '```lines\nDay | Revenue | was: Previous 30 days\n1 Sep | £4,000.00 | £3,600.00\n2 Sep |  | £3,650.00\n3 Sep | £4,200.00 | £3,900.00\n```',
+  'progress toward goals, one reached and one with no target':
+    '```progress | Savings\nHoliday | £1,200.00 | £3,000.00 | by 1 Mar 2027\nNew laptop | £900.00 | £900.00\nSomeday |  | \n```',
+  'a progress budget with one over and a tone': '```progress budget\nGroceries | £212.40 | £300.00 | this month\nEating out | £140.00 | £120.00\nTransport | £10.00 | £100.00 |  | info\n```',
   'lines of one plain column with no numbers': '```lines | Users\nDay | Users\n1 Sep | \n```',
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':

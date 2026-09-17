@@ -22,6 +22,7 @@
   import Bridge from '../Bridge.svelte';
   import Series from '../Series.svelte';
   import Lines from '../Lines.svelte';
+  import Progress from '../Progress.svelte';
   import Forecast from '../Forecast.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -65,6 +66,8 @@
   <Series {block} {opts} />
 {:else if block.kind === 'lines'}
   <Lines {block} {opts} />
+{:else if block.kind === 'progress'}
+  <Progress {block} {opts} />
 {:else if block.kind === 'forecast'}
   <Forecast {block} {opts} />
 {:else}

@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty-seven kinds, and the four intent words.
+ * The eight primitives, the twenty-eight kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -181,6 +181,9 @@ const TABLE = {
   /* A header row `Day | Revenue | was: Previous 30 days`, then a row a point: a measure over time as a line, the
      period before as a quiet dashed one, and the lead figure with its change (`src/lines.ts`). */
   lines: { primitive: 'proportional', cells: 0, tone: false, header: true, minSpan: 4, purpose: 'figure' },
+  /* `label | value | target | note`: one track a row filled toward its target, and the `budget` form, where the target
+     is a limit and spending past it is marked (`src/progress.ts`). */
+  progress: { primitive: 'proportional', cells: 4, optional: 1, forms: ['budget'], tone: true, minSpan: 4, purpose: 'figure' },
   /* `opening | day | label | balance`, then `past`, `step`, `horizon` and `knobs` rows: a cash walk as a
      line, with knobs where the host asks for them (`src/forecast.ts`). Page-only, because its rows are
      a walk the record computed. */

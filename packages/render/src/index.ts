@@ -63,6 +63,7 @@ export { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_STEPS, SPLIT_ZERO, splitPl
 export { BRIDGE_AMOUNT, BRIDGE_STEP, BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
 export { SERIES_AHEAD, SERIES_MOST, SERIES_NET, SERIES_NONE, SERIES_NUMBERS, SERIES_PARTIAL, seriesPlan, seriesValue, type SeriesBar, type SeriesDir, type SeriesPlan, type SeriesState } from './series.ts';
 export { LINES_AGAINST, LINES_MOST, LINES_NONE, LINES_NOTHING, LINES_NUMBERS, changeSaid, linesNearest, linesPlan, linesValue, type LinesLine, type LinesPlan } from './lines.ts';
+export { PROGRESS_LIMIT, PROGRESS_NEAR, PROGRESS_NONE, PROGRESS_OF, PROGRESS_PART, PROGRESS_REACHED, PROGRESS_SHARE, PROGRESS_SO_FAR, PROGRESS_SPENT, PROGRESS_TARGET, progressLeft, progressOver, progressPlan, progressSentence, progressToGo, type ProgressBar, type ProgressForm, type ProgressInput } from './progress.ts';
 export { figureLike } from './figure.ts';
 export {
   FORECAST_KNOBS,

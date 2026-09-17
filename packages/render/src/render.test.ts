@@ -17,7 +17,7 @@ const NOW = Date.UTC(2026, 8, 3, 12); // 2026-09-03
 /* ── the closed sets ──────────────────────────────────────────────────────── */
 
 test('twenty-six kinds over eight primitives, and every kind names one that exists', () => {
-  assert.equal(Object.keys(KINDS).length, 27);
+  assert.equal(Object.keys(KINDS).length, 28);
   assert.equal(PRIMITIVES.length, 8);
   assert.equal(PRIMITIVES_VERSION, 1);
   for (const [kind, spec] of Object.entries(KINDS))

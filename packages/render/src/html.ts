@@ -24,6 +24,7 @@ import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSent
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
+import { PROGRESS_LIMIT, PROGRESS_NONE, PROGRESS_OF, PROGRESS_PART, PROGRESS_SHARE, PROGRESS_SO_FAR, PROGRESS_SPENT, PROGRESS_TARGET, progressPlan, progressSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -276,6 +277,7 @@ function proportional(b: Block, o: RenderOptions): string {
   if (b.kind === 'bridge') return bridge(b, o);
   if (b.kind === 'series') return series(b, o);
   if (b.kind === 'lines') return lines(b, o);
+  if (b.kind === 'progress') return progress(b, o);
   if (b.kind === 'forecast') return forecast(b, o);
 
   if (b.kind === 'gauge') {
@@ -655,6 +657,41 @@ function diff(b: Block): string {
     )
     .join('');
   return `<div class="diff"><p class="diff-sum">${escape(plan.summary)}</p><div class="diff-lines">${body}</div></div>`;
+}
+
+/**
+ * `progress`: one track a row, filled toward its target (`src/progress.ts`), with the value of the target, the share,
+ * what is left, and the numbers in a fold. The `budget` form marks spending past the limit beyond a line at the limit.
+ * `Progress.svelte` is this function's twin.
+ */
+function progress(b: Block, o: RenderOptions): string {
+  const form = b.form === 'budget' ? 'budget' : 'goal';
+  const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
+  const plan = progressPlan(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), form);
+  const drawn = (v: string | undefined): string => renderInline(inline(v || MISSING, o), o);
+  const body = b.rows.length
+    ? b.rows
+        .map((r, i) => {
+          const p = plan[i]!;
+          const track = p.drawable
+            ? `<span class="progress-track" role="img" aria-label="${escape(progressSentence(said(r, 0), said(r, 1), said(r, 2), p.share))}" style="--fill:${p.fill}"><span class="progress-fill"></span>${
+                p.limit === null ? '' : `<span class="progress-over" style="--limit:${p.limit}"></span>`
+              }</span>`
+            : '';
+          return `<div class="progress-row"${toneAttrs(p.intent)}>${cell('progress-label', r.cells[0], o)}<span class="progress-figure num"><span class="progress-value">${drawn(r.cells[1])}</span><span class="progress-of">${PROGRESS_OF}</span><span class="progress-target">${drawn(r.cells[2])}</span></span><span class="progress-share num">${escape(p.share)}</span>${track}${
+            p.left ? `<span class="progress-left num">${escape(p.left)}</span>` : ''
+          }${r.cells[3] ? cell('progress-note', r.cells[3], o) : ''}${toneGlyph(p.intent)}</div>`;
+        })
+        .join('')
+    : `<p class="progress-empty">${escape(PROGRESS_NONE)}</p>`;
+  const numbers = b.rows.length
+    ? numbersFold(
+        'progress',
+        [PROGRESS_PART, form === 'budget' ? PROGRESS_SPENT : PROGRESS_SO_FAR, form === 'budget' ? PROGRESS_LIMIT : PROGRESS_TARGET, PROGRESS_SHARE],
+        b.rows.map((r, i) => [said(r, 0) || PROGRESS_PART, said(r, 1) || MISSING, said(r, 2) || MISSING, plan[i]!.share]),
+      )
+    : '';
+  return `<div class="prop progress"${form === 'budget' ? ' data-form="budget"' : ''}>${body}${numbers}</div>`;
 }
 
 /**
