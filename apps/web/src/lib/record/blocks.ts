@@ -299,8 +299,10 @@ function forecastRows(block: BlockResult): string[] {
 function seriesRows(block: BlockResult): string[] {
   const bars = block.bars;
   if (!bars || bars.keys.length === 0) return [];
-  const currency = bars.unit ?? homeCurrency() ?? null;
   const lines = block.series ?? [];
+  /* A SERIES OF COUNTS IS NOT MONEY: the home currency is only the unit of lines whose figures are money. */
+  const inMoney = lines.some((l) => METRICS[l.metric]?.format?.startsWith('money.'));
+  const currency = bars.unit ?? (inMoney ? homeCurrency() : null) ?? null;
   const head = [
     escapeCell(copy.seriesAxis[bars.bucket] ?? bars.bucket),
     ...lines.map((l) => `${l.dir === 'out' ? 'out' : 'in'}: ${escapeCell(l.label ?? l.metric)}`),
@@ -442,7 +444,10 @@ function boardOrder(block: BlockResult): BlockResult {
     const i = values.indexOf(String(e.fields[field] ?? ''));
     return i === -1 ? values.length : i;
   };
-  return { ...block, entries: [...block.entries].sort((a, b) => rank(a) - rank(b)) };
+  /* THE ROWS MOVE WITH THEIR ENTRIES. A link is drawn from the row's own cells, so sorting only the entries put each card
+     under the project of whichever row had stood in its place. */
+  const order = block.entries.map((e, i) => ({ e, i })).sort((a, b) => rank(a.e) - rank(b.e));
+  return { ...block, entries: order.map((o) => o.e), rows: order.map((o) => block.rows[o.i]!).filter(Boolean) };
 }
 
 /**

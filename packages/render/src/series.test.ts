@@ -68,3 +68,9 @@ test('a computed figure is written the way the host wrote its own', () => {
   assert.equal(figureLike('1,200', 3400.4), '3,400');
   assert.equal(figureLike('no number', 12.5), '12.5');
 });
+
+test('a series of counts by week says each week by its day on a narrow chart, and its figures are counts', () => {
+  const plan = seriesPlan([['Week', 'in: Done, then due', 'state'], ['Week of 20 Jul', '1', ''], ['Week of 7 Sep', '4', 'ahead']]);
+  assert.deepEqual(plan.buckets.map((b) => b.short), ['20', '7']);
+  assert.equal(plan.top, '4');
+});

@@ -139,13 +139,18 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     });
   }
 
+  const shortOf = (label: string): string => {
+    const words = label.split(/\s+/u);
+    return words.length > 2 ? (words.at(-2) ?? label) : (words[0] ?? label);
+  };
   const buckets = body.map((r, i) => {
     const label = (r[0] ?? '').trim();
     const state = stateOf(stated ? r[stateAt] : undefined);
     const v = netOf(i);
     return {
       label,
-      short: label.split(/\s+/u)[0] ?? label,
+      /* The first word (`Sep` of `Sep 2026`), or the day a week begins on (`20` of `Week of 20 Jul`). */
+      short: shortOf(label),
       state,
       said: state === 'partial' ? SERIES_PARTIAL : state === 'due' ? SERIES_DUE : state === 'ahead' ? SERIES_AHEAD : '',
       values: series.map((_, k) => (values[i]![k] === null ? MISSING : (r[k + 1] ?? '').trim())),
