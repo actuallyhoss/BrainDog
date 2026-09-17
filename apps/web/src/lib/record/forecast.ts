@@ -60,6 +60,8 @@ export type Runway = {
    */
   currency: string | null;
   mixed: readonly string[];
+  /** Set when a home currency is chosen and a movement could not be converted into it: each pair, `USD to EGP`. */
+  missing?: string[];
   steps: Step[];
   /** The first step whose balance goes under, or null if none does inside the horizon. */
   crossed: Step | null;
@@ -177,7 +179,7 @@ const HORIZON_CAP = 3650;
  * A `part` obligation counts in full. It is the honest direction for a balance you are asking not to
  * go under: the part already paid is not in the opening figure either.
  */
-export function runway(opening: number, legs: readonly Leg[], horizon = 180): Runway {
+export function runway(opening: number, legs: readonly Leg[], horizon = 180, only?: string): Runway {
   /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
      with nothing checked at all. A refusal is a value here as everywhere else, so a horizon this
      walk cannot carry is a sentence rather than a table drawn over a window that is not a window. */
@@ -295,7 +297,13 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
      already draws names what was wrong with it. */
   /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, each at the rate as of its day, as the kernel's walk
      does; one that cannot be converted leaves the walk with no steps and a sentence naming the rate. */
-  const held = fxNow();
+  /* ONE CURRENCY OF A WALK DRAWN ONCE PER CURRENCY (`only`): that currency's movements, as they are, as the kernel's. */
+  if (only !== undefined && !bare) {
+    for (let i = movements.length - 1; i >= 0; i -= 1) if (movements[i]!.currency !== only) movements.splice(i, 1);
+    seen.clear();
+    seen.add(only);
+  }
+  const held = only === undefined ? fxNow() : { home: null, rates: [] };
   const home = held.home;
   if (!bare && home !== null && seen.size > 0 && (seen.size > 1 || !seen.has(home))) {
     const missing = new Set<string>();
@@ -310,6 +318,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
         from: opening,
         currency: null,
         mixed: [...seen].sort(),
+        missing: [...missing].sort().map((c) => `${c} to ${home}`),
         steps: [],
         crossed: null,
         days: null,

@@ -114,13 +114,21 @@ test('A FIGURE NOBODY DECLARED IS SAID, not walked from zero', async () => {
   assert.equal(out.refusals[0]?.at, 'opening');
 });
 
-test('A BALANCE IN ONE CURRENCY AND BILLS IN ANOTHER ARE NOT ONE WALK', async () => {
+test('A BALANCE IN ONE CURRENCY AND BILLS IN ANOTHER ARE NOT ONE WALK: they are one walk a currency', async () => {
   const k = await record();
   value(k.create('bills', { what: 'Hosting', amount: { amount: 1_000, currency: 'USD' }, due: '2026-09-10' }, OWNER));
   value(k.update('bills', 'bills#1', { amount: { amount: 600_000, currency: 'USD' } }, OWNER));
   const out = k.block(walk({ metric: 'cash-now' }));
   assert.equal(out.walk, undefined);
-  assert.equal(out.refusals[0]?.code, 'MIXED_CURRENCY');
+  assert.deepEqual(out.refusals, []);
+  assert.deepEqual(
+    out.walks?.map((w) => ({ currency: w.currency, from: w.from, steps: w.steps.map((s) => s.label), crossed: w.crossed?.label ?? null })),
+    [
+      { currency: 'GBP', from: 500_000, steps: [], crossed: null },
+      { currency: 'USD', from: 0, steps: ['Hosting', 'Rent'], crossed: 'Hosting' },
+    ],
+  );
+  assert.deepEqual(out.walkFx, { home: null, missing: [] });
 });
 
 /* ── how a figure moved ──────────────────────────────────────────────────── */

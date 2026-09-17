@@ -24,7 +24,7 @@ import { evaluate } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Json } from './coerce.ts';
-import type { Rate } from './fx.ts';
+import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
@@ -187,6 +187,12 @@ export type BlockResult = PageBlock & {
   readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[]; target?: MetricDecl['target'] }[];
   /** A `forecast.runway` block's walk. */
   walk?: Runway;
+  /**
+   * A cash walk over money in several currencies that could not be converted: one walk a currency, each starting from
+   * that currency's part of the opening, in code order, and why it is not one walk (`home`, and each `missing` pair).
+   */
+  walks?: Runway[];
+  walkFx?: { home: string | null; missing: string[] };
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
   /**
@@ -266,7 +272,8 @@ export type PageDeps = {
   /** The field that titles a row of this register — what a template's slug is made from. */
   titleOf: (register: string) => string | null;
   /** The cash walk, when a block names it. */
-  runway: (opening: number, legs: readonly Leg[], horizon?: number) => Runway | null;
+  /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
+  runway: (opening: number, legs: readonly Leg[], horizon?: number, only?: string) => Runway | null;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -586,6 +593,40 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'forecast.runway') {
     const opened = openingOf(deps, block.opening);
     if (opened.refusal) return { ...base, refusals: also(opened.refusal) };
+    /* MONEY IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS ONE WALK A CURRENCY, never a sentence instead of a walk:
+       each walks that currency's part of the opening through that currency's movements, and a crossing day is a day in
+       one currency. A converted opening is walked as one, and a movement it cannot convert still says which rate. */
+    if (Array.isArray(block.from) && (opened.parts || opened.value !== null)) {
+      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, block.horizon);
+      const apart =
+        opened.parts !== undefined ||
+        (whole !== null && !opened.converted && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
+      if (apart) {
+        const moving = whole ?? deps.runway(0, block.from, block.horizon);
+        const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...(moving?.mixed ?? []), ...(moving?.currency ? [moving.currency] : [])])]
+          .filter((c) => /^[A-Z]{3}$/u.test(c))
+          .sort();
+        const walks = currencies.flatMap((c) => {
+          const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
+          const one = deps.runway(from, block.from!, block.horizon, c);
+          return one ? [one] : [];
+        });
+        if (walks.length > 0) {
+          const late = latenessOf(deps, block);
+          if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
+          const home = deps.ctx.fx?.().home ?? null;
+          const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();
+          return {
+            ...base,
+            walks,
+            walkFx: { home, missing },
+            ...late,
+            matched: walks.reduce((n, w) => n + w.steps.length, 0),
+            refusals: also(...walks.flatMap((w) => w.refusals)),
+          };
+        }
+      }
+    }
     if (opened.value === null || !Array.isArray(block.from))
       return {
         ...base,
@@ -810,7 +851,10 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
  * `{ metric }` IS THE ONE THAT CANNOT DRIFT. A page that leads with Cash now and walks from a typed
  * opening says two things about one balance, and only one of them moves when an account is updated.
  */
-function openingOf(deps: PageDeps, opening: PageBlock['opening']): { value: number | null; unit: string | null; refusal?: Refusal } {
+function openingOf(
+  deps: PageDeps,
+  opening: PageBlock['opening'],
+): { value: number | null; unit: string | null; refusal?: Refusal; parts?: Part[]; missing?: string[]; converted?: boolean } {
   if (typeof opening === 'number') return { value: opening, unit: null };
   if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
   const decl = deps.metric(opening.metric);
@@ -823,21 +867,11 @@ function openingOf(deps: PageDeps, opening: PageBlock['opening']): { value: numb
   const read = deps.read(decl);
   if (!read.ok) return { value: null, unit: null, ...(refused(read) ? { refusal: read.refusal } : {}) };
   if (read.value.refusals.length) return { value: null, unit: null, refusal: read.value.refusals[0]! };
-  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM, and the walk says which. */
+  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM: its parts are, one walk a
+     currency, and the pairs it lacks are said beside them. */
   const parts = read.value.parts;
-  if (parts) {
-    const missing = read.value.fx?.missing ?? [];
-    return {
-      value: null,
-      unit: null,
-      refusal: {
-        code: 'MIXED_CURRENCY',
-        fix: `${opening.metric} is in ${parts.map((p) => p.currency).join(' and ')}, and a walk starts from one amount. ${missing.length ? `There is no rate yet from ${missing.join(', ')}.` : 'Set a home currency and rates into it.'}`,
-        at: 'opening',
-      },
-    };
-  }
-  return { value: read.value.value ?? 0, unit: read.value.unit };
+  if (parts) return { value: null, unit: null, parts, missing: read.value.fx?.missing ?? [] };
+  return { value: read.value.value ?? 0, unit: read.value.unit, converted: Boolean(read.value.fx?.asOf) };
 }
 
 /** The knobs a `forecast` may offer. */

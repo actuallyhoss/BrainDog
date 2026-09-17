@@ -38,7 +38,7 @@ import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from 
 import { day as longDay, money, parse, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
+import { NOW, REGISTERS, ROWS, display, homeCurrency, walkTable, type BlockResult } from './api.ts';
 import { copy } from '../copy.ts';
 import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
@@ -614,7 +614,19 @@ const measuresFor = (block: BlockResult) =>
  */
 type Charted = { currency: string | null; block: BlockResult }[];
 
-function charted(block: BlockResult): { charts: Charted; converted: string | null } | null {
+function charted(block: BlockResult): { charts: Charted; converted: string | null; note?: string | null } | null {
+  /* A CASH WALK THE RECORD COULD NOT ADD UP, one walk a currency, each with its own table. */
+  if ((block.kind === 'forecast' || block.kind === 'bridge') && block.walks && block.walks.length > 0) {
+    const today = block.stale_at.slice(0, 10);
+    return {
+      charts: block.walks.map((walk) => ({
+        currency: walk.currency,
+        block: { ...block, walk, walks: undefined, ...walkTable(walk, walk.steps.length, today, false) },
+      })),
+      converted: null,
+      note: block.walkNote ?? null,
+    };
+  }
   /* A SERIES THE RECORD LINED UP ONCE PER CURRENCY. */
   if (block.kind === 'series' && block.bars?.split && block.bars.split.length > 0) {
     const bars = block.bars;
@@ -688,11 +700,14 @@ export function toSegments(block: BlockResult): ReturnType<typeof parse> {
   const split = charted(block);
   if (split) {
     const one = split.charts.length === 1 && split.charts[0]!.currency === null;
-    return split.charts.flatMap(({ currency, block: part }) => [
-      ...(one || currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true })),
-      ...drawSegments(part),
-      ...(split.converted ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
-    ]);
+    return [
+      ...split.charts.flatMap(({ currency, block: part }) => [
+        ...(one || currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true })),
+        ...drawSegments(part),
+        ...(split.converted ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
+      ]),
+      ...(split.note ? parse(split.note, { page: true }) : []),
+    ];
   }
   return drawSegments(block);
 }

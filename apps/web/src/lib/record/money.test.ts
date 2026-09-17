@@ -298,3 +298,22 @@ test('the home currency is the one most of the money is in, and none when there 
   assert.equal(homeOf([1, 'x']), null);
   assert.equal(homeOf([eur(1), gbp(1)]), 'EUR');
 });
+
+test('A CASH WALK OVER TWO CURRENCIES WITH NO RATE IS ONE WALK A CURRENCY, each under its code, and the reason said once', () => {
+  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
+  withEuro('accounts', 'balance', liquid, () => {
+    const cash = read(METRICS['cash-now']!);
+    assert.deepEqual(cash.parts?.map((p) => p.currency), ['EUR', 'GBP'], 'the opening is in two currencies, so this test is about a split walk');
+    const block = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
+    assert.ok(block, 'the Cash ahead forecast is gone; this test is about it');
+    assert.deepEqual(block.refusals, []);
+    assert.equal(block.walk, undefined, 'never one walk across two currencies');
+    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
+    assert.equal(block.walks?.[0]?.from, 123_400, 'the euro walk starts from the euro part');
+    assert.equal(block.walks?.[1]?.from, cash.parts?.find((p) => p.currency === 'GBP')?.amount, 'the sterling walk starts from the sterling part');
+    assert.equal(block.walkNote, copy.figureNoHome);
+    const text = JSON.stringify(toSegments(block));
+    assert.match(text, /In EUR/u);
+    assert.match(text, /In GBP/u);
+  });
+});

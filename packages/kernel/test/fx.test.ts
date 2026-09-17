@@ -374,3 +374,49 @@ test('A TARGET IN THE DECLARED CURRENCY IS CONVERTED AT THE LATEST RATE, and jud
   assert.equal(read(k, { ...cash, target: { lte: 640_000_000 } }).met, true);
   sql.close();
 });
+
+test('A CASH WALK OVER TWO CURRENCIES WITH NO RATE IS ONE WALK A CURRENCY, each from its part of the opening', async () => {
+  const { k, sql } = await founder();
+  assert.ok(
+    (
+      await k.install([
+        { id: 'metric.cash-now', kind: 'metric', body: Object.fromEntries(Object.entries(CASH).filter(([key]) => key !== 'group_by')) } as unknown as Declaration,
+        {
+          id: 'register.bills',
+          kind: 'register',
+          body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }, { id: 'due', type: 'day', required: true }] },
+        } as unknown as Declaration,
+      ])
+    ).ok,
+  );
+  for (const row of [
+    { what: 'Rent', amount: { amount: 2_000_000, currency: 'EGP' }, due: '2026-09-25' },
+    { what: 'Hosting', amount: { amount: 400_000, currency: 'USD' }, due: '2026-09-20' },
+  ])
+    assert.ok(k.create('bills', row, { actor: 'p_1' }).ok);
+  const block = { kind: 'forecast', source: 'forecast.runway', opening: { metric: 'cash-now' }, from: [{ register: 'bills', on: 'due', amount: 'amount' }], horizon: 30 };
+
+  const apart = k.block(block as never);
+  assert.deepEqual(apart.refusals, []);
+  assert.equal(apart.walk, undefined);
+  assert.deepEqual(
+    apart.walks?.map((w) => ({ currency: w.currency, from: w.from, end: w.steps.at(-1)?.balance, crossed: w.crossed?.label ?? null })),
+    [
+      { currency: 'EGP', from: 5_200_000, end: 3_200_000, crossed: null },
+      { currency: 'USD', from: 350_050, end: -49_950, crossed: 'Hosting' },
+    ],
+  );
+  assert.deepEqual(apart.walkFx, { home: null, missing: [] });
+
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  const lacking = k.block(block as never);
+  assert.equal(lacking.walks?.length, 2, 'still one walk a currency');
+  assert.deepEqual(lacking.walkFx, { home: 'EGP', missing: ['USD to EGP'] });
+
+  assert.ok(k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-01' }, { actor: 'p_1' }).ok);
+  const one = k.block(block as never);
+  assert.equal(one.walks, undefined, 'converted, it is one walk');
+  assert.equal(one.walk?.currency, 'EGP');
+  assert.equal(one.walk?.from, 5_200_000 + 17_502_500);
+  sql.close();
+});

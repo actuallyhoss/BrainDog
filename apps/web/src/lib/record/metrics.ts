@@ -296,6 +296,10 @@ export function fxNote(r: { parts?: readonly Part[] | undefined; fx?: FxRead | u
   return null;
 }
 
+/** Why a cash walk is drawn once per currency: the rate it lacks, or that no home currency is chosen. */
+export const walksNote = (home: string | null, missing: readonly string[], walks: number): string | null =>
+  home !== null && missing.length ? copy.figureNoRate(missing.join(', ')) : walks > 1 ? copy.figureNoHome : null;
+
 /** Whether a figure came back in a currency other than the one it declares, so its target, which is in that one, does not apply. */
 export const offTarget = (decl: { format?: string | undefined } | undefined, unit: string | null | undefined): boolean =>
   Boolean(decl?.format?.startsWith('money.') && unit && decl.format.slice('money.'.length) !== unit);

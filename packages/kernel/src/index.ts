@@ -2471,12 +2471,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
-    runway: (opening, legs, horizon) => {
+    runway: (opening, legs, horizon, only) => {
       const out = runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
         legs,
         horizon,
+        only,
       );
       return out.ok ? out.value : null;
     },

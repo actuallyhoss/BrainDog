@@ -41,7 +41,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, fxNote, hrefFor, noteOf, partsShown, targetSaid, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, noteOf, partsShown, targetSaid, walksNote, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
@@ -441,6 +441,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     values,
     drawn,
     walk: walked,
+    walks: walkedApart,
+    walkFx,
     feed: fed,
     seen: mark,
     history: versions,
@@ -530,6 +532,18 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
      is shaped by the function that shapes the sample's, so the same renderer draws both. One the record
      did not send, or sent in a shape this cannot read, says it cannot be drawn rather than drawing empty. */
   if (b.source === 'forecast.runway') {
+    /* ONE WALK A CURRENCY, when the record could not add them up, each drawn under its code and the reason said once. */
+    const apart = Array.isArray(walkedApart) ? walkedApart.map(walkOf) : [];
+    if (apart.length > 0 && apart.every((w): w is Walk => w !== null)) {
+      const fx = isObject(walkFx) ? walkFx : {};
+      const missing = Array.isArray(fx.missing) ? fx.missing.filter((m): m is string => typeof m === 'string') : [];
+      return {
+        ...shell,
+        walks: apart,
+        walkNote: walksNote(typeof fx.home === 'string' ? fx.home : null, missing, apart.length),
+        ...walkTable(apart[0]!, kind === 'bridge' || kind === 'forecast' ? apart[0]!.steps.length : limit, new Date(now).toISOString().slice(0, 10), false),
+      };
+    }
     const walk = walkOf(walked);
     const past = pastOf(remembered);
     return walk

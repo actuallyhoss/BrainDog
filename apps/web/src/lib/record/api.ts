@@ -55,7 +55,7 @@ import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
-import { fxNote, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, windowMs, withParam } from './metrics.ts';
+import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -107,23 +107,19 @@ export const homeCurrency = (): string | null =>
  * `{ metric }` keeps the walk and the Cash now tile on one declaration. A figure that cannot be read
  * leaves the walk with no opening and says why, rather than walking from zero.
  */
-export function openingOf(opening: PageBlock['opening']): { value: number | null; unit: string | null; refusal?: string } {
+export function openingOf(
+  opening: PageBlock['opening'],
+): { value: number | null; unit: string | null; refusal?: string; parts?: Part[]; missing?: string[]; converted?: boolean } {
   if (typeof opening === 'number') return { value: opening, unit: null };
   if (!opening || typeof opening !== 'object' || typeof opening.metric !== 'string') return { value: null, unit: null };
   const decl = METRICS[opening.metric];
   if (!decl) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
   const reading = read(decl);
   if (reading.refusals.length) return { value: null, unit: null, refusal: reading.refusals[0]! };
-  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM, as the record says. */
-  if (reading.parts) {
-    const missing = reading.fx?.missing ?? [];
-    return {
-      value: null,
-      unit: null,
-      refusal: `${opening.metric} is in ${reading.parts.map((p) => p.currency).join(' and ')}, and a walk starts from one amount. ${missing.length ? `There is no rate yet from ${missing.join(', ')}.` : 'Set a home currency and rates into it.'}`,
-    };
-  }
-  return { value: reading.value ?? 0, unit: reading.unit ?? currencyOfFormat(decl.format) };
+  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM: its parts are, one walk a
+     currency, as the record says. */
+  if (reading.parts) return { value: null, unit: null, parts: reading.parts, missing: reading.fx?.missing ?? [] };
+  return { value: reading.value ?? 0, unit: reading.unit ?? currencyOfFormat(decl.format), converted: Boolean(reading.fx?.asOf) };
 }
 
 /** `money.GBP` is sterling; any other format is not a currency. */
@@ -1567,6 +1563,9 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `forecast.runway` block's walk, which a `bridge` draws from rather than from the table. */
   walk?: Walk;
+  /** A walk over several currencies that could not be converted: one walk a currency, and why it is not one. */
+  walks?: Walk[] | undefined;
+  walkNote?: string | null;
   /** A `series` block's buckets and each line's value in them, as the record's `barsOf` lines them up. */
   bars?: Bars;
   /** A `stat` or `lines` over readings: one series a measure, as the record's `measureSeries` works them out. */
@@ -1604,6 +1603,30 @@ export type FeedRow = {
 };
 
 /**
+ * A cash walk over money in several currencies that could not be converted, as the record's `pages.ts` draws it: one walk
+ * a currency, each from that currency's part of the opening, and the sentence saying why it is not one walk.
+ * `null` when the walk is one.
+ */
+function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks: ReturnType<typeof runway>[]; note: string | null } | null {
+  const legs = b.from ?? [];
+  if (!Array.isArray(b.from) || (!opened.parts && opened.value === null)) return null;
+  const whole = opened.parts ? null : runway(opened.value!, legs, b.horizon);
+  const apart =
+    opened.parts !== undefined ||
+    (whole !== null && !opened.converted && !whole.mixed.includes(BARE) && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
+  if (!apart) return null;
+  const moving = whole ?? runway(0, legs, b.horizon);
+  if (moving.mixed.includes(BARE)) return null;
+  const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...moving.mixed, ...(moving.currency ? [moving.currency] : [])])]
+    .filter((c) => /^[A-Z]{3}$/u.test(c))
+    .sort();
+  const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c));
+  if (walks.length === 0) return null;
+  const missing = [...new Set([...(opened.missing ?? []), ...(moving.missing ?? [])])].sort();
+  return { walks, note: walksNote(fxNow().home, missing, walks.length) };
+}
+
+/**
  * The cash walk, shaped as an ordinary table block.
  *
  * Four columns, and the fourth is the reason the walk is drawn at all: the balance after each
@@ -1628,6 +1651,24 @@ function runwayBlock(b: PageBlock): BlockResult {
      It mattered the moment the block started stating its total: "12 of 58" where 58 was movements
      inside a window derived from a row count. */
   const opened = openingOf(b.opening);
+  const split = splitWalks(opened, b);
+  if (split) {
+    const late = latenessOf(b);
+    return {
+      ...b,
+      register: undefined,
+      entries: [],
+      matched: [],
+      refusals: [...(typeof late === 'string' ? [late] : []), ...split.walks.flatMap((w) => w.refusals)],
+      walks: split.walks,
+      walkNote: split.note,
+      ...(typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
+      ...walkTable(split.walks[0]!, b.kind === 'bridge' || b.kind === 'forecast' ? split.walks[0]!.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), false),
+      drawn: b.drawn ?? drawnWhen(b),
+      stale_at: new Date(NOW).toISOString(),
+      metrics: undefined,
+    };
+  }
   const walk = runway(opened.value ?? 0, b.from ?? [], b.horizon);
   /* A WALK THE RECORD CANNOT MAKE IS A SENTENCE, not an empty table. A cash walk over two currencies
      produces a crossing day that looks real and is invented.
