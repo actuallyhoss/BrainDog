@@ -14,6 +14,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, homePageOf, moduleDocument, moduleExamples, moduleManifest } from '../src/usecases/install.ts';
+import { linkExamples, type LinkIo } from '../src/usecases/links.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -206,7 +207,7 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
 test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOALS AND PROJECTS, and every page reads', async () => {
   const { k, sql } = await made('personal');
   const home = value<{ blocks: (Drawn & { kind: string })[] }>(k.page(homePageOf('personal'))).blocks;
-  assert.deepEqual(home.map((b) => b.heading), ['This month', 'Spending against your budget', 'Bills due this week', 'Savings goals', 'Projects in motion', 'Goals and habits']);
+  assert.deepEqual(home.map((b) => b.heading), ['This month', 'Spending against your budget', 'Bills due this week', 'Savings goals', 'Projects in motion', 'Habits this week', 'Goals']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const cells = new Map((home[0]!.readings ?? []).map((r) => [r.metric, r.reading?.value ?? null]));
   /* THE MONTH STARTS ON ITS FIRST DAY: the record is made on 3 September, so the shop on the 1st counts and the cinema on
@@ -219,6 +220,34 @@ test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOA
     const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
     for (const b of page) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading} was refused`);
   }
+  sql.close();
+});
+
+test('A RUN OR A SAVING IS A ROW THAT MOVES ITS GOAL, and a habit counts only this week', async () => {
+  const { k, sql } = await made('personal');
+  const io: LinkIo = {
+    rows: async (register) => {
+      const read = k.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async (register, seq, field, spoken) => k.update(register, `${register}#${seq}`, { [field]: spoken }, { actor: 'p_owner', cascade: false }).ok,
+  };
+  await linkExamples(io, 'personal');
+  type Toward = Omit<Drawn, 'rows'> & { rows?: (Row & { id: string })[] };
+  const blocks = value<{ blocks: Toward[] }>(k.page('goals')).blocks;
+  const partsOf = (heading: string): Record<string, number | null> => {
+    const b = blocks.find((x) => x.heading === heading)!;
+    assert.deepEqual(b.refusals ?? [], [], heading);
+    const names = new Map((b.rows ?? []).map((r) => [r.id, String(r.fields.what ?? r.fields.name)]));
+    const reading = (b.readings?.[0]?.reading ?? {}) as { groups?: { key: string; value: number | null }[] };
+    return Object.fromEntries((reading.groups ?? []).flatMap((g) => (names.has(g.key) ? [[names.get(g.key)!, g.value]] : [])));
+  };
+  assert.deepEqual(partsOf('Savings goals'), { 'Rainy day fund': 185_000, 'Trip to Lisbon': 42_000, 'New laptop': 15_000 });
+  assert.deepEqual(partsOf('Goals'), { 'Run 100 km before the half marathon': 27, 'Read 12 books this year': 1 });
+  /* THE RECORD IS MADE ON A THURSDAY, so Tuesday's run is this week and nothing logged before Monday counts. */
+  assert.deepEqual(partsOf('Habits this week'), { 'Run three times a week': 2, 'Cook at home five nights a week': 2 });
+  const later = value<{ rows: Row[] }>(k.list({ register: 'goals', limit: 10 })).rows;
+  assert.ok(later.every((g) => g.fields.done === undefined || g.fields.done === null), 'nothing on a goal is typed as so far');
   sql.close();
 });
 

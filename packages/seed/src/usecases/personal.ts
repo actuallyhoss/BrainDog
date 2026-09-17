@@ -16,6 +16,39 @@
 /** This calendar month, from its first day, as a structured predicate: the sentence grammar has no "on or after". */
 const THIS_MONTH = { field: 'on', gte: 'bom' };
 
+const RAINY_DAY = 'Rainy day fund';
+const LISBON = 'Trip to Lisbon';
+const LAPTOP = 'New laptop';
+const RUN_WEEKLY = 'Run three times a week';
+const RUN_KM = 'Run 100 km before the half marathon';
+const COOK = 'Cook at home five nights a week';
+const BOOKS = 'Read 12 books this year';
+
+/**
+ * THE EXAMPLE LOG: what each row is, what it counts toward, how much, and when. Days are counted from the day the record is
+ * made, so a habit has something this week on any day: a row on `0d` is always in the week.
+ */
+const LOGGED: readonly (readonly [string, string, number, string])[] = [
+  ['Morning run', RUN_WEEKLY, 1, '0d'],
+  ['Run after work', RUN_WEEKLY, 1, '-2d'],
+  ['Morning run, 5 km', RUN_KM, 5, '0d'],
+  ['Long run, 14 km', RUN_KM, 14, '-3d'],
+  ['Easy run, 8 km', RUN_KM, 8, '-9d'],
+  ['Cooked a curry', COOK, 1, '0d'],
+  ['Pasta night', COOK, 1, '-1d'],
+  ['Finished Piranesi', BOOKS, 1, '-12d'],
+];
+
+/** THE EXAMPLE SAVINGS PUT BY: what, toward which goal, pence, when. */
+const PUT_BY: readonly (readonly [string, string, number, string])[] = [
+  ['Moved from the current account', RAINY_DAY, 150_000, '-60d'],
+  ['Monthly transfer', RAINY_DAY, 17_500, '-30d'],
+  ['Monthly transfer, this month', RAINY_DAY, 17_500, '-2d'],
+  ['Birthday money', LISBON, 20_000, '-45d'],
+  ['Put aside from pay day', LISBON, 22_000, '-10d'],
+  ['Sold the old phone', LAPTOP, 15_000, '-5d'],
+];
+
 /** The categories a person spends in, shared by spending and budgets so a budget line and a purchase can be matched. */
 const CATEGORIES = {
   values: ['groceries', 'eating_out', 'transport', 'home', 'shopping', 'fun', 'health', 'travel', 'gifts', 'other'],
@@ -35,29 +68,50 @@ const CATEGORIES = {
 
 const BILLS_THIS_WEEK = 'state is open or part, direction is owed by me, due before +8d';
 
-/** The blocks Home and the Goals page share: what each savings goal and each goal has reached. */
+/**
+ * THE BLOCKS HOME AND THE GOALS PAGE SHARE: how far each savings goal, habit and goal has come.
+ *
+ * NOTHING IS TYPED AS "SO FAR". A saving is a row on Put by and a run is a row on the Log, each pointing at what it counts
+ * toward, and a track is set against what was logged (`toward:`). A habit counts only this week's rows, from Monday, so
+ * it starts again every week without anybody resetting it; a goal counts every row.
+ */
 const savingsProgress = (span: number) => ({
   kind: 'progress',
   heading: 'Savings goals',
   span,
   source: 'register.savings_goals',
   where: 'state is not paused',
-  columns: [{ field: 'name' }, { field: 'saved' }, { field: 'target' }, { field: 'by' }],
+  columns: [{ field: 'name' }, { field: 'target' }, { field: 'by' }],
+  toward: 'put-by-by-goal',
   order: [{ field: 'seq', dir: 'asc' }],
   limit: 6,
   empty: 'No savings goal yet. Add one and how close you are shows here.',
 });
 
-const goalsProgress = (span: number) => ({
+const habitsProgress = (span: number) => ({
   kind: 'progress',
-  heading: 'Goals and habits',
+  heading: 'Habits this week',
   span,
   source: 'register.goals',
-  where: 'state is active',
-  columns: [{ field: 'what' }, { field: 'done' }, { field: 'target' }, { field: 'unit' }],
+  where: 'state is active, kind is habit',
+  columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
+  toward: 'logged-this-week-by-goal',
   order: [{ field: 'seq', dir: 'asc' }],
   limit: 8,
-  empty: 'No goals yet. Add one, like running three times a week.',
+  empty: 'No habits yet. Add one, like running three times a week, and log each time.',
+});
+
+const goalsProgress = (span: number) => ({
+  kind: 'progress',
+  heading: 'Goals',
+  span,
+  source: 'register.goals',
+  where: 'state is active, kind is goal',
+  columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
+  toward: 'logged-by-goal',
+  order: [{ field: 'seq', dir: 'asc' }],
+  limit: 8,
+  empty: 'No goals yet. Add one, like running a hundred kilometres, and log each step toward it.',
 });
 
 const budgetProgress = (heading: string) => ({
@@ -74,7 +128,7 @@ const budgetProgress = (heading: string) => ({
 
 export const PERSONAL = {
   usecase: 'personal',
-  version: '1.1.0',
+  version: '1.2.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -133,6 +187,8 @@ export const PERSONAL = {
     'budgets:one': 'budget line',
     savings_goals: 'Savings goals',
     goals: 'Goals',
+    goal_log: 'Log',
+    put_by: 'Put by',
     project_steps: 'Project steps',
   },
   skills: [
@@ -183,13 +239,14 @@ export const PERSONAL = {
         icon: 'star',
         holds: 'what you are saving for, how much it takes and how much is put by',
         title: 'name',
-        mobile: ['name', 'saved', 'target'],
+        mobile: ['name', 'target', 'by'],
         state: 'state',
         done: ['reached'],
         fields: [
           { id: 'name', label: 'Saving for', type: 'text', required: true, search: true },
           { id: 'target', label: 'Target', type: 'money', required: true },
-          { id: 'saved', label: 'Saved so far', type: 'money', required: true },
+          /* KEPT FOR A RECORD MADE BEFORE PUT BY, and read by nothing: what is saved is the rows put by toward the goal. */
+          { id: 'saved', label: 'Saved before logging', type: 'money' },
           { id: 'by', label: 'By', type: 'day', index: true },
           { id: 'account', label: 'Kept in', type: 'ref', to: 'accounts', index: true },
           {
@@ -213,7 +270,7 @@ export const PERSONAL = {
         icon: 'check',
         holds: 'the goals and habits you keep, what you aim for and how far you have got',
         title: 'what',
-        mobile: ['what', 'done', 'target'],
+        mobile: ['what', 'kind', 'target'],
         state: 'state',
         done: ['done'],
         fields: [
@@ -227,7 +284,8 @@ export const PERSONAL = {
             default: 'goal',
             index: true,
           },
-          { id: 'done', label: 'So far', type: 'decimal' },
+          /* KEPT FOR A RECORD MADE BEFORE THE LOG, and read by nothing: how far a goal has come is the rows logged toward it. */
+          { id: 'done', label: 'Done before logging', type: 'decimal' },
           { id: 'target', label: 'Aim', type: 'decimal', required: true },
           { id: 'unit', label: 'Counted in', type: 'text' },
           { id: 'by', label: 'By', type: 'day', index: true },
@@ -242,6 +300,42 @@ export const PERSONAL = {
             index: true,
           },
           { id: 'note', label: 'Notes', type: 'document' },
+          { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
+      {
+        /* A RUN, A BOOK FINISHED, A NIGHT COOKED IN: one row each, pointing at the habit or goal it counts toward. */
+        register: 'goal_log',
+        name: 'Log',
+        one: 'log entry',
+        icon: 'check',
+        holds: 'each run, book or night in that counts toward a habit or a goal, and how much',
+        title: 'what',
+        mobile: ['what', 'goal', 'on'],
+        fields: [
+          { id: 'what', label: 'What', type: 'text', required: true, search: true },
+          { id: 'goal', label: 'Counts toward', type: 'ref', to: 'goals', index: true },
+          { id: 'amount', label: 'How much', type: 'decimal', required: true, default: 1 },
+          { id: 'on', label: 'Day', type: 'day', required: true, index: true },
+          { id: 'note', label: 'Notes', type: 'text' },
+          { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
+      {
+        /* MONEY PUT BY TOWARD A SAVINGS GOAL, one row a transfer. */
+        register: 'put_by',
+        name: 'Put by',
+        one: 'saving',
+        icon: 'money',
+        holds: 'each amount put by toward a savings goal, and when',
+        title: 'what',
+        mobile: ['what', 'amount', 'on'],
+        fields: [
+          { id: 'what', label: 'What', type: 'text', required: true, search: true },
+          { id: 'saving', label: 'Toward', type: 'ref', to: 'savings_goals', index: true },
+          { id: 'amount', label: 'Amount', type: 'money', required: true },
+          { id: 'on', label: 'Day', type: 'day', required: true, index: true },
+          { id: 'note', label: 'Notes', type: 'text' },
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
@@ -297,6 +391,41 @@ export const PERSONAL = {
         compare: 'none',
       },
       {
+        /* WHAT WAS LOGGED TOWARD EACH HABIT THIS WEEK, from Monday, so a habit starts again every week. */
+        metric: 'logged-this-week-by-goal',
+        name: 'Logged this week, by goal',
+        source: 'register.goal_log',
+        where: { field: 'on', gte: 'bow' },
+        value: { sum: 'amount' },
+        group_by: 'goal',
+        format: 'decimal',
+        target: { gte: 0 },
+        window: '30d',
+        compare: 'none',
+      },
+      {
+        metric: 'logged-by-goal',
+        name: 'Logged, by goal',
+        source: 'register.goal_log',
+        value: { sum: 'amount' },
+        group_by: 'goal',
+        format: 'decimal',
+        target: { gte: 0 },
+        window: '30d',
+        compare: 'none',
+      },
+      {
+        metric: 'put-by-by-goal',
+        name: 'Put by, by savings goal',
+        source: 'register.put_by',
+        value: { sum: 'amount' },
+        group_by: 'saving',
+        format: 'money.GBP',
+        target: { gte: 0 },
+        window: '30d',
+        compare: 'none',
+      },
+      {
         metric: 'bills-this-week',
         name: 'Bills this week',
         source: 'register.obligations',
@@ -310,9 +439,8 @@ export const PERSONAL = {
       {
         metric: 'saved-toward-goals',
         name: 'Saved toward goals',
-        source: 'register.savings_goals',
-        where: 'state is not paused',
-        value: { sum: 'saved' },
+        source: 'register.put_by',
+        value: { sum: 'amount' },
         format: 'money.GBP',
         target: { gte: 0 },
         window: '30d',
@@ -325,7 +453,7 @@ export const PERSONAL = {
         page: 'home-personal',
         title: 'Day to day',
         icon: 'home',
-        requires: ['register.spending', 'register.budgets', 'register.savings_goals', 'register.goals', 'register.project_steps', 'register.obligations', 'register.accounts'],
+        requires: ['register.spending', 'register.budgets', 'register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by', 'register.project_steps', 'register.obligations', 'register.accounts'],
         blocks: [
           {
             kind: 'stat',
@@ -364,7 +492,8 @@ export const PERSONAL = {
             limit: 6,
             empty: 'No project steps yet. Give a project its steps and its progress shows here.',
           },
-          goalsProgress(12),
+          habitsProgress(6),
+          goalsProgress(6),
         ],
       },
       {
@@ -418,10 +547,41 @@ export const PERSONAL = {
         title: 'Goals',
         nav: { section: 'Goals', order: 10 },
         icon: 'star',
-        requires: ['register.savings_goals', 'register.goals'],
+        requires: ['register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by'],
         blocks: [
           savingsProgress(12),
-          goalsProgress(12),
+          habitsProgress(6),
+          goalsProgress(6),
+          {
+            kind: 'table',
+            heading: 'Logged lately',
+            span: 6,
+            source: 'register.goal_log',
+            columns: [
+              { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },
+              { field: 'goal', label: 'Toward', width: 'minmax(12ch,1fr)' },
+              { field: 'amount', label: 'How much', width: '9ch', align: 'end' },
+              { field: 'on', label: 'Day', width: '12ch', align: 'end' },
+            ],
+            order: [{ field: 'on', dir: 'desc' }],
+            limit: 8,
+            empty: 'Nothing logged yet. Add a run or a book finished and it counts toward its goal.',
+          },
+          {
+            kind: 'table',
+            heading: 'Put by lately',
+            span: 6,
+            source: 'register.put_by',
+            columns: [
+              { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },
+              { field: 'saving', label: 'Toward', width: 'minmax(12ch,1fr)' },
+              { field: 'amount', label: 'Amount', width: '12ch', align: 'end' },
+              { field: 'on', label: 'Day', width: '12ch', align: 'end' },
+            ],
+            order: [{ field: 'on', dir: 'desc' }],
+            limit: 8,
+            empty: 'Nothing put by yet. Add what you set aside and it counts toward its goal.',
+          },
           {
             kind: 'table',
             heading: 'Every goal',
@@ -544,13 +704,15 @@ export const PERSONAL = {
       { register: 'budgets', fields: { category: 'fun', limit: { amount: 5_000, currency: 'GBP' } } },
       { register: 'budgets', fields: { category: 'health', limit: { amount: 4_000, currency: 'GBP' } } },
       { register: 'budgets', fields: { category: 'gifts', limit: { amount: 5_000, currency: 'GBP' } } },
-      { register: 'savings_goals', fields: { name: 'Rainy day fund', target: { amount: 300_000, currency: 'GBP' }, saved: { amount: 185_000, currency: 'GBP' }, state: 'saving' } },
-      { register: 'savings_goals', fields: { name: 'Trip to Lisbon', target: { amount: 90_000, currency: 'GBP' }, saved: { amount: 42_000, currency: 'GBP' }, by: '+140d', state: 'saving' } },
-      { register: 'savings_goals', fields: { name: 'New laptop', target: { amount: 120_000, currency: 'GBP' }, saved: { amount: 15_000, currency: 'GBP' }, by: '+300d', state: 'saving' } },
-      { register: 'goals', fields: { what: 'Run three times a week', kind: 'habit', done: 2, target: 3, unit: 'runs this week', state: 'active' } },
-      { register: 'goals', fields: { what: 'Run a half marathon', kind: 'goal', done: 16, target: 21, unit: 'km, longest run so far', by: '+60d', state: 'active' } },
-      { register: 'goals', fields: { what: 'Cook at home five nights a week', kind: 'habit', done: 3, target: 5, unit: 'nights this week', state: 'active' } },
-      { register: 'goals', fields: { what: 'Read a book a month', kind: 'habit', done: 0, target: 1, unit: 'book this month', state: 'active' } },
+      { register: 'savings_goals', fields: { name: RAINY_DAY, target: { amount: 300_000, currency: 'GBP' }, state: 'saving' } },
+      { register: 'savings_goals', fields: { name: LISBON, target: { amount: 90_000, currency: 'GBP' }, by: '+140d', state: 'saving' } },
+      { register: 'savings_goals', fields: { name: LAPTOP, target: { amount: 120_000, currency: 'GBP' }, by: '+300d', state: 'saving' } },
+      ...PUT_BY.map(([what, , pence, on]) => ({ register: 'put_by', fields: { what, amount: { amount: pence, currency: 'GBP' }, on } })),
+      { register: 'goals', fields: { what: RUN_WEEKLY, kind: 'habit', target: 3, unit: 'runs', state: 'active' } },
+      { register: 'goals', fields: { what: RUN_KM, kind: 'goal', target: 100, unit: 'km', by: '+60d', state: 'active' } },
+      { register: 'goals', fields: { what: COOK, kind: 'habit', target: 5, unit: 'nights', state: 'active' } },
+      { register: 'goals', fields: { what: BOOKS, kind: 'goal', target: 12, unit: 'books', state: 'active' } },
+      ...LOGGED.map(([what, , amount, on]) => ({ register: 'goal_log', fields: { what, amount, on } })),
       { register: 'project_steps', fields: { what: 'Strip and clean the frame', done: true } },
       { register: 'project_steps', fields: { what: 'Order new brake pads', done: true } },
       { register: 'project_steps', fields: { what: 'Fit the new tyres', done: false, by: '+3d' } },
@@ -564,6 +726,12 @@ export const PERSONAL = {
 
 const OLD_BIKE = 'Restore the old road bike';
 const STORIES = 'A collection of short stories';
+
+/** Which goal each example log row and each saving counts toward, for the linker (`links.ts`). */
+export const PERSONAL_LOG_LINKS: readonly { register: string; title: string; field: string; to: string; target: string }[] = [
+  ...LOGGED.map(([title, goal]) => ({ register: 'goal_log', title, field: 'goal', to: 'goals', target: goal })),
+  ...PUT_BY.map(([title, goal]) => ({ register: 'put_by', title, field: 'saving', to: 'savings_goals', target: goal })),
+];
 
 /** Which project each example step belongs to, for the linker (`links.ts`). */
 export const PERSONAL_STEP_PROJECTS: readonly (readonly [string, string])[] = [

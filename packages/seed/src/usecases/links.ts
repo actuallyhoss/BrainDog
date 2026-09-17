@@ -13,7 +13,7 @@
 
 import { firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
-import { PERSONAL_STEP_PROJECTS } from './personal.ts';
+import { PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
@@ -38,6 +38,7 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   personal: [
     ...PERSONAL_STEP_PROJECTS.map(([title, project]) => ({ register: 'project_steps', title, field: 'thing', to: 'things', target: project })),
     { register: 'savings_goals', title: 'Rainy day fund', field: 'account', to: 'accounts', target: 'Savings account' },
+    ...PERSONAL_LOG_LINKS,
   ],
   student: [
     { register: 'assignments', title: 'Problem set 1: probability', field: 'course', to: 'courses', target: COURSE },
