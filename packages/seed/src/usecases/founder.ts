@@ -9,7 +9,7 @@
 
 export const FOUNDER = {
   usecase: 'founder',
-  version: '1.0.0',
+  version: '1.1.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -59,6 +59,11 @@ export const FOUNDER = {
           },
           { id: 'country', label: 'Registered in', type: 'text' },
           { id: 'currency', label: 'Currency', type: 'text' },
+          /* WHAT IT HOLDS AND WHAT IT RUNS. Money's accounts and Projects cannot name an organisation, because a use
+             case adds no field to another pack's list, so the organisation names them: its balance is the money in the
+             accounts it lists, and a project it lists reports its numbers here. */
+          { id: 'accounts', label: 'Accounts', type: 'list', of: 'ref', to: 'accounts' },
+          { id: 'projects', label: 'Projects', type: 'list', of: 'ref', to: 'things' },
           { id: 'note', label: 'Notes', type: 'document' },
           { id: 'tags', type: 'list', of: 'text' },
         ],
@@ -153,13 +158,61 @@ export const FOUNDER = {
         ],
       },
       {
-        /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name. */
+        /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name.
+
+           THE WHOLE PORTFOLIO ON ONE PAGE: the money across every organisation, each organisation's balance, then every
+           number a project reported as a tile and as a line over thirty days against the thirty before. A `stat` and a
+           `lines` over Datapoints name which field is which (when, value, measure and unit) and draw one tile and one
+           chart a measure, so a measure a project starts sending tomorrow is on this page tomorrow without an edit. */
         page: 'dashboard',
         title: 'Dashboard',
         nav: { section: 'Dashboard', order: 10 },
         icon: 'observe',
-        requires: ['register.datapoints', 'register.organisations'],
+        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
         blocks: [
+          {
+            kind: 'stat',
+            heading: 'Across your organisations',
+            lead: true,
+            span: 12,
+            cells: [
+              { metric: 'cash-now', label: 'Cash now', trend: '30d' },
+              { metric: 'in-30d', label: 'Coming in, 30 days' },
+              { metric: 'out-30d', label: 'Going out, 30 days' },
+            ],
+          },
+          {
+            kind: 'bar',
+            heading: 'Balance by organisation',
+            span: 12,
+            source: 'register.organisations',
+            columns: [{ field: 'name' }, { field: 'accounts' }],
+            empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
+          },
+          {
+            kind: 'stat',
+            heading: 'The numbers',
+            span: 12,
+            source: 'register.datapoints',
+            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+            where: 'at after -60d',
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 500,
+            back: 30,
+            empty: 'No project has reported a number yet.',
+          },
+          {
+            kind: 'lines',
+            heading: 'Thirty days against the thirty before',
+            span: 12,
+            source: 'register.datapoints',
+            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+            where: 'at after -60d',
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 500,
+            back: 30,
+            empty: 'No project has reported a number yet.',
+          },
           {
             kind: 'table',
             heading: 'Latest numbers',
@@ -168,12 +221,13 @@ export const FOUNDER = {
             columns: [
               { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
               { field: 'value', label: 'Value', width: '14ch', align: 'end' },
-              { field: 'unit', label: 'Unit', width: '10ch' },
-              { field: 'thing', label: 'Project', width: 'minmax(10ch,18ch)' },
-              { field: 'source', label: 'Source', width: '12ch' },
+              { field: 'unit', label: 'Unit', width: '8ch' },
+              { field: 'organisation', label: 'Organisation', width: 'minmax(10ch,18ch)' },
+              { field: 'source', label: 'Source', width: '11ch' },
+              { field: 'at', label: 'When', width: '12ch', align: 'end' },
             ],
-            order: [{ field: 'seq', dir: 'desc' }],
-            limit: 20,
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 10,
             empty: 'No project has reported a number yet.',
           },
           {
@@ -189,6 +243,69 @@ export const FOUNDER = {
             ],
             empty: 'No organisations yet.',
           },
+        ],
+      },
+      {
+        /* ONE DASHBOARD AN ORGANISATION, from the same declaration, with the organisation's own name in every predicate.
+           Its last section is where a project is given a key to send numbers here, which the app draws under it. */
+        page: 'organisation',
+        title: '{{name}}',
+        for: { register: 'organisations' },
+        nav: { section: 'Dashboard', order: 20 },
+        icon: 'grid',
+        requires: ['register.datapoints', 'register.organisations', 'register.accounts'],
+        blocks: [
+          {
+            kind: 'bar',
+            heading: 'Balance',
+            span: 12,
+            source: 'register.organisations',
+            where: 'name is {{name}}',
+            columns: [{ field: 'name' }, { field: 'accounts' }],
+            empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
+          },
+          {
+            kind: 'stat',
+            heading: 'The numbers',
+            span: 12,
+            source: 'register.datapoints',
+            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+            where: 'organisation is {{name}}, at after -60d',
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 500,
+            back: 30,
+            empty: 'Nothing has been reported for {{name}} yet.',
+          },
+          {
+            kind: 'lines',
+            heading: 'Thirty days against the thirty before',
+            span: 12,
+            source: 'register.datapoints',
+            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+            where: 'organisation is {{name}}, at after -60d',
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 500,
+            back: 30,
+            empty: 'Nothing has been reported for {{name}} yet.',
+          },
+          {
+            kind: 'table',
+            heading: 'Latest numbers',
+            span: 12,
+            source: 'register.datapoints',
+            where: 'organisation is {{name}}',
+            columns: [
+              { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
+              { field: 'value', label: 'Value', width: '14ch', align: 'end' },
+              { field: 'unit', label: 'Unit', width: '8ch' },
+              { field: 'source', label: 'Source', width: '11ch' },
+              { field: 'at', label: 'When', width: '12ch', align: 'end' },
+            ],
+            order: [{ field: 'at', dir: 'desc' }],
+            limit: 10,
+            empty: 'Nothing has been reported for {{name}} yet.',
+          },
+          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
         ],
       },
     ],

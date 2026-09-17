@@ -93,7 +93,8 @@ export function modulesFor(u: UseCase, named: readonly string[] = []): string[] 
 export function pagesOf(u: UseCase): { page: string; title: string; section: string | null }[] {
   const declarations = (u.pack?.declarations ?? []) as Record<string, unknown>[];
   return declarations
-    .filter((d) => typeof d.page === 'string' && d.page !== `home-${u.usecase}`)
+    /* A PAGE PER ROW is not one page yet: it appears with the rows it is about, so the proposal does not name it. */
+    .filter((d) => typeof d.page === 'string' && d.page !== `home-${u.usecase}` && d.for === undefined)
     .map((d) => ({
       page: d.page as string,
       title: typeof d.title === 'string' ? d.title : (d.page as string),
