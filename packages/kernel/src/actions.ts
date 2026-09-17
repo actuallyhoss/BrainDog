@@ -825,9 +825,11 @@ const joinedList = (items: readonly string[]): string =>
  * The egress of one ingest body, or `null` when it calls nothing out.
  *
  * STATIC, FROM THE DECLARATION ALONE. A `pull` and a `poll` run on their interval; a `call` runs on its interval, when a
- * rule says so, or both. Nothing here reads the record, so a pack's plan and a proposal print the same lines.
+ * rule says so, or both. Nothing here reads the record, so a pack's plan and a proposal print the same lines. The one
+ * exception is a project's name: `nameOf` turns the row id a declaration holds into the words its owner gave it, so the
+ * key line says "the project Lanternly", not a row id. Without one, or for a row it cannot find, the id is said as written.
  */
-export function egressOf(body: unknown): Egress | null {
+export function egressOf(body: unknown, nameOf?: (project: string) => string | null): Egress | null {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
   const d = body as Partial<ActionDecl> & { ingest?: unknown; channel?: unknown; every?: unknown; project?: unknown };
   const channel = d.channel;
@@ -850,7 +852,7 @@ export function egressOf(body: unknown): Egress | null {
   const line = `CALLS OUT ${host ?? 'no host declared'} · ${when} · grant "${key ?? 'none'}"${sends.length ? ` · sends ${sends.join(', ')}` : ''}`;
   const key_line =
     project !== null && key !== null
-      ? `${ingest} runs for the project ${project} and sends the key "${key}". Keys are not kept per project yet, so any project's action can send this key.`
+      ? `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}". Keys are not kept per project yet, so any project's action can send this key.`
       : null;
 
   return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, sends, project, line, key_line };

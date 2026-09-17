@@ -762,6 +762,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return said ? bySeq(said.register, said.seq, opts.includeDeleted) : byId(ref, opts.includeDeleted);
   }
 
+  /** A row by the words in its title field, for a row id or spoken id a declaration holds; `null` when there is no such row or no title. */
+  function titleOfRow(ref: string): string | null {
+    const row = get(ref, { includeDeleted: true });
+    const field = row ? registers.get(row.register)?.title : undefined;
+    const said = row && field ? row.fields[field] : undefined;
+    return typeof said === 'string' && said.trim() !== '' ? said.trim() : null;
+  }
+
   /** A row as a person says it, `S42` or `things#3`, or its id when the row is gone. */
   function nameOf(id: string): string {
     const row = byId(id, true);
@@ -2828,7 +2836,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const fault = unreadable(batch) ?? lintBatch(sql, batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
-        const out = d.kind === 'ingest' ? egressOf(d.body) : null;
+        const out = d.kind === 'ingest' ? egressOf(d.body, titleOfRow) : null;
         return out === null ? [] : [out];
       });
       if (egress.length === 0) return ok(null);
@@ -3511,6 +3519,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Whether the vault holds a live key by this label or id. The row is looked at, never its bytes. */
     keyHeld: (name: string): boolean => keyNamed(sql, name) !== null,
 
+    /** A row by its title, for a row id or spoken id: how a plan names the project an action runs for. */
+    titleOfRow: (ref: string): string | null => titleOfRow(ref),
+
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
     /**
      * What a pack that is off would call out once it is on again: each retired action's `CALLS OUT` line, and its key line,
@@ -3524,7 +3535,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         )
         .flatMap((r) => {
           const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
-          const e = egressOf(body);
+          const e = egressOf(body, titleOfRow);
           if (e === null) return [];
           const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
           let host: string | null = null;

@@ -127,6 +127,13 @@ test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF TH
     'CALLS OUT stats.northwind.example · every 1h · grant "northwind stats"',
     `poll_northwind runs for the project things#1 and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`,
   ]);
+  /* A RECORD NAMES THE PROJECT BY ITS TITLE, as a person reads it on Decide, and not by the row id or spoken id the declaration holds. */
+  const title = k.titleOfRow('things#1');
+  assert.ok(title, 'the example project has a title');
+  const named = await plan(pack, { ...stateOf(k), nameOf: (ref) => k.titleOfRow(ref) });
+  assert.equal(named.approve[1], `poll_northwind runs for the project ${title} and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`);
+  const byId = k.get('things#1')!.id;
+  assert.equal(k.titleOfRow(byId), title);
   /* NOT APPROVED IS NOT INSTALLED. */
   const unapproved = await install(pack, diff, hostFor(k), diff.planHash);
   assert.equal(unapproved.ok, false);

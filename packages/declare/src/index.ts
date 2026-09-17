@@ -32,7 +32,8 @@ import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fill
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
  * and the fields. The same reading the record stores on a proposal, so a plan and a proposal print the same lines.
  */
-export const egressOf = (decl: { kind: string; body: unknown }): Egress | null => (decl.kind === 'ingest' ? egressOfBody(decl.body) : null);
+export const egressOf = (decl: { kind: string; body: unknown }, nameOf?: (project: string) => string | null): Egress | null =>
+  decl.kind === 'ingest' ? egressOfBody(decl.body, nameOf) : null;
 export type { Egress };
 
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
@@ -118,6 +119,11 @@ export type Installed = {
    * existed, has nothing to say here. A missing map plans every setting at its default.
    */
   config?: Record<string, Record<string, Json>>;
+  /**
+   * The title of the row an id names, so an action's key line says the project by name and not by a row id.
+   * OPTIONAL: without it the id is said as the declaration wrote it.
+   */
+  nameOf?: (ref: string) => string | null;
 };
 
 export type Diff = {
@@ -1174,7 +1180,7 @@ const hostOf = (address: unknown): string | null => {
 
 const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
   pack.declarations.flatMap((d) => {
-    const e = egressOf(d);
+    const e = egressOf(d, installed.nameOf);
     if (e === null) return [];
     const body = d.body as { ingest?: string; url?: unknown; fetch?: { base?: unknown } };
     /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */

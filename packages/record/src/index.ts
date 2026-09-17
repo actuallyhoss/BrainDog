@@ -1020,6 +1020,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     declarations: kernel.declarations() as Installed['declarations'],
     rows: kernel.census(),
     config: kernel.packSettings(),
+    nameOf: (ref) => kernel.titleOfRow(ref),
   });
 
   /**
