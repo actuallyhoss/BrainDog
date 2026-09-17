@@ -284,3 +284,44 @@ test('A LINK BETWEEN TWO PICKED ROWS GOES OUT BY THEIR TITLES, and one to a row 
   assert.ok(read.ok && read.value.links.length === 1, 'the file reads back with its link');
   sql.close();
 });
+
+test("A TARGET HELD TO A SETTING IS READ LIVE: a person changes it later and the figure is held to it at once", async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const doc = {
+    pack: 'money-lite',
+    version: '1.0.0',
+    summary: 'Spending, held to a sum.',
+    author: 'Me',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    config: {
+      most_spent: { type: 'money', label: 'Most spent', default: { amount: 10_000, currency: 'GBP' } },
+      most_late: { type: 'number', label: 'Most days late', default: 3 },
+    },
+    declarations: [
+      { register: 'spends', name: 'Spends', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }] },
+      { metric: 'spent', name: 'Spent', source: 'register.spends', value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 10_000, setting: 'most_spent' }, window: '30d', compare: 'none' },
+      { metric: 'count', name: 'How many', source: 'register.spends', value: { count: 'id' }, format: 'int', target: { lte: 1, setting: 'most_late' }, window: '30d', compare: 'none' },
+    ],
+  };
+  await install(api, doc);
+  value(await api.create({ register: 'spends', fields: { what: 'Rent', amount: { amount: 25_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'spends', fields: { what: 'Phone', amount: { amount: 1_000, currency: 'GBP' } } }, owner));
+  type Cell = { metric: string; target?: { lte?: number }; reading: { met: boolean | null } | null };
+  const cells = () => (api.kernel.block({ kind: 'stat', cells: [{ metric: 'spent' }, { metric: 'count' }] }) as { readings: Cell[] }).readings;
+  assert.deepEqual(cells().map((c) => [c.target?.lte, c.reading?.met]), [[10_000, false], [3, true]], 'the defaults hold at install');
+
+  value(await api.setPackConfig({ id: 'money-lite', values: { most_spent: { amount: 30_000, currency: 'GBP' }, most_late: 1 } }, owner));
+  assert.deepEqual(cells().map((c) => [c.target?.lte, c.reading?.met]), [[30_000, true], [1, false]], 'no reinstall: the figure reads the setting now');
+
+  /* ANOTHER CURRENCY IS NOT A SUM IN THIS FIGURE'S, so the declared target stands. */
+  value(await api.setPackConfig({ id: 'money-lite', values: { most_spent: { amount: 1, currency: 'EUR' } } }, owner));
+  assert.equal(cells()[0]?.target?.lte, 10_000);
+
+  /* A TARGET HELD TO A SETTING THE PACK DOES NOT DECLARE, or one that is not a sum or a number, is refused at plan. */
+  const wrong = (setting: string) => ({ ...doc, pack: 'money-wrong', declarations: [{ ...doc.declarations[1], metric: 'spent-2', target: { lte: 1, setting } }] , config: { ...doc.config, label: { type: 'text', default: 'x' } } });
+  assert.equal(refusal(await api.planPack({ doc: wrong('nope') }, owner)).code, 'FIELD_UNKNOWN');
+  assert.equal(refusal(await api.planPack({ doc: wrong('label') }, owner)).code, 'VALUE_MALFORMED');
+  sql.close();
+});

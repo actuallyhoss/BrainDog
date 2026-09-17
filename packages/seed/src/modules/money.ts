@@ -232,7 +232,50 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
-export const MONEY_METRICS: Record<string, SeedMetric> = {
+/**
+ * THE TARGETS A PERSON CHANGES LATER, AS SETTINGS OF MONEY. A figure's target was fixed the day Money went in, so somebody
+ * whose rent went up could not move "no more than" without reinstalling. Each of these is a setting of the pack, a sum of
+ * money or a number of days, and the figure names it (`target.setting`): the record reads the setting each time the figure
+ * is read, so a change holds the figure to it at once. The default is the figure's own target, or the use case's.
+ */
+export const MONEY_TARGET_SETTINGS: Readonly<Record<string, { setting: string; type: 'money' | 'number'; label: string }>> = {
+  'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most going out in 30 days' },
+  'every-month-out': { setting: 'most_out_every_month', type: 'money', label: 'Most going out every month' },
+  'every-month-by-category': { setting: 'most_on_one_category', type: 'money', label: 'Most a month on one category' },
+  'due-30d': { setting: 'most_due_30d', type: 'money', label: 'Most due in 30 days' },
+  'owed-to-you': { setting: 'most_owed_to_you', type: 'money', label: 'Most owed to you at once' },
+  'days-late-in': { setting: 'most_days_late', type: 'number', label: 'Most days money in may be late' },
+};
+
+/** What a target setting says under its box on the settings screen. */
+export const TARGET_NOTE = 'Held to this as soon as it is saved.';
+
+type Decl = Record<string, unknown>;
+const boundOf = (target: Decl): number | null => (typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null);
+const currencyOf = (d: Decl): string | undefined => (typeof d.format === 'string' ? /^money\.([A-Z]{3})$/u.exec(d.format)?.[1] : undefined);
+
+/** A figure whose target is one of Money's settings, naming it; any other declaration as it was. */
+export function withTargetSetting(d: Decl): Decl {
+  const said = typeof d.metric === 'string' ? MONEY_TARGET_SETTINGS[d.metric] : undefined;
+  const target = d.target as Decl | undefined;
+  if (!said || !target || boundOf(target) === null || (said.type === 'money' && currencyOf(d) === undefined)) return d;
+  return { ...d, target: { ...target, setting: said.setting } };
+}
+
+/** The settings a set of declarations' targets are held to, each starting at the target it replaces. */
+export function targetConfigOf(declarations: readonly Decl[]): Record<string, Decl> {
+  const config: Record<string, Decl> = {};
+  for (const d of declarations) {
+    const target = d.target as Decl | undefined;
+    const said = typeof d.metric === 'string' ? MONEY_TARGET_SETTINGS[d.metric] : undefined;
+    const bound = target ? boundOf(target) : null;
+    if (!said || !target || target.setting !== said.setting || bound === null) continue;
+    config[said.setting] = { type: said.type, label: said.label, note: TARGET_NOTE, default: said.type === 'money' ? { amount: bound, currency: currencyOf(d) } : bound };
+  }
+  return config;
+}
+
+const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
      due/owed". Liquid accounts only, and remembered daily so the page can draw how it has moved. */
   'cash-now': {
@@ -480,6 +523,11 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     window: '30d',
   },
 };
+
+/* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */
+export const MONEY_METRICS: Record<string, SeedMetric> = Object.fromEntries(
+  Object.entries(DECLARED_METRICS).map(([id, m]) => [id, withTargetSetting(m as unknown as Decl) as unknown as SeedMetric]),
+);
 
 /**
  * The two rules Money ships with, and each one asks rather than acts.

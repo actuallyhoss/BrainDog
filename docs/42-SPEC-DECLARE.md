@@ -203,7 +203,7 @@ with every seed inside the same batch · no identifier reaches the kernel withou
 | `seeds` | `[{ register: Id, fields: object, note? }]`, at most eight per register | no | `[]` | — |
 | `provides` | `[DeclId]` — **derived**; written out, it must equal the derived set (`PROVIDES_MISMATCH`) | no | derived | — |
 | `note` | text ≤ 280 — 21 §11: a note is data, not a YAML comment. Legal on every declaration, field, block, section and action below | no | — | — |
-| `config` | up to 64 settings, `{ <key>: { type, values?, default?, label?, note? } }`, checked by the kernel's `readConfig`; on the manifest only when it holds a setting, so a pack without one keeps its checksum. A body reads one as `{{config:<key>}}`, filled by `plan` and `install` from the chosen value, else the default; every placeholder names a declared setting with a default | no | none | text, enum, bool, money, day, duration |
+| `config` | up to 64 settings, `{ <key>: { type, values?, default?, label?, note? } }`, checked by the kernel's `readConfig`; on the manifest only when it holds a setting, so a pack without one keeps its checksum. A body reads one as `{{config:<key>}}`, filled by `plan` and `install` from the chosen value, else the default; every placeholder names a declared setting with a default. A metric's `target` may name a money or number setting as `setting`, which the record reads each time the figure is read, so a change holds it at once | no | none | text, enum, bool, money, day, duration, number |
 
 `requires` here is a map; on a page it is a list (§4.5). Any key not in a table: `FIELD_UNKNOWN`, naming it.
 
@@ -794,7 +794,7 @@ substituted for the pack at hand. `at`, `found` and `wanted` carry the specifics
 | `SECRET_IN_PACK` *(new)* | §5.3·37 | `ingest.stripe.fetch.headers.Authorization: a pack never spells a credential. Name a grant under auth: and the kernel sends the header` |
 | `WOULD_ORPHAN` *(new)* | §5.3·38; §5.5·2 | `register.clients would be retired with 38 rows under it. A downgrade needs --force, which v1 does not have — upgrade instead, or export first` |
 | `REGISTER_UNRESOLVED` *(new, 2026-09-15)* | `plan` reports it as `Diff.unresolved`; `install` refuses it after the missing-pack check, and the record's `planPack` refuses it too | `money-core points at the people list (register.obligations.fields.party.to), which this record does not hold and money-core does not declare. It also points at things. Install people and portfolio first: they declare people and things.` |
-| `CONFIG_TYPE_UNSUPPORTED` *(new, 2026-09-15)* | `normalise`, through the kernel's `readConfig` | `The setting billing_contact is a ref, and a setting never points at a list, so a pack cannot configure its way into one it did not declare. A setting is text, enum, bool, money, day or duration.` |
+| `CONFIG_TYPE_UNSUPPORTED` *(new, 2026-09-15)* | `normalise`, through the kernel's `readConfig` | `The setting billing_contact is a ref, and a setting never points at a list, so a pack cannot configure its way into one it did not declare. A setting is text, enum, bool, money, day, duration or number.` |
 
 Forty, counted: 04 §5's thirty-three, the five of §13 D4, and the two of the 2026-09-15 pack settings build. Borrowed from other groups of 30 §6 and raised here at install:
 `FIELD_UNKNOWN` · `REQUIRED_MISSING` · `ENUM_VALUE_UNKNOWN` · `OUT_OF_BOUNDS` · `REGISTER_UNKNOWN` · `INT_OUT_OF_RANGE` ·

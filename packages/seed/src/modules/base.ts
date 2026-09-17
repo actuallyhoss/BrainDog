@@ -145,7 +145,8 @@ export type SeedMetric = {
   where?: string;
   value: unknown;
   format?: string;
-  target?: { lte: number } | { gte: number };
+  /** `setting` names a setting of the pack the target is read from, each time the figure is read (`liveTarget`). */
+  target?: ({ lte: number } | { gte: number }) & { setting?: string };
   window?: string;
   compare?: 'previous' | 'none';
   /** The factor tables a `product` reads, carried with the figure so a pack installs them with it. */

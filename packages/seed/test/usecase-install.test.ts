@@ -154,10 +154,15 @@ test('A PERSONAL RECORD HOLDS ROWS OF A PERSON: accounts, bills, spending, a bud
 test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder's keeps Money's own", () => {
   const targetOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
     ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; target?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).target;
-  assert.deepEqual(targetOf(useCase('personal'), 'out-30d'), { lte: 250_000 });
-  assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { lte: 150_000 });
-  assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { lte: 5_000_000 });
-  assert.deepEqual(targetOf(null, 'out-30d'), { lte: 5_000_000 });
+  assert.deepEqual(targetOf(useCase('personal'), 'out-30d'), { lte: 250_000, setting: 'most_out_30d' });
+  assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { lte: 150_000, setting: 'most_out_every_month' });
+  assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { lte: 5_000_000, setting: 'most_out_30d' });
+  assert.deepEqual(targetOf(null, 'out-30d'), { lte: 5_000_000, setting: 'most_out_30d' });
+  /* EACH TARGET IS A SETTING A PERSON CHANGES LATER, starting at the use case's sum. */
+  const configOf = (u: ReturnType<typeof useCase> | null) => (moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { config: Record<string, { type: string; default: unknown }> }).config;
+  assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most going out in 30 days', note: 'Held to this as soon as it is saved.', default: { amount: 250_000, currency: 'GBP' } });
+  assert.deepEqual(configOf(useCase('personal')).most_days_late?.default, 3);
+  assert.deepEqual(configOf(useCase('founder')).most_out_30d?.default, { amount: 5_000_000, currency: 'GBP' });
   /* AND ITS WORDS: the late knob is called by this figure, so a person's pay, not a business's money in. */
   const nameOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
     ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; name?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).name;

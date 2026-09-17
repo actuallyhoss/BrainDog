@@ -268,6 +268,19 @@
                         aria-describedby={why ? `set-${key}-why` : undefined}
                       />
                     </div>
+                  {:else if decl.type === 'number'}
+                    <div class="field setting-number">
+                      <input
+                        class="field-input num"
+                        id="set-{key}"
+                        type="text"
+                        inputmode="decimal"
+                        value={d.text}
+                        oninput={(e) => (d.text = typed(e))}
+                        aria-invalid={why ? 'true' : undefined}
+                        aria-describedby={why ? `set-${key}-why` : undefined}
+                      />
+                    </div>
                   {:else if decl.type === 'duration'}
                     <div class="field setting-number">
                       <input

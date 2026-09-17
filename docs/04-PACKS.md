@@ -97,7 +97,7 @@ at `/packs/<id>`, read back through `{{config:<key>}}`. `loop/research-modular.m
 and why the subset stays narrow.)*
 
 *(Built September 15th 2026. A setting is `config: { <key>: { type, values?, default?, label?, note? } }`, at most 64
-of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day or duration,
+of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day, duration or number,
 and any other type is refused `CONFIG_TYPE_UNSUPPORTED`, with its own sentence for a ref, a secret and a file. A
 default is coerced as a field of that type would be, so a money default is minor units and a currency. A declaration
 reads a setting as `{{config:<key>}}`: a string that is only the placeholder becomes the typed value, and a

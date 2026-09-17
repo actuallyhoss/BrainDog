@@ -63,12 +63,25 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   if (!doc) return null;
   const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
   const names = u === null ? {} : (MODULE_NAMES[u.usecase] ?? {});
+  const config = (doc.config ?? {}) as Record<string, Body>;
   if (Array.isArray(doc.declarations))
-    doc.declarations = (doc.declarations as Body[]).map((d) =>
-      typeof d.metric !== 'string'
-        ? d
-        : { ...d, ...(targets[d.metric] === undefined ? {} : { target: targets[d.metric] }), ...(names[d.metric] === undefined ? {} : { name: names[d.metric] }) },
-    );
+    doc.declarations = (doc.declarations as Body[]).map((d) => {
+      if (typeof d.metric !== 'string') return d;
+      const target = targets[d.metric] as Record<string, unknown> | undefined;
+      /* A TARGET THAT IS A SETTING KEEPS NAMING IT, and the setting starts at the use case's sum. */
+      const setting = (d.target as { setting?: unknown } | undefined)?.setting;
+      const held = typeof setting === 'string' ? config[setting] : undefined;
+      if (target && held) {
+        const bound = typeof target.lte === 'number' ? target.lte : (target.gte as number);
+        const was = held.default as { currency?: string } | number | undefined;
+        held.default = typeof was === 'object' && was !== null ? { amount: bound, currency: was.currency } : bound;
+      }
+      return {
+        ...d,
+        ...(target === undefined ? {} : { target: { ...target, ...(held ? { setting } : {}) } }),
+        ...(names[d.metric] === undefined ? {} : { name: names[d.metric] }),
+      };
+    });
   const out = dated(doc, options.today);
   if (Array.isArray(out.seeds) && out.seeds.length === 0) delete out.seeds;
   return out;

@@ -2,4 +2,4 @@ code:   CONFIG_TYPE_UNSUPPORTED
 via:    lint
 raises: packages/kernel/src/declare.ts
 at:     config.billing_contact.type
-fix:    Declare the setting as text, enum, bool, money, day or duration.
+fix:    Declare the setting as text, enum, bool, money, day, duration or number.

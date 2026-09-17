@@ -3546,7 +3546,7 @@ export async function enablePack(
  * document in a manifest people share. What is left is a value a person can read on a settings
  * screen, so `04 §7`'s enumeration of what a pack can do does not grow.
  */
-export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration'] as const;
+export const CONFIG_TYPES = ['text', 'enum', 'bool', 'money', 'day', 'duration', 'number'] as const;
 export type ConfigType = (typeof CONFIG_TYPES)[number];
 
 /** One setting as a manifest declares it, after `readConfig` has checked it. */
@@ -3572,7 +3572,8 @@ const PLACEHOLDER = /\{\{config:([^{}]*)\}\}/g;
  * exactly as a row's field is.
  */
 export function configValue(key: string, decl: ConfigDecl, value: unknown, at = `config.${key}`): Result<Json> {
-  const field = { id: key, type: decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
+  /* A NUMBER IS A DECIMAL FIELD'S VALUE, the one type a setting names in its own word, because a setting is not a column. */
+  const field = { id: key, type: decl.type === 'number' ? 'decimal' : decl.type, ...(decl.values === undefined ? {} : { values: decl.values }) } as FieldDecl;
   const out = coerce(field, value, {}, at);
   if (!out.ok) return { ok: false, refusal: out.refusal };
   const values = decl.values ?? [];
@@ -3749,6 +3750,37 @@ function settingsOf(manifest: Record<string, unknown>): {
     values[key] = set[key] ?? decl.default ?? null;
   }
   return { config, set, values };
+}
+
+/**
+ * A figure with its target read from the setting it names, as the setting holds it now.
+ *
+ * A TARGET THAT NAMES A SETTING IS READ LIVE (`{ lte: 250000, setting: 'most_out_30d' }`). A placeholder is filled once, when
+ * a pack is installed, so a target a person changes later would wait for a reinstall; a named setting is read each time the
+ * figure is, from the pack that declares the figure. The number in the target is the one used when that setting cannot be
+ * read: no pack row, no such setting, or a value of the wrong kind. A money setting counts only in the figure's own currency.
+ */
+export function liveTarget<T extends { metric: string; format?: unknown; target?: unknown }>(sql: Sql, decl: T): T {
+  const target = decl.target as Record<string, unknown> | undefined;
+  if (!target || typeof target.setting !== 'string') return decl;
+  const owner = sql.one<{ pack: string | null }>(
+    "SELECT coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0",
+    `metric.${decl.metric}`,
+  );
+  const m = owner?.pack ? manifestOf(sql, owner.pack) : null;
+  if (!m) return decl;
+  const { config, values } = settingsOf(m.manifest);
+  const said = config[target.setting];
+  const value = values[target.setting];
+  const currency = typeof decl.format === 'string' ? /^money\.([A-Z]{3})$/u.exec(decl.format)?.[1] : undefined;
+  let bound: number | null = null;
+  if (said?.type === 'number' && typeof value === 'number' && Number.isFinite(value)) bound = value;
+  if (said?.type === 'money' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const money = value as { amount?: unknown; currency?: unknown };
+    if (typeof money.amount === 'number' && money.currency === currency) bound = money.amount;
+  }
+  if (bound === null) return decl;
+  return { ...decl, target: { ...target, [typeof target.gte === 'number' ? 'gte' : 'lte']: bound } };
 }
 
 /**

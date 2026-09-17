@@ -27,8 +27,8 @@ export type PackState = { id: string; version: string | null; disabled_at: strin
 /** What `disablePack` and `enablePack` answer. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
 
-/** The six types a setting may take (`loop/research-modular.md` §1.3). */
-export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration';
+/** The seven types a setting may take (`loop/research-modular.md` §1.3). */
+export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number';
 
 /** One setting as `packConfig` answers it. */
 export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string };
@@ -220,7 +220,7 @@ export async function openSettings(client: Caller, id: string, sampled: boolean)
 export const words = {
   settings: 'Settings',
   /* THE ONE SENTENCE. The record fills `{{config:}}` when a pack is installed, so a saved value waits for that. */
-  when: 'A change takes effect the next time this add-on is installed or updated.',
+  when: 'A change takes effect the next time this add-on is installed or updated, unless the setting says it is held at once.',
   save: 'Save',
   reset: 'Reset',
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
@@ -309,6 +309,11 @@ export function valueOf(decl: ConfigDecl, draft: Draft, currency: string | null)
       const raw = draft.text.trim();
       const size = UNITS.find(([u]) => u === draft.unit)?.[1] ?? 1;
       return { ok: true, value: /^\d+$/u.test(raw) ? Number(raw) * size : raw };
+    }
+    case 'number': {
+      /* SENT AS A NUMBER WHEN IT READS AS ONE, and as typed otherwise, so the record's refusal says what is wrong. */
+      const raw = draft.text.trim();
+      return { ok: true, value: /^-?\d+(\.\d+)?$/u.test(raw) ? Number(raw) : raw };
     }
     default:
       return { ok: true, value: draft.text };

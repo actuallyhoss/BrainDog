@@ -690,7 +690,7 @@ version and every `entry` row are unchanged. It reads no pack setting: each body
 
 **Pack settings** (`declare.ts`, the 2026-09-15 build). `readConfig(config)` checks a manifest's `config:` map: at most
 32 keys matching `^[a-z][a-z0-9_]{0,31}$` (`OUT_OF_BOUNDS`, `PACK_MALFORMED`), the sub-keys `type`, `values`, `default`,
-`label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money, day and duration (`CONFIG_TYPE_UNSUPPORTED`
+`label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money, day, duration and number (`CONFIG_TYPE_UNSUPPORTED`
 otherwise), an enum's one to 64 distinct values (`VALUE_MALFORMED`), and a default `configValue` accepts. `configValue`
 is `coerce` for a field of that type, then enum membership (`ENUM_VALUE_UNKNOWN`) and at most 1024 bytes of text
 (`OUT_OF_BOUNDS`). `fillConfig` replaces each `{{config:<key>}}` in a body, and `validate` refuses `FIELD_UNKNOWN` at

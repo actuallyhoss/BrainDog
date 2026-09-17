@@ -472,6 +472,23 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
         );
     }
 
+  /* A FIGURE'S TARGET MAY NAME A SETTING IT IS HELD TO, read live (`liveTarget`): one this pack declares, a sum or a number. */
+  for (const d of declarations) {
+    const target = d.kind === 'metric' ? (d.body.target as Record<string, unknown> | undefined) : undefined;
+    if (target === undefined || target === null || typeof target !== 'object' || target.setting === undefined) continue;
+    const key = target.setting;
+    const setting = typeof key === 'string' && Object.hasOwn(settings.value, key) ? settings.value[key] : undefined;
+    if (setting === undefined)
+      return no<Pack>('FIELD_UNKNOWN', `${d.id}'s target is held to the setting ${String(key)}, and ${id} declares no setting by that name.`, {
+        at: `${d.id}.target.setting`,
+        allowed: Object.keys(settings.value),
+      });
+    if (setting.type !== 'money' && setting.type !== 'number')
+      return no<Pack>('VALUE_MALFORMED', `${d.id}'s target is held to ${key}, which is a ${setting.type}. A target is held to a money or a number setting.`, {
+        at: `${d.id}.target.setting`,
+      });
+  }
+
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
   const seeds: Seed[] = [];
   /* A FEW EXAMPLES PER LIST, NOT ONE. A guide opens on the six stages a project passes and a board on more than one

@@ -31,6 +31,7 @@ import {
   installDeclarations,
   jcs,
   lintBatch,
+  liveTarget,
   packSettings as declaredPackSettings,
   readPackConfig,
   retireDeclarations,
@@ -2430,7 +2431,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         "SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0",
         `metric.${id}`,
       );
-      return row ? (JSON.parse(row.body) as MetricDecl) : null;
+      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl) : null;
     },
     read: (decl) => evaluateMetric(sql, decl, evalContext()),
     list: (q) => {
@@ -3249,7 +3250,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * links to read the same rows — the alternative is two definitions of "overdue" that agree until
      * somebody edits one.
      */
-    metric: (decl: MetricDecl): Result<Reading> => evaluateMetric(sql, decl, evalContext()),
+    metric: (decl: MetricDecl): Result<Reading> => evaluateMetric(sql, liveTarget(sql, decl), evalContext()),
 
     /* ── pages ──────────────────────────────────────────────────── */
 

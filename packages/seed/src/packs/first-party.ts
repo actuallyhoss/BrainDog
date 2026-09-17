@@ -22,6 +22,7 @@
  */
 
 import { packDocument } from '../index.ts';
+import { targetConfigOf } from '../modules/money.ts';
 import type { PackManifest } from './agents.ts';
 
 export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
@@ -187,6 +188,8 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     requires: { format: 1, primitives: 1, packs: {} },
     declarations: pack.declarations,
     ...(pack.seeds.length > 0 ? { seeds: pack.seeds } : {}),
+    /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later. */
+    ...(Object.keys(targetConfigOf(pack.declarations)).length > 0 ? { config: targetConfigOf(pack.declarations) } : {}),
   };
 }
 

@@ -665,7 +665,7 @@ export const PACKS: PackInfo[] = [
  * The settings the sample's Money add-on declares, one of each of the six types, so `/packs/money-core`
  * draws a whole form with no record behind it. Every other sample add-on declares none.
  */
-export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration'; values?: readonly string[]; default?: unknown; label?: string }>>> = {
+export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number'; values?: readonly string[]; default?: unknown; label?: string }>>> = {
   'money-core': {
     heading: { type: 'text', label: 'Page heading', default: 'Money' },
     reminders: { type: 'enum', label: 'Reminders', values: ['weekly', 'monthly', 'never'], default: 'weekly' },
