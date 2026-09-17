@@ -42,7 +42,6 @@
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
-  const decl = $derived(REGISTERS[id]);
 
   /**
    * THE ROW MAY NOT BE IN THE RECORD YET, AND THIS SCREEN USED TO SAY IT DID NOT EXIST.
@@ -58,6 +57,9 @@
    * answered from both, the record wins.
    */
   let got = $state<Got | null>(null);
+  /* READ AGAIN ONCE THE ROW IS: a use case's own list is declared by the record, and `rowReader` learns it on the way
+     (`remote.ts` `learn`), which a plain read of `REGISTERS` would not notice. */
+  const decl = $derived.by(() => (void got, REGISTERS[id]));
   const live = $derived(got?.from === 'live');
   /* WHAT THIS RECORD CALLS THE ROWS THIS ONE POINTS AT. Undefined on the sample, where `display`
      names a ref out of the sample's own rows as it always has; on a record it is the only source,

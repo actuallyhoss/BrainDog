@@ -15,7 +15,7 @@
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { noRecord } from './device.ts';
-import { entryOf, namesOf, refMapOf, targetsOf, type Names, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, learn, namesOf, refMapOf, targetsOf, type Names, type RecordRow, type RefMap } from './remote.ts';
 import type { Entry } from './schema.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -48,10 +48,12 @@ export type RowReader = { read(register: string, seq: number): Promise<Got> };
 export function rowReader(base: string, io?: Fetch): RowReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const maps = new Map<string, RefMap>();
+  const asked = new Map<string, Promise<void>>();
 
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
+    await learn(client.schema, register, asked);
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
@@ -72,6 +74,9 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       const got = await client.get(register, seq);
       if (!got.ok) return missed(got);
       if (got.value === null) return { from: 'live', entry: null, names: new Map() };
+      /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE: the row's list first, so its refs are known, and each
+         target before it is walked, so a ref is drawn as the row's name and not as `courses#1`. */
+      await learn(client.schema, register, asked);
       const refs = new Map<string, RefMap>();
       for (const target of targetsOf(register)) {
         const map = await mapOf(target);

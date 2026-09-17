@@ -397,3 +397,23 @@ test('A SORTED LIST PAGES WITH THE RECORD’S CURSOR, and a later page keeps the
     'a later page was re-sorted on its own, so the list is no longer the record’s order',
   );
 });
+
+test("a list this build does not ship draws a link by the linked row's name, and asks the record what the linked list is", async () => {
+  const declared: Record<string, unknown> = {
+    rs_meetings: { id: 'rs_meetings', name: 'Meetings', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'book', type: 'ref', to: 'rs_books' }] },
+    rs_books: { id: 'rs_books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text' }] },
+  };
+  const BOOK = ulid(52);
+  tab((name, params) => {
+    if (name === 'boot') return json(200, { ok: true, value: BOOT });
+    if (name === 'schema') return json(200, { ok: true, value: declared[params.get('register') ?? ''] });
+    if (name === 'list' && params.get('register') === 'rs_books') return page([row(BOOK, 2, { name: 'The Remains of the Day' })], null);
+    if (name === 'list' && params.get('register') === 'rs_meetings') return page([row(ulid(61), 1, { what: 'Stevens and the dinner', book: BOOK })], null);
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `Nothing here answers ${name}.` } });
+  });
+  const source = await open();
+  value(await source.schema('rs_meetings'), 'the declaration');
+  const answer = value(await source.page('rs_meetings', EMPTY, null), 'the page');
+  assert.equal(answer.entries[0]?.fields.book, 2);
+  assert.equal(answer.names?.get('rs_books#2'), 'The Remains of the Day');
+});

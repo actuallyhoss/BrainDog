@@ -546,3 +546,29 @@ test("A TILE SAYS THE RECORD'S TARGET, not the build's, so a person's Money is n
   assert.match(String(said({ lte: 250_000 })), /2,500\.00/u);
   assert.equal(said(), said(decl.target), 'without one, the build says its own');
 });
+
+test("a table over a use case's own lists names each link by the linked row, not as club_books#2", async () => {
+  const declared: Record<string, unknown> = {
+    pl_meetings: { id: 'pl_meetings', name: 'Meetings', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'book', type: 'ref', to: 'pl_books' }] },
+    pl_books: { id: 'pl_books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text' }] },
+  };
+  const BOOK = '01JBOOK000000000000000002';
+  const answer = {
+    page: 'club',
+    title: 'Club',
+    blocks: [{ kind: 'table', source: 'register.pl_meetings', columns: [{ field: 'what' }, { field: 'book' }], rows: [{ ...row(1, { what: 'Stevens and the dinner', book: BOOK }), register: 'pl_meetings' }], matched: 1, refusals: [] }],
+  };
+  const { io } = host((method, url) => {
+    if (method === 'page') return json(200, { ok: true, value: answer });
+    if (method === 'schema') return json(200, { ok: true, value: declared[url.searchParams.get('register') ?? ''] });
+    if (method === 'list' && url.searchParams.get('register') === 'pl_books')
+      return json(200, { ok: true, value: { rows: [{ id: BOOK, seq: 2, fields: { name: 'The Remains of the Day' } }], cursor: null } });
+    return json(200, { ok: true, value: { rows: [], cursor: null } });
+  });
+  const out = await pageReader(BASE, io, () => AT).read('club');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [table] = out.page.blocks;
+  assert.equal(table!.cannot, undefined);
+  assert.equal(table!.rows[0]!.cells[1], 'The Remains of the Day');
+});

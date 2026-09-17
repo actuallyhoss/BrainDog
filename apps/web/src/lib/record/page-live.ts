@@ -42,7 +42,7 @@ import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
 import { format, hrefFor, noteOf, targetLine, withParam } from './metrics.ts';
-import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
+import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
 
@@ -652,9 +652,12 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
     walked.set(register, rows);
     return rows;
   }
+  const asked = new Map<string, Promise<void>>();
   async function mapOf(register: string): Promise<RefMap | null> {
     const kept = maps.get(register);
     if (kept) return kept;
+    /* A use case's own list is declared before it is walked, or its rows have no title to be named by. */
+    await learn(client.schema, register, asked);
     const rows = await rowsOf(register);
     if (!rows) return null;
     const map = refMapOf(register, rows);

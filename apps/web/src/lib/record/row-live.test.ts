@@ -138,3 +138,27 @@ test('the row page draws the live row, its refusal, and no sample backlinks when
   assert.match(page, /title=\{got\.fix\}/u);
   assert.match(page, /got\?\.from === 'live' \? \(got\.entry \?\? undefined\)/u, 'a live row that is not there falls back to the sample again');
 });
+
+test("a row on a list this build does not ship draws its link by the linked row's name, not as club_books#2", async () => {
+  const declared: Record<string, unknown> = {
+    rl_meetings: { id: 'rl_meetings', name: 'Meetings', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'book', type: 'ref', to: 'rl_books' }] },
+    rl_books: { id: 'rl_books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text' }] },
+  };
+  const BOOK = '01JBOOK000000000000000002';
+  const { io } = host((url) => {
+    const register = url.searchParams.get('register') ?? '';
+    if (url.pathname === '/api/schema') return json(200, { ok: true, value: declared[register] });
+    if (url.pathname === '/api/get')
+      return json(200, { ok: true, value: { id: '01JMEET000000000000000001', register, seq: 1, fields: { what: 'Stevens and the dinner', book: BOOK }, version: 1, created_at: '2026-09-17T09:00:00.000Z' } });
+    if (url.pathname === '/api/list' && register === 'rl_books')
+      return json(200, { ok: true, value: { rows: [{ id: BOOK, seq: 2, fields: { name: 'The Remains of the Day' } }], cursor: null } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  });
+  const out = await rowReader(BASE, io).read('rl_meetings', 1);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(out.entry?.fields.book, 2);
+  assert.equal(out.names.get('rl_books#2'), 'The Remains of the Day');
+  const { display } = await import('./api.ts');
+  assert.equal(display('rl_meetings', 'book', 2, Date.now(), out.names), 'The Remains of the Day');
+});

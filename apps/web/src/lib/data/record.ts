@@ -15,7 +15,7 @@ import { createClient, type Boot } from '@braindog/client';
 
 import { heldBy, list, NOW, PAGE, REGISTERS, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
-import { declOf, entryOf, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
+import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, treeOf, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 import { labels, relabel } from '../voice.ts';
@@ -100,11 +100,15 @@ function said<T>(r: { ok: true; value: T } | { ok: false; refusal: Refusal } | {
 function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   const declared = new Map<string, RegisterDecl>();
   const maps = new Map<string, RefMap>();
+  const asked = new Map<string, Promise<void>>();
 
   /** One register's rows by ULID, walked to the end of its cursor. Kept once whole. */
   async function refMap(register: string): Promise<Said<RefMap>> {
     const kept = maps.get(register);
     if (kept) return { ok: true, value: kept };
+    /* A LIST THIS BUILD DOES NOT SHIP IS DECLARED FIRST, or `refMapOf` finds no title to name its rows by and every ref
+       into it is drawn as `club_books#2`. */
+    await learn(client.schema, register, asked);
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
