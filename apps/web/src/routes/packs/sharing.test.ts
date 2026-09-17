@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { installShared, nextPatch, offerFor, planShared, readAddress, rowTitle, sharedPlanOf, switchTo, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, offerFor, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, switchTo, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -58,6 +58,7 @@ function stub(over: Partial<SharingClient> = {}): { client: SharingClient; calls
     installPack: log('installPack'),
     enablePack: log('enablePack'),
     disablePack: log('disablePack'),
+    fetchUseCase: log('fetchUseCase'),
     ...over,
   } as SharingClient;
   return { client, calls };
@@ -111,6 +112,10 @@ test('A CARD OFFERS INSTALL, SWITCH, OR SAYS IT IS IN USE', () => {
   assert.equal(offerFor('guide', states, true), 'install');
   assert.equal(offerFor('business', states, false), 'switch');
   assert.equal(offerFor('business', [], false), 'in-use');
+  /* A USE CASE OF MODULES ALONE IS INSTALLED UNTIL EVERY MODULE IS HERE AND ON. */
+  assert.equal(offerFor('business', [state('portfolio')], false, ['portfolio', 'people']), 'install');
+  assert.equal(offerFor('business', [state('portfolio'), state('people', true)], false, ['portfolio', 'people']), 'install');
+  assert.equal(offerFor('business', [state('portfolio'), state('people')], false, ['portfolio', 'people']), 'in-use');
 });
 
 test('SWITCHING TURNS THE CHOSEN ONE ON AND THE ONE SPEAKING OFF', async () => {
@@ -156,8 +161,56 @@ test('AN ADDRESS IS READ ONLY OVER HTTPS, WITH NOTHING SENT, AND NO FURTHER THAN
   assert.deepEqual(await readAddress('https://example.com/a.json', blocked), { ok: false, fix: copy.shareAddressUnread('example.com') });
 });
 
-test('THE SHARE FORM OFFERS THE NEXT PATCH, AND NAMES A ROW BY ITS TITLE', () => {
-  assert.equal(nextPatch('1.0.0'), '1.0.1');
-  assert.equal(nextPatch(null), '1.0.0');
+test('THE SHARE FORM OFFERS A PATCH OR A MINOR ON FROM THE LATER OF INSTALLED AND LAST SHARED, AND NAMES A ROW BY ITS TITLE', () => {
+  assert.equal(offeredVersion('1.0.0', null), '1.0.1');
+  assert.equal(offeredVersion(null, null), '1.0.0');
+  assert.equal(offeredVersion('1.1.1', '1.1.2'), '1.1.3', 'a second share does not offer the same number again');
+  assert.equal(offeredVersion('1.1.1', '1.1.2', 'minor'), '1.2.0');
+  assert.equal(offeredVersion('2.0.0', '1.9.9'), '2.0.1');
+  assert.deepEqual(drawnOrder([{ href: '/p/studies' }], [{ id: 'courses' }, { id: 'assignments' }]), ['/p/studies', '/r/courses', '/r/assignments']);
   assert.equal(rowTitle({ state: 'to_do', what: 'Essay' }), 'Essay');
+});
+
+test('ON A LIVE RECORD AN ADDRESS IS READ BY THE HOST, AND ITS REFUSAL COMES BACK WITH ITS CODE', async () => {
+  const { client, calls } = stub({
+    fetchUseCase: async ({ url }) =>
+      url.includes('10.0.0.1')
+        ? { ok: false as const, refusal: { code: 'PULL_ORIGIN_REFUSED', fix: '10.0.0.1 is a private or local address, so nothing was read from it.' } }
+        : ok({ url, text: '{"usecase":"x"}', bytes: 15 }),
+  });
+  assert.deepEqual(await readOnHost(client, 'https://files.example.org/study.usecase.json'), { ok: true, text: '{"usecase":"x"}' });
+  assert.deepEqual(await readOnHost(client, 'https://10.0.0.1/a.json'), { ok: false, fix: '10.0.0.1 is a private or local address, so nothing was read from it.', code: 'PULL_ORIGIN_REFUSED' });
+  assert.deepEqual(await readOnHost(client, 'http://files.example.org/a.json'), { ok: false, fix: copy.shareAddressHttps, code: null });
+  assert.equal(calls.length, 0, 'the stub logged a call it was not given');
+});
+
+test('A FILE WITH A BLOCK THIS BUILD DOES NOT DRAW IS SAID PLAINLY, WITH ITS CODE KEPT', async () => {
+  const { client, calls } = stub();
+  const text = JSON.stringify({
+    usecase: 'evil', version: '1.0.0', title: 'Evil', summary: 's', author: 'a', license: 'MIT', audience: 'other', tone: 't', modules: [],
+    pack: { pack: 'usecase-evil', requires: { format: 1, primitives: 1, packs: {} }, declarations: [{ page: 'evil', title: 'Evil', blocks: [{ kind: 'iframe', span: 12 }] }] },
+  });
+  const out = await planShared(client, { text, source: 'url' }, [], async () => null);
+  assert.equal(out.ok, false);
+  assert.equal((out as { code: string }).code, 'KIND_UNKNOWN');
+  assert.match((out as { fix: string }).fix, /^This setup uses a block this version of BrainDog does not have: iframe\./u);
+  assert.equal(calls.length, 0);
+});
+
+test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READER ARRANGEMENT', async () => {
+  const rows: Record<string, { seq: number; fields: Record<string, unknown> }[]> = {
+    assignments: [{ seq: 1, fields: { what: 'Problem set 1: probability', tags: ['example'] } }],
+    courses: [{ seq: 4, fields: { name: 'Introduction to statistics', tags: ['example'] } }],
+  };
+  const updates: unknown[] = [];
+  const client = {
+    list: async ({ register }: { register: string }) => ok({ rows: rows[register] ?? [] }),
+    update: async (args: { register: string; seq: number; patch: Record<string, unknown> }) => (updates.push(args), ok({})),
+  };
+  const plan = { ...sharedPlanOf(ANSWER)!, usecase: { ...sharedPlanOf(ANSWER)!.usecase, id: 'student' }, nav: ['/r/courses', '/r/assignments'] };
+  const out = await afterInstall(client, plan, ['/p/money', '/r/assignments']);
+  assert.deepEqual(out.nav, ['/r/courses', '/r/assignments', '/p/money']);
+  assert.ok(out.links >= 1, 'no example was linked');
+  assert.deepEqual(updates[0], { register: 'assignments', seq: 1, patch: { course: 'courses#4' } });
+  assert.equal((await afterInstall(client, { ...plan, nav: [] }, [])).nav, null);
 });

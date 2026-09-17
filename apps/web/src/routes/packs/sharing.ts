@@ -12,7 +12,10 @@
  * PURE, AND THEREFORE TESTABLE, for the reason `packs.ts` gives: the screen only assigns.
  */
 
+import { linkExamples } from '@braindog/seed/usecases/links';
+
 import { copy } from '../../lib/copy.ts';
+import { withOrder } from '../../lib/nav.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
 
@@ -22,7 +25,19 @@ type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: 
 /** The client methods sharing calls, so a test can hand in an object literal. */
 export type SharingClient = {
   planUseCase(args: { doc?: unknown; text?: string; source?: { kind: string; ref?: string }; modules?: Record<string, unknown> }): Promise<Wire<unknown>>;
-  exportUseCase(args: { usecase?: string; title?: string; summary?: string; version?: string; audience?: string; examples?: Record<string, number[]> }): Promise<Wire<unknown>>;
+  exportUseCase(args: {
+    usecase?: string;
+    title?: string;
+    summary?: string;
+    version?: string;
+    audience?: string;
+    examples?: Record<string, number[]>;
+    step?: 'patch' | 'minor';
+    nav?: string[];
+    signals?: string[];
+    skills?: number[];
+  }): Promise<Wire<unknown>>;
+  fetchUseCase(args: { url: string }): Promise<Wire<unknown>>;
   planPack(args: { doc: unknown; source?: { kind: string } }): Promise<Wire<unknown>>;
   installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[] }): Promise<Wire<unknown>>;
   enablePack(args: { id: string }): Promise<Wire<unknown>>;
@@ -39,6 +54,30 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 
 /** The most an address is read to, a little over what a shared use case may weigh, so the record's refusal is the one said. */
 export const URL_MOST_BYTES = 300 * 1024;
+
+/**
+ * The text at an https address, read by the record's host (`fetchUseCase`), or the sentence to say instead.
+ *
+ * ON A LIVE RECORD THE HOST READS IT, because most sites send no CORS header and a tab may not read them. The host sends
+ * nothing of the record's and refuses a private or local address, so what an owner pastes cannot point this server at
+ * its own network. The tab's own read (`readAddress`) is left for the sample, which has no host.
+ */
+export async function readOnHost(client: Pick<SharingClient, 'fetchUseCase'>, address: string): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
+  let url: URL;
+  try {
+    url = new URL(address.trim());
+  } catch {
+    return { ok: false, fix: copy.shareAddressNotOne, code: null };
+  }
+  if (url.protocol !== 'https:') return { ok: false, fix: copy.shareAddressHttps, code: null };
+  const out = await client.fetchUseCase({ url: url.href });
+  if (!out.ok) {
+    const refusal = refusalOf(out);
+    return { ok: false, fix: refusal.fix, code: refusal.code };
+  }
+  const v = out.value;
+  return isMap(v) && typeof v.text === 'string' ? { ok: true, text: v.text } : { ok: false, fix: copy.writeRaced, code: null };
+}
 
 /**
  * The text at an https address, or the sentence to say instead. Nothing is sent with the request: no cookie, no key.
@@ -104,6 +143,8 @@ export type SharedPack = {
 
 export type SharedPlan = {
   usecase: { id: string; title: string; version: string; summary: string; author: string };
+  /** The rail order the file carries, as addresses, applied as the reader's own once it is installed. */
+  nav: string[];
   enable: string[];
   packs: SharedPack[];
   approve: string[];
@@ -135,7 +176,7 @@ function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; 
 }
 
 /** The record's plan, in the screen's words. `null` for an answer this build does not recognise. */
-export function sharedPlanOf(value: unknown): SharedPlan | null {
+export function sharedPlanOf(value: unknown, nav: readonly string[] = []): SharedPlan | null {
   if (!isMap(value) || !isMap(value.usecase) || !Array.isArray(value.packs)) return null;
   const u = value.usecase;
   const packs: SharedPack[] = [];
@@ -162,6 +203,7 @@ export function sharedPlanOf(value: unknown): SharedPlan | null {
   }
   return {
     usecase: { id: String(u.usecase ?? ''), title: String(u.title ?? ''), version: String(u.version ?? ''), summary: String(u.summary ?? ''), author: String(u.author ?? '') },
+    nav: [...nav],
     enable: strings(value.enable),
     packs,
     approve: strings(value.approve),
@@ -177,10 +219,10 @@ export async function planShared(
   file: { text: string; source: 'paste' | 'url' | 'local'; ref?: string },
   installed: readonly PackState[],
   moduleDoc: (id: string, installed: readonly PackState[]) => Promise<Body | null>,
-): Promise<{ ok: true; plan: SharedPlan } | { ok: false; fix: string }> {
+): Promise<{ ok: true; plan: SharedPlan } | { ok: false; fix: string; code: string | null }> {
   const { readShared } = await import('@braindog/declare');
   const read = await readShared(file.text, { kind: file.source });
-  if (!read.ok) return { ok: false, fix: 'refusal' in read ? read.refusal.fix : copy.writeRaced };
+  if (!read.ok) return { ok: false, fix: 'refusal' in read ? read.refusal.fix : copy.writeRaced, code: 'refusal' in read ? read.refusal.code : null };
   const modules: Record<string, unknown> = {};
   for (const m of read.value.usecase.modules) {
     if (installed.some((p) => p.id === m)) continue;
@@ -192,9 +234,12 @@ export async function planShared(
     source: { kind: file.source, ...(file.ref === undefined ? {} : { ref: file.ref }) },
     ...(Object.keys(modules).length === 0 ? {} : { modules }),
   });
-  if (!out.ok) return { ok: false, fix: refusalOf(out).fix };
-  const plan = sharedPlanOf(out.value);
-  return plan ? { ok: true, plan } : { ok: false, fix: copy.writeRaced };
+  if (!out.ok) {
+    const refusal = refusalOf(out);
+    return { ok: false, fix: refusal.fix, code: refusal.code };
+  }
+  const plan = sharedPlanOf(out.value, read.value.usecase.nav);
+  return plan ? { ok: true, plan } : { ok: false, fix: copy.writeRaced, code: null };
 }
 
 /** Whether a plan can be installed as it stands: nothing in it takes over another pack's list or page. */
@@ -229,6 +274,29 @@ export async function installShared(client: SharingClient, plan: SharedPlan): Pr
   return { ok: true, done, fix: null, stale: false };
 }
 
+/**
+ * What a plan does once its packs are in, the two steps onboarding takes after an install: the examples pointed at each
+ * other (`links.ts`, a seed carries no link), and the rail order the file carries laid over the reader's own. Answers the
+ * arrangement to keep, for the screen to write where the rail reads it; a link that is refused is skipped.
+ */
+export async function afterInstall(
+  client: { list(args: { register: string; limit?: number }): Promise<Wire<unknown>>; update(args: { register: string; seq: number; patch: Record<string, unknown> }): Promise<Wire<unknown>> },
+  plan: SharedPlan,
+  arrangement: readonly string[],
+): Promise<{ links: number; nav: string[] | null }> {
+  const links = await linkExamples(
+    {
+      rows: async (register) => {
+        const read = await client.list({ register, limit: 200 });
+        return read.ok && isMap(read.value) && Array.isArray(read.value.rows) ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
+      },
+      link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+    },
+    plan.usecase.id,
+  );
+  return { links, nav: plan.nav.length === 0 ? null : withOrder(plan.nav, arrangement) };
+}
+
 /* ── switching between use cases ───────────────────────────────────────── */
 
 /** The use case this record speaks as: the enabled `usecase-*` pack's id without its prefix, or `null`. */
@@ -238,9 +306,13 @@ export const speakingOf = (states: readonly PackState[]): string | null =>
 /** What a browse card offers for a use case on this record. */
 export type Offer = 'in-use' | 'switch' | 'install';
 
-export function offerFor(id: string, states: readonly PackState[], carriesPack: boolean): Offer {
+export function offerFor(id: string, states: readonly PackState[], carriesPack: boolean, modules: readonly string[] = []): Offer {
   const speaking = speakingOf(states);
-  if (!carriesPack) return speaking === null ? 'in-use' : 'switch';
+  /* A USE CASE THAT CARRIES NO PACK IS ITS MODULES AND THE HOUSE VOICE: installed once every module is here and on. */
+  if (!carriesPack) {
+    if (modules.some((m) => !states.some((s) => s.id === m && s.disabled_at === null))) return 'install';
+    return speaking === null ? 'in-use' : 'switch';
+  }
   if (speaking === id) return 'in-use';
   return states.some((s) => s.id === `usecase-${id}`) ? 'switch' : 'install';
 }
@@ -280,11 +352,24 @@ export async function exportShared(
   return { ok: true, file: v.file, text, bytes: new TextEncoder().encode(text).length };
 }
 
-/** The version a share offers first: the patch after the one installed, as the record would pick. */
-export function nextPatch(was: string | null): string {
-  const m = /^(\d+)\.(\d+)\.(\d+)/u.exec(was ?? '');
-  return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : '1.0.0';
+/**
+ * The version a share offers: a patch or a minor on from the later of the version installed and the one this record last
+ * shared as (`shared_version`), as the record would pick. 1.0.0 for an arrangement that has neither.
+ */
+export function offeredVersion(installed: string | null, lastShared: string | null, step: 'patch' | 'minor' = 'patch'): string {
+  const parse = (v: string | null) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)/u.exec(v ?? '');
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const a = parse(installed);
+  const b = parse(lastShared);
+  const from = !a ? b : !b ? a : a[0]! !== b[0]! ? (a[0]! > b[0]! ? a : b) : a[1]! !== b[1]! ? (a[1]! > b[1]! ? a : b) : a[2]! >= b[2]! ? a : b;
+  if (!from) return '1.0.0';
+  return step === 'minor' ? `${from[0]}.${from[1]! + 1}.0` : `${from[0]}.${from[1]}.${from[2]! + 1}`;
 }
+
+/** The rail as this person sees it, as the addresses a share carries: the pages in drawn order, then the lists. */
+export const drawnOrder = (pages: readonly { href: string }[], lists: readonly { id: string }[]): string[] => [...pages.map((p) => p.href), ...lists.map((l) => `/r/${l.id}`)];
 
 /** A row as a person picks it from a list they know: its first line of text. */
 export function rowTitle(fields: Readonly<Record<string, unknown>>): string {

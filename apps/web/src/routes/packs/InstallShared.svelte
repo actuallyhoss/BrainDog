@@ -4,16 +4,22 @@
   THE FILE IS READ HERE AND PLANNED BY THE RECORD. `readShared` runs in this tab first, so a file too large, a
   credential in it or a block kind nothing draws is said at once; the record then reads it through the same door and
   plans it, and what is drawn is that plan. On the sample nothing is planned, and the sentence says so.
+
+  AN ADDRESS IS READ BY THE HOST on a live record (`fetchUseCase`), so a site with no CORS header still installs, and a
+  private or local address is refused there. A refusal is said in a sentence, with its code beneath it.
+
+  AFTER THE INSTALL, the two steps onboarding takes: the example rows linked, and the rail order the file carries kept.
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
+  import * as pref from '$lib/pref.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { packDocument, type PackState } from '$lib/record/packs.ts';
   import SharedPlan from './SharedPlan.svelte';
-  import { installShared, planShared, readAddress, type SharedPlan as Plan } from './sharing.ts';
+  import { afterInstall, installShared, planShared, readAddress, readOnHost, type SharedPlan as Plan } from './sharing.ts';
 
   let {
     client,
@@ -26,22 +32,28 @@
   let address = $state('');
   let busy = $state(false);
   let said = $state<string | null>(null);
+  let code = $state<string | null>(null);
   let plan = $state<Plan | null>(null);
   let last: { text: string; source: 'local' | 'url'; ref?: string } | null = null;
 
   async function planText(text: string, source: 'local' | 'url', ref?: string) {
     said = null;
+    code = null;
     plan = null;
     last = { text, source, ...(ref === undefined ? {} : { ref }) };
     if (!live || !client) {
       const { readShared } = await import('@braindog/declare');
       const read = await readShared(text);
       said = read.ok ? copy.notWritten(copy.shareInstall(read.value.usecase.title)) : 'refusal' in read ? read.refusal.fix : copy.writeRaced;
+      code = !read.ok && 'refusal' in read ? read.refusal.code : null;
       return;
     }
     const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held) => packDocument(id, held));
     if (out.ok) plan = out.plan;
-    else said = out.fix;
+    else {
+      said = out.fix;
+      code = out.code;
+    }
   }
 
   async function fromFile(file: File | undefined) {
@@ -61,9 +73,10 @@
     if (busy || address.trim() === '') return;
     busy = true;
     try {
-      const read = await readAddress(address);
+      const read = live && client ? await readOnHost(client, address) : await readAddress(address);
       if (!read.ok) {
         said = read.fix;
+        code = (read as { code?: string | null }).code ?? null;
         plan = null;
       } else await planText(read.text, 'url', address.trim());
     } finally {
@@ -77,6 +90,8 @@
     try {
       const out = await installShared(client, plan);
       if (out.ok) {
+        const after = await afterInstall(client, plan, pref.read().nav ?? []);
+        if (after.nav) pref.write({ nav: after.nav });
         toasts.push(copy.shareInstalled(plan.usecase.title), { intent: 'good' });
         plan = null;
         oninstalled();
@@ -108,7 +123,7 @@
       <Button weight="bare" type="submit" disabled={busy || address.trim() === ''}>{busy ? copy.shareReading : copy.readAddress}</Button>
     </form>
   </div>
-  {#if said}<p class="shared-said" role="status">{said}</p>{/if}
+  {#if said}<p class="shared-said" role="status">{said}{#if code}<span class="shared-code">{copy.refusalCode(code)}</span>{/if}</p>{/if}
   {#if plan}<SharedPlan {plan} {busy} oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
 </div>
 
@@ -145,8 +160,17 @@
   }
 
   .shared-said {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  .shared-code {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
   }
 </style>
