@@ -112,16 +112,10 @@ const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  */
 const PACK_VERB: Record<string, string> = { install: 'Added', uninstall: 'Removed', upgrade: 'Updated', retire: 'Retired' };
 function packText(e: EventLine): string | null {
-  /* A PACK'S SETTINGS SAVED reached Home as "Edit". Said as what it did: a use case chosen to speak, or kept beside. */
+  /* A PACK'S SETTINGS SAVED reached Home as "Edit". A use case's voice is said by `voiceText`, which reads the lines beside it. */
   if (e.kind === 'edit' && e.target_kind === 'pack' && e.target) {
     const id = e.target.replace(/^pack:/u, '');
-    const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
-    const name = usecase ? useCaseName(usecase) : (PACKS.find((p) => p.id === id)?.name ?? id);
-    const to = typeof e.to === 'object' && e.to !== null && !Array.isArray(e.to) ? (e.to as Record<string, unknown>) : {};
-    const only = Object.keys(to).length === 1;
-    if (usecase && only && to.speaks === true) return copy.useCaseSpeaks(name);
-    if (usecase && only && to.speaks === false) return copy.useCaseBeside(name);
-    return copy.settingsChanged(name);
+    return copy.settingsChanged(nameOfPack(id));
   }
   const verb = PACK_VERB[e.kind];
   if (e.target_kind !== 'pack' || !verb || !e.target) return null;
@@ -134,6 +128,65 @@ function packText(e: EventLine): string | null {
   if (names.length === 0) return `${verb} the ${id} add-on`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+const nameOfPack = (id: string): string => {
+  const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
+  return usecase ? useCaseName(usecase) : (PACKS.find((p) => p.id === id)?.name ?? id);
+};
+
+/** A use case's `speaks` setting saved, alone, as `{ id, from, to }`; `null` for any other line. */
+function speaksOf(e: EventLine): { id: string; from: unknown; to: boolean } | null {
+  if (e.kind !== 'edit' || e.target_kind !== 'pack' || !e.target?.startsWith('pack:usecase-')) return null;
+  const to = typeof e.to === 'object' && e.to !== null && !Array.isArray(e.to) ? (e.to as Record<string, unknown>) : {};
+  if (Object.keys(to).length !== 1 || typeof to.speaks !== 'boolean') return null;
+  const from = typeof e.from === 'object' && e.from !== null && !Array.isArray(e.from) ? (e.from as Record<string, unknown>).speaks : null;
+  return { id: e.target.slice('pack:'.length), from: from ?? null, to: to.speaks };
+}
+
+/**
+ * THE VOICE WRITTEN DOWN, SAID AS WHAT HAPPENED. Every door that adds a use case beside another writes both answers
+ * (`record` `writeVoice`): the one speaking set to speak, the one added set not to. Said line by line, a use case going
+ * beside Student put "Student speaks for this BrainDog now" in the feed, which reads as a switch.
+ *
+ * So the lines one write made, which sit next to each other in the log, are read together. The voice MOVED only when a use
+ * case that spoke was set not to, one set not to was set to, or the one set to speak is the newest of them to arrive. Then
+ * the new speaker's line says "speaks" and the old one's line is not drawn. Otherwise the use case set not to speak reads
+ * "Personal added beside Student", and the speaker's line, which changed nothing a person sees, is not drawn.
+ *
+ * Returns the text for each line of `events` it answers for (`null` to leave a line out), by index.
+ */
+function voiceTexts(events: readonly EventLine[]): Map<number, string | null> {
+  const out = new Map<number, string | null>();
+  const installedAt = (id: string, from: number): number => {
+    const at = events.findIndex((e, i) => i >= from && e.kind === 'install' && e.target === `pack:${id}`);
+    return at === -1 ? Number.POSITIVE_INFINITY : at;
+  };
+  for (let i = 0; i < events.length; ) {
+    if (!speaksOf(events[i]!)) {
+      i += 1;
+      continue;
+    }
+    let end = i;
+    while (end + 1 < events.length && speaksOf(events[end + 1]!)) end += 1;
+    const group = events.slice(i, end + 1).map((e, k) => ({ at: i + k, ...speaksOf(e)! }));
+    const on = group.filter((g) => g.to);
+    const off = group.filter((g) => !g.to);
+    /* Newest first, so the smaller index is the later arrival. */
+    const newest = [...group].sort((a, b) => installedAt(a.id, end + 1) - installedAt(b.id, end + 1))[0];
+    const moved = off.some((g) => g.from === true) || on.some((g) => g.from === false) || (on.length > 0 && off.length > 0 && installedAt(on[0]!.id, end + 1) !== Number.POSITIVE_INFINITY && newest?.id === on[0]!.id);
+    if (moved) {
+      for (const g of on) out.set(g.at, copy.useCaseSpeaks(nameOfPack(g.id)));
+      for (const g of off) out.set(g.at, null);
+    } else {
+      /* Who speaks: the line set to speak in this write, else the newest older line that did. */
+      const said = on[0]?.id ?? events.slice(end + 1).map(speaksOf).find((x) => x?.to === true)?.id ?? null;
+      for (const g of on) out.set(g.at, null);
+      for (const g of off) out.set(g.at, said ? copy.useCaseAddedBeside(nameOfPack(g.id), nameOfPack(said)) : copy.useCaseBeside(nameOfPack(g.id)));
+    }
+    i = end + 1;
+  }
+  return out;
 }
 
 /**
@@ -197,8 +250,13 @@ function hrefOf(e: EventLine): string {
 }
 
 /** The record's lines as the feed's items, newest first as they came. */
-export const newsOf = (events: readonly EventLine[], me: string | null): NewsItem[] =>
-  events.map((e) => ({ at: e.ts, by: actorFor(e.actor, me), text: textOf(e), href: hrefOf(e) }));
+export function newsOf(events: readonly EventLine[], me: string | null): NewsItem[] {
+  const voice = voiceTexts(events);
+  return events.flatMap((e, i) => {
+    const text = voice.has(i) ? voice.get(i) : textOf(e);
+    return text == null ? [] : [{ at: e.ts, by: actorFor(e.actor, me), text, href: hrefOf(e) }];
+  });
+}
 
 /**
  * The record's `boot` in the shape the shell draws.
