@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { askSpark, canAsk, draftedBy, readSpark, suggestionsOf, words, type Reading, type SparkClient } from './spark.ts';
+import { askSpark, canAsk, dailySaid, draftedBy, readSpark, setDaily, suggestionsOf, words, type Reading, type SparkClient } from './spark.ts';
 
 const READING: Reading = {
   model: null,
@@ -57,4 +57,18 @@ test('reading and asking go to the two record methods, and a refusal is said in 
   assert.deepEqual(await readSpark(member), { ok: false, fix: words.notOwner, owner: false });
   const none = client({ sparkPropose: { ok: true, value: { by: 'rules', filed: [], skipped: [], dropped: [] } } });
   assert.equal(((await askSpark(none)) as { said: string }).said, words.filedNone);
+});
+
+test('the daily switch says what on and off mean and when Spark last looked, and sends only the choice', async () => {
+  assert.equal(dailySaid({ on: true, last: null }), words.dailyOn);
+  assert.equal(dailySaid({ on: false, last: '2026-09-17' }), `${words.dailyOff} It last looked on 17 September 2026.`);
+  for (const line of [words.dailyOn, words.dailyOff, words.dailySwitch, words.dailyTitle]) assert.ok(!line.includes('—'), line);
+
+  const sent: unknown[] = [];
+  const c: SparkClient = { call: async (name, args) => (sent.push([name, args]), { ok: true, value: { on: false, last: '2026-09-17' } }) as never };
+  assert.deepEqual(await setDaily(c, false), { ok: true, daily: { on: false, last: '2026-09-17' }, said: words.dailySaidOff });
+  assert.deepEqual(sent, [['sparkDaily', { on: false }]]);
+
+  const refused: SparkClient = { call: async () => ({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app.' } }) as never };
+  assert.deepEqual(await setDaily(refused, true), { ok: false, fix: 'Open this in the app.' });
 });

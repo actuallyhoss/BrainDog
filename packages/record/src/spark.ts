@@ -282,6 +282,11 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     }
   }
 
+  /* A LIST IS SAID BY THE WORD THE RECORD SPEAKS FOR IT, where the speaking use case relabels it, so Spark's sentences agree
+     with the rail. */
+  const tone = speaking === null ? null : toneOf(kernel, speaking);
+  for (const l of lists) l.name = tone?.settings[labelSetting(l.id)]?.value ?? l.name;
+
   const packs: PackUse[] = kernel.packStates().map((p) => {
     const mine = declared.filter((d) => d.pack === p.id).map((d) => d.created_at).sort();
     return { id: p.id, title: titles.get(p.id) ?? p.id, on: p.disabled_at === null, usecase: p.id.startsWith('usecase-'), since: mine[0] ?? null };
@@ -300,7 +305,7 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     packs,
     speaking,
     writes,
-    tone: speaking === null ? null : toneOf(kernel, speaking),
+    tone,
     skills: kernel.register('skills')
       ? sql
           .all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL")
@@ -553,7 +558,7 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
     for (const { o, s } of missing)
       drafts.push({
         key: '',
-        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${s.trigger}, and your Skills list has no skill by that name.`,
+        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${momentOf(s.trigger)}, and your Skills list has none by that name.`,
         body_kind: 'rowset',
         body: {
           register: 'skills',
@@ -575,6 +580,9 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
     };
   return { noticed, drafts: keyed(drafts), quiet: null };
 }
+
+/** A skill's moment without what it then does: "when a ticket is opened, to set its priority" is "when a ticket is opened". */
+const momentOf = (trigger: string): string => trigger.split(', to ')[0]!.trim();
 
 /** Each draft keyed by what its body is about, the key a filed question is recognised by. */
 const keyed = (drafts: readonly SparkDraft[]): SparkDraft[] => drafts.map((d) => ({ ...d, key: stableKey(d.body) }));

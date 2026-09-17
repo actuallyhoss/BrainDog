@@ -304,6 +304,7 @@
   const lines = $derived(connectLines(origin));
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import SparkDaily from '$lib/ui/SparkDaily.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -2128,6 +2129,8 @@
           </form>
         {/if}
       </Section>
+      <!-- SPARK LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
+      <SparkDaily link />
     {:else if area === 'ingest'}
       <!--
         `25 §9` DRAWS THIS SCREEN, which makes it the one settings area where inventing a control is

@@ -15,11 +15,18 @@ export type SparkClient = { call: <T>(name: string, args?: Record<string, unknow
 
 export type Noticed = { kind: string; subject: string; text: string };
 export type Draft = { question: string; body_kind: string; asked: { id: string; status: string } | null };
-export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: { id: string; question: string }[]; cap: number };
+/** Whether Spark looks once a day on its own, and the day it last did. */
+export type Daily = { on: boolean; last: string | null };
+export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: { id: string; question: string }[]; cap: number; daily?: Daily };
 export type Asked = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
 
 /** One suggestion as the screen draws it: its question, and where it stands. */
 export type Suggestion = { question: string; state: 'new' | 'waiting' | 'answered'; href: string | null; said: string };
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** `2026-09-17` as a person says it: 17 September 2026. */
+const spokenDay = (day: string): string => (/^\d{4}-\d{2}-\d{2}$/u.test(day) ? `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}` : day);
 
 export const words = {
   title: 'Spark',
@@ -42,6 +49,14 @@ export const words = {
   sampleBody: 'This is the sample. In your own BrainDog, Spark says what it notices about how you use it and what it would change.',
   notOwner: 'Only the owner of this BrainDog can see what Spark noticed.',
   skipped: 'Not put on Decide',
+  dailyTitle: 'Spark on its own',
+  dailySwitch: 'Let Spark look once a day',
+  dailyOn: 'Once a day, Spark looks at how you use this BrainDog and puts anything new on Decide, never more than three at a time and never a question you already answered.',
+  dailyOff: 'Spark waits for you. It looks only when you open Spark and press to put its suggestions on Decide.',
+  dailyLast: (day: string) => `It last looked on ${spokenDay(day)}.`,
+  dailySaidOn: 'Spark will look once a day.',
+  dailySaidOff: 'Spark will wait for you to ask.',
+  dailyMore: 'Open Spark',
 } as const;
 
 const decideHref = (id: string): string => `/decide/${encodeURIComponent(id)}`;
@@ -78,4 +93,14 @@ export async function askSpark(client: SparkClient): Promise<{ ok: true; asked: 
   const out = await client.call<Asked>('sparkPropose', {});
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   return { ok: true, asked: out.value, said: out.value.filed.length === 0 ? words.filedNone : words.filed(out.value.filed.length) };
+}
+
+/** The line under the switch: what on or off means, and when Spark last looked. */
+export const dailySaid = (daily: Daily): string => (daily.on ? words.dailyOn : words.dailyOff) + (daily.last ? ` ${words.dailyLast(daily.last)}` : '');
+
+/** The switch: Spark looking once a day, on or off. Only the owner, in a browser. */
+export async function setDaily(client: SparkClient, on: boolean): Promise<{ ok: true; daily: Daily; said: string } | { ok: false; fix: string }> {
+  const out = await client.call<Daily>('sparkDaily', { on });
+  if (!out.ok) return { ok: false, fix: fixOf(out) };
+  return { ok: true, daily: out.value, said: out.value.on ? words.dailySaidOn : words.dailySaidOff };
 }

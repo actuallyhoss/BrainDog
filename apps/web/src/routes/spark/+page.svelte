@@ -19,6 +19,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import SparkDaily from '$lib/ui/SparkDaily.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let client: SparkClient | null = null;
@@ -125,6 +126,8 @@
         {/if}
       {/if}
     </Section>
+
+    {#if reading.daily}<SparkDaily daily={reading.daily} />{/if}
 
     {#if asked && (asked.skipped.length > 0 || asked.dropped.length > 0)}
       <Section title={words.skipped}>

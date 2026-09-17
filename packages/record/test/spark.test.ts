@@ -440,8 +440,8 @@ test('THE SKILLS A USE CASE NAMES are offered to the agents once each, as rows o
   assert.deepEqual(
     seen.drafts.filter((d) => d.body_kind === 'rowset').map((d) => d.question),
     [
-      'Give your agents the skill task-triage? Team names it for when a ticket is opened, to set its priority, and your Skills list has no skill by that name.',
-      'Give your agents the skill standup-digest? Team names it for each morning, to say what moved yesterday, and your Skills list has no skill by that name.',
+      'Give your agents the skill task-triage? Team names it for when a ticket is opened, and your Skills list has none by that name.',
+      'Give your agents the skill standup-digest? Team names it for each morning, and your Skills list has none by that name.',
     ],
   );
 
