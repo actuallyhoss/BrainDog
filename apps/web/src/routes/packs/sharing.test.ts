@@ -337,6 +337,12 @@ test('A PLAN NAMES A MODULE BY ITS TITLE AND A PAGE FOR EACH ROW BY ITS LIST, ne
   assert.equal(plan.packs[0]?.title, 'Money');
   assert.equal(plan.packs[1]?.title, plan.usecase.title);
   assert.deepEqual(plan.packs[1]?.adds.map((a) => a.name), ['Organisations', 'A page for each organisation', 'Today']);
+  /* A LIST THE DOCUMENT DOES NOT DECLARE is named by the pack in the plan that does, or by this build. */
+  const each = { declarations: [{ page: 'thing', title: '{{name}}', for: { register: 'things' }, blocks: [] }] };
+  const across = sharedPlanOf({ ...ANSWER, packs: [{ ...ANSWER.packs[0], id: 'portfolio', role: 'module', installed_version: null, adds: [], doc: { declarations: [{ register: 'things', name: 'Ventures', title: 'name', fields: [] }] } }, { ...ANSWER.packs[0], adds: ['page.thing'], doc: each }] })!;
+  assert.deepEqual(across.packs[1]?.adds.map((x) => x.name), ['A page for each venture']);
+  const built = sharedPlanOf({ ...ANSWER, packs: [{ ...ANSWER.packs[0], adds: ['page.thing'], doc: each }] })!;
+  assert.deepEqual(built.packs[0]?.adds.map((x) => x.name), ['A page for each project']);
   assert.equal(moduleTitle('no-such-module'), 'No such module');
   assert.deepEqual(['Studies', 'Organisations', 'Classes', 'Status', 'Steps'].map(oneOf), ['study', 'organisation', 'class', 'status', 'step']);
 });

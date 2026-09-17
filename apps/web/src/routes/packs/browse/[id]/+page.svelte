@@ -25,6 +25,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { drew } from '../../../../lib/ui/screen.svelte.ts';
   import Offer from '../Offer.svelte';
+  import { moduleTitle } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
 
   const u = $derived(useCase(page.params.id ?? '') ?? null);
@@ -90,7 +91,7 @@
         <dl class="facts">
           {#if installs.modules.length > 0}
             <dt>{copy.useCaseModulesFirst}</dt>
-            <dd>{installs.modules.join(', ')}</dd>
+            <dd>{installs.modules.map(moduleTitle).join(', ')}</dd>
           {/if}
           {#if installs.lists.length > 0}
             <dt>{copy.browseLists}</dt>

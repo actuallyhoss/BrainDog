@@ -35,7 +35,7 @@
   import { day, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display } from '$lib/record/api.ts';
+  import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { ARRANGING, PROPOSALS, ROWSETS } from '$lib/record/data.ts';
@@ -491,7 +491,7 @@
         <p class="settled-head">
           <Icon name="check" size="m" />
           {copy.decidedBy}
-          {settled.by}, {since(settled.at, now)}
+          {whoDid(settled.by, String(page.data.me?.person ?? '') || null).name}, {since(settled.at, now)}
         </p>
         <p class="settled-choice">{settled.title}</p>
         <p class="settled-reason">“{settled.reason}”</p>

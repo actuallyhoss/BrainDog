@@ -19,7 +19,7 @@ import { withOrder } from '../../lib/nav.ts';
 import { SPEAKS, speaking, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
-import { PACKS } from '../../lib/record/data.ts';
+import { PACKS, REGISTERS } from '../../lib/record/data.ts';
 
 type Body = Record<string, unknown>;
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
@@ -171,8 +171,11 @@ export const oneOf = (list: string): string => {
 export const moduleTitle = (id: string): string => PACKS.find((p) => p.id === id)?.name ?? copy.valueWord(id.replace(/^usecase-/u, '').replace(/[_-]+/gu, ' '));
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
-function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
-  const decls = Array.isArray(doc.declarations) ? (doc.declarations as Body[]) : [];
+function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
+  const declsOf = (d: Body): Body[] => (Array.isArray(d.declarations) ? (d.declarations as Body[]) : []);
+  const decls = declsOf(doc);
+  /* A LIST ANOTHER PACK IN THE SAME PLAN DECLARES, such as Projects for a page on each of Portfolio's rows. */
+  const lists = [...decls, ...others.flatMap(declsOf)];
   /* A TITLE MAY READ A SETTING, `{{config:voice_home}}`, and is said as the value this file installs it with. */
   const config = isMap(doc.config) ? doc.config : {};
   const filled = (text: string): string =>
@@ -191,8 +194,9 @@ function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; 
       const d = decls.find((x) => x.page === bare);
       /* A PAGE FOR EACH ROW is titled by the row, `{{name}}`, which names nothing until a row is chosen: said by its list. */
       if (typeof d?.title === 'string' && /\{\{(?!config:)/u.test(d.title) && isMap(d.for) && typeof d.for.register === 'string') {
-        const list = decls.find((x) => x.register === (d.for as Body).register && x.page === undefined);
-        return { kind: 'page', name: copy.sharePageEach(oneOf(typeof list?.name === 'string' ? filled(list.name) : String((d.for as Body).register))) };
+        const list = lists.find((x) => x.register === (d.for as Body).register && x.page === undefined);
+        const register = String((d.for as Body).register);
+        return { kind: 'page', name: copy.sharePageEach(oneOf(typeof list?.name === 'string' ? filled(list.name) : (REGISTERS[register]?.name ?? register))) };
       }
       return { kind: 'page', name: typeof d?.title === 'string' ? filled(d.title) : bare };
     }
@@ -209,7 +213,7 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
   const packs: SharedPack[] = [];
   for (const raw of value.packs) {
     if (!isMap(raw) || typeof raw.id !== 'string' || !isMap(raw.doc)) return null;
-    const name = namesIn(raw.doc);
+    const name = namesIn(raw.doc, value.packs.flatMap((other) => (isMap(other) && isMap(other.doc) && other !== raw ? [other.doc] : [])));
     const role = raw.role === 'module' ? 'module' : 'usecase';
     packs.push({
       id: raw.id,
