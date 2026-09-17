@@ -198,29 +198,34 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
     sql.all<{ register: string; n: number }>('SELECT register, count(*) AS n FROM entry WHERE deleted_at IS NULL GROUP BY register').map((r) => [r.register, Number(r.n)]),
   );
 
-  /* WRITES IN NINETY DAYS, by actor, list and day: one pass over the log for both "untouched" and "what agents write". */
+  /* WRITES IN NINETY DAYS, by actor, list and day: one pass over the log for both "untouched" and "what agents write".
+     FROM THE LOG, NOT THE ROWS LEFT: a row the hourly sweep purged names its list in its own `purge` event, so writes to
+     it still count. */
   const writes90 = new Map<string, number>();
   const agentWrites30 = new Map<string, number>();
   const writes = { all30: 0, agents30: 0, agents90: 0 };
   const agents = new Map<string, { writes30: number; days: Set<string>; lists: Map<string, number> }>();
-  for (const r of sql.all<{ actor: string; register: string; day: string; n: number }>(
-    `SELECT e.actor AS actor, en.register AS register, substr(e.ts, 1, 10) AS day, count(*) AS n
-       FROM event e JOIN entry en ON en.id = substr(e.target, 7)
+  for (const r of sql.all<{ actor: string; list: string; day: string; n: number }>(
+    `SELECT e.actor AS actor, coalesce(en.register, json_extract(p.from_v, '$')) AS list, substr(e.ts, 1, 10) AS day, count(*) AS n
+       FROM event e
+       LEFT JOIN entry en ON en.id = substr(e.target, 7)
+       LEFT JOIN event p ON en.id IS NULL AND p.target = e.target AND p.kind = 'purge' AND p.field = 'register'
       WHERE e.ts >= ? AND e.target_kind = 'entry' AND e.kind IN ${WRITES}
-      GROUP BY e.actor, en.register, day`,
+      GROUP BY e.actor, list, day
+     HAVING list IS NOT NULL`,
     since90,
   )) {
     const n = Number(r.n);
-    writes90.set(r.register, (writes90.get(r.register) ?? 0) + n);
+    writes90.set(r.list, (writes90.get(r.list) ?? 0) + n);
     if (r.day >= day30) writes.all30 += n;
     if (isAgent(r.actor)) writes.agents90 += n;
     if (r.day >= day30 && isAgent(r.actor)) {
       writes.agents30 += n;
-      agentWrites30.set(r.register, (agentWrites30.get(r.register) ?? 0) + n);
+      agentWrites30.set(r.list, (agentWrites30.get(r.list) ?? 0) + n);
       const a = agents.get(r.actor) ?? { writes30: 0, days: new Set<string>(), lists: new Map<string, number>() };
       a.writes30 += n;
       a.days.add(r.day);
-      a.lists.set(r.register, (a.lists.get(r.register) ?? 0) + n);
+      a.lists.set(r.list, (a.lists.get(r.list) ?? 0) + n);
       agents.set(r.actor, a);
     }
   }

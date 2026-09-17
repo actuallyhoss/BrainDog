@@ -242,8 +242,8 @@ export function purge(
   const cutoff = instant(cutoffMs);
 
   return transaction(() => {
-    const doomed = sql.all<{ id: string; rowid: number }>(
-      'SELECT id, rowid FROM entry WHERE deleted_at IS NOT NULL AND deleted_at < ? ORDER BY deleted_at LIMIT ?',
+    const doomed = sql.all<{ id: string; rowid: number; register: string }>(
+      'SELECT id, rowid, register FROM entry WHERE deleted_at IS NOT NULL AND deleted_at < ? ORDER BY deleted_at LIMIT ?',
       cutoff,
       Math.max(0, Math.floor(limit)),
     );
@@ -255,6 +255,15 @@ export function purge(
       sql.exec('DELETE FROM entry_vec WHERE id = ?', row.id);
       sql.exec('DELETE FROM entry_fts WHERE rowid = ?', row.rowid);
       sql.exec('DELETE FROM entry WHERE id = ?', row.id);
+      /* THE LIST IT WAS IN STAYS IN ITS HISTORY: a row event carries no list, so once the row is gone this is the only
+         place that says which list its writes were to, and counts read from the log (Spark's ninety days) still add up. */
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, from_v, to_v) VALUES (?, ?, 'system', 'purge', ?, 'entry', 'register', ?, NULL)",
+        mint(),
+        instant(nowMs),
+        `entry:${row.id}`,
+        JSON.stringify(row.register),
+      );
     }
 
     /* Four hundred days of daily counters, pruned rather than rolled up: a rolled-up figure answers
