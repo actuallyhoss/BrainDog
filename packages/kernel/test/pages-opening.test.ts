@@ -258,6 +258,34 @@ test('A BAR OR A SPLIT MAY READ A FIGURE GROUPED BY A WORD, and nothing else rea
   assert.equal(k.block({ kind: 'bar', source: 'metric.nonesuch', empty: 'None.' }).refusals[0]?.code, 'METRIC_UNKNOWN');
 });
 
+test('A PROGRESS BUDGET READS ITS ROWS AND THE FIGURE IT SPENT, which groups by a word or is refused', async () => {
+  const k = await record();
+  value(
+    await k.install([
+      {
+        id: 'metric.by-bill',
+        kind: 'metric',
+        body: { metric: 'by-bill', name: 'By bill', source: 'register.bills', value: { sum: 'amount' }, group_by: 'what', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+      } as Declaration,
+      {
+        id: 'metric.by-month',
+        kind: 'metric',
+        body: { metric: 'by-month', name: 'By month', source: 'register.bills', value: { sum: 'amount' }, group_by: 'due', bucket: 'month', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+      } as Declaration,
+    ]),
+  );
+  const budget = { kind: 'progress', source: 'register.bills', columns: [{ field: 'what' }, { field: 'amount' }], limit: 1, empty: 'None.' };
+  const out = k.block({ ...budget, spent: 'by-bill' });
+  assert.deepEqual(out.refusals, []);
+  assert.equal(out.rows.length, out.matched, 'a progress block reduces, so limit: counts bars and every row is read');
+  assert.equal(out.readings?.[0]?.metric, 'by-bill');
+  assert.equal(out.readings?.[0]?.reading?.groups?.[0]?.key, 'Rent');
+  assert.equal(k.block(budget).readings, undefined, 'a goal names no figure');
+  assert.equal(k.block({ ...budget, spent: 'nonesuch' }).refusals[0]?.code, 'METRIC_UNKNOWN');
+  assert.equal(k.block({ ...budget, spent: 'by-month' }).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(k.block({ ...budget, spent: 3 }).refusals[0]?.at, 'spent');
+});
+
 test("A PAGE SAYS WHAT THE RECORD'S CLOCK READ, so a host draws today from the record", async () => {
   const k = await record();
   value(await k.install([{ id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Desk', requires: ['register.bills'], blocks: [{ kind: 'table', source: 'register.bills', columns: [{ field: 'what' }], empty: 'None.' }] } } as Declaration]));

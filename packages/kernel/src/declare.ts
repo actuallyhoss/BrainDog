@@ -428,7 +428,7 @@ function metricBody(decl: Declaration): Refusal | null {
 }
 
 /**
- * The twenty-seven drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
+ * The twenty-eight drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
  *
  * `packages/render` owns `KINDS` and is the authority (`05 §2`), but the
  * kernel depends on `ports` and `where` and on nothing else — `31 §2` puts the renderer above it, so
@@ -447,7 +447,7 @@ function metricBody(decl: Declaration): Refusal | null {
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress',
 ] as const;
 
 /**

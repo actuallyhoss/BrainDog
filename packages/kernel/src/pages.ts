@@ -107,6 +107,11 @@ export type PageBlock = {
   unset?: string;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
   stale?: { field: string; after: string };
+  /**
+   * A `progress` block's: the figure, grouped by a word, that says what was spent against each row's limit. The record
+   * reads it beside the rows and the host sets each row against the part whose key is that row's value.
+   */
+  spent?: string;
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -143,6 +148,8 @@ const READS = new Set([
   'late', 'under', 'lateness',
   /* A card grid's out-of-date rule. */
   'stale',
+  /* A `progress` budget's figure of what was spent, grouped by the word its rows are. */
+  'spent',
 ]);
 
 export type PageDecl = {
@@ -286,7 +293,7 @@ const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actio
  * a reducing block that was handed less than the whole answer. So these read as many rows as a list
  * read hands back at once, and a register past that says it cannot be drawn rather than adding up part.
  */
-const REDUCES = new Set(['bar', 'chips', 'gauge', 'split']);
+const REDUCES = new Set(['bar', 'chips', 'gauge', 'split', 'progress']);
 const READ_WHOLE = 200;
 
 /** The register `sessions.live` reads, whose fields its `where` and columns name. */
@@ -744,8 +751,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
 
   const rows = listed.value.rows;
+  /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer. */
+  const spent = block.kind === 'progress' && block.spent !== undefined ? spentOf(deps, block.spent) : {};
+  if ('refusal' in spent) return { ...base, refusals: also(spent.refusal) };
   return {
     ...base,
+    ...spent,
     rows,
     ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
     matched: listed.value.matched,
@@ -912,6 +923,23 @@ function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockRe
   if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
   if (read.value.refusals.length) return { ...base, refusals: also(...read.value.refusals) };
   return { ...base, readings: [{ metric: id, reading: read.value }], matched: read.value.groups?.length ?? 0 };
+}
+
+/**
+ * What a `progress` budget spent, as the figure it names: grouped by a word, never cut into date buckets, because each
+ * part is set against the row whose value is its key.
+ */
+function spentOf(deps: PageDeps, id: unknown): { readings: NonNullable<BlockResult['readings']> } | { refusal: Refusal } | Record<string, never> {
+  if (typeof id !== 'string' || id === '')
+    return { refusal: { code: 'DECLARATION_INVALID', fix: 'spent: names a figure grouped by a word, such as spent-this-month.', at: 'spent' } };
+  const decl = deps.metric(id);
+  if (!decl) return { refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id}.`, at: 'spent' } };
+  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `A budget sets each row against a part of ${id}, so it groups by a word, and a date cut into buckets is a series.`, at: 'spent' } };
+  const read = deps.read(decl);
+  if (!read.ok) return refused(read) ? { refusal: read.refusal } : {};
+  if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };
+  return { readings: [{ metric: id, reading: read.value }] };
 }
 
 /** The column that says who changed a row last. A register's own field of that name wins. */
