@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  coerce,
   looksLikeCredential,
   openRecord,
   validateDeclaration,
@@ -444,4 +445,31 @@ test('A TEXT OF TENS OF MEGABYTES IN ONE RUN IS JUDGED, NOT THROWN, and a key af
   assert.equal(looksLikeCredential(long), false);
   assert.equal(looksLikeCredential(`${long} ${SHAPES.Stripe}`), true);
   assert.equal(looksLikeCredential(`${long} ${noise(48, 7)}`), true, 'a random run after the long one');
+});
+
+test('A TEXT WITH NO MAX IS STILL HELD TO 16 KB, a document to 512 KB and an address to 2 KB, from every writer', async () => {
+  /* `02 §5`'s default caps. Before them a write token could put a field of any length in any row, and a thousand of
+     them filled a record. Measured in bytes, as `max:` is, and in a list's elements as in a field. */
+  const { k, sql } = await record();
+  const why = 'Long enough to pass the min.';
+  value(k.create('learnings', { lesson: LESSON, why: 'x'.repeat(16_384) }, OWNER));
+  const long = refusal(k.create('learnings', { lesson: LESSON, why: 'x'.repeat(16_385) }, OWNER));
+  assert.equal(`${long.code} at ${long.at}`, 'OUT_OF_BOUNDS at why');
+  assert.match(long.fix, /is 16385 bytes, and a text takes at most 16384 bytes/);
+  assert.equal(said(k.create('learnings', { lesson: LESSON, why: 'é'.repeat(8_193) }, OWNER)), 'OUT_OF_BOUNDS at why');
+  assert.equal(said(k.create('learnings', { lesson: LESSON, notes: ['fine', 'x'.repeat(16_385)] }, OWNER)), 'OUT_OF_BOUNDS at notes[1]');
+
+  value(k.create('learnings', { lesson: LESSON, why, body: 'x'.repeat(524_288) }, OWNER));
+  assert.equal(said(k.create('learnings', { lesson: LESSON, why, body: 'x'.repeat(524_289) }, OWNER)), 'OUT_OF_BOUNDS at body');
+
+  const row = value<Entry>(k.create('learnings', { lesson: LESSON, why }, OWNER));
+  assert.equal(said(k.update('learnings', row.id, { why: 'x'.repeat(20_000) }, OWNER)), 'OUT_OF_BOUNDS at why');
+
+  const site = `https://example.com/${'a'.repeat(2_048 - 20)}`;
+  assert.equal(coerce({ id: 'site', type: 'url' }, site).ok, true);
+  assert.equal(said(coerce({ id: 'site', type: 'url' }, `${site}a`)), 'OUT_OF_BOUNDS at site');
+  const address = `${'a'.repeat(2_048 - 12)}@example.com`;
+  assert.equal(coerce({ id: 'to', type: 'email' }, address).ok, true);
+  assert.equal(said(coerce({ id: 'to', type: 'email' }, `a${address}`)), 'OUT_OF_BOUNDS at to');
+  sql.close();
 });

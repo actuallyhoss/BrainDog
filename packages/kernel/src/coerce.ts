@@ -78,6 +78,24 @@ const good = (value: Json): Coerced => ({ ok: true, value });
 /** 2^53 − 1: past it, an integer is no longer exactly itself, and money stops being money. */
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
+/**
+ * THE DEFAULT CAPS, in UTF-8 bytes (`02 §5`, `41 §5.4`): what a field of each type holds when its declaration says no
+ * `max`, and what a `max` may lower and never raise. Without them any writer could put a field of any length in a
+ * row, and a write token could fill a record a row at a time. `json`, a `list`'s length and a row's whole `fields`
+ * are not capped here yet.
+ */
+export const TEXT_CAPS: Readonly<Record<'text' | 'document' | 'url' | 'email', number>> = { text: 16_384, document: 524_288, url: 2_048, email: 2_048 };
+
+/** `OUT_OF_BOUNDS` for a string past its type's cap, or `null`. Counted without encoding a string that cannot be under. */
+function overCap(type: keyof typeof TEXT_CAPS, value: string, at: string): Coerced | null {
+  const cap = TEXT_CAPS[type];
+  /* A UTF-16 unit is at most three UTF-8 bytes, so most text is known to be under without being encoded. */
+  if (value.length * 3 <= cap) return null;
+  const bytes = new TextEncoder().encode(value).length;
+  if (bytes <= cap) return null;
+  return bad('OUT_OF_BOUNDS', `${at} is ${bytes} bytes, and ${type === 'email' ? 'an email address' : type === 'url' ? 'a URL' : `a ${type}`} takes at most ${cap} bytes.`, at);
+}
+
 const INT_STRING = /^-?\d+$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const CURRENCY = /^[A-Za-z]{3}$/;
@@ -233,6 +251,9 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
     case 'text':
     case 'document': {
       if (typeof value !== 'string') return malformed(`${at} takes a string.`);
+      /* THE CAP FIRST, so a text of megabytes is refused before the credential check reads it. */
+      const over = overCap(field.type, value, at);
+      if (over) return over;
       /* A CREDENTIAL NEVER GOES IN A ROW IN PLAIN TEXT, and this is the check that keeps it out of
          every text a register holds, from every caller. First, so a key sent JSON-quoted is still
          answered with where keys go.
@@ -431,6 +452,8 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
 
     case 'url': {
       if (typeof value !== 'string') return malformed(`${at} takes a URL.`);
+      const over = overCap('url', value, at);
+      if (over) return over;
       let url: URL;
       try {
         url = new URL(value.trim());
@@ -446,6 +469,8 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
 
     case 'email': {
       if (typeof value !== 'string') return malformed(`${at} takes an email address.`);
+      const over = overCap('email', value, at);
+      if (over) return over;
       const s = value.trim();
       const parts = s.split('@');
       if (parts.length !== 2 || !parts[0] || !parts[1] || /\s/.test(s))
