@@ -292,7 +292,8 @@ export function draftOf(decl: ConfigDecl, value: unknown): Draft {
     case 'money': {
       if (!isMoney(value)) return blank;
       const exp = exponentOf(value.currency);
-      return { ...blank, text: (value.amount / 10 ** exp).toFixed(exp) };
+      /* GROUPED, AS EVERY OTHER AMOUNT IN THE APP READS: a limit drew as `50000.00` beside its code. `valueOf` reads the commas back. */
+      return { ...blank, text: (value.amount / 10 ** exp).toLocaleString('en-GB', { minimumFractionDigits: exp, maximumFractionDigits: exp }) };
     }
     case 'duration': {
       const n = Number(value);
@@ -316,7 +317,9 @@ export function valueOf(decl: ConfigDecl, draft: Draft, currency: string | null)
     case 'bool':
       return { ok: true, value: draft.on };
     case 'money': {
-      const raw = draft.text.trim();
+      const typed = draft.text.trim();
+      /* Thousands grouped as the box first draws them are read as the digits they group; any other comma is refused below. */
+      const raw = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/u.test(typed) ? typed.replace(/,/gu, '') : typed;
       if (currency === null) return { ok: true, value: raw };
       const exp = exponentOf(currency);
       if (!/^-?\d+(\.\d+)?$/u.test(raw)) return { ok: false, why: copy.moneyShape };

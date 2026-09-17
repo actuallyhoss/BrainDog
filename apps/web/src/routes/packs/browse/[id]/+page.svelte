@@ -110,7 +110,7 @@
             <dt>{copy.useCasePages}</dt>
             <dd>
               <ul class="names">
-                {#each installs.pages as p (p.title)}<li><Icon name="doc" size="s" />{p.title}{#if p.section}<span class="section">{p.section}</span>{/if}</li>{/each}
+                {#each installs.pages as p (p.title)}<li><Icon name="doc" size="s" />{p.title}{#if p.section && p.section.toLowerCase() !== p.title.toLowerCase()}<span class="section">{p.section}</span>{/if}</li>{/each}
               </ul>
             </dd>
           {/if}

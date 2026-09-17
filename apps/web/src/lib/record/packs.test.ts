@@ -216,7 +216,10 @@ test("THE SAMPLE'S MONEY DECLARES THE HOME CURRENCY AND THE SIX TARGETS THE REAL
 test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async () => {
   const money = await settingsOf();
   const targets = draftsOf(money);
-  assert.equal(targets.most_out_30d?.text, '50000.00');
+  /* GROUPED AS AMOUNTS READ ELSEWHERE, and read back as the same amount, so an untouched box has not moved. */
+  assert.equal(targets.most_out_30d?.text, '50,000.00');
+  assert.deepEqual(changesOf(money, { ...targets, most_out_30d: { ...targets.most_out_30d!, text: '1,234.50' } }).values, { most_out_30d: { amount: 123_450, currency: 'GBP' } });
+  assert.ok('most_out_30d' in changesOf(money, { ...targets, most_out_30d: { ...targets.most_out_30d!, text: '1,23' } }).wrong);
   assert.equal(targets.most_days_late?.text, '14');
   assert.deepEqual(changesOf(money, targets), { values: {}, wrong: {} });
   assert.deepEqual(

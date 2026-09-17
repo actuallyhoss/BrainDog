@@ -590,11 +590,11 @@
     font-weight: 600;
   }
 
-  /* The switch sits at the end of the head line and pulls in so its track, not its hit area, lines
-     up with the card's edge. */
+  /* The switch sits at the end of the head line and pulls in on the block axis only. It pulled in on
+     the inline axis too, by more than the space around its track, so at 390px the track crossed the
+     16px gutter; its hit area now ends at the card's edge. */
   .pack-head .switch {
     margin-block: calc(var(--sp-2) * -1);
-    margin-inline-end: calc(var(--sp-2) * -1);
   }
 
   .pack-name {
