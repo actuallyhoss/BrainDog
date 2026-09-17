@@ -3688,6 +3688,9 @@
   .capture-input {
     flex: 1;
     align-self: stretch;
+    /* OVER THE BOX'S TWO BORDERS, so the field a thumb presses is the box's full `--ctl-h` and not 42px inside it. The
+       input draws nothing of its own, so nothing moves. */
+    margin-block: -1px;
     min-inline-size: 0;
     padding-block: 0;
     background: none;

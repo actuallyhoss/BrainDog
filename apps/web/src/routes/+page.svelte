@@ -313,7 +313,7 @@
         </ul>
 
         {#if hidden > 0}
-          <a class="more" href="/r/obligations?f=state:in:open,part&f=due:before:today">
+          <a class="more tap" href="/r/obligations?f=state:in:open,part&f=due:before:today">
             {hidden} more past their date
             <Icon name="arrow" size="s" />
           </a>
@@ -349,7 +349,7 @@
           {/each}
         </ul>
         {#if capped || fresh.length > NEWS_CAP}
-          <a class="more" href="/audit">
+          <a class="more tap" href="/audit">
             {capped ? copy.andMore : copy.moreInTheLog(fresh.length - NEWS_CAP)}
             <Icon name="arrow" size="s" />
           </a>

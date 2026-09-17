@@ -1006,10 +1006,17 @@
       margin-block-start: 0;
     }
 
-    .pick::after {
+    /* `::before`, THE PSEUDO-ELEMENT EVERY OTHER HIT AREA IN THE PRODUCT USES (`.tap` in `a11y.css`), so the square
+       round the box is the one the layout gate measures. */
+    .pick::before {
       content: '';
       position: absolute;
-      inset: -10px;
+      inset: calc((100% - var(--tap)) / 2);
+    }
+
+    /* A QUESTION WITH A ONE-LINE TITLE AND A META LINE WAS 43PX TALL, a pixel under a thumb. */
+    .q-open {
+      min-block-size: var(--tap);
     }
 
     .q:hover .pick,

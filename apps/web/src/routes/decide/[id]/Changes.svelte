@@ -149,6 +149,15 @@
     list-style: none;
   }
 
+  /* THE FOLD IS A CONTROL, and a one-line field name was 21px tall under a thumb. The row keeps its baseline; the
+     press is taken by the height round it. */
+  @media (pointer: coarse) {
+    .change-fold > summary {
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
   .change-fold > summary::-webkit-details-marker {
     display: none;
   }

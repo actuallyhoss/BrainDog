@@ -33,7 +33,7 @@ import { extname, join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness, skipDir } from './lib.mjs';
-import { answers, forward, forwards, startRecord } from './record.mjs';
+import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -313,6 +313,16 @@ const MEASURE = ([w, slack, COARSE]) => {
        */
       if (COARSE) {
         const box = (el) => {
+          /* A CHECKBOX OR RADIO INSIDE ITS OWN LABEL IS PRESSED THROUGH THE LABEL. The browser toggles the input on a
+             press anywhere in a wrapping `<label>`, so that box is the target, the way a `::before` is below. Only the
+             wrapping form counts: a `for=` label elsewhere on the screen is not round the control. A native box is
+             drawn at the size of the element, so a 44px input would be a 44px square of chrome; `/packs/share` gives
+             its rows `min-block-size: var(--tap)` and this is the rule that sees it. */
+          const around = el.matches('input[type="checkbox"], input[type="radio"]') ? el.closest('label') : null;
+          if (around) {
+            const l = around.getBoundingClientRect();
+            return [l.width, l.height];
+          }
           const r = el.getBoundingClientRect();
           const b = getComputedStyle(el, '::before');
           const w = parseFloat(b.width);
@@ -405,6 +415,7 @@ for (const width of widths) {
   process.stdout.write(`    ${String(width).padStart(4)}px `);
 
   for (const route of ROUTES) {
+    await recordFor(page, route);
     await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
     /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
        served off disk is a script tag that imports the client, and `#main` does not exist until it
