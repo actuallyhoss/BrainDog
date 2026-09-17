@@ -21,6 +21,13 @@ export const REPORT_PREFIX = 'report:';
 /** The most rows one `report` call writes. A batch past it is refused whole. */
 export const REPORT_ROWS_MOST = 100;
 
+/**
+ * The most one `report` call weighs, as the JSON of its rows. A hundred readings of a name, a number and a unit are a few
+ * kilobytes; a key kept in a project's environment is the credential most likely to leak, and nothing else held what one
+ * call could write, so a single row of five megabytes went in.
+ */
+export const REPORT_BYTES_MOST = 256 * 1024;
+
 /** The most fields a key fixes. Each is a value the project cannot change. */
 export const REPORT_FIXED_MOST = 8;
 

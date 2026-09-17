@@ -82,11 +82,11 @@ import type { Json as JsonValue } from '@braindog/kernel';
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { grammarOf } from './grammar.ts';
-import { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
-export { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
@@ -1733,6 +1733,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'report takes one row as its fields, or { rows: [ ... ] } with each row an object.', { at: 'rows' });
       if (rows.length > REPORT_ROWS_MOST)
         return no('OUT_OF_BOUNDS', `One report carries at most ${REPORT_ROWS_MOST} rows, and this one has ${rows.length}. Send them in batches.`, { at: 'rows' });
+      const weight = new TextEncoder().encode(JSON.stringify(rows)).length;
+      if (weight > REPORT_BYTES_MOST)
+        return no('OUT_OF_BOUNDS', `One report is at most ${REPORT_BYTES_MOST / 1024} KB, and this one is ${Math.ceil(weight / 1024)} KB. Send shorter rows, or fewer at a time.`, { at: 'rows' });
       const decl = kernel.register(binding.register);
       if (!decl) return no('REGISTER_UNKNOWN', `This key sends rows to ${binding.register}, and this record has no such list now.`, { at: 'register' });
       const stampType = binding.stamp === undefined ? undefined : decl.fields.find((f) => f.id === binding.stamp)?.type;

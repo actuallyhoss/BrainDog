@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, reportBindingOf, reportLabel, reportedFields, type CallContext } from '../src/index.ts';
+import { createRecordApi, REPORT_BYTES_MOST, reportBindingOf, reportLabel, reportedFields, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 9);
@@ -99,6 +99,22 @@ test('A BATCH IS ALL OR NOTHING, and a stamp the project sent is kept', async ()
 
   const over = refusal(await api.report({ rows: Array.from({ length: 101 }, (_, i) => ({ name: 'n', value: i })) }, ctx));
   assert.equal(over.code, 'OUT_OF_BOUNDS');
+  sql.close();
+});
+
+test("A REPORT IS WEIGHED, so a key kept in a project's environment cannot fill the record with text", async () => {
+  const { api, sql, key } = await record();
+  const { ctx } = await key();
+  /* ONE ROW OF FIVE MEGABYTES WAS WRITTEN. A report key lives in a project's environment, where it is the credential most
+     likely to leak, and a hundred rows of that is half a gigabyte a call. */
+  const heavy = refusal(await api.report({ name: 'x'.repeat(REPORT_BYTES_MOST), value: 1 }, ctx));
+  assert.equal(heavy.code, 'OUT_OF_BOUNDS');
+  assert.equal(heavy.at, 'rows');
+  const batch = refusal(await api.report({ rows: Array.from({ length: 50 }, () => ({ name: 'y'.repeat(Math.ceil(REPORT_BYTES_MOST / 40)), value: 1 })) }, ctx));
+  assert.equal(batch.code, 'OUT_OF_BOUNDS');
+  assert.equal(value<{ rows: unknown[] }>(await api.list({ register: 'points' }, owner)).rows.length, 0, 'an oversized report was written');
+  /* A report of ordinary size is untouched. */
+  value(await api.report({ rows: Array.from({ length: 100 }, (_, i) => ({ name: 'Sign-ups', value: i, unit: 'people' })) }, ctx));
   sql.close();
 });
 
