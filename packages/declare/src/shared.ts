@@ -19,7 +19,7 @@ import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { validateDeclaration } from '@braindog/kernel';
 
-import { credentialKey, credentialValue } from './credentials.ts';
+import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { normalise, SEEDS_PER_REGISTER, type Pack, type PackSource } from './index.ts';
 import { normaliseUseCase, packIdOf, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
 
@@ -74,6 +74,9 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
   }
   if (!isMap(doc) || typeof doc.usecase !== 'string')
     return no('PACK_MALFORMED', 'This is not a use-case file: it has no usecase in it. An add-on is installed from its own screen.', { at: 'usecase' });
+
+  if (nestedPast(doc))
+    return no('PACK_MALFORMED', `This is not a use-case file: it nests deeper than ${NESTED_MOST} levels, and no use case does.`, { at: 'file' });
 
   const key = credentialKey(doc);
   if (key) return no('SECRET_IN_PACK', `This file carries a ${key}. A shared use case never carries a credential; take it out and share it again.`, { at: key });

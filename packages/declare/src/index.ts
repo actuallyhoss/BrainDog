@@ -25,7 +25,7 @@
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import { credentialKey as credential, credentialValue } from './credentials.ts';
+import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
@@ -298,6 +298,8 @@ const CSS_COLOUR = /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/iu;
  */
 export async function normalise(doc: unknown, source: PackSource = { kind: 'local' }): Promise<Result<Pack>> {
   if (!isObject(doc)) return malformed('A pack is a document with a `pack` and a `version` in it.');
+  /* BEFORE ANY WALK, because the walks recurse and a document a hundred thousand levels deep threw out of them. */
+  if (nestedPast(doc)) return malformed(`This pack nests deeper than ${NESTED_MOST} levels, and no declaration does.`);
 
   const id = doc.pack;
   if (typeof id !== 'string' || !PACK_ID.test(id))

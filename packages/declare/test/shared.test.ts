@@ -151,6 +151,34 @@ test('A CREDENTIAL ANYWHERE IN THE FILE IS REFUSED, BY ITS KEY OR BY ITS SHAPE',
   assert.equal(refused(await readShared(inVoice)).code, 'SECRET_IN_PACK');
 });
 
+test('A FILE NESTED PAST ANY DECLARATION IS REFUSED AS NOT ONE, and never throws', async () => {
+  /* TWO HUNDRED KILOBYTES OF BRACKETS THREW. The credential walk recursed once a level and ran out of stack, so readShared
+     threw out of a function that answers a Result, and a propose token's file was a 500. */
+  const text = `{"usecase":"deep","pad":${'['.repeat(100_000)}${']'.repeat(100_000)}}`;
+  const r = refused(await readShared(text));
+  assert.equal(r.code, 'PACK_MALFORMED');
+  let doc: unknown = 1;
+  for (let i = 0; i < 40_000; i++) doc = { a: doc };
+  assert.equal(refused(await readShared({ usecase: 'deep', pad: doc })).code, 'PACK_MALFORMED');
+  const pack = refused(await normalise({ pack: 'deep', version: '1.0.0', summary: 's', author: 'a', license: 'MIT', declarations: [{ ...STUDIES, pad: doc }] }));
+  assert.equal(pack.code, 'PACK_MALFORMED');
+  /* A real file is nowhere near the line. */
+  value(await readShared(value<Record<string, unknown>>(exportUseCase(PARTS))));
+});
+
+test('A CREDENTIAL IS KNOWN BY THE NAMES PROVIDERS GIVE IT, AND A RANDOM KEY WITH NO PREFIX IS KNOWN AS THE RECORD KNOWS ONE', async () => {
+  const doc = value<Record<string, unknown>>(exportUseCase(PARTS));
+  for (const key of ['client_secret', 'access_token', 'refresh_token', 'API-Key', 'apiToken', 'secret_key', 'privateKey'])
+    assert.equal(refused(await readShared({ ...doc, [key]: 'abc' })).code, 'SECRET_IN_PACK', key);
+  /* A BRAINDOG KEY, which is the credential somebody arranging a BrainDog is most likely to paste: a record id, a dot, and
+     forty-three random characters. The record refuses one in a row; a label, a page title or a voice line took it. */
+  const bearer = ['rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', ['q7Rk2Zp9Lm4X', 'v8Bn3Hc6Tw1Y', 'd5Gs0JfAe4Ku7Nx2Qb'].join('')].join('.');
+  assert.equal(refused(await readShared({ ...doc, labels: { courses: `Key ${bearer}` } })).code, 'SECRET_IN_PACK');
+  assert.equal(refused(await normalise({ pack: 'leaky', version: '1.0.0', summary: 's', author: 'a', license: 'MIT', declarations: [{ ...STUDIES, title: bearer }] })).code, 'SECRET_IN_PACK');
+  /* Ids, hashes and words are not keys. */
+  value(await readShared({ ...doc, summary: 'Courses 01JZ8QK3F7R2M9V4XN6TCB5HAD, commit 3f9a1c2e4b5d6e7f8091a2b3c4d5e6f708192a3b, and tokens_used counted.' }));
+});
+
 test('A PACK CARRYING A CREDENTIAL-SHAPED VALUE IS REFUSED BY normalise TOO, so planPack refuses it', async () => {
   const r = refused(
     await normalise({ pack: 'leaky', version: '1.0.0', summary: 's', author: 'a', license: 'MIT', declarations: [{ ...STUDIES, title: `Studies ${fake.stripe()}` }] }),
