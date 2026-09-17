@@ -6,8 +6,11 @@
   Revoke. A record with no list of readings draws nothing here at all, and a reader who cannot make keys still sees
   the line, with the record's own sentence about why there is no button.
 
-  POLLING IS ONE SENTENCE, NOT A FORM. A poll calls out and costs money, so it is proposed by an agent and approved
-  once, where the address and the interval are shown (`packs`, Decide).
+  POLLING IS A FORM THAT FILES A PROPOSAL, on an organisation's page (`PollForm.svelte`). A poll calls out and costs
+  money, so nothing is fetched until the owner approves the address and the interval once, on Decide.
+
+  THE KEYS ARE READ AGAIN when the reader comes back to the tab and every half minute while it is in view, so a key
+  the project has just used stops saying it never was.
 
   Imported by the page route only, so nothing here reaches the entry chunk.
 -->
@@ -19,6 +22,7 @@
   import * as clipboard from '$lib/clipboard.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
+  import PollForm from './PollForm.svelte';
   import { READINGS, bindable, bindingOf, curlLine, keyFor, organisationOf, type Binding } from '$lib/record/reporting.ts';
 
   let { register, seq, title }: { register: string; seq: number; title: string } = $props();
@@ -71,6 +75,23 @@
   $effect(() => {
     void spoken;
     untrack(() => void load());
+  });
+
+  /** How often the keys are read again while the page is in view. */
+  const RELIST_MS = 30_000;
+
+  $effect(() => {
+    const again = () => {
+      if (from === 'ready' && !busy && document.visibilityState === 'visible') void list();
+    };
+    const timer = setInterval(again, RELIST_MS);
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', again);
+      document.removeEventListener('visibilitychange', again);
+    };
   });
 
   async function make() {
@@ -138,7 +159,7 @@
       </ul>
     {/if}
 
-    <p class="report-poll">{copy.reportPoll}</p>
+    {#if register === 'organisations'}<PollForm {seq} {title} />{/if}
   </section>
 {/if}
 
@@ -150,18 +171,11 @@
     margin-block-start: var(--sp-3);
   }
 
-  .report-why,
-  .report-poll {
+  .report-why {
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-base);
     text-wrap: pretty;
-  }
-
-  .report-poll {
-    margin-block-start: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .report-once {

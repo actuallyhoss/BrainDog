@@ -602,8 +602,36 @@ export const copy = {
   reportKeys: 'Report keys',
   reportRevoked: 'Revoked. The key stops working now.',
   reportUnread: 'The report keys could not be read just now.',
-  reportPoll:
-    'Or let BrainDog fetch them: if the project answers its numbers as JSON at an https address, ask your agent to propose a poll of it. You approve the address and how often once, and the numbers arrive on their own.',
+  /* THE POLL FORM (`routes/p/[slug]/PollForm.svelte`): an address, how often, and which number is which. It files a
+     proposal, because a poll calls out on a clock and the owner approves the address once, on Decide. */
+  pollHeading: 'Or let BrainDog fetch them',
+  pollWhy:
+    'If the project answers its numbers as JSON at an https address, BrainDog can fetch them on a clock. You approve the address and how often once, on Decide, and nothing is fetched before that.',
+  pollAddress: 'Address',
+  pollAddressHint: 'https://api.example.com/numbers.json',
+  pollEvery: 'How often',
+  pollEveryLabels: { '15m': 'Every 15 minutes', '1h': 'Every hour', '6h': 'Every 6 hours', '1d': 'Every day' } as Record<string, string>,
+  pollKey: 'Key in the vault, only if the address needs one',
+  pollKeyNote: 'Leave it empty for an address anybody can read. A key is sent to this address and nowhere else.',
+  pollNumbers: 'The numbers in the answer',
+  pollPath: 'Where it is',
+  pollPathHint: 'data.mrr',
+  pollName: 'Called',
+  pollNameHint: 'Monthly recurring revenue',
+  pollUnit: 'Unit',
+  pollUnitHint: 'GBP',
+  pollAddRow: 'Add a number',
+  pollRemoveRow: (n: number) => `Remove number ${n}`,
+  pollFile: 'Propose this poll',
+  pollFiled: 'Proposed. Approve it on Decide and the numbers start arriving.',
+  pollOpenDecide: 'Open it on Decide',
+  pollFaultUrl: 'Write the whole https:// address the numbers are at.',
+  pollFaultKey: 'A key’s label is 40 characters at most.',
+  pollFaultNone: 'Name at least one number: where it is in the answer, and what it is called.',
+  pollFaultMost: (n: number) => `One address fills ${n} numbers at most.`,
+  pollFaultName: (path: string) => `Say what the number at ${path} is called.`,
+  pollFaultPath: (path: string) => `${path} is not a path. Write it as data.mrr or plans[0].count.`,
+  pollQuestion: (host: string, every: string, title: string, names: string) => `Poll ${host} ${every.toLowerCase()} for ${title}’s numbers: ${names}?`,
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
