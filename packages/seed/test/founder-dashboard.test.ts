@@ -65,7 +65,8 @@ async function founder(): Promise<Kernel> {
   return k;
 }
 
-type Drawn = { kind: string; heading?: string; rows?: { fields: Record<string, unknown> }[]; refusals?: { code: string; fix: string }[]; readings?: unknown[] };
+type Series = { name: string; now: (number | null)[]; latest: { value: number } | null };
+type Drawn = { kind: string; heading?: string; rows?: { fields: Record<string, unknown> }[]; refusals?: { code: string; fix: string }[]; readings?: unknown[]; measures?: Series[]; matched?: number };
 const OWNER = { actor: 'p_1' };
 
 test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a project sent are their rows', async () => {
@@ -78,8 +79,11 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   const dashboard = value<{ blocks: Drawn[] }>(k.page('dashboard')).blocks;
   assert.deepEqual(dashboard.map((b) => b.kind), ['stat', 'bar', 'stat', 'lines', 'table', 'table']);
   for (const b of dashboard) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(dashboard[2]!.readings, undefined, 'the numbers are rows, not figures');
-  assert.ok((dashboard[2]!.rows?.length ?? 0) >= 40, 'the tiles read the rows of the last sixty days');
+  assert.equal(dashboard[2]!.readings, undefined, 'the numbers are series, not figures');
+  assert.deepEqual(dashboard[2]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no tile');
+  assert.deepEqual(dashboard[3]!.measures?.map((m) => m.name), ['Sign-ups'], 'and in no chart');
+  assert.equal(dashboard[2]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
+  assert.ok((dashboard[4]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
   assert.equal(dashboard[1]!.rows?.length, 2, 'the example organisation and Harbour Studio');
 
   const pages = k.pages() as unknown as { slug: string; title: string }[];
@@ -89,5 +93,30 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   assert.deepEqual(own.map((b) => b.heading), ['Balance', 'The numbers', 'Thirty days against the thirty before', 'Latest numbers', 'Send numbers here']);
   for (const b of own) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(own[0]!.rows?.length, 1, 'its balance reads its own row');
-  assert.equal(own[1]!.rows?.length, 40, 'only its own numbers, the example one left out');
+  assert.equal(own[1]!.matched, 40, 'only its own numbers, the example one left out');
+});
+
+test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, the numbers it reports and where it sends them', async () => {
+  const k = await founder();
+  assert.ok(!held(k).includes('services'), 'a founder keeps no services');
+  const project = value<{ id: string }>(k.create('things', { name: 'Harbour app', lane: 'building' }, OWNER));
+  value(k.create('datapoints', { name: 'Installs', value: 7, thing: project.id, source: 'reported', at: new Date(NOW).toISOString() }, OWNER));
+  const pages = k.pages() as unknown as { slug: string; title: string }[];
+  const page = pages.find((p) => p.title === 'Harbour app');
+  assert.ok(page, 'a project has its own page');
+  const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
+  assert.deepEqual(blocks.map((b) => b.heading), [
+    'At a glance',
+    'What is open',
+    'Agents',
+    'Money',
+    'Work on this from an agent',
+    'The numbers',
+    'Thirty days against the thirty before',
+    'Send numbers here',
+  ]);
+  for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.equal((blocks[0] as unknown as { cells: unknown[] }).cells.length, 2, 'what it costs a year needs Estate, so that figure is left out');
+  assert.equal((blocks[3] as unknown as { span: number }).span, 12, 'the money table takes the width the services list had');
+  assert.deepEqual(blocks[5]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

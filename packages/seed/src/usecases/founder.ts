@@ -7,9 +7,28 @@
  * project at one moment, written by the project itself over the API or by a poll the record runs.
  */
 
+import { projectTemplate } from '../modules/portfolio.ts';
+
+/** The lists a founder's record holds once its four modules and this pack are in: no Estate, so no services. */
+const HOLDS = ['things', 'people', 'accounts', 'obligations', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
+
+/**
+ * THE NUMBERS BLOCKS, ONCE, for the dashboard, an organisation and a project: which field is which, the example left
+ * out, and thirty days against the thirty before. The record works the series out (`measures.ts` in the kernel), so a
+ * year of hourly polls draws as fast as a week of them.
+ */
+const numbers = (where: string | null, empty: string) => {
+  const said = ['source is not example', ...(where ? [where] : [])].join(', ');
+  const columns = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }];
+  return [
+    { kind: 'stat', heading: 'The numbers', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
+    { kind: 'lines', heading: 'Thirty days against the thirty before', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
+  ];
+};
+
 export const FOUNDER = {
   usecase: 'founder',
-  version: '1.1.0',
+  version: '1.2.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -87,8 +106,10 @@ export const FOUNDER = {
             id: 'source',
             label: 'Source',
             type: 'enum',
-            values: ['reported', 'polled', 'typed'],
-            labels: { reported: 'Reported', polled: 'Polled', typed: 'Typed' },
+            /* `example` IS THE SEED'S, so the dashboards leave it out of every tile and chart while it still shows,
+               marked, in the lists of latest numbers. */
+            values: ['reported', 'polled', 'typed', 'example'],
+            labels: { reported: 'Reported', polled: 'Polled', typed: 'Typed', example: 'Example' },
             index: true,
           },
           { id: 'tags', type: 'list', of: 'text' },
@@ -98,7 +119,7 @@ export const FOUNDER = {
         metric: 'datapoints-30d',
         name: 'Numbers reported, 30 days',
         source: 'register.datapoints',
-        where: 'at after -30d',
+        where: 'at after -30d, source is not example',
         value: { count: 'id' },
         format: 'int',
         target: { gte: 1 },
@@ -189,30 +210,7 @@ export const FOUNDER = {
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
           },
-          {
-            kind: 'stat',
-            heading: 'The numbers',
-            span: 12,
-            source: 'register.datapoints',
-            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
-            where: 'at after -60d',
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 500,
-            back: 30,
-            empty: 'No project has reported a number yet.',
-          },
-          {
-            kind: 'lines',
-            heading: 'Thirty days against the thirty before',
-            span: 12,
-            source: 'register.datapoints',
-            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
-            where: 'at after -60d',
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 500,
-            back: 30,
-            empty: 'No project has reported a number yet.',
-          },
+          ...numbers(null, 'No project has reported a number yet.'),
           {
             kind: 'table',
             heading: 'Latest numbers',
@@ -264,30 +262,7 @@ export const FOUNDER = {
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
           },
-          {
-            kind: 'stat',
-            heading: 'The numbers',
-            span: 12,
-            source: 'register.datapoints',
-            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
-            where: 'organisation is {{name}}, at after -60d',
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 500,
-            back: 30,
-            empty: 'Nothing has been reported for {{name}} yet.',
-          },
-          {
-            kind: 'lines',
-            heading: 'Thirty days against the thirty before',
-            span: 12,
-            source: 'register.datapoints',
-            columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
-            where: 'organisation is {{name}}, at after -60d',
-            order: [{ field: 'at', dir: 'desc' }],
-            limit: 500,
-            back: 30,
-            empty: 'Nothing has been reported for {{name}} yet.',
-          },
+          ...numbers('organisation is {{name}}', 'Nothing has been reported for {{name}} yet.'),
           {
             kind: 'table',
             heading: 'Latest numbers',
@@ -308,10 +283,23 @@ export const FOUNDER = {
           { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
         ],
       },
+      {
+        /* A PROJECT'S PAGE, WITHOUT ESTATE. Portfolio's template reads what a project runs on from Estate's services,
+           which a founder does not install, so it is taken without them (`projectTemplate`), and the numbers the
+           project reports and where it sends them are added under it. Same id as the template, so a record never has
+           two pages at one project's address. */
+        ...projectTemplate(HOLDS),
+        requires: [...(projectTemplate(HOLDS).requires as string[]), 'register.datapoints'],
+        blocks: [
+          ...(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
+          ...numbers('thing is {{name}}', 'Nothing has been reported for {{name}} yet.'),
+          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
+        ],
+      },
     ],
     seeds: [
       { register: 'organisations', fields: { name: 'Northwind Labs Ltd', kind: 'company', country: 'United Kingdom', currency: 'GBP' } },
-      { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'reported', at: '-1d' } },
+      { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } },
     ],
   },
 };

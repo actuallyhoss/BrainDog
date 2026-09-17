@@ -335,3 +335,36 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     ],
   },
 };
+
+/**
+ * THE LISTS THE PROJECT TEMPLATE ONLY LINKS TO. What a project runs on, and what that costs a year, come from Estate's
+ * services, and a record that keeps no services still has projects worth a page: a founder's apps, a student's passion
+ * project. So services are a link and not a dependency, the way People's "Met in" is (`first-party.ts` `LINKS`).
+ */
+export const PROJECT_LINKS: readonly string[] = ['services'];
+
+/**
+ * The project template for a record that holds these lists: every block and figure over a linked list it does not hold
+ * left out, and the width a block took given to the block before it, so a row that paired two still fills the width.
+ */
+export function projectTemplate(holds: Iterable<string>): SeedPage {
+  const held = new Set(holds);
+  const gone = (source: unknown): boolean => {
+    if (typeof source !== 'string') return false;
+    const register = source.replace(/^register\./u, '');
+    return source.startsWith('register.') && PROJECT_LINKS.includes(register) && !held.has(register);
+  };
+  const page = PORTFOLIO_PAGES.project!;
+  const blocks: Record<string, unknown>[] = [];
+  for (const block of page.blocks as Record<string, unknown>[]) {
+    if (gone(block.source)) {
+      const before = blocks.at(-1);
+      if (before && typeof before.span === 'number' && typeof block.span === 'number')
+        blocks[blocks.length - 1] = { ...before, span: Math.min(12, before.span + block.span) };
+      continue;
+    }
+    const cells = block.cells as { metric: string }[] | undefined;
+    blocks.push(cells ? { ...block, cells: cells.filter((c) => !gone(PROJECT_METRICS[c.metric.split(':')[0] ?? '']?.source)) } : block);
+  }
+  return { ...page, requires: (page.requires as string[]).filter((r) => !gone(r)), blocks };
+}
