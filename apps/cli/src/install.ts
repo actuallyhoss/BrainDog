@@ -1,17 +1,18 @@
 /**
- * `braindog install`: the two hook entries in Claude Code's user settings, shown first and written only when asked.
+ * `braindog install`: the two hook entries in Claude Code's settings, shown first and written only when asked: the user
+ * profile by default, each `--config-dir` profile folder, or each `--settings` file the person names.
  *
  * A DRY RUN BY DEFAULT. Settings belong to the person, and a hook runs in every session they start, so the
  * command prints exactly what it would add and changes nothing without `--apply`. With it, the file as it
  * was is copied beside itself first. Existing entries, other tools' hooks included, are left as they are.
  *
- * ONLY THE USER'S `settings.json`. A project's `.mcp.json` is shared through its repository, so this never
- * opens one (`loop/research-agent-path.md` question 5).
+ * NEVER A `.mcp.json`. A project's `.mcp.json` is shared through its repository, so this never opens one
+ * (`loop/research-agent-path.md` question 5). A project's settings file is changed only when it is named.
  */
 
-import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 type Env = Record<string, string | undefined>;
 type Entry = { hooks: { type: 'command'; command: string; timeout: number }[] };
@@ -41,12 +42,22 @@ const backupOf = (file: string): string => {
   return n === 0 ? `${file}.bak` : `${file}.bak${String(n)}`;
 };
 
+type Options = { apply: boolean; scripts: string; platform?: string };
+
+/** What installing into one profile does: its `settings.json`. */
+export const installInto = (dir: string, options: Options): string[] => installAt(join(dir, 'settings.json'), options);
+
 /**
- * What installing into one profile does, as the lines to print. Throws one sentence when the file cannot
+ * What installing into one settings file does, as the lines to print. Throws one sentence when the file cannot
  * be read as settings, and then writes nothing.
+ *
+ * ANY SETTINGS FILE THE PERSON NAMES, such as a project's `.claude/settings.local.json`, so the hooks can run in one
+ * repository and nowhere else. Its folder is made on `--apply` when it is missing, because a repository without a
+ * `.claude` folder is the usual case. A name that is not a `.json` file is refused before anything is read.
  */
-export function installInto(dir: string, options: { apply: boolean; scripts: string; platform?: string }): string[] {
-  const file = join(dir, 'settings.json');
+export function installAt(named: string, options: Options): string[] {
+  const file = resolve(named);
+  if (!basename(file).toLowerCase().endsWith('.json')) throw new Error(`${file} is not a .json settings file, so braindog install leaves it alone.`);
   const had = existsSync(file);
   let settings: Record<string, unknown> = {};
   if (had) {
@@ -79,6 +90,7 @@ export function installInto(dir: string, options: { apply: boolean; scripts: str
   const next = { ...settings, hooks: { ...hooks } } as Record<string, unknown> & { hooks: Record<string, unknown> };
   for (const { event, entry } of added) next.hooks[event] = [...((hooks[event] as unknown[] | undefined) ?? []), entry];
   let kept: string | null = null;
+  if (!had) mkdirSync(dirname(file), { recursive: true });
   if (had) {
     kept = backupOf(file);
     copyFileSync(file, kept);

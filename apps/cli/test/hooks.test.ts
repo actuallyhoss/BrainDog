@@ -365,6 +365,38 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
   assert.ok(!refused.stderr.includes('hunter2'));
 });
 
+test('INSTALL INTO A SETTINGS FILE THE PERSON NAMES: a project settings.local.json, its folder made on --apply, and no profile touched', async () => {
+  const repo = folder('repo');
+  const profile = folder('profile');
+  const file = join(repo, '.claude', 'settings.local.json');
+  /* The profile a bare install would change, so a write there is seen. */
+  const env = { ...envFor(folder('config'), {}), CLAUDE_CONFIG_DIR: profile };
+  const start = hookCommand('start', join(APP, 'hooks'));
+
+  const dry = await run(['install', '--settings', file], env, '');
+  assert.equal(dry.code, 0, dry.stderr);
+  assert.ok(dry.stdout.startsWith(`braindog install would change ${file}, a new file:
+`), dry.stdout);
+  assert.ok(!existsSync(join(repo, '.claude')), 'the dry run made the folder');
+
+  const applied = await run(['install', '--apply', '--settings', file], env, '');
+  assert.equal(applied.code, 0, applied.stderr);
+  assert.ok(applied.stdout.includes('There was no file before, so there is nothing to keep a copy of.'), applied.stdout);
+  const now = JSON.parse(readFileSync(file, 'utf8')) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+  assert.deepEqual(now.hooks.SessionStart!.map((g) => g.hooks[0]!.command), [start]);
+  assert.deepEqual(readdirSync(profile), [], 'naming a file changed the user profile too');
+
+  /* Both named: the profile folder and the file, each once. */
+  const both = await run(['install', '--config-dir', profile, '--settings', file], env, '');
+  assert.ok(both.stdout.includes(`braindog install would change ${join(profile, 'settings.json')}, a new file:`), both.stdout);
+  assert.ok(both.stdout.includes(`${file} already runs both BrainDog hooks. Nothing to change.`), both.stdout);
+
+  const wrong = await run(['install', '--apply', '--settings', join(repo, 'settings.yaml')], env, '');
+  assert.equal(wrong.code, 1);
+  assert.match(wrong.stderr, /is not a \.json settings file, so braindog install leaves it alone/);
+  assert.ok(!existsSync(join(repo, 'settings.yaml')));
+});
+
 test('NO CHILD EVER PRINTED THE TOKEN', () => {
   assert.ok(printed.length > 0);
   for (const text of printed) assert.ok(!text.includes('stub-bearer') && !text.includes(TOKEN), 'a child printed the token');
