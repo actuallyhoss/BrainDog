@@ -672,11 +672,13 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
       converted: null,
     };
   }
-  /* A REGISTER'S ROWS, each amount in its own currency and dated by the list's first day. A list of links adds up
-     money another list holds, which is left to `barRows` as it was. */
+  /* A REGISTER'S ROWS, each amount in its own currency and dated by the list's first day. */
   const register = block.register ?? '';
   const of = block.columns[1]?.field ?? 'amount';
-  if (!register || linkOf(register, of)) return null;
+  if (!register) return null;
+  /* A LIST OF LINKS ADDS UP MONEY ANOTHER LIST HOLDS, so that money is converted into the home currency at the latest
+     rate, or drawn once per currency, before `barRows` adds it up: a bar is never pounds and dollars added as they are. */
+  if (linkOf(register, of)) return block.linked ? linkedCharted(block, of) : null;
   const seen = new Set(block.matched.map((e) => currencyOf(e.fields[of])).filter((c): c is string => c !== null));
   const fx = block.fx ?? fxNow();
   const home = fx.home;
@@ -725,6 +727,38 @@ export function walkTables(block: BlockResult): { said: ReturnType<typeof parse>
     })),
     ...(split.note ? [{ said: parse(split.note, { page: true }) }] : []),
   ];
+}
+
+/** A bar over a list of links whose linked money is in more than one currency: converted, or one bar chart a currency. */
+function linkedCharted(block: BlockResult, of: string): { charts: Charted; converted: string | null } | null {
+  const linked = block.linked ?? {};
+  const named = new Set(block.matched.flatMap((e) => (Array.isArray(e.fields[of]) ? (e.fields[of] as unknown[]).map(String) : [])));
+  const held = [...named].flatMap((id) => {
+    const v = linked[id];
+    const c = currencyOf(v);
+    return c === null ? [] : [{ id, currency: c, amount: (v as { amount: number }).amount }];
+  });
+  const seen = new Set(held.map((h) => h.currency));
+  const fx = block.fx ?? fxNow();
+  const home = fx.home;
+  if (seen.size === 0 || (seen.size === 1 && (home === null || seen.has(home)))) return null;
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  if (home !== null) {
+    const got = across(held.map((h) => ({ currency: h.currency, amount: h.amount, day: today })), home, fx.rates, today);
+    if (got.kind === 'converted') {
+      const into = Object.fromEntries(
+        held.map((h) => [h.id, { amount: convertMinor(h.amount, h.currency, home, rateFor(fx.rates as Rate[], h.currency, home, today)!.rate), currency: home }]),
+      );
+      return { charts: [{ currency: null, block: { ...block, linked: { ...linked, ...into }, fx: undefined } }], converted: got.asOf };
+    }
+  }
+  return {
+    charts: [...seen].sort().map((unit) => ({
+      currency: unit,
+      block: { ...block, linked: Object.fromEntries(held.filter((h) => h.currency === unit).map((h) => [h.id, linked[h.id]])), fx: undefined },
+    })),
+    converted: null,
+  };
 }
 
 export function toSegments(block: BlockResult): ReturnType<typeof parse> {

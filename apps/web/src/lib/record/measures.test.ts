@@ -153,3 +153,26 @@ test('a bar over a list of links adds up the money in the rows each row names', 
     'an organisation that names no account has no bar, rather than a zero',
   );
 });
+
+test('a bar over a list of links in two currencies is one bar chart a currency, or converted into the home currency', () => {
+  REGISTERS.organisations = ORGANISATIONS;
+  const orgs = [
+    { id: 'o1', fields: { name: 'Northwind Labs', accounts: ['acc1', 'acc2'] } },
+    { id: 'o2', fields: { name: 'Harbour Studio', accounts: ['acc3'] } },
+  ];
+  const linked = {
+    acc1: { amount: 2_000_000, currency: 'GBP' },
+    acc2: { amount: 50_000, currency: 'USD' },
+    acc3: { amount: 910_000, currency: 'GBP' },
+  };
+  const read = blockOf(answered('bar', 'register.organisations', ['name', 'accounts'], orgs) as never, new Map(), NOW);
+  const cells = (segments: ReturnType<typeof toSegments>) =>
+    segments.filter((s): s is Block => s.type === 'block').map((b) => b.rows.map((r) => r.cells.slice(0, 2).join(' | ').replace(/\s/gu, ' ')));
+  const apart = toSegments({ ...read, linked, fx: { home: null, rates: [] } });
+  assert.deepEqual(cells(apart), [['Northwind Labs | GBP 20,000.00', 'Harbour Studio | GBP 9,100.00'], ['Northwind Labs | USD 500.00']], 'never pounds and dollars added as they are');
+  assert.match(JSON.stringify(apart), /In GBP/u);
+  const rates = [{ currency: 'USD', base: 'GBP', rate: 0.8, as_of: '2026-09-01' }];
+  const one = toSegments({ ...read, linked, fx: { home: 'GBP', rates } });
+  assert.deepEqual(cells(one), [['Northwind Labs | GBP 20,400.00', 'Harbour Studio | GBP 9,100.00']], 'the dollars converted at the latest rate');
+  assert.match(JSON.stringify(one), /1 Sep 2026/u);
+});
