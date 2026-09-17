@@ -38,8 +38,20 @@ export type Part =
 
 export type Arranged = { lead: string; parts: Part[]; summary: string };
 
-/** What the screen knows that the body does not: the record's name for each list, and a changed page as it stands. */
-export type Context = { lists?: ReadonlyMap<string, string> | undefined; pagesNow?: Readonly<Record<string, Row>> | undefined };
+/**
+ * What the screen knows that the body does not: the record's name for each list, the labels it gives them now (the rail's
+ * words), and a changed page as it stands. `names` is the body's own, filed by the record, and read in `arrangedOf`.
+ */
+export type Context = {
+  lists?: ReadonlyMap<string, string> | undefined;
+  labels?: Readonly<Record<string, string>> | undefined;
+  pagesNow?: Readonly<Record<string, Row>> | undefined;
+  names?: Readonly<Record<string, string>> | undefined;
+};
+
+/** The names the record filed for a proposal's lists and pages, as the rail will say them once it is accepted. */
+const namesOf = (body: Row): Record<string, string> =>
+  isRow(body.names) ? Object.fromEntries(Object.entries(body.names).filter((e): e is [string, string] => typeof e[1] === 'string' && e[1] !== '')) : {};
 
 const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
@@ -67,9 +79,10 @@ export function packName(id: string, body: Row): string {
 /** A use case named by its id, bare or as its pack: "Student". */
 const useCaseWords = (id: string): string => moduleName(id.startsWith('usecase-') ? id : `usecase-${id}`);
 
+/** A list as the rail says it: the name the record filed for it, else the label it has now, else its name, else its id in words. */
 const listName = (id: string, ctx: Context): string => {
   const bare = id.replace(/^register\./u, '');
-  return ctx.lists?.get(bare) ?? words(bare);
+  return ctx.names?.[`register.${bare}`] ?? ctx.labels?.[bare] ?? ctx.lists?.get(bare) ?? words(bare);
 };
 
 /**
@@ -113,6 +126,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
   const known = declared(doc);
   const drawn: Appears[] = [];
   const named = new Map<string, string[]>();
+  const changed = new Map<string, string[]>();
   const out = { examples: 0, pages: 0, lists: 0, more: 0 };
   for (const step of Array.isArray(plan) ? plan.filter(isRow) : []) {
     out.examples += typeof step.examples === 'number' ? step.examples : 0;
@@ -124,7 +138,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
         const kind = id.split('.')[0] ?? '';
         const full = known.get(id);
         const seen = full ? appearsOf(full) : null;
-        const title = kind === 'register' ? listName(id, ctx) : (seen?.title ?? (kind === 'rule' ? ruleName(id) : null) ?? words(id));
+        const title = kind === 'register' ? listName(id, ctx) : (ctx.names?.[id] ?? seen?.title ?? (kind === 'rule' ? ruleName(id) : null) ?? words(id));
         if (fresh && kind === 'page') out.pages++;
         else if (fresh && kind === 'register') out.lists++;
         else out.more++;
@@ -132,16 +146,20 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
           drawn.push({ ...seen, kind: fresh ? newKind(kind) : copy.arrangeChanged(copy.proposalKind(kind)), title });
           continue;
         }
-        const label = fresh ? copy.arrangeMany(kind) : copy.arrangeChanged(copy.arrangeMany(kind));
-        named.set(label, [...(named.get(label) ?? []), title]);
+        /* WHAT IS ADDED AND WHAT IS CHANGED ARE TWO GROUPS, each drawn only when it holds something: an update that only
+           changes drew an Adds heading over nothing it added. */
+        const group = fresh ? named : changed;
+        const label = copy.arrangeMany(kind);
+        group.set(label, [...(group.get(label) ?? []), title]);
       }
     }
   }
   const first = (label: string) => [copy.arrangeMany('page'), copy.arrangeMany('register')].indexOf(label) >>> 0;
   const weight = (a: Appears) => (a.kind.toLowerCase().endsWith(copy.proposalKind('page').toLowerCase()) ? 0 : 1);
   const appears = drawn.map((a, i) => [a, i] as const).sort(([a, i], [b, j]) => weight(a) - weight(b) || i - j).map(([a]) => a);
-  if (named.size)
-    appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: [...named].sort(([a], [b]) => first(a) - first(b)).map(([label, names]) => ({ label, value: names.join(', ') })) });
+  const lines = (group: Map<string, string[]>) => [...group].sort(([a], [b]) => first(a) - first(b)).map(([label, names]) => ({ label, value: names.join(', ') }));
+  if (named.size) appears.push({ kind: appears.length ? copy.arrangeAlso : copy.arrangeAdds, title: '', lines: lines(named) });
+  if (changed.size) appears.push({ kind: copy.arrangeChanges, title: '', lines: lines(changed) });
   return { appears, ...out };
 }
 
@@ -207,8 +225,9 @@ function settingsLines(s: Row, installing: readonly string[], ctx: Context, body
 /**
  * A `pack`, `settings` or `arrange` body as the story Decide draws, or `null` for every other kind.
  */
-export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged | null {
+export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arranged | null {
   if (!isArranging(kind)) return null;
+  const ctx: Context = { ...screen, names: namesOf(body) };
   const parts: Part[] = [];
   const packs = isRow(body.packs) ? body.packs : {};
   const install = strings(packs.install);
@@ -290,7 +309,7 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
 /** A page an arrangement puts in place, by the title its body gives, or its id in words. */
 const pageTitle = (id: string, body: Row): string => {
   const raw = (Array.isArray(body.pages) ? body.pages.filter(isRow) : []).find((p) => p.id === id);
-  return text(isRow(raw?.body) ? raw.body.title : undefined) || words(id);
+  return text(isRow(raw?.body) ? raw.body.title : undefined) || namesOf(body)[id] || words(id);
 };
 
 /* ── what an accepted one did ───────────────────────────────────────────── */

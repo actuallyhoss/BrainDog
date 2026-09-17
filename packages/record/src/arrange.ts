@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { labelsOf, laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -279,13 +279,13 @@ export function arranger(d: ArrangeDeps) {
     return ok({ install, enable });
   }
 
-  type Planned = { plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>> };
+  type Planned = { plan: Body[]; approve: string[]; batch: Declaration[]; config: Map<string, Record<string, ConfigDecl>>; packs: Map<string, Pack> };
 
   /** Each pack planned in order, each against the record as the ones before it would leave it. Nothing is written. */
   async function planAll(ids: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
     const base = d.installed();
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
-    const out: Planned = { plan: [], approve: [], batch: [], config: new Map() };
+    const out: Planned = { plan: [], approve: [], batch: [], config: new Map(), packs: new Map() };
     for (const id of ids) {
       const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
@@ -307,6 +307,7 @@ export function arranger(d: ArrangeDeps) {
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
       out.config.set(id, pack.manifest.config ?? {});
+      out.packs.set(id, pack);
       for (const decl of pack.declarations) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
       state = {
         ...state,
@@ -318,6 +319,43 @@ export function arranger(d: ArrangeDeps) {
       };
     }
     return ok(out);
+  }
+
+  /**
+   * WHAT DECIDE CALLS EACH LIST AND PAGE A PROPOSAL NAMES, as the rail will once it is accepted. Decide named a use case's
+   * Home page from its id, "Home personal", and a list by the build's word, Things, where the rail says Projects, because
+   * a catalogue pack is filed without its document. So the record files the names: a list by the label the use case
+   * speaking afterwards gives it, else its declared name; that use case's Home page by its voice, else a page by its title.
+   */
+  function namesFor(planned: Planned, speaker: string | null): Record<string, string> {
+    let values: Record<string, unknown> = {};
+    let config: Record<string, { label?: unknown }> = {};
+    if (speaker !== null) {
+      const coming = planned.packs.get(speaker)?.manifest.config ?? {};
+      const read = kernel.packConfig(speaker);
+      const now = read.ok ? read.value : { values: {}, config: {} };
+      config = { ...(now.config as Record<string, { label?: unknown }>), ...coming };
+      values = { ...Object.fromEntries(Object.entries(coming).map(([k, decl]) => [k, decl.default ?? null])), ...(now.values as Record<string, unknown>) };
+    }
+    const labels = labelsOf(values, config);
+    const home = voiceIn(values).home;
+    const out: Record<string, string> = {};
+    for (const [key, word] of Object.entries(labels)) if (/^[a-z][a-z0-9_]*$/u.test(key)) out[`register.${key}`] = word;
+    for (const pack of planned.packs.values()) {
+      for (const decl of pack.declarations) {
+        const body = decl.body as Body;
+        if (decl.kind === 'register') {
+          const name = typeof body.name === 'string' ? body.name : null;
+          const bare = decl.id.slice('register.'.length);
+          if (out[decl.id] === undefined && name !== null) out[decl.id] = labels[bare] ?? name;
+        } else if (decl.kind === 'page') {
+          const title = typeof body.title === 'string' && !body.title.includes('{{') ? body.title : null;
+          const said = speaker !== null && home !== undefined && decl.id === `page.home-${speaker.slice(USE_CASE.length)}` ? home : title;
+          if (said !== null) out[decl.id] = said;
+        }
+      }
+    }
+    return out;
   }
 
   /** The lists a declaration state holds. */
@@ -446,6 +484,7 @@ export function arranger(d: ArrangeDeps) {
       /* A USE CASE ADDED BESIDE THE ONE SPEAKING KEEPS THAT VOICE, and Decide says whose. An update changes no voice. */
       const speaker = speakerNow();
       const keeps = target.startsWith(USE_CASE) && !on(target) && speaker !== null && speaker !== target ? speaker : null;
+      const names = namesFor(planned.value, keeps ?? (target.startsWith(USE_CASE) && !on(target) ? target : speaker));
       return ok({
         install: target,
         ...(entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
@@ -453,6 +492,7 @@ export function arranger(d: ArrangeDeps) {
         packs: { install: order.value.install, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
         approve: planned.value.approve,
+        ...(Object.keys(names).length === 0 ? {} : { names }),
         ...(isMap(body.doc) ? { doc: body.doc } : {}),
       });
     }
@@ -520,6 +560,7 @@ export function arranger(d: ArrangeDeps) {
       settings.push(one.value);
     }
 
+    const names = namesFor(planned.value, lead ?? speakerNow() ?? order.value.install.find((id) => id.startsWith(USE_CASE)) ?? null);
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
       ...(beside.length === 0 ? {} : { alongside: beside.map((id) => id.slice(USE_CASE.length)) }),
@@ -532,6 +573,7 @@ export function arranger(d: ArrangeDeps) {
       ...(planned.value.plan.length === 0 ? {} : { plan: planned.value.plan, approve: planned.value.approve }),
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
+      ...(Object.keys(names).length === 0 ? {} : { names }),
     });
   }
 

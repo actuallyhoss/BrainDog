@@ -429,3 +429,42 @@ test('A CATALOGUE THAT SAYS ITS VERSIONS LISTS THE UPDATES ON OFFER in the arran
   assert.deepEqual(value<{ updates?: unknown }>(await later.api.arrangement({}, agent)).updates, [{ id: 'work', from: '1.0.0', to: '1.1.0' }]);
   later.sql.close();
 });
+
+test('A PROPOSAL IS FILED WITH THE NAMES THE RAIL WILL USE: a list by its label, the use case’s Home by its voice', async () => {
+  const u = normaliseUseCase({
+    usecase: 'desk',
+    version: '1.0.0',
+    title: 'Desk',
+    summary: 'Tasks, called what a desk calls them.',
+    author: 'BrainDog',
+    license: 'MIT',
+    audience: 'individual',
+    tone: 'plain',
+    signals: ['desk'],
+    modules: ['work'],
+    voice: { home: 'At my desk' },
+    labels: { tasks: 'To do' },
+    pack: {
+      pack: 'usecase-desk',
+      version: '1.0.0',
+      summary: 'A desk.',
+      author: 'BrainDog',
+      license: 'MIT',
+      requires: { format: 1, primitives: 1, packs: {} },
+      declarations: [
+        { register: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] },
+        { page: 'home-desk', title: 'Home', requires: ['register.notes'], blocks: [{ kind: 'table', source: 'register.notes', span: 12, empty: 'Nothing yet.' }] },
+      ],
+    },
+  });
+  assert.ok(u.ok);
+  const DESK = useCasePack(u.value)!;
+  const { api, sql } = await record([...CATALOGUE, { id: 'usecase-desk', kind: 'usecase', title: 'Desk', summary: 'A desk.', modules: ['work'], doc: () => DESK }]);
+  const filed = value<{ id: string }>(await api.propose({ question: 'A desk?', body_kind: 'pack', body: { install: 'desk', names: { 'register.tasks': 'Stolen' } } } as never, agent));
+  const row = value<{ body: { names: Record<string, string> } }>(await api.governance({ id: filed.id }, owner));
+  assert.equal(row.body.names['register.tasks'], 'To do', 'the list read by the build’s word, or the proposer’s');
+  assert.equal(row.body.names['register.notes'], 'Notes');
+  assert.equal(row.body.names['page.home-desk'], 'At my desk');
+  assert.equal(row.body.names['page.work'], 'Work');
+  sql.close();
+});

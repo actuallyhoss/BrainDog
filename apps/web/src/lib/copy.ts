@@ -2026,6 +2026,8 @@ export const copy = {
   arrangeChanged: (kind: string) => `Changed ${kind.toLowerCase()}`,
   arrangeAlso: 'Also adds',
   arrangeAdds: 'Adds',
+  /** What an arrangement changes that is already here, apart from what it adds. */
+  arrangeChanges: 'Changes',
   arrangeMany: (kind: string): string =>
     ({ page: 'Pages', register: 'Lists', ingest: 'Rules for what comes in', theme: 'Looks', metric: 'Measures', digest: 'Summaries', rule: 'Rules', block: 'Blocks' })[kind] ??
     kind.charAt(0).toUpperCase() + kind.slice(1),

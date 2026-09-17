@@ -195,3 +195,48 @@ test('an update of a module under a use case already at its version is said as t
   assert.equal(out?.lead, 'Updates Money from 1.0.0 to 1.1.0');
   assert.deepEqual(appliedLines({ installed: ['money-core'] }, body), ['Updated Money from 1.0.0 to 1.1.0']);
 });
+
+test('LISTS AND PAGES ARE NAMED AS THE RAIL NAMES THEM: the names the record filed, then the labels the record gives now', () => {
+  const body = {
+    install: 'usecase-personal',
+    kind: 'usecase',
+    title: 'Personal',
+    packs: { install: ['portfolio', 'usecase-personal'] },
+    plan: [
+      { pack: 'portfolio', version: '1.0.0', adds: ['register.things'] },
+      { pack: 'usecase-personal', version: '1.2.0', adds: ['page.home-personal', 'page.spending', 'register.goals'] },
+    ],
+    names: { 'register.things': 'Projects', 'page.home-personal': 'Day to day' },
+  };
+  const out = arrangedOf('pack', body, { lists: new Map([['things', 'Things'], ['goals', 'Goals']]) });
+  const appears = out?.parts.find((p) => p.part === 'appears');
+  assert.deepEqual(appears?.part === 'appears' && appears.appears.at(-1)?.lines, [
+    { label: 'Pages', value: 'Day to day, Spending' },
+    { label: 'Lists', value: 'Projects, Goals' },
+  ]);
+  assert.doesNotMatch(JSON.stringify(out), /Home personal|Things/u);
+
+  /* A BODY FILED BEFORE THE NAMES WERE reads the record's labels now, as the rail does. */
+  const older = arrangedOf('pack', { ...body, names: undefined }, { lists: new Map([['things', 'Things']]), labels: { things: 'Projects' } });
+  assert.match(JSON.stringify(older), /Projects/u);
+  assert.doesNotMatch(JSON.stringify(older), /Things/u);
+});
+
+test('AN UPDATE THAT ONLY CHANGES draws what changes under Changes, and no Adds heading over nothing', () => {
+  const out = arrangedOf('pack', {
+    install: 'money-core',
+    packs: { install: ['money-core'] },
+    plan: [{ pack: 'money-core', from: '0.9.0', version: '1.0.0', adds: [], changes: ['register.obligations', 'page.money'] }],
+    names: { 'register.obligations': 'Bills', 'page.money': 'Money' },
+  });
+  const appears = out?.parts.find((p) => p.part === 'appears');
+  assert.ok(appears?.part === 'appears');
+  assert.deepEqual(
+    appears.appears.map((a) => a.kind),
+    ['Changes'],
+  );
+  assert.deepEqual(appears.appears[0]?.lines, [
+    { label: 'Pages', value: 'Money' },
+    { label: 'Lists', value: 'Bills' },
+  ]);
+});

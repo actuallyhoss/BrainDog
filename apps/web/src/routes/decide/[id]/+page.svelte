@@ -43,6 +43,7 @@
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
   import Applied from './Applied.svelte';
+  import { heard } from '$lib/voice.svelte.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
@@ -121,7 +122,7 @@
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
   const story = $derived(
-    about ? arrangedOf(about.kind, about.body, { lists, pagesNow: from === 'live' ? live?.pagesNow : PROPOSALS[String(page.params.id)]?.pagesNow }) : null,
+    about ? arrangedOf(about.kind, about.body, { lists, labels: heard(), pagesNow: from === 'live' ? live?.pagesNow : PROPOSALS[String(page.params.id)]?.pagesNow }) : null,
   );
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */

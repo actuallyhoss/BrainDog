@@ -12,7 +12,7 @@ import { heardLabels, homePageOf, labelsOf, lineOf, relabelAll, speaking, voiceO
 
 export { labels, listNamed } from './voice.ts';
 
-const state = $state<{ voice: Voice; pack: string | null }>({ voice: {}, pack: null });
+const state = $state<{ voice: Voice; pack: string | null; labels: Labels }>({ voice: {}, pack: null, labels: {} });
 let heardFor: unknown = null;
 
 /** The line to draw for a voice key. Reactive where it is read in markup. */
@@ -24,12 +24,16 @@ export const said = (key: VoiceKey): string => lineOf(state.voice, key);
  */
 export const homePage = (): string | null => (state.pack === null ? null : homePageOf(state.pack));
 
+/** The words the record gives its lists now, as the rail draws them. Reactive where it is read, so a screen drawn before the voice was heard catches up. */
+export const heard = (): Labels => state.labels;
+
 /**
  * The words a record gives its lists, heard: kept for the list reader, and drawn over the build's own lists, which a
  * page, Home and the palette read by id (People on a team's Board).
  */
 async function hear(labels: Labels): Promise<void> {
   heardLabels(labels);
+  state.labels = labels;
   const { REGISTERS } = await import('./record/data.ts');
   relabelAll(REGISTERS, labels);
 }
