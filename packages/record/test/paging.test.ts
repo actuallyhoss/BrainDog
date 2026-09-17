@@ -114,3 +114,23 @@ test('A PAGE DECLARED FOR A LIST PAST TWO HUNDRED ROWS has a page for every row'
   assert.equal(last.title, 'Entry 0', 'the oldest row, past every page of two hundred, draws');
   sql.close();
 });
+
+test('BOOT NAMES THE ONE LIST A PAGE DRAWS, so the rail can put a saved view under it, and no list for a page over none', async () => {
+  const VIEW = {
+    id: 'page.diary-long',
+    kind: 'page' as const,
+    body: {
+      page: 'diary-long',
+      title: 'Long entries',
+      nav: { section: 'Views', order: 900 },
+      requires: ['register.diary'],
+      blocks: [{ kind: 'table', span: 12, source: 'register.diary' }],
+    } as never,
+  };
+  const PROSE = { id: 'page.about', kind: 'page' as const, body: { page: 'about', title: 'About', nav: { section: 'Work', order: 1 }, blocks: [{ kind: 'note', body: 'Hello.' }] } as never };
+  const { api, sql } = await record(VIEW, PROSE);
+  const pages = value<Boot>(await api.boot(owner)).pages;
+  assert.equal(pages.find((p) => p.slug === 'diary-long')?.list, 'diary');
+  assert.equal(pages.find((p) => p.slug === 'about')?.list, null);
+  sql.close();
+});

@@ -48,7 +48,7 @@
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
+  import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -76,8 +76,8 @@
   async function readLive(id: string) {
     const at = opened();
     client ??= createClient({ base: location.origin });
-    const [out, opens] = await Promise.all([readOne(client, id), client.governance({ status: 'open' })]);
-    queue = opens.ok && Array.isArray(opens.value) ? opens.value.map((r: { id?: unknown }) => String(r.id)) : [];
+    const [out, opens] = await Promise.all([readOne(client, id), everyGovernance(client, { status: 'open' })]);
+    queue = opens.ok ? opens.value.map((r) => String(r.id)) : [];
     /* An answer for a question somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== id) return closed(true, at);
     live = out.from === 'live' ? out.value : null;

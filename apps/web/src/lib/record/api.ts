@@ -1267,7 +1267,9 @@ export function values(): Record<string, string> {
     'obligations.count': String((ROWS.obligations ?? []).length),
     'services.count': String((ROWS.services ?? []).length),
     ...Object.fromEntries(
-      ['owed-to-you', 'due-30d', 'overdue', 'late-in', 'renews-30d', 'estate-year', 'lapsing'].map((id) => [id, metric(id).value]),
+      /* EVERY FIGURE THE RECORD DECLARES, not a list of the ones some page happened to name, so a note any pack writes resolves. A
+         figure with a parameter is left out, because it is only a figure once a page fills it. */
+      Object.keys(METRICS).filter((id) => !JSON.stringify(METRICS[id]).includes('{{')).map((id) => [id, metric(id).value]),
     ),
   };
 }
@@ -1396,7 +1398,7 @@ export function boot() {
            */
           views: Object.entries(VIEWS)
             .filter(([, v]) => v.register === r.id)
-            .map(([key, v]) => ({ key, name: v.name })),
+            .map(([key, v]) => ({ key, name: v.name, href: `/v/${key}` })),
         })),
     },
     nav,

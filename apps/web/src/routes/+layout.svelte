@@ -92,7 +92,12 @@
 
   /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
       was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
-  const grouped = $derived(arrange(data.nav, pref.read().nav ?? []));
+  /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
+  const railNav = $derived.by(() => {
+    const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
+    return placed.size ? data.nav.filter((n) => !placed.has(n.href)) : data.nav;
+  });
+  const grouped = $derived(arrange(railNav, pref.read().nav ?? []));
   /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
   const moreLists = $derived(orderLists(data.index.registers, pref.read().nav ?? []));
 
@@ -335,7 +340,7 @@
         <Sidebar
           icons={railIcons}
           ontoggle={toggleRail}
-          nav={data.nav}
+          nav={railNav}
           pen={data.pen}
           record={data.index.name}
           records={data.me.records}
@@ -504,7 +509,7 @@
       </a>
       <!-- And its saved views, which are the same list with a predicate. -->
       {#each r.views ?? [] as v}
-        <a class="more-view" href="/v/{v.key}" onclick={() => (moreOpen = false)}>{v.name}</a>
+        <a class="more-view" href={v.href} onclick={() => (moreOpen = false)}>{v.name}</a>
       {/each}
     {/each}
 

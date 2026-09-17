@@ -24,8 +24,8 @@ type Row = Record<string, unknown>;
 
 /** The client methods these screens call, as `@braindog/client` names them. */
 export type Governor = {
-  boot(): Promise<Wire<{ waiting?: readonly { id: string; question?: string }[] }>>;
-  governance(args: { register?: string; id?: string; status?: string; limit?: number }): Promise<Wire<unknown>>;
+  boot(): Promise<Wire<{ waiting?: readonly { id: string; question?: string }[]; counts?: { decided?: number } }>>;
+  governance(args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string }): Promise<Wire<unknown>>;
   schema(register: string): Promise<Wire<unknown>>;
   get(register: string, seq: number): Promise<Wire<unknown>>;
   call(name: string, args?: Record<string, unknown>): Promise<Wire<unknown>>;
@@ -44,7 +44,21 @@ export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[
     `by`, and a `change` or a `pattern` is previewed from `body` (`routes/decide/[id]/proposed.ts`). */
 export type About = { kind: string; body: Row; by: string };
 
-export type Queue = Rows & { open: Question[]; decided: Question[]; rowsets: Record<string, RowsetBody>; about?: Record<string, About> };
+export type Queue = Rows & {
+  open: Question[];
+  decided: Question[];
+  rowsets: Record<string, RowsetBody>;
+  about?: Record<string, About>;
+  /** Where the decisions below the ones read carry on, and how many there are in all. Absent on a queue read whole. */
+  older?: Older;
+};
+
+/**
+ * THE DECISIONS NOT READ YET. `cursor` is the id of the last decision read and `null` once there are no more; `total` is
+ * every decision on the record, from `boot`, so a screen can say how many there are before it has them all. The
+ * suggestions read so far are kept, so a decision on a later page is named by the option it chose.
+ */
+export type Older = { cursor: string | null; total: number; suggestions: Map<string, Row>; after: string | null; read: boolean };
 
 /**
  * `closed` is a question no longer open: a decision, or a suggestion somebody has settled. `calls` is what an open
@@ -146,13 +160,69 @@ export function pairs(decisions: readonly Row[], suggestions: readonly Row[]): M
 
 const listed = (out: Wire<unknown>): Row[] => (out.ok && Array.isArray(out.value) ? out.value.filter(isRow) : []);
 
-/** Every suggestion and every decision the queue reads, for `pairs`. */
-async function everything(client: Governor): Promise<{ suggestions: Row[]; decisions: Row[] }> {
-  const [suggestions, decisions] = await Promise.all([
-    client.governance({ register: 'suggestion', status: 'all', limit: 200 }),
-    client.governance({ register: 'decision', limit: 200 }),
-  ]);
-  return { suggestions: listed(suggestions), decisions: listed(decisions) };
+/** The most rows one `governance` read answers with. */
+export const GOVERNANCE_PAGE = 200;
+/** How many decisions Decide reads at a time. */
+export const DECIDED_PAGE = 50;
+
+/**
+ * ONE PAGE OF A GOVERNANCE LIST, and where the next starts. The record answers a page no longer than `limit`, filled from
+ * what the caller may see, so a page shorter than it is the last. A page whose last row is the cursor it was asked
+ * with has gone nowhere, and is read as the last too, so a host that ignores the cursor cannot loop a screen.
+ */
+export async function governancePage(
+  client: Pick<Governor, 'governance'>,
+  args: { register?: string; status?: string },
+  cursor: string | null,
+  limit = GOVERNANCE_PAGE,
+): Promise<{ ok: true; rows: Row[]; cursor: string | null } | { ok: false; out: Wire<unknown> }> {
+  const out = await client.governance({ ...args, limit, ...(cursor ? { cursor } : {}) });
+  if (!out.ok || !Array.isArray(out.value)) return { ok: false, out };
+  const rows = out.value.filter(isRow);
+  const last = rows.at(-1)?.id;
+  const next = rows.length >= limit && typeof last === 'string' && last !== cursor ? last : null;
+  return { ok: true, rows, cursor: next };
+}
+
+/** EVERY ROW OF A GOVERNANCE LIST, a page at a time: open questions past `boot`'s twenty, decisions past any one page. */
+export async function everyGovernance(client: Pick<Governor, 'governance'>, args: { register?: string; status?: string }): Promise<Wire<Row[]>> {
+  const rows: Row[] = [];
+  let cursor: string | null = null;
+  do {
+    const got = await governancePage(client, args, cursor);
+    if (!got.ok) return got.out as Wire<Row[]>;
+    rows.push(...got.rows);
+    cursor = got.cursor;
+  } while (cursor);
+  return { ok: true, value: rows };
+}
+
+/** Read suggestions, a page at a time, until every one these decisions name is held or none are left. */
+async function suggestionsFor(client: Governor, decisions: readonly Row[], older: Older): Promise<void> {
+  const wanted = () => decisions.some((d) => typeof d.suggestion === 'string' && !older.suggestions.has(d.suggestion));
+  while (wanted() && !(older.read && older.after === null)) {
+    const got = await governancePage(client, { register: 'suggestion', status: 'all' }, older.after);
+    older.read = true;
+    if (!got.ok) {
+      older.after = null;
+      return;
+    }
+    for (const r of got.rows) older.suggestions.set(String(r.id), r);
+    older.after = got.cursor;
+  }
+}
+
+/**
+ * THE NEXT PAGE OF DECISIONS, each named by the option it chose. `older` is the queue's, and it moves on: its cursor to
+ * the last decision read, and the suggestions read so far kept for the page after.
+ */
+export async function olderDecisions(client: Governor, older: Older): Promise<Read<{ decided: Question[]; older: Older }>> {
+  const got = await governancePage(client, { register: 'decision' }, older.cursor, DECIDED_PAGE);
+  if (!got.ok) return missed(got.out);
+  const next: Older = { ...older, suggestions: new Map(older.suggestions), cursor: got.cursor };
+  await suggestionsFor(client, got.rows, next);
+  const settled = pairs(got.rows, [...next.suggestions.values()]);
+  return { from: 'live', value: { decided: got.rows.map((d) => decisionOf(d, settled.get(String(d.id)))), older: next } };
 }
 
 /** The one row a link names, or nothing when there is no link or the record does not give the row. */
@@ -239,21 +309,24 @@ const questionsAsked = (booted: Awaited<ReturnType<Governor['boot']>> | null): M
 
 /** The queue: the open suggestions, the decisions with their options, and the rows the open ones would change. */
 export async function readQueue(client: Governor): Promise<Read<Queue>> {
-  const [open, booted, all] = await Promise.all([client.governance({ status: 'open' }), client.boot(), everything(client)]);
+  const [open, booted] = await Promise.all([everyGovernance(client, { status: 'open' }), client.boot()]);
   if (!open.ok) return missed(open);
   const asked = questionsAsked(booted);
-  const rows = listed(open);
+  const rows = open.value;
+  const total = booted.ok ? booted.value.counts?.decided : undefined;
+  const first = await olderDecisions(client, { cursor: null, total: 0, suggestions: new Map(), after: null, read: false });
+  const decided = first.from === 'live' ? first.value : { decided: [], older: null };
   const rowsets: Record<string, RowsetBody> = {};
   for (const r of rows) {
     const body = rowsetOf(r);
     if (body) rowsets[String(r.id)] = body;
   }
-  const settled = pairs(all.decisions, all.suggestions);
   return {
     from: 'live',
     value: {
-      open: rows.map((r, i) => questionOf(r, asked.get(String(r.id)), i + 1)),
-      decided: all.decisions.map((d) => decisionOf(d, settled.get(String(d.id)))),
+      open: rows.map((r, i) => questionOf(r, asked.get(String(r.id)) || text(r.question), i + 1)),
+      decided: decided.decided,
+      ...(decided.older ? { older: { ...decided.older, total: Math.max(total ?? 0, decided.decided.length) } } : {}),
       rowsets,
       about: Object.fromEntries(rows.map((r) => [String(r.id), aboutOf(r)])),
       ...(await heldBy(client, Object.values(rowsets))),

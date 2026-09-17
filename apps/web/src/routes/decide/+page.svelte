@@ -35,7 +35,7 @@
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
+  import { olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -80,6 +80,23 @@
     untrack(() => void readLive());
   });
 
+  /* THE DECISIONS BELOW THE ONES READ, a page at a time, added under the ones already drawn so nothing above moves. */
+  let loadingOlder = $state(false);
+  let olderFix = $state('');
+  async function loadOlder() {
+    const had = live;
+    if (!client || !had?.older || had.older.cursor === null || loadingOlder) return;
+    loadingOlder = true;
+    olderFix = '';
+    try {
+      const out = await olderDecisions(client, had.older);
+      if (out.from === 'live' && live === had) live = { ...had, decided: [...had.decided, ...out.value.decided], older: out.value.older };
+      else if (out.from === 'refused') olderFix = out.fix;
+    } finally {
+      loadingOlder = false;
+    }
+  }
+
   /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
   const now = $derived(from === 'live' ? Date.now() : NOW);
 
@@ -88,6 +105,8 @@
   );
   /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
   const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
+  /* EVERY DECISION ON THE RECORD, read or not yet, so the heading says how many there are and not how many were read. */
+  const decidedTotal = $derived(from === 'live' && live?.older ? Math.max(live.older.total, DECIDED.length) : DECIDED.length);
   const target = metric('open-questions');
 
   /**
@@ -735,7 +754,7 @@
   {/if}
 
   {#if DECIDED.length}
-    <Section title={copy.searchDecided} count={DECIDED.length}>
+    <Section title={copy.searchDecided} count={decidedTotal}>
       <ul class="ledger">
         {#each DECIDED.slice(0, DOM_CAP) as q}
           <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
@@ -753,7 +772,13 @@
           </li>
         {/each}
       </ul>
-      <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={DECIDED.length} />
+      <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={decidedTotal} />
+      {#if from === 'live' && live?.older && live.older.cursor !== null}
+        <div class="older">
+          <Button weight="quiet" onclick={loadOlder} disabled={loadingOlder}>{copy.olderEntries}</Button>
+        </div>
+      {/if}
+      {#if olderFix}<p class="older-fix" role="status">{olderFix}</p>{/if}
     </Section>
   {/if}
 </div>
@@ -1140,6 +1165,17 @@
   .why-fix {
     max-inline-size: var(--measure);
     font-size: var(--t-ui);
+  }
+
+  /* THE PRESS FOR OLDER DECISIONS, under the ledger it adds to. */
+  .older {
+    display: flex;
+    margin-block: var(--sp-3);
+  }
+
+  .older-fix {
+    color: var(--dim);
+    font-size: var(--t-xs);
   }
 
   /* At the trailing edge, as wide as it needs, so a toast at the leading edge and the bar do not meet. */

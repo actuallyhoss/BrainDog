@@ -62,7 +62,7 @@
     records?: { slug: string; name: string; level: string }[];
     /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
     refused?: string | undefined;
-    registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string }[] }[];
+    registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string; href: string }[] }[];
     open?: number | undefined;
     inbox?: number | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
@@ -547,7 +547,7 @@
                NO GLYPH, AND INDENTED. It is not a sibling of the list; it is a way of looking at it,
                and the indent is what says so without a second section to read. -->
           {#each r.views ?? [] as v}
-            <a class="item view tap" href="/v/{v.key}" aria-current={under(`/v/${v.key}`) ? 'page' : undefined}>
+            <a class="item view tap" href={v.href} aria-current={under(v.href) ? 'page' : undefined}>
               <span class="item-name">{v.name}</span>
             </a>
           {/each}

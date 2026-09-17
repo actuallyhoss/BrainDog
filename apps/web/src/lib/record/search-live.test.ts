@@ -119,7 +119,9 @@ test('a live search finds the record\'s questions and pages too, asked once for 
           ],
         },
       });
-    if (path === '/api/governance') return json(200, { ok: true, value: [{ id: 'D2', question: 'Pay the rent early?', answer: 'yes' }, { id: 'D3', question: 'Hire help?' }] });
+    if (path === '/api/governance' && new URL(String(url)).searchParams.get('register') === 'decision')
+      return json(200, { ok: true, value: [{ id: 'D2', question: 'Pay the rent early?', answer: 'yes' }, { id: 'D3', question: 'Hire help?' }] });
+    if (path === '/api/governance') return json(200, { ok: true, value: [{ id: 'SG4', body_kind: 'options', question: 'Renew the studio rent?' }] });
     return io(url, init);
   }) as Fetch;
   const find = searcher(BASE, routed);
@@ -178,4 +180,30 @@ test("a pack's own list is grouped under the name and icon the record declares, 
   assert.equal(schemas.length, 1, 'only the list the build does not ship is asked about');
   await find.find('linear');
   assert.equal(sent.filter((u) => u.pathname === '/api/schema').length, 1, 'and it is asked once for the tab');
+});
+
+test('SEARCH REACHES EVERY OPEN QUESTION AND EVERY DECISION, past boot’s twenty and past a page of two hundred', async () => {
+  const { io, sent } = host(() => json(500, {}));
+  const open = Array.from({ length: 45 }, (_, i) => ({ id: `SG${100 - i}`, question: i === 44 ? 'The oldest open rent question?' : `Open ${i}?` }));
+  const decided = Array.from({ length: 431 }, (_, i) => ({ id: `D${1000 - i}`, question: i === 430 ? 'The oldest rent decision?' : `Decided ${i}?` }));
+  const routed = (async (url: string | URL | Request, init?: RequestInit) => {
+    const at = new URL(String(url));
+    sent.push(String(url));
+    if (at.pathname === '/api/search') return json(200, { ok: true, value: [] });
+    if (at.pathname === '/api/boot') return json(200, { ok: true, value: { registers: [], now: '2026-09-16T00:00:00.000Z', waiting: open.slice(0, 20), pages: [] } });
+    if (at.pathname === '/api/governance') {
+      const rows = at.searchParams.get('register') === 'decision' ? decided : open;
+      const limit = Number(at.searchParams.get('limit'));
+      const cursor = at.searchParams.get('cursor');
+      const from = cursor ? rows.findIndex((r) => r.id === cursor) + 1 : 0;
+      return json(200, { ok: true, value: rows.slice(from, from + limit) });
+    }
+    return io(url, init);
+  }) as Fetch;
+  const out = await searcher(BASE, routed).find('oldest rent');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.deepEqual(out.value.groups[0]?.hits.map((h) => h.href), ['/decide/SG56', '/decide/D570']);
+  const decisionPages = sent.filter((u) => new URL(u).searchParams.get('register') === 'decision').length;
+  assert.equal(decisionPages, 3, 'decisions are read a page of two hundred at a time');
 });

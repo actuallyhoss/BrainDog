@@ -62,7 +62,7 @@ export type Boot = {
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
   /** The pages the caller may open, each with its place in the rail when it has one. */
-  pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
+  pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null; list?: string | null }[];
   /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
   counts?: { decide: number; inbox: number | null; decided?: number };
   /** What changed since the caller last read, as `whatsNew` answers. */

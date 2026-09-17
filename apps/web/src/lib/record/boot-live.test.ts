@@ -258,3 +258,20 @@ test('THE SAMPLE SAYS ONE COUNT OF OPEN QUESTIONS: the rail and Home, the Decide
   assert.equal(shell.open, QUEUE.length);
   assert.equal(metric('open-questions').value, String(QUEUE.length));
 });
+
+test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail, at its page, and one over a list the rail does not draw stays under Views', () => {
+  const shell = layoutOf({
+    ...BOOT,
+    pages: [
+      ...BOOT.pages,
+      { slug: 'obligations-late', title: 'Late to pay', nav: { section: 'Views', order: 900 }, icon: null, list: 'obligations' },
+      { slug: 'services-cheap', title: 'Cheap services', nav: { section: 'Views', order: 900 }, icon: null, list: 'services' },
+    ],
+  } as never);
+  assert.deepEqual(shell.index.registers.map((r) => [r.id, r.views]), [['obligations', [{ key: 'obligations-late', name: 'Late to pay', href: '/p/obligations-late' }]]]);
+  assert.deepEqual(
+    shell.nav.map((n) => n.href),
+    ['/p/money', '/p/obligations-late', '/p/services-cheap'],
+    'the palette still reads every view as a page',
+  );
+});

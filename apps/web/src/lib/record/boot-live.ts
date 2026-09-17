@@ -304,6 +304,10 @@ export function layoutOf(b: Boot): Shell {
   const record = b.record ?? null;
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';
+  /* A SAVED VIEW IS A PAGE UNDER VIEWS OVER ONE LIST, and the rail draws it under that list, as the sample draws its own. */
+  const views = new Map<string, { key: string; name: string; href: string }[]>();
+  for (const p of b.pages ?? [])
+    if (p.nav?.section === copy.viewsSection && p.list) views.set(p.list, [...(views.get(p.list) ?? []), { key: p.slug, name: p.title, href: `/p/${p.slug}` }]);
   const nav: NavEntry[] = (b.pages ?? []).flatMap((p) =>
     p.nav
       ? [{ id: p.slug, title: p.title, href: `/p/${p.slug}`, section: p.nav.section, order: p.nav.order, icon: iconFor(p.icon ?? undefined, 'doc') }]
@@ -317,7 +321,7 @@ export function layoutOf(b: Boot): Shell {
       /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows. */
       registers: b.registers
         .filter((r) => r.count > 0)
-        .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: [] })),
+        .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
     pages: (b.pages ?? []).map((p) => p.slug),

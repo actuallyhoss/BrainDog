@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { answer, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
+import { answer, DECIDED_PAGE, everyGovernance, olderDecisions, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import type { Question } from './schema.ts';
 
@@ -75,7 +75,7 @@ test('the queue is the record’s open suggestions, in its order, each with the 
   assert.equal(out.from, 'live');
   if (out.from !== 'live') return;
   assert.deepEqual(out.value.open.map((q) => [q.id, q.rank]), [['SG4', 1], ['SG2', 2]]);
-  assert.deepEqual(calls.find((c) => c.name === 'governance')?.args, { status: 'open' });
+  assert.deepEqual(calls.find((c) => c.name === 'governance')?.args, { status: 'open', limit: 200 });
 
   const [rowset, options] = out.value.open;
   assert.equal(options?.title, 'Per seat or per product?');
@@ -301,4 +301,74 @@ test('A QUESTION CARRIES THE REASONING IT WAS OPENED WITH, and one opened with n
   const asked = questionOf({ id: 'SG4', body_kind: 'options', body: { options: [{ id: 'a', label: 'Ship it' }], context: '  Two clients asked for it this week.  ' }, opened_at: '' }, 'Ship dark mode?', 1);
   assert.equal(asked.context, 'Two clients asked for it this week.');
   assert.equal('context' in questionOf({ id: 'SG5', body_kind: 'options', body: { options: [], context: '   ' }, opened_at: '' }, 'Q', 2), false);
+});
+
+/** A record of `n` rows that pages as the record does: newest first, `limit` at a time, after the id in `cursor`. */
+const paged = (rows: readonly Record<string, unknown>[]) => (args: { limit?: number; cursor?: string }) => {
+  const from = args.cursor ? rows.findIndex((r) => r.id === args.cursor) + 1 : 0;
+  return rows.slice(from, from + (args.limit ?? 50));
+};
+
+test('OPEN QUESTIONS PAST BOOT’S TWENTY: the queue reads every one, a page at a time', async () => {
+  const open = Array.from({ length: 437 }, (_, i) => ({ id: `SG${1000 - i}`, body_kind: 'options', status: 'open', question: `Q${i}?`, body: {} }));
+  const pages: unknown[] = [];
+  const many = client({
+    boot: async () => ({ ok: true, value: { waiting: open.slice(0, 20).map((r) => ({ id: r.id, question: r.question })), counts: { decided: 0 } } }),
+    governance: async (args) => {
+      if (args.register === 'decision') return { ok: true, value: [] };
+      pages.push(args.cursor ?? null);
+      return { ok: true, value: paged(open)(args) };
+    },
+  });
+  const out = await readQueue(many);
+  assert.ok(out.from === 'live');
+  assert.equal(out.value.open.length, 437);
+  assert.equal(new Set(out.value.open.map((q) => q.id)).size, 437);
+  assert.equal(out.value.open.at(-1)?.title, 'Q436?', 'a question past boot’s twenty keeps the words it asks');
+  assert.deepEqual(pages, [null, 'SG801', 'SG601']);
+});
+
+test('DECISIONS PAST THE NEWEST TWO HUNDRED: Decide reads a page, says how many there are, and loads the rest in order', async () => {
+  const suggestions = Array.from({ length: 260 }, (_, i) => ({
+    id: `SG${260 - i}`,
+    body_kind: 'options',
+    status: 'resolved',
+    body: { options: [{ id: 'yes', label: `Yes to ${260 - i}` }] },
+    decision: `D${260 - i}`,
+  }));
+  const decisions = suggestions.map((s) => ({ id: s.decision, question: `About ${s.id}?`, answer: 'yes', reason: 'r', ts: '2026-09-01T00:00:00Z', suggestion: s.id }));
+  const many = client({
+    boot: async () => ({ ok: true, value: { waiting: [], counts: { decided: 260 } } }),
+    governance: async (args) => {
+      if (args.id) return { ok: true, value: null };
+      if (args.register === 'decision') return { ok: true, value: paged(decisions)(args) };
+      if (args.status === 'open') return { ok: true, value: [] };
+      return { ok: true, value: paged(suggestions)(args) };
+    },
+  });
+  const out = await readQueue(many);
+  assert.ok(out.from === 'live');
+  assert.equal(out.value.decided.length, DECIDED_PAGE);
+  assert.equal(out.value.older?.total, 260);
+  let older = out.value.older!;
+  const all = [...out.value.decided];
+  while (older.cursor !== null) {
+    const next = await olderDecisions(many, older);
+    assert.ok(next.from === 'live');
+    all.push(...next.value.decided);
+    older = next.value.older;
+  }
+  assert.equal(all.length, 260);
+  assert.equal(new Set(all.map((q) => q.id)).size, 260);
+  const last = all.at(-1)!;
+  assert.equal(last.id, 'D1');
+  assert.equal(last.options.find((o) => o.key === last.decided?.option)?.title, 'Yes to 1', 'the oldest decision is named by the option it chose');
+});
+
+test('A HOST THAT IGNORES THE CURSOR cannot loop a screen: a page that goes nowhere is the last', async () => {
+  const rows = Array.from({ length: 200 }, (_, i) => ({ id: `SG${i}` }));
+  let asked = 0;
+  const out = await everyGovernance({ governance: async () => (asked++, { ok: true, value: rows }) }, { status: 'open' });
+  assert.ok(out.ok);
+  assert.equal(asked, 2);
 });
