@@ -64,7 +64,7 @@ test('a settings change says each word before and after, from what the record ho
     out?.parts.map((p) => ('lines' in p ? p.lines : [])),
     [
       ['“Waiting on you” will read “On your plate”', 'The list Tickets will be called “Issues”', 'In Tickets, State will be called “Stage”'],
-      ['Team: Week starts will be monday, where it is sunday now'],
+      ['Team board: Week starts will be monday, where it is sunday now'],
     ],
   );
 });
