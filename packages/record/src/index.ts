@@ -28,6 +28,7 @@ import {
   unresolvedFault,
 } from '@braindog/declare';
 import { no, ok } from '@braindog/ports';
+import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -668,10 +669,12 @@ export type RecordDeps = {
 const INVITES_OFF = 'This BrainDog has no sign-in switched on, so an invitation link would lead nowhere. Set up sign-in first.';
 
 export async function createRecordApi(deps: RecordDeps) {
-  const kernel = await openRecord(deps.sql, deps.clock, {
+  const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
   });
+  /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
+  const kernel = backfillSpeaks(opened, deps.sql);
   return { ...api(kernel, deps), kernel };
 }
 
