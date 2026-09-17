@@ -78,7 +78,7 @@ test('ONLY UNTOUCHED EXAMPLES ARE CLEARED: one linked to another example goes, o
   /* Linking one example to another, as setting up does, leaves both untouched. */
   const project = exampleIn(k, 'things')!;
   const task = exampleIn(k, 'tasks')!;
-  const decl = k.register('tasks') as { fields: { id: string; type: string; to?: string }[] };
+  const decl = k.register('tasks') as unknown as { fields: { id: string; type: string; to?: string }[] };
   const link = decl.fields.find((f) => f.type === 'ref' && f.to === 'things');
   assert.ok(link, 'a task can name its project');
   value(k.update('tasks', task.id, { [link.id]: project.id }, w));
@@ -106,4 +106,37 @@ test('ONLY UNTOUCHED EXAMPLES ARE CLEARED: one linked to another example goes, o
   assert.deepEqual(k.examples(), { untouched: 0, touched: 3, registers: {}, others: 0 });
   /* Twice is the same answer. */
   assert.deepEqual(value(k.clearExamples(w)), { cleared: 0, kept: 3 });
+});
+
+/* THE RECORD'S OWN SEED PATH: `example` added to the tags a seed already carries (`packages/record` `exampleTag`). */
+const recordHost = (k: Kernel): Host => ({
+  ...hostFor(k),
+  seed: (register, fields) => {
+    const tags = Array.isArray(fields.tags) ? (fields.tags as unknown[]).map(String) : [];
+    return k.create(register, { ...fields, tags: tags.includes('example') ? tags : [...tags, 'example'] }, { actor: 'p_1', cascade: false }) as never;
+  },
+});
+
+async function guideRecord(said: string | null): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'my-podcast', name: 'My podcast', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'maker@example.test', name: 'Ada' } }).ok);
+  const pack = value<Pack>(await normalise(carriedDocument(useCase('guide')!, TODAY, said), { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  value(await install(pack, diff, recordHost(k), diff.planHash));
+  return k;
+}
+
+test("A GUIDE'S PLAN FORMED FROM WHAT THE PERSON SAID IS NEVER OFFERED FOR CLEARING, while a guide's own demo examples are", async () => {
+  const formed = await guideRecord('a podcast about local history');
+  const milestones = value<{ rows: { fields: Record<string, unknown> }[] }>(formed.list({ register: 'milestones', limit: 50 })).rows;
+  assert.ok(milestones.length > 0, 'the plan was formed');
+  assert.ok(milestones.every((r) => (r.fields.tags as string[]).includes('formed') && (r.fields.tags as string[]).includes('example')));
+  assert.deepEqual(formed.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 });
+  assert.deepEqual(value(formed.clearExamples({ actor: 'p_1' })), { cleared: 0, kept: 0 });
+  assert.equal(value<{ rows: unknown[] }>(formed.list({ register: 'milestones', limit: 50 })).rows.length, milestones.length, 'the plan is all still there');
+
+  const plain = await guideRecord(null);
+  const demo = plain.examples();
+  assert.ok(demo.untouched > 0, "a guide set up without a sentence has the use case's own examples to clear");
+  assert.equal(value<{ cleared: number }>(plain.clearExamples({ actor: 'p_1' })).cleared, demo.untouched);
 });

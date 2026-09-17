@@ -781,10 +781,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * pointed it at another example, which is what setting up a use case does when it links its examples to each other.
    * Any other event (an edited value, a move, a note, a tag, a restore) makes it touched, and so does a live row that is
    * not an example naming it: deleting a project a real task belongs to would take the task's project away.
+   *
+   * A ROW FORMED AROUND WHAT THE PERSON SAID IS NOT AN EXAMPLE HERE AT ALL. The Guide plants the plan somebody's own words
+   * asked for as example rows, tagged `formed` beside `example` (`seed` `carriedDocument`); it is neither cleared nor
+   * counted, and it counts as a row of theirs when it names an example.
    */
   function untouchedExamples(): { untouched: Entry[]; touched: number } {
     const tagged = sql.all<{ id: string; deleted_at: string | null }>(
-      "SELECT DISTINCT e.id, e.deleted_at FROM entry e, json_each(e.fields, '$.tags') t WHERE json_type(e.fields, '$.tags') = 'array' AND t.value = 'example'",
+      "SELECT DISTINCT e.id, e.deleted_at FROM entry e, json_each(e.fields, '$.tags') t WHERE json_type(e.fields, '$.tags') = 'array' AND t.value = 'example'" +
+        " AND NOT EXISTS (SELECT 1 FROM json_each(e.fields, '$.tags') f WHERE f.value = 'formed')",
     );
     const examples = new Set(tagged.map((r) => r.id));
     const idOf = (raw: string | null): string | null => {
@@ -807,7 +812,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (created?.kind === 'create' && created.to_v !== null)
         try {
           const tags = (JSON.parse(created.to_v) as { tags?: unknown }).tags;
-          arrived = Array.isArray(tags) && tags.includes('example');
+          arrived = Array.isArray(tags) && tags.includes('example') && !tags.includes('formed');
         } catch {
           arrived = false;
         }

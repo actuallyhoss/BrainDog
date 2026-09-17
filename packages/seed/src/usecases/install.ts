@@ -123,8 +123,23 @@ export function carriedDocument(u: UseCase, today: string, said?: string | null)
   if (!formed) return useCaseDocument(u.usecase, today);
   const doc = useCaseDocument(u.usecase, '1970-01-01');
   if (!doc) return null;
-  return dated({ ...doc, seeds: formed.seeds }, today);
+  return dated({ ...doc, seeds: formedSeeds(formed.seeds) }, today);
 }
+
+/** The tag a row formed around what the person said carries beside `example`, so Clear the examples never offers their plan. */
+export const FORMED_TAG = 'formed';
+
+/**
+ * A FORMED PLAN IS THE PERSON'S, NOT A DEMO. Its rows are planted like examples, so they can be edited, finished or deleted
+ * like any, but they are what somebody's own words asked for: "Clear the examples" deleting an untouched plan would take
+ * away the thing they came for. Each carries `formed` in its tags, and the kernel leaves such a row out of what it clears.
+ */
+const formedSeeds = (seeds: readonly Body[]): Body[] =>
+  seeds.map((s) => {
+    const fields = (s.fields ?? {}) as Record<string, unknown>;
+    const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : [];
+    return { ...s, fields: { ...fields, tags: tags.includes(FORMED_TAG) ? tags : [...tags, FORMED_TAG] } };
+  });
 
 /** The example rows a use case gives the modules it names, for a test or a proposal to show. */
 export const moduleExamples = (u: UseCase): readonly Body[] => MODULE_EXAMPLES[u.usecase] ?? [];
