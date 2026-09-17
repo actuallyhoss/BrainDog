@@ -45,6 +45,9 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../../packages/ports
+      '@braindog/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
 
   apps/selfhost:
     dependencies:

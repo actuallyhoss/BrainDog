@@ -90,7 +90,7 @@ const usage = () =>
     '  Add an add-on version to a catalogue folder, by the same rules, signed with an author key when one is named.',
     'braindog pack key <file> --author <name>',
     '  Make an author key in a file you choose, outside any repository. Keep it private: it signs what you publish.',
-    'braindog import legacy <export.json> [--host <host>] [--dry-run]',
+    'braindog import legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run] | --draft-setup',
     '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',

@@ -10,8 +10,13 @@
  * `client_id`, a question in its body), each list is read once before writing, and a row found by its key is updated
  * only in the fields that differ. A question already asked is never asked again, answered or not.
  *
- * IT SAYS WHAT IT DID. Added, updated and unchanged by list, the questions asked, everything left out with its reason,
- * and every row the record refused with the record's own sentence. `--dry-run` reads and reports and writes nothing.
+ * IT SAYS WHAT IT DID. Added, updated and unchanged by list, each row that changes with the fields that change, the
+ * questions asked, everything left out with its reason, and every row the record refused with the record's own sentence.
+ * `--dry-run` reads and reports and writes nothing.
+ *
+ * THE OWNER'S SETUP COMES BESIDE THE EXPORT (`--setup`): the organisations he runs and the numbers to poll, which the old tool
+ * never kept. Organisations are rows like any other; a poll is filed on Decide as a pack to install, because it sends
+ * requests to another server and only the owner approves that. `--draft-setup` prints a first one from the export.
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -21,12 +26,14 @@ import { parseArgs } from 'node:util';
 import { refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
-import { KEY_PREFIX, ORDER, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, type Plan, type PlannedRow } from './legacy.ts';
+import { pollPack } from '@braindog/seed/usecases/founder-poll';
+
+import { KEY_PREFIX, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
 import type { AgentIo } from './skills.ts';
 
 import { createClient } from '@braindog/client';
 
-const USAGE = 'braindog import takes legacy <export.json> [--host <host>] [--dry-run].';
+const USAGE = 'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup.';
 
 /** The largest export this reads: the old tool's is about 108 KB of document and an audit of up to 100,000 lines. */
 export const IMPORT_MOST_BYTES = 64 * 1024 * 1024;
@@ -40,7 +47,7 @@ export type Door = {
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number }) => Promise<Result<unknown>>;
-  propose: (args: { question: string; body_kind: 'options'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
+  propose: (args: { question: string; body_kind: 'options' | 'pack'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
 };
 
 export type Tally = { added: number; updated: number; unchanged: number };
@@ -50,6 +57,10 @@ export type Report = {
   tally: Record<string, Tally>;
   asked: number;
   alreadyAsked: number;
+  /** Polls filed on Decide, and those already filed or installed. */
+  polls: { filed: number; before: number };
+  /** Each row that changes, with the fields that change. */
+  changes: { register: string; label: string; fields: string[] }[];
   refused: { label: string; register: string; fix: string }[];
   plan: Plan;
 };
@@ -67,6 +78,7 @@ const NAMES: Readonly<Record<string, string>> = {
   credentials: 'Keys (the index only)',
   accounts: 'Accounts',
   obligations: 'Money in and out',
+  organisations: 'Organisations',
   session: 'Agent runs',
 };
 
@@ -112,7 +124,7 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
  * the same list written later is set in a second pass.
  */
 export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
-  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, refused: [], plan };
+  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], plan };
   const registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
   for (const register of registers) {
@@ -187,6 +199,7 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
       tally.unchanged++;
       continue;
     }
+    report.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
     if (o.dryRun) {
       tally.updated++;
       continue;
@@ -212,12 +225,19 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
     else report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
   }
 
-  if (plan.asks.length > 0) {
-    const asked = new Set<string>();
+  const asked = new Set<string>();
+  const installs = new Set<string>();
+  if (plan.asks.length > 0 || plan.polls.length > 0) {
     const got = await door.governance({ register: 'suggestion', status: 'all', limit: 200 });
     if (!got.ok && unreachable(got)) throw new Unreachable();
     if (got.ok && Array.isArray(got.value))
-      for (const s of got.value) if (isObj(s) && isObj(s.body) && typeof s.body.from === 'string') asked.add(s.body.from);
+      for (const s of got.value)
+        if (isObj(s) && isObj(s.body)) {
+          if (typeof s.body.from === 'string') asked.add(s.body.from);
+          if (typeof s.body.install === 'string') installs.add(s.body.install);
+        }
+  }
+  if (plan.asks.length > 0) {
     for (const ask of plan.asks) {
       if (asked.has(ask.key)) {
         report.alreadyAsked++;
@@ -236,8 +256,49 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
       report.asked++;
     }
   }
+
+  /* A POLL IS A PACK TO INSTALL, filed once. Its project and organisation are the rows this import wrote or found. */
+  for (const poll of plan.polls) {
+    const pack = `poll-${poll.id}`;
+    if (installs.has(pack)) {
+      report.polls.before++;
+      continue;
+    }
+    if (o.dryRun) {
+      report.polls.filed++;
+      continue;
+    }
+    const project = poll.project ? ids.get(poll.project) : undefined;
+    const organisation = poll.organisation ? ids.get(poll.organisation) : undefined;
+    const doc = pollPack({
+      id: poll.id,
+      url: poll.url,
+      every: poll.every,
+      ...(poll.grant ? { grant: poll.grant } : {}),
+      ...(project ? { project } : {}),
+      ...(organisation ? { organisation } : {}),
+      measures: poll.measures,
+    });
+    const done = await door.propose({ question: `Poll ${hostOf(poll.url)} every ${poll.every} for ${and(poll.measures.map((m) => m.name))}?`, body_kind: 'pack', body: { install: pack, doc } });
+    if (!done.ok) {
+      if (unreachable(done)) throw new Unreachable();
+      /* ALREADY INSTALLED, AND NOTHING NEWER: the record says so, and that is a poll filed before. */
+      if (refused(done) && done.refusal.code === 'TRANSITION_ILLEGAL') report.polls.before++;
+      else report.refused.push({ label: poll.label, register: 'Decide', fix: fixOf(done) });
+      continue;
+    }
+    report.polls.filed++;
+  }
   return report;
 }
+
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+};
 
 /** A list said the way a sentence says it: `a, b and c`. */
 const and = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${String(items.at(-1))}`);
@@ -261,6 +322,14 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     lines.push(`${NAMES[register] ?? register}: ${String(t.added)} ${verb}added, ${String(t.updated)} ${verb}updated, ${String(t.unchanged)} unchanged.`);
   }
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
+  if (plan.polls.length > 0)
+    lines.push(`Polls: ${String(report.polls.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.polls.before)} filed before.`);
+  if (report.changes.length > 0) {
+    lines.push('', o.dryRun ? 'What would change:' : 'What changed:');
+    const most = 40;
+    for (const c of report.changes.slice(0, most)) lines.push(`- ${NAMES[c.register] ?? c.register}, ${c.label}: ${c.fields.join(', ')}.`);
+    if (report.changes.length > most) lines.push(`- and ${String(report.changes.length - most)} more.`);
+  }
   if (report.refused.length > 0) {
     lines.push('', 'Refused by the record:');
     for (const r of report.refused) lines.push(`- ${r.label} (${NAMES[r.register] ?? r.register}): ${r.fix}`);
@@ -279,10 +348,10 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
 
 /** `braindog import legacy <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
 export async function importCommand(args: string[], io: AgentIo, today: string = new Date().toISOString().slice(0, 10)): Promise<number> {
-  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined };
+  let values: { host?: string | undefined; 'dry-run'?: boolean | undefined; setup?: string | undefined; 'draft-setup'?: boolean | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' } } }));
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, 'dry-run': { type: 'boolean' }, setup: { type: 'string' }, 'draft-setup': { type: 'boolean' } } }));
   } catch {
     io.say(USAGE);
     return 1;
@@ -309,7 +378,27 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
     io.say(read.fix);
     return 1;
   }
-  const plan = planLegacyTool(read.value, today);
+  if (values['draft-setup'] === true) {
+    io.out(JSON.stringify(draftSetup(read.value), null, 2));
+    return 0;
+  }
+  let setup: Setup | undefined;
+  if (values.setup !== undefined) {
+    let setupText: string;
+    try {
+      setupText = readFileSync(resolve(io.cwd, values.setup), 'utf8');
+    } catch {
+      io.say(`${values.setup} could not be read.`);
+      return 1;
+    }
+    const got = readSetup(setupText);
+    if (!got.ok) {
+      io.say(got.fix);
+      return 1;
+    }
+    setup = got.value;
+  }
+  const plan = planLegacyTool(read.value, today, setup);
 
   let to: Target;
   try {

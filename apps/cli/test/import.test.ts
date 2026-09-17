@@ -11,10 +11,10 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { planLegacyTool, readLegacyTool, type Plan } from '../src/legacy.ts';
+import { draftSetup, planLegacyTool, readLegacyTool, readSetup, type Plan, type Setup } from '../src/legacy.ts';
 import { applyPlan, importCommand, said, type Door } from '../src/import.ts';
 import type { AgentIo } from '../src/skills.ts';
-import { syntheticExport } from './legacy-export.ts';
+import { syntheticExport, syntheticSetup } from './legacy-export.ts';
 
 const TODAY = '2026-09-17';
 const plan = (o?: Parameters<typeof syntheticExport>[0]): Plan => planLegacyTool(syntheticExport(o), TODAY);
@@ -60,7 +60,7 @@ function memoryRecord(registers: string[]) {
   return { door, rows, asked, writes };
 }
 
-const ALL = ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'session'];
+const ALL = ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'organisations', 'session'];
 
 test('an export is read only when it has a db with projects', () => {
   assert.equal(readLegacyTool('not json').ok, false);
@@ -103,9 +103,14 @@ test('threads, tasks and people keep their links, lanes and references', () => {
   assert.equal(t101.what, 'Write the annual plan copy');
   assert.equal(t101.by, '2026-09-25');
   assert.deepEqual(t101.track, { $ref: 'legacy:track:lanternly:annual' });
-  assert.equal(t101.note, 'Was #101 in the old tool. For you. Tier: high, because it blocks the launch.\n\nKeep it short.');
-  assert.match(String(row(p, 'legacy:task:102')!.fields.note), /^Was #102 in the old tool\. For an agent\. Tier: medium\. Follow-up to #101\.$/u);
+  assert.equal(t101.note, 'Was #101 in the old tool. High priority, because it blocks the launch.\n\nKeep it short.');
+  assert.equal(t101.priority, 'high');
+  assert.equal(t101.agent, undefined, "his lane is a task nobody else holds, which Work reads as his");
+  /* THE AGENT LANE IS A TASK AN AGENT TOOK, a medium tier is Normal, and a follow-up is a step of the task it follows. */
+  const t102 = row(p, 'legacy:task:102')!.fields;
+  assert.deepEqual({ note: t102.note, priority: t102.priority, agent: t102.agent, parent: t102.parent }, { note: 'Was #102 in the old tool.', priority: 'normal', agent: 'claude', parent: { $ref: 'legacy:task:101' } });
   assert.equal(row(p, 'legacy:task:103')!.fields.state, 'done');
+  assert.equal(row(p, 'legacy:task:103')!.fields.done_on, '2026-09-12', 'the day it was done there, not the day of the import');
   assert.equal(row(p, 'legacy:task:105')!.fields.thing, undefined, 'a task on no project is global');
   assert.equal(row(p, 'legacy:task:104'), undefined);
   assert.deepEqual(skippedItems(p, /^Deleted/u), ['#104']);
@@ -277,6 +282,95 @@ test('applied to a record, refs become ids; applied again it adds nothing, asks 
   assert.equal(nextDay.tally.things!.added, 0);
 });
 
+test('a setup file names the organisations with their accounts and projects, and polls; what it names wrongly is said', () => {
+  const setup = readSetup(JSON.stringify(syntheticSetup()));
+  assert.ok(setup.ok);
+  const p = planLegacyTool(syntheticExport(), TODAY, (setup as { value: Setup }).value);
+  assert.deepEqual(row(p, 'legacy:organisation:studio')!.fields, {
+    name: 'Example Studio LLC',
+    kind: 'company',
+    country: 'US',
+    currency: 'USD',
+    /* By the label an account is shown with; a pending balance is not carried, so it is not named either. */
+    accounts: [{ $ref: 'legacy:company:mercury:ops:checking' }],
+    projects: [{ $ref: 'legacy:project:lanternly' }, { $ref: 'legacy:project:tidepool' }],
+    note: 'The company the apps are sold through.',
+  });
+  const quill = row(p, 'legacy:organisation:quill-consulting')!.fields;
+  assert.deepEqual(quill.accounts, [{ $ref: 'legacy:account:main' }, { $ref: 'legacy:account:wallet' }]);
+  assert.equal(quill.kind, undefined);
+  assert.ok(p.changed.some((c) => c.includes('sole_proprietorship')));
+  assert.deepEqual(skippedItems(p, /names an account/u), ['Example Studio LLC: Stripe pending']);
+  assert.deepEqual(skippedItems(p, /names a project/u), ['Quill Consulting: nowhere']);
+  assert.deepEqual(skippedItems(p, /no organisations/u), [], 'with a setup the organisations are not said to be missing');
+
+  assert.deepEqual(p.polls, [
+    {
+      key: 'legacy:poll:lanternly',
+      label: 'lanternly',
+      id: 'lanternly',
+      url: 'https://stats.lanternly.example/api/numbers',
+      every: '1h',
+      grant: 'lanternly-stats',
+      project: 'legacy:project:lanternly',
+      organisation: 'legacy:organisation:studio',
+      measures: [
+        { name: 'Monthly revenue, Lanternly', path: 'data.mrr', unit: 'USD' },
+        { name: 'Subscribers, Lanternly', path: 'data.subscribers', type: 'int' },
+      ],
+    },
+  ]);
+  assert.deepEqual(skippedItems(p, /lower case letters/u), ['Bad Id']);
+  assert.deepEqual(skippedItems(p, /https address/u), ['plain']);
+  const order = [...new Set(p.rows.map((r) => r.register))];
+  assert.ok(order.indexOf('organisations') > order.indexOf('accounts') && order.indexOf('organisations') > order.indexOf('things'));
+
+  assert.equal(readSetup('[]').ok, false);
+  assert.match((readSetup('{"orgs":[]}') as { fix: string }).fix, /orgs is neither/u);
+  assert.match((readSetup(JSON.stringify({ polls: [{ id: 'x', url: `https://x.example/?k=${['sk', 'live', 'FAKEFAKEFAKEFAKEFAKEFAKE0000'].join('_')}` }] })) as { fix: string }).fix, /shaped like a key/u);
+});
+
+test('a draft setup holds one organisation with every company account and every project that earns or is being built', () => {
+  assert.deepEqual(draftSetup(syntheticExport()), {
+    organisations: [{ id: 'company', name: 'Your company', kind: 'company', country: '', currency: 'USD', accounts: ['Company operating'], projects: ['lanternly', 'tidepool', 'quill'], note: '' }],
+    polls: [],
+  });
+});
+
+test('applied with a setup, organisations point at the rows, a poll is filed once as a pack to install, and a re-run adds nothing', async () => {
+  const setup = syntheticSetup() as unknown as Setup;
+  const mem = memoryRecord(ALL);
+  const first = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), mem.door, { dryRun: false });
+  assert.deepEqual(first.refused, []);
+  assert.equal(first.tally.organisations!.added, 2);
+  assert.deepEqual(first.polls, { filed: 1, before: 0 });
+  const byTag = (key: string) => mem.rows.find((r) => (r.fields.tags as string[] | undefined)?.includes(key))!;
+  const studio = byTag('legacy:organisation:studio');
+  assert.deepEqual(studio.fields.projects, [byTag('legacy:project:lanternly').id, byTag('legacy:project:tidepool').id]);
+  const poll = mem.asked.find((a) => a.body.install === 'poll-lanternly')!;
+  assert.equal(poll.question, 'Poll stats.lanternly.example every 1h for Monthly revenue, Lanternly and Subscribers, Lanternly?');
+  const decl = ((poll.body.doc as { declarations: Record<string, unknown>[] }).declarations)[0]!;
+  assert.equal(decl.project, byTag('legacy:project:lanternly').id);
+  assert.equal(decl.grant, 'lanternly-stats');
+  assert.deepEqual((decl.map as Record<string, unknown>[])[0]!.organisation, { value: studio.id });
+
+  mem.writes.length = 0;
+  const again = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), mem.door, { dryRun: false });
+  assert.deepEqual(mem.writes, []);
+  assert.deepEqual(again.polls, { filed: 0, before: 1 });
+  assert.equal(again.tally.organisations!.unchanged, 2);
+});
+
+test('a dry run says each row that would change and the fields that would', async () => {
+  const mem = memoryRecord(ALL);
+  await applyPlan(plan(), mem.door, { dryRun: false });
+  const report = await applyPlan(plan({ mrr: 2100 }), mem.door, { dryRun: true });
+  assert.deepEqual(report.changes, [{ register: 'datapoints', label: 'lanternly Monthly revenue', fields: ['value'] }]);
+  const lines = said(report, { dryRun: true, file: 'export.json' });
+  assert.ok(lines.includes('What would change:'));
+  assert.ok(lines.includes('- Datapoints, lanternly Monthly revenue: value.'));
+});
+
 test('a dry run reads and reports, and writes nothing', async () => {
   const mem = memoryRecord(ALL);
   const report = await applyPlan(plan(), mem.door, { dryRun: true });
@@ -338,5 +432,5 @@ test('the command reads the file, talks to the host over the API, and exits 0; a
   assert.equal(await importCommand(['legacy', 'nope.json'], io, TODAY), 1);
   assert.equal(say.at(-1), 'nope.json could not be read.');
   assert.equal(await importCommand(['notion', 'export.json'], io, TODAY), 1);
-  assert.equal(say.at(-1), 'braindog import takes legacy <export.json> [--host <host>] [--dry-run].');
+  assert.equal(say.at(-1), 'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup.');
 });
