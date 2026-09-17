@@ -678,10 +678,37 @@ export type CatalogueOffer = {
   body: Record<string, unknown>;
   /** The key id that signed it, or `null` when nothing did. */
   signedBy: string | null;
+  /** The key id that verifiably signed the version installed, as the catalogue lists it, or `null` when nothing did or it is not listed. */
+  installedSignedBy: string | null;
+  /** Whether a statement from `installedSignedBy` names `signedBy` as its successor. */
+  rotated: boolean;
   /** Hosts it would newly call out to, and what it takes away, when the catalogue still holds the version installed. */
   hostsAdded: readonly string[];
   removed: readonly string[];
+  /** `false` when the catalogue no longer holds the version installed, so `hostsAdded` and `removed` could not be read. */
+  changesKnown: boolean;
 };
+
+/** The one line saying who signed a version, held to the key that signed the version installed. */
+function keyNote(o: CatalogueOffer): { text: string; warning: boolean } {
+  const was = o.installedSignedBy;
+  if (o.signedBy === null) return was === null ? { text: 'It is unsigned.', warning: false } : { text: `Warning: it is unsigned, and the version installed was signed by key ${was}.`, warning: true };
+  if (was === null) return { text: `It is signed by key ${o.signedBy}.`, warning: false };
+  if (was === o.signedBy) return { text: `It is signed by key ${o.signedBy}, the key that signed the version installed.`, warning: false };
+  if (o.rotated) return { text: `It is signed by key ${o.signedBy}, which key ${was} that signed the version installed named as its successor.`, warning: false };
+  return { text: `Warning: it is signed by key ${o.signedBy}, not key ${was} that signed the version installed.`, warning: true };
+}
+
+/**
+ * An update question within `QUESTION_MAX`: warnings come straight after the question and are never cut for length. What
+ * gives way, in order, is the line naming the catalogue, a key note that is not a warning, and then the title.
+ */
+function fitQuestion(title: string, from: string, to: string, warnings: readonly string[], plain: readonly string[]): string {
+  const say = (t: string, rest: readonly string[]) => [`Update ${t} from ${from} to ${to}?`, ...warnings, ...rest].join(' ');
+  for (const rest of [plain, plain.slice(0, -1), []]) if (say(title, rest).length <= QUESTION_MAX) return say(title, rest);
+  const room = Math.max(12, title.length - (say(title, []).length - QUESTION_MAX) - 3);
+  return say(`${title.slice(0, room).trimEnd()}...`, []).slice(0, QUESTION_MAX);
+}
 
 /**
  * Spark's question for each newer version: filed like any other draft, through `prepare`, so the plan on Decide is the
@@ -689,14 +716,16 @@ export type CatalogueOffer = {
  */
 export function catalogueDrafts(offers: readonly CatalogueOffer[]): SparkDraft[] {
   return offers.map((o) => {
-    const notes = [
-      o.signedBy === null ? 'It is unsigned.' : `It is signed by key ${o.signedBy}.`,
+    const key = keyNote(o);
+    const warnings = [
+      key.warning ? key.text : '',
       o.hostsAdded.length > 0 ? `It would newly call out to ${joinNames(o.hostsAdded)}.` : '',
       o.removed.length > 0 ? `It takes away ${joinNames(o.removed)}.` : '',
+      o.changesKnown ? '' : `This catalogue no longer holds ${o.from}, so what it adds, takes away or newly calls out to is not known here. The plan on Decide says.`,
     ].filter((n) => n !== '');
     return {
       key: `catalogue:${o.id}@${o.to}`,
-      question: `Update ${o.title} from ${o.from} to ${o.to}? This BrainDog's catalogue has it. ${notes.join(' ')}`.slice(0, 280),
+      question: fitQuestion(o.title, o.from, o.to, warnings, [...(key.warning ? [] : [key.text]), "This BrainDog's catalogue has it."]),
       body_kind: 'pack',
       body: o.body,
       by: 'rules',

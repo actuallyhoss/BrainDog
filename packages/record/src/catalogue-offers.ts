@@ -9,7 +9,7 @@
  * does not verify is never offered. A catalogue with no index, or an index that does not read, offers nothing.
  */
 
-import { CATALOGUE_INDEX, catalogueUpdates, readCatalogue } from '@braindog/declare/catalogue';
+import { CATALOGUE_INDEX, catalogueUpdates, readCatalogue, rotatedFrom, verifiedStatements, verifySignature } from '@braindog/declare/catalogue';
 
 import type { CatalogueOffer } from './spark.ts';
 
@@ -28,15 +28,27 @@ export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id
     const index = readCatalogue(doc);
     if (!index.ok) return [];
     const { updates } = await catalogueUpdates(index.value, held.map((h) => ({ id: h.id, version: h.version, disabled_at: h.on ? null : 'off' })), read);
-    return updates.map((u) => ({
-      id: u.installed,
-      title: u.entry.title,
-      from: u.from,
-      to: u.to.version,
-      body: u.file.kind === 'usecase' ? { file: u.text } : { install: u.installed, doc: u.file.file.doc },
-      signedBy: u.signature?.key_id ?? null,
-      hostsAdded: u.changes?.hosts.added ?? [],
-      removed: (u.changes?.removed ?? []).map((r) => r.title),
-    }));
+    const statements = await verifiedStatements(index.value.keys);
+    const offers: CatalogueOffer[] = [];
+    for (const u of updates) {
+      /* THE KEY NOTE IS HELD TO THE VERSION INSTALLED: its signature as listed, verified here, or nothing. */
+      const was = u.entry.versions.find((v) => v.version === u.from);
+      const installedSignedBy = was?.signature && (await verifySignature(was.signature, u.entry.kind, u.entry.id, was.version, was.checksum)).ok ? was.signature.key_id : null;
+      const signedBy = u.signature?.key_id ?? null;
+      offers.push({
+        id: u.installed,
+        title: u.entry.title,
+        from: u.from,
+        to: u.to.version,
+        body: u.file.kind === 'usecase' ? { file: u.text } : { install: u.installed, doc: u.file.file.doc },
+        signedBy,
+        installedSignedBy,
+        rotated: signedBy !== null && installedSignedBy !== null && signedBy !== installedSignedBy && rotatedFrom(statements, [installedSignedBy], signedBy) !== null,
+        hostsAdded: u.changes?.hosts.added ?? [],
+        removed: (u.changes?.removed ?? []).map((r) => r.title),
+        changesKnown: u.changes !== null,
+      });
+    }
+    return offers;
   };
 }

@@ -39,7 +39,7 @@ test('a newer catalogue version is asked about once, with who signed it, and not
   const version = () => sql.all<{ version: string }>("SELECT version FROM pack WHERE id = 'bookshelf'")[0]?.version;
   assert.equal(version(), '1.0.0');
 
-  offers = [{ id: 'bookshelf', title: 'Bookshelf', from: '1.0.0', to: '1.1.0', body: { install: 'bookshelf', doc: doc('1.1.0', [BOOKS, SHELF, LOANS]) }, signedBy: '0123456789abcdef', hostsAdded: [], removed: [] }];
+  offers = [{ id: 'bookshelf', title: 'Bookshelf', from: '1.0.0', to: '1.1.0', body: { install: 'bookshelf', doc: doc('1.1.0', [BOOKS, SHELF, LOANS]) }, signedBy: '0123456789abcdef', installedSignedBy: null, rotated: false, hostsAdded: [], removed: [], changesKnown: true }];
   type Filed = { filed: { id: string; question: string }[]; skipped: { question: string; why: string }[] };
   const out = value<Filed>(await api.sparkPropose({}, owner));
   assert.ok(seenHeld.at(-1)?.some((h) => h.id === 'bookshelf' && h.version === '1.0.0' && h.on));
