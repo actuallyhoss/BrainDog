@@ -182,7 +182,7 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   const bo: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'read' } };
   const boot = value<Boot>(await api.boot(bo));
   assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en' });
-  assert.deepEqual(boot.me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read' });
+  assert.deepEqual(boot.me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read', prefs: {} });
   assert.equal(boot.counts.decide, 1);
   assert.equal(boot.counts.inbox, null, 'a reader was told how much waits in the inbox');
   assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, 0);
