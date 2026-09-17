@@ -97,7 +97,6 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   assert.deepEqual(pagesOf(useCase('personal')!), [
     { page: 'spending', title: 'Spending', section: 'Money' },
     { page: 'goals', title: 'Goals', section: 'Goals' },
-    { page: 'projects', title: 'Projects', section: 'Projects' },
   ]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);

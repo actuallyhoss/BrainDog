@@ -217,7 +217,7 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
 test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOALS AND PROJECTS, and every page reads', async () => {
   const { k, sql } = await made('personal');
   const home = value<{ blocks: (Drawn & { kind: string })[] }>(k.page(homePageOf('personal'))).blocks;
-  assert.deepEqual(home.map((b) => b.heading), ['This month', 'Spending against your budget', 'Bills due this week', 'Savings goals', 'Projects in motion', 'Habits this week', 'Goals']);
+  assert.deepEqual(home.map((b) => b.heading), ['This month', 'Spending against your budget', 'Bills due this week', 'Savings goals', 'Projects in motion', 'Habits this week', 'Goals', 'Next steps']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const cells = new Map((home[0]!.readings ?? []).map((r) => [r.metric, r.reading?.value ?? null]));
   /* THE MONTH STARTS ON ITS FIRST DAY: the record is made on 3 September, so the shop on the 1st counts and the cinema on
@@ -226,10 +226,14 @@ test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOA
   assert.equal(cells.get('budget-each-month'), 30_000 + 8_000 + 6_000 + 5_000 + 4_000 + 5_000);
   assert.equal(cells.get('bills-this-week'), 85_000 + 1_800 + 1_099);
   assert.equal(home[2]!.rows?.length, 3, 'rent, the phone and the streaming subscription are due this week');
-  for (const slug of ['money', 'spending', 'goals', 'projects', 'restore-the-old-road-bike']) {
+  for (const slug of ['money', 'spending', 'goals', 'portfolio', 'restore-the-old-road-bike']) {
     const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
     for (const b of page) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading} was refused`);
   }
+  /* ONE PROJECTS PAGE ON THE RAIL: Projects' Overview, and no second one of the use case's own beside it. */
+  const rail = (k.pages() as unknown as { slug: string; title: string; nav: { section?: string } | null }[]).filter((p) => p.nav?.section === 'Projects');
+  assert.ok(rail.some((p) => p.slug === 'portfolio'), 'Projects has its Overview');
+  assert.deepEqual(rail.filter((p) => p.slug !== 'portfolio' && !['restore-the-old-road-bike', 'a-collection-of-short-stories'].includes(p.slug)).map((p) => p.slug), []);
   sql.close();
 });
 

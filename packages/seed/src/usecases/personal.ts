@@ -128,7 +128,8 @@ const budgetProgress = (heading: string) => ({
 
 export const PERSONAL = {
   usecase: 'personal',
-  version: '1.2.0',
+  /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home. */
+  version: '1.3.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -494,6 +495,24 @@ export const PERSONAL = {
           },
           habitsProgress(6),
           goalsProgress(6),
+          {
+            /* THE NEXT STEP ON EACH PROJECT, across all of them. It was a Projects page of this use case's own, which sat on
+               the rail beside Projects' Overview under the same heading; the Overview lists the projects, each moving project
+               has its own page of steps, and what is next across them is here. */
+            kind: 'table',
+            heading: 'Next steps',
+            span: 12,
+            source: 'register.project_steps',
+            where: 'done is false',
+            columns: [
+              { field: 'what', label: 'Step', width: 'minmax(18ch,1fr)' },
+              { field: 'thing', label: 'Project', width: 'minmax(12ch,22ch)' },
+              { field: 'by', label: 'By', width: '13ch', align: 'end' },
+            ],
+            order: [{ field: 'by', dir: 'asc' }],
+            limit: 6,
+            empty: 'Nothing left to do on your projects. Add the next step when you have one.',
+          },
         ],
       },
       {
@@ -595,52 +614,6 @@ export const PERSONAL = {
             ],
             limit: 20,
             empty: 'No goals yet.',
-          },
-        ],
-      },
-      {
-        page: 'projects',
-        title: 'Projects',
-        nav: { section: 'Projects', order: 10 },
-        icon: 'thing',
-        requires: ['register.things', 'register.project_steps'],
-        blocks: [
-          {
-            kind: 'progress',
-            heading: 'How far each one is',
-            span: 12,
-            source: 'register.project_steps',
-            columns: [{ field: 'thing' }, { field: 'done' }],
-            limit: 8,
-            empty: 'No project steps yet. Give a project its steps and its progress shows here.',
-          },
-          {
-            kind: 'table',
-            heading: 'Next steps',
-            span: 12,
-            source: 'register.project_steps',
-            where: 'done is false',
-            columns: [
-              { field: 'what', label: 'Step', width: 'minmax(18ch,1fr)' },
-              { field: 'thing', label: 'Project', width: 'minmax(12ch,22ch)' },
-              { field: 'by', label: 'By', width: '13ch', align: 'end' },
-            ],
-            order: [{ field: 'by', dir: 'asc' }],
-            limit: 12,
-            empty: 'Nothing left to do. Add the next step when you have one.',
-          },
-          {
-            kind: 'table',
-            heading: 'Every project',
-            span: 12,
-            source: 'register.things',
-            columns: [
-              { field: 'name', label: 'Project', width: 'minmax(18ch,1fr)' },
-              { field: 'lane', label: 'Status', width: '12ch' },
-              { field: 'since', label: 'Since', width: '13ch', align: 'end' },
-            ],
-            limit: 20,
-            empty: 'No projects yet.',
           },
         ],
       },
