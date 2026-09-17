@@ -600,9 +600,13 @@
     font-size: var(--t-sm);
   }
 
-  /* A SERIES' NUMBERS ARE FOR A SCREEN READER. A fold headed "The numbers" under a weekly count read as a stray caption,
-     so the table is kept out of sight and in the document. */
-  .series-numbers {
+  /* A CHART'S NUMBERS ARE FOR A SCREEN READER where the drawing or its rows already say them: a series, a split, a bridge
+     and a sparkline. A fold headed "The numbers" under each read as a stray caption, so the table is kept out of sight and
+     in the document. */
+  .series-numbers,
+  .split-numbers,
+  .bridge-numbers,
+  .spark-numbers {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
@@ -613,10 +617,7 @@
 
   /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
   .lines-numbers,
-  .forecast-numbers,
-  .bridge-numbers,
-  .split-numbers,
-  .spark-numbers {
+  .forecast-numbers {
     /* THE FOLD SCROLLS SIDEWAYS, AND THE PAGE DOES NOT. A month to a column is wider than a phone, and a series table
        held Money and a shared page at 375px on a 320px screen, the whole document sliding under the thumb. A table
        that is wider than its place scrolls inside it, as the register grid's region does. The padding is room for
@@ -629,10 +630,7 @@
   }
 
   .lines-toggle,
-  .forecast-toggle,
-  .bridge-toggle,
-  .split-toggle,
-  .spark-toggle {
+  .forecast-toggle {
     display: flex;
     align-items: center;
     min-block-size: var(--ctl-h);
@@ -643,27 +641,18 @@
   }
 
   .lines-toggle::-webkit-details-marker,
-  .forecast-toggle::-webkit-details-marker,
-  .bridge-toggle::-webkit-details-marker,
-  .split-toggle::-webkit-details-marker,
-  .spark-toggle::-webkit-details-marker {
+  .forecast-toggle::-webkit-details-marker {
     display: none;
   }
 
   .lines-toggle:hover,
-  .forecast-toggle:hover,
-  .bridge-toggle:hover,
-  .split-toggle:hover,
-  .spark-toggle:hover {
+  .forecast-toggle:hover {
     color: var(--ink2);
   }
 
   @media (pointer: coarse) {
     .lines-toggle,
-    .forecast-toggle,
-    .bridge-toggle,
-    .split-toggle,
-    .spark-toggle {
+    .forecast-toggle {
       min-block-size: var(--tap);
     }
   }

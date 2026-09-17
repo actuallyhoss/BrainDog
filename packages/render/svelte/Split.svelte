@@ -8,7 +8,6 @@
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
   import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from '../src/split.ts';
-  import { SERIES_NUMBERS } from '../src/series.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -71,8 +70,8 @@
     {/if}
   {/each}
   {#if block.rows.length}
-    <details class="split-numbers">
-      <summary class="split-toggle">{SERIES_NUMBERS}</summary>
+    <!-- The figures for a screen reader. The rows above already say them, and a fold headed "The numbers" read as a stray caption. -->
+    <div class="split-numbers">
       <table class="split-table">
         <thead>
           <tr><th scope="col">{SPLIT_PART}</th><th scope="col">{SPLIT_AMOUNT}</th><th scope="col">{SPLIT_SHARE}</th></tr>
@@ -87,6 +86,6 @@
           {/each}
         </tbody>
       </table>
-    </details>
+    </div>
   {/if}
 </div>

@@ -61,6 +61,6 @@ test('A BRIDGE PUTS ITS NUMBERS IN A FOLD, a row for each step with its amount a
   const html = toHTML(parse('```bridge\nStart | 100\nSomething | soon\nEnd | \n```'));
   assert.match(
     html,
-    /<details class="bridge-numbers"><summary class="bridge-toggle">The numbers<\/summary><table class="bridge-table"><thead><tr><th scope="col">Step<\/th><th scope="col">Amount<\/th><\/tr><\/thead><tbody><tr><th scope="row">Start<\/th><td class="num">100<\/td><\/tr><tr><th scope="row">Something<\/th><td class="num">soon<\/td><\/tr><tr><th scope="row">End<\/th><td class="num">—<\/td><\/tr><\/tbody><\/table><\/details><\/div>/u,
+    /<div class="bridge-numbers"><table class="bridge-table"><thead><tr><th scope="col">Step<\/th><th scope="col">Amount<\/th><\/tr><\/thead><tbody><tr><th scope="row">Start<\/th><td class="num">100<\/td><\/tr><tr><th scope="row">Something<\/th><td class="num">soon<\/td><\/tr><tr><th scope="row">End<\/th><td class="num">—<\/td><\/tr><\/tbody><\/table><\/div><\/div>/u,
   );
 });

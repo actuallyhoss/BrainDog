@@ -10,7 +10,6 @@
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type RenderOptions } from '../src/index.ts';
   import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from '../src/bridge.ts';
-  import { SERIES_NUMBERS } from '../src/series.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -49,8 +48,8 @@
     <p class="bridge-warn" data-intent="warn"><span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>{plan.warn}</p>
   {/if}
   {#if block.rows.length}
-    <details class="bridge-numbers">
-      <summary class="bridge-toggle">{SERIES_NUMBERS}</summary>
+    <!-- The figures for a screen reader. The rows above already say them, and a fold headed "The numbers" read as a stray caption. -->
+    <div class="bridge-numbers">
       <table class="bridge-table">
         <thead>
           <tr><th scope="col">{BRIDGE_STEP}</th><th scope="col">{BRIDGE_AMOUNT}</th></tr>
@@ -61,6 +60,6 @@
           {/each}
         </tbody>
       </table>
-    </details>
+    </div>
   {/if}
 </div>

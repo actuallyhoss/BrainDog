@@ -22,7 +22,7 @@ import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
-import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
+import { SERIES_NET, SERIES_NONE, seriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, progressPlan, progressSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
@@ -178,16 +178,17 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
 }
 
 /**
- * The numbers a figure was drawn from, as a table in a fold: `bridge`, `split` and `sparkline` put
- * one under the drawing, as `series` does. Column heads first, then each row as its row head and
+ * The numbers a figure was drawn from, as a table a screen reader reads and nobody sees: `bridge`, `split` and
+ * `sparkline` put one under the drawing, as `series` does. It was a fold headed "The numbers", which under every chart
+ * read as a stray caption. Column heads first, then each row as its row head and
  * its cells, all plain text this function escapes.
  */
 function numbersFold(kind: string, heads: readonly string[], rows: readonly (readonly string[])[]): string {
-  return `<details class="${kind}-numbers"><summary class="${kind}-toggle">${SERIES_NUMBERS}</summary><table class="${kind}-table"><thead><tr>${heads
+  return `<div class="${kind}-numbers"><table class="${kind}-table"><thead><tr>${heads
     .map((h) => `<th scope="col">${escape(h)}</th>`)
     .join('')}</tr></thead><tbody>${rows
     .map(([head, ...cells]) => `<tr><th scope="row">${escape(head ?? '')}</th>${cells.map((c) => `<td class="num">${escape(c)}</td>`).join('')}</tr>`)
-    .join('')}</tbody></table></details>`;
+    .join('')}</tbody></table></div>`;
 }
 
 function grid(b: Block, o: RenderOptions): string {

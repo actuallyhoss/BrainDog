@@ -57,8 +57,9 @@ test('all zero, the track is a sentence and the figures are still printed', () =
 
 test('A SPLIT PUTS ITS NUMBERS IN A FOLD: each part, its figure and its share, and a row that is no part has no share', () => {
   const html = toHTML(parse('```split\nRent | 300\n | 100\nTools | pending\nUncategorised | 50 | 2 rows | hole\n```'));
-  const fold = /<details class="split-numbers">[\s\S]*<\/details>/u.exec(html)?.[0] ?? '';
-  assert.match(fold, /<summary class="split-toggle">The numbers<\/summary><table class="split-table"><thead><tr><th scope="col">Part<\/th><th scope="col">Amount<\/th><th scope="col">Share<\/th><\/tr><\/thead>/u);
+  const fold = /<div class="split-numbers">[\s\S]*<\/table><\/div>/u.exec(html)?.[0] ?? '';
+  assert.doesNotMatch(html, /The numbers/u);
+  assert.match(fold, /<div class="split-numbers"><table class="split-table"><thead><tr><th scope="col">Part<\/th><th scope="col">Amount<\/th><th scope="col">Share<\/th><\/tr><\/thead>/u);
   assert.match(fold, /<tr><th scope="row">Rent<\/th><td class="num">300<\/td><td class="num">75%<\/td><\/tr>/u);
   assert.match(fold, /<tr><th scope="row">Part<\/th><td class="num">100<\/td><td class="num">25%<\/td><\/tr>/u, 'an unnamed part is still a row head');
   assert.match(fold, /<tr><th scope="row">Tools<\/th><td class="num">pending<\/td><td class="num">—<\/td><\/tr>/u);

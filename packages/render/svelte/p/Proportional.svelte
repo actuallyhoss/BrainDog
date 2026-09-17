@@ -15,7 +15,7 @@
   one-pixel stub: the chart unreadable because of the thing it reports (05 §7.5).
 -->
 <script lang="ts">
-  import { inline, magnitudeOfCell, text, trendOf, SERIES_NUMBERS, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -84,8 +84,7 @@
       </div>
     {/each}
     {#if runs.length}
-      <details class="spark-numbers">
-        <summary class="spark-toggle">{SERIES_NUMBERS}</summary>
+      <div class="spark-numbers">
         <table class="spark-table">
           <thead>
             <tr><th scope="col">{SPARKLINE_POINT}</th>{#each runs as run}<th scope="col">{run.label}</th>{/each}</tr>
@@ -96,7 +95,7 @@
             {/each}
           </tbody>
         </table>
-      </details>
+      </div>
     {/if}
   {:else if block.kind === 'gauge'}
     {@const row = block.rows[0] ?? { cells: [] }}
