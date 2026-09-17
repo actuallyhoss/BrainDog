@@ -223,10 +223,17 @@ const columnsOf = (b: Answered) => {
  * THE VERDICT IS THE RECORD'S (`met`), and a figure over no rows carries none, because a tick over an
  * empty list is a verdict on nothing. The label, the format and the target line are the declaration's.
  */
+const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
+  typeof v === 'object' && v !== null && (typeof (v as { lte?: unknown }).lte === 'number' || typeof (v as { gte?: unknown }).gte === 'number');
+
 function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
-  const decl = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
+  const built = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
+  /* THE TARGET IS THE RECORD'S, which a use case may have set for a person (`install.ts` `MODULE_TARGETS`); the build's
+     declaration only says it when the record did not. */
+  const held = (cell as { target?: unknown }).target;
+  const decl = built && isTarget(held) ? { ...built, target: held } : built;
   const label = str(cell.label) ?? decl?.name ?? cell.metric;
   const r = cell.reading;
   if (!r || r.value === null || cell.refusal || r.refusals.length)

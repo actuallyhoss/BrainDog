@@ -538,3 +538,11 @@ test('a live feed names its reader as You, anybody else without an id, and a pac
     ],
   );
 });
+
+test("A TILE SAYS THE RECORD'S TARGET, not the build's, so a person's Money is not held to a studio's sums", () => {
+  const decl = METRICS['out-30d']!;
+  const said = (target?: unknown) =>
+    blockOf({ kind: 'stat', cells: [{ metric: 'out-30d' }], readings: [{ metric: 'out-30d', reading: { value: 115_749, unit: 'GBP', rows: 7, met: true, refusals: [] }, ...(target === undefined ? {} : { target }) }], rows: [], matched: 0, refusals: [] } as never, new Map(), Date.UTC(2026, 8, 17, 12)).metrics?.[0]?.note;
+  assert.match(String(said({ lte: 250_000 })), /2,500\.00/u);
+  assert.equal(said(), said(decl.target), 'without one, the build says its own');
+});

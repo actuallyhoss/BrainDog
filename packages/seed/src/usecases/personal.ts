@@ -555,7 +555,7 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Logged lately',
-            span: 6,
+            span: 12,
             source: 'register.goal_log',
             columns: [
               { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },
@@ -570,7 +570,7 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Put by lately',
-            span: 6,
+            span: 12,
             source: 'register.put_by',
             columns: [
               { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },

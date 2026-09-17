@@ -175,7 +175,8 @@ export type BlockResult = PageBlock & {
   /** How many the predicate matched, which is what a total is a total OF. */
   matched: number;
   /** A `stat` block's figures, in the order its cells named them. */
-  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[] }[];
+  /** Each cell's figure, and the target the record holds for it, so a host says the record's target rather than its own build's. */
+  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[]; target?: MetricDecl['target'] }[];
   /** A `forecast.runway` block's walk. */
   walk?: Runway;
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
@@ -547,9 +548,10 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
         const moved = window === undefined ? {} : trendOf(deps, cell.metric, window);
-        if ('refusal' in moved) return { ...cell, reading: read.ok ? read.value : null, refusal: moved.refusal };
-        if (read.ok) return { ...cell, reading: read.value, ...moved };
-        return refused(read) ? { ...cell, reading: null, refusal: read.refusal } : { ...cell, reading: null };
+        const target = decl.target === undefined ? {} : { target: decl.target };
+        if ('refusal' in moved) return { ...cell, ...target, reading: read.ok ? read.value : null, refusal: moved.refusal };
+        if (read.ok) return { ...cell, ...target, reading: read.value, ...moved };
+        return refused(read) ? { ...cell, ...target, reading: null, refusal: read.refusal } : { ...cell, ...target, reading: null };
       }),
     };
   }
