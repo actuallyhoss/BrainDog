@@ -11,7 +11,7 @@
   buttons for a proposal sit under its title and not a screen below it; the gate draws it whole.
 -->
 <script lang="ts">
-  import { diffPlan } from 'braindog-render';
+  import { diffPlan, ref } from 'braindog-render';
   import { Diff } from 'braindog-render/svelte';
   import { words, type Updated } from './changes.ts';
 
@@ -23,7 +23,7 @@
     <li class="change">
       <p class="change-row">
         <span class="change-title">{u.title}</span>
-        <span class="change-id">{u.at}</span>
+        <span class="change-id">{ref(u.at)}</span>
       </p>
       {#each u.changes as c (c.field)}
         {#if c.long && compact}

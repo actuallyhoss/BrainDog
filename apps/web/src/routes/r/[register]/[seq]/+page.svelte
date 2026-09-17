@@ -22,7 +22,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values, whoDid } from '$lib/record/api.ts';
+  import { backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, spokenRow, toneOf, values, whoDid } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -681,6 +681,9 @@
                   {:else if f.type === 'day'}
                     {display(id, f.id, value, clock, names)}
                     <span class="rel">{relative(String(value), clock)}</span>
+                  {:else if id === 'session' && f.id === 'project' && spokenRow(value, names)}
+                    <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it. -->
+                    <a href={spokenRow(value, names)!.href}>{spokenRow(value, names)!.label}</a>
                   {:else if f.type === 'enum'}
                     <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
                   {:else}

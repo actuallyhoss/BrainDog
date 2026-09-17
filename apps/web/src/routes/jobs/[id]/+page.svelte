@@ -13,7 +13,7 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { ROWS, job as jobById, runName } from '$lib/record/api.ts';
+  import { ROWS, job as jobById, runName, spokenRow } from '$lib/record/api.ts';
   import { page as route } from '$app/state';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -114,7 +114,7 @@
       {#if pressable}<Icon name="chevronDown" size="s" />{:else}{e.seq}{/if}
     </span>
     <span class="line-main">
-      <span class="line-title"><span class="step-tool">{e.tool}</span> {e.input}</span>
+      <span class="line-title"><span class="step-tool">{e.tool}</span> {spokenRow(e.input)?.label ?? e.input}</span>
     </span>
     <span class="out" data-ok={e.ok ? '' : undefined}>
       <!-- `data-ok` was the only thing separating a result from a failure, which is colour carrying

@@ -302,6 +302,39 @@ export function readableFields(register: string): FieldDecl[] {
  * Formatting is decided for the reader, not at the call site. A `ref` reads as the title of the row
  * it points at, because a person says "Halden", not "people#1".
  */
+/**
+ * A ROW NOBODY NAMED, SAID AS ITS KIND AND NUMBER: `Course #1`, never `courses#1`. A ref to a row with
+ * no title, or to a row the record did not name, drew the stored spoken id in a table cell, which is
+ * the string a person never says. `label` is the field's own label, for a list this build does not
+ * declare.
+ */
+export function unnamed(register: string, seq: number | string, label?: string): string {
+  const kind = REGISTERS[register]?.one ?? label ?? register.replace(/_/g, ' ');
+  return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} #${seq}`;
+}
+
+/** A spoken id as a person writes it and a tool call passes it: `things#1`. */
+const SPOKEN_ID = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
+
+/**
+ * WHAT A SPOKEN ID HELD AS TEXT READS AS, AND WHERE IT OPENS. A run holds its project as `things#1` and
+ * a tool call reads `tracks#1`; both drew the id. The name comes from `names` when the screen is
+ * drawing a record, and from the sample otherwise, and a row with no name reads as `unnamed`.
+ */
+export function spokenRow(value: unknown, names?: Names): { label: string; href: string } | null {
+  const m = typeof value === 'string' ? SPOKEN_ID.exec(value) : null;
+  if (!m) return null;
+  const [, register, seq] = m as unknown as [string, string, string];
+  const titleField = REGISTERS[register]?.title;
+  const said = names
+    ? names.get(value as string)
+    : titleField
+      ? (ROWS[register] ?? []).find((e) => e.seq === Number(seq))?.fields[titleField]
+      : undefined;
+  const label = typeof said === 'string' && said.trim() !== '' ? said : unnamed(register, seq);
+  return { label, href: `/r/${register}/${seq}` };
+}
+
 /** Money when the walk knows its currency, and the bare integer when there is nothing to say. */
 const moneyOr = (minor: number, currency: string | null): string => (currency === null ? integer(minor) : money(minor, currency));
 
@@ -384,15 +417,18 @@ export function display(
        * ONLY source: a number the record did not name draws as `<list>#<number>`, which is a row
        * somebody can open, rather than as whatever the built-in sample happens to call that number.
        */
-      if (names) return names.get(`${f.to}#${value}`) ?? `${f.to}#${value}`;
+      if (names) return names.get(`${f.to}#${value}`) || unnamed(f.to ?? register, String(value), f.label);
       const target = f.to ? ROWS[f.to] : undefined;
       const hit = target?.find((e) => e.seq === Number(value));
       const titleField = f.to ? REGISTERS[f.to]?.title : undefined;
-      return hit && titleField ? String(hit.fields[titleField] ?? `${f.to}#${value}`) : `${f.to}#${value}`;
+      const said = hit && titleField ? hit.fields[titleField] : undefined;
+      return said === undefined || said === null || said === '' ? unnamed(f.to ?? register, String(value), f.label) : String(said);
     }
     case 'secret':
       return '••••••••';
     default:
+      /* A RUN'S PROJECT IS HELD AS A SPOKEN ID, and reads as the project's name. */
+      if (register === 'session' && field === 'project') return spokenRow(value, names)?.label ?? String(value);
       return String(value);
   }
 }

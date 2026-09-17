@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, readableFields, readBlock, search, toRows } from './api.ts';
+import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, readableFields, readBlock, search, spokenRow, toRows, unnamed } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -148,9 +148,24 @@ test('a ref reads as the title of the row it points at', () => {
   assert.equal(display('obligations', 'party', 1), String(target.fields[titleField]));
 });
 
-test('a ref that points at nothing degrades to the spoken id, not to a bare number', () => {
-  const out = display('obligations', 'party', 999_999);
-  assert.equal(out, 'people#999999');
+test('a ref that points at nothing reads as its kind and number, never a bare number or a spoken id', () => {
+  assert.equal(display('obligations', 'party', 999_999), 'Person #999999');
+  /* A LIVE RECORD THAT DID NOT NAME IT, and a list this build does not declare, which takes the field's label. */
+  assert.equal(display('obligations', 'party', 7, undefined, new Map() as never), 'Person #7');
+  assert.equal(unnamed('courses', 1, 'Course'), 'Course #1');
+  assert.equal(unnamed('courses', 1), 'Courses #1');
+});
+
+test('A RUN’S PROJECT, HELD AS A SPOKEN ID, READS AS THE PROJECT AND OPENS IT', () => {
+  const run = ROWS.session?.find((r) => typeof r.fields.project === 'string');
+  assert.ok(run, 'the sample needs a run placed in a project');
+  const shown = display('session', 'project', run.fields.project) ?? '';
+  assert.doesNotMatch(shown, /#/u);
+  const seq = Number(String(run.fields.project).split('#')[1]);
+  assert.equal(shown, String(ROWS.things?.find((e) => e.seq === seq)?.fields.name));
+  assert.deepEqual(spokenRow('things#999'), { label: 'Project #999', href: '/r/things/999' });
+  assert.equal(spokenRow('tracks#1')?.label, String(ROWS.tracks?.find((e) => e.seq === 1)?.fields.name));
+  assert.equal(spokenRow('not an id'), null);
 });
 
 test('an undeclared field is stringified rather than dropped', () => {
