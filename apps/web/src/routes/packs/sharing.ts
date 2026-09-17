@@ -176,7 +176,9 @@ function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; 
       const d = decls.find((x) => x.page === bare);
       return { kind: 'page', name: typeof d?.title === 'string' ? filled(d.title) : bare };
     }
-    return { kind: 'other', name: bare || id };
+    /* A FIGURE OR A RULE IS SAID BY ITS OWN NAME, "Going out, 30 days", not `out-30d`. */
+    const d = decls.find((x) => x[kind ?? ''] === bare);
+    return { kind: 'other', name: typeof d?.name === 'string' ? filled(d.name) : bare || id };
   };
 }
 

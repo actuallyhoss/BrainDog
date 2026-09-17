@@ -308,3 +308,10 @@ test("A MODULE ALREADY HERE IS OFFERED IN THE ADDED USE CASE'S WORDS, and left a
   assert.deepEqual((await installShared(yes.client, plan)).done, ['money-core', 'usecase-study']);
   assert.equal(copy.shareRelabel(['money-core'], 'Personal'), "Update money-core to Personal's words and targets");
 });
+
+test('A FIGURE IN A PLAN IS SAID BY ITS NAME, and one the document does not name by its id', () => {
+  const doc = { declarations: [{ metric: 'out-30d', name: 'Going out, 30 days' }] };
+  const plan = sharedPlanOf({ ...ANSWER, packs: [{ ...ANSWER.packs[0], adds: ['metric.out-30d', 'metric.nameless'], changes: ['metric.out-30d'], doc }] })!;
+  assert.deepEqual(plan.packs[0]?.adds.map((a) => a.name), ['Going out, 30 days', 'nameless']);
+  assert.deepEqual(plan.packs[0]?.changes, ['Going out, 30 days']);
+});
