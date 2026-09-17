@@ -312,3 +312,18 @@ test("ONE WRITE'S LINES ARE ONE LINE from three, led by the note they share: cle
   /* Two lines of one write keep their own lines. */
   assert.equal(newsOf(cleared.slice(0, 2) as never, 'p_1').length, 2);
 });
+
+test('THE DAY A ROW WAS FINISHED, filled by the record in the same write as its state, is part of that line and not one of its own', () => {
+  const moved = [
+    line({ rowid: 31, kind: 'edit', batch: 'w1', field: 'reached_on', from: null, to: '2026-09-15', register: 'milestones', seq: 2, title: 'Idea', target: 'entry:m2' }),
+    line({ rowid: 30, id: 'w1', kind: 'state', batch: null, field: 'status', from: 'underway', to: 'reached', register: 'milestones', seq: 2, title: 'Idea', target: 'entry:m2' }),
+  ];
+  const texts = newsOf(moved as never, 'p_1').map((i) => i.text);
+  assert.equal(texts.length, 1);
+  assert.ok(!texts.some((t) => /reached on/iu.test(t)), texts.join(' | '));
+  /* Reopened: the day emptied beside the move back is folded too. */
+  const reopened = moved.map((l) => (l.kind === 'edit' ? { ...l, from: '2026-09-15', to: null } : { ...l, from: 'reached', to: 'underway' }));
+  assert.equal(newsOf(reopened as never, 'p_1').length, 1);
+  /* A day a person set on its own, with no move beside it, keeps its line. */
+  assert.equal(newsOf([moved[0]!] as never, 'p_1').length, 1);
+});

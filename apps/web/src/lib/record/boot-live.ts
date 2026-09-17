@@ -314,11 +314,33 @@ const BULK_KIND: Record<string, BulkPart> = {
   propose: 'asked',
 };
 
+/**
+ * THE DAY A ROW WAS FINISHED IS PART OF ITS MOVE. A register's `finished:` day is filled or emptied by the record in the same
+ * write as the state change (`kernel` `finished.ts`), and Home drew it as a line of its own, "reached on set to 17 Sep 2026",
+ * under the move it belongs to. A day written beside a state change of the same row, in the same write, on that write's day
+ * (or emptied) is folded into the move. A write's first line carries no batch and the lines after it carry its id, so a
+ * move is keyed by its batch or else its own id. A day a person sets on its own keeps its line.
+ */
+function finishedDays(events: readonly EventLine[]): Set<number> {
+  const moves = new Set(events.filter((e) => e.kind === 'state').map((e) => `${e.batch ?? e.id} ${e.target} ${e.actor}`));
+  const day = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v);
+  const near = (d: string, ts: string): boolean => Math.abs(Date.parse(d) - Date.parse(ts.slice(0, 10))) <= 86_400_000;
+  const out = new Set<number>();
+  for (const e of events) {
+    if (e.kind !== 'edit' || !e.batch || !moves.has(`${e.batch} ${e.target} ${e.actor}`)) continue;
+    const emptied = (e.to === null || e.to === undefined || e.to === '') && day(e.from);
+    if (emptied || (day(e.to) && near(e.to, e.ts))) out.add(e.rowid);
+  }
+  return out;
+}
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
   const reasons = reasonsOf(events);
+  const folded = finishedDays(events);
   const said = events.flatMap((e, i): { e: EventLine; last: boolean; item: NewsItem }[] => {
+    if (folded.has(e.rowid)) return [];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
     if (reasons.folded.has(e.rowid)) return [];
