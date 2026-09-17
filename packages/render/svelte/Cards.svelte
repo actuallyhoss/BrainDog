@@ -66,7 +66,7 @@
             {#if L.figure >= 0}
               <span class="cards-figure"
                 ><span class="cards-value num"
-                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span>
+                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>
                     <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text nodes={nodes(r, L.figure)} {opts} />{/if}</span
                 >{@render labelled(L.figure)}</span
               >

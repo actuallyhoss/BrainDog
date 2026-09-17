@@ -494,7 +494,7 @@ function amount(value: string, o: RenderOptions): string {
   if (symbol) return escape(symbol);
   const coded = leadingCode(value);
   return coded
-    ? `<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest, o), o)}`
+    ? `${escape(coded.sign)}<span class="amount-code">${escape(coded.currency)}</span> ${renderInline(inline(coded.rest, o), o)}`
     : renderInline(inline(value, o), o);
 }
 

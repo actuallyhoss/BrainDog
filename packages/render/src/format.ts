@@ -63,9 +63,11 @@ export function money(minor: number, currency: string): string {
  * starts with a code" rather than a regex in every component. Three capitals, one space, then a
  * digit or a minus: anything else is not a figure this module wrote, and comes back `null`.
  */
-export function leadingCode(text: string): { currency: string; rest: string } | null {
-  const m = /^([A-Z]{3}) (?=[\u2212\-\d])/u.exec(text);
-  return m ? { currency: m[1]!, rest: text.slice(m[0].length) } : null;
+export function leadingCode(text: string): { currency: string; rest: string; sign: string } | null {
+  /* A SIGN WRITTEN IN FRONT OF THE CODE IS PART OF THE FIGURE. A page may mark an amount as money in or money out
+     ("+GBP 850.00"), and read as not a figure at all the whole cell stayed in the code’s spelling, in a column of symbols. */
+  const m = /^([+\u2212-]?)([A-Z]{3}) (?=[\u2212\-\d])/u.exec(text);
+  return m ? { currency: m[2]!, rest: text.slice(m[0].length), sign: m[1] ?? '' } : null;
 }
 
 /**
@@ -90,7 +92,7 @@ export function symbolFigure(text: string): string | null {
   }
   if (!symbol || symbol.toUpperCase() === coded.currency) return null;
   const minus = /^[\u2212-]/u.exec(coded.rest)?.[0] ?? '';
-  return `${minus}${symbol}${coded.rest.slice(minus.length)}`;
+  return `${coded.sign}${minus}${symbol}${coded.rest.slice(minus.length)}`;
 }
 
 /**

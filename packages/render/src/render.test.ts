@@ -1526,9 +1526,13 @@ test('AN EMPTY CELL KEEPS ITS PLACE ON THE CARD AND STILL READS AS MISSING', () 
 
 
 test('A LEADING CURRENCY CODE is split from the amount money() wrote, and nothing else is', () => {
-  assert.deepEqual(leadingCode(money(2_832_000, 'GBP')), { currency: 'GBP', rest: '28,320.00' });
-  assert.deepEqual(leadingCode(money(-129_900, 'EGP')), { currency: 'EGP', rest: '\u22121,299.00' });
-  assert.deepEqual(leadingCode('USD -5.00'), { currency: 'USD', rest: '-5.00' });
+  assert.deepEqual(leadingCode(money(2_832_000, 'GBP')), { currency: 'GBP', rest: '28,320.00', sign: '' });
+  assert.deepEqual(leadingCode(money(-129_900, 'EGP')), { currency: 'EGP', rest: '\u22121,299.00', sign: '' });
+  assert.deepEqual(leadingCode('USD -5.00'), { currency: 'USD', rest: '-5.00', sign: '' });
+  /* A COLUMN THAT MARKS MONEY IN AND MONEY OUT writes the sign in front of the code, and the figure is still a figure. */
+  assert.deepEqual(leadingCode('+GBP 850.00'), { currency: 'GBP', rest: '850.00', sign: '+' });
+  assert.equal(symbolFigure('+GBP 850.00'), '+\u00a3850.00');
+  assert.equal(symbolFigure('\u2212GBP 850.00'), '\u2212\u00a3850.00');
   for (const not of ['VAT quarter to 31 Aug', 'GBP', 'Over 30 days', 'gbp 5.00', 'GBPX 5.00', ''])
     assert.equal(leadingCode(not), null, not);
 });
