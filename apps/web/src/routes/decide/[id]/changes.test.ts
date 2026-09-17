@@ -84,3 +84,19 @@ test('an instant the formatter left alone reads as a day', async () => {
   assert.equal(dated('people#2'), 'people#2');
   assert.equal(dated(null), null);
 });
+
+test('a typed token in a diffed field reads as what it draws, and one that does not parse stays', async () => {
+  const { diffBlock, filled } = await import('./changes.ts');
+  assert.equal(filled('Target {{money:1840000 GBP}} by May'), 'Target GBP 18,400.00 by May');
+  assert.equal(filled('{{money:12 gbp}}'), '{{money:12 gbp}}');
+  const lines = diffBlock('Raise {{money:1840000 GBP}}\nkeep', 'Raise {{money:2000000 GBP}}\nkeep').rows.map((r) => r.cells[0] ?? '');
+  assert.ok(lines.every((l) => !l.includes('{{')), lines.join(' | '));
+});
+
+test('THE SAMPLE DIFFS DRAW NO RAW TOKEN', () => {
+  for (const q of QUESTIONS) {
+    for (const u of updatesOf(ROWSETS[q.id], REGISTERS, ROWS, (r, f, v) => display(r, f, v))) {
+      for (const c of u.changes) if (c.long) for (const r of c.block.rows) assert.ok(!/\{\{/u.test(r.cells[0] ?? ''), `${q.id} ${u.at}: ${r.cells[0]}`);
+    }
+  }
+});

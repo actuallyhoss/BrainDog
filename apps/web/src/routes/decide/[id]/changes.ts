@@ -8,7 +8,7 @@
  * PURE: the declarations, the rows and the formatter are handed in, so `node --test` reads it.
  */
 
-import { day, diffRows, type Block } from 'braindog-render';
+import { TYPED, day, diffRows, formatTyped, type Block, type TypedForm } from 'braindog-render';
 
 /**
  * AN INSTANT THE FORMATTER HANDED BACK UNTOUCHED IS DRAWN AS A DAY, the way every other date in the
@@ -42,11 +42,21 @@ const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 
 const text = (v: unknown): string => (v === null || v === undefined ? '' : typeof v === 'string' ? v : JSON.stringify(v));
 
-/** A `diff` block, as a fence of `- `, `+ ` and two-space rows would parse. */
+/**
+ * A TYPED TOKEN IN A FIELD READS AS WHAT IT DRAWS. The diff primitive prints its lines verbatim, which
+ * is right for a skill's source but put `{{money:1840000 GBP}}` on both sides of a note's change. The
+ * question asks whether the words should change, so the words are filled first; a token whose
+ * argument does not parse stays as the author typed it.
+ */
+const TOKEN = new RegExp(String.raw`\{\{(${TYPED.join('|')}):([^{}|]*)\}\}`, 'gu');
+export const filled = (s: string, now?: number): string =>
+  s.replace(TOKEN, (whole, form: string, arg: string) => formatTyped(form as TypedForm, arg, now) ?? whole);
+
+/** A `diff` block, as a fence of `- `, `+ ` and two-space rows would parse, with typed tokens filled. */
 export const diffBlock = (before: string, after: string): Block => ({
   type: 'block',
   kind: 'diff',
-  rows: diffRows(before, after).map((line) => ({ cells: [line] })),
+  rows: diffRows(filled(before), filled(after)).map((line) => ({ cells: [line] })),
   raw: '',
   start: 0,
   end: 0,
