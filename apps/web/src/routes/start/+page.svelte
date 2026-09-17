@@ -32,7 +32,7 @@
   import { firstRun } from '$lib/first-run.ts';
   import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
-  import { carriedDocument, dayOf, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
+  import { carriedDocument, dayOf, formedFor, forms, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
@@ -228,6 +228,8 @@
   /** A use case the person chose over the suggestion, by id. Kept while they keep typing. */
   let picked_use = $state<string | null>(null);
   const proposal = $derived<UseCase | null>(USE_CASES.find((u) => u.usecase === picked_use) ?? arranged?.pick ?? null);
+  /** What the proposed use case forms around the sentence it was read from: the guide's plan for a podcast. `null` when nothing. */
+  const formed = $derived(proposal && arranged ? formedFor(proposal, arranged.from) : null);
   /** The other use cases for one person that the sentence also described, installed after the proposal: Student beside Personal. */
   const beside = $derived<UseCase[]>(arranged ? alongside(arranged, proposal) : []);
 
@@ -296,7 +298,9 @@
     const now = read;
     if (!now || now.declined === 'empty' || now.declined === 'language' || (now.declined !== null && !proposal)) return [];
     const person = heard?.name ?? null;
-    const own = proposal ? [proposal, ...beside].flatMap(listsOf).map((l) => ({ id: l.id, name: l.name, rows: [] as { title: string; note: string | null }[] })) : [];
+    /* THE PLAN FORMED FROM THE SENTENCE IS SAID BEFORE IT IS MADE: the milestones a podcast passes, under Milestones. */
+    const formedRows = (list: string) => (formed?.seeds ?? []).filter((s) => s.register === list && list === 'milestones').map((s) => ({ title: String((s.fields as Record<string, unknown>).what ?? ''), note: null }));
+    const own = proposal ? [proposal, ...beside].flatMap(listsOf).map((l) => ({ id: l.id, name: l.name, rows: formedRows(l.id) as { title: string; note: string | null }[] })) : [];
     return [...own, ...modulesToTurnOn(now, person !== null, proposal).map((id) => ({
       id,
       name: packName(id),
@@ -378,7 +382,10 @@
          pack already here that is off is turned on; one that is here and on is left as it is. Then each use case the
          sentence described beside it, so the proposed one goes in first and its voice is the one the record speaks in. */
       for (const one of u ? [u, ...beside] : []) {
-        const doc = carriedDocument(one, dayOf(Date.now()));
+        /* THE PROPOSED USE CASE IS MADE FOR WHAT WAS SAID, when it forms around it (`formedFor`); one beside it keeps its examples. */
+        const said = one === u ? (arranged?.from ?? about) : null;
+        const plan = formedFor(one, said);
+        const doc = carriedDocument(one, dayOf(Date.now()), said);
         if (!doc) continue;
         const id = String(doc.pack);
         const state = installed.find((p) => p.id === id);
@@ -408,6 +415,7 @@
                 link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
               },
               one.usecase,
+              plan ? { links: plan.links } : undefined,
             );
           }
         }
@@ -908,6 +916,7 @@
                 {#if listsOf(proposal).length > 0}<li>{firstRun.useLists(firstRun.shapeAnd(listsOf(proposal).map((l) => l.name)))}</li>{/if}
                 {#if proposal.modules.length > 0}<li>{firstRun.useBuildsOn(firstRun.shapeAnd(proposal.modules.map(packName)))}</li>{/if}
                 {#if beside.length > 0}<li>{firstRun.useBeside(firstRun.shapeAnd(beside.map((b) => b.title)))}</li>{/if}
+                {#if formed}<li>{firstRun.useFormed(formed.name)}</li>{:else if forms(proposal)}<li>{firstRun.useFormHint}</li>{/if}
                 <li>{said_as(proposal)}</li>
               </ul>
             {:else}

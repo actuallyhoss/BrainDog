@@ -111,6 +111,9 @@ export const formedFor = (u: UseCase, said: string | null | undefined): FormedPl
 
 export type { FormedPlan };
 
+/** Whether a use case forms its examples around what the person says, so onboarding can ask what the project is. */
+export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
+
 /**
  * The pack a use case carries, with its voice as settings and its examples' days counted from today, or `null`. Given what
  * the person said, a use case that forms around it carries that plan as its examples instead of its own (`formedFor`).

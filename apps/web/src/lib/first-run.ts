@@ -54,6 +54,9 @@ export const firstRun = {
   useBeside: (names: string) => `Adds ${names} as well, from what you said.`,
   useVoice: (tone: string, lines: string) => `In a voice that is ${tone}: ${lines}.`,
   useHouseVoice: 'Speaks in the house voice.',
+  /* A USE CASE THAT FORMS AROUND WHAT WAS SAID (the guide): what it made from the sentence, or the one thing to add. */
+  useFormed: (name: string) => `Its milestones, first steps and choices are for ${name}, from what you said.`,
+  useFormHint: 'Say what the project is, such as a podcast, a shop or an app, and its milestones and first steps are made for it.',
   useQuoted: (line: string) => `“${line}”`,
   shapeHeard: 'What I heard',
   shapeRecord: 'Your record',
