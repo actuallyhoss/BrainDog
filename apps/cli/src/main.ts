@@ -21,6 +21,7 @@ import { parseArgs } from 'node:util';
 
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
+import { importCommand } from './import.ts';
 import { installInto, profilesOf } from './install.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
@@ -70,6 +71,8 @@ const usage = () =>
     '  Read a use-case file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
     'braindog usecase install <file|url> [--host <host>]',
     '  Ask the owner to install a shared use case: files a proposal and prints its link on Decide. Nothing is installed until they accept it.',
+    'braindog import legacy <export.json> [--host <host>] [--dry-run]',
+    '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
@@ -172,8 +175,8 @@ async function keysCommand(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog skills|tools|page|usecase`, over the real terminal, and the exit code the command decides. */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase', args: string[]): Promise<void> {
+/** `braindog skills|tools|page|usecase|import`, over the real terminal, and the exit code the command decides. */
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'import', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -189,7 +192,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase', args
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : await pageCommand(args, io);
+    which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : await pageCommand(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -262,7 +265,7 @@ try {
   if (command === 'mcp') await mcp(rest);
   else if (command === 'login') await signIn(rest);
   else if (command === 'keys') await keysCommand(rest);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase') await agentCommand(command, rest);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'import') await agentCommand(command, rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
