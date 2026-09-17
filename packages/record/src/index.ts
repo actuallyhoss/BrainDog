@@ -1068,14 +1068,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         } catch {
           shows = false;
         }
-      return { id: e.id, kind: e.kind, title: titled(e), modules: e.modules, showsAgents: shows };
+      return { id: e.id, kind: e.kind, title: titled(e), modules: e.modules, showsAgents: shows, skills: e.skills };
     });
     const seen = noticeUsage(usage, offered);
     /* ASKED: anything Spark filed, in any state, and anything anybody filed that is still open. */
     const asked = new Map<string, { id: string; status: string }>();
     const waiting: { id: string; question: string }[] = [];
     for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string }>(
-      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
+      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
       SPARK,
     )) {
       try {
@@ -1086,6 +1086,83 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (row.opened_by === SPARK && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
     }
     return { usage, offered, ...seen, asked, waiting };
+  };
+
+  /**
+   * Spark's proposals filed on Decide: the model's, when one is configured and answers something valid, else the rules'.
+   * The one filing path, for the owner's press and for the daily run alike.
+   *
+   * EVERY ARRANGEMENT GOES THROUGH `prepare`, the door a token's proposal goes through, and a row it offers (a skill) through
+   * the kernel's own check of a rowset; all are filed as `spark`, which may suggest and write nothing else (`kernel/spark.ts`).
+   * A draft already asked, in any state, is not asked again, so a dismissal holds; no more than `SPARK_OPEN_CAP` wait at once.
+   */
+  const sparkFile = async () => {
+    const r = sparkReading();
+    let drafts: SparkDraft[] = r.drafts;
+    let by = 'rules';
+    const dropped: string[] = [];
+    const model = deps.sparkModel;
+    if (model && r.quiet === null) {
+      try {
+        const raw = await model.draft({
+          usage: r.usage,
+          noticed: r.noticed,
+          rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
+          offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
+          kinds: ['pack', 'settings', 'arrange'],
+          most: SPARK_OPEN_CAP,
+        });
+        const got = fromModel(raw, model.name);
+        dropped.push(...got.dropped);
+        if (got.drafts.length > 0) {
+          drafts = got.drafts;
+          by = model.name;
+        } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
+      } catch {
+        dropped.push("The model did not answer, so Spark's own rules drafted these.");
+      }
+    }
+    const filed: { id: string; question: string; by: string }[] = [];
+    const skipped: { question: string; why: string }[] = [];
+    for (const d of drafts) {
+      if (r.asked.has(d.key)) {
+        skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+        continue;
+      }
+      if (r.waiting.length + filed.length >= SPARK_OPEN_CAP) {
+        skipped.push({ question: d.question, why: `${SPARK_OPEN_CAP} of Spark's questions are already waiting on Decide.` });
+        continue;
+      }
+      const prepared = d.body_kind === 'rowset' ? ok(d.body) : await arrangement.prepare(d.body_kind, d.body);
+      if (!prepared.ok) {
+        skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
+        continue;
+      }
+      const key = stableKey(prepared.value);
+      if (r.asked.has(key)) {
+        skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+        continue;
+      }
+      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SPARK);
+      if (!put.ok) {
+        skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
+        continue;
+      }
+      r.asked.set(key, { id: put.value.id, status: 'open' });
+      filed.push({ id: put.value.id, question: d.question, by: d.by });
+    }
+    return { by, filed, skipped, dropped };
+  };
+
+  /**
+   * WHETHER SPARK RUNS ON ITS OWN, and the day it last did. Kept as Spark's own two prefs (`pref`, person `spark`): the
+   * record's, not a person's, local to this copy as every pref is, and no migration. On unless the owner turned it off.
+   */
+  const SPARK_DAILY = 'spark.daily';
+  const SPARK_LAST = 'spark.last';
+  const sparkDailyState = () => {
+    const prefs = kernel.prefsOf(SPARK);
+    return { on: prefs[SPARK_DAILY] !== false, last: typeof prefs[SPARK_LAST] === 'string' ? (prefs[SPARK_LAST] as string) : null };
   };
 
   /* A USE CASE SHARED AS A FILE, and one planned here (`usecase.ts`). */
@@ -1973,76 +2050,53 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, asked: r.asked.get(d.key) ?? null })),
         waiting: r.waiting,
         cap: SPARK_OPEN_CAP,
+        daily: sparkDailyState(),
       });
     },
 
     /**
-     * Put Spark's proposals on Decide: the model's, when one is configured and answers something valid, else the rules'.
-     *
-     * EVERY DRAFT GOES THROUGH `prepare`, the door a token's proposal goes through, and is filed as `spark`, which may
-     * suggest and write nothing else (`kernel/spark.ts`). A draft already asked, in any state, is not asked again, so a
-     * dismissal holds; and no more than `SPARK_OPEN_CAP` of Spark's questions wait at once.
+     * Put Spark's proposals on Decide now (`sparkFile`): the model's, when one is configured and answers something valid,
+     * else the rules'. Never one already asked, and never more than `SPARK_OPEN_CAP` waiting.
      */
     async sparkPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'ask Spark to put questions on Decide');
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, []);
       if (extra) return { ok: false as const, refusal: extra };
-      const r = sparkReading();
-      let drafts: SparkDraft[] = r.drafts;
-      let by = 'rules';
-      const dropped: string[] = [];
-      const model = deps.sparkModel;
-      if (model && r.quiet === null) {
-        try {
-          const raw = await model.draft({
-            usage: r.usage,
-            noticed: r.noticed,
-            rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
-            offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
-            kinds: ['pack', 'settings', 'arrange'],
-            most: SPARK_OPEN_CAP,
-          });
-          const got = fromModel(raw, model.name);
-          dropped.push(...got.dropped);
-          if (got.drafts.length > 0) {
-            drafts = got.drafts;
-            by = model.name;
-          } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
-        } catch {
-          dropped.push("The model did not answer, so Spark's own rules drafted these.");
-        }
-      }
-      const filed: { id: string; question: string; by: string }[] = [];
-      const skipped: { question: string; why: string }[] = [];
-      for (const d of drafts) {
-        if (r.asked.has(d.key)) {
-          skipped.push({ question: d.question, why: 'Spark has asked this before.' });
-          continue;
-        }
-        if (r.waiting.length + filed.length >= SPARK_OPEN_CAP) {
-          skipped.push({ question: d.question, why: `${SPARK_OPEN_CAP} of Spark's questions are already waiting on Decide.` });
-          continue;
-        }
-        const prepared = await arrangement.prepare(d.body_kind, d.body);
-        if (!prepared.ok) {
-          skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
-          continue;
-        }
-        const key = stableKey(prepared.value);
-        if (r.asked.has(key)) {
-          skipped.push({ question: d.question, why: 'Spark has asked this before.' });
-          continue;
-        }
-        const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SPARK);
-        if (!put.ok) {
-          skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
-          continue;
-        }
-        r.asked.set(key, { id: put.value.id, status: 'open' });
-        filed.push({ id: put.value.id, question: d.question, by: d.by });
-      }
-      return tail(ok({ by, filed, skipped, dropped }));
+      return tail(ok(await sparkFile()));
+    },
+
+    /**
+     * Whether Spark looks once a day on its own and puts what it finds on Decide. On by default; the owner's to turn off.
+     *
+     * AN OWNER'S, IN A BROWSER, as the press is: turning it on is asking Spark to file questions without a press each time.
+     * It is not an event, for the reason a pref is not: it changes when Spark asks, and nothing in the record's history.
+     */
+    async sparkDaily(args: { on?: unknown } | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'choose whether Spark looks on its own');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['on']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.on !== 'boolean') return no('VALUE_MALFORMED', 'on is true to let Spark look once a day on its own, or false to wait for your press.', { at: 'on' });
+      kernel.setPref(SPARK, SPARK_DAILY, args.on ? null : false);
+      return ok(sparkDailyState());
+    },
+
+    /**
+     * SPARK'S DAILY RUN, for a host's tick and never routed: once a UTC day at most, unless the owner turned it off. The day
+     * is kept before the work, so a run that throws or a model that hangs is not retried until tomorrow. Everything after is
+     * the press's own path, so the cap of three and a dismissal holding are the same here.
+     */
+    async sparkTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
+      if (kernel.refused()) return { ran: false, why: 'unopened' };
+      const state = sparkDailyState();
+      if (!state.on) return { ran: false, why: 'off' };
+      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      if (state.last === today) return { ran: false, why: 'today' };
+      kernel.setPref(SPARK, SPARK_LAST, today);
+      const out = await sparkFile();
+      if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
+      return { ran: true, ...out };
     },
 
     /**

@@ -34,6 +34,8 @@ export type SeedCatalogueEntry = {
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
   afterInstall?: (io: LinkIo) => Promise<unknown>;
   carry?: (io: CarryIo, from: string) => Promise<number>;
+  /** The skills a use case names for agents, which Spark offers once it is on. */
+  skills?: readonly { name: string; trigger: string }[];
 };
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -86,6 +88,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     afterInstall: (io) => linkExamples(io, u.usecase),
     /* AN UPDATE FROM BEFORE A VERSION THAT READS WHAT IS LOGGED moves what was typed into the log (`links.ts`). */
     carry: (io, from) => carryForward(io, u.usecase, from, today()),
+    skills: u.skills,
   }));
   return [
     ...modules,

@@ -3,7 +3,8 @@
  *
  * TIER A READ A SENTENCE; THIS READS THE RECORD. Which lists grow, which pages are opened, what nothing has touched in a
  * quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
- * proposals in the three kinds an agent already files (`pack`, `settings`, `arrange`), each with its reason as the question.
+ * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case names),
+ * each with its reason as the question. The words it may change are only those the speaking use case declares (S8).
  *
  * IT RECOMMENDS AND NEVER REARRANGES (§5c, `docs/29` §1). Nothing here writes a row, a pack or a setting. A draft becomes a
  * question only through `arranger().prepare`, the same door and the same validation a token's proposal goes through, and
@@ -19,6 +20,7 @@
 
 import type { Sql } from '@braindog/ports';
 import type { Kernel } from '@braindog/kernel';
+import { labelSetting, voiceSetting } from '@braindog/declare';
 
 const DAY_MS = 86_400_000;
 
@@ -32,6 +34,15 @@ const QUIET_DAYS = 90;
 const YOUNG_DAYS = 14;
 /** Another use case's lists take this many times the speaking one's new rows, and at least `VOICE.rows`, before the voice is questioned. */
 const VOICE = { ratio: 3, rows: 10 };
+/** A page opened this many times, on this many separate days, in thirty days names what it shows in the person's own word. */
+const OPENED = { opens: 5, days: 3 };
+/** Agents make at least this share of the changes to rows in thirty days before the voice is asked to say so. */
+const AGENT_SHARE = 2 / 3;
+/** A label a page title may lend a list is a word or a few, as a label is (`declare` `usecase.ts`). */
+const LABEL_MOST = 40;
+/** How Home heads its recent changes when agents do most of the work, and when no agent has worked in a quarter. */
+export const AGENTS_LINE = 'What you and your agents did since you last looked';
+export const QUIET_LINE = 'Since you last looked';
 /** At most this many arrangement questions open at once (ADR-051). */
 export const SPARK_OPEN_CAP = 3;
 
@@ -55,7 +66,26 @@ export type ListUse = {
   declaredAt: string;
 };
 
-export type PageUse = { slug: string; title: string; pack: string | null; registers: string[]; opens30: number; opens90: number; lastOpened: string | null; declaredAt: string };
+export type PageUse = {
+  slug: string;
+  title: string;
+  /** Whether `title` is the page's own words, and not its slug standing in for a title filled per row. */
+  titled: boolean;
+  pack: string | null;
+  registers: string[];
+  opens30: number;
+  /** On how many separate days it was opened in thirty days. */
+  openDays30: number;
+  opens90: number;
+  lastOpened: string | null;
+  declaredAt: string;
+};
+
+/** One of the speaking use case's words: a voice line or a label, as declared and as it reads now. */
+export type ToneSetting = { title: string | null; default: string | null; value: string | null };
+
+/** The speaking use case's words by setting name (`voice_home`, `label_tickets`): only the text settings it declares. */
+export type Tone = { pack: string; settings: Record<string, ToneSetting> };
 
 export type AgentUse = { actor: string; writes30: number; days30: number; lists: string[] };
 
@@ -74,17 +104,23 @@ export type Usage = {
   packs: PackUse[];
   /** The use case this record speaks in now, or `null` for the house voice. */
   speaking: string | null;
+  /** Changes to rows in thirty days, by anybody and by agents, and by agents in ninety. */
+  writes: { all30: number; agents30: number; agents90: number };
+  /** The words the speaking use case declares and what each says now, or `null` when the house voice speaks. */
+  tone: Tone | null;
+  /** The skill names the record holds, or `null` when it has no Skills list. */
+  skills: string[] | null;
 };
 
 /** A thing Spark noticed, said in one sentence. */
-export type Noticed = { kind: 'grows' | 'agents' | 'unopened' | 'untouched' | 'voice' | 'young'; subject: string; text: string };
+export type Noticed = { kind: 'grows' | 'agents' | 'unopened' | 'untouched' | 'voice' | 'young' | 'label' | 'skills'; subject: string; text: string };
 
 /** A proposal Spark would file: the question is its reason, and the body is what `propose` takes. */
 export type SparkDraft = {
   /** What it is about, stable across readings, so the same draft is recognised once it has been asked. */
   key: string;
   question: string;
-  body_kind: 'pack' | 'settings' | 'arrange';
+  body_kind: 'pack' | 'settings' | 'arrange' | 'rowset';
   body: Record<string, unknown>;
   /** Who drafted it: the rules, or the model named. */
   by: string;
@@ -97,6 +133,8 @@ export type Offered = {
   modules: readonly string[];
   /** Whether the pack's own pages show what agents are doing, so it is worth offering when agents write here. */
   showsAgents: boolean;
+  /** The skills a use case names for agents working in it (`research-spark.md` S9), offered once it is on. */
+  skills?: readonly { name: string; trigger: string }[] | undefined;
 };
 
 const isAgent = (actor: string): boolean => /^S\d+$/u.test(actor) || actor.startsWith('agent:') || actor === 'spark';
@@ -163,6 +201,7 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
   /* WRITES IN NINETY DAYS, by actor, list and day: one pass over the log for both "untouched" and "what agents write". */
   const writes90 = new Map<string, number>();
   const agentWrites30 = new Map<string, number>();
+  const writes = { all30: 0, agents30: 0, agents90: 0 };
   const agents = new Map<string, { writes30: number; days: Set<string>; lists: Map<string, number> }>();
   for (const r of sql.all<{ actor: string; register: string; day: string; n: number }>(
     `SELECT e.actor AS actor, en.register AS register, substr(e.ts, 1, 10) AS day, count(*) AS n
@@ -173,7 +212,10 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
   )) {
     const n = Number(r.n);
     writes90.set(r.register, (writes90.get(r.register) ?? 0) + n);
+    if (r.day >= day30) writes.all30 += n;
+    if (isAgent(r.actor)) writes.agents90 += n;
     if (r.day >= day30 && isAgent(r.actor)) {
+      writes.agents30 += n;
       agentWrites30.set(r.register, (agentWrites30.get(r.register) ?? 0) + n);
       const a = agents.get(r.actor) ?? { writes30: 0, days: new Set<string>(), lists: new Map<string, number>() };
       a.writes30 += n;
@@ -186,8 +228,12 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
   const observed = (kind: string, from: string) =>
     new Map(
       sql
-        .all<{ subject: string; n: number; last: string }>('SELECT subject, sum(n) AS n, max(day) AS last FROM observation WHERE kind = ? AND day >= ? GROUP BY subject', kind, from)
-        .map((r) => [r.subject, { n: Number(r.n), last: r.last }]),
+        .all<{ subject: string; n: number; last: string; days: number }>(
+          'SELECT subject, sum(n) AS n, max(day) AS last, count(DISTINCT day) AS days FROM observation WHERE kind = ? AND day >= ? GROUP BY subject',
+          kind,
+          from,
+        )
+        .map((r) => [r.subject, { n: Number(r.n), last: r.last, days: Number(r.days) }]),
     );
   const reads90 = observed('register.read', day90);
   const opens90 = observed('page.render', day90);
@@ -220,12 +266,15 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
       });
     } else if (!('for' in body)) {
       /* A PAGE PER ROW is opened under each row's slug, so it is not judged by its template's. */
+      const titled = typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{');
       pages.push({
         slug: bare,
-        title: typeof body.title === 'string' && !body.title.includes('{{') ? body.title : bare,
+        title: titled ? String(body.title) : bare,
+        titled,
         pack: d.pack,
         registers: registersIn(body),
         opens30: opens30.get(bare)?.n ?? 0,
+        openDays30: opens30.get(bare)?.days ?? 0,
         opens90: opens90.get(bare)?.n ?? 0,
         lastOpened: opens90.get(bare)?.last ?? null,
         declaredAt: d.created_at,
@@ -250,7 +299,35 @@ export function readUsage(sql: Sql, kernel: Kernel, nowMs: number, titles: Reado
       .sort((a, b) => b.writes30 - a.writes30),
     packs,
     speaking,
+    writes,
+    tone: speaking === null ? null : toneOf(kernel, speaking),
+    skills: kernel.register('skills')
+      ? sql
+          .all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL")
+          .flatMap((r) => (typeof r.name === 'string' ? [r.name] : []))
+      : null,
   };
+}
+
+/** A setting that is one of a use case's words: a voice line, a label, a list's singular or what it holds. */
+const WORDS = /^(voice_|label_|one_|holds_|lk_)/u;
+
+/** The speaking use case's words, as it declares them and as they read now. */
+function toneOf(kernel: Kernel, pack: string): Tone | null {
+  const read = kernel.packConfig(pack);
+  if (!read.ok) return null;
+  const settings: Record<string, ToneSetting> = {};
+  const values = read.value.values as Record<string, unknown>;
+  for (const [name, decl] of Object.entries(read.value.config as Record<string, { type?: unknown; label?: unknown; default?: unknown }>)) {
+    if (!WORDS.test(name) || decl?.type !== 'text') continue;
+    const now = values[name];
+    settings[name] = {
+      title: typeof decl.label === 'string' ? decl.label : null,
+      default: typeof decl.default === 'string' ? decl.default : null,
+      value: typeof now === 'string' && now.trim() !== '' ? now : null,
+    };
+  }
+  return { pack, settings };
 }
 
 /** The lists a page body draws from, by its blocks' `source: register.<id>`. */
@@ -403,6 +480,89 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
     }
   }
 
+  /* THE WORDS FOLLOW USE, and only words the speaking use case declares, so every draft is a setting `prepare` can check.
+     A page over one list that the person keeps opening names that list in their own word: the list is offered that word. */
+  const tone = usage.tone;
+  if (tone !== null) {
+    const worded = new Set<string>();
+    for (const p of [...usage.pages].sort((a, b) => b.opens30 - a.opens30)) {
+      if (!p.titled || p.registers.length !== 1 || p.opens30 < OPENED.opens || p.openDays30 < OPENED.days) continue;
+      const list = usage.lists.find((l) => l.id === p.registers[0]);
+      if (!list || worded.has(list.id)) continue;
+      const setting = labelSetting(list.id);
+      const held = tone.settings[setting];
+      if (!held) continue;
+      const word = held.value ?? list.name;
+      const title = p.title.trim();
+      if (title.length > LABEL_MOST || title.toLowerCase() === word.toLowerCase()) continue;
+      worded.add(list.id);
+      noticed.push({ kind: 'label', subject: list.id, text: `You opened ${title}, a page of ${word}, ${plural(p.opens30, 'time')} in the last thirty days.` });
+      drafts.push({
+        key: '',
+        question: `Call ${word} ${title} everywhere? You opened the ${title} page, which shows ${word}, ${plural(p.opens30, 'time')} on ${p.openDays30} separate days in the last thirty days.`,
+        body_kind: 'settings',
+        body: { pack: tone.pack, values: { [setting]: title } },
+        by: 'rules',
+      });
+    }
+
+    /* HOME SAYS WHO DID THE WORK. Agents making most of the changes are named in how Home heads them; a heading that names
+       agents when none has worked in a quarter goes back to the use case's own line, or a plain one. */
+    const awaySetting = voiceSetting('since_away');
+    const away = tone.settings[awaySetting];
+    if (away) {
+      const line = away.value ?? away.default ?? '';
+      const namesAgents = /agent/iu.test(line);
+      const byAgents = working.length > 0 && usage.writes.agents30 >= AGENT_SHARE * usage.writes.all30;
+      if (byAgents && !namesAgents) {
+        drafts.push({
+          key: '',
+          question: `Head what changed on Home "${AGENTS_LINE}"? Agents made ${usage.writes.agents30} of the ${plural(usage.writes.all30, 'change')} here in the last thirty days, and "${line}" does not say so.`,
+          body_kind: 'settings',
+          body: { pack: tone.pack, values: { [awaySetting]: AGENTS_LINE } },
+          by: 'rules',
+        });
+      } else if (namesAgents && usage.writes.agents90 === 0 && usage.ageDays >= QUIET_DAYS) {
+        const back = away.value !== null && away.default !== null && away.value !== away.default && !/agent/iu.test(away.default);
+        const to = back ? away.default! : QUIET_LINE;
+        drafts.push({
+          key: '',
+          question: `Head what changed on Home "${to}" instead of "${line}"? No agent has changed anything here in ninety days.`,
+          body_kind: 'settings',
+          body: { pack: tone.pack, values: { [awaySetting]: back ? null : QUIET_LINE } },
+          by: 'rules',
+        });
+      }
+    }
+  }
+
+  /* THE SKILLS A USE CASE NAMES (S9), once it is on and the record keeps skills: each one it does not hold yet is a row for
+     the owner to accept, never one written for them. */
+  if (usage.skills !== null) {
+    const held = new Set(usage.skills);
+    const missing = offered
+      .filter((o) => o.kind === 'usecase' && usage.packs.some((p) => p.id === o.id && p.on))
+      .flatMap((o) => (o.skills ?? []).filter((s) => !held.has(s.name)).map((s) => ({ o, s })));
+    const naming = [...new Set(missing.map(({ o }) => o.title))];
+    if (missing.length > 0)
+      noticed.push({
+        kind: 'skills',
+        subject: missing.map(({ s }) => s.name).join(','),
+        text: `${joinNames(naming)} ${naming.length === 1 ? 'names' : 'name'} ${missing.length === 1 ? 'a skill' : 'skills'} for agents that your Skills list does not hold: ${joinNames(missing.map(({ s }) => s.name))}.`,
+      });
+    for (const { o, s } of missing)
+      drafts.push({
+        key: '',
+        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${s.trigger}, and your Skills list has no skill by that name.`,
+        body_kind: 'rowset',
+        body: {
+          register: 'skills',
+          rows: [{ name: s.name, trigger: s.trigger, what: `A skill ${o.title} names for agents working here.`, kind: 'skill', body: `Use this skill ${s.trigger}.\n\n${o.title} names it. Its steps are not written yet.\n` }],
+        },
+        by: 'rules',
+      });
+  }
+
   /* A YOUNG RECORD IS WATCHED, NOT ADVISED. What was noticed is still said; nothing is proposed yet. */
   if (usage.firstWrite === null || usage.ageDays < YOUNG_DAYS)
     return {
@@ -480,7 +640,15 @@ export function fromModel(raw: unknown, name: string, most = SPARK_OPEN_CAP): { 
 /** What a body is about, for recognising it once asked: the pack it names, the use case, or the pages it adds. */
 export function stableKey(body: Record<string, unknown>): string {
   for (const k of ['install', 'enable', 'disable', 'usecase'] as const) if (typeof body[k] === 'string') return `${k}:${body[k]}`;
-  if (typeof body.pack === 'string') return `settings:${body.pack}:${Object.keys((body.values as object) ?? {}).sort().join(',')}`;
+  /* A SETTINGS CHANGE IS WHAT IT SETS, so turning a line one way and back again are two questions, and each is asked once. */
+  if (typeof body.pack === 'string')
+    return `settings:${body.pack}:${Object.entries((body.values as Record<string, unknown>) ?? {})
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => `${k}=${JSON.stringify(v ?? null)}`)
+      .join(',')}`;
+  /* A ROW SPARK OFFERS is recognised by its list and its title, so a skill declined is not offered again. */
+  if (typeof body.register === 'string' && Array.isArray(body.rows))
+    return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown })?.name ?? (r as { what?: unknown })?.what ?? '')).sort().join(',')}`;
   if (body.voice && typeof body.voice === 'object') return `voice:${Object.keys(body.voice).sort().join(',')}`;
   if (Array.isArray(body.pages)) return `pages:${body.pages.map((p) => String((p as { id?: unknown })?.id)).sort().join(',')}`;
   return JSON.stringify(body).slice(0, 120);

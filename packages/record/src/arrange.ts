@@ -58,6 +58,8 @@ export type CatalogueEntry = {
    * proposal or any other caller, after the install and before its examples are linked. OPTIONAL, and never a reason to fail.
    */
   carry?: (io: CarryIo, from: string) => Promise<number>;
+  /** The skills a use case names for agents working in it, which Spark offers once it is on (`loop/research-spark.md` S9). */
+  skills?: readonly { name: string; trigger: string }[] | undefined;
 };
 
 /** The rows of a list, and one link set on one row, as the owner who accepted. */
