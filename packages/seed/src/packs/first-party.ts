@@ -38,7 +38,24 @@ const SUMMARIES: Record<FirstPartyId, string> = {
   work: 'Tasks, the threads of work they belong to, and how each thread is going.',
 };
 
-const VERSION = '1.0.0';
+/**
+ * EACH PACK'S OWN VERSION. A record is offered an update when the version here is later than the one it installed, so a
+ * pack whose declarations or settings change goes up, and one that did not stays where it is: nobody is asked to update
+ * Estate because Work gained a field. A new field, page, figure or setting is a minor step; a list or field taken away is
+ * a major one. `test/pack-versions.test.ts` holds each version to what it declares, and fails when a pack changes and its
+ * version does not.
+ *
+ * - money-core 1.1.0: the home currency is chosen from a list.
+ * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
+ *   Board pages, and the figures under them.
+ */
+export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
+  portfolio: '1.0.0',
+  people: '1.0.0',
+  'money-core': '1.1.0',
+  estate: '1.0.0',
+  work: '1.1.0',
+};
 
 type Body = Record<string, unknown>;
 
@@ -125,7 +142,7 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
     for (const r of leansOn(d)) if (!own.has(r)) any.add(`register.${r}`);
   }
   const links = [...any].filter((r) => !needs.has(r)).sort();
-  return { id, version: VERSION, requires: [...needs].sort(), provides: mine.map(idOf).sort(), links };
+  return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links };
 }
 
 /** The block kinds whose first column is what they group by, so they say nothing once it is gone. */
@@ -197,7 +214,7 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
   };
   return {
     pack: id,
-    version: VERSION,
+    version: FIRST_PARTY_VERSIONS[id as FirstPartyId],
     summary: SUMMARIES[id as FirstPartyId],
     author: 'BrainDog',
     license: 'MIT',

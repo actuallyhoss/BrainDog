@@ -25,7 +25,7 @@ import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type Json, type Kerne
 import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './packs/agents.ts';
 
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
-export { FIRST_PARTY, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
+export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, OBLIGATIONS, cashSeries } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
