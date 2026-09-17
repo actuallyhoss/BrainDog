@@ -19,11 +19,35 @@ import { homePageOf } from './install.ts';
 
 type Body = Record<string, unknown>;
 
+/**
+ * THE HOUSE SETUP'S MODULES, for a use case that carries no pack and names none (Small business): what onboarding installs
+ * for a business when the sentence names nothing in particular, less the agents pack, which is added when agents are
+ * mentioned. Browse installs these, so the house setup is installed like the others rather than only switched to.
+ */
+export const HOUSE_MODULES: readonly string[] = ['portfolio', 'people', 'money-core', 'estate', 'work'];
+
+/** The modules browse installs for a use case: its own, or the house setup's for one that carries nothing. */
+export const modulesToInstall = (u: UseCase): readonly string[] => (u.pack === null && u.modules.length === 0 ? HOUSE_MODULES : u.modules);
+
 /** A built-in use case as a shared file's document, its examples dated from `today`. `null` for an id that is not one. */
 export function builtInFile(id: string, today: string = dayOf(Date.now())): Body | null {
   const u = useCase(id);
   if (!u) return null;
-  return { ...u, pack: u.pack === null ? null : dated(u.pack, today) } as unknown as Body;
+  return { ...u, modules: [...modulesToInstall(u)], pack: u.pack === null ? null : dated(u.pack, today) } as unknown as Body;
+}
+
+/** What a use case's detail page says it installs, read from the file: modules, lists, pages, example rows and skills. */
+export type Installs = { modules: string[]; lists: string[]; pages: { title: string; section: string | null }[]; examples: number; skills: { name: string; trigger: string }[] };
+
+export function installsOf(u: UseCase): Installs {
+  const seeds = Array.isArray(u.pack?.seeds) ? (u.pack.seeds as unknown[]).length : 0;
+  return {
+    modules: [...modulesToInstall(u)],
+    lists: listsOf(u).map((l) => u.labels[l.id] ?? l.name),
+    pages: pagesOf(u).map((p) => ({ title: p.title, section: p.section })),
+    examples: seeds,
+    skills: u.skills.map((k) => ({ name: k.name, trigger: k.trigger })),
+  };
 }
 
 export type Heading = { text: string } | { voice: VoiceKey; text: string | null };
