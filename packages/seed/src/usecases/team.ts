@@ -383,31 +383,40 @@ const set = (v: unknown): boolean => v !== undefined && v !== null && v !== '';
 
 /**
  * Copy each ticket of Team 1.x to a task, with its cycle and points on the cycle plan. Answers how many tickets were
- * copied. The tickets stay where they are, under Earlier tickets. A ticket whose title a task already has is taken as
- * copied, so running it twice copies nothing twice; a refused write is skipped.
+ * copied. The tickets stay where they are, under Earlier tickets. A ticket is taken as copied only when a task already
+ * says what its copy would say (title, state, priority and note), one task for one ticket, so running it twice copies
+ * nothing twice, and neither a second ticket with the same title nor a task somebody typed with it stands in for a
+ * ticket. A refused write is skipped.
  */
 export async function moveTickets(io: TicketIo): Promise<number> {
   const tickets = (await io.rows('tickets').catch(() => null)) ?? [];
   if (tickets.length === 0) return 0;
   const titles = async (): Promise<readonly { seq: number | null; fields: Record<string, unknown> }[]> => (await io.rows('tasks').catch(() => null)) ?? [];
-  const had = new Set((await titles()).map((t) => String(t.fields.what)));
+  /* WHAT A COPY SAYS, as a count per shape, so each task already there answers for one ticket and no more. */
+  const shape = (f: Record<string, unknown>): string => JSON.stringify([String(f.what ?? ''), String(f.state ?? ''), String(f.priority ?? ''), String(f.note ?? '')]);
+  const had = new Map<string, number>();
+  for (const t of await titles()) had.set(shape(t.fields), (had.get(shape(t.fields)) ?? 0) + 1);
   let moved = 0;
   for (const ticket of [...tickets].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))) {
     const f = ticket.fields;
     const what = String(f.what ?? '');
-    if (what === '' || had.has(what)) continue;
+    if (what === '') continue;
     const state = TICKET_STATES[String(f.state)] ?? 'open';
     const fields: Record<string, unknown> = { what, state };
     if (set(f.priority)) fields.priority = f.priority;
+    if (set(f.note)) fields.note = f.note;
+    const copied = had.get(shape(fields)) ?? 0;
+    if (copied > 0) {
+      had.set(shape(fields), copied - 1);
+      continue;
+    }
     if (set(f.owner)) fields.owner = f.owner;
     if (set(f.agent)) fields.agent = f.agent;
     if (set(f.due)) fields.by = f.due;
-    if (set(f.note)) fields.note = f.note;
     if (Array.isArray(f.tags) && f.tags.length > 0) fields.tags = f.tags;
     /* A FINISHED TICKET KEEPS THE DAY IT WAS LAST CHANGED as the day it was done, rather than the day of the update. */
     if ((state === 'done' || state === 'dropped') && typeof ticket.updated_at === 'string') fields.done_on = ticket.updated_at.slice(0, 10);
     if (!(await io.create('tasks', fields).catch(() => false))) continue;
-    had.add(what);
     moved += 1;
     if (!set(f.cycle) && !set(f.points)) continue;
     const task = (await titles()).filter((t) => t.fields.what === what && t.seq !== null).sort((a, b) => (b.seq ?? 0) - (a.seq ?? 0))[0];
