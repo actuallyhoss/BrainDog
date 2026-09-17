@@ -35,6 +35,7 @@ import {
   AUDIENCES,
   type Audience,
   type Diff,
+  type ExampleLink,
   type Installed,
   type Pack,
   type PackSource,
@@ -172,6 +173,8 @@ export function useCases(d: UseCaseDeps) {
 
     const registers = new Map(declarations.filter((b) => typeof b.register === 'string').map((b) => [String(b.register), b]));
     const examples: { register: string; fields: Body }[] = [];
+    /* EACH PICKED ROW AS IT IS HELD, so a link between two picked rows goes out by their titles (a seed carries none). */
+    const picked = new Map<string, { register: string; fields: Body }>();
     for (const [register, seqs] of Object.entries(args.examples ?? {})) {
       const decl = registers.get(register);
       if (!decl)
@@ -186,6 +189,29 @@ export function useCases(d: UseCaseDeps) {
         const row = read.value.find((r) => r.seq === seq);
         if (!row) return refuse('OUT_OF_BOUNDS', `${register} has no row ${seq}.`, `examples.${register}`);
         examples.push({ register, fields: exampleFields(decl, row.fields) });
+        const one = { register, fields: row.fields };
+        picked.set(`${register}#${seq}`, one);
+        /* A LINK IS HELD AS THE ROW'S ID, and said as `register#seq` when it was written that way. */
+        const held = (row as { id?: unknown }).id;
+        if (typeof held === 'string') picked.set(held, one);
+      }
+    }
+
+    const links: ExampleLink[] = [];
+    const titleOf = (register: string, fields: Body): string | null => {
+      const field = registers.get(register)?.title;
+      const value = typeof field === 'string' ? fields[field] : undefined;
+      return typeof value === 'string' && value.trim() !== '' ? value : null;
+    };
+    for (const row of new Set(picked.values())) {
+      const title = titleOf(row.register, row.fields);
+      const fields = registers.get(row.register)?.fields;
+      if (title === null || !Array.isArray(fields)) continue;
+      for (const field of fields as Body[]) {
+        if (field.type !== 'ref' || typeof field.id !== 'string') continue;
+        const target = picked.get(String(row.fields[field.id] ?? ''));
+        const named = target ? titleOf(target.register, target.fields) : null;
+        if (target && named !== null) links.push({ register: row.register, title, field: field.id, to: target.register, target: named });
       }
     }
 
@@ -224,6 +250,7 @@ export function useCases(d: UseCaseDeps) {
       ...(args.signals === undefined ? {} : { signals: args.signals }),
       ...(skills.length === 0 ? {} : { skills }),
       ...(nav.length === 0 ? {} : { nav }),
+      ...(links.length === 0 ? {} : { links }),
     });
     if (!built.ok) return built;
     /* THE FILE IS READ BACK THROUGH THE DOOR IT WILL COME IN BY, so a picked row holding a credential is refused here,

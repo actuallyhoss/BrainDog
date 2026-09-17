@@ -74,9 +74,22 @@ export type UseCase = {
    * second record draws the lists in id order. Applied as the reader's own nav order, which they can change.
    */
   nav: string[];
+  /**
+   * How its example rows point at each other, which a seed cannot say (a seed carries no link): the example titled `title`
+   * in `register` points its `field` at the example titled `target` in `to`. Made after the install through the ordinary
+   * write path, and only between rows that are still examples, so a file that shares its own lists shares their links too.
+   */
+  links: ExampleLink[];
 };
 
-const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills', 'nav'];
+/** One link between two example rows, by their titles. */
+export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
+
+const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills', 'nav', 'links'];
+const LINK_KEYS = ['register', 'title', 'field', 'to', 'target'];
+const LINK_NAME = /^[a-z][a-z0-9_]{0,63}$/;
+const LINKS_CEILING = 256;
+const LINK_TITLE_BYTES = 200;
 const ID = /^[a-z][a-z0-9-]{1,40}$/;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 const SIGNAL = /^[a-z0-9][a-z0-9 '-]{0,39}$/;
@@ -270,6 +283,22 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
   if (pack === null && Object.keys(labels).length > 0)
     return malformed('Labels are kept as the settings of the pack a use case carries, so a use case with labels carries a pack.', 'labels');
 
+  const links = doc.links ?? [];
+  if (!Array.isArray(links) || links.length > LINKS_CEILING)
+    return no('VALUE_MALFORMED', `links is a list of up to ${LINKS_CEILING} links between example rows.`, { at: 'links' });
+  for (const [i, link] of links.entries()) {
+    const at = `links[${i}]`;
+    if (!isObject(link)) return malformed('A link says register, title, field, to and target.', at);
+    const stray = Object.keys(link).find((k) => !LINK_KEYS.includes(k));
+    if (stray !== undefined) return no('FIELD_UNKNOWN', `A link has no ${stray}. It says ${LINK_KEYS.join(', ')}.`, { at: `${at}.${stray}`, allowed: LINK_KEYS });
+    for (const key of ['register', 'field', 'to'] as const)
+      if (typeof link[key] !== 'string' || !LINK_NAME.test(link[key]))
+        return no('VALUE_MALFORMED', `${at}.${key} is the id of a ${key === 'field' ? 'field' : 'list'}, such as ${key === 'field' ? 'course' : 'courses'}.`, { at: `${at}.${key}` });
+    for (const key of ['title', 'target'] as const)
+      if (!text(link[key], LINK_TITLE_BYTES))
+        return no('VALUE_MALFORMED', `${at}.${key} is the title of an example row, a line of at most ${LINK_TITLE_BYTES} bytes.`, { at: `${at}.${key}` });
+  }
+
   const skills = doc.skills ?? [];
   if (!Array.isArray(skills) || skills.some((s) => !isObject(s) || typeof s.name !== 'string' || !SKILL.test(s.name) || !text(s.trigger, 400)))
     return no('VALUE_MALFORMED', 'A skill is a name in lower case with hyphens and the moment to reach for it.', { at: 'skills' });
@@ -290,6 +319,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     pack,
     skills: (skills as { name: string; trigger: string }[]).map((s) => ({ name: s.name, trigger: s.trigger })),
     nav: [...(nav as string[])],
+    links: (links as ExampleLink[]).map((l) => ({ register: l.register, title: l.title, field: l.field, to: l.to, target: l.target })),
   });
 }
 

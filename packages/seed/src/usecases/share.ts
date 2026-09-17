@@ -16,6 +16,7 @@ import type { UseCase, VoiceKey } from '@braindog/declare';
 import { dated, dayOf } from './dates.ts';
 import { listsOf, pagesOf, useCase } from './index.ts';
 import { homePageOf } from './install.ts';
+import { exampleLinks } from './links.ts';
 
 type Body = Record<string, unknown>;
 
@@ -33,7 +34,9 @@ export const modulesToInstall = (u: UseCase): readonly string[] => (u.pack === n
 export function builtInFile(id: string, today: string = dayOf(Date.now())): Body | null {
   const u = useCase(id);
   if (!u) return null;
-  return { ...u, modules: [...modulesToInstall(u)], pack: u.pack === null ? null : dated(u.pack, today) } as unknown as Body;
+  /* ITS LINKS GO IN THE FILE, so a built-in use case is linked by the same declared path as one somebody shared. */
+  const links = exampleLinks(id);
+  return { ...u, modules: [...modulesToInstall(u)], pack: u.pack === null ? null : dated(u.pack, today), ...(links.length > 0 ? { links: [...links] } : {}) } as unknown as Body;
 }
 
 /** What a use case's detail page says it installs, read from the file: modules, lists, pages, example rows and skills. */

@@ -258,3 +258,29 @@ test('AN ADDRESS IS READ BY THE HOST FOR AN OWNER, AND REFUSED WHERE THE HOST RE
   assert.equal(refusal(await bare.fetchUseCase({ url: 'https://files.example.org/a.json' }, owner)).code, 'PULL_ORIGIN_REFUSED');
   sql.close();
 });
+
+test('A LINK BETWEEN TWO PICKED ROWS GOES OUT BY THEIR TITLES, and one to a row not picked does not', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const club = useCasePack({
+    ...(normaliseUseCase({ usecase: 'club', version: '1.0.0', title: 'Club', summary: 'A reading club.', author: 'Me', license: 'MIT', audience: 'other', tone: 'plain' }) as { value: Parameters<typeof useCasePack>[0] }).value,
+    pack: {
+      pack: 'usecase-club',
+      requires: { format: 1, primitives: 1, packs: {} },
+      declarations: [
+        { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'tags', type: 'list', of: 'text' }] },
+        { register: 'meetings', name: 'Meetings', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'book', type: 'ref', to: 'books' }, { id: 'tags', type: 'list', of: 'text' }] },
+      ],
+    },
+  })!;
+  await install(api, club);
+  value(await api.create({ register: 'books', fields: { name: 'Middlemarch' } }, owner));
+  value(await api.create({ register: 'books', fields: { name: 'Kept to myself' } }, owner));
+  value(await api.create({ register: 'meetings', fields: { what: 'First meeting', book: 'books#1' } }, owner));
+  value(await api.create({ register: 'meetings', fields: { what: 'Second meeting', book: 'books#2' } }, owner));
+  const out = value<Exported>(await api.exportUseCase({ examples: { books: [1], meetings: [1, 2] } }, owner));
+  assert.deepEqual(out.doc.links, [{ register: 'meetings', title: 'First meeting', field: 'book', to: 'books', target: 'Middlemarch' }]);
+  const read = normaliseUseCase(out.doc);
+  assert.ok(read.ok && read.value.links.length === 1, 'the file reads back with its link');
+  sql.close();
+});

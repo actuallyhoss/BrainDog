@@ -11,12 +11,18 @@
  * A write that is refused is skipped: an unlinked example is not worth failing an install over.
  */
 
-import { firstPartyDocument } from '../packs/first-party.ts';
+import { FIRST_PARTY, firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
 import { PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
+
+/**
+ * WHAT A FILE SAYS OF ITS OWN LINKS (`UseCase.links`), and the declarations it installs, so a use case shared under an id
+ * this build has never heard of links its examples too. The lists' title fields are read from those declarations first.
+ */
+export type DeclaredLinks = { links: readonly ExampleLink[]; declarations?: readonly Record<string, unknown>[] };
 
 /** A row as the linker reads it. */
 export type LinkRow = { seq: number | null; fields: Record<string, unknown> };
@@ -64,29 +70,36 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
 export const exampleLinks = (usecase: string): readonly ExampleLink[] => LINKS[usecase.replace(/^usecase-/u, '')] ?? [];
 
 /** The field a list's rows are titled by, read off the pack the use case carries or a first-party module it builds on. */
-export function titleFieldOf(usecase: string, register: string): string | undefined {
+export function titleFieldOf(usecase: string, register: string, carried: readonly Record<string, unknown>[] = []): string | undefined {
   const u = useCase(usecase.replace(/^usecase-/u, ''));
   const declarations = [
+    ...carried,
     ...((u?.pack?.declarations ?? []) as Record<string, unknown>[]),
     ...(u?.modules ?? []).flatMap((m) => (firstPartyDocument(m)?.declarations ?? []) as Record<string, unknown>[]),
   ];
-  const title = declarations.find((d) => d.register === register && d.page === undefined)?.title;
+  const found = declarations.find((d) => d.register === register && d.page === undefined && typeof d.title === 'string')?.title;
+  /* A LIST OF A MODULE THE USE CASE DOES NOT NAME, which a shared file under its own id may still link to. */
+  const title = found ?? (FIRST_PARTY as readonly string[]).flatMap((m) => (firstPartyDocument(m)?.declarations ?? []) as Record<string, unknown>[]).find((d) => d.register === register && d.page === undefined)?.title;
   return typeof title === 'string' ? title : undefined;
 }
 
 const isExample = (row: LinkRow): boolean => Array.isArray(row.fields.tags) && (row.fields.tags as unknown[]).includes('example');
 const empty = (v: unknown): boolean => v === undefined || v === null || v === '';
 
-/** Link a use case's example rows to each other. Answers how many links were made; never throws for a refusal. */
-export async function linkExamples(io: LinkIo, usecase: string): Promise<number> {
-  const links = exampleLinks(usecase);
+/**
+ * Link a use case's example rows to each other: by the links its file declares, or else the built-in ones for its id.
+ * Answers how many links were made; never throws for a refusal.
+ */
+export async function linkExamples(io: LinkIo, usecase: string, declared?: DeclaredLinks): Promise<number> {
+  const links = declared && declared.links.length > 0 ? declared.links : exampleLinks(usecase);
+  const carried = declared?.declarations ?? [];
   const read = new Map<string, readonly LinkRow[]>();
   const rowsOf = async (register: string): Promise<readonly LinkRow[]> => {
     if (!read.has(register)) read.set(register, (await io.rows(register).catch(() => null)) ?? []);
     return read.get(register) ?? [];
   };
   const find = async (register: string, title: string): Promise<LinkRow | undefined> => {
-    const field = titleFieldOf(usecase, register);
+    const field = titleFieldOf(usecase, register, carried);
     if (field === undefined) return undefined;
     return (await rowsOf(register)).find((r) => isExample(r) && r.fields[field] === title);
   };

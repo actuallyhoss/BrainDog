@@ -21,7 +21,7 @@ import { validateDeclaration } from '@braindog/kernel';
 
 import { credentialKey, credentialValue } from './credentials.ts';
 import { normalise, SEEDS_PER_REGISTER, type Pack, type PackSource } from './index.ts';
-import { normaliseUseCase, packIdOf, useCasePack, type Audience, type UseCase, type VoiceKey } from './usecase.ts';
+import { normaliseUseCase, packIdOf, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
 
 /** The most a shared use case may weigh, in bytes of its file. The built-in five are each under 40 KB. */
 export const SHARED_MOST_BYTES = 256 * 1024;
@@ -131,6 +131,8 @@ export type ExportParts = {
   skills?: readonly { name: string; trigger: string }[];
   /** The rail's order, as addresses of the pages and lists this file carries (`UseCase.nav`). */
   nav?: readonly string[];
+  /** How the picked examples point at each other, by title (`UseCase.links`). */
+  links?: readonly ExampleLink[];
 };
 
 /**
@@ -175,6 +177,7 @@ export function exportUseCase(parts: ExportParts): Result<Record<string, unknown
       : null,
     skills: (parts.skills ?? []).map((s) => ({ name: s.name, trigger: s.trigger })),
     ...(parts.nav !== undefined && parts.nav.length > 0 ? { nav: [...parts.nav] } : {}),
+    ...(parts.links !== undefined && parts.links.length > 0 ? { links: parts.links.map((l) => ({ ...l })) } : {}),
   };
   const checked = normaliseUseCase(doc);
   if (!checked.ok) return checked as Result<Record<string, unknown>>;

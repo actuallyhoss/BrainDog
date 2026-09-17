@@ -12,7 +12,7 @@
  * PURE, AND THEREFORE TESTABLE, for the reason `packs.ts` gives: the screen only assigns.
  */
 
-import { linkExamples } from '@braindog/seed/usecases/links';
+import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
@@ -148,6 +148,8 @@ export type SharedPlan = {
   usecase: { id: string; title: string; version: string; summary: string; author: string };
   /** The rail order the file carries, as addresses, applied as the reader's own once it is installed. */
   nav: string[];
+  /** How the file's example rows point at each other, by title, made once they are in (`UseCase.links`). */
+  links: ExampleLink[];
   enable: string[];
   packs: SharedPack[];
   approve: string[];
@@ -179,7 +181,7 @@ function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; 
 }
 
 /** The record's plan, in the screen's words. `null` for an answer this build does not recognise. */
-export function sharedPlanOf(value: unknown, nav: readonly string[] = []): SharedPlan | null {
+export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links: readonly ExampleLink[] = []): SharedPlan | null {
   if (!isMap(value) || !isMap(value.usecase) || !Array.isArray(value.packs)) return null;
   const u = value.usecase;
   const packs: SharedPack[] = [];
@@ -207,6 +209,7 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = []): Share
   return {
     usecase: { id: String(u.usecase ?? ''), title: String(u.title ?? ''), version: String(u.version ?? ''), summary: String(u.summary ?? ''), author: String(u.author ?? '') },
     nav: [...nav],
+    links: links.map((l) => ({ ...l })),
     enable: strings(value.enable),
     packs,
     approve: strings(value.approve),
@@ -241,7 +244,7 @@ export async function planShared(
     const refusal = refusalOf(out);
     return { ok: false, fix: refusal.fix, code: refusal.code };
   }
-  const plan = sharedPlanOf(out.value, read.value.usecase.nav);
+  const plan = sharedPlanOf(out.value, read.value.usecase.nav, read.value.usecase.links);
   return plan ? { ok: true, plan } : { ok: false, fix: copy.writeRaced, code: null };
 }
 
@@ -296,6 +299,10 @@ export async function afterInstall(
       link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
     },
     plan.usecase.id,
+    {
+      links: plan.links,
+      declarations: plan.packs.flatMap((p) => (Array.isArray(p.doc.declarations) ? (p.doc.declarations as Body[]) : [])),
+    },
   );
   return { links, nav: plan.nav.length === 0 ? null : withOrder(plan.nav, arrangement) };
 }

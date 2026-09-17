@@ -126,3 +126,30 @@ test('ON A REAL RECORD, A STUDENT, A GUIDE AND A TEAM OPEN WITH THEIR EXAMPLES L
     sql.close();
   }
 });
+
+test('A FILE UNDER ITS OWN ID LINKS ITS EXAMPLES BY THE LINKS IT DECLARES, reading title fields from its declarations', async () => {
+  const rows: Record<string, LinkRow[]> = {
+    books: [{ seq: 3, fields: { name: 'Middlemarch', tags: ['example'] } }],
+    meetings: [{ seq: 1, fields: { what: 'First meeting', tags: ['example'] } }],
+    accounts: [{ seq: 7, fields: { name: 'Club kitty', tags: ['example'] } }],
+    dues: [{ seq: 2, fields: { what: 'Autumn dues', tags: ['example'] } }],
+  };
+  const made: [string, number, string, string][] = [];
+  const io: LinkIo = { rows: async (r) => rows[r] ?? null, link: async (r, seq, field, spoken) => (made.push([r, seq, field, spoken]), true) };
+  const declarations = [
+    { register: 'books', title: 'name' },
+    { register: 'meetings', title: 'what' },
+    { register: 'dues', title: 'what' },
+  ];
+  assert.equal(await linkExamples(io, 'reading-club'), 0, 'an id this build does not know has no links of its own');
+  const links = [
+    { register: 'meetings', title: 'First meeting', field: 'book', to: 'books', target: 'Middlemarch' },
+    /* A MODULE'S LIST THE FILE DOES NOT DECLARE is read by its first-party title field. */
+    { register: 'dues', title: 'Autumn dues', field: 'account', to: 'accounts', target: 'Club kitty' },
+  ];
+  assert.equal(await linkExamples(io, 'reading-club', { links, declarations }), 2);
+  assert.deepEqual(made, [
+    ['meetings', 1, 'book', 'books#3'],
+    ['dues', 2, 'account', 'accounts#7'],
+  ]);
+});
