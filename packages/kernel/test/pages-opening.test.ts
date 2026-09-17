@@ -283,7 +283,7 @@ test('A PROGRESS BUDGET READS ITS ROWS AND THE FIGURE IT SPENT, which groups by 
   assert.equal(k.block(budget).readings, undefined, 'a goal names no figure');
   assert.equal(k.block({ ...budget, spent: 'nonesuch' }).refusals[0]?.code, 'METRIC_UNKNOWN');
   assert.equal(k.block({ ...budget, spent: 'by-month' }).refusals[0]?.code, 'DECLARATION_INVALID');
-  assert.equal(k.block({ ...budget, spent: 3 }).refusals[0]?.at, 'spent');
+  assert.equal(k.block({ ...budget, spent: 3 as unknown as string }).refusals[0]?.at, 'spent');
 });
 
 test("A PAGE SAYS WHAT THE RECORD'S CLOCK READ, so a host draws today from the record", async () => {
