@@ -81,9 +81,9 @@ test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND BOTH ENGI
   ROWS.milestones = SAID.map((done, i) => ({ ...things[at]!, id: `m_${i}`, seq: i + 1, fields: { what: `Milestone ${i + 1}`, thing: things[at]!.seq, done } }));
   const sample = rings(page('portfolio')!.blocks.find((b) => b.heading === 'In play')!);
 
-  assert.match(live, /25 %/u, live);
-  assert.match(sample, /25 %/u, sample);
-  for (const typed of ['60 %', '85 %']) {
+  assert.match(live, /25%/u, live);
+  assert.match(sample, /25%/u, sample);
+  for (const typed of ['60%', '85%']) {
     assert.ok(live.includes(typed), `the record's ${typed} was drawn over`);
     assert.ok(sample.includes(typed), `the sample's ${typed} was drawn over`);
   }

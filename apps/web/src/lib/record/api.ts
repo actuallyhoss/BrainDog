@@ -366,6 +366,9 @@ export function display(
   if (value === null || value === undefined || value === '') return null;
   /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). */
   if (Array.isArray(value)) return listLine(value);
+  /* AN AGENT BY ITS NAME: the field holds what the agent signs with, `claude`, and a card read "claude" beside "Changed by
+     Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
+  if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
   const f = decl(register, field);
   if (!f) return String(value);
   switch (f.type) {
@@ -414,7 +417,8 @@ export function display(
          not: `1200 d` was a number nobody reads as one thousand two hundred. */
       const n = Number(value);
       const shown = Number.isFinite(n) ? n.toLocaleString('en-GB', { maximumFractionDigits: 3 }) : String(value);
-      return `${shown}${f.unit ? ` ${f.unit}` : ''}`;
+      /* A PERCENTAGE SITS ON ITS FIGURE, "60%", as every share on the screen is written; another unit keeps its space. */
+      return `${shown}${f.unit ? `${f.unit === '%' ? '' : ' '}${f.unit}` : ''}`;
     }
     case 'bool':
       return value ? 'yes' : 'no';

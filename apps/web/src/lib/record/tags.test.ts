@@ -18,3 +18,8 @@ test("display says a list without the record's own tags, with a space after each
   assert.equal(display('no_such_list', 'tags', ['formed', 'example']), null);
   assert.equal(display('no_such_list', 'tags', ['audio', 'gear']), 'audio, gear');
 });
+
+test("an agent's field says the agent by its name, Claude and not claude", () => {
+  assert.equal(display('no_such_list', 'agent', 'claude'), 'Claude');
+  assert.equal(display('no_such_list', 'agent', 'GPT-5 runner'), 'GPT-5 runner');
+});

@@ -98,7 +98,7 @@ test('THE OVERVIEW’S QUEUE IS THE PROJECTS SOMEBODY SAID ARE NOT GOING WELL, a
   const held = overview.blocks.find((b) => b.heading === 'With an agent')!;
   assert.deepEqual(held.rows.map((r) => String(r.cells.at(-1)).split(',')[0]), ['Claude', 'Cursor'], 'each project an agent holds names that agent');
   const cards = overview.blocks.find((b) => b.heading === 'In play')!;
-  assert.match(JSON.stringify(toSegments(cards)), /60 %/u, 'how far along is a proportion a ring can draw');
+  assert.match(JSON.stringify(toSegments(cards)), /60%/u, 'how far along is a proportion a ring can draw');
 });
 
 test('HOW THEY ARE GOING DRAWS EACH PART IN ITS INTENT, and a part nobody has said about stays neutral', () => {

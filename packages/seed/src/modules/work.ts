@@ -11,7 +11,7 @@ import { TODAY, day, days, hours, stamp, type Fields, type SeedMetric, type Seed
 
 export const TASKS: Fields[] = [
   { what: 'Chase Halden on 2026-041', state: 'review', thing: 2, agent: 'cursor', by: day(1), effort: days(0.2), note: 'Cursor drafted the chaser. Read it before it goes.' },
-  { what: 'Decide the licensing tier split', state: 'blocked', thing: 1, by: day(6), effort: days(1), note: 'Waiting on SG31.' },
+  { what: 'Decide the licensing tier split', state: 'blocked', thing: 1, by: day(6), effort: days(1), note: 'Waiting on the pricing question on Decide.' },
   /* THE REMEDY, AND IT USED TO BE THE CAUSE. This said "Move kilnfonts.example off auto-renew",
      and the service row two hundred lines down is `lapsing` BECAUSE auto-renew is off: the audit
      note says so in as many words, and the Kiln project's own document says letting it lapse
