@@ -227,6 +227,7 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
   for (const [id, u] of updates) if (install.includes(id) && !(saidByLead && kind === 'pack')) packLines.push(copy.arrangeUpdates(name(id), u.from, u.to));
   const beside = strings(body.alongside);
   if (beside.length && kind === 'arrange') packLines.push(copy.arrangeBeside(beside.map((id) => words(id))));
+  if (kind === 'pack' && text(body.keeps)) packLines.push(copy.arrangeKeepsVoice(words(text(body.keeps))));
   if (enable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOn(enable.map(name)));
   if (disable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOff(disable.map(name)));
   const registers = strings(body.registers).map((r) => listName(r, ctx));

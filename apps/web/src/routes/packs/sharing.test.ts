@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
 import { afterInstall, drawnOrder, installShared, moduleTitle, nothingElse, oneOf, relabelled, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { speaking } from '../../lib/voice.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -234,20 +235,21 @@ test('A SECOND USE CASE ASKS WHOSE VOICE IS KEPT, and the answer is kept whichev
   assert.deepEqual(voiceQuestion(student, 'personal'), { now: 'student', rule: 'speaks' });
   assert.deepEqual(voiceQuestion(student, 'team'), { now: 'student', rule: 'beside' });
 
-  /* ONLY WHAT THE RULE WOULD NOT DO: beside, though Personal sorts first, sets Personal not to speak, and nothing else. */
+  /* THE ANSWER IS WRITTEN DOWN WHOLE: the one speaking set to, every other one on set not to, whichever id sorts first. */
   const written = async (states: Parameters<typeof keepVoice>[1], adding: string, choice: 'speaks' | 'beside') => {
     const s = stub();
     await keepVoice(s.client, states, adding, choice);
     return s.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks]);
   };
-  assert.deepEqual(await written(student, 'personal', 'beside'), [['usecase-personal', false]]);
-  assert.deepEqual(await written(student, 'personal', 'speaks'), [], 'Personal speaks unasked');
-  assert.deepEqual(await written(student, 'team', 'beside'), [], 'Team goes beside unasked');
-  assert.deepEqual(await written(student, 'team', 'speaks'), [['usecase-team', true]]);
+  assert.deepEqual(await written(student, 'personal', 'beside'), [['usecase-student', true], ['usecase-personal', false]]);
+  assert.deepEqual(await written(student, 'personal', 'speaks'), [['usecase-student', false], ['usecase-personal', true]]);
+  assert.deepEqual(await written(student, 'team', 'beside'), [['usecase-student', true], ['usecase-team', false]]);
+  assert.deepEqual(await written(student, 'team', 'speaks'), [['usecase-student', false], ['usecase-team', true]]);
   /* ONE ALREADY CHOSEN TO SPEAK IS SET NOT TO when another takes the voice over. */
   const chosen = [{ ...state('usecase-student'), speaks: true }];
   assert.deepEqual(voiceQuestion(chosen, 'personal'), { now: 'student', rule: 'beside' });
-  assert.deepEqual(await written(chosen, 'personal', 'speaks'), [['usecase-personal', true], ['usecase-student', false]]);
+  assert.deepEqual(await written(chosen, 'personal', 'speaks'), [['usecase-student', false], ['usecase-personal', true]]);
+  assert.deepEqual(await written(chosen, 'personal', 'beside'), [['usecase-personal', false]], 'only what differs is written');
 
   /* READ BACK, THE RULE SPEAKS AS CHOSEN, and a card offers Switch to the one put beside. */
   const held: Record<string, boolean> = { 'usecase-personal': false, 'usecase-student': true };
@@ -337,4 +339,32 @@ test('A PLAN NAMES A MODULE BY ITS TITLE AND A PAGE FOR EACH ROW BY ITS LIST, ne
   assert.deepEqual(plan.packs[1]?.adds.map((a) => a.name), ['Organisations', 'A page for each organisation', 'Today']);
   assert.equal(moduleTitle('no-such-module'), 'No such module');
   assert.deepEqual(['Studies', 'Organisations', 'Classes', 'Status', 'Steps'].map(oneOf), ['study', 'organisation', 'class', 'status', 'step']);
+});
+
+test('WITH THREE USE CASES ON, ADDING ONE BESIDE NEVER CHANGES WHO SPEAKS, and exactly one speaks after every door', async () => {
+  const ids = ['usecase-art', 'usecase-guide', 'usecase-personal', 'usecase-student', 'usecase-team'];
+  /* Every way the two already on can hold the setting, and every use case added beside or taking over. */
+  const values = [undefined, null, true, false] as const;
+  for (const a of values)
+    for (const b of values) {
+      const states = [
+        { ...state('usecase-personal'), ...(a === undefined ? {} : { speaks: a }) },
+        { ...state('usecase-student'), ...(b === undefined ? {} : { speaks: b }) },
+      ];
+      const before = speaking(states)!;
+      for (const adding of ['art', 'team', 'guide']) {
+        for (const choice of ['beside', 'speaks'] as const) {
+          const s = stub();
+          await keepVoice(s.client, states, adding, choice);
+          const held = new Map<string, boolean | null | undefined>([...states.map((p) => [p.id, (p as { speaks?: boolean | null }).speaks] as const), [`usecase-${adding}`, null]]);
+          for (const [, args] of s.calls) held.set(String(args.id), (args.values as Record<string, boolean>).speaks);
+          const after = ids.filter((id) => held.has(id)).map((id) => ({ id, disabled_at: null, speaks: held.get(id) ?? null }));
+          const now = speaking(after);
+          assert.equal(now, choice === 'beside' ? before : `usecase-${adding}`, `${choice} ${adding} over ${JSON.stringify(states)}`);
+          /* WRITTEN DOWN: exactly one set to speak, so a fourth arriving by any id cannot move it. */
+          assert.deepEqual(after.filter((p) => p.speaks === true).map((p) => p.id), [now]);
+          assert.equal(speaking([...after, { id: 'usecase-aaa', disabled_at: null }]), now, 'a later use case sorting first took the voice');
+        }
+      }
+    }
 });

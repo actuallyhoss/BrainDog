@@ -159,6 +159,8 @@ test('AN UPDATE IS SAID AS ONE, with the versions it goes from and to, before an
   };
   const out = arrangedOf('pack', body);
   assert.equal(out?.lead, 'Updates Personal from 1.0.0 to 1.2.0');
+  const beside = arrangedOf('pack', { ...body, plan: [{ pack: 'usecase-personal', version: '1.2.0', adds: [] }], keeps: 'usecase-student' });
+  assert.deepEqual(beside?.parts.find((p) => p.part === 'packs'), { part: 'packs', lines: ['Student keeps its voice and Home'] });
   assert.equal(out?.parts.some((p) => p.part === 'packs'), false, 'the update was said twice');
   assert.deepEqual(appliedLines({ installed: ['usecase-personal'] }, body), ['Updated Personal from 1.0.0 to 1.2.0']);
 

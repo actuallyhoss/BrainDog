@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -109,6 +109,26 @@ export type ArrangeDeps = {
 /** A use case's pack starts with this, by `declare`'s own convention. */
 const USE_CASE = packIdOf('');
 
+/** The record's packs with each use case's `speaks` setting read, as the voice rule reads them. */
+const speakingStates = (kernel: Kernel) =>
+  kernel.packStates().map((p) => {
+    if (!p.id.startsWith(USE_CASE)) return { id: p.id, disabled_at: p.disabled_at };
+    const read = kernel.packConfig(p.id);
+    const said = read.ok ? read.value.values[SPEAKS] : null;
+    return { id: p.id, disabled_at: p.disabled_at, speaks: typeof said === 'boolean' ? said : null };
+  });
+
+/** The use case this record speaks in now, by the voice rule (`declare` `voiceWhenAdding`), or `null` for the house voice. */
+export const speakingNow = (kernel: Kernel): string | null => speakingPack(speakingStates(kernel));
+
+/**
+ * Write the voice rule down with `speaker` speaking (`declare` `voiceWrites`): it set to speak and every other use case on
+ * set not to, only where that differs. A pack that refuses the setting is passed over; the rule still names one speaker.
+ */
+export function writeVoice(kernel: Kernel, speaker: string, actor: string): void {
+  for (const w of voiceWrites(speakingStates(kernel), speaker)) kernel.setPackConfig(w.id, { [SPEAKS]: w.speaks }, { actor });
+}
+
 const isMap = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
 const refuse = <T>(code: Refusal['code'], fix: string, at?: string, allowed?: readonly string[]): Result<T> => ({
   ok: false,
@@ -143,7 +163,9 @@ export function arranger(d: ArrangeDeps) {
     const offered = offeredVersion(id, docs);
     return offered !== null && offered !== held.version && laterVersion(offered, held.version) === offered ? { from: held.version, to: offered } : null;
   };
-  const useCaseOn = (): string | null => states().find((s) => s.id.startsWith(USE_CASE) && s.disabled_at === null)?.id ?? null;
+  const speakerNow = (): string | null => speakingNow(kernel);
+  /* THE USE CASE SPEAKING, by the rule and the setting a person chose, never simply the first one on. */
+  const useCaseOn = (): string | null => speakerNow();
   const waiting = (): string[] => {
     const open = kernel.openSuggestions();
     return open.ok ? open.value.filter((r) => r.body_kind === 'arrange').map((r) => String(r.id)) : [];
@@ -417,9 +439,13 @@ export function arranger(d: ArrangeDeps) {
       const planned = await planAll(order.value.install, docs);
       if (!planned.ok) return planned;
       const entry = entryOf(target);
+      /* A USE CASE ADDED BESIDE THE ONE SPEAKING KEEPS THAT VOICE, and Decide says whose. An update changes no voice. */
+      const speaker = speakerNow();
+      const keeps = target.startsWith(USE_CASE) && !on(target) && speaker !== null && speaker !== target ? speaker : null;
       return ok({
         install: target,
         ...(entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
+        ...(keeps === null ? {} : { keeps }),
         packs: { install: order.value.install, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
         approve: planned.value.approve,
@@ -431,30 +457,18 @@ export function arranger(d: ArrangeDeps) {
     const packs = isMap(body.packs) ? body.packs : {};
     const lead = typeof body.usecase === 'string' ? packIdOf(body.usecase.replace(new RegExp(`^${USE_CASE}`), '')) : null;
     /* A USE CASE BESIDE THE ONE SPEAKING, by the voice rule every other door keeps (`declare` `voiceWhenAdding`): it
-       installs after the lead, and one that would take the voice over is refused rather than quietly changing it. */
+       installs after the lead and never changes who speaks, whichever way its id sorts, because accepting writes the
+       answer down (`apply`). */
     const beside: string[] = [];
     if (body.alongside !== undefined) {
       if (!Array.isArray(body.alongside) || body.alongside.some((x) => typeof x !== 'string'))
         return refuse('VALUE_MALFORMED', 'alongside is a list of use case ids from offer, such as ["student"].', 'body.alongside');
-      /* WITH THE `speaks` SETTING A PERSON CHOSE, so the one kept speaking is the one asked about. */
-      const speaks = (id: string): boolean | null => {
-        const v = id.startsWith(USE_CASE) ? kernel.packConfig(id) : null;
-        const said = v?.ok ? v.value.values[SPEAKS] : null;
-        return typeof said === 'boolean' ? said : null;
-      };
-      const speaking = [...states().map((p) => ({ ...p, speaks: speaks(p.id) })), ...(lead === null ? [] : [{ id: lead, disabled_at: null }])];
-      if (!speaking.some((p) => p.id.startsWith(USE_CASE) && p.disabled_at === null))
+      if (lead === null && speakerNow() === null)
         return refuse('REQUIRED_MISSING', 'A use case goes beside the one this BrainDog speaks in, and none is on. Name one as usecase, and the others beside it.', 'body.alongside');
       for (const [i, raw] of (body.alongside as string[]).entries()) {
         const id = packIdOf(raw.replace(new RegExp(`^${USE_CASE}`), ''));
         const entry = entryOf(id);
         if (!entry || entry.kind !== 'usecase') return notOffered(raw, `body.alongside[${i}]`);
-        if (voiceWhenAdding(speaking, id) === 'speaks')
-          return refuse(
-            'TRANSITION_ILLEGAL',
-            `${entry.title} would speak in place of the use case this BrainDog speaks in now, and beside it keeps that voice. Propose ${entry.title} as usecase, or leave it out.`,
-            `body.alongside[${i}]`,
-          );
         beside.push(id);
       }
     }
@@ -553,6 +567,7 @@ export function arranger(d: ArrangeDeps) {
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
+    const spokeBefore = speakerNow();
     for (const id of packs.install ?? []) {
       /* AN UPDATE THE OWNER ACCEPTED goes in over the pack that is on, unless that pack is already at the planned version. */
       const step = steps.find((s) => s.pack === id);
@@ -590,6 +605,16 @@ export function arranger(d: ArrangeDeps) {
       const off = kernel.disablePack(id, { actor });
       if (!off.ok) return stopped(off);
       done.disabled.push(id);
+    }
+    /* THE VOICE RULE, WRITTEN DOWN (`declare` `voiceWrites`). The use case an arrangement sets the record up for speaks;
+       any other use case this press added or turned on goes beside the one that spoke before, which keeps its voice. Every
+       use case on is then set to speak or not, so a third one, or an id that sorts first, never moves it. */
+    const lead = kind === 'arrange' && typeof body.usecase === 'string' ? packIdOf(body.usecase.replace(new RegExp(`^${USE_CASE}`), '')) : null;
+    const updated = new Set(steps.filter((s) => typeof s.from === 'string').map((s) => String(s.pack)));
+    const joined = [...done.installed.filter((id) => !updated.has(id)), ...done.enabled].filter((id) => id.startsWith(USE_CASE));
+    if (lead !== null || joined.length > 0) {
+      const speaker = (lead !== null && on(lead) ? lead : null) ?? (spokeBefore !== null && on(spokeBefore) ? spokeBefore : null) ?? speakerNow();
+      if (speaker !== null) writeVoice(kernel, speaker, actor);
     }
     for (const page of Array.isArray(body.pages) ? (body.pages as Body[]) : []) {
       const put = await kernel.install([{ id: String(page.id), kind: 'page', body: page.body as never }]);

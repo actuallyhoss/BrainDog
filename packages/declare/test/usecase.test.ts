@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
+import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
 
 const DOC = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   usecase: 'reading',
@@ -158,6 +158,28 @@ test('THE VOICE RULE: a use case added goes beside the one speaking, or takes th
   assert.equal(speakingPack([{ id: 'usecase-personal', disabled_at: null, speaks: false }, ...on('usecase-student')]), 'usecase-student');
   assert.equal(speakingPack([...on('usecase-personal'), { id: 'usecase-student', disabled_at: null, speaks: true }]), 'usecase-student');
   assert.equal(voiceWhenAdding([...on('usecase-student'), { id: 'usecase-personal', disabled_at: null, speaks: false }], 'team'), 'beside');
+  /* UNASKED, ONE A PERSON CHOSE TO SPEAK KEEPS THE VOICE, however the added id sorts. */
+  assert.equal(voiceWhenAdding([{ id: 'usecase-student', disabled_at: null, speaks: true }], 'personal'), 'beside');
   const carried = useCasePack({ ...(normaliseUseCase(DOC({})) as { value: UseCase }).value });
   assert.deepEqual((carried?.config as Record<string, unknown>)?.speaks, { type: 'bool', label: 'Speaks for this BrainDog' });
+});
+
+test('THE VOICE WRITTEN DOWN: exactly one use case on speaks, and no id sorting first moves it afterwards', () => {
+  const three = [
+    { id: 'usecase-personal', disabled_at: null },
+    { id: 'usecase-student', disabled_at: null, speaks: true },
+    { id: 'usecase-team', disabled_at: null, speaks: false },
+    { id: 'usecase-guide', disabled_at: '2026-09-17', speaks: true },
+  ];
+  assert.deepEqual(voiceWrites(three, 'usecase-team'), [
+    { id: 'usecase-student', speaks: false },
+    { id: 'usecase-team', speaks: true },
+    { id: 'usecase-personal', speaks: false },
+  ].sort((a, b) => three.findIndex((p) => p.id === a.id) - three.findIndex((p) => p.id === b.id)));
+  const after = three.map((p) => ({ ...p, ...(voiceWrites(three, 'usecase-team').find((w) => w.id === p.id) ?? {}) }));
+  assert.equal(speakingPack(after), 'usecase-team');
+  assert.equal(speakingPack([...after, { id: 'usecase-art', disabled_at: null }]), 'usecase-team', 'a use case added later took the voice');
+  assert.deepEqual(voiceWrites(after, 'usecase-team'), [], 'written twice');
+  assert.deepEqual(voiceWrites([{ id: 'usecase-personal', disabled_at: null }], 'usecase-personal'), [], 'one alone is not written');
+  assert.deepEqual(voiceWrites(three, 'usecase-guide'), [], 'a use case switched off is never made to speak');
 });

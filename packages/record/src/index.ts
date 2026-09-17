@@ -78,7 +78,7 @@ import {
 import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, type CatalogueEntry } from './arrange.ts';
+import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
@@ -2498,8 +2498,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AN UPDATE MOVES WHAT THE OLDER VERSION KEPT TYPED into the rows the newer one reads, here and not in a tab, so every
          caller that updates a use case does it (`arrange.ts` `carryUpdate`). */
       const from = state.packs.find((p) => p.id === pack.value.manifest.pack)?.version ?? null;
+      const spoke = speakingNow(kernel);
       const put = await install(pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]);
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
+      /* A USE CASE INSTALLED BESIDE THE ONE SPEAKING NEVER TAKES ITS VOICE (`declare` `voiceWhenAdding`), whichever way the ids
+         sort: the answer is written down. A person who chose the new one to speak says so with its setting after. */
+      if (put.ok && from === null && spoke !== null && pack.value.manifest.pack.startsWith('usecase-')) writeVoice(kernel, spoke, actorOf(ctx));
       return tail(put);
     },
 

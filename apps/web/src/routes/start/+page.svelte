@@ -26,6 +26,7 @@
 <script lang="ts">
   import { onDestroy, tick, untrack } from 'svelte';
   import { createClient } from '@braindog/client';
+  import { SPEAKS, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
@@ -409,6 +410,19 @@
               one.usecase,
             );
           }
+        }
+      }
+
+      /* THE VOICE RULE, WRITTEN DOWN (`voice.ts` `voiceWrites`): the use case proposed speaks, and every other one on, those
+         the sentence put beside it included, is set not to, so no use case added later moves the voice by how its id sorts. */
+      if (u && !chosen.source.sample) {
+        const packs = await client.packs();
+        if (packs.ok) {
+          const states = await withSpeaks(packs.value as SpeakingState[], async (id) => {
+            const read = await client.packConfig({ id });
+            return read.ok ? ((read.value as { values?: Record<string, unknown> }).values ?? null) : null;
+          });
+          for (const w of voiceWrites(states, `usecase-${u.usecase}`)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks } }).catch(() => null);
         }
       }
 

@@ -279,26 +279,56 @@ const smallUseCase = (id: string, list: string) => {
   return useCasePack(u.value)!;
 };
 
-test('A USE CASE GOES BESIDE THE ONE SPEAKING BY THE VOICE RULE, and one that would take the voice over is refused', async () => {
+test('A USE CASE GOES BESIDE THE ONE SPEAKING AND NEVER TAKES ITS VOICE, whichever way the ids sort, with three on', async () => {
   const { api, sql } = await record([
     ...CATALOGUE,
     { id: 'usecase-writing', kind: 'usecase', title: 'Writing', summary: 'Drafts.', modules: [], doc: () => smallUseCase('writing', 'drafts') },
     { id: 'usecase-art', kind: 'usecase', title: 'Art', summary: 'Sketches.', modules: [], doc: () => smallUseCase('art', 'sketches') },
+    { id: 'usecase-diary', kind: 'usecase', title: 'Diary', summary: 'Entries.', modules: [], doc: () => smallUseCase('diary', 'entries') },
   ]);
-  const taken = refusal(await api.propose({ question: 'Art beside it?', body_kind: 'arrange', body: { why: ['They draw.'], usecase: 'study', alongside: ['art'] } } as never, agent));
-  assert.equal(taken.code, 'TRANSITION_ILLEGAL');
-  assert.equal(taken.at, 'body.alongside[0]');
-  assert.match(taken.fix, /Art would speak in place/u);
   assert.equal(refusal(await api.propose({ question: 'Writing?', body_kind: 'arrange', body: { why: ['x'], alongside: ['writing'] } } as never, agent)).code, 'REQUIRED_MISSING');
   assert.equal(refusal(await api.propose({ question: 'Work?', body_kind: 'arrange', body: { why: ['x'], usecase: 'study', alongside: ['work'] } } as never, agent)).at, 'body.alongside[0]');
 
-  const filed = value<{ id: string }>(await api.propose({ question: 'Study, with writing beside?', body_kind: 'arrange', body: { why: ['They study and write.'], usecase: 'study', alongside: ['writing'] } } as never, agent));
+  /* ART SORTS BEFORE STUDY, and goes beside it all the same. */
+  const filed = value<{ id: string }>(await api.propose({ question: 'Study, with art and writing beside?', body_kind: 'arrange', body: { why: ['They study, draw and write.'], usecase: 'study', alongside: ['art', 'writing'] } } as never, agent));
   const row = value<{ body: { alongside: string[]; packs: { install: string[] } } }>(await api.governance({ id: filed.id }, owner));
-  assert.deepEqual(row.body.alongside, ['writing']);
-  assert.deepEqual(row.body.packs.install, ['work', 'usecase-study', 'usecase-writing'], 'the one speaking goes in first');
+  assert.deepEqual(row.body.alongside, ['art', 'writing']);
+  assert.deepEqual(row.body.packs.install, ['work', 'usecase-study', 'usecase-art', 'usecase-writing'], 'the one speaking goes in first');
   value(await api.decide(accept(filed.id), owner));
-  const now = value<{ voice: { pack: string } }>(await api.arrangement({}, agent));
-  assert.equal(now.voice.pack, 'usecase-study', 'the voice stayed with the use case it went beside');
+  type Config = { values: Record<string, unknown> };
+  const speaks = async (id: string) => value<Config>(await api.packConfig({ id }, owner)).values.speaks;
+  const voice = async () => value<{ voice: { pack: string } }>(await api.arrangement({}, agent)).voice.pack;
+  assert.equal(await voice(), 'usecase-study', 'the voice moved to a use case put beside it');
+  assert.deepEqual([await speaks('usecase-art'), await speaks('usecase-study'), await speaks('usecase-writing')], [false, true, false], 'the answer was not written down');
+
+  /* A FOURTH, BY A PACK PROPOSAL, SORTING FIRST OF ALL: Decide is told who keeps the voice, and it is kept. */
+  const diary = value<{ id: string }>(await api.propose({ question: 'Diary?', body_kind: 'pack', body: { install: 'diary' } } as never, agent));
+  assert.equal(value<{ body: { keeps?: string } }>(await api.governance({ id: diary.id }, owner)).body.keeps, 'usecase-study');
+  value(await api.decide(accept(diary.id), owner));
+  assert.equal(await voice(), 'usecase-study');
+  assert.equal(await speaks('usecase-diary'), false);
+
+  /* AN ARRANGEMENT SETTING THE RECORD UP FOR ONE ALREADY ON MAKES IT SPEAK, and exactly one does. */
+  const lead = value<{ id: string }>(await api.propose({ question: 'Writing first?', body_kind: 'arrange', body: { why: ['Mostly writing now.'], usecase: 'writing', packs: { disable: ['usecase-art'] } } } as never, agent));
+  value(await api.decide(accept(lead.id), owner));
+  assert.equal(await voice(), 'usecase-writing');
+  assert.deepEqual([await speaks('usecase-diary'), await speaks('usecase-study'), await speaks('usecase-writing')], [false, false, true]);
+  sql.close();
+});
+
+test('THE OWNER INSTALLING A USE CASE BESIDE ONE SPEAKING KEEPS THAT VOICE, even when the new id sorts first', async () => {
+  const { api, sql } = await record([]);
+  const put = async (doc: unknown) => {
+    const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc }, owner));
+    value(await api.installPack({ doc, planHash: planned.diff.planHash }, owner));
+  };
+  await put(smallUseCase('writing', 'drafts'));
+  await put(smallUseCase('study', 'lessons'));
+  await put(smallUseCase('art', 'sketches'));
+  const said = value<{ voice: { pack: string } }>(await api.arrangement({}, agent));
+  assert.equal(said.voice.pack, 'usecase-writing');
+  const held = await Promise.all(['usecase-art', 'usecase-study', 'usecase-writing'].map(async (id) => value<{ values: Record<string, unknown> }>(await api.packConfig({ id }, owner)).values.speaks));
+  assert.deepEqual(held, [false, false, true]);
   sql.close();
 });
 

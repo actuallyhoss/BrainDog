@@ -138,18 +138,20 @@ const OLD_USE_CASE = (id: string, register: string) => ({
 
 test('a use case installed before speaks existed reads as declaring it, with the one speaking by id set, and can be chosen', async () => {
   const { api, sql } = await installed(OLD_USE_CASE('personal', 'errands'));
+  type Config = { config: Record<string, unknown>; values: Record<string, unknown> };
+  assert.equal(value<Config>(await api.packConfig({ id: 'usecase-personal' }, reader)).values.speaks, true);
+  const alone = sql.one<{ manifest: string }>("SELECT manifest FROM pack WHERE id = 'usecase-personal'")!;
+  assert.equal(Object.hasOwn(JSON.parse(alone.manifest).config, 'speaks'), false, 'a read wrote to the record');
+  /* A SECOND ONE INSTALLED BESIDE IT WRITES THE VOICE DOWN (`declare` `voiceWrites`), which gives both the setting. */
   for (const doc of [OLD_USE_CASE('student', 'lessons')]) {
     const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc }, owner));
     value(await api.installPack({ doc, planHash: planned.diff.planHash }, owner));
   }
-  type Config = { config: Record<string, unknown>; values: Record<string, unknown> };
   const personal = value<Config>(await api.packConfig({ id: 'usecase-personal' }, reader));
   const student = value<Config>(await api.packConfig({ id: 'usecase-student' }, reader));
   assert.equal((personal.config.speaks as { type: string }).type, 'bool');
   assert.equal(personal.values.speaks, true, 'the one speaking by id was not set to speak');
-  assert.equal(student.values.speaks, null);
-  const held = sql.one<{ manifest: string }>("SELECT manifest FROM pack WHERE id = 'usecase-personal'")!;
-  assert.equal(Object.hasOwn(JSON.parse(held.manifest).config, 'speaks'), false, 'a read wrote to the record');
+  assert.equal(student.values.speaks, false, 'the use case added beside was not written down as not speaking');
 
   /* SWITCH TO, as the app does it: the one chosen set to speak, the other set not to. */
   value(await api.setPackConfig({ id: 'usecase-student', values: { speaks: true } }, owner));

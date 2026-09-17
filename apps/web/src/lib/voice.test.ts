@@ -7,11 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack } from '@braindog/seed/usecases';
-import { labelSetting as labelSettingOfPack, speakingPack as speakingPackOf, useCasePack, voiceWhenAdding as voiceWhenAddingPack } from '@braindog/declare';
+import { labelSetting as labelSettingOfPack, speakingPack as speakingPackOf, useCasePack, voiceWhenAdding as voiceWhenAddingPack, voiceWrites as voiceWritesOf } from '@braindog/declare';
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, homePageOf, homeSlugOf, labelSetting, labelsOf, voiceWhenAdding, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, homeSlugOf, labelSetting, labelsOf, voiceWhenAdding, voiceWrites, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -145,4 +145,21 @@ test('HOME ASKS ONLY FOR A PAGE THE RECORD HOLDS: the use case\'s, else the hous
   assert.equal(homeSlugOf('home-reading-club', ['meetings']), null);
   assert.equal(homeSlugOf(null, ['home']), 'home');
   assert.equal(homeSlugOf(null, []), null);
+});
+
+test('THE VOICE WRITES MAKE ONE USE CASE SPEAK AND EVERY OTHER ONE ON NOT, as the format writes them', () => {
+  const cases: [{ id: string; disabled_at: string | null; speaks?: boolean | null }[], string][] = [
+    [[{ id: 'usecase-personal', disabled_at: null }, { id: 'usecase-student', disabled_at: null, speaks: true }, { id: 'usecase-team', disabled_at: null }], 'usecase-student'],
+    [[{ id: 'usecase-personal', disabled_at: null, speaks: false }, { id: 'usecase-student', disabled_at: '2026-09-17', speaks: true }, { id: 'usecase-team', disabled_at: null }], 'usecase-team'],
+    [[{ id: 'usecase-personal', disabled_at: null }], 'usecase-personal'],
+    [[{ id: 'usecase-personal', disabled_at: null }, { id: 'usecase-student', disabled_at: null }], 'usecase-guide'],
+  ];
+  for (const [packs, speaker] of cases) assert.deepEqual(voiceWrites(packs, speaker), voiceWritesOf(packs, speaker), speaker);
+  assert.deepEqual(voiceWrites(cases[0]![0], 'usecase-student'), [{ id: 'usecase-personal', speaks: false }, { id: 'usecase-team', speaks: false }]);
+  assert.deepEqual(voiceWrites(cases[2]![0], 'usecase-personal'), [], 'one alone speaks whatever it holds');
+  assert.deepEqual(voiceWrites(cases[3]![0], 'usecase-guide'), [], 'a use case that is not on is never made to speak');
+  /* UNASKED, a use case chosen to speak keeps the voice whichever id sorts first. */
+  const chosen = [{ id: 'usecase-student', disabled_at: null, speaks: true }];
+  assert.equal(voiceWhenAdding(chosen, 'personal'), 'beside');
+  assert.equal(voiceWhenAddingPack(chosen, 'personal'), 'beside');
 });

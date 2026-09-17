@@ -109,14 +109,31 @@ export const packIdOf = (usecase: string): string => `usecase-${usecase}`;
 
 /**
  * THE VOICE RULE, ONE PLACE FOR EVERY DOOR A SECOND USE CASE COMES IN BY (onboarding, browse, a shared file, an agent's
- * arrangement). A record speaks in the voice of its first use-case pack switched on, by id, so installing another use case
- * either goes beside the one speaking, which keeps its voice and its Home, or takes the voice over. `beside` when the
- * one speaking keeps it; `speaks` when the use case added would, or when none speaks yet.
+ * arrangement, switching):
+ *
+ * 1. EXACTLY ONE USE CASE SPEAKS while any is on: `speakingPack`, the first by id set to speak, else the first not set
+ *    against it, else the first.
+ * 2. ADDING ONE BESIDE NEVER CHANGES WHO SPEAKS. Taking the voice over, or switching, is the only way it moves.
+ * 3. EVERY DOOR THAT ADDS OR SWITCHES WRITES THE ANSWER DOWN once two or more are on (`voiceWrites`): the one speaking
+ *    set to speak and every other set not to. So who speaks never rests on how ids sort, on a third use case arriving,
+ *    or on which one was read first.
+ *
+ * This answers what happens UNASKED: `speaks` when the use case added would speak by the rule once it is on, or when none
+ * speaks yet; `beside` when the one speaking now would keep it.
  */
 export function voiceWhenAdding(packs: readonly SpeakingState[], adding: string): 'speaks' | 'beside' {
-  const speaking = speakingPack(packs);
   const pack = adding.startsWith(packIdOf('')) ? adding : packIdOf(adding);
-  return speaking === null || speaking === pack || pack < speaking ? 'speaks' : 'beside';
+  return speakingPack([...packs.filter((p) => p.id !== pack), { id: pack, disabled_at: null }]) === pack ? 'speaks' : 'beside';
+}
+
+/**
+ * The `speaks` settings that make `speaker` the one use case speaking, and every other one on not: only those that differ
+ * from what `packs` say they hold. None while fewer than two are on, because one alone speaks whatever it holds.
+ */
+export function voiceWrites(packs: readonly SpeakingState[], speaker: string): { id: string; speaks: boolean }[] {
+  const on = packs.filter((p) => p.id.startsWith(packIdOf('')) && p.disabled_at === null);
+  if (on.length < 2 || !on.some((p) => p.id === speaker)) return [];
+  return on.flatMap((p) => (p.speaks === (p.id === speaker) ? [] : [{ id: p.id, speaks: p.id === speaker }]));
 }
 
 /**

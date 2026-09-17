@@ -16,7 +16,7 @@ import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
-import { SPEAKS, speaking, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
+import { SPEAKS, speaking, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
 import { PACKS } from '../../lib/record/data.ts';
@@ -393,18 +393,18 @@ const unasked = (states: readonly SpeakingState[], adding: string): 'speaks' | '
   speaking([...states.filter((p) => p.id !== `usecase-${adding}`), { id: `usecase-${adding}`, disabled_at: null }]) === `usecase-${adding}` ? 'speaks' : 'beside';
 
 /**
- * Keep the person's answer once the use case is in, as the `speaks` setting, writing only what the rule would not do on
- * its own: nothing when the answer is what happens unasked, the added use case set to speak or not to otherwise, and one
- * already set to speak set not to when another takes the voice over. Called after the examples are linked, so the setup
- * stays one line of the feed. A pack that has no such setting (one installed before it existed) is passed over.
+ * Keep the person's answer once the use case is in, as the `speaks` settings, by the voice rule (`voice.ts` `voiceWrites`):
+ * the one chosen set to speak, the added one when it takes the voice over or the one speaking now when it goes beside, and
+ * EVERY OTHER USE CASE ON set not to. Writing only the added one left a third use case speaking by how ids sort. Only what
+ * differs is written. Called after the examples are linked, so the setup stays one line of the feed. A pack that has no
+ * such setting (one installed before it existed) is given it by the record on the first write.
  */
 export async function keepVoice(client: Pick<SharingClient, 'setPackConfig'>, states: readonly SpeakingState[], adding: string, choice: 'speaks' | 'beside'): Promise<void> {
   const added = `usecase-${adding}`;
-  const set = (id: string, speaks: boolean) => client.setPackConfig({ id, values: { [SPEAKS]: speaks } }).catch(() => null);
-  if (choice === 'speaks') {
-    if (unasked(states, adding) !== 'speaks') await set(added, true);
-    for (const p of states) if (p.id !== added && p.disabled_at === null && p.speaks === true) await set(p.id, false);
-  } else if (unasked(states, adding) === 'speaks') await set(added, false);
+  const now = speaking(states.filter((p) => p.id !== added));
+  const speaker = choice === 'speaks' || now === null ? added : now;
+  const after = [...states.filter((p) => p.id !== added), { id: added, disabled_at: null, speaks: null }];
+  for (const w of voiceWrites(after, speaker)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks } }).catch(() => null);
 }
 
 /** What a browse card offers for a use case on this record. */

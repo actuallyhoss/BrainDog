@@ -93,8 +93,18 @@ export async function withSpeaks(packs: readonly SpeakingState[], valuesOf: (id:
  */
 export function voiceWhenAdding(packs: readonly SpeakingState[], adding: string): 'speaks' | 'beside' {
   const pack = USE_CASE_PACK.test(adding) ? adding : `usecase-${adding}`;
-  const now = speaking(packs) ?? undefined;
-  return now === undefined || now === pack || pack < now ? 'speaks' : 'beside';
+  return speaking([...packs.filter((p) => p.id !== pack), { id: pack, disabled_at: null }]) === pack ? 'speaks' : 'beside';
+}
+
+/**
+ * The `speaks` settings that make `speaker` the one use case speaking and every other one on not, by the rule
+ * `@braindog/declare` `voiceWrites` keeps: exactly one speaks, adding one beside never moves it, and every door that adds
+ * or switches writes the answer down once two are on. Only what differs; none while fewer than two are on.
+ */
+export function voiceWrites(packs: readonly SpeakingState[], speaker: string): { id: string; speaks: boolean }[] {
+  const on = packs.filter((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null);
+  if (on.length < 2 || !on.some((p) => p.id === speaker)) return [];
+  return on.flatMap((p) => (p.speaks === (p.id === speaker) ? [] : [{ id: p.id, speaks: p.id === speaker }]));
 }
 
 /**

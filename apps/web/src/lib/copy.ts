@@ -2015,6 +2015,8 @@ export const copy = {
   arrangeUpdates: (name: string, from: string, to: string) => `Updates ${name} from ${from} to ${to}`,
   /** Use cases an arrangement installs beside the one the record speaks in, which keeps its voice. */
   arrangeBeside: (names: string[]) => `Adds ${list(names)} beside it, in the same voice`,
+  /** A use case a pack proposal adds while another speaks: that one keeps speaking. */
+  arrangeKeepsVoice: (name: string) => `${name} keeps its voice and Home`,
   arrangeTurnsOn: (names: readonly string[]) => `Turns on ${list([...names])}`,
   arrangeTurnsOff: (names: readonly string[]) => `Turns off ${list([...names])}`,
   arrangeListsLeave: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'leaves' : 'leave'} the sidebar. The rows are kept.`,
