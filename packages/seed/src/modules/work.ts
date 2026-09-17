@@ -5,12 +5,12 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { day, days, hours, stamp, type Fields, type SeedPage, type SeedRegister } from './base.ts';
+import { day, days, hours, stamp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
 
 /* ── tasks ────────────────────────────────────────────────────────────────── */
 
 export const TASKS: Fields[] = [
-  { what: 'Chase Halden on 2026-041', state: 'open', thing: 2, by: day(1), effort: days(0.2), note: '' },
+  { what: 'Chase Halden on 2026-041', state: 'review', thing: 2, agent: 'cursor', by: day(1), effort: days(0.2), note: 'Cursor drafted the chaser. Read it before it goes.' },
   { what: 'Decide the licensing tier split', state: 'blocked', thing: 1, by: day(6), effort: days(1), note: 'Waiting on SG31.' },
   /* THE REMEDY, AND IT USED TO BE THE CAUSE. This said "Move kilnfonts.example off auto-renew",
      and the service row two hundred lines down is `lapsing` BECAUSE auto-renew is off: the audit
@@ -26,15 +26,29 @@ export const TASKS: Fields[] = [
      about the data and wrong about the world, on five pages whose whole subject is the work. Two of
      the seven are `done`, so the filtering that heading promises is exercised rather than assumed. */
   { what: 'Wire the sending domain to Ledger Post', state: 'open', thing: 3, track: 4, by: day(9), effort: days(0.5), note: '' },
-  { what: 'Year-end pack for Pell & Vine', state: 'open', thing: null, track: 5, by: day(23), effort: days(1.5), note: '' },
+  { what: 'Year-end pack for Pell & Vine', state: 'open', thing: null, track: 5, owner: 4, by: day(23), effort: days(1.5), note: '' },
   { what: 'Retire the Tallow staging box', state: 'open', thing: 4, by: day(30), effort: days(0.5), note: '' },
-  { what: 'Variable axis QA on the new cut', state: 'doing', thing: 1, track: 1, by: day(3), effort: days(3), note: '' },
+  { what: 'Variable axis QA on the new cut', state: 'doing', thing: 1, track: 1, agent: 'claude', by: day(3), effort: days(3), note: '' },
   { what: 'Rotate the Fenwick deploy key', state: 'open', thing: 1, track: 2, by: day(12), effort: days(0.2), note: '' },
-  { what: 'Write the specimen page', state: 'open', thing: 1, track: 3, by: day(18), effort: days(2), note: '' },
+  { what: 'Write the specimen page', state: 'doing', thing: 1, track: 3, agent: 'codex', by: day(18), effort: days(2), note: '' },
   { what: 'Invoice Ravensworth for September', state: 'open', thing: 2, by: day(27), effort: days(0.2), note: '' },
-  { what: 'Kerning pass, lowercase', state: 'done', thing: 1, track: 1, by: day(-11), effort: days(4), note: '' },
-  { what: 'Set up the newsletter archive', state: 'done', thing: 3, track: 4, by: day(-6), effort: days(1), note: '' },
-  { what: 'Cancel the Hobnail plan', state: 'done', thing: 4, by: day(-58), effort: days(0.2), note: '' },
+  { what: 'Kerning pass, lowercase', state: 'done', thing: 1, track: 1, agent: 'claude', by: day(-11), done_on: day(-12), effort: days(4), note: '' },
+  { what: 'Set up the newsletter archive', state: 'done', thing: 3, track: 4, owner: 6, by: day(-6), done_on: day(-7), effort: days(1), note: '' },
+  { what: 'Cancel the Hobnail plan', state: 'done', thing: 4, by: day(-58), done_on: day(-58), effort: days(0.2), note: '' },
+  /* FROM HERE ON, WORK AS A PERSON AND THEIR AGENTS SHARE IT: who holds a task, which agent took it, the steps a task
+     was split into (`parent`), and the day each one was finished, so the page can say what moved week by week.
+     Appended rather than interleaved, because `tasks#1` to `tasks#14` are named elsewhere by number. */
+  { what: 'Illustrations for the specimen page', state: 'doing', thing: 1, track: 3, parent: 10, owner: 3, by: day(10), effort: days(3), note: '' },
+  { what: 'Type tester for the specimen page', state: 'open', thing: 1, track: 3, parent: 10, by: day(14), effort: days(1), note: '' },
+  { what: 'Reconcile the Fenwick invoice against services', state: 'review', thing: 3, track: 2, agent: 'claude', by: day(2), effort: days(0.5), note: 'Two services share one monthly total. Claude matched them by renewal date; check the match.' },
+  { what: 'Check the September bank statement', state: 'open', thing: null, by: day(5), effort: days(0.2), note: '' },
+  { what: 'Mastering pass, all instances', state: 'done', thing: 1, track: 1, agent: 'claude', by: day(-3), done_on: day(-4), effort: days(2), note: '' },
+  { what: 'Outline check on instances 1 to 3', state: 'done', thing: 1, track: 1, agent: 'claude', by: day(-19), done_on: day(-20), effort: days(0.5), note: '' },
+  { what: 'Sign off instances 1 to 3', state: 'done', thing: 1, track: 1, by: day(-18), done_on: day(-19), effort: days(0.5), note: '' },
+  { what: 'Move the Portage API to the new host', state: 'done', thing: 3, owner: 6, by: day(-24), done_on: day(-26), effort: days(2), note: '' },
+  { what: 'Send the August invoices', state: 'done', thing: null, by: day(-31), done_on: day(-31), effort: days(0.3), note: '' },
+  { what: 'Update the licence PDF template', state: 'done', thing: 1, agent: 'codex', by: day(-40), done_on: day(-45), effort: days(0.5), note: '' },
+  { what: 'Archive the old Marlow brand files', state: 'dropped', thing: 2, by: day(-30), effort: days(0.2), note: 'Marlow keeps its own archive.' },
 ];
 
 /**
@@ -172,7 +186,9 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
     icon: 'task',
     name: 'Tasks',
     one: 'task',
-    holds: 'work with a state and a date, so nothing is carried in your head',
+    /* WHAT AN AGENT READS BEFORE IT TOUCHES ONE, so the sentence says how the work is shared: take a task by setting
+       Agent, split one by adding tasks Part of it, hand it back as To check, and say the day it was done. */
+    holds: 'work with a state and a date, who holds it, and which agent took it, so nothing is carried in your head',
     title: 'what',
     mobile: ['what', 'thing', 'state'],
     state: 'state',
@@ -180,7 +196,25 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
     pack: 'work',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
-      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'doing', 'blocked', 'done', 'dropped'], index: true, required: true },
+      /* `review` IS THE QUEUE A PERSON WORKS FROM: an agent finished its part and a person checks it before it is done. */
+      {
+        id: 'state',
+        label: 'Status',
+        type: 'enum',
+        values: ['open', 'doing', 'review', 'blocked', 'done', 'dropped'],
+        labels: { review: 'To check' },
+        index: true,
+        required: true,
+      },
+      /* WHO HOLDS IT, a person. Empty is you. A link, so Work installs on a record with no People and leaves it out. */
+      { id: 'owner', label: 'Owner', type: 'ref', to: 'people', index: true },
+      /* THE AGENT THAT TOOK IT, by the name it signs its runs with (claude, codex, cursor). An agent is a delegate, never
+         the owner, so the two are separate fields. */
+      { id: 'agent', label: 'Agent', type: 'text', index: true },
+      /* A TASK SPLIT INTO STEPS: each step points at the task it is part of. */
+      { id: 'parent', label: 'Part of', type: 'ref', to: 'tasks', index: true },
+      /* THE DAY IT WAS FINISHED, set by whoever finishes it, so progress is counted by when work was done. */
+      { id: 'done_on', label: 'Done on', type: 'day', index: true },
       /* A task on no project is global. */
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true, scope: {} },
       { id: 'by', label: 'Due', type: 'day', index: true, deadline: true, remind: ['0d'] },
@@ -193,58 +227,276 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
-export const WORK_PAGES: Record<string, SeedPage> = {
+/* ── the figures ──────────────────────────────────────────────────────────── */
 
+/** Every state a task is still in play in. */
+const LIVE = 'state is not done or dropped';
+
+/**
+ * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
+ * its date, what waits on a person, and what was finished, by the day it was finished.
+ *
+ * NOTHING HERE IS ABOUT ONE KIND OF PERSON. A student's homework and a team's cycle are the same five questions.
+ */
+export const WORK_METRICS: Record<string, SeedMetric> = {
+  'open-tasks': {
+    metric: 'open-tasks',
+    name: 'Open',
+    source: 'register.tasks',
+    where: LIVE,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-due-7d': {
+    metric: 'tasks-due-7d',
+    name: 'Due in 7 days',
+    source: 'register.tasks',
+    where: `${LIVE}, by after yesterday, by before +8d`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-overdue': {
+    metric: 'tasks-overdue',
+    name: 'Past their date',
+    source: 'register.tasks',
+    where: `${LIVE}, by before today`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* WHAT WAITS ON A PERSON: work an agent handed back to be checked, and work that cannot move. */
+  'tasks-waiting': {
+    metric: 'tasks-waiting',
+    name: 'Waiting on you',
+    source: 'register.tasks',
+    where: 'state is review or blocked',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-with-agents': {
+    metric: 'tasks-with-agents',
+    name: 'With an agent',
+    source: 'register.tasks',
+    where: `${LIVE}, agent is set`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-done-7d': {
+    metric: 'tasks-done-7d',
+    name: 'Done in 7 days',
+    source: 'register.tasks',
+    where: 'state is done, done_on after -8d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-done-7d-agents': {
+    metric: 'tasks-done-7d-agents',
+    name: 'Done in 7 days by an agent',
+    source: 'register.tasks',
+    where: 'state is done, done_on after -8d, agent is set',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* PROGRESS OVER TIME: finished by the week it was finished, then what is due in the weeks ahead. */
+  'tasks-done-by-week': {
+    metric: 'tasks-done-by-week',
+    name: 'Done, by week',
+    source: 'register.tasks',
+    where: 'state is done, done_on after -63d',
+    value: { count: 'id' },
+    group_by: 'done_on',
+    bucket: 'week',
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-due-by-week': {
+    metric: 'tasks-due-by-week',
+    name: 'Due, by week',
+    source: 'register.tasks',
+    where: `${LIVE}, by after yesterday, by before +29d`,
+    value: { count: 'id' },
+    group_by: 'by',
+    bucket: 'week',
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};
+
+/* ── the pages ────────────────────────────────────────────────────────────── */
+
+const DESCRIPTION = { field: 'what', label: 'Task', width: 'minmax(20ch,1fr)' } as const;
+
+export const WORK_PAGES: Record<string, SeedPage> = {
+  /**
+   * WORK LEADS WITH WHAT IS IN PLAY AND WHAT WAITS ON YOU (`loop/DIRECTION.md` §3, `research-modules.md` §2.2). "What I
+   * have to do next, what my agents are doing, and what's stuck": the figures, the queue a person works from, what is
+   * due, how the work moved week by week, where it sits, and what agents took. The board is its own page beside it.
+   */
   work: {
     page: 'work',
-    title: 'Board',
+    title: 'Overview',
     nav: { section: 'Work', order: 10 },
+    icon: 'task',
+    requires: ['register.tasks'],
+    pack: 'work',
+    blocks: [
+      {
+        kind: 'stat',
+        lead: true,
+        heading: 'Right now',
+        span: 12,
+        cells: [
+          { metric: 'open-tasks', label: 'Open', note: '{{tasks-with-agents}} with an agent' },
+          { metric: 'tasks-waiting', label: 'Waiting on you', note: 'to check, or blocked' },
+          { metric: 'tasks-due-7d', label: 'Due in 7 days', note: '{{tasks-overdue}} past their date' },
+          { metric: 'tasks-done-7d', label: 'Done in 7 days', note: '{{tasks-done-7d-agents}} of them by an agent' },
+        ],
+      },
+      {
+        /* THE QUEUE A PERSON WORKS FROM: what an agent handed back to be checked, and what cannot move, with who touched
+           it last, so a person sees whose work they are checking. */
+        kind: 'table',
+        heading: 'Waiting on you',
+        span: 12,
+        source: 'register.tasks',
+        where: 'state is review or blocked',
+        columns: [
+          DESCRIPTION,
+          { field: 'state', label: 'Status', width: '12ch' },
+          { field: 'agent', label: 'Agent', width: '10ch' },
+          { field: 'note', label: 'Why', width: 'minmax(16ch,1fr)' },
+          { field: 'changed', label: 'Changed by', width: '16ch' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 12,
+        empty: 'Nothing is waiting on you.',
+      },
+      {
+        kind: 'table',
+        heading: 'Due soon',
+        span: 7,
+        source: 'register.tasks',
+        where: `${LIVE}, by before +15d`,
+        columns: [
+          DESCRIPTION,
+          { field: 'thing', label: 'Project', width: 'minmax(8ch,14ch)' },
+          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing is due in the next two weeks.',
+      },
+      {
+        /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. */
+        kind: 'bar',
+        heading: 'Open work by project',
+        span: 5,
+        source: 'register.tasks',
+        where: LIVE,
+        columns: [{ field: 'thing' }, { field: 'effort' }],
+        limit: 6,
+        unset: 'No project',
+        empty: 'No open work has a size yet.',
+      },
+      {
+        kind: 'series',
+        heading: 'Done, and due ahead',
+        span: 12,
+        series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
+        back: 8,
+        ahead: 4,
+        empty: 'Nothing was finished or is due in these weeks.',
+      },
+      {
+        /* WHAT AGENTS HOLD NOW, and where each one is with it. */
+        kind: 'table',
+        heading: 'With an agent',
+        span: 12,
+        source: 'register.tasks',
+        where: `${LIVE}, agent is set`,
+        columns: [
+          DESCRIPTION,
+          { field: 'agent', label: 'Agent', width: '10ch' },
+          { field: 'state', label: 'Status', width: '12ch' },
+          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 12,
+        empty: 'No agent holds a task. An agent takes one by setting itself as its agent.',
+      },
+      {
+        kind: 'table',
+        heading: 'Done lately',
+        span: 12,
+        source: 'register.tasks',
+        where: 'state is done',
+        columns: [
+          DESCRIPTION,
+          { field: 'agent', label: 'Agent', width: '10ch' },
+          { field: 'done_on', label: 'Done on', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'done_on', dir: 'desc' }],
+        limit: 6,
+        empty: 'Nothing is done yet.',
+      },
+    ],
+  },
+
+  /** THE BOARD AND THE LIST, for moving work along and seeing all of it. */
+  'work-board': {
+    page: 'work-board',
+    title: 'Board',
+    nav: { section: 'Work', order: 20 },
     icon: 'board',
     requires: ['register.tasks'],
     pack: 'work',
     blocks: [
       {
         kind: 'board',
-        /* `By status`, for the same reason as the column two blocks down: the field this groups on
-           is headed Status everywhere it is drawn. */
         heading: 'By status',
         span: 12,
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
+        where: 'state is not dropped',
         empty: 'Nothing open.',
-      },
-      {
-        kind: 'steps',
-        heading: 'What has to happen first',
-        /* Twelve, because there is nothing beside it. A five-twelfth block between two full-width
-           ones is not a narrow card, it is a row that is seven twelfths empty. */
-        span: 12,
-        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
-        source: 'register.tasks',
-        where: 'state is open',
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 5,
-        empty: 'Nothing waiting.',
       },
       {
         kind: 'table',
         heading: 'Everything open',
         span: 12,
         source: 'register.tasks',
-        /* The heading says open. It used to be the only place that said so — the filter was keyed on
-           register-and-kind inside the reader, and a heading is not evaluated. */
-        where: 'state is not done or dropped',
+        where: LIVE,
         columns: [
-          { field: 'what', label: 'Description', width: 'minmax(20ch,1fr)' },
-          /* `Project` AND `Status`, AND THEY WERE `Thing` AND `State`. Every one of the five
-             registers that carries a `thing` ref labels it Project and `things` labels its own
-             lane Status, and this table — authored by hand rather than derived, so no rename
-             reaches it — was the last place in the record saying either of the old words. A
-             column header a person reads beside four others that say something else is the same
-             defect as two names for one screen, one row further down. */
+          DESCRIPTION,
           { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },
+          { field: 'owner', label: 'Owner', width: 'minmax(8ch,14ch)' },
+          { field: 'agent', label: 'Agent', width: '10ch' },
           { field: 'state', label: 'Status', width: '12ch' },
-          { field: 'by', label: 'Due', width: '15ch', align: 'end' },
+          { field: 'by', label: 'Due', width: '13ch', align: 'end' },
         ],
         order: [{ field: 'by', dir: 'asc' }],
         empty: 'Nothing open.',

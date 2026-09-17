@@ -55,7 +55,8 @@ test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
     ['estate-year', 'GBP 2,906.80'],
     /* The three project figures, now read through the parameter rather than through three documents
        with the name typed into each. Same numbers as the `kiln-*` documents they replace. */
-    ['project-open:Kiln', '5'],
+    /* Seven since Work split the specimen page into steps, two of them Kiln's. */
+    ['project-open:Kiln', '7'],
     ['project-owed:Kiln', 'GBP 4,980.00'],
     ['project-cost:Kiln', 'GBP 1,036.00'],
   ] as const) {

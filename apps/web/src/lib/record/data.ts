@@ -785,9 +785,11 @@ export const NEWS: NewsItem[] = [
      contradicted the claim, on the surface whose whole job is telling you what happened while you
      were not looking. The audit is the source: everything else quotes it. */
   { at: stamp(-3), by: 'claude', text: 'Added 2 services from the Fenwick invoice', href: '/r/services', tone: 'info' },
+  { at: stamp(-5), by: 'claude', text: 'Matched the Fenwick invoice to services and handed it back to check', href: '/r/tasks/17' },
   { at: stamp(-9), by: 'rule.reply', text: 'Halden replied on 2026-041: payment run on the 12th', href: '/r/obligations/1', tone: 'good' },
   { at: stamp(-14), by: 'you', text: 'Marked Kerning pass, lowercase done', href: '/r/tasks/12' },
   { at: stamp(-26), by: 'rule.renewal', text: 'kilnfonts.example moved to lapsing because auto-renew is off', href: '/r/services/2', tone: 'bad' },
+  { at: stamp(-28), by: 'cursor', text: 'Drafted the chaser for 2026-041 and handed it back to check', href: '/r/tasks/1' },
   { at: stamp(-31), by: 'codex', text: 'Opened SG31, the Kiln licensing question', href: '/decide/SG31', tone: 'warn' },
   { at: stamp(-49), by: 'claude', text: 'Set the year-end date on Pell & Vine', href: '/r/people/4' },
 ];

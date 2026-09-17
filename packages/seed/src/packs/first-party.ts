@@ -49,7 +49,7 @@ type Body = Record<string, unknown>;
  * left out of the document with every column drawn over it, and the pack installs on its own. Installing the
  * pack again once that list is there puts the field back.
  */
-const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'] };
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], work: ['owner'] };
 
 /** The id a declaration in a document is filed under: its kind's key. */
 const idOf = (d: Body): string =>

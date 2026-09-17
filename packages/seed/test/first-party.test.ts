@@ -72,7 +72,8 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
     people: ['register.things'],
     'money-core': [],
     estate: [],
-    work: [],
+    /* WORK ONLY LINKS TO PEOPLE: who holds a task is left out of a record with no People. */
+    work: ['register.people'],
   });
 
   for (const id of FIRST_PARTY) {
