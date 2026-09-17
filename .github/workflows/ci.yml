@@ -38,6 +38,13 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
+# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
+# Worker that did not know its build.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   check:
     # PINNED, NOT `ubuntu-latest`. GitHub rolls that label to a new image about once a year and the

@@ -33,6 +33,13 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
+# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
+# Worker that did not know its build.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   deploy:
     # `workflow_run` FIRES ON FAILURE, CANCELLATION AND TIMEOUT TOO, so the first clause is what

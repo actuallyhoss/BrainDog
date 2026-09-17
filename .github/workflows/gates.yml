@@ -68,6 +68,13 @@ concurrency:
   # last one is the tree, and it is the one worth the runner.
   cancel-in-progress: true
 
+# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
+# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
+# Worker that did not know its build.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   gates:
     # A pull request runs this only when it is asked to. Written as "not a pull request, or
