@@ -2,7 +2,7 @@
  * A catalogue of shared use cases and add-ons served from a folder, read-only: `/catalogue/index.json` and each version's
  * file at `/catalogue/usecases/<id>/<version>.usecase.json` or `/catalogue/packs/<id>/<version>.pack.json` (`@braindog/declare/catalogue`, `loop/research-marketplace.md` §2).
  *
- * THE OPERATOR NAMES THE FOLDER (`BRAINDOG_CATALOGUE`), and `braindog usecase publish --to` writes into it. Nothing else
+ * THE OPERATOR NAMES THE FOLDER (`BRAINDOG_CATALOGUE`), or the built shell's bundled one is served (`catalogueFolder`), and `braindog usecase publish --to` writes into it. Nothing else
  * in it is reachable: a path is matched whole against the two shapes, so no `..`, no other file and no listing. The files
  * are ones their authors shared, so they are answered without a sign-in, as a public add-on index would answer them.
  *
@@ -10,11 +10,12 @@
  * the owner approves, like any other shared file.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CATALOGUE_INDEX, catalogueUpdates, readCatalogue } from '@braindog/declare/catalogue';
+import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
 import type { CatalogueOffer } from '@braindog/record';
+import { offersFromCatalogue } from '@braindog/record/catalogue-offers';
 
 const INDEX = /^\/catalogue\/index\.json$/u;
 const FILE = /^\/catalogue\/(?:usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack)\.json$/u;
@@ -43,34 +44,24 @@ export function catalogueAnswer(dir: string | undefined, method: string, pathnam
 }
 
 /**
- * Newer versions of what a record holds, from the same folder, for Spark to ask about (`RecordDeps.catalogueOffers`).
- *
- * EACH IS HELD TO ITS CHECKSUM AND SIGNATURE and read through its door before it is offered (`catalogueUpdates`); one that
- * does not verify is never offered. A folder with no index offers nothing.
+ * The folder to serve: the one the operator named, or else the catalogue bundled in the built shell (`apps/web/static/catalogue`,
+ * the one the hosted app serves), so a self-host started with no `BRAINDOG_CATALOGUE` shows what its own shell ships
+ * instead of hiding it behind a 404. Served by the same two path shapes, read-only.
  */
+export function catalogueFolder(named: string | undefined, shell: string | undefined): string | undefined {
+  if (named !== undefined) return named;
+  if (shell === undefined) return undefined;
+  const bundled = join(shell, 'catalogue');
+  return existsSync(join(bundled, CATALOGUE_INDEX)) ? bundled : undefined;
+}
+
+/** Newer versions of what a record holds, from the same folder, for Spark to ask about (`@braindog/record/catalogue-offers`). */
 export function catalogueOffersFrom(dir: string): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
-  const read = (path: string): string | null => {
+  return offersFromCatalogue((path) => {
     try {
       return readFileSync(join(dir, ...path.split('/')), 'utf8');
     } catch {
       return null;
     }
-  };
-  return async (held) => {
-    const text = read(CATALOGUE_INDEX);
-    if (text === null) return [];
-    const index = readCatalogue(JSON.parse(text));
-    if (!index.ok) return [];
-    const { updates } = await catalogueUpdates(index.value, held.map((h) => ({ id: h.id, version: h.version, disabled_at: h.on ? null : 'off' })), read);
-    return updates.map((u) => ({
-      id: u.installed,
-      title: u.entry.title,
-      from: u.from,
-      to: u.to.version,
-      body: u.file.kind === 'usecase' ? { file: u.text } : { install: u.installed, doc: u.file.file.doc },
-      signedBy: u.signature?.key_id ?? null,
-      hostsAdded: u.changes?.hosts.added ?? [],
-      removed: (u.changes?.removed ?? []).map((r) => r.title),
-    }));
-  };
+  });
 }

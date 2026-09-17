@@ -40,7 +40,7 @@ import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { catalogueAnswer, catalogueOffersFrom } from './catalogue.ts';
+import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalogue.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
@@ -701,6 +701,8 @@ export async function start(options: {
      is off, it cannot. */
   let invitesOff: string | null = INVITES_OFF;
   const buildApp = options.build ?? env.BRAINDOG_BUILD ?? '';
+  /* THE CATALOGUE NAMED, or the one bundled in the built shell when none is. */
+  const catalogueDir = catalogueFolder(options.catalogue, options.shell);
   api = await createRecordApi({
     sql,
     clock,
@@ -715,7 +717,7 @@ export async function start(options: {
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     sparkModel,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */
-    ...(options.catalogue === undefined ? {} : { catalogueOffers: catalogueOffersFrom(options.catalogue) }),
+    ...(catalogueDir === undefined ? {} : { catalogueOffers: catalogueOffersFrom(catalogueDir) }),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
@@ -789,7 +791,7 @@ export async function start(options: {
       return;
     }
     /* A CATALOGUE IS FILES, answered before any door, and never a record's: a deleted record does not change it. */
-    const listed = catalogueAnswer(options.catalogue, req.method ?? 'GET', new URL(req.url ?? '/', 'http://localhost').pathname);
+    const listed = catalogueAnswer(catalogueDir, req.method ?? 'GET', new URL(req.url ?? '/', 'http://localhost').pathname);
     if (listed) {
       res.writeHead(listed.status, listed.headers);
       res.end(req.method === 'HEAD' ? undefined : listed.body);

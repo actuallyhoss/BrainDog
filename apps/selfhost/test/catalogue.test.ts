@@ -99,3 +99,52 @@ test('the folder offers Spark a newer version of an installed add-on, verified, 
   writeFileSync(join(dir, 'packs', 'bookshelf', '1.1.0.pack.json'), text('1.1.0', [books]));
   assert.deepEqual(await offers([{ id: 'bookshelf', version: '1.0.0', on: true }]), []);
 });
+
+test('with no BRAINDOG_CATALOGUE, the catalogue bundled in the built shell is served read-only, by the same two shapes', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bd-bundled-'));
+  const shell = join(dir, 'build');
+  const folder = join(shell, 'catalogue');
+  mkdirSync(join(folder, 'packs', 'reading-list'), { recursive: true });
+  writeFileSync(join(shell, 'index.html'), '<!doctype html><title>BrainDog</title>');
+  writeFileSync(join(dir, 'secret.json'), '{"not":"yours"}');
+  writeFileSync(join(folder, 'index.json'), '{"format":1,"name":"Bundled","entries":[]}');
+  writeFileSync(join(folder, 'packs', 'reading-list', '1.0.0.pack.json'), '{"pack":"reading-list"}');
+  writeFileSync(join(folder, 'notes.txt'), 'private');
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0, shell });
+  t.after(async () => {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
+  const get = (path: string, init?: RequestInit) => fetch(`${base}${path}`, init);
+
+  const index = await get('/catalogue/index.json');
+  assert.equal(index.status, 200);
+  assert.match(index.headers.get('content-type') ?? '', /json/u);
+  assert.deepEqual(await index.json(), { format: 1, name: 'Bundled', entries: [] });
+  assert.equal(await (await get('/catalogue/packs/reading-list/1.0.0.pack.json')).text(), '{"pack":"reading-list"}');
+  for (const path of ['/catalogue/notes.txt', '/catalogue/..%2f..%2fsecret.json', '/catalogue/packs/..%2f..%2f..%2fsecret/1.0.0.pack.json', '/catalogue/packs/reading-list/1.0.1.pack.json', '/catalogue/']) {
+    const res = await get(path);
+    assert.equal(res.status, 404, path);
+    assert.doesNotMatch(await res.text(), /yours|private|doctype/u, path);
+  }
+  /* A PATH THE CLIENT FOLDS OUT OF /catalogue/ is the shell's to answer, and the shell never reads outside its build. */
+  for (const path of ['/catalogue/%2e%2e/%2e%2e/secret.json', '/catalogue/../../secret.json']) assert.doesNotMatch(await (await get(path)).text(), /yours|private/u, path);
+  assert.equal((await get('/catalogue/index.json', { method: 'PUT', body: '{}' })).status, 405);
+});
+
+test('the folder named wins over the bundled one, and a shell with no bundled catalogue serves none', async () => {
+  const { catalogueFolder } = await import('../src/catalogue.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'bd-folder-'));
+  try {
+    mkdirSync(join(dir, 'with', 'catalogue'), { recursive: true });
+    writeFileSync(join(dir, 'with', 'catalogue', 'index.json'), '{}');
+    mkdirSync(join(dir, 'without'), { recursive: true });
+    assert.equal(catalogueFolder('/named', join(dir, 'with')), '/named');
+    assert.equal(catalogueFolder(undefined, join(dir, 'with')), join(dir, 'with', 'catalogue'));
+    assert.equal(catalogueFolder(undefined, join(dir, 'without')), undefined);
+    assert.equal(catalogueFolder(undefined, undefined), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

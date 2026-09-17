@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./directory": "./src/directory.ts", "./webauthn": "./src/webauthn.ts" },
+  "exports": { ".": "./src/index.ts", "./directory": "./src/directory.ts", "./webauthn": "./src/webauthn.ts", "./catalogue-offers": "./src/catalogue-offers.ts" },
   "dependencies": {
     "@braindog/declare": "workspace:*",
     "@braindog/kernel": "workspace:*",
