@@ -137,7 +137,7 @@
               <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
               {#each drawn.segments as segment}
-                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<Markdown {segment} />{/if}
+                {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
               {/each}
             {/if}
 

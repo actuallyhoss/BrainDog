@@ -787,7 +787,7 @@
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
                     onmove={(row, to) => moveCard(block, row, to)}
                     ontick={(row, done) => tickTask(row, done)}
-                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<Markdown {segment} />{/if}
+                  />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
               {/each}
             {/if}
 
