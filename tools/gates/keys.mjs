@@ -107,6 +107,25 @@ const onFirst = async (page) => {
 };
 
 /**
+ * THE CURSOR ON THE FIRST QUESTION `a` CAN ANSWER. `a` takes the suggested option or accepts a change,
+ * and a question with neither is one it rightly leaves alone. The record's rules now raise questions
+ * of their own at the head of the queue (a balance to update, an invoice gone late) with two plain
+ * options and no suggestion, so `onFirst` put the cursor where `a` has nothing to do and the gate read
+ * the key as dead. Each `j` moves one question; this stops on the first with a suggestion or an accept.
+ */
+const onSuggested = async (page) => {
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press('j');
+    await page.waitForTimeout(120);
+    const answerable = await page.evaluate(() => {
+      const q = document.querySelector('li.q[data-cursor]');
+      return !!q && (q.querySelector('.rec') !== null || q.querySelector('[id$="-accept"]') !== null);
+    });
+    if (answerable) return;
+  }
+};
+
+/**
  * THE GATE'S RECORD HAS NO ARRIVALS, so an inbox key would be pressed on an empty state and read as dead.
  * Two are handed to the screen in the record's own shape, which is the read the keys act on; nothing is
  * written. Filing one then asks the record, which refuses an id it does not hold, and says so in a toast.
@@ -251,7 +270,7 @@ const RECIPES = {
      key is pressed with the cursor already placed by `setup`, or the `j` would be what changed the page. */
   'decide-move': { route: '/decide', press: ['j'] },
   'decide-answer': { route: '/decide', setup: onFirst, press: ['1'] },
-  'decide-approve': { route: '/decide', setup: onFirst, press: ['a'] },
+  'decide-approve': { route: '/decide', setup: onSuggested, press: ['a'] },
   'decide-defer': { route: '/decide', setup: onFirst, press: ['d'] },
   'decide-select': { route: '/decide', setup: onFirst, press: ['x'] },
   'inbox-move': { route: '/inbox', setup: arrivals, press: ['j'] },
