@@ -445,3 +445,21 @@ test('A WALK WHOSE OPENING CONVERTS AND A BILL WITH NO RATE is the same walks in
     ROWS.fx = rates;
   }
 });
+
+test('A CARD SAYS "Everywhere" FOR A ROW OF NO PROJECT: a scope column on a card is a fact, named in both engines', async () => {
+  const deps = await seeded;
+  const block = {
+    kind: 'cards',
+    source: 'register.skills',
+    columns: [{ field: 'name', as: 'title' }, { field: 'project', label: 'Where it applies', as: 'scope' }] as never,
+    empty: 'No skills yet.',
+  } as KernelBlock & PageBlock;
+  const kernel = kernelBlock(deps, block);
+  const web = webBlock(block);
+  assert.deepEqual(kernel.refusals, []);
+  assert.deepEqual(web.refusals, []);
+  assert.equal((web.columns as { as?: string }[])[1]?.as, 'fact');
+  const global = kernel.rows.findIndex((r) => r.fields.name === 'review-pr' && !r.fields.project);
+  assert.ok(global >= 0 && kernel.scopes?.[global] === null, 'the seed has no global review-pr');
+  assert.ok(web.rows.some((r) => r.cells[0] === 'review-pr' && r.cells[1] === 'Everywhere'), JSON.stringify(web.rows.map((r) => r.cells)));
+});

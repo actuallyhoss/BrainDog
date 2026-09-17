@@ -925,14 +925,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         if (column.as === 'scope' && block.kind !== 'cards') continue;
         if (block.kind !== 'cards')
           return bad('DECLARATION_INVALID', `${id}.${at} gives a column as, which is its role on a card, and only a cards block reads it.`, at);
-        if (typeof column.as !== 'string' || !(CARD_ROLES as readonly string[]).includes(column.as))
+        /* ON A CARD, `scope` IS A FACT that says where the row applies, "Everywhere" for a row of no project. */
+        const role = column.as === 'scope' ? 'fact' : column.as;
+        if (typeof role !== 'string' || !(CARD_ROLES as readonly string[]).includes(role))
           return bad('ENUM_VALUE_UNKNOWN', `${id}.${at}: ${JSON.stringify(column.as)} is not a role on a card.`, at, CARD_ROLES);
-        const n = (roles.get(column.as) ?? 0) + 1;
-        roles.set(column.as, n);
-        if (n > (column.as === 'fact' ? CARD_FACTS : 1))
+        const n = (roles.get(role) ?? 0) + 1;
+        roles.set(role, n);
+        if (n > (role === 'fact' ? CARD_FACTS : 1))
           return bad(
             'OUT_OF_BOUNDS',
-            `${id}.${at} has ${n} columns as ${column.as}. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`,
+            `${id}.${at} has ${n} columns as ${role}. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`,
             at,
           );
       }

@@ -204,7 +204,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         columns: [
           { field: 'lesson', as: 'title' },
           { field: 'kind', label: 'Kind', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'scope' },
           { field: 'confirmed_on', as: 'when' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
@@ -221,7 +221,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
           { field: 'name', as: 'title' },
           { field: 'trigger', label: 'When to use it', as: 'fact' },
           { field: 'rev', label: 'Version', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'scope' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
         limit: 8,
@@ -239,7 +239,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
           { field: 'name', as: 'title' },
           { field: 'trigger', label: 'When to use it', as: 'fact' },
           { field: 'transport', label: 'Transport', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'scope' },
           { field: 'seen', as: 'when' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
@@ -255,7 +255,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         columns: [
           { field: 'label', as: 'title' },
           { field: 'opens', label: 'What it opens', as: 'fact' },
-          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'scope' },
           { field: 'verified', as: 'when' },
         ],
         order: [{ field: 'seq', dir: 'desc' }],
@@ -344,7 +344,7 @@ export const RUNS_ON: { requires: readonly string[]; blocks: readonly Record<str
 };
 
 export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES } = {
-  manifest: { id: 'agents', version: '1.1.0', requires: ['register.things'] },
+  manifest: { id: 'agents', version: '1.1.1', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
 };

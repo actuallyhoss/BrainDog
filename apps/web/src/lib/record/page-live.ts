@@ -213,7 +213,8 @@ const columnsOf = (b: Answered) => {
      place. A block over no register has nothing to ask and truncates as the text it is drawn as. */
   const register = registerOf(b) ?? '';
   return (b.columns ?? []).map((c) => {
-    const as = roleOf(c.as);
+    /* A SCOPE COLUMN ON A CARD IS A FACT: the cell says where the row applies, filled from `scopes` below. */
+    const as = c.as === 'scope' && b.kind === 'cards' ? 'fact' : roleOf(c.as);
     return {
       field: c.field,
       label: columnHeading(register, { field: c.field, label: str(c.label) }),

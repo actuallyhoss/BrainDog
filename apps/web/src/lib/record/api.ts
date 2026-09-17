@@ -2196,7 +2196,7 @@ export function readBlock(b: PageBlock): BlockResult {
           truncate: decl(register ?? '', c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
           /* A card's role for this column. Without it every cards block fell back to the guessed roles.
              `scope` is not a role the renderer draws: it says what the cell holds, which is settled here. */
-          ...(c.as === undefined || c.as === 'scope' ? {} : { as: c.as }),
+          ...(c.as === undefined || (c.as === 'scope' && b.kind !== 'cards') ? {} : { as: c.as === 'scope' ? ('fact' as const) : c.as }),
         }))
       : [];
     const rows = toRows(register ?? '', ringed(register, b, entries), columns);
