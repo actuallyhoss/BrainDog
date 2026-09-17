@@ -72,7 +72,8 @@ export function updatesOf(body: Row): Map<string, { from: string; to: string }> 
  * case's name ("Money", never "Money core" from `money-core`), else its id in words.
  */
 export function packName(id: string, body: Row): string {
-  if (id === text(body.install) && text(body.title) !== '') return copy.valueWord(text(body.title));
+  /* A MODULE'S CATALOGUE TITLE IS ITS ID (`money-core`), which is not a name: "Updates Money-core" reached Decide. */
+  if (id === text(body.install) && text(body.title) !== '' && text(body.title) !== id) return copy.valueWord(text(body.title));
   return moduleName(id);
 }
 
@@ -143,6 +144,9 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
         else if (fresh && kind === 'register') out.lists++;
         else out.more++;
         if (seen && seen.lines.length > 0 && (kind === 'page' || kind === 'register')) {
+          /* WHAT A PAGE READS FROM IS NAMED AS THE RAIL NAMES THOSE LISTS, not by their declared words. */
+          const reads = kind === 'page' && full && Array.isArray(full.body.requires) ? strings(full.body.requires).filter((r) => r.startsWith('register.')).map((r) => listName(r, ctx)) : [];
+          if (reads.length) seen.lines = seen.lines.map((l) => (l.label === copy.proposalReads ? { ...l, value: reads.join(', ') } : l));
           drawn.push({ ...seen, kind: fresh ? newKind(kind) : copy.arrangeChanged(copy.proposalKind(kind)), title });
           continue;
         }

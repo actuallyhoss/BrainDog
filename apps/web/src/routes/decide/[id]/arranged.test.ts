@@ -240,3 +240,18 @@ test('AN UPDATE THAT ONLY CHANGES draws what changes under Changes, and no Adds 
     { label: 'Lists', value: 'Bills' },
   ]);
 });
+
+test('A CHANGED PAGE READS FROM ITS LISTS BY THE RAIL’S NAMES, and a module whose catalogue title is its id is named as the module', () => {
+  const out = arrangedOf('pack', {
+    install: 'money-core',
+    kind: 'pack',
+    title: 'money-core',
+    packs: { install: ['money-core'] },
+    plan: [{ pack: 'money-core', from: '1.0.0', version: '1.0.1', adds: [], changes: ['page.money'] }],
+    names: { 'register.obligations': 'Bills' },
+    doc: { pack: 'money-core', declarations: [{ page: 'money', title: 'Overview', nav: { section: 'Money' }, requires: ['register.obligations', 'register.accounts'], blocks: [{ kind: 'stat', heading: 'Right now' }] }] },
+  }, { lists: new Map([['obligations', 'Obligations'], ['accounts', 'Accounts']]) });
+  assert.equal(out?.lead, 'Updates Money from 1.0.0 to 1.0.1');
+  const appears = out?.parts.find((p) => p.part === 'appears');
+  assert.deepEqual(appears?.part === 'appears' && appears.appears[0]?.lines.find((l) => l.label === 'Reads from'), { label: 'Reads from', value: 'Bills, Accounts' });
+});
