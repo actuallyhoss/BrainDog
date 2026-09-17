@@ -74,7 +74,7 @@ test('projects keep their lane, mark, repos, plan and their own decisions, and t
   assert.equal(lanternly.register, 'things');
   assert.deepEqual({ ...lanternly.fields, note: undefined }, { name: 'Lanternly', lane: 'earning', hue: 212, mark: '◆', repos: ['example/lanternly-app'], note: undefined });
   const note = String(lanternly.fields.note);
-  for (const part of ['A reading-light subscription', '## Plan', '- Ship the annual plan', '## Blockers', '### D3: Monthly or annual first?', 'Because It lifts cash']) assert.ok(note.includes(part), part);
+  for (const part of ['A reading-light subscription', '## Plan', '- Ship the annual plan', '## Blockers', '### D3: Monthly or annual first?', 'Why: It lifts cash']) assert.ok(note.includes(part), part);
   assert.ok(!note.includes('D4'), 'a decision on no project is not put on a project page');
   assert.equal(row(p, 'legacy:project:tidepool')!.fields.lane, 'building');
   assert.equal(row(p, 'legacy:project:quill')!.fields.lane, 'earning');
@@ -293,6 +293,7 @@ test('a record without the founder and agents lists is told what to install, and
   assert.deepEqual(report.missing, ['datapoints', 'learnings', 'skills', 'tools', 'credentials']);
   assert.deepEqual(mem.writes, []);
   const lines = said(report, { dryRun: false, file: 'export.json' });
+  assert.equal(lines[0], 'Read, and wrote nothing: export.json, exported 2026-09-15.');
   assert.match(lines[1]!, /^This BrainDog has no Datapoints, Learnings, Skills, Tools and Keys \(the index only\) lists, so nothing was written\. Install Solo founder and Agents on this BrainDog first, then run the import again\.$/u);
 });
 

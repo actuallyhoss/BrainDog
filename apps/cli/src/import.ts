@@ -248,7 +248,7 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   const { plan } = report;
   const lines: string[] = [];
   const when = plan.taken ? `, exported ${plan.taken.slice(0, 10)}` : '';
-  lines.push(`${o.dryRun ? 'Read, and wrote nothing' : 'Imported'}: ${o.file}${when}.`);
+  lines.push(`${o.dryRun || report.missing.length > 0 ? 'Read, and wrote nothing' : 'Imported'}: ${o.file}${when}.`);
   if (report.missing.length > 0) {
     const need = [...new Set(report.missing.map((r) => PROVIDED_BY[r] ?? r))];
     lines.push(`This BrainDog has no ${and(report.missing.map((r) => NAMES[r] ?? r))} lists, so nothing was written. Install ${and(need)} on this BrainDog first, then run the import again.`);
