@@ -329,6 +329,9 @@ export function arranger(d: ArrangeDeps) {
    * Home page from its id, "Home personal", and a list by the build's word, Things, where the rail says Projects, because
    * a catalogue pack is filed without its document. So the record files the names: a list by the label the use case
    * speaking afterwards gives it, else its declared name; that use case's Home page by its voice, else a page by its title.
+   *
+   * A LIST ALREADY HERE IS NAMED ONLY WHEN THE PROPOSAL MOVES THE VOICE. Otherwise its name is the one the rail draws when
+   * Decide is opened, which a later switch may change, and a name filed now would go stale beside it.
    */
   function namesFor(planned: Planned, speaker: string | null): Record<string, string> {
     let values: Record<string, unknown> = {};
@@ -343,14 +346,15 @@ export function arranger(d: ArrangeDeps) {
     const labels = labelsOf(values, config);
     const home = voiceIn(values).home;
     const out: Record<string, string> = {};
-    for (const [key, word] of Object.entries(labels)) if (/^[a-z][a-z0-9_]*$/u.test(key)) out[`register.${key}`] = word;
+    const moves = speaker !== speakerNow();
+    if (moves) for (const [key, word] of Object.entries(labels)) if (/^[a-z][a-z0-9_]*$/u.test(key)) out[`register.${key}`] = word;
     for (const pack of planned.packs.values()) {
       for (const decl of pack.declarations) {
         const body = decl.body as Body;
         if (decl.kind === 'register') {
           const name = typeof body.name === 'string' ? body.name : null;
           const bare = decl.id.slice('register.'.length);
-          if (out[decl.id] === undefined && name !== null) out[decl.id] = labels[bare] ?? name;
+          if (out[decl.id] === undefined && name !== null && (moves || kernel.register(bare) === undefined)) out[decl.id] = labels[bare] ?? name;
         } else if (decl.kind === 'page') {
           const title = typeof body.title === 'string' && !body.title.includes('{{') ? body.title : null;
           const said = speaker !== null && home !== undefined && decl.id === `page.home-${speaker.slice(USE_CASE.length)}` ? home : title;

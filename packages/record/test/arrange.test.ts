@@ -479,6 +479,12 @@ test('A PROPOSAL IS FILED WITH THE NAMES THE RAIL WILL USE: a list by its label,
   assert.equal(row.body.names['register.notes'], 'Notes');
   assert.equal(row.body.names['page.home-desk'], 'At my desk');
   assert.equal(row.body.names['page.work'], 'Work');
+
+  /* ONCE IT IS IN AND THE VOICE STAYS, A LIST ALREADY HERE IS LEFT TO THE RAIL'S NAME WHEN DECIDE IS OPENED, which a later switch may change. */
+  value(await api.decide(accept(filed.id), owner));
+  const update = value<{ id: string }>(await api.propose({ question: 'Newer Work?', body_kind: 'pack', body: { install: 'work', doc: { ...WORK, version: '1.0.1', declarations: [{ ...WORK.declarations[0], name: 'Jobs' }, WORK.declarations[1]] } } } as never, agent));
+  const later = value<{ body: { names?: Record<string, string>; plan: unknown[] } }>(await api.governance({ id: update.id }, owner));
+  assert.equal(later.body.names?.['register.tasks'], undefined, JSON.stringify(later.body));
   sql.close();
 });
 
