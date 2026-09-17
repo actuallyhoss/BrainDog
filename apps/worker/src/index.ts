@@ -34,6 +34,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
 import { sparkLook, workerSparkModel } from './spark.ts';
+import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
@@ -99,6 +100,8 @@ type Env = {
   AUTH_MAIL_FROM?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
+  /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Spark reads (`catalogue.ts`). */
+  ASSETS?: Fetcher;
 };
 
 /** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
@@ -208,6 +211,8 @@ export class Record$ extends DurableObject<Env> {
            self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
            left what it kept typed where nothing reads it. */
         catalogue: CATALOGUE,
+        /* NEWER VERSIONS IN THE CATALOGUE BUNDLED WITH THE SHELL, for Spark to ask about on Decide, as a self-host's folder gives. */
+        catalogueOffers: workerCatalogueOffers(this.env.ASSETS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         /* DELETION, `51 §5.13`. The record has checked the owner, the sign-in and the typed name; this is the alarm,

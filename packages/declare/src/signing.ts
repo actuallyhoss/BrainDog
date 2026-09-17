@@ -71,8 +71,8 @@ export async function keyIdOf(publicKey: string): Promise<string> {
 /** A new key pair for an author, as the file they keep. The caller writes it where the author chose. */
 export async function newAuthorKey(author: string, now: Date = new Date()): Promise<AuthorKey> {
   const pair = (await crypto.subtle.generateKey(ALG, true, ['sign', 'verify'])) as { publicKey: Parameters<typeof crypto.subtle.exportKey>[1]; privateKey: Parameters<typeof crypto.subtle.exportKey>[1] };
-  const public_key = toB64(await crypto.subtle.exportKey('raw', pair.publicKey));
-  const private_key = toB64(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const public_key = toB64((await crypto.subtle.exportKey('raw', pair.publicKey)) as ArrayBuffer);
+  const private_key = toB64((await crypto.subtle.exportKey('pkcs8', pair.privateKey)) as ArrayBuffer);
   return { format: AUTHOR_KEY_FORMAT, alg: 'ed25519', author, key_id: await keyIdOf(public_key), public_key, private_key, created_at: now.toISOString() };
 }
 
