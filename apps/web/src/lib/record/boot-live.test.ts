@@ -248,3 +248,13 @@ test('A RECORD SETTING ITSELF UP IS ONE LINE: the use case and how many example 
   assert.equal(at({ target: null, target_kind: null, to: 1 }), 'Added 1 example row');
   assert.equal(at({ target: null, target_kind: null, to: 0 }), 'Linked the example rows to each other');
 });
+
+test('THE SAMPLE SAYS ONE COUNT OF OPEN QUESTIONS: the rail and Home, the Decide figure and the queue Decide draws', async () => {
+  const { sampleShell } = await import('./boot-live.ts');
+  const { boot, metric } = await import('./api.ts');
+  const { ARRANGING, QUEUE } = await import('./data.ts');
+  const shell = sampleShell(boot() as never, 0);
+  assert.ok(ARRANGING.every((q) => QUEUE.includes(q)), 'Decide draws the arranging proposals, so the count holds them');
+  assert.equal(shell.open, QUEUE.length);
+  assert.equal(metric('open-questions').value, String(QUEUE.length));
+});

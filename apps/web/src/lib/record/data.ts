@@ -537,6 +537,13 @@ export const ARRANGING: Question[] = [
   },
 ];
 
+/**
+ * EVERY QUESTION THE SAMPLE HAS OPEN, in the queue's order: the one count the rail, Home and Decide say.
+ * The rail and Home counted `QUESTIONS` and Decide drew `ARRANGING` after them, so the badge said 5
+ * over a screen headed Open questions 8.
+ */
+export const QUEUE: Question[] = [...QUESTIONS, ...ARRANGING].sort((a, b) => a.rank - b.rank);
+
 export const PROPOSALS: Record<string, Proposal> = {
   SG40: {
     kind: 'pack',

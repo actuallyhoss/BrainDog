@@ -41,6 +41,7 @@ import {
   SIGNING_KEY,
   SOURCES,
   QUESTIONS,
+  QUEUE,
   DECIDED,
   REGISTERS,
   ROWS,
@@ -1114,18 +1115,18 @@ export function metric(id: string): Metric {
        guard was written for, on `/decide` — which `19 §2` names as one of the three spine screens,
        and which the commit that added the guard edited in the same breath. A figure over an empty
        list is not good news; it is not news. */
-    const none = QUESTIONS.length === 0 && DECIDED.length === 0;
+    const none = QUEUE.length === 0 && DECIDED.length === 0;
     return {
       id,
       label: 'Open questions',
-      value: String(QUESTIONS.length),
+      value: String(QUEUE.length),
       /* A LITERAL THAT `targetLine` WOULD HAVE WRITTEN. Every other target on every other tile went
          from `target ≤ X` to a sentence; this one is typed out here, so it stayed — on `/decide`,
          which `19 §2` names as one of the three spine screens. */
       note: none
         ? copy.nothingIn('Decisions')
         : targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]),
-      ...(none ? {} : { tone: QUESTIONS.length > 3 ? ('warn' as const) : ('good' as const) }),
+      ...(none ? {} : { tone: QUEUE.length > 3 ? ('warn' as const) : ('good' as const) }),
       href: '/decide',
     };
   }

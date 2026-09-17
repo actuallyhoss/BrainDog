@@ -19,6 +19,7 @@ import { useCaseName } from '@braindog/seed/usecases/names';
 import { iconFor, NOW, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
 import { noRecord } from './device.ts';
+import { QUEUE } from './data.ts';
 import { noteOf } from './history-live.ts';
 import type { NewsItem } from './schema.ts';
 
@@ -350,7 +351,7 @@ export const sampleShell = (sample: Sample, inbox: number): Shell => ({
   pages: [],
   names: {},
   inbox,
-  open: sample.questions.length,
+  open: QUEUE.length,
   now: NOW,
   live: false,
   upTo: null,

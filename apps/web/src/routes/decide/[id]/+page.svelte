@@ -38,7 +38,7 @@
   import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
-  import { ARRANGING, PROPOSALS, ROWSETS } from '$lib/record/data.ts';
+  import { ARRANGING, PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
   import Changes from './Changes.svelte';
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
@@ -97,7 +97,7 @@
    * decision, so the one just decided keeps its place and the next is the one after it.
    */
   let queue = $state<string[]>([]);
-  const openIds = $derived(from === 'live' ? queue : [...QUESTIONS, ...ARRANGING].sort((a, b) => a.rank - b.rank).map((q) => q.id));
+  const openIds = $derived(from === 'live' ? queue : QUEUE.map((q) => q.id));
   const here = $derived(openIds.indexOf(String(page.params.id)));
   const nextId = $derived(here >= 0 ? openIds[here + 1] : openIds[0]);
   const prevId = $derived(here > 0 ? openIds[here - 1] : undefined);

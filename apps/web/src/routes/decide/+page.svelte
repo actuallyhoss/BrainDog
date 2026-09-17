@@ -26,7 +26,7 @@
   import { since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
-  import { ARRANGING, PROPOSALS, ROWSETS } from '$lib/record/data.ts';
+  import { PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
   import Changes from './[id]/Changes.svelte';
   import Proposed from './[id]/Proposed.svelte';
   import Arranged from './[id]/Arranged.svelte';
@@ -84,7 +84,7 @@
   const now = $derived(from === 'live' ? Date.now() : NOW);
 
   const open = $derived(
-    from === 'live' ? (live?.open ?? []) : from === 'sample' ? [...data.questions, ...ARRANGING].sort((a, b) => a.rank - b.rank) : [],
+    from === 'live' ? (live?.open ?? []) : from === 'sample' ? QUEUE : [],
   );
   /* Every decision ever taken: the record's, or the sample's. The name is the one the cap test reads. */
   const DECIDED = $derived(from === 'live' ? (live?.decided ?? []) : from === 'sample' ? SAMPLE_DECIDED : []);
