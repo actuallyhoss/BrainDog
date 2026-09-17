@@ -228,7 +228,12 @@ body: { text: "Summary up to {until:date}" }   # JSON, 8 KB at most; string leav
 | `grant` | required | required | a vault label of at most 40 characters |
 | `every` | required | required | at least fifteen minutes, and at least `floor:` when one is declared |
 | `body` | optional | refused | an object of at most 8 KB; each string leaf may use `{since}` and `{until}` |
-| `writes.register` | optional | required | the ingest pipeline's own `extract:` and `writes:` |
+| `writes.register` | optional | required | the ingest pipeline's own `extract:` or `map:`, and `writes:` |
+
+A `poll` whose endpoint answers JSON reads it with `map:` in place of `extract:` (43 §4.5): one field per path,
+with `{ value: ... }` for what the declaration states and `{ arrived: true }` for when the answer came. A founder's
+project polled for its numbers is one such poll per measure, writing a datapoint
+(`packages/seed/src/usecases/founder-poll.ts`).
 
 Substitution is §3.1's with fewer names. `{since}` and `{until}` are the only placeholders a scheduled action
 has values for, with the formats `date`, `instant`, `epoch_s` and `epoch_ms`. `{since}` is the last successful

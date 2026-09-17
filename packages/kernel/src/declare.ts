@@ -30,6 +30,7 @@ import { checkInterval, type PullDecl } from './pull.ts';
    `31 §2`'s order is not about. `DATE_FORMATS` comes over the same edge for the same reason: a
    `date:` form this file accepts is one `day` can read, and there is one list of them. */
 import { ARRIVAL, DATE_FORMATS } from './ingest.ts';
+import { MAP_TYPES } from './map.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -427,7 +428,7 @@ function metricBody(decl: Declaration): Refusal | null {
 }
 
 /**
- * The twenty drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
+ * The twenty-seven drawn kinds, WRITTEN OUT here rather than imported, and the dependency graph is why.
  *
  * `packages/render` owns `KINDS` and is the authority (`05 §2`), but the
  * kernel depends on `ports` and `where` and on nothing else — `31 §2` puts the renderer above it, so
@@ -446,7 +447,7 @@ function metricBody(decl: Declaration): Refusal | null {
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines',
 ] as const;
 
 /**
@@ -1230,10 +1231,20 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
     const map = body.map;
     if (map === null || typeof map !== 'object' || Array.isArray(map))
       return bad('DECLARATION_INVALID', `${id}'s map is one entry per field.`, 'map');
+    if (body.extract !== undefined)
+      return bad('DECLARATION_INVALID', `${id} carries both extract and map. Read text with extract, or a JSON answer with map, and not both.`, 'map');
+    /* A POLL'S MAP FILLS ONE ROW, and is held to `mappingFault` whole. A PULL'S is a connector's, whose `read.rows`
+       may expand a list, so its paths keep the grammar check they had and a stated value or `arrived` is checked as one. */
     for (const [field, entry] of Object.entries(map as Record<string, { path?: unknown }>)) {
-      const paths = Array.isArray(entry?.path) ? entry.path : [entry?.path];
+      const at = `${id}.map.${field}`;
+      if (body.channel === 'poll' || entry === null || typeof entry !== 'object' || !('path' in entry)) {
+        const wrong = mappingFault(entry, at);
+        if (wrong) return wrong;
+        continue;
+      }
+      const paths = Array.isArray(entry.path) ? entry.path : [entry.path];
       for (const path of paths) {
-        const wrong = pathFault(path, `${id}.map.${field}.path`);
+        const wrong = pathFault(path, `${at}.path`);
         if (wrong) return wrong;
       }
     }
@@ -1685,6 +1696,50 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
 }
 
 /** `43 §4.4`'s grammar, and its ceiling. An empty path is the root and is legal. */
+/** What one `map:` entry may carry beside its `path` and `type`. */
+const MAPPING_KEYS = new Set(['path', 'type', 'from', 'minor', 'currency', 'format', 'values', 'other', 'note']);
+
+/**
+ * One `map:` entry (`map.ts`, `43 §4.5`): read from a path with a type, a `value` the declaration states, or
+ * `arrived: true`. Anything else is refused here, because at arrival it would read nothing and say nothing.
+ */
+function mappingFault(entry: unknown, at: string): Refusal | null {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry))
+    return bad('DECLARATION_INVALID', `${at} is one object: { path, type }, { value } or { arrived: true }.`, at);
+  const e = entry as Record<string, unknown>;
+  const keys = Object.keys(e).filter((k) => k !== 'note');
+  if ('value' in e) {
+    if (keys.length !== 1) return bad('DECLARATION_INVALID', `${at} states a value, and a stated value takes no other key.`, at);
+    return null;
+  }
+  if ('arrived' in e) {
+    if (keys.length !== 1 || e.arrived !== true)
+      return bad('DECLARATION_INVALID', `${at} is { arrived: true }, the instant the answer arrived, with no other key.`, at);
+    return null;
+  }
+  if (!('path' in e)) return bad('DECLARATION_INVALID', `${at} names no path. Write { path, type }, { value } or { arrived: true }.`, at);
+  const unknown = keys.find((k) => !MAPPING_KEYS.has(k));
+  if (unknown !== undefined) return bad('DECLARATION_INVALID', `${at} has ${JSON.stringify(unknown)}, which a mapping does not take.`, `${at}.${unknown}`);
+  if (typeof e.type !== 'string' || !(MAP_TYPES as readonly string[]).includes(e.type))
+    return bad('DECLARATION_INVALID', `${at}'s type is ${JSON.stringify(e.type ?? null)}, and a mapped field is one of ${MAP_TYPES.join(', ')}.`, `${at}.type`, MAP_TYPES as unknown as string[]);
+  const paths = Array.isArray(e.path) ? e.path : [e.path];
+  if (Array.isArray(e.path) && (e.type !== 'money' || e.path.length !== 2))
+    return bad('DECLARATION_INVALID', `${at} names two paths, and only money reads two: [amount, currency].`, `${at}.path`);
+  for (const path of paths) {
+    const wrong = pathFault(path, `${at}.path`);
+    if (wrong) return wrong;
+    if (typeof path === 'string' && path.includes('[]'))
+      return bad('PATH_INVALID', `${at}.path says [], which reads every element, and a mapped field is one value. Name one: [0] or [-1].`, `${at}.path`);
+  }
+  if (e.from !== undefined && e.from !== 'epoch_s' && e.from !== 'epoch_ms')
+    return bad('DECLARATION_INVALID', `${at}'s from is epoch_s or epoch_ms.`, `${at}.from`, ['epoch_s', 'epoch_ms']);
+  if (e.type === 'money' && !Array.isArray(e.path) && (typeof e.currency !== 'string' || !/^[A-Z]{3}$/u.test(e.currency)))
+    return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with a three-letter code.`, `${at}.currency`);
+  if (e.type === 'enum' && (!Array.isArray(e.values) || e.values.length === 0 || e.values.some((v) => typeof v !== 'string')))
+    return bad('DECLARATION_INVALID', `${at} is an enum, so it lists its values.`, `${at}.values`);
+  return null;
+}
+
 function pathFault(path: unknown, at: string): Refusal | null {
   if (typeof path !== 'string')
     return bad('PATH_INVALID', `${at} is ${JSON.stringify(path ?? null)}, and a path is text.`, at);

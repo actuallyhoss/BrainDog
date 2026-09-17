@@ -42,6 +42,7 @@ import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 import { sparkMayWrite } from './spark.ts';
+import { mapField, parseAnswer, type Mapping } from './map.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -114,6 +115,11 @@ export type IngestDecl = {
   /** Over the ARRIVAL, `34 §1.9`'s seven: `from to subject body channel state ts`. Never a register. */
   match?: Predicate;
   extract: Record<string, Extractor>;
+  /**
+   * A JSON answer read by paths (`map.ts`, `43 §4.5`), in place of `extract`. A declaration carries one or the
+   * other, and `declare` refuses both.
+   */
+  map?: Record<string, Mapping>;
   writes: {
     register: string;
     /**
@@ -338,8 +344,21 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        and this loop used to keep the value alone. */
     const soft: string[] = [];
 
-    for (const [field, form] of Object.entries(matched.extract)) {
-      const got = resolve(deps, form, text);
+    /* A MAP READS THE BODY AS JSON, once, and each field by its path; an extract reads the text with anchors. The
+       outcomes are the same words, so everything below files a mapped row exactly as it files an extracted one. */
+    const reads: [string, () => { value: Json | null; outcome: string }][] =
+      matched.map !== undefined && matched.extract === undefined
+        ? (() => {
+            const root = parseAnswer(body);
+            const fields = deps.schemaOf(matched.writes.register)?.fields ?? {};
+            return Object.entries(matched.map).map(([field, mapping]) => [
+              field,
+              () => mapField({ exponent: exponentOf, day }, mapping, root, at, fields[field]?.type),
+            ] as [string, () => { value: Json | null; outcome: string }]);
+          })()
+        : Object.entries(matched.extract ?? {}).map(([field, form]) => [field, () => resolve(deps, form, text)]);
+    for (const [field, read] of reads) {
+      const got = read();
       if (got.value === null) missed.push(field);
       else {
         extracted[field] = got.value;

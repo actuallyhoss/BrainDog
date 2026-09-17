@@ -63,6 +63,8 @@ export type ActionDecl = {
   /** `pull` only, `42 §4.7`: where it fetches when it does not say `url:`. */
   fetch?: { base?: string; path?: string };
   extract?: Record<string, unknown>;
+  /** A JSON answer read by paths, in place of `extract` (`map.ts`). */
+  map?: Record<string, unknown>;
   writes?: { register?: string };
 };
 
@@ -517,7 +519,7 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
       ? changed ? `${ingest} polled ${host}, and the answer changed.` : `${ingest} polled ${host}, and the answer is the same.`
       : channel === 'call' ? `${ingest} called ${host}, and it answered ${status}.` : `${ingest} fetched from ${host}.`;
 
-    if (changed && decl.writes?.register !== undefined && decl.extract !== undefined) {
+    if (changed && decl.writes?.register !== undefined && (decl.extract !== undefined || decl.map !== undefined)) {
       /* A POLL'S ARRIVALS ARE KEYED BY RUN, so an answer that goes A, B and back to A is three changes and
          not a redelivery of the first. A PULL'S ARE KEYED BY CONTENT, so the same page twice is one row. */
       const sha = channel === 'poll' ? `${ingest}:${hash}:${job.id}` : `${ingest}:${hash}`;

@@ -288,6 +288,23 @@ type Mapping = { path: string | [string, string]; type: 'text' | 'int' | 'decima
 `select(row, path)` must reach exactly one value: zero → `missing`, two or more → `ambiguous`. `ref`, `file`,
 `secret`, `quantity` and `list<T>` are not mappable in v1 (§10).
 
+**Built, September 17th 2026, for a `poll` and a `pull` answer** (`packages/kernel/src/map.ts`, `ingest.ts`). An
+answer handed to a declaration that carries `map:` and no `extract:` is parsed as JSON once (the 2,000,000-byte cap;
+a body that is not JSON reaches nothing) and each field is read by its entry. Two forms are added beside
+`{ path, type }`, for facts a response does not carry:
+
+| Form | Writes | Outcome |
+|---|---|---|
+| `{ value: <literal> }` | the literal, as the declaration states it: a measure's name, the project it is about | `exact` |
+| `{ arrived: true }` | the instant the answer arrived (the raw row's own `ts`), cut to its day for a `day` field | `exact` |
+
+A field that reads nothing is `missing` and an `enum` that falls back to `other:` is `defaulted`, so the row files
+by §5.1 step 7 exactly as an extracted one does. On a `poll` every entry is checked at install: one of the three
+forms, a type from the table above, a path in §4.4's grammar with no `[]` (a poll fills one row, so a path reads
+one value), `from:` only `epoch_s` or `epoch_ms`, money with two paths or a `currency:`, an enum with `values:`,
+and never `map:` beside `extract:`. A `pull`'s `map:` keeps the path check it had. Refusals are
+`DECLARATION_INVALID` and `PATH_INVALID`.
+
 ---
 
 ## 5 · Algorithms
