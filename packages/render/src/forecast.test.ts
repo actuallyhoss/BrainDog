@@ -96,6 +96,7 @@ test('the plan holds zero in view, gaps in the past, stems and the crossing', ()
   assert.equal(plan.warn, true);
   assert.equal(plan.said, 'Goes under on 20 Oct');
   assert.equal(plan.cross?.day, '20 Oct');
+  assert.equal(plan.rises, false, 'a walk that goes under keeps the bottom of the axis in the near corner');
   assert.equal(plan.base, '', 'no baseline until a knob moves');
   assert.ok(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).base.length > 0);
   assert.deepEqual(plan.ticks.map((t) => t.label), ['Oct', 'Nov']);
