@@ -373,8 +373,14 @@
 
   /* `stat lead`: the first figure is the screen's one hero figure (DESIGN-SYSTEM 2.2). The others
      stay the size they are, so the lead reads as the answer and the rest as its detail. */
+  /* THE HERO STEPS DOWN INSIDE ITS OWN CELL rather than running into the next one: a balance in the millions, in
+     pounds with its code, is wider than a quarter of the page at the hero size. */
+  .block[data-form='lead'] .cell:first-child {
+    container-type: inline-size;
+  }
+
   .block[data-form='lead'] .cell:first-child .cell-figure {
-    font-size: var(--t-2xl);
+    font-size: min(var(--t-2xl), 10cqi);
     letter-spacing: -0.025em;
   }
 

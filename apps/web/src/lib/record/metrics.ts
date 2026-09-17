@@ -278,7 +278,10 @@ export function targetSaid(decl: MetricDecl, r: { unit?: string | null | undefin
   if (!offTarget(decl, r.unit)) return targetLine(decl);
   if (!r.targetIn) return '';
   const from = decl.format!.slice('money.'.length);
-  return copy.targetConverted(targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target }), from);
+  const line = targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target });
+  /* NOTHING IS NOTHING IN EVERY CURRENCY, so a bound of zero is not said to be converted. */
+  const bound = 'lte' in r.targetIn.target ? r.targetIn.target.lte : r.targetIn.target.gte;
+  return bound === 0 ? line : copy.targetConverted(line, from);
 }
 
 /**

@@ -1187,7 +1187,9 @@
        already follows for the same width. */
     .block-slot :global(.grid:has(> .cell) .cell-figure) {
       font-size: var(--t-lg);
-      white-space: nowrap;
+      /* ONE AMOUNT NEVER BREAKS, because its code sits on a no-break space; a figure in several currencies breaks
+         between them rather than running out of half a phone. */
+      white-space: normal;
     }
 
     /* THE LEAD FIGURE STAYS THE SCREEN'S HERO on a phone, a step above the figures beside it. */
@@ -1213,13 +1215,16 @@
       grid-template-areas:
         'label glyph figure'
         'note note figure';
-      grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+      /* THE LABEL KEEPS A FLOOR, so a figure in several currencies, which is long, does not squeeze it to a word a line. */
+      grid-template-columns: minmax(min(14ch, 45%), max-content) minmax(0, 1fr) minmax(0, auto);
       column-gap: var(--sp-2);
     }
 
     .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child) .cell-figure) {
       font-size: var(--t-md);
       text-align: end;
+      /* AND THE FIGURE BREAKS BETWEEN ITS AMOUNTS, never inside one: each keeps its code on a no-break space. */
+      white-space: normal;
     }
   }
 </style>
