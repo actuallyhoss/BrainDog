@@ -88,6 +88,7 @@ import {
   decide,
   getGovernance,
   listGovernance,
+  countGovernance,
   propose as openSuggestion,
   reopen,
   keepApplied,
@@ -2466,8 +2467,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         ...(q.where ? { where: q.where } : {}),
         ...(q.limit ? { limit: q.limit } : {}),
         ...(q.order?.length ? { order: q.order } : {}),
+        ...(q.cursor ? { cursor: q.cursor } : {}),
       });
-      return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched }) : out;
+      return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
@@ -3939,8 +3941,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * THE RECORD OPENS SUGGESTIONS FROM THREE PLACES and until this existed nothing could read one.
      * A proposal nobody can see is a proposal that was never made.
      */
-    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean } = {}) =>
+    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string } = {}) =>
       listGovernance({ sql, nowMs: clock.now() }, register, opts),
+
+    /** How many rows a governance register holds, all of them. */
+    governanceCount: (register: GovernRegister) => countGovernance(sql, register),
 
     /** Every open suggestion, uncapped, for a count or a list the record filters to its caller before it trims. */
     openSuggestions: () => listGovernance({ sql, nowMs: clock.now() }, 'suggestion', { status: 'open', every: true }),

@@ -136,7 +136,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'dryRun', group: 'READ+', writes: false, what: 'What a rule would do, before anybody turns it on. It writes nothing.',
     takes: { rule: 'json', limit: 'integer' } },
   { name: 'governance', group: 'READ+', writes: false, what: 'What has been proposed, what was decided, and what was predicted.',
-    takes: { register: 'text', id: 'text', status: 'text', limit: 'integer' } },
+    takes: { register: 'text', id: 'text', status: 'text', limit: 'integer', cursor: 'text' } },
   { name: 'propose', group: 'DATA', writes: true, what: 'Put a question in front of a person. It changes nothing by itself.' },
   { name: 'decide', group: 'DATA', writes: true, what: 'Answer one, with the reason. No token reaches this.' },
   { name: 'packs', group: 'READ+', writes: false, what: 'Which packs this record has, and at what version.' },

@@ -459,7 +459,7 @@ export type Boot = {
    * COUNTS AND NOT LISTS. `waiting` is capped for the first paint and a rail badge is the whole number. The inbox holds
    * whatever was sent in, so only an owner is told how much; anybody else gets `null`, which is not zero.
    */
-  counts: { decide: number; inbox: number | null };
+  counts: { decide: number; inbox: number | null; decided: number };
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
   /**
@@ -1345,6 +1345,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
         inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
+        /* EVERY DECISION, for a screen that reads them a page at a time. A decision carries no body, so none is held
+           back from a reader of the record, and the count is the table's. */
+        decided: kernel.governanceCount('decision'),
       },
       whatsNew: newsFor(ctx),
       ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
@@ -2383,7 +2386,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * one register — and one that the person who has to answer it cannot see is a proposal that was
      * never made.
      */
-    async governance(args: { register?: string; id?: string; status?: string; limit?: number }, ctx: CallContext) {
+    async governance(args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const register = (args?.register ?? 'suggestion') as GovernRegister;
@@ -2394,9 +2397,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const row = kernel.governanceRow(register, String(args.id));
         return ok(row && holds(ctx, row) ? null : asked(register, row));
       }
+      /* A PAGE AT A TIME PAST THE LIMIT: `cursor` is the id of the last row the page above held, and a page shorter than
+         the limit is the last one. */
+      if (args?.cursor !== undefined && (typeof args.cursor !== 'string' || args.cursor === ''))
+        return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with.', { at: 'cursor' });
+      const after = args?.cursor === undefined ? {} : { cursor: args.cursor };
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
+        ...after,
       });
       if (!rows.ok) return rows;
 
@@ -2411,7 +2420,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
-      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true });
+      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true, ...after });
       if (!every.ok) return every;
       return ok(every.value.filter((r) => !holds(ctx, r)).slice(0, rows.value.length).map((r) => asked(register, r)));
     },

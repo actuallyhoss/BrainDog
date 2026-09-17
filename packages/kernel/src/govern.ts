@@ -175,6 +175,9 @@ const ORDER: Record<GovernRegister, string> = {
   prediction: 'score_at DESC, rowid DESC',
 };
 
+/** The column each register is ordered by before its rowid, for the cursor. */
+const WHEN: Record<GovernRegister, string> = { suggestion: 'opened_at', decision: 'ts', prediction: 'score_at' };
+
 /**
  * The governance rows, read like a register.
  *
@@ -185,7 +188,7 @@ const ORDER: Record<GovernRegister, string> = {
 export function listGovernance(
   deps: Pick<GovernDeps, 'sql' | 'nowMs'>,
   register: GovernRegister,
-  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined } = {},
+  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined; cursor?: string | undefined } = {},
 ): Result<Record<string, unknown>[]> {
   if (!(GOVERNANCE as readonly string[]).includes(register))
     return no('REGISTER_UNKNOWN', `${register} is not a governance register.`, { at: 'register', allowed: GOVERNANCE });
@@ -203,12 +206,29 @@ export function listGovernance(
     }
   }
 
+  /* THE CURSOR IS THE ID OF THE LAST ROW THE PAGE ABOVE HELD, and the next page is every row after it in the one order
+     this list has: its time, then the order it was written in. Keyset rather than an offset, so a question opened
+     while somebody reads page two does not push a row they already saw onto page three. An id this register does not
+     hold is refused, never read as the first page. */
+  if (opts.cursor !== undefined) {
+    const at = deps.sql.one<{ w: string; r: number }>(`SELECT COALESCE(${WHEN[register]}, '') AS w, rowid AS r FROM ${register} WHERE id = ?`, opts.cursor);
+    if (!at) return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with. Start from the first page.', { at: 'cursor' });
+    where.push(`(COALESCE(${WHEN[register]}, '') < ? OR (COALESCE(${WHEN[register]}, '') = ? AND rowid < ?))`);
+    params.push(at.w, at.w, at.r);
+  }
+
   const rows = deps.sql.all<Record<string, unknown>>(
     `SELECT ${COLUMNS[register]} FROM ${register}${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${ORDER[register]} LIMIT ?`,
     ...params,
     limit,
   );
   return ok(rows.map((r) => hydrate(register, r)));
+}
+
+/** How many rows one governance register holds, every one of them: a count for a screen that pages. */
+export function countGovernance(sql: Sql, register: GovernRegister): number {
+  if (!(GOVERNANCE as readonly string[]).includes(register)) return 0;
+  return sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM ${register}`)?.n ?? 0;
 }
 
 /** One row, or `null`. A missing governance row is a value, not a refusal — 45 §13 #10. */

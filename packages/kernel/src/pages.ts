@@ -267,7 +267,9 @@ export type PageDeps = {
     where?: Predicate | undefined;
     limit?: number;
     order?: { field: string; dir?: 'asc' | 'desc' }[];
-  }) => Result<{ rows: Entry[]; matched: number }>;
+    /** The cursor the page above answered with. A host that pages answers one; `null` or absent is the last page. */
+    cursor?: string;
+  }) => Result<{ rows: Entry[]; matched: number; cursor?: string | null }>;
   schemaOf: (register: string) => Schema | null;
   /** The field that titles a row of this register — what a template's slug is made from. */
   titleOf: (register: string) => string | null;
@@ -340,6 +342,26 @@ const VERSIONS = { least: 2, most: 10 } as const;
  * `/p/kiln` is a URL somebody can type and one that survives the row being renumbered; `/p/things-1`
  * is neither.
  */
+/**
+ * EVERY ROW A PREDICATE MATCHES, a page at a time, in the record's own order. A template is a page per row, and it
+ * read one page of 200: the row after that had no page at all, and nothing said so. The walk follows the cursor
+ * `list` answers with, so the order is the keyset's and a row comes once. A host whose `list` answers no cursor
+ * is read as one page, which is what it said it had.
+ */
+function everyRow(deps: PageDeps, register: string, where: Predicate | undefined): Result<{ rows: Entry[]; matched: number }> {
+  const rows: Entry[] = [];
+  let cursor: string | null = null;
+  let matched = 0;
+  do {
+    const got = deps.list({ register, ...(where ? { where } : {}), limit: 500, ...(cursor ? { cursor } : {}) });
+    if (!got.ok) return got;
+    rows.push(...got.value.rows);
+    matched = got.value.matched;
+    cursor = got.value.rows.length > 0 ? (got.value.cursor ?? null) : null;
+  } while (cursor);
+  return ok({ rows, matched });
+}
+
 export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
   const out: { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] = [];
   const taken = new Set<string>();
@@ -392,7 +414,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       refuse(said.bad[0]!);
       continue;
     }
-    const listed = deps.list({ register: decl.for.register, where: said.predicate, limit: 200 });
+    const listed = everyRow(deps, decl.for.register, said.predicate);
     if (!listed.ok) {
       /* A LIST CANNOT CONFLICT — nothing was written — so the guard is the type system agreeing
          rather than a case anybody expects to see. */
@@ -423,7 +445,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       if (!scope || typeof at !== 'string') return null;
       if (!places) {
         const named = deps.titleOf(scope.to);
-        const held = deps.list({ register: scope.to, limit: 200 });
+        const held = everyRow(deps, scope.to, undefined);
         places = new Map(held.ok && named ? held.value.rows.map((r) => [r.id, String(r.fields[named] ?? '')]) : []);
       }
       return places.get(at) || null;

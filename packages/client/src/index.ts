@@ -64,7 +64,7 @@ export type Boot = {
   /** The pages the caller may open, each with its place in the rail when it has one. */
   pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
   /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
-  counts?: { decide: number; inbox: number | null };
+  counts?: { decide: number; inbox: number | null; decided?: number };
   /** What changed since the caller last read, as `whatsNew` answers. */
   whatsNew?: WhatsNew;
 };
@@ -556,7 +556,7 @@ export function createClient(options: ClientOptions) {
     /* ADMIN, SO A BROWSER SESSION. Nothing cascades: `alsoDisable` names what a `PACK_REQUIRED` listed. */
     disablePack: (args: { id: string; alsoDisable?: string[] }) => call<PackToggle>('disablePack', args as Record<string, unknown>),
     enablePack: (args: { id: string }) => call<PackToggle>('enablePack', args as Record<string, unknown>),
-    governance: (args: { register?: string; id?: string; status?: string; limit?: number } = {}) =>
+    governance: (args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string } = {}) =>
       call<unknown>('governance', args as Record<string, unknown>),
     members: () => call<unknown[]>('members'),
     listTokens: () => call<unknown[]>('listTokens'),

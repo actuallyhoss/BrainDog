@@ -185,6 +185,7 @@ export const TOOLS: readonly Tool[] = [
       id: str('One row, by its SG or D number.'),
       status: str('open (the default), resolved, or all.'),
       limit: int('At most 200.'),
+      cursor: str('The id of the last row the page above held, for the page after it.'),
     }),
     writes: false,
   },
