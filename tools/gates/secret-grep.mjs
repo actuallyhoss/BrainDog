@@ -78,6 +78,46 @@ const sourceIn = (args, whole) => STRONG.test(args) || (/\broot\b/i.test(args) &
 const WIRE = /\b(?:sid|linkToken|claimToken|serverKey)\b/;
 
 /**
+ * AND THE TWO KEYS SEPTEMBER 17TH ADDED, which the key hierarchy's names never matched: a report key's bearer, which
+ * `createReportKey` answers once (`packages/record/src/report.ts`), and a vault key opened for one scheduled action
+ * (`packages/host/src/actions.ts`, where it is `opened` and then `secret`). Either opens something from anywhere.
+ *
+ * BY NAME, READ IN CODE ONLY. `bearer`, `opened` and `secret` are ordinary words in a sentence ("the key was not
+ * opened"), so a string's text is taken out first and a template keeps only what it interpolates: `${opened}` is a
+ * finding and `'was not opened'` is not.
+ *
+ * AND BY WHERE A VALUE CAME FROM. A name assigned from `openKey(` holds the key whatever it is called, and one
+ * assigned from `createReportKey(` holds the answer that carries the bearer. That answer also carries an id, which
+ * may be logged, so the name counts bare, as `.value` or as `.bearer`, and `minted.value.id` is not a finding.
+ *
+ * NOT A SINK FOR THEM: an outbound request, a serialisation or a child process, for the reason sign-in's four are
+ * not. Sending the opened key to the origin that declared it is the one thing it is opened for, and a report key's
+ * bearer is shown once to the person who made it.
+ */
+const HELD = /(?<![\w$])(?:bearer|opened|secret)(?![\w$])/;
+const HELD_FROM = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)(?:\s*:[^=\n]+)?\s*=\s*(?:await\s+)?[\w$.?]*\b(?:openKey|createReportKey)\s*\(/g;
+function heldFrom(text) {
+  const names = [...new Set([...text.matchAll(HELD_FROM)].map((m) => m[1]))];
+  if (names.length === 0) return null;
+  return new RegExp(`(?<![.\\w$])(?:${names.map((n) => n.split('$').join('\\$')).join('|')})(?:\\.value)?(?:\\.bearer)?(?![\\w$.])`);
+}
+/**
+ * The code of an argument list: quoted text removed, a template's text removed around what it interpolates, and
+ * what a `digest(` call is handed, because a hash of a bearer is what the record keeps in place of it
+ * (`kernel/src/token.ts`, `device.ts`).
+ */
+function codeOf(args) {
+  let code = args
+    .replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, "''")
+    .replace(/`(?:\\.|[^`\\])*`/g, (t) => [...t.matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1]).join(' , '));
+  for (let m = /\bdigest\s*\(/.exec(code); m !== null; m = /\bdigest\s*\(/.exec(code)) {
+    const open = m.index + m[0].length - 1;
+    code = code.slice(0, m.index) + code.slice(open + argsOf(code, open).length + 2);
+  }
+  return code;
+}
+
+/**
  * What keeps or transmits. `52 §5.2`'s five, and every one of them outlives the process.
  *
  * `push(` IS WEB PUSH AND NOT `Array.prototype.push`, which is why the source has to appear in the
@@ -341,6 +381,7 @@ for (const top of ['packages', 'apps'])
     const text = decomment(readFileSync(file, 'utf8'));
     const home = BRAND_HOMES.some((h) => h.test(rel));
     const branded = home ? namesRe(brandedNames(text)) : null;
+    const flowed = heldFrom(text);
 
     for (const sink of SINKS) {
       sink.re.lastIndex = 0;
@@ -349,10 +390,13 @@ for (const top of ['packages', 'apps'])
         const args = sink.bound ? bound(raw) : raw;
         const plain = sourceIn(args, text) || (branded !== null && branded.test(args));
         if (plain && EXEMPT.some((e) => e.file.test(rel) && e.sinks.includes(sink.id) && enclosing(text, m.index) === e.fn)) continue;
-        if (plain || (sink.wire !== false && WIRE.test(args)))
+        const wire = sink.wire !== false && WIRE.test(args);
+        const code = sink.wire === false ? '' : codeOf(args);
+        const held = HELD.test(code) || (flowed !== null && flowed.test(code));
+        if (plain || wire || held)
           findings.push({
             where: `${rel}:${lineOf(text, m.index)}`,
-            why: plain ? `a plaintext reaches ${sink.id}` : `a sign-in secret reaches ${sink.id}`,
+            why: plain ? `a plaintext reaches ${sink.id}` : wire ? `a sign-in secret reaches ${sink.id}` : `a report key or an opened action key reaches ${sink.id}`,
             text: `${m[0]}${args.trim().slice(0, 60)}`,
           });
       }

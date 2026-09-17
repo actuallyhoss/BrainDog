@@ -119,6 +119,13 @@ const CASES = [
      followed. The fixture also logs the answer of a deposit, a call whose return type does not, so one finding
      proves the gate follows only a return typed as plaintext. */
   { gate: 'secret-grep-return', run: 'secret-grep', expect: /a plaintext reaches standard output/, findings: 1 },
+  /* THE SEVENTH, EIGHTH AND NINTH: the two keys September 17th added, which no name above matched. A report key's
+     answer logged whole beside its id logged alone; an opened action key under a name on no list, beside a sentence
+     that says "opened"; and `secret` in an error message, beside a bearer handed to `digest(`. One finding each proves
+     the gate follows where the value came from and reads code, not prose. */
+  { gate: 'secret-grep-report', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
+  { gate: 'secret-grep-opened', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
+  { gate: 'secret-grep-held', run: 'secret-grep', expect: /a report key or an opened action key reaches an error message/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
      drift — and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
