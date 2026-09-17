@@ -92,6 +92,14 @@ test('TWO SESSIONS IN ONE WORKING TREE are said word for word, and never when th
   assert.ok(!briefing(attached(alone), AT, undefined).includes('Two sessions'));
 });
 
+test('A RUN THAT STOPPED IS NOT A COLLISION: idle after its end hook, waiting on a handoff, or stale', () => {
+  const s46 = full().live.same_repo[0]!;
+  for (const run of [{ ...s46, state: 'idle' }, { ...s46, state: 'handoff' }, { ...s46, stale: true }]) {
+    const text = briefing(attached({ ...full(), live: { same_repo: [run], elsewhere: [] } }), AT, undefined);
+    assert.ok(!text.includes(TWO_SESSIONS) && !text.includes('Also live in this repo'), `${String(run.state)} ${String(run.stale)} was said as live`);
+  }
+});
+
 test('NO VALUE IS EVER PRINTED: a key is its label, and nothing that is not a string is read', () => {
   const text = briefing(attached(full()), AT, undefined);
   assert.ok(!text.includes(SENTINEL), 'a field of a key other than its label reached the briefing');

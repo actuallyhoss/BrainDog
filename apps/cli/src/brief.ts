@@ -87,8 +87,12 @@ export function briefing(attached: Attached, at: Where, moved: Moved): string {
       );
   }
 
-  if (c.live.same_repo.length > 0) {
-    const runs = c.live.same_repo.slice(0, PER_LINE).map((r) => `${r.spoken}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
+  /* ONLY A RUN STILL WORKING IS A COLLISION. The end hook leaves a run idle, and a handoff waits for a pickup, so
+     the session after an ordinary exit was told to coordinate with one that had already stopped. A stale run is a
+     crash nobody reported, and is not working either. */
+  const working = c.live.same_repo.filter((r) => r.state === 'active' && !r.stale);
+  if (working.length > 0) {
+    const runs = working.slice(0, PER_LINE).map((r) => `${r.spoken}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     keep(`Also live in this repo: ${runs.join('; ')}.`);
     keep(`  ${TWO_SESSIONS}`);
   }
