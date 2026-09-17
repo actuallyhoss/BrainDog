@@ -44,6 +44,7 @@ import { ulids } from '@braindog/kernel';
 
 import { fixOf } from '@braindog/ports';
 
+import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { openSqlite, start } from './server.ts';
 
@@ -466,10 +467,20 @@ async function serve(): Promise<void> {
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
 
+  /* THE NIGHTLY COPY, beside the record in `snapshots/`, at `BRAINDOG_BACKUP_AT` (HH:MM in UTC, 03:20 unless set, `off`
+     for none). It is taken the first time the host looks after that time, so a machine that was asleep catches up. */
+  const at = env.BRAINDOG_BACKUP_AT ?? NIGHTLY_AT;
+  const nightly =
+    at === 'off'
+      ? null
+      : nightlyBackups({ sql: running.sql, file, at, now: () => Date.now(), say, logged: (note) => running.api.kernel.lifecycle('export', 'system', note) });
+  if (nightly) await nightly.check();
+
   /* AND IT STOPS WHEN IT IS ASKED TO. A container that kills a process holding a WAL leaves it to
      the next boot's recovery; closing takes a second and makes the file whole. */
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {
+      nightly?.stop();
       void running.close().then(() => exit(0));
     });
 }
