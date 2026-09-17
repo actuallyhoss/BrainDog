@@ -81,3 +81,10 @@ test('and the two sentences that teach the keyboard describe the keyboard that i
   for (const said of [copy.keymapHint, copy.characterKeysHint, copy.keymapSilenced])
     assert.doesNotMatch(said, /!|sorry|simply|just |easy|Get Started/u, `"${said}" is not the house voice`);
 });
+
+test('SIGN-IN NAMES ANOTHER WAY IN ONLY WHEN ONE IS DRAWN', () => {
+  assert.doesNotMatch(copy.passkeyUnusable(false), /another way|other ways/u);
+  assert.match(copy.passkeyUnusable(true), /other ways in below/u);
+  assert.equal(copy.rejectedNext(false), 'Try again.');
+  for (const s of [copy.passkeyUnusable(true), copy.passkeyUnusable(false), copy.rejectedNext(true)]) assert.doesNotMatch(s, /—/u);
+});

@@ -83,6 +83,11 @@
     }
   });
 
+  /** Whether a way in other than a passkey is drawn, so a sentence never points at one that is not there. */
+  const otherWays = (ways: Ways | null): boolean => ways !== null && (ways.magic || ways.key);
+  /** How many ways in are drawn: after one is refused, "another" is only true when there is more than one. */
+  const wayCount = (ways: Ways | null): number => (ways ? [ways.passkey, ways.magic, ways.key].filter(Boolean).length : 0);
+
   const demo = $derived(view.name !== 'loading' && view.name !== 'signed-in' && view.name !== 'open');
   /** The demo is the filled button where it is the only thing on the screen that can be pressed. */
   const demoLeads = $derived(
@@ -95,7 +100,7 @@
       : view.note === 'cancelled'
         ? copy.passkeyCancelled
         : view.note === 'unsupported'
-          ? copy.passkeyUnusable
+          ? copy.passkeyUnusable(otherWays(view.ways))
           : view.note === 'out'
             ? copy.signedOut
             : null,
@@ -270,7 +275,7 @@
           <Empty
             kind="error"
             title={view.closed ? copy.closedTitle : (view.fix ?? copy.rejectedTitle)}
-            body={view.closed ? copy.closedNext : copy.rejectedNext}
+            body={view.closed ? copy.closedNext : copy.rejectedNext(wayCount(view.ways) > 1)}
           />
         </div>
       {:else if view.name === 'link-expired'}

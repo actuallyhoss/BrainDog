@@ -1767,7 +1767,12 @@ export const copy = {
      gesture itself a moment later. */
   waitingForPasskey: 'Waiting for your passkey',
   passkeyCancelled: 'Sign-in was cancelled. Nothing changed.',
-  passkeyUnusable: 'This browser cannot use a passkey here. Try another browser, or another way in.',
+  /* ANOTHER WAY IN IS NAMED ONLY WHEN THE SCREEN DRAWS ONE: a server that offers passkeys alone was
+     told to try a way in that does not exist. */
+  passkeyUnusable: (others: boolean) =>
+    others
+      ? 'This browser cannot use a passkey here. Use one of the other ways in below, or open this page in a browser that supports passkeys.'
+      : 'This browser cannot use a passkey here. Open this page in a browser that supports passkeys.',
   emailLink: 'Email me a sign-in link',
   emailLabel: 'Email',
   emailLike: 'you@example.com',
@@ -1786,7 +1791,7 @@ export const copy = {
   hideToken: 'Hide',
   signingIn: 'Signing you in',
   rejectedTitle: 'That did not sign you in.',
-  rejectedNext: 'Try again, or use another way in.',
+  rejectedNext: (others: boolean) => (others ? 'Try again, or use another way in below.' : 'Try again.'),
   closedTitle: 'The server could not check that just now.',
   closedNext: 'Nobody was let in. Try again in a minute.',
   lockedTitle: (minutes: number) => `Sign-in is paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.`,
