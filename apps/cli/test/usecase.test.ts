@@ -1,5 +1,5 @@
 /**
- * `braindog usecase export|check` against a stub record on node:http: export writes the record's own file and sends the
+ * `braindog usecase list|export|check|install` against a stub record on node:http: export writes the record's own file and sends the
  * rows only when named; check reads a file the way a record will, and sends nothing.
  */
 
@@ -18,6 +18,15 @@ import type { AgentIo } from '../src/skills.ts';
 
 /* Obviously fake. */
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-44ab'].join('.');
+/* What `arrangement` answers: Personal on and speaking, Student on offer, Team on at an older version. */
+const ARRANGEMENT = {
+  packs: [{ id: 'money-core', version: '1.0.0' }, { id: 'usecase-personal', version: '1.2.0' }, { id: 'usecase-team', version: '1.0.0' }],
+  offer: [{ id: 'usecase-student', usecase: 'Student', summary: 'Courses, deadlines and grades', modules: ['portfolio'] }, { id: 'portfolio', summary: 'Projects.' }],
+  updates: [{ id: 'usecase-team', from: '1.0.0', to: '1.1.0' }],
+  voice: { pack: 'usecase-personal', said: {} },
+  pages: [],
+  waiting: [],
+};
 const CONTEXT = { session: null, ambiguous: [], handoff: null, live: { same_repo: [], elsewhere: [] }, waiting: [], people: [], faded: 0, project: null, registers: [], next: '' };
 
 const built = exportUseCase({
@@ -61,6 +70,7 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
       res.writeHead(200, { 'content-type': 'application/json' });
       if (method === 'context') return res.end(JSON.stringify({ ok: true, value: CONTEXT }));
       if (url.pathname === '/files/study.usecase.json') return res.end(JSON.stringify(DOC));
+      if (method === 'arrangement') return res.end(JSON.stringify({ ok: true, value: ARRANGEMENT }));
       if (method === 'propose') return res.end(JSON.stringify({ ok: true, value: { id: 'SG3' } }));
       if (method === 'exportUseCase') return res.end(JSON.stringify({ ok: true, value: { file: 'study-1.0.1.usecase.json', doc: DOC, bytes: 400 } }));
       res.end(JSON.stringify({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } }));
@@ -178,4 +188,38 @@ test('usecase install: an address is read to 300 KB and ten seconds at most, as 
   writeFileSync(join(dir, 'big.usecase.json'), big);
   const onDisk = await readSource('big.usecase.json', io);
   assert.match(onDisk.ok ? '' : onDisk.fix, /larger than a shared use case may be/);
+});
+
+test('usecase list: says the use cases on, the one speaking, and those on offer, from one read', async (t) => {
+  const h = await setup(t);
+  assert.equal(await usecase(['list'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(h.seen.filter((s) => s.method !== 'context').map((s) => s.method), ['arrangement']);
+  assert.deepEqual(h.out, [
+    'On this BrainDog:',
+    '  personal  Personal (1.2.0, speaking)',
+    '  team  Team (1.0.0)',
+    'On offer, installed with braindog usecase install <id>:',
+    '  student  Student. Courses, deadlines and grades. Builds on portfolio.',
+  ]);
+  assert.equal(await usecase(['list', '--nope'], h.io), 1);
+});
+
+test('usecase install <id>: files a pack proposal for a use case on offer, as an agent does over MCP, and refuses one not on offer', async (t) => {
+  const h = await setup(t);
+  assert.equal(await usecase(['install', 'student'], h.io), 0, h.said.join('\n'));
+  const proposed = () => h.seen.filter((s) => s.method === 'propose');
+  assert.deepEqual(proposed()[0]?.args, { question: 'Set this BrainDog up for Student?', body_kind: 'pack', body: { install: 'usecase-student' } });
+  assert.equal(h.out.at(-1), `Asked the owner to set this BrainDog up for Student. Nothing is installed until they accept it: ${h.io.env.BRAINDOG_HOST}/decide/SG3`);
+
+  /* BY ITS PACK ID TOO, and one on at an older version is asked as its update. */
+  assert.equal(await usecase(['install', 'usecase-team'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(proposed()[1]?.args, { question: 'Update Team from 1.0.0 to 1.1.0?', body_kind: 'pack', body: { install: 'usecase-team' } });
+
+  /* ONE ALREADY ON, ONE NOT OFFERED, AND A MODULE ARE REFUSED, AND NOTHING IS PROPOSED. */
+  assert.equal(await usecase(['install', 'personal'], h.io), 1);
+  assert.equal(h.said.at(-1), 'Personal is already on this BrainDog. On offer: student.');
+  assert.equal(await usecase(['install', 'reading-club'], h.io), 1);
+  assert.equal(h.said.at(-1), 'There is no use case called reading-club on offer here. On offer: student.');
+  assert.equal(await usecase(['install', 'portfolio'], h.io), 1);
+  assert.equal(proposed().length, 2, 'a use case not on offer was proposed');
 });

@@ -1,5 +1,5 @@
 /**
- * `braindog usecase export|check|install`: a BrainDog's arrangement as a file somebody else can install
+ * `braindog usecase list|export|check|install`: a BrainDog's arrangement as a file somebody else can install
  * (`loop/research-spark.md` S14).
  *
  * EXPORT IS A READ, so a signed-in machine may save one: `exportUseCase` answers the modules, the use case's lists and
@@ -18,6 +18,11 @@
  * it. So `install <file|url>` files a `pack` proposal carrying the file, which the record reads through the same door the
  * app does, plans with the modules it names, and puts in front of the owner on Decide. It prints that link. A file this
  * build would refuse is refused here first, and nothing is sent.
+ *
+ * A USE CASE ON OFFER IS INSTALLED BY ITS ID, the way an agent asks over MCP: `install student` reads the arrangement, and
+ * files a `pack` proposal `{ "install": "usecase-student" }`, which the record plans with the modules it builds on. An id
+ * not on offer is refused here with the ids that are, and nothing is sent. `list` says the use cases on this BrainDog, the
+ * one speaking, and those on offer, from the same read.
  */
 
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -27,16 +32,17 @@ import { parseArgs } from 'node:util';
 import { readShared, SHARED_SUFFIX } from '@braindog/declare';
 import { refused, type Result } from '@braindog/ports';
 
-import { connect, fixOf, type AgentIo } from './skills.ts';
+import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
-  'braindog usecase takes export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], check <file>, or install <file|url> [--host <host>].';
+  'braindog usecase takes list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], check <file>, or install <id|file|url> [--host <host>].';
 
 /** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
 
 export async function usecase(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
+  if (verb === 'list') return list(rest, io);
   if (verb === 'export') return exportFile(rest, io);
   if (verb === 'check') return check(rest, io);
   if (verb === 'install') return installFile(rest, io);
@@ -241,6 +247,7 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     io.say('braindog usecase install takes one file or address, as in braindog usecase install reading-club-1.0.0.usecase.json.');
     return 1;
   }
+  if (ID.test(given)) return installOffered(given, values.host, io);
   const read = await readSource(given, io);
   if (!read.ok) {
     io.say(read.fix);
@@ -272,5 +279,106 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
   }
   const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
   io.out(`Asked the owner to install ${u.title} ${u.version}. Nothing is installed until they accept it: ${link}`);
+  return 0;
+}
+
+/* ── a use case on offer, by its id ─────────────────────────────────────── */
+
+/** A use case's id, bare or as its pack: `student` or `usecase-student`. A file or an address always has a dot or a slash. */
+const ID = /^[a-z][a-z0-9-]*$/u;
+const USE_CASE = 'usecase-';
+
+/** What `arrangement` answers that these two commands read. */
+type Offer = { id: string; usecase?: string; summary?: string; modules?: string[] };
+type Arrangement = { packs: { id: string; version?: string; off?: boolean }[]; offer: Offer[]; updates?: { id: string; from: string; to: string }[]; voice?: { pack?: string | null } };
+
+const isArrangement = (v: unknown): v is Arrangement =>
+  typeof v === 'object' && v !== null && Array.isArray((v as Arrangement).packs) && Array.isArray((v as Arrangement).offer);
+
+/** A use case not on offer here said by its id in words: `usecase-reading-club` as "Reading club". */
+const idWords = (id: string): string => {
+  const bare = id.slice(USE_CASE.length).replace(/-/gu, ' ');
+  return bare.charAt(0).toUpperCase() + bare.slice(1);
+};
+
+/** The arrangement, or the exit code after saying why it could not be read. */
+async function arrangementOf(host: string | undefined, io: AgentIo): Promise<{ at: Connected; value: Arrangement } | number> {
+  const at = await connect(host, io);
+  if (typeof at === 'number') return at;
+  const answer = await at.client.call<unknown>('arrangement', {});
+  if (!answer.ok) {
+    io.say(saidWithCode(answer));
+    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+  }
+  if (!isArrangement(answer.value)) {
+    io.say('The record answered in a shape this build does not recognise as its arrangement.');
+    return 1;
+  }
+  return { at, value: answer.value };
+}
+
+async function list(args: string[], io: AgentIo): Promise<number> {
+  let values: { host?: string | undefined };
+  try {
+    ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' } } }));
+  } catch {
+    io.say('braindog usecase list takes --host <host>, and nothing else.');
+    return 1;
+  }
+  const read = await arrangementOf(values.host, io);
+  if (typeof read === 'number') return read;
+  const { packs, offer, voice } = read.value;
+  const on = packs.filter((p) => p.id.startsWith(USE_CASE));
+  const offered = offer.filter((o) => o.id.startsWith(USE_CASE) || typeof o.usecase === 'string');
+  if (on.length === 0) io.out('No use case is set up on this BrainDog yet.');
+  else {
+    io.out('On this BrainDog:');
+    for (const p of on) {
+      const notes = [p.version === undefined ? '' : p.version, p.off ? 'turned off' : '', voice?.pack === p.id ? 'speaking' : ''].filter((n) => n !== '');
+      io.out(`  ${p.id.slice(USE_CASE.length)}  ${idWords(p.id)}${notes.length ? ` (${notes.join(', ')})` : ''}`);
+    }
+  }
+  if (offered.length === 0) io.out('No other use case is on offer here.');
+  else {
+    io.out('On offer, installed with braindog usecase install <id>:');
+    for (const o of offered) {
+      const summary = o.summary ? ` ${o.summary.replace(/\.?$/u, '.')}` : '';
+      const needs = o.modules?.length ? ` Builds on ${o.modules.join(', ')}.` : '';
+      io.out(`  ${o.id.replace(USE_CASE, '')}  ${o.usecase ?? idWords(o.id)}.${summary}${needs}`);
+    }
+  }
+  return 0;
+}
+
+/** `install student`: a `pack` proposal for a use case on offer, as an agent files one over MCP. */
+async function installOffered(given: string, host: string | undefined, io: AgentIo): Promise<number> {
+  const id = given.startsWith(USE_CASE) ? given : `${USE_CASE}${given}`;
+  const read = await arrangementOf(host, io);
+  if (typeof read === 'number') return read;
+  const { at, value } = read;
+  const offered = value.offer.find((o) => o.id === id);
+  /* ONE ON AT AN OLDER VERSION THAN OFFERED is updated by the same proposal. */
+  const update = value.updates?.find((u) => u.id === id);
+  if (offered === undefined && update === undefined) {
+    const held = value.packs.find((p) => p.id === id);
+    const ids = value.offer.filter((o) => o.id.startsWith(USE_CASE)).map((o) => o.id.slice(USE_CASE.length));
+    const others = ids.length === 0 ? 'No other use case is on offer here.' : `On offer: ${ids.join(', ')}.`;
+    io.say(held ? `${idWords(id)} is already on this BrainDog. ${others}` : `There is no use case called ${id.slice(USE_CASE.length)} on offer here. ${others}`);
+    return 1;
+  }
+  const title = offered?.usecase ?? idWords(id);
+  const answer = await at.client.call<{ id: string }>('propose', { question: update ? `Update ${title} from ${update.from} to ${update.to}?` : `Set this BrainDog up for ${title}?`, body_kind: 'pack', body: { install: id } });
+  if (!answer.ok) {
+    io.say(saidWithCode(answer));
+    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+  }
+  const filed = (answer.value as { id?: unknown }).id;
+  if (typeof filed !== 'string') {
+    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    return 1;
+  }
+  const link = new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href;
+  const asked = update ? `update ${title} from ${update.from} to ${update.to}` : `set this BrainDog up for ${title}`;
+  io.out(`Asked the owner to ${asked}. Nothing is installed until they accept it: ${link}`);
   return 0;
 }
