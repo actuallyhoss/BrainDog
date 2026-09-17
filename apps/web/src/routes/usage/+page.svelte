@@ -13,6 +13,7 @@
   import { untrack } from 'svelte';
   import type { Block as Drawn } from 'braindog-render';
   import { Block } from 'braindog-render/svelte';
+  import '$lib/blocks-charts.css';
   import { titleOf } from '$lib/title.ts';
   import { NOW } from '$lib/record/api.ts';
   import { countsOf, monthWords, readUsage, words, type Named, type UsageView } from '$lib/record/actions.ts';

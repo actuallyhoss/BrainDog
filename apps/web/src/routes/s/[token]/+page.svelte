@@ -15,6 +15,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { titleOf } from '$lib/title.ts';
   import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import '$lib/blocks-charts.css';
   import { page as state } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';

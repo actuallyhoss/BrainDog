@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
   import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import '$lib/blocks-charts.css';
   import { copy } from '$lib/copy.ts';
   import { REGISTERS, homeCurrency } from '$lib/record/api.ts';
   import { draw } from '$lib/record/blocks.ts';

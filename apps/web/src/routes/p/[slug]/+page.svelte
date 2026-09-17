@@ -14,6 +14,7 @@
   import { titleOf } from '$lib/title.ts';
   import { KINDS, holeLabel, isKind, type Row, type RowRef } from 'braindog-render';
   import { Block, Degraded, Table } from 'braindog-render/svelte';
+  import '$lib/blocks-charts.css';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
