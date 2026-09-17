@@ -340,17 +340,33 @@ export async function keepVoice(client: Pick<SharingClient, 'setPackConfig'>, st
 }
 
 /** What a browse card offers for a use case on this record. */
-export type Offer = 'in-use' | 'switch' | 'install';
+export type Offer = 'in-use' | 'switch' | 'install' | 'update';
 
-export function offerFor(id: string, states: readonly (PackState & SpeakingState)[], carriesPack: boolean, modules: readonly string[] = []): Offer {
+/** Whether version `a` comes before `b`, by number, a pre-release tail ignored. `false` when either is not a version. */
+export function olderThan(a: string | null | undefined, b: string | null | undefined): boolean {
+  const parse = (v: string | null | undefined) => /^(\d+)\.(\d+)\.(\d+)/u.exec(v ?? '')?.slice(1).map(Number) ?? null;
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return (x[i] as number) < (y[i] as number);
+  return false;
+}
+
+/**
+ * `version` is the use case as this build offers it: a pack held at an earlier version is offered as an update, with the
+ * plan saying the difference, rather than In use or Switch to over an older copy.
+ */
+export function offerFor(id: string, states: readonly (PackState & SpeakingState)[], carriesPack: boolean, modules: readonly string[] = [], version?: string): Offer {
   const speaking = speakingOf(states);
   /* A USE CASE THAT CARRIES NO PACK IS ITS MODULES AND THE HOUSE VOICE: installed once every module is here and on. */
   if (!carriesPack) {
     if (modules.some((m) => !states.some((s) => s.id === m && s.disabled_at === null))) return 'install';
     return speaking === null ? 'in-use' : 'switch';
   }
+  const held = states.find((s) => s.id === `usecase-${id}`);
+  if (held && olderThan(held.version, version)) return 'update';
   if (speaking === id) return 'in-use';
-  return states.some((s) => s.id === `usecase-${id}`) ? 'switch' : 'install';
+  return held ? 'switch' : 'install';
 }
 
 /**

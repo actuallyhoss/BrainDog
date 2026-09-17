@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, keepVoice, offerFor, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -251,4 +251,14 @@ test('A SECOND USE CASE ASKS WHOSE VOICE IS KEPT, and the answer is kept whichev
   assert.equal(offerFor('student', both, true), 'in-use');
   assert.equal(offerFor('personal', both, true), 'switch');
   assert.equal(offerFor('personal', [state('usecase-personal'), state('usecase-student')], true), 'in-use', 'unread, the rule by id');
+});
+
+test('A USE CASE HELD AT AN EARLIER VERSION IS OFFERED AS AN UPDATE, not said to be in use', () => {
+  const held = [{ ...state('usecase-personal'), version: '1.0.0' }];
+  assert.equal(offerFor('personal', held, true, [], '1.2.0'), 'update');
+  assert.equal(offerFor('personal', held, true, [], '1.0.0'), 'in-use');
+  assert.equal(offerFor('personal', [{ ...state('usecase-personal'), version: '1.3.0' }], true, [], '1.2.0'), 'in-use', 'a later copy is not taken back');
+  assert.equal(offerFor('personal', held, true), 'in-use', 'no version offered, nothing to compare');
+  assert.equal(olderThan('1.9.0', '1.10.0'), true);
+  assert.equal(olderThan('2.0.0', '1.10.0'), false);
 });

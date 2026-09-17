@@ -56,7 +56,7 @@
     const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held) => packDocument(id, held));
     if (out.ok) {
       heard = await speakingStates(client, installed);
-      const q = voiceQuestion(heard, out.plan.usecase.id);
+      const q = out.plan.packs.some((p) => p.role === 'usecase' && p.installedVersion !== null) ? null : voiceQuestion(heard, out.plan.usecase.id);
       asked = q === null ? null : { now: useCaseTitle(q.now, USE_CASES) };
       choice = q?.rule ?? 'speaks';
       plan = out.plan;

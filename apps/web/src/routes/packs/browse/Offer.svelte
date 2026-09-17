@@ -35,7 +35,7 @@
     spoken = [...held];
     if (live && client) void speakingStates(client, held).then((read) => (states === held ? (spoken = read) : null));
   });
-  const offer = $derived(offerFor(u.usecase, spoken, carries, modulesToInstall(u)));
+  const offer = $derived(offerFor(u.usecase, spoken, carries, modulesToInstall(u), u.version));
   let busy = $state(false);
   let plan = $state<Plan | null>(null);
   let refused = $state<{ fix: string; code: string | null } | null>(null);
@@ -58,7 +58,8 @@
       const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held) => packDocument(m, held));
       if (out.ok) {
         heard = await speakingStates(client, states);
-        const q = voiceQuestion(heard, u.usecase);
+        /* AN UPDATE ASKS NOTHING: the use case is already here, speaking or beside, and stays as it was. */
+        const q = offer === 'update' ? null : voiceQuestion(heard, u.usecase);
         asked = q === null ? null : { now: useCaseTitle(q.now, USE_CASES) };
         choice = q?.rule ?? 'speaks';
         plan = out.plan;
@@ -108,6 +109,10 @@
   <div class="offer-row">
     {#if offer === 'in-use'}
       <span class="in-use"><Icon name="check" size="s" />{copy.inUse}</span>
+    {:else if offer === 'update'}
+      <Button weight="quiet" disabled={busy || plan !== null} onclick={() => void offerInstall()}>
+        {busy && plan === null ? copy.packPlanning : copy.updateTo(u.version)}
+      </Button>
     {:else if offer === 'switch'}
       <Button weight="quiet" disabled={busy} onclick={() => void switchOver()}>{copy.switchTo(u.title)}</Button>
     {:else}
