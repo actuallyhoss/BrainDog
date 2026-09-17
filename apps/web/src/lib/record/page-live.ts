@@ -37,6 +37,7 @@ import {
   type Walk,
   type WalkStep,
 } from './api.ts';
+import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
@@ -469,7 +470,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };
 
   if (refusals.length || drawn === false) return shell;
-  if (kind === 'stat' || b.cells) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
+  /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
+  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
     const reading = readings?.[0]?.reading;
@@ -584,8 +586,9 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
 
   /* A REF ARRIVES AS THE TARGET ROW'S ULID, so each register a ref points at is walked once and kept,
      as the row reader does. A register this reader may not list is left out, and its refs draw as ids. */
-  async function mapOf(register: string): Promise<RefMap | null> {
-    const kept = maps.get(register);
+  const walked = new Map<string, RecordRow[]>();
+  async function rowsOf(register: string): Promise<RecordRow[] | null> {
+    const kept = walked.get(register);
     if (kept) return kept;
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
@@ -595,6 +598,14 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
+    walked.set(register, rows);
+    return rows;
+  }
+  async function mapOf(register: string): Promise<RefMap | null> {
+    const kept = maps.get(register);
+    if (kept) return kept;
+    const rows = await rowsOf(register);
+    if (!rows) return null;
     const map = refMapOf(register, rows);
     maps.set(register, map);
     return map;
@@ -652,10 +663,26 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          project page carries its own hue for the reason the sample's does (`pages.ts` sets both from
          one pair), rather than losing it to a key nobody carried across. What the record sent wins. */
       const identity = page.identity ?? (page.param ? { register: page.param.register, seq: page.param.seq } : undefined);
+      /* A BAR OVER A LIST OF LINKS adds up what the linked rows hold: an organisation's balance is the money in the
+         accounts it names. The linked list is walked once, as a ref's target is, and each row's money is handed on by id. */
+      const linked = new Map<number, Record<string, unknown>>();
+      for (const [i, b] of blocks.entries()) {
+        const link = b.refusals?.length || (b.kind !== 'bar' && b.kind !== 'split') ? null : linkOf(registerOf(b), b.columns?.[1]?.field);
+        if (!link) continue;
+        const rows = await rowsOf(link.to);
+        if (rows) linked.set(i, Object.fromEntries(rows.map((r) => [r.id, r.fields[link.money]])));
+      }
       return {
         from: 'live',
         now,
-        page: { page: identity ? { ...page, identity } : page, blocks: blocks.map((b) => blockOf(b, refs, now, me)) },
+        page: {
+          page: identity ? { ...page, identity } : page,
+          blocks: blocks.map((b, i) => {
+            const drawn = blockOf(b, refs, now, me);
+            const held = linked.get(i);
+            return held && !drawn.cannot ? { ...drawn, linked: held } : drawn;
+          }),
+        },
       };
     },
   };

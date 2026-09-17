@@ -1554,6 +1554,8 @@ export type BlockResult = PageBlock & {
   past?: readonly { at: string; value: number }[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
+  /** A `bar` over a list of links: the money each linked row holds, by the row's id, which the bar adds up per row. */
+  linked?: Readonly<Record<string, unknown>>;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */

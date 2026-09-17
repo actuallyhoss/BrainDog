@@ -43,6 +43,21 @@ import { declaredValue, registerHref } from './where.ts';
 import { format, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
+import { linesText, measuresOf, tileRows } from './measures.ts';
+
+/**
+ * Where a list of links points and the money field each linked row holds, or `null` when the field is not such a list.
+ *
+ * `FieldDecl` names `to` and not `of`, so a list of links is a `list` field that says where it points.
+ */
+export function linkOf(register: string | null, field: string | undefined): { to: string; money: string } | null {
+  if (!register || !field) return null;
+  const f = REGISTERS[register]?.fields.find((x) => x.id === field);
+  /* `FieldType` is the build's own list, and a record's schema may send a `list` it does not name. */
+  if (!f || (f.type as string) !== 'list' || !f.to) return null;
+  const money = REGISTERS[f.to]?.fields.find((x) => x.type === 'money')?.id;
+  return money ? { to: f.to, money } : null;
+}
 
 /**
  * The rest of the groups, as one group.
@@ -72,21 +87,30 @@ function cutTotals(groups: (readonly [string, Total])[], limit: number | undefin
 function barRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? 'party';
   const of = block.columns[1]?.field ?? 'amount';
+  /* A LIST OF LINKS ADDS UP WHAT IT LINKS TO, each linked row's money handed on by the page reader, and the sum is
+     written as that money field writes it. */
+  const link = block.linked ? linkOf(block.register ?? null, of) : null;
+  const valuesOf = (v: unknown): unknown[] =>
+    link ? (Array.isArray(v) ? v.map((id) => block.linked?.[String(id)]).filter((m) => m !== undefined) : []) : [v];
+  const written = (sum: Total): string | null =>
+    link ? display(link.to, link.money, asMoney(sum.amount, sum.currency)) : display(block.register ?? '', of, asMoney(sum.amount, sum.currency));
   const grouped = new Map<string, unknown[]>();
   /* `matched`, NOT `entries`. The block draws the first `limit:` rows and it ADDS UP all of them:
      summing the page instead of the answer is a figure that is wrong by however many rows did not
      fit, silently, and it is the same number of pixels either way. */
   const unset: unknown[] = [];
   for (const e of block.matched) {
+    /* A ROW THAT LINKS TO NOTHING WITH MONEY IN IT HAS NO BAR, because a zero would say it holds none. */
+    if (link && valuesOf(e.fields[of]).length === 0) continue;
     const said = display(block.register ?? '', by, e.fields[by]);
     /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
     if (said === null && block.unset) {
-      unset.push(e.fields[of]);
+      unset.push(...valuesOf(e.fields[of]));
       continue;
     }
     const key = said ?? 'Nobody in particular';
     const list = grouped.get(key) ?? [];
-    list.push(e.fields[of]);
+    list.push(...valuesOf(e.fields[of]));
     grouped.set(key, list);
   }
 
@@ -104,12 +128,12 @@ function barRows(block: BlockResult): string[] {
        the thing it is adding up is currency. */
     const shown = sum.mixed.length
       ? mixedFix(sum.mixed)
-      : (display(block.register ?? '', of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
+      : (written(sum) ?? String(sum.amount));
     return `${escapeCell(key)} | ${escapeCell(shown)} | `;
   });
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);
-  const shown = sum.mixed.length ? mixedFix(sum.mixed) : (display(block.register, of, asMoney(sum.amount, sum.currency)) ?? String(sum.amount));
+  const shown = sum.mixed.length ? mixedFix(sum.mixed) : (written(sum) ?? String(sum.amount));
   return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown)];
 }
 
@@ -504,6 +528,9 @@ function sectionRow(block: BlockResult): string {
  * heading rather than a caption, and `blocks.css` takes the bar away over it so it is said once.
  */
 export function toSegments(block: BlockResult) {
+  /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
+  if (block.kind === 'lines' && block.register && !block.authored?.length)
+    return parse(linesText(measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? '')), { page: true });
   const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
   const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : '';
@@ -533,6 +560,8 @@ export function toSegments(block: BlockResult) {
     ? block.metrics.map(
         (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
       )
+    : block.kind === 'stat' && block.register
+      ? tileRows(measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? ''))
     : block.kind === 'bar' || block.kind === 'split'
       ? block.parts
         ? partsRows(block)
@@ -567,7 +596,7 @@ export function toSegments(block: BlockResult) {
     !conflicted &&
     !block.authored?.length &&
     !block.metrics &&
-    !['bar', 'split', 'chips', 'gauge', 'cards', 'section'].includes(block.kind) &&
+    !['bar', 'split', 'chips', 'gauge', 'cards', 'section', 'stat'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
   return projected && block.register
     ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)

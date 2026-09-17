@@ -586,6 +586,11 @@ export const copy = {
   /* A series's first column names what each bar is, by the bucket it is cut into. */
   seriesAxis: { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year' } as Record<string, string>,
   seriesWeekOf: (day: string) => `Week of ${day}`,
+  /* A MEASURE A PROJECT REPORTS, as a tile and a line (`record/measures.ts`): the period before, and the change against it. */
+  measurePrevious: (days: number) => `Previous ${days} days`,
+  measureAgainst: (change: string, days: number) => `${change} on the previous ${days} days`,
+  measureNothingBefore: (days: number) => `Nothing reported in the ${days} days before`,
+  measureLastOn: (day: string) => `Last reported ${day}`,
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
