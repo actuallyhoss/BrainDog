@@ -17,6 +17,7 @@ import type { Column, TableRow } from 'braindog-render/svelte';
 import { answers, terms, tokensOf, why } from './find.ts';
 import { PATHS, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
+import { useCaseName } from '@braindog/seed/usecases/names';
 import {
   AUDIT,
   INBOX,
@@ -2301,6 +2302,25 @@ export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockRe
   return { rows, shown: feed.length };
 }
 
+/**
+ * WHO DID IT, AS A PERSON READS IT. A live record signs a person's write with their id, and a feed drew
+ * `p_01M2PAZ28BN3FTKQB266DVT4HX` beside every line: the reader is You, and anybody else is somebody on the record.
+ */
+export const feedWho = (who: string, me: string | null): string =>
+  me !== null && who === me ? copy.feedYou : /^p_[0-9A-Z]{20,}$/u.test(who) ? copy.feedSomeone : actorOf(who);
+
+/**
+ * WHAT IT WAS DONE TO, when that is not a row: a feed drew "installed pack:usecase-team" and "suggested suggestion:SG1".
+ */
+export function feedThing(target: string | null): string | null {
+  if (target === null) return null;
+  const usecase = /^pack:usecase-([a-z][a-z0-9-]*)$/u.exec(target)?.[1];
+  if (usecase) return copy.feedUseCase(useCaseName(usecase));
+  const pack = /^pack:(.+)$/u.exec(target)?.[1];
+  if (pack) return copy.feedPack(pack);
+  return /^suggestion:(SG\d+)$/u.exec(target)?.[1] ?? target;
+}
+
 /** When a feed row happened, in words: a day against today, and an instant as how long ago. */
 const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test(at) ? relative(at, now) : since(at, now));
 
@@ -2311,10 +2331,10 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
  * below the rows newer than the reader's read mark, which the renderer draws as new, and says when that
  * was. A reader with no mark yet gets it at the end with no time, which is the renderer's "not looked yet".
  */
-export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number): Pick<BlockResult, 'rows' | 'shown'> {
+export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    cells: [r.by, r.who === null ? '' : feedWho(r.who, me), String(r.count), agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

@@ -598,6 +598,11 @@ export const copy = {
   recordEmpty: 'Nothing in the record yet.',
   /** A use case's pack going in or out, in the feed: "Added the Student use case". */
   useCaseEvent: (verb: string, name: string) => `${verb} the ${name} use case`,
+  /** Who did it and what to, in a `feed` block on a live record: "You", "Someone", "installed the Team board use case". */
+  feedYou: 'You',
+  feedSomeone: 'Someone on this record',
+  feedUseCase: (name: string) => `the ${name} use case`,
+  feedPack: (id: string) => `the ${id} add-on`,
   recordEmptyBody: 'A record holds what a business is made of: what you owe and are owed, what it runs on, who is involved, and the decisions behind them.',
   startHere: 'Start here',
   noPacksYet: 'No add-ons installed.',

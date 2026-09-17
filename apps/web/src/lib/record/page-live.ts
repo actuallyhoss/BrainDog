@@ -38,6 +38,7 @@ import {
   type WalkStep,
 } from './api.ts';
 import { METRICS } from './declared.ts';
+import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
 import { format, hrefFor, noteOf, targetLine, withParam } from './metrics.ts';
 import { entryOf, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
@@ -374,7 +375,7 @@ function changeOf(changes: unknown, n: number): { by: string; at: string } | nul
 }
 
 /** One answered block as the page draws it. */
-export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number): LiveBlock {
+export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number, me: string | null = null): LiveBlock {
   const {
     kind: _kind,
     where: _where,
@@ -510,7 +511,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     if (kind === 'agents') return { ...shell, feed, ...agentsTable(feed, now), total: feed.length };
     const seen = typeof mark === 'string' ? mark : null;
     const marks = b.since === 'seen' || mark !== undefined;
-    return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now), total: matched };
+    return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now, me), total: matched };
   }
   if (kind === 'diff') {
     const history = historyOf(versions);
@@ -636,6 +637,9 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const register = b.refusals?.length ? null : registerOf(b);
         if (register) for (const target of targetsOf(register)) wanted.add(target);
       }
+      /* WHO IS READING, for a feed that names the reader as You: the shell's own `boot`, kept, so it costs no call. */
+      const booted = blocks.some((b) => b.source === 'activity') ? await readBoot(base, io) : null;
+      const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
       const refs = new Map<string, RefMap>();
       for (const target of wanted) {
         const map = await mapOf(target);
@@ -651,7 +655,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       return {
         from: 'live',
         now,
-        page: { page: identity ? { ...page, identity } : page, blocks: blocks.map((b) => blockOf(b, refs, now)) },
+        page: { page: identity ? { ...page, identity } : page, blocks: blocks.map((b) => blockOf(b, refs, now, me)) },
       };
     },
   };

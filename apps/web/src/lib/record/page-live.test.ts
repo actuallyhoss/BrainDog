@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { MISSING } from 'braindog-render';
 
 import { METRICS } from './declared.ts';
-import { ROWS } from './api.ts';
+import { ROWS, feedTable } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf, liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
 
@@ -511,4 +511,30 @@ test('a page over a list this build does not ship asks the record for that list,
   assert.equal(table!.cannot, undefined);
   assert.equal(table!.rows.length, 1);
   assert.ok(sent.includes('schema'));
+});
+
+test('a live feed names its reader as You, anybody else without an id, and a pack or a question in words', () => {
+  const me = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+  const at = '2026-09-16T11:00:00.000Z';
+  const { rows } = feedTable(
+    [
+      { by: 'you', who: me, count: 1, kind: 'delete', target: 'tickets#5', note: null, at, thing: 'Tidy the backlog labels' },
+      { by: 'you', who: 'p_01M2PAZ28BN3FTKQB266DVT4HZ', count: 1, kind: 'suggest', target: 'suggestion:SG1', note: null, at },
+      { by: 'rule', who: 'system', count: 1, kind: 'install', target: 'pack:usecase-team', note: null, at },
+      { by: 'rule', who: 'system', count: 1, kind: 'install', target: 'pack:polish-log', note: null, at },
+    ],
+    false,
+    null,
+    Date.parse(at),
+    me,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.cells[1], r.cells[3]]),
+    [
+      ['You', 'deleted Tidy the backlog labels'],
+      ['Someone on this record', 'suggested SG1'],
+      ['the record itself', 'installed the Team board use case'],
+      ['the record itself', 'installed the polish-log add-on'],
+    ],
+  );
 });
