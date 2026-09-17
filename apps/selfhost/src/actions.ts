@@ -130,7 +130,10 @@ const EMPTY = new Set([204, 205, 304]);
  * The default transport: `node:https` connecting to the checked address, with the name kept for SNI, the
  * certificate and the `Host` header. `fetch` has no way to be told which address to use, so it is not used here.
  */
-export const pinnedSend: Send = (url, init, pinned) =>
+export const pinnedSend: Send = (url, init, pinned) => sendPinned(url, init, pinned);
+
+/* The socket itself. `ca` is only ever the rehearsal's throwaway certificate, below. */
+const sendPinned = (url: URL, init: RequestInit, pinned: Pinned, ca?: string): Promise<Response> =>
   new Promise<Response>((resolve, reject) => {
     const headers: Record<string, string> = {};
     new Headers(init.headers).forEach((value, name) => {
@@ -143,6 +146,7 @@ export const pinnedSend: Send = (url, init, pinned) =>
         method: init.method ?? 'GET',
         headers,
         lookup: lookupFor(pinned),
+        ...(ca === undefined ? {} : { ca }),
         ...(literal ? {} : { servername: url.hostname }),
         ...(init.signal ? { signal: init.signal } : {}),
       },
@@ -203,6 +207,29 @@ export function sharedReader(options: { send?: Send | undefined; resolve?: Resol
    copy carrying a note that the two must not drift; one copy cannot. */
 
 /**
+ * A REHEARSAL ON THIS MACHINE, for a test or a scratch run and never for a deployment: the names listed resolve to
+ * `127.0.0.1`, and their certificate is checked against `ca`, a throwaway one made for the rehearsal.
+ *
+ * OFF UNLESS PASSED IN CODE. No environment variable or command line turns it on, and `main.ts` never passes it. Every
+ * name must end in `.test`, which RFC 2606 reserves so that it never exists on the internet, so it cannot open a way to
+ * a real host's name. Every other name, and every refusal of a local address written in an action, is unchanged.
+ */
+export type RehearseOnThisMachine = { names: readonly string[]; ca: string };
+
+const REHEARSAL_NAME = /^(?:[a-z0-9-]+\.)+test$/;
+
+function rehearsing(rehearsal: RehearseOnThisMachine, pin: Pin<Pinned>, send: Send): { pin: Pin<Pinned>; send: Send } {
+  const names = new Set(rehearsal.names.map((n) => n.toLowerCase()));
+  if (names.size === 0 || [...names].some((n) => !REHEARSAL_NAME.test(n)))
+    throw new Error('A rehearsal on this machine names hosts ending in .test, and nothing else.');
+  const here = (url: URL) => names.has(url.hostname.toLowerCase());
+  return {
+    pin: async (at, signal) => (here(at) ? { address: '127.0.0.1', family: 4 } : pin(at, signal)),
+    send: (url, init, pinned) => (here(url) ? sendPinned(url, init, pinned, rehearsal.ca) : send(url, init, pinned)),
+  };
+}
+
+/**
  * The executor `runActions` is handed on this host: the shared loop, with this host's name service, socket and keys.
  *
  * THE ALLOWED ORIGINS ARE READ ON EVERY RUN, from the record's active declarations, so a pack turned off or
@@ -210,14 +237,16 @@ export function sharedReader(options: { send?: Send | undefined; resolve?: Resol
  */
 export function actionExecutor(
   api: Pick<RecordApi, 'kernel'>,
-  options: { openKey: OpenKey; send?: Send | undefined; resolve?: Resolve | undefined },
+  options: { openKey: OpenKey; send?: Send | undefined; resolve?: Resolve | undefined; rehearseOnThisMachine?: RehearseOnThisMachine | undefined },
 ): Execute {
+  const plain = { send: options.send ?? pinnedSend, pin: pinFor(options.resolve ?? systemResolve) };
+  const { send, pin } = options.rehearseOnThisMachine ? rehearsing(options.rehearseOnThisMachine, plain.pin, plain.send) : plain;
   return idempotentCalls(
     sendAction<Pinned>({
       origins: () => api.kernel.actionOrigins(),
       openKey: options.openKey,
-      send: options.send ?? pinnedSend,
-      pin: pinFor(options.resolve ?? systemResolve),
+      send,
+      pin,
     }),
   );
 }

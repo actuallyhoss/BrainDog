@@ -46,7 +46,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type Resolve, type Send } from './actions.ts';
+import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
 import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
@@ -464,7 +464,7 @@ export async function start(options: {
    * pack should not. `main.ts` turns it on. `send` and `openKey` are for tests: the defaults are `fetch` and
    * the key store above, and `./actions.ts` says what either may send.
    */
-  actions?: { send?: Send | undefined; openKey?: OpenKey | undefined } | undefined;
+  actions?: { send?: Send | undefined; openKey?: OpenKey | undefined; rehearseOnThisMachine?: RehearseOnThisMachine | undefined } | undefined;
   /**
    * How a shared use-case file is read from an address (`fetchUseCase`). The default is the pinned socket and the
    * system's name service; a test passes a web of its own so nothing leaves the machine.
@@ -617,7 +617,11 @@ export async function start(options: {
          again until the Directory knows the record: `init` provisions on that plan, and this covers a record made
          before plans existed. */
       if (planned !== record && ledger.setPlan(record, 'selfhost').ok) planned = record;
-      execute ??= actionExecutor(api, { openKey: options.actions.openKey ?? keyOpener(api, options.keys), send: options.actions.send });
+      execute ??= actionExecutor(api, {
+        openKey: options.actions.openKey ?? keyOpener(api, options.keys),
+        send: options.actions.send,
+        rehearseOnThisMachine: options.actions.rehearseOnThisMachine,
+      });
       const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun));
       await meterPass(ledger.meter, record, out.usage);
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
