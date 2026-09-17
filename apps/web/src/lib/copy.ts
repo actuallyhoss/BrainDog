@@ -992,6 +992,7 @@ export const copy = {
   shareTurnsOn: 'Turns on',
   shareUpdates: (from: string, to: string) => `Updates from ${from} to ${to}`,
   shareSameVersion: 'This version is already installed, so nothing is added.',
+  shareNothingElse: 'Nothing else changes',
   shareChanges: 'Changes',
   shareTakesAway: 'Takes away',
   shareInstall: (title: string) => `Install ${title}`,

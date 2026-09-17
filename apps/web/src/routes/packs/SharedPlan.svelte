@@ -13,7 +13,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { words as vaultWords } from '$lib/record/vault.ts';
-  import { installable, type SharedPlan } from './sharing.ts';
+  import { installable, nothingElse, type SharedPlan } from './sharing.ts';
 
   let {
     plan,
@@ -63,7 +63,7 @@
     {#if own}
       {#if updating && own.installedVersion}
         <dt>{copy.shareUpdates(own.installedVersion, own.version)}</dt>
-        <dd>{#if same}{copy.shareSameVersion}{/if}</dd>
+        <dd>{#if same}{copy.shareSameVersion}{:else if nothingElse(plan)}{copy.shareNothingElse}{/if}</dd>
       {/if}
       {#if own.adds.length > 0}
         <dt>{copy.diffAdds}</dt>

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, nothingElse, keepVoice, offerFor, olderThan, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -286,4 +286,14 @@ test('AN UPDATE FROM BEFORE THE LOG CARRIES A GOAL TYPED PROGRESS INTO ONE ROW, 
     ['create', { register: 'goal_log', fields: { what: 'So far, before the log', goal: 'goals#2', amount: 12, on: '2026-09-17' } }],
     ['update', { register: 'goals', seq: 2, patch: { done: null } }],
   ]);
+});
+
+test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one that adds a list or installs does not', () => {
+  const bare = { ...ANSWER, enable: [], packs: [{ ...ANSWER.packs[0]!, adds: [], examples: 0 }] };
+  assert.equal(nothingElse(sharedPlanOf(bare)!), true);
+  assert.equal(nothingElse(sharedPlanOf(ANSWER)!), false, 'it adds a list and a page and turns People on');
+  assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, installed_version: null, direction: 'install' }] })!), false);
+  assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, direction: 'reinstall' }] })!), false, 'the same version says so in its own words');
+  assert.equal(nothingElse(sharedPlanOf({ ...bare, packs: [{ ...bare.packs[0]!, changes: ['register.courses'] }] })!), false);
+  assert.equal(copy.shareNothingElse, 'Nothing else changes');
 });

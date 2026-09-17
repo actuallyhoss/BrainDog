@@ -252,6 +252,24 @@ export async function planShared(
 export const installable = (plan: SharedPlan): boolean => plan.packs.every((p) => p.conflicts.length === 0);
 
 /**
+ * An update that brings nothing but its version: no list or page added, changed or taken away, no module and nothing turned
+ * on, and nothing new called out. The plan says so, rather than drawing "Updates from" over nothing.
+ */
+export const nothingElse = (plan: SharedPlan): boolean =>
+  plan.enable.length === 0 &&
+  plan.packs.every(
+    (p) =>
+      p.role === 'usecase' &&
+      p.installedVersion !== null &&
+      p.direction !== 'reinstall' &&
+      p.adds.length === 0 &&
+      p.changes.length === 0 &&
+      p.retires.length === 0 &&
+      p.calls.length === 0,
+  ) &&
+  plan.packs.length > 0;
+
+/**
  * Install the plan that was read, a pack at a time through `planPack` and `installPack`. The modules that are off are
  * turned on first. Answers the packs that went in, and the sentence that stopped it, if one did.
  */
