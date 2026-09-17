@@ -1560,6 +1560,8 @@ export type BlockResult = PageBlock & {
   linked?: Readonly<Record<string, unknown>>;
   /** A `progress` budget: what its `spent:` figure read, each part by the raw value of the word it groups by. */
   spentBy?: { metric: string; unit: string | null; groups: { key: string; value: number | null }[] };
+  /** On a live record: the record's own title for each row a ref on this block points at, so a group is never named from the sample. */
+  names?: Names;
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */

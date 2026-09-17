@@ -11,6 +11,7 @@ import type { Block } from 'braindog-render';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { blockOf } from './page-live.ts';
+import { refMapOf } from './remote.ts';
 import type { RegisterDecl } from './schema.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 12);
@@ -72,6 +73,26 @@ test('a yes or no column counts: steps done out of steps, grouped by the first c
     ]),
   );
   assert.deepEqual(block.rows.map((r) => r.cells.slice(0, 3)), [['Bike', '2', '3'], ['Stories', '0', '1']]);
+});
+
+test('A PROJECT IS NAMED AS THE RECORD NAMES IT, never as the sample row with the same number', () => {
+  REGISTERS.project_steps = register('project_steps', [
+    { id: 'what', type: 'text' },
+    { id: 'thing', type: 'ref' },
+    { id: 'done', type: 'bool' },
+  ]);
+  (REGISTERS.project_steps.fields[1] as { to?: string }).to = 'things';
+  const refs = new Map([['things', refMapOf('things', [{ id: 'T1', seq: 1, fields: { name: 'Restore the old road bike' } }])]]);
+  const live = blockOf(
+    answered('register.project_steps', ['thing', 'done'], [
+      { what: 'Strip the frame', thing: 'T1', done: true },
+      { what: 'New tyres', thing: 'T1', done: false },
+    ]) as never,
+    refs,
+    NOW,
+  );
+  const [block] = toSegments(live).filter((x): x is Block => x.type === 'block');
+  assert.deepEqual(block?.rows.map((r) => r.cells.slice(0, 3)), [['Restore the old road bike', '1', '2']]);
 });
 
 test('A BUDGET SETS EACH LIMIT AGAINST WHAT ITS FIGURE SPENT, zero where nothing was, in the budget form', () => {

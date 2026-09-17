@@ -102,7 +102,7 @@ function barRows(block: BlockResult): string[] {
   for (const e of block.matched) {
     /* A ROW THAT LINKS TO NOTHING WITH MONEY IN IT HAS NO BAR, because a zero would say it holds none. */
     if (link && valuesOf(e.fields[of]).length === 0) continue;
-    const said = display(block.register ?? '', by, e.fields[by]);
+    const said = display(block.register ?? '', by, e.fields[by], NOW, block.names);
     /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
     if (said === null && block.unset) {
       unset.push(...valuesOf(e.fields[of]));
@@ -150,7 +150,7 @@ function progressRows(block: BlockResult): string[] {
   const register = block.register ?? '';
   const [label, value, target, note] = block.columns.map((c) => c.field);
   if (!label || !value) return [];
-  const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v) ?? '') : '');
+  const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v, NOW, block.names) ?? '') : '');
   const cap = (rows: string[]) => (block.limit === undefined ? rows : rows.slice(0, Math.max(0, block.limit)));
 
   if (block.spentBy) {
@@ -169,7 +169,7 @@ function progressRows(block: BlockResult): string[] {
   if (REGISTERS[register]?.fields.find((f) => f.id === value)?.type === 'bool') {
     const groups = new Map<string, { done: number; all: number }>();
     for (const e of block.matched) {
-      const key = display(register, label, e.fields[label]) ?? REST;
+      const key = display(register, label, e.fields[label], NOW, block.names) ?? REST;
       const g = groups.get(key) ?? { done: 0, all: 0 };
       g.all += 1;
       if (e.fields[value] === true) g.done += 1;

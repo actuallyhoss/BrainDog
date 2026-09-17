@@ -585,6 +585,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     shown: reduces ? matched : entries.length,
     total: matched,
     ...(spentBy === undefined ? {} : { spentBy }),
+    names: namesOf(refs),
     ...(inherited === undefined ? {} : { inherited }),
     ...(live ? { quiet: got.map((r) => isStale({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
   };
