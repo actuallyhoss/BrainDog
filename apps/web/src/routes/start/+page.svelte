@@ -30,7 +30,7 @@
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
-  import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
+  import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { carriedDocument, dayOf, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
@@ -227,6 +227,8 @@
   /** A use case the person chose over the suggestion, by id. Kept while they keep typing. */
   let picked_use = $state<string | null>(null);
   const proposal = $derived<UseCase | null>(USE_CASES.find((u) => u.usecase === picked_use) ?? arranged?.pick ?? null);
+  /** The other use cases for one person that the sentence also described, installed after the proposal: Student beside Personal. */
+  const beside = $derived<UseCase[]>(arranged ? alongside(arranged, proposal) : []);
 
   const said_as = (u: UseCase): string => {
     const lines = Object.values(u.voice).slice(0, 3).map(firstRun.useQuoted);
@@ -236,7 +238,7 @@
   /** The first-party packs to turn on: the use case's own, what the sentence named, and what each leans on, in order. */
   function modulesToTurnOn(now: Shape | null, person: boolean, u: UseCase | null): PackId[] {
     const heardPacks: string[] = now && now.declined === null ? toTurnOn(now, person) : person ? ['people'] : [];
-    const wanted = new Set<PackId>((u ? modulesFor(u, heardPacks) : heardPacks) as PackId[]);
+    const wanted = new Set<PackId>((u ? [...modulesFor(u, heardPacks), ...beside.flatMap((b) => b.modules)] : heardPacks) as PackId[]);
     for (let grew = true; grew; ) {
       grew = false;
       for (const id of [...wanted])
@@ -293,7 +295,7 @@
     const now = read;
     if (!now || now.declined === 'empty' || now.declined === 'language' || (now.declined !== null && !proposal)) return [];
     const person = heard?.name ?? null;
-    const own = proposal ? listsOf(proposal).map((l) => ({ id: l.id, name: l.name, rows: [] as { title: string; note: string | null }[] })) : [];
+    const own = proposal ? [proposal, ...beside].flatMap(listsOf).map((l) => ({ id: l.id, name: l.name, rows: [] as { title: string; note: string | null }[] })) : [];
     return [...own, ...modulesToTurnOn(now, person !== null, proposal).map((id) => ({
       id,
       name: packName(id),
@@ -372,24 +374,26 @@
       }
 
       /* THE USE CASE'S OWN PACK, after the modules it builds on: its lists, its pages and its voice. A
-         pack already here that is off is turned on; one that is here and on is left as it is. */
-      const doc = u ? carriedDocument(u, dayOf(Date.now())) : null;
-      if (u && doc) {
+         pack already here that is off is turned on; one that is here and on is left as it is. Then each use case the
+         sentence described beside it, so the proposed one goes in first and its voice is the one the record speaks in. */
+      for (const one of u ? [u, ...beside] : []) {
+        const doc = carriedDocument(one, dayOf(Date.now()));
+        if (!doc) continue;
         const id = String(doc.pack);
         const state = installed.find((p) => p.id === id);
-        const names = listsOf(u).map((l) => l.name);
-        const lacking = u.modules.filter((m) => !usable.has(m));
+        const names = listsOf(one).map((l) => l.name);
+        const lacking = one.modules.filter((m) => !usable.has(m));
         if (chosen.source.sample) out.absent.push(...names);
-        else if (lacking.length > 0) out.refused.push(firstRun.shapeNeedsFirst(u.title, firstRun.shapeAnd(lacking.map(packName))));
+        else if (lacking.length > 0) out.refused.push(firstRun.shapeNeedsFirst(one.title, firstRun.shapeAnd(lacking.map(packName))));
         else if (state && state.disabled_at !== null) {
           const on = await chosen.source.enable(id);
-          if (!on.ok) out.refused.push(firstRun.shapeRefused(u.title, on.refusal.fix));
+          if (!on.ok) out.refused.push(firstRun.shapeRefused(one.title, on.refusal.fix));
           else if (on.value.changed) out.on.push(...names);
         } else if (!state) {
           const planned = await client.planPack({ doc });
           const planHash = planned.ok ? ((planned.value as { diff?: { planHash?: string } }).diff?.planHash ?? '') : '';
           const done = planned.ok ? await client.call('installPack', { doc, planHash }) : planned;
-          if (!done.ok) out.refused.push(firstRun.shapeNotAdded(u.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
+          if (!done.ok) out.refused.push(firstRun.shapeNotAdded(one.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
           else {
             out.added.push(...names);
             /* A SEED CARRIES NO LINK (42 §5.2), so the examples are pointed at each other now they are in: a student's
@@ -402,7 +406,7 @@
                 },
                 link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
               },
-              u.usecase,
+              one.usecase,
             );
           }
         }
@@ -888,6 +892,7 @@
                 {#if pagesOf(proposal).length > 0}<li>{firstRun.usePages(firstRun.shapeAnd(pagesOf(proposal).map((p) => p.title)))}</li>{/if}
                 {#if listsOf(proposal).length > 0}<li>{firstRun.useLists(firstRun.shapeAnd(listsOf(proposal).map((l) => l.name)))}</li>{/if}
                 {#if proposal.modules.length > 0}<li>{firstRun.useBuildsOn(firstRun.shapeAnd(proposal.modules.map(packName)))}</li>{/if}
+                {#if beside.length > 0}<li>{firstRun.useBeside(firstRun.shapeAnd(beside.map((b) => b.title)))}</li>{/if}
                 <li>{said_as(proposal)}</li>
               </ul>
             {:else}

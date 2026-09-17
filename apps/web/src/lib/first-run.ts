@@ -51,6 +51,7 @@ export const firstRun = {
   usePages: (names: string) => `Pages: ${names}.`,
   useLists: (names: string) => `Lists: ${names}.`,
   useBuildsOn: (names: string) => `Builds on ${names}.`,
+  useBeside: (names: string) => `Adds ${names} as well, from what you said.`,
   useVoice: (tone: string, lines: string) => `In a voice that is ${tone}: ${lines}.`,
   useHouseVoice: 'Speaks in the house voice.',
   useQuoted: (line: string) => `“${line}”`,
