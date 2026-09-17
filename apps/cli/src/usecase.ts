@@ -30,12 +30,14 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { readShared, SHARED_SUFFIX } from '@braindog/declare';
+import { reachOf } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
+import { installFromCatalogue, reachLines, sdkVerb } from './catalogue.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
-  'braindog usecase takes list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], check <file>, or install <id|file|url> [--host <host>].';
+  'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
 
 /** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
@@ -46,6 +48,8 @@ export async function usecase(args: string[], io: AgentIo): Promise<number> {
   if (verb === 'export') return exportFile(rest, io);
   if (verb === 'check') return check(rest, io);
   if (verb === 'install') return installFile(rest, io);
+  const sdk = sdkVerb(verb);
+  if (sdk) return sdk(rest, io);
   io.say(USAGE);
   return 1;
 }
@@ -165,6 +169,8 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   const pages = shared.value.pack?.declarations.filter((d) => d.kind === 'page').length ?? 0;
   const needs = u.modules.length === 0 ? 'no module first' : `${u.modules.join(', ')} first`;
   io.out(`${u.title} ${u.version} reads as a use case: ${lists} lists, ${pages} pages and ${shared.value.pack?.seeds.length ?? 0} example rows, needing ${needs}. Nothing was sent.`);
+  io.out(`  By ${u.author}, ${u.license}.`);
+  for (const line of reachLines(reachOf(shared.value))) io.out(line);
   return 0;
 }
 
@@ -234,10 +240,10 @@ export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE
 }
 
 async function installFile(args: string[], io: AgentIo): Promise<number> {
-  let values: { host?: string | undefined };
+  let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' } } }));
   } catch {
     io.say(USAGE);
     return 1;
@@ -245,6 +251,12 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
   const [given, ...more] = positionals;
   if (!given || more.length > 0) {
     io.say('braindog usecase install takes one file or address, as in braindog usecase install reading-club-1.0.0.usecase.json.');
+    return 1;
+  }
+  /* FROM A CATALOGUE BY ID, held to the checksum the index gives, then asked for as a file. */
+  if (values.from !== undefined) return ID.test(given) ? installFromCatalogue(given, values.from, values.version, values.host, io) : (io.say('--from names a catalogue to install a use case from by its id, as in braindog usecase install study --from ./catalogue.'), 1);
+  if (values.version !== undefined) {
+    io.say('--version picks a version from a catalogue, so it goes with --from.');
     return 1;
   }
   if (ID.test(given)) return installOffered(given, values.host, io);
@@ -259,14 +271,20 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     io.say(saidWithCode(shared));
     return 1;
   }
-  const u = shared.value.usecase;
+  return proposeFile(read.text, shared.value.usecase, values.host, io);
+}
 
-  const at = await connect(values.host, io);
+/**
+ * A `pack` proposal carrying a file already read through `readShared`, and the Decide link it prints. The record reads the
+ * file through the same door again and plans it; nothing is installed until the owner accepts it.
+ */
+export async function proposeFile(text: string, u: { title: string; version: string }, host: string | undefined, io: AgentIo, question?: string): Promise<number> {
+  const at = await connect(host, io);
   if (typeof at === 'number') return at;
   const answer = await at.client.call<{ id: string }>('propose', {
-    question: `Install ${u.title} ${u.version}?`,
+    question: question ?? `Install ${u.title} ${u.version}?`,
     body_kind: 'pack',
-    body: { file: read.text },
+    body: { file: text },
   });
   if (!answer.ok) {
     io.say(saidWithCode(answer));
@@ -278,7 +296,7 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
-  io.out(`Asked the owner to install ${u.title} ${u.version}. Nothing is installed until they accept it: ${link}`);
+  io.out(`${question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${question}`} Nothing is installed until they accept it: ${link}`);
   return 0;
 }
 
