@@ -493,6 +493,15 @@ export function arranger(d: ArrangeDeps) {
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;
       const target = entryOf(asked)?.id ?? asked;
+      /* A DOCUMENT IS FOR A PACK THE CATALOGUE LACKS, as the grammar says. One sent for a pack the host offers was filed under the
+         catalogue's title and summary, so a propose token could put its own pages, rules and version in front of the owner as
+         "Study". What the host offers is installed from the host's own document; a shared file says its own name. */
+      if (fromFile === null && isMap(body.doc) && entryOf(asked) !== undefined)
+        return refuse(
+          'VALUE_MALFORMED',
+          `${target} is on offer here, so it is installed from this host's own document. Propose {"install":"${asked}"} without doc.`,
+          'body.doc',
+        );
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
       const sent = new Map<string, readonly string[]>(fromFile === null ? [] : [[target, fromFile.modules]]);
       /* AN UPDATE OF A MODULE UNDER IT is an update too: Personal at its version with Money behind is planned for Money. */

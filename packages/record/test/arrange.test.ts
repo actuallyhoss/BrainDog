@@ -438,7 +438,9 @@ test('A CATALOGUE THAT SAYS ITS VERSIONS LISTS THE UPDATES ON OFFER in the arran
   assert.equal(value<{ updates?: unknown }>(await api.arrangement({}, agent)).updates, undefined);
   sql.close();
   const later = await record([{ ...CATALOGUE[0]!, version: '1.1.0', doc: () => ({ ...WORK, version: '1.1.0' }) }]);
-  value(await later.api.decide(accept(value<{ id: string }>(await later.api.propose({ question: 'Work?', body_kind: 'pack', body: { install: 'work', doc: WORK } } as never, agent)).id), owner));
+  /* Work 1.0.0 is installed by the owner, since a proposal installs what the catalogue offers. */
+  const planned = value<{ diff: { planHash: string; approve: string[] } }>(await later.api.planPack({ doc: WORK, source: { kind: 'local' } } as never, owner));
+  value(await later.api.installPack({ doc: WORK, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
   assert.deepEqual(value<{ updates?: unknown }>(await later.api.arrangement({}, agent)).updates, [{ id: 'work', from: '1.0.0', to: '1.1.0' }]);
   later.sql.close();
 });
@@ -472,7 +474,9 @@ test('A PROPOSAL IS FILED WITH THE NAMES THE RAIL WILL USE: a list by its label,
   });
   assert.ok(u.ok);
   const DESK = useCasePack(u.value)!;
-  const { api, sql } = await record([...CATALOGUE, { id: 'usecase-desk', kind: 'usecase', title: 'Desk', summary: 'A desk.', modules: ['work'], doc: () => DESK }]);
+  /* The host offers Work at whichever version this test says, as a catalogue does after an upgrade. */
+  let work: Record<string, unknown> = WORK;
+  const { api, sql } = await record([{ ...CATALOGUE[0]!, doc: () => work }, CATALOGUE[1]!, { id: 'usecase-desk', kind: 'usecase', title: 'Desk', summary: 'A desk.', modules: ['work'], doc: () => DESK }]);
   const filed = value<{ id: string }>(await api.propose({ question: 'A desk?', body_kind: 'pack', body: { install: 'desk', names: { 'register.tasks': 'Stolen' } } } as never, agent));
   const row = value<{ body: { names: Record<string, string> } }>(await api.governance({ id: filed.id }, owner));
   assert.equal(row.body.names['register.tasks'], 'To do', 'the list read by the build’s word, or the proposer’s');
@@ -482,7 +486,8 @@ test('A PROPOSAL IS FILED WITH THE NAMES THE RAIL WILL USE: a list by its label,
 
   /* ONCE IT IS IN AND THE VOICE STAYS, A LIST ALREADY HERE IS LEFT TO THE RAIL'S NAME WHEN DECIDE IS OPENED, which a later switch may change. */
   value(await api.decide(accept(filed.id), owner));
-  const update = value<{ id: string }>(await api.propose({ question: 'Newer Work?', body_kind: 'pack', body: { install: 'work', doc: { ...WORK, version: '1.0.1', declarations: [{ ...WORK.declarations[0], name: 'Jobs' }, WORK.declarations[1]] } } } as never, agent));
+  work = { ...WORK, version: '1.0.1', declarations: [{ ...WORK.declarations[0], name: 'Jobs' }, WORK.declarations[1]] };
+  const update = value<{ id: string }>(await api.propose({ question: 'Newer Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent));
   const later = value<{ body: { names?: Record<string, string>; plan: unknown[] } }>(await api.governance({ id: update.id }, owner));
   assert.equal(later.body.names?.['register.tasks'], undefined, JSON.stringify(later.body));
   sql.close();
@@ -525,5 +530,30 @@ test('A SHARED USE-CASE FILE IS PROPOSED AS A QUESTION: read through readShared,
   assert.equal(no.code, 'SECRET_IN_PACK');
   assert.match(String(no.at), /^body\.file/u);
   assert.equal(refusal(await api.propose({ question: 'Nothing?', body_kind: 'pack', body: { file: 42 } } as never, agent)).code, 'VALUE_MALFORMED');
+  sql.close();
+});
+
+test('A PROPOSAL NEVER SENDS ITS OWN DOCUMENT FOR A PACK THE HOST OFFERS, so the owner is never shown the catalogue name over it', async () => {
+  const { api, sql } = await record();
+  /* A PROPOSER'S DOCUMENT WAS FILED UNDER THE CATALOGUE'S TITLE AND SUMMARY. A propose token sent its own usecase-study, with
+     a page of its choosing and a later version, and Decide read "Study" and "Courses and what is due." over it. */
+  const evil = {
+    ...STUDY,
+    version: '9.0.0',
+    declarations: [
+      ...(STUDY.declarations as Record<string, unknown>[]),
+      { page: 'elsewhere', title: 'Elsewhere', nav: { section: 'Studies', order: 20 }, blocks: [{ kind: 'text', span: 12, text: 'Not what the catalogue offers.' }] },
+    ],
+  };
+  for (const asked of ['study', 'usecase-study']) {
+    const no = refusal(await api.propose({ question: 'Set this BrainDog up for studying?', body_kind: 'pack', body: { install: asked, doc: evil } } as never, agent));
+    assert.equal(no.code, 'VALUE_MALFORMED');
+    assert.equal(no.at, 'body.doc');
+  }
+  assert.equal(refusal(await api.propose({ question: 'Work?', body_kind: 'pack', body: { install: 'work', doc: { ...WORK, version: '2.0.0' } } } as never, agent)).at, 'body.doc');
+  assert.equal(value<unknown[]>(await api.governance({}, owner)).length, 0, 'a proposal was filed');
+  /* The pack the catalogue offers is still asked for by name, and a document for a pack the catalogue lacks is still taken. */
+  value(await api.propose({ question: 'Set this BrainDog up for studying?', body_kind: 'pack', body: { install: 'study' } } as never, agent));
+  value(await api.propose({ question: 'Notes?', body_kind: 'pack', body: { install: 'notes', doc: { ...WORK, pack: 'notes', declarations: [{ ...WORK.declarations[0], register: 'notes', pack: 'notes' }] } } } as never, agent));
   sql.close();
 });
