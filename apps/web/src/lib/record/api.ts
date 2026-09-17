@@ -244,6 +244,18 @@ export function noticed(register: string, suspended: string | null = SUSPENDED):
 export const decl = (register: string, field: string): FieldDecl | undefined =>
   REGISTERS[register]?.fields.find((f) => f.id === field);
 
+/**
+ * A COLUMN'S HEADING: the label its block gives it, or over a list's title field the word for one of its rows, as the list
+ * is labelled, so a team whose tasks are Tickets reads Ticket over them. Any other column is headed by its field id, as
+ * it always was.
+ */
+export const columnHeading = (register: string, c: { field: string; label?: string | undefined }): string => {
+  if (typeof c.label === 'string') return c.label;
+  const list = REGISTERS[register];
+  const one = list && list.title === c.field ? list.one : undefined;
+  return typeof one === 'string' && one ? one.charAt(0).toUpperCase() + one.slice(1) : c.field;
+};
+
 /** A label is the field id with `_` as a space, until a pack needs a different word (50 §10). */
 export const labelOf = (f: FieldDecl): string =>
   f.label ?? f.id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
@@ -2154,7 +2166,7 @@ export function readBlock(b: PageBlock): BlockResult {
     const columns = b.columns
       ? b.columns.map((c) => ({
           field: c.field,
-          label: c.label ?? c.field,
+          label: columnHeading(register ?? '', c),
           width: c.width ?? 'minmax(12ch,1fr)',
           align: c.align ?? 'start',
           /* A FIGURE NEVER TRUNCATES, AND WHICH COLUMNS ARE FIGURES IS THE REGISTER'S TO SAY.

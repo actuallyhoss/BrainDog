@@ -15,6 +15,20 @@
 
 export type FinishedDecl = { state?: string | undefined; done?: readonly string[] | undefined; finished?: string | undefined };
 
+/**
+ * The day `ms` falls on in a timezone, as `YYYY-MM-DD`: a task finished at 01:00 in Cairo was finished that day, not the
+ * UTC day before. A timezone this runtime cannot read, or none, is UTC.
+ */
+export function dayIn(ms: number, tz: string | null | undefined): string {
+  if (tz)
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+    } catch {
+      /* an unknown zone falls through to UTC */
+    }
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
 const empty = (v: unknown): boolean => v === undefined || v === null || v === '';
 
 /**

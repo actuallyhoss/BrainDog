@@ -49,7 +49,7 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
 
   /* WHAT IS OFFERED: exactly the packs whose version went up. */
   const changed = FIRST_PARTY.filter((id) => FIRST_PARTY_VERSIONS[id] !== '1.0.0');
-  assert.deepEqual([...changed].sort(), ['money-core', 'work']);
+  assert.deepEqual([...changed].sort(), ['money-core', 'portfolio', 'work']);
   const read = said<{ updates?: { id: string; from: string; to: string }[] }>(await api.arrangement({}, agent));
   assert.deepEqual(
     [...(read.updates ?? [])].sort((a, b) => a.id.localeCompare(b.id)),
@@ -57,11 +57,13 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
   );
 
   /* A PACK THAT DID NOT CHANGE HAS NOTHING TO UPDATE, and asking says so. */
-  const same = await api.propose({ question: 'Update Estate?', body_kind: 'pack', body: { install: 'estate' } } as never, agent);
+  const same = await api.propose({ question: 'Update People?', body_kind: 'pack', body: { install: 'people' } } as never, agent);
   assert.equal((same as { ok: boolean }).ok, false);
 
   /* TAKING THE UPDATES, as the owner accepts them. */
   for (const id of changed) {
+    /* A PACK UPDATED ALREADY, as the module under one updated before it, is not asked for again. */
+    if (said<{ packs: { id: string; version?: string }[] }>(await api.arrangement({}, agent)).packs.find((p) => p.id === id)?.version === FIRST_PARTY_VERSIONS[id]) continue;
     const filed = said<{ id: string }>(await api.propose({ question: `Update ${id}?`, body_kind: 'pack', body: { install: id } } as never, agent));
     said(await api.decide({ id: filed.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   }

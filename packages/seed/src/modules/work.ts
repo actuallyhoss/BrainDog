@@ -224,13 +224,16 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
     pack: 'work',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
-      /* `review` IS THE QUEUE A PERSON WORKS FROM: an agent finished its part and a person checks it before it is done. */
+      /* `review` IS THE QUEUE A PERSON WORKS FROM: an agent finished its part and a person checks it before it is done.
+         `backlog` IS WORK KEPT FOR LATER, not yet taken on: a team's backlog, or homework for next term. It comes first on
+         the board, and a new task is To do unless somebody says Later. */
       {
         id: 'state',
         label: 'Status',
         type: 'enum',
-        values: ['open', 'doing', 'review', 'blocked', 'done', 'dropped'],
-        labels: { review: 'To check' },
+        values: ['backlog', 'open', 'doing', 'review', 'blocked', 'done', 'dropped'],
+        labels: { backlog: 'Later', review: 'To check' },
+        default: 'open',
         index: true,
         required: true,
       },
@@ -387,7 +390,9 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
 
 /* ── the pages ────────────────────────────────────────────────────────────── */
 
-const DESCRIPTION = { field: 'what', label: 'Task', width: 'minmax(20ch,1fr)' } as const;
+/* NO LABEL: a column over a list's title is headed by what one row of the list is called, so a record whose tasks are
+   Tickets reads Ticket, and one that relabels them later reads that. */
+const DESCRIPTION = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
 export const WORK_PAGES: Record<string, SeedPage> = {
   /**
@@ -450,7 +455,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing is due in the next two weeks.',
       },
       {
-        /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. */
+        /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. A task with no size adds
+           nothing and draws no bar, so open work nobody sized says the empty line rather than "No project 0 d". */
         kind: 'bar',
         heading: 'Open work by project',
         span: 5,

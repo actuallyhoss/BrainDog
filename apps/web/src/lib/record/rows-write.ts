@@ -195,10 +195,10 @@ export function capturedFields(
 }
 
 /** The emptiest value a required field can honestly take, or `undefined` where there is not one. */
-function emptiest(register: string, f: { id: string; type: string; values?: readonly string[] }, now: number, seen: readonly Entry[]): Fields[string] | undefined {
+function emptiest(register: string, f: { id: string; type: string; values?: readonly string[]; default?: unknown }, now: number, seen: readonly Entry[]): Fields[string] | undefined {
   switch (f.type) {
     case 'enum':
-      return f.values?.[0];
+      return typeof f.default === 'string' && f.values?.includes(f.default) ? f.default : f.values?.[0];
     case 'day':
       return new Date(now).toISOString().slice(0, 10);
     case 'instant':

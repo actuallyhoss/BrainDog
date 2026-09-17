@@ -11,9 +11,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 import { NOW, TODAY, installSeed } from '@braindog/seed';
 
-import { page } from './api.ts';
+import { REGISTERS, columnHeading, page } from './api.ts';
 import { TASKS } from './data.ts';
 import { toSegments } from './blocks.ts';
+import { relabelAll } from '../voice.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -142,4 +143,38 @@ test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were fini
   /* Yesterday the task finished today was still open. */
   assert.equal(open.trend.at(-1), live + TASKS.filter((t) => t.fields.done_on === TODAY).length);
   assert.ok(open.trend[0]! > open.trend.at(-1)!, 'more was open eight weeks ago, before the finished work was done');
+});
+
+test('A TASK COLUMN IS HEADED BY WHAT ONE ROW IS CALLED, in both engines, and a team whose tasks are Tickets reads Ticket', async () => {
+  const k = await kernel;
+  const record = k.page('work');
+  assert.ok(record.ok);
+  const heads = () => ({
+    record: record.value.blocks.filter((b) => b.kind === 'table').map((b) => columnHeading('tasks', (b as { columns: { field: string; label?: string }[] }).columns[0]!)),
+    demo: page('work')!.blocks.filter((b) => b.kind === 'table').map((b) => b.columns[0]!.label),
+  });
+  const plain = heads();
+  assert.deepEqual(plain.record, plain.demo);
+  assert.ok(plain.demo.length > 0 && plain.demo.every((h) => h === 'Task'), plain.demo.join(', '));
+  relabelAll(REGISTERS, { tasks: 'Tickets', 'tasks:one': 'ticket' });
+  try {
+    const team = heads();
+    assert.deepEqual(team.record, team.demo);
+    assert.ok(team.demo.every((h) => h === 'Ticket'), team.demo.join(', '));
+  } finally {
+    relabelAll(REGISTERS, {});
+  }
+});
+
+test('OPEN WORK BY PROJECT DRAWS NO BAR FOR TASKS WITH NO SIZE, so unsized work is not "No project 0 d"', () => {
+  const bar = page('work')!.blocks.find((b) => b.heading === 'Open work by project')!;
+  const said = (b: typeof bar) => JSON.stringify(toSegments(b));
+  assert.match(said(bar), /No project/u, 'the sample sizes its tasks on no project');
+  /* THE TASKS ON NO PROJECT LOSE THEIR SIZE: that row goes, and the sized ones stay. */
+  const unsizedRest = { ...bar, matched: bar.matched.map((e) => (e.fields.thing ? e : { ...e, fields: { ...e.fields, effort: null } })) };
+  assert.doesNotMatch(said(unsizedRest), /No project/u);
+  assert.match(said(unsizedRest), /Kiln/u);
+  /* NOTHING SIZED AT ALL: no bar, and no zero. */
+  const unsized = { ...bar, matched: bar.matched.map((e) => ({ ...e, fields: { ...e.fields, effort: null } })) };
+  assert.doesNotMatch(said(unsized), /No project|0 d/u, said(unsized).slice(0, 300));
 });

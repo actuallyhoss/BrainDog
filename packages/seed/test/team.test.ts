@@ -135,14 +135,14 @@ test('A RECORD WITH TEAM 1.0.0 UPDATES TO TICKETS ON TASKS AND LOSES NOTHING', a
   };
   assert.equal(await carryForward(io, 'usecase-team', '1.0.0', TODAY), 3);
   assert.equal(await carryForward(io, 'usecase-team', '1.0.0', TODAY), 0, 'a second run copies nothing twice');
-  assert.equal(await carryForward(io, 'usecase-team', '2.0.0', TODAY), 0, 'a record already on 2.0.0 moves nothing');
+  assert.equal(await carryForward(io, 'usecase-team', '2.1.0', TODAY), 0, 'a record already on 2.1.0 moves nothing');
 
   const tasks = rows(k, 'tasks').filter((t) => !examples.has(t.id));
   assert.equal(tasks.length, 3);
   const by = (what: string) => tasks.find((t) => t.fields.what === what)!.fields;
   const shipped = by('Ship the export');
   assert.deepEqual([shipped.state, shipped.priority, shipped.owner, shipped.by], ['doing', 'high', priya.id, '2026-09-10']);
-  assert.equal(by('Groom the backlog').state, 'open');
+  assert.equal(by('Groom the backlog').state, 'backlog', 'a backlog ticket is still in the backlog');
   assert.equal(by('Retire the old importer').state, 'done');
   assert.equal(typeof by('Retire the old importer').done_on, 'string', 'a finished ticket is a finished task with its day');
 
@@ -157,5 +157,40 @@ test('A RECORD WITH TEAM 1.0.0 UPDATES TO TICKETS ON TASKS AND LOSES NOTHING', a
     for (const b of value<Page>(k.page(slug)).blocks) assert.deepEqual(b.refusals ?? [], [], `${slug} ${b.heading}`);
   const board = value<Page>(k.page('work-board')).blocks;
   assert.ok(board.find((b) => b.heading === 'By status')!.rows!.some((r) => r.fields.what === 'Ship the export'));
+  sql.close();
+});
+
+test('A RECORD THAT TOOK TEAM 2.0.0 PUTS ITS BACKLOG TICKETS BACK IN THE BACKLOG, and leaves one somebody moved since', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const u = useCase('team')!;
+  value(await put(k, moduleDocument(u, 'portfolio', { today: TODAY, holds: ['things'] })));
+  value(await put(k, moduleDocument(u, 'people', { today: TODAY, holds: [...held(k), 'people'] })));
+  value(await put(k, TEAM_1));
+  value(k.create('tickets', { what: 'Groom the backlog', state: 'backlog' }, OWNER));
+  value(k.create('tickets', { what: 'Sketch the importer', state: 'backlog' }, OWNER));
+  value(k.create('tickets', { what: 'Ship the export', state: 'to_do' }, OWNER));
+  value(await put(k, moduleDocument(u, 'work', { today: TODAY, holds: [...held(k), 'tasks', 'tracks', 'updates'] })));
+  value(await put(k, useCaseDocument('team', TODAY, held(k))));
+  /* AS 2.0.0 COPIED THEM: every one To do. Then a person started one of the backlog tickets. */
+  for (const what of ['Groom the backlog', 'Sketch the importer', 'Ship the export']) value(k.create('tasks', { what, state: 'open' }, OWNER));
+  const sketch = rows(k, 'tasks').find((t) => t.fields.what === 'Sketch the importer')!;
+  value(k.update('tasks', `tasks#${sketch.seq}`, { state: 'doing' }, OWNER));
+
+  const io: CarryIo = {
+    rows: async (register) => {
+      const read = k.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async (register, seq, field, spoken) => k.update(register, `${register}#${seq}`, { [field]: spoken }, OWNER).ok,
+    create: async (register, fields) => k.create(register, fields, OWNER).ok,
+    clear: async (register, seq, field) => k.update(register, `${register}#${seq}`, { [field]: null }, OWNER).ok,
+  };
+  const before = k.count('tasks');
+  assert.equal(await carryForward(io, 'usecase-team', '2.0.0', TODAY), 1);
+  assert.equal(k.count('tasks'), before, 'no ticket is copied twice');
+  const state = (what: string) => rows(k, 'tasks').find((t) => t.fields.what === what)!.fields.state;
+  assert.deepEqual([state('Groom the backlog'), state('Sketch the importer'), state('Ship the export')], ['backlog', 'doing', 'open']);
+  assert.equal(await carryForward(io, 'usecase-team', '2.0.0', TODAY), 0, 'a second run moves nothing');
   sql.close();
 });

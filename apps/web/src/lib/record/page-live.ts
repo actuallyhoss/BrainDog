@@ -25,6 +25,7 @@ import type { ActionRow, Outcome } from './actions.ts';
 import {
   REGISTERS,
   agentsTable,
+  columnHeading,
   decl as fieldOf,
   feedTable,
   historyTable,
@@ -214,7 +215,7 @@ const columnsOf = (b: Answered) => {
     const as = roleOf(c.as);
     return {
       field: c.field,
-      label: str(c.label) ?? c.field,
+      label: columnHeading(register, { field: c.field, label: str(c.label) }),
       width: c.width ?? 'minmax(12ch,1fr)',
       align: c.align ?? 'start',
       truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),

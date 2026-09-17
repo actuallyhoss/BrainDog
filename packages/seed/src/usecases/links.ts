@@ -14,7 +14,7 @@
 import { FIRST_PARTY, firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
 import { PERSONAL_CARRIED, PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
-import { TEAM_PLAN_LINKS, TICKETS_MOVED_IN, moveTickets } from './team.ts';
+import { BACKLOG_KEPT_IN, TEAM_PLAN_LINKS, TICKETS_MOVED_IN, backlogAgain, moveTickets } from './team.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
@@ -142,9 +142,13 @@ const carried = (v: unknown): boolean =>
  * a number is only emptied once its row is written.
  */
 export async function carryForward(io: CarryIo, usecase: string, fromVersion: string | null, today: string): Promise<number> {
-  /* A TEAM FROM BEFORE ITS TICKETS WERE WORK'S TASKS copies each one across (`team.ts` `moveTickets`). */
-  if (usecase.replace(/^usecase-/u, '') === 'team')
-    return fromVersion !== null && olderThan(fromVersion, TICKETS_MOVED_IN) ? moveTickets(io).catch(() => 0) : 0;
+  /* A TEAM FROM BEFORE ITS TICKETS WERE WORK'S TASKS copies each one across (`team.ts` `moveTickets`), and one that copied
+     them at 2.0.0 puts its backlog tickets back in the backlog (`backlogAgain`). */
+  if (usecase.replace(/^usecase-/u, '') === 'team') {
+    if (fromVersion === null) return 0;
+    if (olderThan(fromVersion, TICKETS_MOVED_IN)) return moveTickets(io).catch(() => 0);
+    return olderThan(fromVersion, BACKLOG_KEPT_IN) ? backlogAgain(io).catch(() => 0) : 0;
+  }
   const plan = CARRIED[usecase.replace(/^usecase-/u, '')];
   if (!plan || fromVersion === null || !olderThan(fromVersion, plan.before)) return 0;
   let moved = 0;

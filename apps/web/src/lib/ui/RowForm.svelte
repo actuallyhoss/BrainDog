@@ -160,7 +160,11 @@
    * is what `taken` reads, so a segment writing anywhere else can only ever be a second source of
    * truth with one reader.
    */
-  const pick = (f: FieldDecl): string => typed[f.id] ?? f.values?.[0] ?? '';
+  /* AN ENUM OPENS ON ITS DECLARED DEFAULT, which the record fills when nobody says, and on its first value otherwise: Work's
+     tasks list Backlog first and a new task is To do. */
+  const firstOf = (f: FieldDecl): string =>
+    typeof f.default === 'string' && f.values?.includes(f.default) ? f.default : (f.values?.[0] ?? '');
+  const pick = (f: FieldDecl): string => typed[f.id] ?? firstOf(f);
 
   /**
    * WHAT A PERSON HAS TYPED INTO A MONEY FIELD, and whether the record would take it.
@@ -200,7 +204,7 @@
          the segmented control beside it looked selected and was not, so the two arms of one field
          type disagreed about what "the default" means and only the long one carried its answer into
          the row. */
-      if (f.type === 'enum' && f.values?.[0]) out[f.id] = f.values[0];
+      if (f.type === 'enum' && f.values?.[0]) out[f.id] = firstOf(f);
     }
     return first ? { ...out, ...given } : out;
   };

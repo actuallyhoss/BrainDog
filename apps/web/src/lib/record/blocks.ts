@@ -103,6 +103,10 @@ function barRows(block: BlockResult): string[] {
   for (const e of block.matched) {
     /* A ROW THAT LINKS TO NOTHING WITH MONEY IN IT HAS NO BAR, because a zero would say it holds none. */
     if (link && valuesOf(e.fields[of]).length === 0) continue;
+    /* NOR DOES A ROW WITH NOTHING TO ADD: open work with no size is not "No project 0 d", and a group or the rest that only
+       holds such rows is left out, so a bar with nothing sized says its empty line. */
+    const bare = e.fields[of];
+    if (!link && (bare === undefined || bare === null || bare === '')) continue;
     const said = display(block.register ?? '', by, e.fields[by], NOW, block.names);
     /* WHAT NO PART HOLDS IS ITS OWN ROW, LAST, where the block names it, and it opens those rows. */
     if (said === null && block.unset) {

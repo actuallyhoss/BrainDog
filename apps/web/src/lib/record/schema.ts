@@ -32,6 +32,8 @@ export type FieldDecl = {
   values?: readonly string[];
   /** `enum` only: the words a person reads for some of its values. The column holds the id. */
   labels?: Readonly<Record<string, string>>;
+  /** What a new row holds when nobody says, as the record fills it on create. An enum's form opens on it. */
+  default?: unknown;
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
   index?: boolean;
   /**

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, stampFinished, type Declaration } from '../src/index.ts';
+import { dayIn, openRecord, stampFinished, type Declaration } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.parse('2026-09-17T10:00:00Z');
@@ -86,4 +86,20 @@ test('A REGISTER WITH NO FINISHED DAY IS LEFT ALONE, and one naming a field that
   const fields: Record<string, unknown> = { state: 'done' };
   assert.equal(stampFinished({ state: 'state', done: ['done'] }, null, fields, [], TODAY), null);
   assert.deepEqual(fields, { state: 'done' });
+});
+
+test('THE DAY IS THE RECORD\'S OWN: finished at 01:00 in Cairo is that day, not the UTC day before', async () => {
+  /* 22:30 UTC on the 16th is 01:30 on the 17th in Cairo. */
+  const k = await openRecord(openSqlite(), fixedClock(Date.parse('2026-09-16T22:30:00Z')));
+  ok(k.createRecord({ id: 'rec_01J8ZX0000000000000000CA00', slug: 'cairo-desk', name: 'Cairo desk', tz: 'Africa/Cairo', locale: 'en', owner: { id: 'p_1', name: 'Ada' } }));
+  ok(await k.install([tasks()]));
+  ok(k.create('tasks', { what: 'Late finish', state: 'done' }, OWNER));
+  assert.equal(k.get('tasks#1')!.fields.done_on, '2026-09-17');
+
+  /* A RECORD THAT NAMES NO TIMEZONE, OR ONE THIS RUNTIME CANNOT READ, DATES IT IN UTC. */
+  const plain = await openRecord(openSqlite(), fixedClock(Date.parse('2026-09-16T22:30:00Z')));
+  ok(await plain.install([tasks()]));
+  ok(plain.create('tasks', { what: 'Late finish', state: 'done' }, OWNER));
+  assert.equal(plain.get('tasks#1')!.fields.done_on, '2026-09-16');
+  assert.equal(dayIn(Date.parse('2026-09-16T22:30:00Z'), 'Not/AZone'), '2026-09-16');
 });

@@ -103,7 +103,7 @@ import {
   type Verdict,
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
-import { stampFinished } from './finished.ts';
+import { dayIn, stampFinished } from './finished.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -214,7 +214,7 @@ export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBuc
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
-export { stampFinished, type FinishedDecl } from './finished.ts';
+export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -1908,8 +1908,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
       /* ── the day a row was finished (`finished.ts`) ──
          Filled when the row enters a done state and emptied when it leaves one, in the write itself, so the history
-         names whoever moved the row and not a mechanism after them. Today is the UTC day, as `resolveDay` is. */
-      if (!deleting && stampFinished(decl, current ? { state: current.state } : null, merged, touched, instant(clock.now()).slice(0, 10)) !== null && decl.finished)
+         names whoever moved the row and not a mechanism after them. Today is the day in the record's timezone, where a
+         person finished it, and the UTC day on a record that names none. */
+      if (!deleting && decl.finished && stampFinished(decl, current ? { state: current.state } : null, merged, touched, dayIn(clock.now(), recordIdentity(sql)?.tz)) !== null)
         touched.push(decl.finished);
 
       /* ── validate ── */

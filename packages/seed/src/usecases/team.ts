@@ -11,15 +11,19 @@
  * A RECORD THAT HAD TEAM BEFORE 2.0.0 KEPT ITS OWN TICKETS LIST, and keeps it: the update installs it again under the
  * name Earlier tickets, so nothing it holds is lost, and copies each ticket to Tickets with its cycle and points on the
  * cycle plan (`moveTickets`).
+ *
+ * BACKLOG IS WORK'S OWN STATUS since 2.1.0, called Later on a record without Team, so a backlog ticket stays in the backlog.
+ * A record that took 2.0.0 had its backlog tickets made To do, and the update puts them back (`backlogAgain`).
  */
 
 type Body = Record<string, unknown>;
 
-const TICKET = { field: 'what', label: 'Ticket', width: 'minmax(20ch,1fr)' } as const;
+/* NO LABEL: the column over a ticket's title is headed by what one ticket is called, so a team that calls them Issues reads Issue. */
+const TICKET = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
 export const TEAM = {
   usecase: 'team',
-  version: '2.0.0',
+  version: '2.1.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -47,6 +51,7 @@ export const TEAM = {
     tasks: 'Tickets',
     'tasks:one': 'ticket',
     'tasks:holds': 'every piece of work the team has, who owns it, how urgent it is and whether an agent took it',
+    'tasks.state.backlog': 'Backlog',
     'tasks.state.open': 'To do',
     'tasks.state.doing': 'In progress',
     'tasks.state.review': 'In review',
@@ -281,6 +286,7 @@ export const TEAM_EXAMPLES: readonly Body[] = [
   { register: 'tasks', fields: { what: 'Fix the sign-in link that expires too soon', state: 'review', priority: 'urgent', agent: 'claude' } },
   { register: 'tasks', fields: { what: 'Wait on the design for the settings screen', state: 'blocked', priority: 'normal', by: '+5d' } },
   { register: 'tasks', fields: { what: 'Tidy the backlog labels', state: 'done', priority: 'low', agent: 'claude' } },
+  { register: 'tasks', fields: { what: 'Let a teammate export the board as a spreadsheet', state: 'backlog', priority: 'low' } },
 ];
 
 /** The planned tickets linked to their ticket and to the example cycle once both are in (`links.ts`). */
@@ -341,12 +347,12 @@ export const EARLIER_TICKETS: Body = {
   ],
 };
 
-/**
- * HOW EACH OLD STATUS READS ON A TASK. A backlog ticket and one to do are both To do: what tells them apart on a team's
- * board now is whether a cycle has planned it.
- */
+/** The version a backlog ticket stayed in the backlog, on Work's own Backlog status. */
+export const BACKLOG_KEPT_IN = '2.1.0';
+
+/** HOW EACH OLD STATUS READS ON A TASK: each one has its own, and a backlog ticket is in the backlog. */
 export const TICKET_STATES: Readonly<Record<string, string>> = {
-  backlog: 'open',
+  backlog: 'backlog',
   to_do: 'open',
   in_progress: 'doing',
   in_review: 'review',
@@ -399,6 +405,21 @@ export async function moveTickets(io: TicketIo): Promise<number> {
     if (set(f.points)) line.points = f.points;
     if (Array.isArray(f.tags) && f.tags.length > 0) line.tags = f.tags;
     await io.create('cycle_plan', line).catch(() => false);
+  }
+  return moved;
+}
+
+/**
+ * A RECORD THAT TOOK TEAM 2.0.0 copied its backlog tickets as To do. Each task copied from a ticket still in the backlog,
+ * and still To do, goes back to the backlog; one somebody has moved since is left where they put it. Answers how many.
+ */
+export async function backlogAgain(io: { rows: TicketIo['rows']; link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean> }): Promise<number> {
+  const waiting = new Set(((await io.rows('tickets').catch(() => null)) ?? []).filter((t) => t.fields.state === 'backlog').map((t) => String(t.fields.what ?? '')));
+  if (waiting.size === 0) return 0;
+  let moved = 0;
+  for (const task of (await io.rows('tasks').catch(() => null)) ?? []) {
+    if (task.seq === null || task.fields.state !== 'open' || !waiting.has(String(task.fields.what ?? ''))) continue;
+    if (await io.link('tasks', task.seq, 'state', 'backlog').catch(() => false)) moved += 1;
   }
   return moved;
 }
