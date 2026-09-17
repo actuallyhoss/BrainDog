@@ -20,6 +20,9 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PACKS, PAGES, REGISTERS, pages } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
+  import { currencyChoices } from '$lib/record/currencies.ts';
+  import RatesForm from './RatesForm.svelte';
   import {
     UNITS,
     changesOf,
@@ -243,6 +246,14 @@
                     <select class="setting-select" id="set-{key}" value={d.text} onchange={(e) => (d.text = typed(e))}>
                       {#each decl.values ?? [] as v (v)}<option value={v}>{v.replace(/_/g, ' ')}</option>{/each}
                     </select>
+                  {:else if key === HOME_CURRENCY_SETTING && decl.type === 'text'}
+                    <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency. -->
+                    {@const choices = currencyChoices(d.text)}
+                    <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
+                      <option value="">{copy.currencyNone}</option>
+                      <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+                      <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+                    </select>
                   {:else if decl.type === 'day'}
                     <input
                       class="setting-select"
@@ -332,6 +343,11 @@
           <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{fix && !besideField ? fix : ''}</p>
         </form>
       </Section>
+      {#if HOME_CURRENCY_SETTING in settings.config}
+        <Section title={copy.ratesHeading}>
+          <RatesForm home={typeof settings.values[HOME_CURRENCY_SETTING] === 'string' ? String(settings.values[HOME_CURRENCY_SETTING]) : ''} />
+        </Section>
+      {/if}
     {:else}
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
            where somebody comes to find out what they were. -->

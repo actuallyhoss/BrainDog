@@ -634,6 +634,31 @@ export const copy = {
   pollFaultName: (path: string) => `Say what the number at ${path} is called.`,
   pollFaultPath: (path: string) => `${path} is not a path. Write it as data.mrr or plans[0].count.`,
   pollQuestion: (host: string, every: string, title: string, names: string) => `Poll ${host} ${every.toLowerCase()} for ${title}’s numbers: ${names}?`,
+  /* THE HOME CURRENCY PICKER AND THE EXCHANGE RATES FORM, on Money's settings (`routes/packs/[id]`). The form files a
+     proposal like the poll form above, because a poll calls out on a clock and the owner approves the address once. */
+  currencyNone: 'None chosen',
+  currencyCommon: 'Common',
+  currencyAll: 'All currencies',
+  ratesHeading: 'Exchange rates, fetched every day',
+  ratesWhy:
+    'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. You approve the address once, on Decide, and nothing is fetched before that.',
+  ratesSource: 'From',
+  ratesCustom: 'Another address',
+  ratesCoversOpenEr: 'About 160 currencies, including the Egyptian pound, updated once a day. No key needed.',
+  ratesCoversFrankfurter: 'The European Central Bank’s rates for about 30 currencies, on working days. No Egyptian pound. No key needed.',
+  ratesCustomCovers: 'Any https address that answers JSON. Say which currency it quotes against and where each number is.',
+  ratesBase: 'Quoted against',
+  ratesBaseNote: (base: string) => `Each number in the answer says what one ${base} is worth in that currency.`,
+  ratesCurrencies: 'Currencies to fetch',
+  ratesCurrenciesNote: 'The currencies your money is in, and your home currency.',
+  ratesAdd: 'Add a currency',
+  ratesRemove: (code: string) => `Remove ${code}`,
+  ratesFile: 'Propose these rates',
+  ratesFaultBase: 'Choose the currency the address quotes against.',
+  ratesFaultNone: 'Choose at least one currency other than the one the address quotes against.',
+  ratesFaultCode: (code: string) => `${code || 'That'} is not a currency code.`,
+  ratesFaultUnquoted: (name: string, codes: string) => `${name} does not quote ${codes}. Choose another address.`,
+  ratesQuestion: (host: string, base: string, codes: string) => `Fetch ${host} every day for what one ${base} is worth in ${codes}?`,
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */
@@ -1143,6 +1168,8 @@ export const copy = {
   figureNoRate: (pairs: string) => `Not added up yet: there is no rate from ${pairs}. Add one to Exchange rates.`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   figureConvertedForward: (day: string) => `Converted at rates as of ${day}, the first after some of these amounts.`,
+  /** A target declared in one currency, said in the one the figure was converted into. */
+  targetConverted: (line: string, from: string) => `${line}, converted from ${from} at the latest rate`,
   blockNeedsOneCurrency: 'This needs its money in one currency, and it is in more than one.',
   /** The heading over one currency's chart, when a chart is drawn once per currency. */
   inCurrency: (currency: string) => `In ${currency}`,

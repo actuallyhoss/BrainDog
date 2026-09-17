@@ -258,7 +258,7 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
 
 /** The Money setting a record adds every currency up in. Read each time a figure is, so a change holds at once. */
 export const MONEY_HOME_SETTING = {
-  home_currency: { type: 'text', label: 'Home currency', note: 'The three-letter code money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
+  home_currency: { type: 'text', label: 'Home currency', note: 'The currency money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
 } as const;
 
 /**
