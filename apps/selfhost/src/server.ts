@@ -932,6 +932,19 @@ async function write(res: ServerResponse, out: Response, cookie?: string): Promi
   res.end(Buffer.from(await out.arrayBuffer()));
 }
 
+/**
+ * The most a request body to `/api`, `/auth` or `/account` may weigh: 100 MB, what Cloudflare takes before a Worker sees a
+ * request, so a record answers the same on either host. `/mcp` holds its own, smaller cap.
+ */
+export const BODY_MOST_BYTES = 100 * 1024 * 1024;
+
+/** A 413 for a body past the cap, and the connection closed, so nothing more of it is read. */
+async function tooLarge(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  /* DESTROYED ONCE THE ANSWER HAS LEFT, or the socket closes under it and the caller reads a reset instead of the 413. */
+  res.once('finish', () => req.destroy());
+  await write(res, json(413, { ok: false }, [['connection', 'close']]));
+}
+
 async function answer(
   req: IncomingMessage,
   res: ServerResponse,
@@ -951,8 +964,17 @@ async function answer(
   const path = new URL(url).pathname;
   if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site));
 
+  /* A BODY IS WEIGHED AS IT ARRIVES, BEFORE ANYBODY IS KNOWN. Every byte was held in memory before the credential was
+     read, so anybody who could reach a host bound to every interface could send it gigabytes with no key at all. */
+  const said = Number(req.headers['content-length'] ?? Number.NaN);
+  if (Number.isFinite(said) && said > BODY_MOST_BYTES) return tooLarge(req, res);
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let weight = 0;
+  for await (const chunk of req) {
+    weight += (chunk as Buffer).length;
+    if (weight > BODY_MOST_BYTES) return tooLarge(req, res);
+    chunks.push(chunk as Buffer);
+  }
   const request = new Request(url, { method, headers, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) });
   /* `reached` IS THE `Host` THE SOCKET GOT, so a device that called this process by another name is not told to
      approve itself at the configured origin. */
