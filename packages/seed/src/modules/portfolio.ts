@@ -206,7 +206,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     metric: 'project-open',
     name: 'Open',
     source: 'register.tasks',
-    where: 'thing is {{it}}, state is not done or dropped',
+    where: 'thing is {{it}}, state is not backlog or done or dropped',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 5 },

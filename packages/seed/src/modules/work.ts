@@ -53,6 +53,9 @@ export const TASKS: Fields[] = [
   { what: 'Archive the old Marlow brand files', state: 'dropped', thing: 2, by: day(-30), done_on: day(-30), effort: days(0.2), note: 'Marlow keeps its own archive.' },
   /* FINISHED TODAY AND NOT DATED BY HAND: the record fills Done on, and the sample fills it the same way (`finished`). */
   { what: 'Send the specimen proofs to Kiln', state: 'done', thing: 1, track: 3, by: day(1), effort: days(0.3), note: '' },
+  /* KEPT FOR LATER, so the board draws its Later column and Open is seen to leave it out: work nobody has taken on yet has
+     no due day and is not counted as open. */
+  { what: 'Try a second layout for the specimen page', state: 'backlog', thing: 1, track: 3, effort: days(1), note: 'Once the first one is live.' },
 ];
 
 /**
@@ -84,6 +87,8 @@ export function openTasksSeries(back = 60): { at: string; value: number }[] {
   for (let offset = -back; offset <= -1; offset++) {
     const at = day(offset);
     const open = TASKS.filter((t) => {
+      /* A TASK KEPT FOR LATER IS NOT OPEN WORK, as the figure says. The sample has no day it was moved there, so it is left out of every day. */
+      if (t.state === 'backlog') return false;
       if (t.state !== 'done' && t.state !== 'dropped') return true;
       const finished = typeof t.done_on === 'string' ? t.done_on : TODAY;
       return finished > at;
@@ -269,8 +274,11 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
 
 /* ── the figures ──────────────────────────────────────────────────────────── */
 
-/** Every state a task is still in play in. */
+/** Every state a task is still in play in, kept for later included. */
 const LIVE = 'state is not done or dropped';
+
+/** Work somebody has taken on: in play, and not kept for later. What Open counts. */
+const OPEN = 'state is not backlog or done or dropped';
 
 /**
  * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
@@ -284,13 +292,25 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     metric: 'open-tasks',
     name: 'Open',
     source: 'register.tasks',
-    where: LIVE,
+    /* NOT THE BACKLOG. A team with forty tickets kept for later has not got forty open, so those are counted beside it. */
+    where: OPEN,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
     snapshot: { grain: 'day', into: 'series.open-tasks' },
+  },
+  'tasks-later': {
+    metric: 'tasks-later',
+    name: 'Kept for later',
+    source: 'register.tasks',
+    where: 'state is backlog',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
   },
   'tasks-due-7d': {
     metric: 'tasks-due-7d',
@@ -414,7 +434,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         heading: 'Right now',
         span: 12,
         cells: [
-          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent' },
+          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent, {{tasks-later}} kept for later' },
           { metric: 'tasks-waiting', label: 'Waiting on you', note: 'to check, or blocked' },
           { metric: 'tasks-due-7d', label: 'Due in 7 days', note: '{{tasks-overdue}} past their date' },
           { metric: 'tasks-done-7d', label: 'Done in 7 days', note: '{{tasks-done-7d-agents}} of them by an agent' },
@@ -534,7 +554,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         heading: 'Everything open',
         span: 12,
         source: 'register.tasks',
-        where: LIVE,
+        /* WHAT OPEN COUNTS: work kept for later has its own column on the board above. */
+        where: OPEN,
         columns: [
           DESCRIPTION,
           { field: 'thing', label: 'Project', width: 'minmax(10ch,16ch)' },

@@ -33,6 +33,7 @@ const DECLARED: Record<string, string> = {
   'portfolio@1.1.0': 'a51dab345b11594b',
   'money-core@1.1.0': '5cb37a57b9de3499',
   'work@1.1.0': 'b49e051fe7c26ac5',
+  'work@1.2.0': '49a30d2ef8c1d672',
 };
 
 test('EACH FIRST-PARTY PACK DECLARES WHAT ITS VERSION SAYS, and one that changed has a version of its own', () => {

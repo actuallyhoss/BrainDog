@@ -12,7 +12,7 @@ import { openRecord, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { NOW, TASKS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { METRICS, NOW, TASKS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -64,6 +64,8 @@ const block = (p: PageResult, heading: string) => {
 
 const TODAY = new Date(NOW).toISOString().slice(0, 10);
 const live = (t: (typeof TASKS)[number]) => t.state !== 'done' && t.state !== 'dropped';
+/** What Open counts: work in play that is not kept for later. */
+const open = (t: (typeof TASKS)[number]) => live(t) && t.state !== 'backlog';
 
 test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and the figures count the sample’s rows', async () => {
   const k = await seeded();
@@ -71,12 +73,25 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
 
   const figures = Object.fromEntries((block(opened(k, 'work'), 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
   assert.deepEqual(figures, {
-    'open-tasks': TASKS.filter(live).length,
+    'open-tasks': TASKS.filter(open).length,
     'tasks-waiting': TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length,
     'tasks-due-7d': TASKS.filter((t) => live(t) && String(t.by) >= TODAY && String(t.by) < new Date(NOW + 8 * 86_400_000).toISOString().slice(0, 10)).length,
     'tasks-done-7d': TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length,
   });
   assert.ok(figures['tasks-waiting']! > 0, 'the sample shows a queue');
+});
+
+test('OPEN LEAVES OUT WORK KEPT FOR LATER AND SAYS IT BESIDE, and the sample board draws a Later column', async () => {
+  const k = await seeded();
+  const later = TASKS.filter((t) => t.state === 'backlog').length;
+  assert.ok(later > 0, 'the sample keeps a task for later');
+  assert.ok(TASKS.filter(live).length > TASKS.filter(open).length);
+  const note = (block(opened(k, 'work'), 'Right now') as { cells?: { metric: string; note?: string }[] }).cells?.find((c) => c.metric === 'open-tasks')?.note;
+  assert.ok(String(note).includes('{{tasks-later}} kept for later'),'Open says what is kept for later beside it');
+  const read = k.metric(METRICS['tasks-later'] as never);
+  assert.ok(read.ok, sayOf(read));
+  assert.equal(read.value.value, later);
+  assert.ok(block(opened(k, 'work-board'), 'By status').rows.some((r) => r.fields.state === 'backlog'), 'no Later column on the board');
 });
 
 test('THE BOARD HAS A COLUMN FOR WORK AN AGENT HANDED BACK, and progress is counted by the week work was finished', async () => {
@@ -198,5 +213,5 @@ test('OPEN IS REMEMBERED EACH DAY, so its figure draws a line once the record ha
   await k.drain();
   const trend = cell()?.trend;
   assert.ok(trend, 'Open has a line after the first night');
-  assert.equal(trend!.at(-1), TASKS.filter(live).length, 'the last point is the day before, counted as it stood');
+  assert.equal(trend!.at(-1), TASKS.filter(open).length, 'the last point is the day before, counted as it stood');
 });
