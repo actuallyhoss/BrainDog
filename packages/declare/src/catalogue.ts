@@ -280,6 +280,16 @@ const subjectOf = (x: Shared | PackFile | CatalogueFile): Subject => {
   return { id: s.pack.manifest.pack, version: s.pack.manifest.version, pack: s.pack, modules: Object.keys(s.pack.manifest.requires.packs), skills: [], words: { ...words, title: s.title } as Json };
 };
 
+/**
+ * A file held to the entry and version it is listed under: its kind, its own id and its own version. A checksum and a
+ * signature cover what the index says, so an unsigned index could otherwise list another entry's file under this one.
+ */
+export function heldToEntry(entry: Pick<CatalogueEntry, 'kind' | 'id' | 'title'>, version: string, file: CatalogueFile): Result<true> {
+  const s = subjectOf(file);
+  if (file.kind === entry.kind && s.id === entry.id && s.version === version) return ok(true);
+  return no('PACK_MALFORMED', `${catalogueFile(entry.id, version, entry.kind)} is listed as ${entry.title} ${version} and the file inside is ${s.id} ${s.version}, so this catalogue lists it wrongly. Nothing was installed.`, { at: 'file' });
+}
+
 /** What a shared use case or an add-on can reach, read from what it declares. */
 export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
   const s = subjectOf(file);
@@ -647,8 +657,13 @@ export async function catalogueUpdates(
       }
     }
     const file = await readCatalogueFile(text, { kind: 'url' });
-    if (!file.ok || file.value.kind !== entry.kind) {
-      refused.push({ entry, fix: !file.ok && 'refusal' in file ? file.refusal.fix : `${entry.title} ${latest.version} does not read.` });
+    if (!file.ok) {
+      refused.push({ entry, fix: 'refusal' in file ? file.refusal.fix : `${entry.title} ${latest.version} does not read.` });
+      continue;
+    }
+    const matches = heldToEntry(entry, latest.version, file.value);
+    if (!matches.ok) {
+      refused.push({ entry, fix: 'refusal' in matches ? matches.refusal.fix : `${entry.title} ${latest.version} does not read.` });
       continue;
     }
     let changes: Changes | null = null;
@@ -656,7 +671,7 @@ export async function catalogueUpdates(
     if (was) {
       const old = await read(catalogueFile(entry.id, was.version, entry.kind));
       const oldOk = old === null ? null : (await verifyFile(was, old)).ok ? await readCatalogueFile(old, { kind: 'url' }) : null;
-      if (oldOk?.ok && oldOk.value.kind === entry.kind) changes = changesBetween(oldOk.value, file.value);
+      if (oldOk?.ok && heldToEntry(entry, was.version, oldOk.value).ok) changes = changesBetween(oldOk.value, file.value);
     }
     updates.push({ entry, installed, from: state.version, to: latest, text, file: file.value, changes, signature: verified.value });
   }

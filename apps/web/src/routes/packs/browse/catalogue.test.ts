@@ -331,3 +331,14 @@ test('a version arriving unsigned after signed ones is said loudly, cannot be as
   const updates = readFileSync(new URL('../CatalogueUpdates.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(updates, /entry\.author, /u);
 });
+
+test('a file whose own id is not the entry it is listed under is not asked for', async () => {
+  const { entry, fetcher } = await servedAddon(await newAuthorKey('Halden'));
+  const { signature: _s, ...bare } = entry.versions[0]!;
+  const other = { ...entry, id: 'other', title: 'Other', versions: [bare] };
+  const moved = async (input: string) => fetcher(input.replace('/packs/other/', '/packs/bookshelf/'));
+  const calls: string[] = [];
+  const asked = await askForVersion(moved, async (name) => (calls.push(name), { ok: true, value: { id: '1' } }), other, bare, null);
+  assert.ok(!asked.ok && /is listed as Other 1\.1\.0 and the file inside is bookshelf 1\.1\.0/u.test(asked.fix), JSON.stringify(asked));
+  assert.deepEqual(calls, []);
+});

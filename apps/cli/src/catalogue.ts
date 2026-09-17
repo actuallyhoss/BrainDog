@@ -49,6 +49,7 @@ import {
   verifiedStatements,
   changesBetween,
   emptyCatalogue,
+  heldToEntry,
   newAuthorKey,
   publishTo,
   reachOf,
@@ -628,6 +629,11 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   if (read.value.kind !== kind) {
     io.say(`${path} is not ${NOUN[kind].a}, so this catalogue lists it wrongly. Nothing was sent.`);
+    return 1;
+  }
+  const matches = heldToEntry(entry, chosen.version, read.value);
+  if (!matches.ok) {
+    io.say(saidWithCode(matches));
     return 1;
   }
   const statements = await verifiedStatements(at.index.keys);

@@ -92,9 +92,9 @@ export async function changesSince(fetcher: Fetcher, entry: CatalogueEntry, from
   if (!was || !now || was === now) return null;
   const [a, b] = await Promise.all([catalogueText(fetcher, entry, was), catalogueText(fetcher, entry, now)]);
   if (!a.ok || !b.ok) return null;
-  const { changesBetween, readCatalogueFile } = await import('@braindog/declare/catalogue');
+  const { changesBetween, heldToEntry, readCatalogueFile } = await import('@braindog/declare/catalogue');
   const [x, y] = await Promise.all([readCatalogueFile(a.text), readCatalogueFile(b.text)]);
-  return x.ok && y.ok ? changesBetween(x.value, y.value) : null;
+  return x.ok && y.ok && heldToEntry(entry, was.version, x.value).ok && heldToEntry(entry, now.version, y.value).ok ? changesBetween(x.value, y.value) : null;
 }
 
 /**
@@ -233,15 +233,17 @@ export async function askForVersion(
 ): Promise<{ ok: true; id: string; signature: Signature | null } | { ok: false; fix: string; code: string | null }> {
   const got = await catalogueText(fetcher, entry, version);
   if (!got.ok) return got;
-  const { keysSignedBefore, readCatalogueFile, strippedNotice } = await import('@braindog/declare/catalogue');
+  const { heldToEntry, keysSignedBefore, readCatalogueFile, strippedNotice } = await import('@braindog/declare/catalogue');
   /* AN UNSIGNED VERSION AFTER SIGNED ONES IS NEVER ASKED FOR. */
   if (got.signature === null) {
     const before = await keysSignedBefore(entry, version.version);
     if (before.length > 0) return { ok: false, fix: strippedNotice(entry.title, version.version, before), code: 'SIGNATURE_INVALID' };
   }
   const file = await readCatalogueFile(got.text, { kind: 'url' });
-  if (!file.ok || file.value.kind !== entry.kind)
-    return { ok: false, fix: !file.ok && 'refusal' in file ? file.refusal.fix : `${entry.title} ${version.version} does not read.`, code: !file.ok && 'refusal' in file ? file.refusal.code : null };
+  if (!file.ok) return { ok: false, fix: 'refusal' in file ? file.refusal.fix : `${entry.title} ${version.version} does not read.`, code: 'refusal' in file ? file.refusal.code : null };
+  /* THE FILE IS THE ENTRY IT IS LISTED UNDER, by its own id and version. */
+  const matches = heldToEntry(entry, version.version, file.value);
+  if (!matches.ok) return { ok: false, fix: 'refusal' in matches ? matches.refusal.fix : `${entry.title} ${version.version} does not read.`, code: 'refusal' in matches ? matches.refusal.code : null };
   const filed = await fileProposal(call, await proposalFor(entry, version.version, from, got.text, file.value, got.signature));
   return filed.ok ? { ...filed, signature: got.signature } : filed;
 }

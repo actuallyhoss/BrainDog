@@ -210,3 +210,30 @@ test('a version arriving unsigned after signed ones is said loudly and never off
   const renamed = { ...entry, author: 'Someone Else' };
   assert.equal(trustOf(known, trustSubject(renamed), { ...sigOf, key_id: mallory.key_id }).kind, 'changed');
 });
+
+test('a file whose own id or version is not the entry it is listed under is refused, never offered', async () => {
+  const { catalogueFile, fileChecksum, heldToEntry, readCatalogueFile } = await import('../src/catalogue.ts');
+  const named = (pack: string, version: string) => JSON.stringify({ pack, version, title: pack === 'alpha' ? 'Alpha' : 'Beta', summary: 'Books.', author: 'Halden', license: 'MIT', declarations: [BOOKS] });
+  const files = new Map<string, string>();
+  const read = (p: string) => files.get(p) ?? null;
+  let index = emptyCatalogue('Mixed');
+  for (const text of [named('alpha', '1.0.0'), named('alpha', '1.1.0')]) {
+    const out = await publishTo(index, text, read);
+    assert.ok(out.ok);
+    index = out.value.index;
+    files.set(out.value.path, text);
+  }
+  /* An unsigned index points Alpha 1.1.0 at Beta's file, with Beta's checksum. */
+  const beta = named('beta', '1.1.0');
+  files.set(catalogueFile('alpha', '1.1.0', 'pack'), beta);
+  const entry = index.entries[0]!;
+  const edited: CatalogueIndex = { ...index, entries: [{ ...entry, versions: [{ ...entry.versions[0]!, checksum: await fileChecksum(beta) }, entry.versions[1]!] }] };
+  const offered = await catalogueUpdates(edited, [{ id: 'alpha', version: '1.0.0' }], read);
+  assert.equal(offered.updates.length, 0);
+  assert.match(offered.refused[0]?.fix ?? '', /is listed as Alpha 1\.1\.0 and the file inside is beta 1\.1\.0/u);
+
+  const file = await readCatalogueFile(named('alpha', '1.2.0'));
+  assert.ok(file.ok);
+  assert.equal(heldToEntry(entry, '1.2.0', file.value).ok, true);
+  assert.equal(heldToEntry(entry, '1.1.0', file.value).ok, false);
+});

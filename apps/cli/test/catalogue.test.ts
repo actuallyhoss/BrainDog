@@ -172,3 +172,21 @@ test('install refuses a version that arrives unsigned after signed ones, and sea
   assert.equal(await pack(['search', '--from', 'catalogue'], h.io), 0);
   assert.ok(h.out.some((l) => /Unsigned, and earlier versions were signed by key/u.test(l)));
 });
+
+test('install refuses a file whose own id is not the entry it is listed under', async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const { fileChecksum } = await import('@braindog/declare/catalogue');
+  const h = await setup(t);
+  assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join(' '));
+  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue'], h.io), 0, h.said.join(' '));
+  const doc = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  const swapped = JSON.stringify({ ...doc, pack: 'other' });
+  writeFileSync(join(h.dir, 'catalogue', 'packs', 'bookshelf', '1.0.0.pack.json'), swapped);
+  const path = join(h.dir, 'catalogue', 'index.json');
+  const index = JSON.parse(readFileSync(path, 'utf8')) as { entries: { versions: { checksum: string }[] }[] };
+  index.entries[0]!.versions[0]!.checksum = await fileChecksum(swapped);
+  writeFileSync(path, JSON.stringify(index));
+  assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /the file inside is other 1\.0\.0/u);
+  assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0);
+});
