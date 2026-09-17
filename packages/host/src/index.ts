@@ -149,6 +149,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
   { name: 'planPack', group: 'ADMIN', writes: false, what: 'What installing a pack would do to this record. It writes nothing.',
     takes: { doc: 'json', source: 'json' } },
+  { name: 'spark', group: 'ADMIN', writes: false, what: 'What Spark noticed about how this BrainDog is used, and the arrangement proposals it would file. It writes nothing.' },
+  { name: 'sparkPropose', group: 'ADMIN', writes: true, what: "Put Spark's proposals on Decide, through propose's checks. It changes nothing until the owner accepts one." },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',

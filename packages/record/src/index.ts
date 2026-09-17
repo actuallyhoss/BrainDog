@@ -75,16 +75,19 @@ import {
   type ArrivalSettled,
   setupCollapser,
   isUlid,
+  SPARK,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
+import { fromModel, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
+export { fromModel, noticeUsage, readUsage, SPARK_OPEN_CAP, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
@@ -452,7 +455,7 @@ export type Boot = {
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
   me: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: Level | null };
   /** The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one. */
-  pages: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
+  pages: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null; list: string | null }[];
   /**
    * How many questions wait on a person, and how many arrivals wait in the inbox.
    *
@@ -669,6 +672,12 @@ export type RecordDeps = {
    * timeout). Absent, `fetchUseCase` refuses and says to download the file and choose it instead.
    */
   readAddress?: ((address: string) => Promise<{ ok: true; text: string; bytes: number } | { ok: false; fix: string }>) | undefined;
+  /**
+   * A model Spark may ask to draft arrangement proposals: a person's own key or a self-host's endpoint, built by the host
+   * (`spark.ts` `SparkModel`). Absent, Spark's own rules draft them. Either way a draft is filed only through `propose`'s
+   * validation, and only an owner's press applies it.
+   */
+  sparkModel?: SparkModel | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -684,7 +693,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress'>) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel'>) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
@@ -1029,6 +1038,44 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
   });
 
+  /**
+   * One reading for Spark: how the record is used, what the host offers, what that says, and what Spark has asked already.
+   * A catalogue pack is built to see whether its pages show agents only when an agent has written here.
+   */
+  const sparkReading = () => {
+    const catalogue = deps.catalogue ?? [];
+    const titled = (e: CatalogueEntry) => (e.title === e.id ? e.id.charAt(0).toUpperCase() + e.id.slice(1) : e.title);
+    const usage = readUsage(sql, kernel, clock.now(), new Map(catalogue.map((e) => [e.id, titled(e)])), speakingNow(kernel));
+    const busy = usage.agents.length > 0;
+    const offered: Offered[] = catalogue.map((e) => {
+      let shows = false;
+      if (busy && e.kind === 'pack')
+        try {
+          const doc = e.doc({ holds: [], usecase: null });
+          shows = Array.isArray(doc?.declarations) && doc.declarations.some((x) => typeof (x as { page?: unknown })?.page === 'string' && pageShowsAgents(x));
+        } catch {
+          shows = false;
+        }
+      return { id: e.id, kind: e.kind, title: titled(e), modules: e.modules, showsAgents: shows };
+    });
+    const seen = noticeUsage(usage, offered);
+    /* ASKED: anything Spark filed, in any state, and anything anybody filed that is still open. */
+    const asked = new Map<string, { id: string; status: string }>();
+    const waiting: { id: string; question: string }[] = [];
+    for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string }>(
+      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
+      SPARK,
+    )) {
+      try {
+        asked.set(stableKey(JSON.parse(row.body) as Record<string, unknown>), { id: row.id, status: row.status });
+      } catch {
+        /* a body that will not parse asks nothing */
+      }
+      if (row.opened_by === SPARK && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
+    }
+    return { usage, offered, ...seen, asked, waiting };
+  };
+
   /* A USE CASE SHARED AS A FILE, and one planned here (`usecase.ts`). */
   const sharing = useCases({ kernel, catalogue: deps.catalogue ?? [], installed: () => installedState() });
 
@@ -1341,7 +1388,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       pages: kernel
         .pages()
         .filter((page) => page.registers.length === 0 || page.registers.some((id) => !readable(ctx, id)))
-        .map((page) => ({ slug: page.slug, title: page.title, nav: page.nav, icon: page.icon })),
+        /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail. */
+        .map((page) => ({
+          slug: page.slug,
+          title: page.title,
+          nav: page.nav,
+          icon: page.icon,
+          list: page.registers.length === 1 && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
+        })),
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
         inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
@@ -1885,6 +1939,97 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return arrangement.declaration(args.page, visiblePages(ctx));
       }
       return ok(arrangement.overview(visiblePages(ctx)));
+    },
+
+    /**
+     * What Spark noticed about how this BrainDog is used, and what it would propose (`spark.ts`, `loop/research-spark.md` S15).
+     *
+     * AN OWNER'S, IN A BROWSER, because it reads the use of every list, and a token has `arrangement` for what it may propose.
+     * It writes nothing and asks no model: each draft says whether it is already a question, and which.
+     */
+    async spark(args: Record<string, unknown> | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'read how the whole record is used');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, []);
+      if (extra) return { ok: false as const, refusal: extra };
+      const r = sparkReading();
+      return ok({
+        model: deps.sparkModel?.name ?? null,
+        quiet: r.quiet,
+        noticed: r.noticed,
+        drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, asked: r.asked.get(d.key) ?? null })),
+        waiting: r.waiting,
+        cap: SPARK_OPEN_CAP,
+      });
+    },
+
+    /**
+     * Put Spark's proposals on Decide: the model's, when one is configured and answers something valid, else the rules'.
+     *
+     * EVERY DRAFT GOES THROUGH `prepare`, the door a token's proposal goes through, and is filed as `spark`, which may
+     * suggest and write nothing else (`kernel/spark.ts`). A draft already asked, in any state, is not asked again, so a
+     * dismissal holds; and no more than `SPARK_OPEN_CAP` of Spark's questions wait at once.
+     */
+    async sparkPropose(args: Record<string, unknown> | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'ask Spark to put questions on Decide');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, []);
+      if (extra) return { ok: false as const, refusal: extra };
+      const r = sparkReading();
+      let drafts: SparkDraft[] = r.drafts;
+      let by = 'rules';
+      const dropped: string[] = [];
+      const model = deps.sparkModel;
+      if (model && r.quiet === null) {
+        try {
+          const raw = await model.draft({
+            usage: r.usage,
+            noticed: r.noticed,
+            rules: r.drafts.map(({ question, body_kind, body }) => ({ question, body_kind, body })),
+            offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
+            kinds: ['pack', 'settings', 'arrange'],
+            most: SPARK_OPEN_CAP,
+          });
+          const got = fromModel(raw, model.name);
+          dropped.push(...got.dropped);
+          if (got.drafts.length > 0) {
+            drafts = got.drafts;
+            by = model.name;
+          } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
+        } catch {
+          dropped.push("The model did not answer, so Spark's own rules drafted these.");
+        }
+      }
+      const filed: { id: string; question: string; by: string }[] = [];
+      const skipped: { question: string; why: string }[] = [];
+      for (const d of drafts) {
+        if (r.asked.has(d.key)) {
+          skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+          continue;
+        }
+        if (r.waiting.length + filed.length >= SPARK_OPEN_CAP) {
+          skipped.push({ question: d.question, why: `${SPARK_OPEN_CAP} of Spark's questions are already waiting on Decide.` });
+          continue;
+        }
+        const prepared = await arrangement.prepare(d.body_kind, d.body);
+        if (!prepared.ok) {
+          skipped.push({ question: d.question, why: 'refusal' in prepared ? prepared.refusal.fix : 'It would not apply.' });
+          continue;
+        }
+        const key = stableKey(prepared.value);
+        if (r.asked.has(key)) {
+          skipped.push({ question: d.question, why: 'Spark has asked this before.' });
+          continue;
+        }
+        const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SPARK);
+        if (!put.ok) {
+          skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
+          continue;
+        }
+        r.asked.set(key, { id: put.value.id, status: 'open' });
+        filed.push({ id: put.value.id, question: d.question, by: d.by });
+      }
+      return tail(ok({ by, filed, skipped, dropped }));
     },
 
     /**
