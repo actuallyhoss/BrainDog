@@ -75,6 +75,7 @@ import {
   type ArrivalSettled,
   setupCollapser,
   isUlid,
+  slugify,
   SPARK,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
@@ -712,6 +713,17 @@ export async function createRecordApi(deps: RecordDeps) {
 
 function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers'>) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
+  /**
+   * The page declaration served at a slug, and its version: the one named exactly, or else the one whose name slugs to it
+   * as the kernel serves it (`pages.ts` `claim`), when exactly one does. A page per row (`for:`) has none of its own slug.
+   */
+  const pageDeclaredAt = (slug: string): { id: string; version: number } | null => {
+    const live = sql.all<{ id: string; version: number }>("SELECT id, version FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0");
+    const exact = live.find((d) => d.id === `page.${slug}`);
+    if (exact) return exact;
+    const slugged = live.filter((d) => slugify(d.id.slice('page.'.length)) === slug);
+    return slugged.length === 1 ? slugged[0]! : null;
+  };
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
    *
@@ -2223,10 +2235,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
       if (!out.ok) return out;
       /* THE VERSION A WRITE OVER THIS PAGE CARRIES (`setDeclaration`). A page declared `for:` rows has none of its own slug. */
-      const declared = sql.one<{ version: number }>(
-        "SELECT version FROM declaration WHERE id = ? AND kind = 'page' AND superseded_at IS NULL AND retired = 0",
-        `page.${args.slug}`,
-      );
+      const declared = pageDeclaredAt(args.slug);
       return ok({
         ...out.value,
         ...(declared ? { declared_version: declared.version } : {}),
@@ -3098,7 +3107,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       );
       if (!one.ok) return one;
 
-      const decl = one.value.declarations[0]!;
+      /* A PAGE IS NAMED THE WAY IT IS SERVED. `page` answers a page at its slug, so a page declared `my_plans` is read at
+         `my-plans` and written back under that name: held to the declaration served there, it overwrites that one against
+         its version rather than landing beside it as a second page with no version to conflict with. */
+      let decl = one.value.declarations[0]!;
+      if (decl.kind === 'page') {
+        const at = pageDeclaredAt(slugify(decl.id.slice('page.'.length)));
+        if (at && at.id !== decl.id) decl = { ...decl, id: at.id, body: { ...(decl.body as object), page: at.id.slice('page.'.length) } as never };
+      }
       const expect = args.version === undefined ? undefined : { id: decl.id, version: args.version };
       return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect));
     },

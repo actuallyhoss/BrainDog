@@ -81,3 +81,27 @@ test('A PAGE THAT IS NOT THERE IS VERSION 0, a version that is not a whole numbe
   assert.ok((await api.setDeclaration({ body: body('b') }, owner)).ok, 'a write that says no version is refused');
   sql.close();
 });
+
+test('A PAGE WHOSE NAME IS NOT ITS SLUG (an underscore) answers its version at its slug, and a write back at the slug is held to it', async () => {
+  const { api, sql } = await record();
+  const named = (...notes: string[]) => ({ ...body(...notes), page: 'my_plans' });
+  assert.ok((await api.setDeclaration({ body: named('a', 'b') }, owner)).ok);
+
+  const read = await api.page({ slug: 'my-plans' }, owner);
+  assert.ok(read.ok, JSON.stringify(read));
+  const answered = read.value as { page: string; declared_version?: number };
+  assert.equal(answered.declared_version, 1);
+
+  /* The app writes back what it read, the page named by its slug, at the version it read. */
+  const ada = await api.setDeclaration({ body: { ...named('b', 'a'), page: answered.page }, version: 1 }, owner);
+  assert.ok(ada.ok, JSON.stringify(ada));
+  const bo = await api.setDeclaration({ body: { ...named('a', 'b', 'c'), page: answered.page }, version: 1 }, owner);
+  assert.ok(conflicted(bo), `the second write was not a conflict: ${JSON.stringify(bo)}`);
+
+  const pages = sql.all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0");
+  assert.equal(pages.length, 1, `the write made a second page: ${JSON.stringify(pages)}`);
+  const now = await api.page({ slug: 'my-plans' }, owner);
+  assert.ok(now.ok);
+  assert.deepEqual((now.value as { blocks: { body: string }[] }).blocks.map((b) => b.body), ['b', 'a']);
+  sql.close();
+});
