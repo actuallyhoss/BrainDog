@@ -557,3 +557,55 @@ test('A PROPOSAL NEVER SENDS ITS OWN DOCUMENT FOR A PACK THE HOST OFFERS, so the
   value(await api.propose({ question: 'Notes?', body_kind: 'pack', body: { install: 'notes', doc: { ...WORK, pack: 'notes', declarations: [{ ...WORK.declarations[0], register: 'notes', pack: 'notes' }] } } } as never, agent));
   sql.close();
 });
+
+test('TURNING A PACK BACK ON SHOWS WHAT IT WILL CALL OUT AGAIN, and is refused when that is not what was shown', async () => {
+  const { api, sql } = await record([]);
+  const POINTS = {
+    pack: 'points',
+    version: '1.0.0',
+    summary: 'Points.',
+    author: 'BrainDog',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [{ register: 'datapoints', name: 'Datapoints', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'value', type: 'decimal' }, { id: 'at', type: 'instant' }] }],
+  };
+  const POLL = {
+    pack: 'poll-northwind',
+    version: '1.0.0',
+    summary: 'Polls api.example.com.',
+    author: 'BrainDog',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [
+      { ingest: 'poll_northwind', channel: 'poll', url: 'https://api.example.com/metrics', every: '1h', map: { name: { value: 'MRR' }, value: { path: 'mrr', type: 'decimal' }, at: { arrived: true } }, writes: { register: 'datapoints' } },
+    ],
+  };
+  const put = async (doc: unknown) => {
+    const planned = value<{ diff: { planHash: string; approve: string[] } }>(await api.planPack({ doc } as never, owner));
+    value(await api.installPack({ doc, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+    return planned.diff.approve;
+  };
+  await put(POINTS);
+  const approved = await put(POLL);
+  assert.equal(approved.length, 1);
+  value(await api.disablePack({ id: 'poll-northwind' } as never, owner));
+  assert.deepEqual(api.kernel.actionOrigins(), []);
+
+  /* THE OWNER WAS ASKED "TURN IT BACK ON?" WITH NOTHING ABOUT THE CALL. Accepting armed the poll of api.example.com again, and
+     the proposal said nothing of it, where installing the same pack names the call before anything is armed. */
+  for (const body of [{ enable: 'poll-northwind' }]) {
+    const filed = value<{ id: string }>(await api.propose({ question: 'Turn the poll back on?', body_kind: 'pack', body } as never, agent));
+    const row = value<{ body: { approve?: string[] } }>(await api.governance({ id: filed.id }, owner));
+    assert.deepEqual(row.body.approve, approved);
+    value(await api.decide({ id: filed.id, decide: { option: 'reject', reason: 'not now' } }, owner));
+  }
+  const arranged = value<{ id: string }>(await api.propose({ question: 'Turn it on?', body_kind: 'arrange', body: { why: ['The numbers stopped.'], packs: { enable: ['poll-northwind'] } } } as never, agent));
+  assert.deepEqual(value<{ body: { approve?: string[] } }>(await api.governance({ id: arranged.id }, owner)).body.approve, approved);
+
+  /* WHAT WAS SHOWN IS WHAT IS ARMED: a proposal filed without the line is refused, not accepted. */
+  sql.exec("UPDATE suggestion SET body = json_remove(body, '$.approve') WHERE id = ?", arranged.id);
+  const stale = refusal(await api.decide(accept(arranged.id), owner));
+  assert.equal(stale.code, 'PLAN_STALE');
+  assert.deepEqual(api.kernel.actionOrigins(), []);
+  sql.close();
+});

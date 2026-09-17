@@ -470,7 +470,9 @@ export function arranger(d: ArrangeDeps) {
         if (!state) return refuse('DECLARATION_UNKNOWN', `${id} is not installed here, so it cannot be turned ${verb === 'enable' ? 'on' : 'off'}. Propose install instead.`, `body.${verb}`);
         if ((state.disabled_at === null) === (verb === 'enable'))
           return refuse('TRANSITION_ILLEGAL', `${id} is already ${verb === 'enable' ? 'on' : 'off'}.`, `body.${verb}`);
-        return ok({ [verb]: id, registers: state.registers });
+        /* TURNING A PACK ON ARMS WHAT IT CALLS OUT AGAIN, so the owner is shown those lines, as an install shows them. */
+        const calls = verb === 'enable' ? kernel.callsWhenEnabled(id) : [];
+        return ok({ [verb]: id, registers: state.registers, ...(calls.length === 0 ? {} : { approve: calls }) });
       }
       /* A SHARED USE-CASE FILE, as `braindog usecase install` sends it. It is read through the door the app and `planUseCase`
          read one through (`readShared`: the size, a credential, a block kind nothing draws), and becomes the install of its
@@ -606,7 +608,8 @@ export function arranger(d: ArrangeDeps) {
         ...(enable.length === 0 ? {} : { enable }),
         ...(disable.length === 0 ? {} : { disable }),
       },
-      ...(planned.value.plan.length === 0 ? {} : { plan: planned.value.plan, approve: planned.value.approve }),
+      ...(planned.value.plan.length === 0 ? {} : { plan: planned.value.plan }),
+      ...((approve) => (approve.length === 0 ? {} : { approve }))([...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id))])]),
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
@@ -657,6 +660,9 @@ export function arranger(d: ArrangeDeps) {
       const updating = on(id) && typeof step?.from === 'string' && typeof step.version === 'string' && held !== step.version && laterVersion(step.version, held) === step.version;
       if (on(id) && !updating) continue;
       if (stateOf(id) && !updating) {
+        const unshown = kernel.callsWhenEnabled(id).filter((line) => !approved.includes(line));
+        if (unshown.length > 0)
+          return stopped(refuse('PLAN_STALE', `${id} would call out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
         const back = await kernel.enablePack(id, { actor });
         if (!back.ok) return stopped(back);
         done.enabled.push(id);
@@ -678,6 +684,9 @@ export function arranger(d: ArrangeDeps) {
     }
     for (const id of enable) {
       if (on(id)) continue;
+      const unshown = kernel.callsWhenEnabled(id).filter((line) => !approved.includes(line));
+      if (unshown.length > 0)
+        return stopped(refuse('PLAN_STALE', `${id} would call out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
       const back = await kernel.enablePack(id, { actor });
       if (!back.ok) return stopped(back);
       done.enabled.push(id);

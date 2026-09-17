@@ -3452,6 +3452,31 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     keyHeld: (name: string): boolean => keyNamed(sql, name) !== null,
 
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
+    /**
+     * What a pack that is off would call out once it is on again: each retired action's `CALLS OUT` line, and its key line,
+     * as a plan says them. Turning a pack on re-arms what it retired, so a proposal to do it shows these, as an install does.
+     */
+    callsWhenEnabled: (id: string): string[] =>
+      sql
+        .all<{ body: string }>(
+          "SELECT body FROM declaration WHERE coalesce(pack_id, json_extract(body, '$.pack')) = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 1 ORDER BY id",
+          id,
+        )
+        .flatMap((r) => {
+          const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
+          const e = egressOf(body);
+          if (e === null) return [];
+          const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
+          let host: string | null = null;
+          try {
+            host = base === null ? null : new URL(base).host;
+          } catch {
+            host = null;
+          }
+          const line = host === null ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`);
+          return e.key_line === null ? [line] : [line, e.key_line];
+        }),
+
     actionOrigins: (): string[] =>
       originsOf(
         sql
