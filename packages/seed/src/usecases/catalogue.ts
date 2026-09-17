@@ -83,7 +83,8 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     summary: u.summary,
     modules: modulesFor(u),
     version,
-    doc: () => useCaseDocument(u.usecase, today()),
+    /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`). */
+    doc: ({ holds }) => useCaseDocument(u.usecase, today(), holds),
     /* A SEED CARRIES NO LINK (42 §5.2), so the use case's examples are pointed at each other once they are in (`links.ts`). */
     afterInstall: (io) => linkExamples(io, u.usecase),
     /* AN UPDATE FROM BEFORE A VERSION THAT READS WHAT IS LOGGED moves what was typed into the log (`links.ts`). */

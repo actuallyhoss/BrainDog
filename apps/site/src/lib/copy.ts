@@ -143,7 +143,7 @@ export const site = {
         id: 'team',
         title: 'Team board',
         body: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
-        holds: 'Opens on Team, with Board and Agent work. Lists: Teammates, Cycles and Tickets.',
+        holds: 'Opens on Team, with Cycles and Agent work beside Work. Lists: Tickets, Cycles, Cycle plan and Teammates.',
         shot: 'team',
         alt: "A team's record: tickets in flight with the agent working on each, what is blocked, and what is due this week.",
       },

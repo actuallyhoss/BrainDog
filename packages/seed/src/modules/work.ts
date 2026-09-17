@@ -234,6 +234,15 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
         index: true,
         required: true,
       },
+      /* HOW SOON IT MATTERS, when somebody says. Usually unset: a homework list and a team's backlog both use it, few rows need it, and it is not
+         indexed: a register holds eight indexes and the rest are read far more. */
+      {
+        id: 'priority',
+        label: 'Priority',
+        type: 'enum',
+        values: ['urgent', 'high', 'normal', 'low'],
+        labels: { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' },
+      },
       /* WHO HOLDS IT, a person. Empty is you. A link, so Work installs on a record with no People and leaves it out. */
       { id: 'owner', label: 'Owner', type: 'ref', to: 'people', index: true },
       /* THE AGENT THAT TOOK IT, by the name it signs its runs with (claude, codex, cursor). An agent is a delegate, never

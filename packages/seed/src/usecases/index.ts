@@ -18,7 +18,7 @@ import { FOUNDER } from './founder.ts';
 import { GUIDE } from './guide.ts';
 import { PERSONAL } from './personal.ts';
 import { STUDENT } from './student.ts';
-import { TEAM } from './team.ts';
+import { EARLIER_TICKETS, TEAM } from './team.ts';
 
 export type { UseCase } from '@braindog/declare';
 export { pollPack, type PolledMeasure, type PollSpec } from './founder-poll.ts';
@@ -44,11 +44,18 @@ export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) =
  * The pack document a use case installs, with its voice as settings, or `null`. A day in an example row written
  * `+3d` is counted from `today` (`dates.ts`), so the example is due that week whenever the record is made.
  */
-export const useCaseDocument = (id: string, today: string = dayOf(Date.now())): Record<string, unknown> | null => {
+export const useCaseDocument = (id: string, today: string = dayOf(Date.now()), holds?: readonly string[]): Record<string, unknown> | null => {
   const u = useCase(id);
   const doc = u ? useCasePack(u) : null;
-  return doc ? dated(doc, today) : null;
+  if (!doc) return null;
+  /* A LIST AN OLDER VERSION DECLARED IS KEPT FOR A RECORD THAT HOLDS IT, so an update leaves no row without its list. */
+  const kept = (KEPT[u!.usecase] ?? []).filter((d) => holds?.includes(String(d.register)));
+  if (kept.length > 0) doc.declarations = [...((doc.declarations as unknown[] | undefined) ?? []), ...kept];
+  return dated(doc, today);
 };
+
+/** The lists each use case's older versions declared and its current one does not, by use case. */
+const KEPT: Readonly<Record<string, readonly Record<string, unknown>[]>> = { team: [EARLIER_TICKETS] };
 
 export type Span = { at: number; text: string };
 export type Ranked = { usecase: UseCase; score: number; why: Span[] };

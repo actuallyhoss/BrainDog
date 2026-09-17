@@ -14,6 +14,7 @@
 import { FIRST_PARTY, firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
 import { PERSONAL_CARRIED, PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
+import { TEAM_PLAN_LINKS, TICKETS_MOVED_IN, moveTickets } from './team.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
@@ -36,7 +37,6 @@ export type LinkIo = {
 };
 
 const COURSE = 'Introduction to statistics';
-const CYCLE = 'Cycle 1';
 
 const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   /* A PERSON'S STEPS POINT AT PROJECTS AND A GOAL AT AN ACCOUNT, lists Money and Projects hold, so their examples are the
@@ -57,13 +57,8 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
     { register: 'choices', title: 'What will it be called?', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' },
     { register: 'resources', title: 'Three projects like yours to learn from', field: 'milestone', to: 'milestones', target: 'Plan the smallest first version' },
   ],
-  team: [
-    { register: 'tickets', title: 'Write the release notes', field: 'cycle', to: 'cycles', target: CYCLE },
-    { register: 'tickets', title: 'Agree what goes in the next cycle', field: 'cycle', to: 'cycles', target: CYCLE },
-    { register: 'tickets', title: 'Fix the sign-in link that expires too soon', field: 'cycle', to: 'cycles', target: CYCLE },
-    { register: 'tickets', title: 'Wait on the design for the settings screen', field: 'cycle', to: 'cycles', target: CYCLE },
-    { register: 'tickets', title: 'Tidy the backlog labels', field: 'cycle', to: 'cycles', target: CYCLE },
-  ],
+  /* A TEAM'S PLANNED TICKETS POINT AT THE TICKET, one of Work's tasks, and at the example cycle. */
+  team: TEAM_PLAN_LINKS,
 };
 
 /** The links a use case makes between its examples, by its id (`student`, or `usecase-student`). None for most. */
@@ -147,6 +142,9 @@ const carried = (v: unknown): boolean =>
  * a number is only emptied once its row is written.
  */
 export async function carryForward(io: CarryIo, usecase: string, fromVersion: string | null, today: string): Promise<number> {
+  /* A TEAM FROM BEFORE ITS TICKETS WERE WORK'S TASKS copies each one across (`team.ts` `moveTickets`). */
+  if (usecase.replace(/^usecase-/u, '') === 'team')
+    return fromVersion !== null && olderThan(fromVersion, TICKETS_MOVED_IN) ? moveTickets(io).catch(() => 0) : 0;
   const plan = CARRIED[usecase.replace(/^usecase-/u, '')];
   if (!plan || fromVersion === null || !olderThan(fromVersion, plan.before)) return 0;
   let moved = 0;
