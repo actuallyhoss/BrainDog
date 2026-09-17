@@ -1072,3 +1072,10 @@ test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no cat
   assert.match(String(last.cells[1]), /123\.45/u);
   assert.equal(segment.rows.length, Math.min(parts.groups.length, split.limit ?? 99) + 1);
 });
+
+test('a first-party rule acts under its name, and any other rule by its id in words', async () => {
+  const { actorOf } = await import('./api.ts');
+  assert.equal(actorOf('rule.invoice-late'), 'Chase late payments');
+  assert.equal(actorOf('rule.renewal'), 'renewal rule');
+  assert.equal(actorOf('rule.late-reply'), 'late reply rule');
+});

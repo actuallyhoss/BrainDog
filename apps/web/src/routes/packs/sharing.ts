@@ -13,6 +13,7 @@
  */
 
 import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
+import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
@@ -168,7 +169,7 @@ export const oneOf = (list: string): string => {
 };
 
 /** A pack by the name a person knows it by: this build's name for a module, else its id in words. */
-export const moduleTitle = (id: string): string => PACKS.find((p) => p.id === id)?.name ?? copy.valueWord(id.replace(/^usecase-/u, '').replace(/[_-]+/gu, ' '));
+export const moduleTitle = (id: string): string => PACKS.find((p) => p.id === id)?.name ?? moduleName(id);
 
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
@@ -200,9 +201,11 @@ function namesIn(doc: Body, others: readonly Body[] = []): (id: string) => { kin
       }
       return { kind: 'page', name: typeof d?.title === 'string' ? filled(d.title) : bare };
     }
-    /* A FIGURE OR A RULE IS SAID BY ITS OWN NAME, "Going out, 30 days", not `out-30d`. */
+    /* A FIGURE OR A RULE IS SAID BY ITS OWN NAME, "Going out, 30 days", not `out-30d`. A rule declares none, so a
+       first-party one is said by the name this build gives it: "Chase late payments", not `invoice-late`. */
     const d = decls.find((x) => x[kind ?? ''] === bare);
-    return { kind: 'other', name: typeof d?.name === 'string' ? filled(d.name) : bare || id };
+    const own = typeof d?.name === 'string' ? filled(d.name) : kind === 'rule' ? ruleName(bare) : null;
+    return { kind: 'other', name: own ?? (bare || id) };
   };
 }
 

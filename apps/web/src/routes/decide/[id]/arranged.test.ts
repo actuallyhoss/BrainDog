@@ -30,7 +30,7 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   const [why, calls, packs, appears, words] = out.parts;
   assert.deepEqual(why?.part === 'why' && why.lines[1], { text: 'Two courses start on Monday.', at: 'courses#2' });
   assert.deepEqual(calls?.part === 'calls' && calls.calls, [{ host: 'calendar.example', detail: 'every 1h, with the key “Timetable feed”' }]);
-  assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Portfolio, then Student', 'Turns off Money core']);
+  assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Portfolio, then Student', 'Turns off Money']);
   assert.ok(appears?.part === 'appears');
   assert.equal(appears.examples, 6);
   /* The changed page first, then pages, then lists, then the rest. */
@@ -59,7 +59,7 @@ test('a settings change says each word before and after, from what the record ho
     { pack: 'usecase-team', values: { voice_needs_you: 'On your plate', label_tickets: 'Issues', label_tickets__state: 'Stage', week_starts: 'monday' }, before: { voice_needs_you: 'Waiting on you', label_tickets: '', week_starts: 'sunday' } },
     { lists: new Map([['tickets', 'Tickets']]) },
   );
-  assert.equal(out?.lead, 'Changes the words and settings of Team');
+  assert.equal(out?.lead, 'Changes the words and settings of Team board');
   assert.deepEqual(
     out?.parts.map((p) => ('lines' in p ? p.lines : [])),
     [
@@ -71,7 +71,7 @@ test('a settings change says each word before and after, from what the record ho
 
 test('a pack turned off names the lists that leave the sidebar, and one installed with its document shows where its page lands', () => {
   const off = arrangedOf('pack', { disable: 'money-core', registers: ['obligations', 'ledger'] }, { lists: new Map([['obligations', 'Bills']]) });
-  assert.equal(off?.lead, 'Turns Money core off');
+  assert.equal(off?.lead, 'Turns Money off');
   assert.deepEqual(off?.parts, [{ part: 'packs', lines: ['Bills and Ledger leave the sidebar. The rows are kept.'] }]);
 
   const on = arrangedOf('pack', {
@@ -123,7 +123,7 @@ test('a partial apply says what was done, what was not, and why it stopped', () 
   assert.deepEqual(partialOf('arrange', STUDENT, fix), {
     why: 'usecase-student now calls out something this proposal did not show: CALLS OUT x. Propose it again.',
     done: ['Portfolio'],
-    left: ['Student', 'Money core', 'the page Today', 'the words and settings of Student'],
+    left: ['Student', 'Money', 'the page Today', 'the words and settings of Student'],
   });
   assert.equal(partialOf('arrange', STUDENT, 'Nothing landed.'), null);
 });
@@ -175,4 +175,16 @@ test('AN UPDATE IS SAID AS ONE, with the versions it goes from and to, before an
   });
   const packs = arranged?.parts.find((p) => p.part === 'packs');
   assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Student', 'Updates Personal from 1.0.0 to 1.2.0']);
+});
+
+test('a first-party module and rule are named as a person knows them, never from their ids', () => {
+  const body = { install: 'money-core', plan: [{ pack: 'money-core', version: '1.0.0', adds: ['register.obligations', 'rule.invoice-late', 'rule.cash-stale'] }] };
+  const out = arrangedOf('pack', body);
+  assert.equal(out?.lead, 'Adds Money');
+  const appears = out?.parts.find((p) => p.part === 'appears');
+  const said = JSON.stringify(appears);
+  assert.match(said, /Chase late payments/u);
+  assert.match(said, /Keep balances current/u);
+  assert.doesNotMatch(said, /invoice|Invoice late|cash-stale/u);
+  assert.equal(arrangedOf('arrange', { usecase: 'founder', alongside: ['usecase-student'] })?.lead, 'Sets this BrainDog up for Solo founder');
 });

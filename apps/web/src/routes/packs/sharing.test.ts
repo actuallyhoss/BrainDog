@@ -374,3 +374,16 @@ test('WITH THREE USE CASES ON, ADDING ONE BESIDE NEVER CHANGES WHO SPEAKS, and e
       }
     }
 });
+
+test('A MONEY RULE WITH NO NAME IS SAID BY THE NAME THIS BUILD GIVES IT, and a module by its own', () => {
+  const plan = sharedPlanOf({
+    usecase: { usecase: 'personal', title: 'Personal', version: '1.0.0' },
+    packs: [{ id: 'money-core', role: 'module', version: '1.0.0', doc: { declarations: [{ rule: 'invoice-late' }] }, adds: ['rule.invoice-late', 'rule.somebody-else'] }],
+  });
+  assert.equal(plan?.packs[0]?.title, 'Money');
+  assert.deepEqual(plan?.packs[0]?.adds, [
+    { kind: 'other', name: 'Chase late payments' },
+    { kind: 'other', name: 'somebody-else' },
+  ]);
+  assert.equal(moduleTitle('usecase-team'), 'Team board');
+});

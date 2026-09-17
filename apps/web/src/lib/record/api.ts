@@ -17,7 +17,7 @@ import type { Column, TableRow } from 'braindog-render/svelte';
 import { answers, terms, tokensOf, why } from './find.ts';
 import { PATHS, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
-import { useCaseName } from '@braindog/seed/usecases/names';
+import { ruleName, useCaseName } from '@braindog/seed/usecases/names';
 import {
   AUDIT,
   INBOX,
@@ -2690,7 +2690,7 @@ export function markColumns(
 
 export const actorOf = (by: string): string => {
   const rule = /^rule\.(.+)$/.exec(by);
-  if (rule) return `${rule[1]!.replace(/[._]/g, ' ')} rule`;
+  if (rule) return ruleName(rule[1]!) ?? `${rule[1]!.replace(/[._-]/g, ' ')} rule`;
   /* THE TWO ACTORS THAT ARE NEITHER PEOPLE NOR RULES. `30 §3` closes the grammar at five shapes and
      two of them are bare words: `spark` is the assistant — *"only ever on `suggest`, `propose` or
      `predict`, never on a row write"* — and `system` is *"migrations, purges, the scheduler itself,

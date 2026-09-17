@@ -14,6 +14,8 @@
  * NOTHING HERE ASSUMES A KIND OF RECORD. A pack is named by its id when the body gives no title, a list by the record's
  * own name for it when the screen has one, and every sentence is `copy.ts`'s.
  */
+import { moduleName, ruleName } from '@braindog/seed/usecases/names';
+
 import { copy } from '../../../lib/copy.ts';
 import { labelsOf, VOICE_LINES, type VoiceKey } from '../../../lib/voice.ts';
 import { appearsOf, type Appears } from './proposed.ts';
@@ -53,11 +55,17 @@ export function updatesOf(body: Row): Map<string, { from: string; to: string }> 
   return out;
 }
 
-/** A pack by the name a person knows it by: the body's title for the one it installs, its id in words otherwise. */
+/**
+ * A pack by the name a person knows it by: the body's title for the one it installs, else a first-party module's or a use
+ * case's name ("Money", never "Money core" from `money-core`), else its id in words.
+ */
 export function packName(id: string, body: Row): string {
   if (id === text(body.install) && text(body.title) !== '') return copy.valueWord(text(body.title));
-  return words(id);
+  return moduleName(id);
 }
+
+/** A use case named by its id, bare or as its pack: "Student". */
+const useCaseWords = (id: string): string => moduleName(id.startsWith('usecase-') ? id : `usecase-${id}`);
 
 const listName = (id: string, ctx: Context): string => {
   const bare = id.replace(/^register\./u, '');
@@ -116,7 +124,7 @@ function planned(plan: unknown, doc: unknown, ctx: Context): { appears: Appears[
         const kind = id.split('.')[0] ?? '';
         const full = known.get(id);
         const seen = full ? appearsOf(full) : null;
-        const title = kind === 'register' ? listName(id, ctx) : (seen?.title ?? words(id));
+        const title = kind === 'register' ? listName(id, ctx) : (seen?.title ?? (kind === 'rule' ? ruleName(id) : null) ?? words(id));
         if (fresh && kind === 'page') out.pages++;
         else if (fresh && kind === 'register') out.lists++;
         else out.more++;
@@ -226,8 +234,8 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
   if (fresh.length > 0 && !saidByLead) packLines.push(copy.arrangeInstalls(fresh.map(name)));
   for (const [id, u] of updates) if (install.includes(id) && !(saidByLead && kind === 'pack')) packLines.push(copy.arrangeUpdates(name(id), u.from, u.to));
   const beside = strings(body.alongside);
-  if (beside.length && kind === 'arrange') packLines.push(copy.arrangeBeside(beside.map((id) => words(id))));
-  if (kind === 'pack' && text(body.keeps)) packLines.push(copy.arrangeKeepsVoice(words(text(body.keeps))));
+  if (beside.length && kind === 'arrange') packLines.push(copy.arrangeBeside(beside.map(useCaseWords)));
+  if (kind === 'pack' && text(body.keeps)) packLines.push(copy.arrangeKeepsVoice(useCaseWords(text(body.keeps))));
   if (enable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOn(enable.map(name)));
   if (disable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOff(disable.map(name)));
   const registers = strings(body.registers).map((r) => listName(r, ctx));
@@ -261,7 +269,7 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
             ? copy.arrangeLeadEnable(name(enable[0]!))
             : copy.arrangeLeadDisable(name(disable[0] ?? ''))
         : useCase
-          ? copy.arrangeLeadUseCase(words(useCase))
+          ? copy.arrangeLeadUseCase(useCaseWords(useCase))
           : copy.arrangeLeadArrange;
 
   /* ONE LINE FOR THE QUEUE: what appears and what is renamed, counted. The calls are never folded into it. */
