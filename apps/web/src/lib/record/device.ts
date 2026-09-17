@@ -35,6 +35,27 @@ export type TokenRow = {
   revoked_at: string | null;
 };
 
+/**
+ * A report key, as a person reads one: what its owner named it and the list it sends numbers to, or `null` for any
+ * other token.
+ *
+ * ITS LABEL IS ITS BINDING, `report:{"register":...}` (`packages/record/src/report.ts`), because a label is fixed for a
+ * token's life. Printed as it is, the settings list showed JSON where a name goes and "can read and change rows"
+ * beside a key that can do neither.
+ */
+export function reportKeyOf(label: string | null): { name: string | null; register: string } | null {
+  if (label === null || !label.startsWith('report:')) return null;
+  try {
+    const said = JSON.parse(label.slice('report:'.length)) as { register?: unknown; name?: unknown };
+    return {
+      name: typeof said.name === 'string' && said.name.trim() !== '' ? said.name : null,
+      register: typeof said.register === 'string' ? said.register : '',
+    };
+  } catch {
+    return { name: null, register: '' };
+  }
+}
+
 /** `createToken`: the only copy of the bearer there will ever be. */
 export type Minted = { id: string; bearer: string; scope: string; expires_at: string };
 

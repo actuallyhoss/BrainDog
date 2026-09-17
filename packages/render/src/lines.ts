@@ -211,5 +211,6 @@ export function linesNearest(plan: Pick<LinesPlan, 'points'>, fraction: number):
 /** The renderer's own words, as `series.ts` keeps its own: it imports nothing from the app. */
 export const LINES_NONE = 'Nothing to draw yet: no point here has a value.';
 export const LINES_NOTHING = 'no values';
-export const LINES_NUMBERS = 'The numbers';
+/** NOT "The numbers", which is what a page of tiles is headed: a chart's fold holds the points it was drawn from. */
+export const LINES_NUMBERS = 'Points on this chart';
 export const LINES_AGAINST = 'against';

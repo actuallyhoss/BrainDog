@@ -32,7 +32,7 @@
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import {
     CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, noRecord, reachKey, revocable, sampleMachines,
-    sampleTokens, standing, type Answer, type DeviceRow, type TokenRow,
+    reportKeyOf, sampleTokens, standing, type Answer, type DeviceRow, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
@@ -1992,14 +1992,15 @@
         {/if}
         <ul class="whos">
           {#each tokens as t (t.id)}
+            {@const report = reportKeyOf(t.label)}
             <!-- The one nobody has used is the one to look at, so it carries a mark as well as the words. -->
             <li class="who" data-intent={t.last_used_at === null ? 'warn' : undefined}>
               <div class="who-head">
                 {#if t.last_used_at === null}
                   <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
                 {:else}<Icon name="key" size="s" />{/if}
-                <span class="who-name">{t.label ?? copy.unnamedToken}</span>
-                <span class="who-detail">{copy.keyCan[t.scope] ?? t.scope}</span>
+                <span class="who-name">{report ? copy.reportKeyNamed(report.name) : (t.label ?? copy.unnamedToken)}</span>
+                <span class="who-detail">{report ? copy.reportKeyCan(report.register ? (REGISTERS[report.register]?.name ?? report.register) : '') : (copy.keyCan[t.scope] ?? t.scope)}</span>
                 <span class="who-detail">
                   {t.last_used_at ? copy.usedWhen(since(t.last_used_at, agentsNow())) : copy.neverUsed}{#if t.expires_at}{' · '}{copy.endsWhen(relative(t.expires_at.slice(0, 10), agentsNow()))}{/if}
                 </span>

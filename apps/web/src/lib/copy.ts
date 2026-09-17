@@ -1359,6 +1359,9 @@ export const copy = {
   endsWhen: (when: string) => `ends ${when}`,
   revokeKey: 'Revoke',
   unnamedToken: 'A token with no name',
+  /* A REPORT KEY IN THE TOKENS LIST (`record/device.ts` `reportKeyOf`): its name and the one thing it can do. */
+  reportKeyNamed: (name: string | null) => (name ? `Report key for ${name}` : 'A report key'),
+  reportKeyCan: (list: string) => (list ? `can send numbers to ${list}, and nothing else` : 'can do nothing, because it is bound to no list'),
 
   /* Connect an agent: a write token for ninety days, its bearer shown once. */
   connectTitle: 'Connect an agent',

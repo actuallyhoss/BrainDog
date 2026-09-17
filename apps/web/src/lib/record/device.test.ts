@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, normalise, reachKey, revocable,
+  reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, noRecord, normalise, reachKey, revocable,
   sampleMachines, sampleTokens, standing, type DeviceRow, type TokenRow,
 } from './device.ts';
 import { DEVICES, TOKENS } from './data.ts';
@@ -200,4 +200,12 @@ test('the two lines to copy name the origin and carry no token', () => {
 test('a token minted here is a ninety-day write token with a label the kernel accepts', () => {
   assert.equal(TOKEN_DAYS, 90);
   assert.equal(LABEL_MAX, 120);
+});
+
+test('a report key reads as its name and the list it sends to, never as its label', () => {
+  assert.deepEqual(reportKeyOf('report:{"register":"datapoints","fixed":{"organisation":"organisations#1"},"stamp":"at","name":"Northwind"}'), { name: 'Northwind', register: 'datapoints' });
+  assert.deepEqual(reportKeyOf('report:{"register":"datapoints"}'), { name: null, register: 'datapoints' });
+  assert.deepEqual(reportKeyOf('report:not json'), { name: null, register: '' });
+  assert.equal(reportKeyOf('Claude on the laptop'), null);
+  assert.equal(reportKeyOf(null), null);
 });
