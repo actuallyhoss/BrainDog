@@ -15,6 +15,7 @@ import {
   callsOutOf,
   estimateOf,
   installWords,
+  live,
   everyMs,
   HOSTED_RUNS,
   runsAMonth,
@@ -351,4 +352,13 @@ test('installing a pack that calls out says it asks once, and accepting a propos
   assert.equal(installWords.wouldAsk('Studio shop', 1), 'Studio shop would ask you once to approve the call it makes, shown in its plan');
   assert.equal(installWords.wouldAsk('Studio shop', 3), 'Studio shop would ask you once to approve the 3 calls it makes, shown in its plan');
   for (const said of [installWords.asksOnce, installWords.acceptApproves, installWords.wouldAsk('A', 2)]) assert.doesNotMatch(said, /—/u);
+});
+
+test('A 401 CANCELS ITS BODY rather than leaving the request pending', async () => {
+  let cancelled = false;
+  const body = new ReadableStream({ cancel: () => void (cancelled = true) });
+  const io = (async () => new Response(body, { status: 401 })) as unknown as Fetch;
+  const first = await live(io).actions();
+  assert.equal(first.ok === false && first.refusal.code, 'UNAUTHORIZED');
+  assert.equal(cancelled, true);
 });

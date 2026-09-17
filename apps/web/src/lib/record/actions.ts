@@ -118,7 +118,12 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
   } catch {
     return unreachable();
   }
-  if (res.status === 401) return unauthorized();
+  /* THE BODY IS CANCELLED, NOT LEFT. A 401 returned with its body unread, and the request stayed pending in
+     the network panel on /p/kiln for as long as the tab was open. */
+  if (res.status === 401) {
+    await res.body?.cancel().catch(() => undefined);
+    return unauthorized();
+  }
   const said: unknown = await res.json().catch(() => undefined);
   const out = (isAnswer(said) ? said : unreachable()) as Answer<T>;
   return res.status === 404 ? { ...out, notFound: true } : out;
