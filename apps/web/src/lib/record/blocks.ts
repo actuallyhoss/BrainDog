@@ -276,7 +276,12 @@ function forecastRows(block: BlockResult): string[] {
     `horizon | ${block.horizon ?? 180} |  | `,
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
     /* HOW LATE MONEY HAS COME IN, in whole days, which the late knob marks; and how near a crossing is said. */
-    ...(typeof block.lateness === 'number' && Number.isFinite(block.lateness) ? [`late | ${Math.round(block.lateness)} |  | `] : []),
+    /* AND WHAT THE KNOB IS CALLED, the figure's name as the record holds it, so a person's record says it in their words. */
+    ...(typeof block.lateness === 'number' && Number.isFinite(block.lateness)
+      ? [`late | ${Math.round(block.lateness)} | ${escapeCell(block.late_name ?? '')} | `]
+      : block.late_name
+        ? [`late |  | ${escapeCell(block.late_name)} | `]
+        : []),
     ...(typeof block.under === 'number' ? [`under | ${block.under} |  | `] : []),
   ];
 }

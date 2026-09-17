@@ -151,7 +151,7 @@ const READS = new Set([
   /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
   'changes', 'unset',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
-  'late', 'under', 'lateness',
+  'late', 'under', 'lateness', 'late_name',
   /* A card grid's out-of-date rule. */
   'stale',
   /* A `progress` budget's figure of what was spent, grouped by the word its rows are, and a goal's of what was logged
@@ -202,6 +202,8 @@ export type BlockResult = PageBlock & {
   changes?: ({ by: FeedBy; who: string; at: string } | null)[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
+  /** That figure's name as the record declares it, which the late knob is called by, so a use case's words reach it. */
+  late_name?: string;
   /**
    * Every `{{path}}` in the block's heading, body, empty sentence or authored cells that the record
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
@@ -845,7 +847,7 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
  * THE MARK IS A FACT ABOUT WHAT HAPPENED: how late money has come in, from the paid rows. The knob itself
  * stays arithmetic over the walk, and the mark only says where the record puts a reader's guess.
  */
-function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | null } | { refusal: Refusal } {
+function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | null; late_name?: string } | { refusal: Refusal } {
   if (block.under !== undefined && (!Number.isInteger(block.under) || block.under < 1 || block.under > 365))
     return { refusal: { code: 'OUT_OF_BOUNDS', fix: 'under: is a whole number of days between 1 and 365.', at: 'under' } };
   if (block.late === undefined) return {};
@@ -854,7 +856,8 @@ function latenessOf(deps: PageDeps, block: PageBlock): { lateness?: number | nul
   const read = deps.read(decl);
   if (!read.ok) return refused(read) ? { refusal: read.refusal } : {};
   if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };
-  return { lateness: read.value.value };
+  /* THE KNOB IS CALLED BY THE FIGURE IT MARKS, as the record holds it, so it speaks as the use case installed it. */
+  return { lateness: read.value.value, ...(typeof decl.name === 'string' && decl.name.trim() !== '' ? { late_name: decl.name } : {}) };
 }
 
 /**

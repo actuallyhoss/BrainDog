@@ -39,6 +39,8 @@ export type ForecastModel = {
   knobs: ForecastKnob[];
   /** How many days late money has come in on average, which the late knob marks, or `null` when the host sent none. */
   late: number | null;
+  /** What the late knob is called, the figure it marks as the host names it, or `null` for the renderer's own words. */
+  lateName: string | null;
   /** How near a crossing is said under the chart, in days, or `null` when it is never said. */
   under: number | null;
 };
@@ -97,6 +99,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     horizon: Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180,
     knobs: FORECAST_KNOBS.filter((k) => knobWords.includes(k)),
     late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
+    lateName: rows.find((r) => r[0]?.trim() === 'late')?.[2]?.trim() || null,
     under: whole(rows.find((r) => r[0]?.trim() === 'under')?.[1], 1),
   };
 }

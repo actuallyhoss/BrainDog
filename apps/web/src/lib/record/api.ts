@@ -1556,6 +1556,8 @@ export type BlockResult = PageBlock & {
   past?: readonly { at: string; value: number }[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
+  /** That figure's name as the record declares it, which the late knob is called by. */
+  late_name?: string;
   /** A `bar` over a list of links: the money each linked row holds, by the row's id, which the bar adds up per row. */
   linked?: Readonly<Record<string, unknown>>;
   /**
@@ -1637,7 +1639,7 @@ function runwayBlock(b: PageBlock): BlockResult {
     refusals,
     ...(refusals.length ? {} : { walk }),
     ...(refusals.length || typeof recorded === 'string' || !recorded ? {} : { past: recorded }),
-    ...(refusals.length || typeof late === 'string' || late === undefined ? {} : { lateness: late }),
+    ...(refusals.length || typeof late === 'string' || late === undefined ? {} : { lateness: late, ...(typeof b.late === 'string' && METRICS[b.late]?.name ? { late_name: METRICS[b.late]!.name } : {}) }),
     /* A BRIDGE ADDS UP THE WHOLE WALK, and a forecast draws it, so each shows every movement it read rather than a slice of them. */
     ...walkTable(walk, b.kind === 'bridge' || b.kind === 'forecast' ? walk.steps.length : b.limit, new Date(NOW).toISOString().slice(0, 10), refusals.length > 0),
     drawn: b.drawn ?? drawnWhen(b),

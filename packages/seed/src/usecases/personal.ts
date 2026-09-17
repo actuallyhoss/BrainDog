@@ -775,6 +775,14 @@ export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: 
 };
 
 /**
+ * WHAT MONEY'S FIGURES ARE CALLED FOR ONE PERSON, where a business's words would read as somebody else's record. The
+ * forecast's late knob is called by the figure it marks, so "Money in arrives late by" becomes a person's pay.
+ */
+export const PERSONAL_NAMES: Readonly<Record<string, string>> = {
+  'days-late-in': 'Pay comes in late by',
+};
+
+/**
  * THE EXAMPLE ROWS MONEY AND PROJECTS GET IN A PERSON'S RECORD, in place of the sample studio's: a current account, a
  * savings account and a card; rent, a phone, a streaming subscription and the rest of a month's bills, and a pay day;
  * two projects on the go and one on hold. People gets none: onboarding writes the person's own row there.

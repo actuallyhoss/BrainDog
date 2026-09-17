@@ -21,7 +21,7 @@ import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
-import { PERSONAL_EXAMPLES, PERSONAL_TARGETS } from './personal.ts';
+import { PERSONAL_EXAMPLES, PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
 
 type Body = Record<string, unknown>;
@@ -31,6 +31,9 @@ const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { founder: FO
 
 /** The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. */
 const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };
+
+/** What each use case calls the modules' figures, by metric: the words a tile and the forecast's late knob say. */
+const MODULE_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = { personal: PERSONAL_NAMES };
 
 /** The page a use case's Home is, by the id of the pack it carries or the use case's own id. */
 export const homePageOf = (id: string): string => `home-${id.replace(/^usecase-/u, '')}`;
@@ -59,8 +62,13 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   const doc = firstPartyDocument(id, { ...(options.holds === undefined ? {} : { holds: options.holds }), ...(seeds === undefined ? {} : { seeds }) });
   if (!doc) return null;
   const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
+  const names = u === null ? {} : (MODULE_NAMES[u.usecase] ?? {});
   if (Array.isArray(doc.declarations))
-    doc.declarations = (doc.declarations as Body[]).map((d) => (typeof d.metric === 'string' && targets[d.metric] !== undefined ? { ...d, target: targets[d.metric] } : d));
+    doc.declarations = (doc.declarations as Body[]).map((d) =>
+      typeof d.metric !== 'string'
+        ? d
+        : { ...d, ...(targets[d.metric] === undefined ? {} : { target: targets[d.metric] }), ...(names[d.metric] === undefined ? {} : { name: names[d.metric] }) },
+    );
   const out = dated(doc, options.today);
   if (Array.isArray(out.seeds) && out.seeds.length === 0) delete out.seeds;
   return out;

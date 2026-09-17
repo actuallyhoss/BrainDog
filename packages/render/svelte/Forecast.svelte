@@ -140,7 +140,7 @@
         {/if}
         {#if model.knobs.includes('late')}
           <label class="forecast-knob">
-            <span class="forecast-knob-name">{FORECAST_LATE}</span>
+            <span class="forecast-knob-name">{model.lateName ?? FORECAST_LATE}</span>
             <input class="forecast-range" type="range" min="0" max="60" step="5" bind:value={late} />
             <span class="forecast-knob-value num">{forecastDays(late)}</span>
             {#if model.late !== null}<span class="forecast-knob-note">{forecastAverage(model.late)}</span>{/if}

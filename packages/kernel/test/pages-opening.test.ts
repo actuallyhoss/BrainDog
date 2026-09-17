@@ -204,6 +204,7 @@ test('THE LATE KNOB MARKS A FIGURE, and how near a crossing is said is a number 
   const out = k.block(forecast);
   assert.deepEqual(out.refusals, []);
   assert.equal(out.lateness, 0);
+  assert.equal(out.late_name, 'Late', 'the knob is called by the figure it marks, as the record holds it');
   assert.equal(out.under, 30);
   assert.equal(k.block({ ...forecast, late: 'weather' }).refusals[0]?.code, 'METRIC_UNKNOWN');
   assert.equal(k.block({ ...forecast, under: 0 }).refusals[0]?.at, 'under');

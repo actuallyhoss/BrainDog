@@ -28,6 +28,9 @@ test('the rows become a model, and a walk with no opening is no model', () => {
   assert.deepEqual(m.past.map((p) => p.value), [700, 900]);
   assert.equal(m.steps.length, 4);
   assert.equal(forecastModel([['step', '2026-09-19', 'x', '£1.00']]), null);
+  assert.equal(m.lateName, null, 'no name sent, the renderer says its own');
+  assert.equal(forecastModel([...ROWS, ['late', '3', 'Pay comes in late by', '']])!.lateName, 'Pay comes in late by');
+  assert.equal(forecastModel([...ROWS, ['late', '', 'Pay comes in late by', '']])!.late, null, 'a name with no reading marks nothing');
 });
 
 test('the baseline walks the steps day by day, and says where it goes under and its lowest', () => {

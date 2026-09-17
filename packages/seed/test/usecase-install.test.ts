@@ -158,6 +158,11 @@ test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder
   assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { lte: 150_000 });
   assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { lte: 5_000_000 });
   assert.deepEqual(targetOf(null, 'out-30d'), { lte: 5_000_000 });
+  /* AND ITS WORDS: the late knob is called by this figure, so a person's pay, not a business's money in. */
+  const nameOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
+    ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; name?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).name;
+  assert.equal(nameOf(useCase('personal'), 'days-late-in'), 'Pay comes in late by');
+  assert.equal(nameOf(useCase('founder'), 'days-late-in'), 'Money in arrives late by');
 });
 
 type Drawn = { heading?: string; kind: string; rows?: Row[]; refusals?: unknown[]; readings?: { metric: string; reading: { value: number | null } | null; refusal?: unknown }[] };
