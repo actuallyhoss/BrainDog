@@ -111,6 +111,8 @@ test('A WEBHOOK GOES TO AN HTTPS ADDRESS ON A PUBLIC HOST, and the check is here
     'https://[0:0:0:0:0:ffff:7f00:1]/',
     'https://[::]/',
     'https://[fe80::1]/',
+    'https://[febf::1]/',
+    'https://[fec0::1]/',
     'file:///etc/passwd',
     'not a url',
   ])

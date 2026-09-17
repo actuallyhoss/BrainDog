@@ -174,7 +174,7 @@ function refusedV4([a = 0, b = 0, c = 0]: number[]): string | null {
  * Why an address may not be called, in a word or two, or `null` when it is public.
  *
  * REFUSED: unspecified (`0/8`, `::`), loopback (`127/8`, `::1`), private (`10/8`, `172.16/12`, `192.168/16`,
- * NAT64's local-use `64:ff9b:1::/48`), link-local (`169.254/16`, `fe80::/10`), unique-local (`fc00::/7`), carrier-grade
+ * NAT64's local-use `64:ff9b:1::/48`), link-local (`169.254/16`, `fe80::/10`), site-local (`fec0::/10`), unique-local (`fc00::/7`), carrier-grade
  * NAT (`100.64/10`), multicast (`224/4`, `ff00::/8`) and reserved (`240/4`, which holds the broadcast address,
  * `198.18/15`, `192.0.0/24` and the discard-only `100::/64`). An IPv6 address that carries an IPv4 one (mapped
  * `::ffff:0:0/96`, translated `::ffff:0:0:0/96`, compatible `::/96`, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`) is judged
@@ -199,6 +199,8 @@ export function refusedAddress(address: string): string | null {
   if (b[0] === 0x01 && b.slice(1, 8).every((x) => x === 0)) return 'reserved';
   if (b[0] === 0x00 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b && b.slice(4, 12).every((x) => x === 0)) return refusedV4(inner);
   if (b[0] === 0xfe && ((b[1] ?? 0) & 0xc0) === 0x80) return 'link-local';
+  /* `fec0::/10` was site-local until RFC 3879 retired it; a network that still routes it routes it inside. */
+  if (b[0] === 0xfe && ((b[1] ?? 0) & 0xc0) === 0xc0) return 'site-local';
   if (((b[0] ?? 0) & 0xfe) === 0xfc) return 'unique-local';
   if (b[0] === 0xff) return 'multicast';
   return null;

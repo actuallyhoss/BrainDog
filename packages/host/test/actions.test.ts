@@ -235,6 +235,9 @@ test('EVERY PRIVATE, LOCAL AND SPECIAL RANGE IS REFUSED, in both families and in
     ['fe80::1', 'link-local'],
     ['febf::1', 'link-local'],
     ['fe80::1%eth0', 'link-local'],
+    /* The deprecated site-local block, `fec0::/10`: nothing public answers there, and a network may still route it inside. */
+    ['fec0::1', 'site-local'],
+    ['feff::1', 'site-local'],
     ['fc00::1', 'unique-local'],
     ['fd12:3456::1', 'unique-local'],
     ['ff02::1', 'multicast'],
@@ -261,7 +264,7 @@ test('EVERY PRIVATE, LOCAL AND SPECIAL RANGE IS REFUSED, in both families and in
   ];
   for (const [address, why] of refused) assert.equal(refusedAddress(address), why, address);
 
-  for (const address of ['203.0.113.10', '8.8.8.8', '172.32.0.1', '172.15.255.255', '100.128.0.1', '100.63.255.255', '192.169.0.1', '169.253.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', 'fec0::1', '2002:808:808::1', '198.20.0.1', '198.17.255.255', '192.0.1.1'])
+  for (const address of ['203.0.113.10', '8.8.8.8', '172.32.0.1', '172.15.255.255', '100.128.0.1', '100.63.255.255', '192.169.0.1', '169.253.0.1', '2606:4700:4700::1111', '::ffff:8.8.8.8', 'fbff::1', '2002:808:808::1', '198.20.0.1', '198.17.255.255', '192.0.1.1'])
     assert.equal(refusedAddress(address), null, address);
 });
 

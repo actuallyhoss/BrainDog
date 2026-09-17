@@ -72,7 +72,8 @@ export function postable(raw: string): string | null {
     if (inner === '::1' || inner === '::' || inner === '') return null;
     const mapped = /^::ffff:([0-9a-f:.]+)$/.exec(inner)?.[1];
     if (mapped) return null;
-    if (/^(?:fe80|fc|fd)/.test(inner)) return null;
+    /* Link-local `fe80::/10` and the retired site-local `fec0::/10` together are `fe80::/9`, and `fc00::/7` is unique-local. */
+    if (/^(?:fe[89a-f][0-9a-f]:|fc|fd)/.test(inner)) return null;
   }
   return url.toString();
 }
