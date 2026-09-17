@@ -102,10 +102,10 @@ test('THE NEXT VERSION IS THE NEXT PATCH, AND A FILE IS NAMED FOR IT', () => {
 });
 
 test('A HEADING FILLED FROM THE VOICE IS WRITTEN BACK AS ITS PLACEHOLDER, AND NOTHING ELSE IS', () => {
-  const body = { page: 'home-student', title: 'Home', blocks: [{ kind: 'table', heading: 'Coming up', empty: 'Coming up soon, nothing yet.' }] };
+  const body = { page: 'home-student', title: 'Coming up', blocks: [{ kind: 'table', heading: 'Coming up', empty: 'Coming up soon, nothing yet.' }] };
   assert.deepEqual(unfilled(body, new Map([['Coming up', 'voice_needs_you']])), {
     page: 'home-student',
-    title: 'Home',
+    title: 'Coming up',
     blocks: [{ kind: 'table', heading: '{{config:voice_needs_you}}', empty: 'Coming up soon, nothing yet.' }],
   });
 });

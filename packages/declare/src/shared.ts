@@ -197,12 +197,16 @@ export function exampleFields(register: Record<string, unknown>, fields: Record<
  *
  * THE RECORD STORES A DECLARATION FILLED IN (`{{config:voice_needs_you}}` becomes "Coming up"), so a Home heading
  * exported as it is stored would stop following the voice on the record it is installed on. A string that is exactly a
- * voice or label setting's value, now or by default, is written back as its placeholder. Only a whole string, so a
- * sentence that happens to contain the word is left as it was.
+ * voice setting's value, now or by default, is written back as its placeholder, and only under a block's `heading`: a page
+ * title that happens to read Today stays Today. Only a whole string, so a sentence containing the word is left as it was.
  */
-export function unfilled(body: unknown, settings: ReadonlyMap<string, string>): unknown {
-  if (typeof body === 'string') return settings.has(body) ? `{{config:${settings.get(body)}}}` : body;
-  if (Array.isArray(body)) return body.map((v) => unfilled(v, settings));
-  if (isMap(body)) return Object.fromEntries(Object.entries(body).map(([k, v]) => [k, unfilled(v, settings)]));
-  return body;
+export function unfilled(body: unknown, settings: ReadonlyMap<string, string>, keys: ReadonlySet<string> = HEADINGS): unknown {
+  if (Array.isArray(body)) return body.map((v) => unfilled(v, settings, keys));
+  if (!isMap(body)) return body;
+  return Object.fromEntries(
+    Object.entries(body).map(([k, v]) => [k, typeof v === 'string' ? (keys.has(k) && settings.has(v) ? `{{config:${settings.get(v)}}}` : v) : unfilled(v, settings, keys)]),
+  );
 }
+
+/** The keys a voice placeholder is put back under: a block's heading, which is where a use case's Home reads its voice. */
+const HEADINGS: ReadonlySet<string> = new Set(['heading']);

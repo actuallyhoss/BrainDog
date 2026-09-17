@@ -161,7 +161,7 @@ export function useCases(d: UseCaseDeps) {
       version,
       title,
       summary: args.summary ?? `${title}, as one BrainDog is arranged.`,
-      author: args.author ?? 'Shared from a BrainDog',
+      author: args.author ?? 'a BrainDog owner',
       license: 'MIT',
       audience: (args.audience ?? 'other') as Audience,
       tone: 'as its owner arranged it',

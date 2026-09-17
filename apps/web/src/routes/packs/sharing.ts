@@ -112,16 +112,23 @@ export type SharedPlan = {
 /** A declaration id as a person reads it, from the document that declares it: a list's name, a page's title. */
 function namesIn(doc: Body): (id: string) => { kind: 'list' | 'page' | 'other'; name: string } {
   const decls = Array.isArray(doc.declarations) ? (doc.declarations as Body[]) : [];
+  /* A TITLE MAY READ A SETTING, `{{config:voice_home}}`, and is said as the value this file installs it with. */
+  const config = isMap(doc.config) ? doc.config : {};
+  const filled = (text: string): string =>
+    text.replace(/\{\{config:([a-z0-9_]+)\}\}/gu, (all, key: string) => {
+      const d = config[key];
+      return isMap(d) && typeof d.default === 'string' ? d.default : all;
+    });
   return (id) => {
     const [kind, ...rest] = id.split('.');
     const bare = rest.join('.');
     if (kind === 'register') {
       const d = decls.find((x) => x.register === bare);
-      return { kind: 'list', name: typeof d?.name === 'string' ? d.name : bare };
+      return { kind: 'list', name: typeof d?.name === 'string' ? filled(d.name) : bare };
     }
     if (kind === 'page') {
       const d = decls.find((x) => x.page === bare);
-      return { kind: 'page', name: typeof d?.title === 'string' ? d.title : bare };
+      return { kind: 'page', name: typeof d?.title === 'string' ? filled(d.title) : bare };
     }
     return { kind: 'other', name: bare || id };
   };

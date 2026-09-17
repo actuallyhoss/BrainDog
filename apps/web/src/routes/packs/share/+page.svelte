@@ -32,6 +32,8 @@
   let states = $state<PackState[]>([]);
   let rows = $state<Record<string, { seq: number; title: string }[]>>({});
   let picked = $state<Record<string, number[]>>({});
+  /** Each list by the word this record gives it, so a list renamed Modules is picked from under Modules. */
+  let names = $state<Record<string, string>>({});
   let title = $state('');
   let version = $state('');
   let summary = $state('');
@@ -59,6 +61,9 @@
         version = nextPatch(states.find((s) => s.id === `usecase-${id}`)?.version ?? null);
       } else version = '1.0.0';
       if (live && own) {
+        const config = await client.packConfig({ id: own.id });
+        const values = config.ok ? ((config.value as { values?: Record<string, unknown> }).values ?? {}) : {};
+        names = Object.fromEntries(own.registers.flatMap((r) => (typeof values[`label_${r}`] === 'string' && values[`label_${r}`] !== '' ? [[r, values[`label_${r}`] as string]] : [])));
         const out: typeof rows = {};
         for (const register of own.registers) {
           const listed = await client.list({ register, limit: 50 });
@@ -144,7 +149,7 @@
           <p class="note">{count === 0 ? copy.shareExamplesNone : copy.shareExamplesPicked(count)} {copy.shareExamplesMost}</p>
           {#each own.registers as register (register)}
             <fieldset class="rows">
-              <legend class="rows-h">{listWords(register)}</legend>
+              <legend class="rows-h">{names[register] ?? listWords(register)}</legend>
               {#each rows[register] ?? [] as row (row.seq)}
                 {@const on = (picked[register] ?? []).includes(row.seq)}
                 <label class="row-pick">
