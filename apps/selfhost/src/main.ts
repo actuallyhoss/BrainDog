@@ -474,7 +474,8 @@ async function serve(): Promise<void> {
     at === 'off'
       ? null
       : nightlyBackups({ sql: running.sql, file, at, now: () => Date.now(), say, logged: (note) => running.api.kernel.lifecycle('export', 'system', note) });
-  if (nightly) await nightly.check();
+  /* A COPY THAT CANNOT BE WRITTEN DOES NOT STOP THE HOST. It is said in one sentence and tried again on the clock. */
+  if (nightly) await nightly.look();
 
   /* AND IT STOPS WHEN IT IS ASKED TO. A container that kills a process holding a WAL leaves it to
      the next boot's recovery; closing takes a second and makes the file whole. */

@@ -18,8 +18,17 @@ import { dirname, join } from 'node:path';
 
 import type { Snapshot, Snapshots, Sql } from '@braindog/ports';
 
-/** How many copies are kept (`53 §5.4`: thirty). A `before-restore` copy is never what makes one go. */
+/**
+ * How many copies are kept (`53 §5.4`: thirty), of each kind: thirty nightly copies, and apart from them thirty a person
+ * took. A `before-restore` copy is never what makes one go.
+ *
+ * TWO KINDS, KEPT APART. The nightly copies shared the thirty with copies taken by hand, so a month of nights pruned a copy
+ * somebody had taken on purpose before a big change. A nightly copy now only ever pushes out an older nightly copy.
+ */
 export const KEEP = 30;
+
+/** A copy the host took on its clock, `...Z-nightly` or `...Z-nightly-2`, as against one a person took. */
+export const isNightly = (id: string): boolean => /Z-nightly(?:-\d+)?$/u.test(id);
 
 const ID = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})Z-[a-z][a-z0-9-]*$/;
 
@@ -31,6 +40,8 @@ const EXT = '.brain';
 export type FileSnapshots = Snapshots & {
   /** The file behind one kept copy, or `null` when the id is not one. */
   path(id: string): string | null;
+  /** Keep the newest `keep` of the copies `which` picks (all of them when it is left out), and delete the rest of those. */
+  prune(keep: number, which?: (id: string) => boolean): Promise<void>;
 };
 
 /* COPIES TAKEN IN ONE SECOND ARE NUMBERED, `-now`, `-now-2` … `-now-10`, AND THEY SORT AS NUMBERS. By name,
@@ -59,8 +70,8 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
       .sort((a, b) => (a.at === b.at ? NATURAL.compare(b.id, a.id) : a.at < b.at ? 1 : -1));
   };
 
-  const prune = async (keep: number): Promise<void> => {
-    for (const old of (await list()).slice(keep)) rmSync(join(dir, `${old.id}.brain`), { force: true });
+  const prune = async (keep: number, which: (id: string) => boolean = () => true): Promise<void> => {
+    for (const old of (await list()).filter((c) => which(c.id)).slice(keep)) rmSync(join(dir, `${old.id}.brain`), { force: true });
   };
 
   return {
@@ -82,7 +93,7 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
         /* Advisory on Windows. */
       }
       /* A COPY TAKEN JUST BEFORE A RESTORE PRUNES NOTHING, so the copy being restored cannot be the one that goes. */
-      if (label !== 'before-restore') await prune(KEEP);
+      if (label !== 'before-restore') await prune(KEEP, isNightly(id) ? isNightly : (other) => !isNightly(other));
       return { id, at: atOf(id), bytes: statSync(target).size };
     },
 

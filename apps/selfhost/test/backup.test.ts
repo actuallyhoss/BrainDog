@@ -1,5 +1,5 @@
 /**
- * The nightly copy: due once a day at a time in UTC, caught up on start, pruned with the other copies, and put back.
+ * The nightly copy: due once a day at a time in UTC, caught up on start, thirty kept apart from the copies a person takes, and put back; a copy that cannot be written stops nothing.
  *
  * REAL FILES IN A TEMPORARY DIRECTORY and a clock the test moves, because the claims are about days: that a host asleep
  * at the hour takes the copy when it wakes, that a restart takes no second one, and that the copy restores.
@@ -81,14 +81,61 @@ test('ONE NIGHTLY COPY A DAY, caught up when the host wakes after the hour, neve
     assert.equal(logged.length, 2);
     assert.match(logged[0]!, /^snapshot 2026-09-16T22-00-00Z-nightly \d+ bytes$/);
 
-    /* Rotation: a month and more of nights keeps the newest thirty copies, the restore's own among them. */
+    /* A copy somebody takes by hand before a big change. */
+    const mine = await call('snapshot', {});
+    assert.equal(mine.status, 200, JSON.stringify(mine.body));
+    const manual = (mine.body.value as { id: string }).id;
+
+    /* Rotation: a month and more of nights keeps the newest thirty nightly copies, and never pushes out a copy a person
+       took, nor the one kept before the restore. */
     for (let d = 18; d < 18 + KEEP + 5; d++) {
       now = Date.parse('2026-09-18T04:00:00Z') + (d - 18) * 86_400_000;
       assert.ok(await nightly.check());
     }
     const files = readdirSync(join(dir, 'snapshots')).filter((n) => n.endsWith('.brain'));
-    assert.equal(files.length, KEEP);
-    assert.ok(!files.includes(`${String(first)}.brain`), 'the oldest copy was kept past thirty');
+    assert.equal(files.filter((n) => /Z-nightly(?:-\d+)?\.brain$/u.test(n)).length, KEEP);
+    assert.ok(!files.includes(`${String(first)}.brain`), 'the oldest nightly copy was kept past thirty');
+    assert.ok(files.includes(`${manual}.brain`), "a month of nights pruned a copy somebody took by hand");
+    assert.ok(files.some((n) => n.endsWith('-before-restore.brain')), 'the copy kept before the restore was pruned');
+    assert.equal(files.length, KEEP + 2);
+
+    /* And thirty-one copies by hand push out the oldest one by hand, never a nightly copy. */
+    for (let i = 0; i < KEEP; i++) assert.equal((await call('snapshot', {})).status, 200);
+    const after = readdirSync(join(dir, 'snapshots')).filter((n) => n.endsWith('.brain'));
+    assert.ok(!after.includes(`${manual}.brain`));
+    assert.equal(after.filter((n) => /Z-nightly(?:-\d+)?\.brain$/u.test(n)).length, KEEP);
+  } finally {
+    nightly.stop();
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('A NIGHTLY COPY THAT CANNOT BE WRITTEN IS SAID IN ONE SENTENCE, and the host goes on serving the record', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-nightly-fail-'));
+  const file = join(dir, 'record.sqlite');
+  const running = await start({ file, port: 0, pollMs: 0 });
+  /* A database that refuses the copy, as a full disk or a folder nobody may write would. */
+  const refusing = new Proxy(running.sql, {
+    get: (target, key) =>
+      key === 'exec'
+        ? (text: string, ...args: unknown[]) => {
+            if (/^VACUUM INTO/u.test(text)) throw new Error('disk I/O error');
+            return (target.exec as (t: string, ...a: unknown[]) => unknown)(text, ...args);
+          }
+        : Reflect.get(target, key),
+  });
+  const said: string[] = [];
+  const nightly = nightlyBackups({ sql: refusing, file, now: () => Date.parse('2026-09-17T08:00:00Z'), at: '03:20', tickMs: 0, say: (l) => said.push(l) });
+  try {
+    await assert.rejects(nightly.check(), /disk I\/O error/u);
+    assert.equal(await nightly.look(), null);
+    assert.equal(said.length, 1);
+    assert.match(said[0]!, /^braindog · the nightly copy was not taken, and the record is still served: disk I\/O error\. /u);
+    assert.ok(!said[0]!.includes('—'));
+    const port = (running.server.address() as { port: number }).port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/whoami`);
+    assert.ok(res.status < 500, 'the host still answers');
   } finally {
     nightly.stop();
     await running.close();

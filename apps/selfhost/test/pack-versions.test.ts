@@ -49,7 +49,7 @@ test('A RECORD MADE AT 1.0.0 IS OFFERED ONLY THE PACKS THAT CHANGED, and updatin
 
   /* WHAT IS OFFERED: exactly the packs whose version went up. */
   const changed = FIRST_PARTY.filter((id) => FIRST_PARTY_VERSIONS[id] !== '1.0.0');
-  assert.deepEqual([...changed].sort(), ['money-core', 'portfolio', 'work']);
+  assert.deepEqual([...changed].sort(), ['estate', 'money-core', 'portfolio', 'work']);
   const read = said<{ updates?: { id: string; from: string; to: string }[] }>(await api.arrangement({}, agent));
   assert.deepEqual(
     [...(read.updates ?? [])].sort((a, b) => a.id.localeCompare(b.id)),

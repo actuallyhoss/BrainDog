@@ -2,7 +2,7 @@
  * The self-host's nightly copy (`loop/research-switch.md` §4, step 6, for a record kept on this machine).
  *
  * THE SAME COPY AS "SNAPSHOT NOW", ON A CLOCK. `snapshots.ts` takes it (`VACUUM INTO`, the whole file, beside the record in
- * `snapshots/`), prunes to its thirty, and puts one back; the app lists, downloads and restores them. This only decides
+ * `snapshots/`), keeps thirty nightly copies apart from the thirty a person takes, and puts one back; the app lists, downloads and restores them. This only decides
  * when one is due and takes it labelled `nightly`, with the `export` line in the log a copy taken from the app writes.
  *
  * DUE ONCE A DAY, AT A TIME OF DAY IN UTC, AND CAUGHT UP ON START. A machine that was off at that time takes the copy the
@@ -12,13 +12,12 @@
 
 import type { Sql } from '@braindog/ports';
 
-import { fileSnapshots } from './snapshots.ts';
+import { fileSnapshots, isNightly } from './snapshots.ts';
 
 /** the old tool's own nightly copy ran at 03:20 UTC; this keeps the hour. */
 export const NIGHTLY_AT = '03:20';
 
 const AT = /^([01]\d|2[0-3]):([0-5]\d)$/u;
-const NIGHTLY = /Z-nightly(?:-\d+)?$/u;
 
 /** `HH:MM` as minutes after midnight, or `null` when it is not one. */
 export function minutesOf(at: string): number | null {
@@ -36,6 +35,11 @@ export function lastDue(now: number, minutes: number): number {
 export type Nightly = {
   /** Take the copy when one is due: its id, or `null` when there is already one since it fell due. */
   check(): Promise<string | null>;
+  /**
+   * `check`, and a copy that cannot be written is said in one sentence rather than thrown: the id, or `null`. The host
+   * serves the record either way, because a backup that failed is a thing to fix, not a reason nobody can open the record.
+   */
+  look(): Promise<string | null>;
   stop(): void;
 };
 
@@ -62,7 +66,7 @@ export function nightlyBackups(o: {
     try {
       const since = new Date(lastDue(o.now(), minutes)).toISOString();
       const kept = await copies.list();
-      if (kept.some((c) => NIGHTLY.test(c.id) && c.at >= since)) return null;
+      if (kept.some((c) => isNightly(c.id) && c.at >= since)) return null;
       const taken = await copies.take('nightly');
       o.logged?.(`snapshot ${taken.id} ${String(taken.bytes)} bytes`);
       o.say?.(`braindog · nightly copy ${taken.id} · ${String(taken.bytes)} bytes`);
@@ -72,16 +76,20 @@ export function nightlyBackups(o: {
     }
   };
 
+  const look = (): Promise<string | null> =>
+    check().catch((e: unknown) => {
+      o.say?.(
+        `braindog · the nightly copy was not taken, and the record is still served: ${e instanceof Error ? e.message : String(e)}. Check that the snapshots folder beside the record can be written; it is tried again every ten minutes.`,
+      );
+      return null;
+    });
+
   const tick = o.tickMs ?? 600_000;
-  const timer =
-    tick > 0
-      ? setInterval(() => {
-          check().catch((e: unknown) => o.say?.(`braindog · the nightly copy was not taken: ${e instanceof Error ? e.message : String(e)}`));
-        }, tick)
-      : null;
+  const timer = tick > 0 ? setInterval(() => void look(), tick) : null;
   timer?.unref?.();
   return {
     check,
+    look,
     stop: () => {
       if (timer) clearInterval(timer);
     },
