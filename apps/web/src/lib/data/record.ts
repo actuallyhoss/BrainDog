@@ -92,8 +92,8 @@ function said<T>(r: { ok: true; value: T } | { ok: false; refusal: Refusal } | {
  * in the order they came.
  *
  * AND A SORTED ANSWER THAT IS WHOLE ON ITS FIRST PAGE IS ORDERED HERE, the way this screen has always
- * ordered it. The record orders the stored value, so a ref sorts by its ULID and text by its bytes;
- * `sortRows` orders what the cell shows, by name and in the reader's collation. When the page holds
+ * ordered it. The record orders the stored value, so a ref sorts by its ULID; `sortRows` orders what the
+ * cell shows, by name. Text, money and an enum's labels follow one rule in both. When the page holds
  * every row there is nothing the second order can get wrong. When it does not, re-sorting one page
  * would disagree with the pages either side of it, so the record's order is the one drawn.
  */

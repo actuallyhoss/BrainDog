@@ -125,3 +125,38 @@ test('AN EMPTY VALUE SORTS LAST IN EITHER DIRECTION, as the sample sorts it, and
   assert.deepEqual(names([{ field: 'rank', dir: 'asc' }]).slice(0, 2).sort(), ['b', 'f']);
   sql.close();
 });
+
+/* ONE RULE IN BOTH ENGINES (`apps/web/src/lib/record/query.test.ts` asserts the same orders over the same rows): money
+   groups by currency and then by amount, and text sorts without regard to case, the stored text breaking a tie. */
+const MIXED = [
+  { name: 'beta', amount: { amount: 100, currency: 'USD' } },
+  { name: 'Alpha', amount: { amount: 50, currency: 'GBP' } },
+  { name: 'alpha', amount: { amount: 900, currency: 'EUR' } },
+  { name: 'Gamma', amount: { amount: 200, currency: 'GBP' } },
+  { name: 'delta' },
+];
+
+test('MONEY GROUPS BY CURRENCY THEN AMOUNT, TEXT SORTS WITHOUT CASE, as the sample sorts them, and both page without gaps', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([THINGS])).ok);
+  for (const fields of MIXED) assert.ok(k.create('things', fields, { actor: 'p_1' }).ok);
+  const names = (order: { field: string; dir?: 'asc' | 'desc' }[], limit = 100) => {
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      const p: Page = page(k.list({ register: 'things', order, limit, cursor }));
+      seen.push(...p.rows.map((r) => String(r.fields.name)));
+      cursor = p.cursor;
+      if (cursor === null) break;
+    }
+    return seen;
+  };
+  for (const limit of [1, 2, 100]) {
+    assert.deepEqual(names([{ field: 'name', dir: 'asc' }], limit), ['Alpha', 'alpha', 'beta', 'delta', 'Gamma'], `name up at ${limit}`);
+    assert.deepEqual(names([{ field: 'name', dir: 'desc' }], limit), ['Gamma', 'delta', 'beta', 'alpha', 'Alpha'], `name down at ${limit}`);
+    assert.deepEqual(names([{ field: 'amount', dir: 'asc' }], limit), ['alpha', 'Alpha', 'Gamma', 'beta', 'delta'], `amount up at ${limit}`);
+    assert.deepEqual(names([{ field: 'amount', dir: 'desc' }], limit), ['beta', 'Gamma', 'Alpha', 'alpha', 'delta'], `amount down at ${limit}`);
+  }
+  sql.close();
+});

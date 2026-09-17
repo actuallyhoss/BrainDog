@@ -61,12 +61,13 @@ test('sorting does not mutate what it was given', () => {
   assert.deepEqual(seqs(given), [1, 2], 'the caller’s array was reordered underneath it');
 });
 
-test('text sorts the way a person reads a list, not the way a byte compares', () => {
+test('text sorts without regard to case, not the way a byte compares, and in the order the record uses', () => {
   // `<` on strings compares UTF-16 code units: every capital sorts before every lowercase, so
-  // "Zebra" lands above "apple", and anything accented lands after "z". A column of party names is
-  // exactly where that shows.
+  // "Zebra" landed above "apple". Case is folded now, as the record folds it (`COLLATE NOCASE`), and
+  // the order is the record's: a letter outside A to Z, as in "Ökonkwo", sorts after "z" in both
+  // engines, because the record has no collation of the reader's to agree with.
   const out = sortRows('people', rows({ name: 'apple' }, { name: 'Zebra' }, { name: 'Ökonkwo' }, { name: 'Banks' }), 'name', 'asc');
-  assert.deepEqual(out.map((e) => e.fields.name), ['apple', 'Banks', 'Ökonkwo', 'Zebra']);
+  assert.deepEqual(out.map((e) => e.fields.name), ['apple', 'Banks', 'Zebra', 'Ökonkwo']);
 });
 
 /* ── filtering ───────────────────────────────────────────────────────────── */
@@ -380,4 +381,20 @@ test('AN INSTANT CELL IS BANDED, NOT TRUNCATED TO ITS DAY', () => {
   /* And a `day` field is still a DATE, which is the branch beside it and a different answer on
      purpose: a deadline is a date somebody diaries against, and an age is not. */
   assert.equal(display('obligations', 'due', '2026-09-03'), '3 Sep 2026');
+});
+
+test('money groups by currency then amount, and text sorts without case, as the record sorts them', () => {
+  /* The same rows and orders as `packages/kernel/test/list-order-paging.test.ts`, so the two engines are held to one rule. */
+  const given = rows(
+    { what: 'beta', amount: { amount: 100, currency: 'USD' } },
+    { what: 'Alpha', amount: { amount: 50, currency: 'GBP' } },
+    { what: 'alpha', amount: { amount: 900, currency: 'EUR' } },
+    { what: 'Gamma', amount: { amount: 200, currency: 'GBP' } },
+    { what: 'delta' },
+  );
+  const whats = (field: string, dir: 'asc' | 'desc') => sortRows('obligations', given, field, dir).map((e) => e.fields.what);
+  assert.deepEqual(whats('what', 'asc'), ['Alpha', 'alpha', 'beta', 'delta', 'Gamma']);
+  assert.deepEqual(whats('what', 'desc'), ['Gamma', 'delta', 'beta', 'alpha', 'Alpha']);
+  assert.deepEqual(whats('amount', 'asc'), ['alpha', 'Alpha', 'Gamma', 'beta', 'delta']);
+  assert.deepEqual(whats('amount', 'desc'), ['beta', 'Gamma', 'Alpha', 'alpha', 'delta']);
 });

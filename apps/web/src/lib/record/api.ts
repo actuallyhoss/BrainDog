@@ -131,9 +131,6 @@ const declaredWalk = (): PageBlock | null => {
   return null;
 };
 
-/** One locale for collation, so a list is in the same order for everybody looking at one record. */
-const LOCALE = 'en-GB';
-
 /* ── what the record noticed, on the screen it is about ──────────── */
 
 /**
@@ -800,6 +797,19 @@ export function sortRows(register: string, entries: Entry[], field: string, dir:
   return [...entries].sort((a, b) => compareRows(register, a, b, field, sign, names) || tie(a, b));
 }
 
+/**
+ * TEXT IN THE RECORD'S ORDER, which is one rule in both engines: without regard to case (ASCII letters folded, as SQLite's
+ * `NOCASE` folds them), then by the stored text to break a tie. `localeCompare` here and byte order in the kernel put a
+ * mixed-case column in two orders, and a page that is whole is sorted here while a longer one is sorted there.
+ */
+const foldCase = (s: string): string => s.replace(/[A-Z]/gu, (c) => c.toLowerCase());
+const textOrder = (x: string, y: string): number => {
+  const fx = foldCase(x);
+  const fy = foldCase(y);
+  if (fx !== fy) return fx < fy ? -1 : 1;
+  return x === y ? 0 : x < y ? -1 : 1;
+};
+
 function compareRows(register: string, a: Entry, b: Entry, field: string, sign: number, names?: Names): number {
   if (field === 'seq') return (a.seq - b.seq) * sign;
   const x = a.fields[field];
@@ -829,15 +839,14 @@ function compareRows(register: string, a: Entry, b: Entry, field: string, sign: 
   if (decl?.type === 'ref' || (decl?.type === 'enum' && decl.labels)) {
     const sx = display(register, field, x, NOW, names) ?? '';
     const sy = display(register, field, y, NOW, names) ?? '';
-    return sx.localeCompare(sy, LOCALE) * sign;
+    return textOrder(sx, sy) * sign;
   }
 
-  /* TEXT COLLATES, everything else compares. `<` on strings compares UTF-16 code units, so every
-     capital sorts above every lowercase — "Zebra" before "apple" — and anything accented lands
-     after "z", which puts "Ökonkwo" at the bottom of a column of party names. Numbers and ISO
-     days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
-     chronological already precisely because it is written to sort as text. */
-  if (typeof x === 'string' && typeof y === 'string') return x.localeCompare(y, LOCALE) * sign;
+  /* TEXT SORTS WITHOUT CASE, everything else compares. `<` on strings alone put every capital above every lowercase,
+     "Zebra" before "apple". It is the record's rule (`textOrder`), not the reader's collation, so the two engines agree.
+     Numbers and ISO days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
+     chronological already precisely because it is written to sort as text, and folds to itself. */
+  if (typeof x === 'string' && typeof y === 'string') return textOrder(x, y) * sign;
   /* MONEY IS AN OBJECT, and `{} < {}` is false both ways round — so a column of money sorted into
      whatever order the rows arrived in, which looks exactly like a sort that worked. Within one
      currency it compares by magnitude; across two it groups by code first, because there is no
@@ -847,7 +856,7 @@ function compareRows(register: string, a: Entry, b: Entry, field: string, sign: 
   if (mx !== null && my !== null) {
     const cx = currencyOf(x) ?? '';
     const cy = currencyOf(y) ?? '';
-    if (cx !== cy) return cx.localeCompare(cy) * sign;
+    if (cx !== cy) return (cx < cy ? -1 : 1) * sign;
     return (mx - my) * sign;
   }
   return (x < y ? -1 : 1) * sign;

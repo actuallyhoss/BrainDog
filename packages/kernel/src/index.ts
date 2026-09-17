@@ -610,6 +610,9 @@ export type RecordOptions = {
    base64url JSON. The `~` keeps it apart from the record order's `<when>|<id>`, which can never start with one. */
 const SORTED_CURSOR = '~';
 
+/** The field types a sorted list orders without regard to case, as the sample does (`compareRows`). */
+const TEXT_SORTED = new Set(['text', 'document', 'url', 'email', 'enum']);
+
 function orderKeyOf(order: readonly { field: string; dir?: 'asc' | 'desc' }[]): string {
   return JSON.stringify(order.map((o) => [o.field, o.dir === 'asc' ? 'asc' : 'desc']));
 }
@@ -1458,10 +1461,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const expr = labels && Object.keys(labels).length
           ? `(CASE ${fieldSqlIn(schema, o.field)} ${Object.entries(labels).map(([v, l]) => `WHEN ${quote(v)} THEN ${quote(l)}`).join(' ')} ELSE ${fieldSqlIn(schema, o.field)} END)`
           : fieldSqlIn(schema, o.field);
-        /* AN EMPTY VALUE GOES LAST, IN EITHER DIRECTION. SQLite puts `NULL` first ascending, so a table sorted by an optional
-           day led with every row that has none; the sample put them last both ways, and last is the one a reader wants. */
-        parts.push(`${expr} IS NULL, ${expr} ${dir}`);
-        keys.push({ expr, asc: dir === 'ASC' });
+        /* ONE RULE IN BOTH ENGINES (`apps/web/src/lib/record/api.ts` `compareRows`). MONEY GROUPS BY CURRENCY, THEN AMOUNT:
+           there is no order between two currencies, and by amount alone GBP 50 sat between two dollar figures. TEXT SORTS
+           WITHOUT REGARD TO CASE, the stored text breaking a tie, so a mixed-case column reads in one order here and in the
+           sample. Every key is also a cursor key, compared with the same collation, so the pages stay gap-free. */
+        const type = Object.hasOwn(schema.fields, o.field) ? schema.fields[o.field]?.type : undefined;
+        const exprs =
+          type === 'money'
+            ? [`json_extract(fields, '${jsonPath(o.field)}.currency')`, expr]
+            : type !== undefined && TEXT_SORTED.has(type)
+              ? [`(${expr} COLLATE NOCASE)`, expr]
+              : [expr];
+        for (const e of exprs) {
+          /* AN EMPTY VALUE GOES LAST, IN EITHER DIRECTION. SQLite puts `NULL` first ascending, so a table sorted by an optional
+             day led with every row that has none; the sample put them last both ways, and last is the one a reader wants. */
+          parts.push(`${e} IS NULL, ${e} ${dir}`);
+          keys.push({ expr: e, asc: dir === 'ASC' });
+        }
       }
       keys.push({ expr: 'id', asc: false });
 
