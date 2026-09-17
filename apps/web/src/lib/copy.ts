@@ -654,6 +654,8 @@ export const copy = {
   setUpRows: (rows: number) => `Added ${rows} example ${rows === 1 ? 'row' : 'rows'}`,
   setUpLinked: 'Linked the example rows to each other',
   /** Who did it and what to, in a `feed` block on a live record: "You", "Someone", "installed the Team board use case". */
+  /** A decision in the feed, with the reason it was given when there is one. */
+  feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
   feedYou: 'You',
   feedSomeone: 'Someone on this record',
   /** Under a row's Details: when it was added, and by whom, in the middle of a sentence. */

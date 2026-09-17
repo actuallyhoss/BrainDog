@@ -232,7 +232,7 @@ function textOf(e: EventLine): string {
     return e.title ? `${e.title}: ${what}` : sentence(what);
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
-  if (e.kind === 'decide' && e.title) return `Decided: ${e.title}`;
+  if (e.kind === 'decide' && e.title) return copy.feedDecided(e.title, null);
   const pack = packText(e) ?? exportText(e) ?? accessText(e);
   if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
@@ -249,13 +249,32 @@ function hrefOf(e: EventLine): string {
   return '/audit';
 }
 
+/**
+ * THE REASON A QUESTION WAS ANSWERED IS PART OF ITS DECISION. Accepting writes `decide` and then `resolve` with the reason as
+ * its note (`govern.ts`), and the feed drew the reason, "Yes, for the proof.", as a line of its own under "Decided: ...".
+ * A `resolve` written straight after a `decide` is folded into that decision's line; any other `resolve` keeps its own.
+ */
+function reasonsOf(events: readonly EventLine[]): { byDecision: Map<number, string | null>; folded: Set<number> } {
+  const decides = new Map(events.filter((e) => e.kind === 'decide' && e.title).map((e) => [e.rowid, e]));
+  const out = { byDecision: new Map<number, string | null>(), folded: new Set<number>() };
+  for (const e of events) {
+    if (e.kind !== 'resolve' || !decides.has(e.rowid - 1)) continue;
+    out.byDecision.set(e.rowid - 1, e.note && e.note.trim() !== '' ? e.note.trim() : null);
+    out.folded.add(e.rowid);
+  }
+  return out;
+}
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null): NewsItem[] {
   const voice = voiceTexts(events);
+  const reasons = reasonsOf(events);
   return events.flatMap((e, i) => {
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
-    const text = voice.has(i) ? voice.get(i) : textOf(e);
+    if (reasons.folded.has(e.rowid)) return [];
+    const reason = reasons.byDecision.get(e.rowid);
+    const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
     return text == null ? [] : [{ at: e.ts, by: actorFor(e.actor, me), text, href: hrefOf(e) }];
   });
 }

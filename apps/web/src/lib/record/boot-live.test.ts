@@ -151,6 +151,21 @@ test('what was applied, kept on a decision, is not a line of its own in the feed
   assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal?']);
 });
 
+test('THE REASON A QUESTION WAS ACCEPTED FOR IS PART OF ITS DECISION LINE, never a line of its own', () => {
+  const items = newsOf(
+    [
+      line({ rowid: 12, kind: 'resolve', target: 'suggestion:SG2', target_kind: 'suggestion', to: 'addressed', note: 'Yes, for the proof.', title: 'Add Personal?' }),
+      line({ rowid: 11, kind: 'decide', target: 'decision:D2', target_kind: 'decision', title: 'Add Personal?' }),
+      /* A resolve with no decision before it (a no) keeps its own line. */
+      line({ rowid: 5, kind: 'resolve', target: 'suggestion:SG1', target_kind: 'suggestion', to: 'wont-fix', note: 'Not this week.', title: 'Add Student?' }),
+    ] as never,
+    null,
+  );
+  assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal? Yes, for the proof.', 'Not this week.']);
+  const bare = newsOf([line({ rowid: 3, kind: 'resolve', target: 'suggestion:SG3', to: 'addressed', note: null }), line({ rowid: 2, kind: 'decide', title: 'Renew' })] as never, null);
+  assert.deepEqual(bare.map((i) => i.text), ['Decided: Renew']);
+});
+
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
   assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');
