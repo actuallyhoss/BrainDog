@@ -158,7 +158,7 @@ test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what
   const blocks = pageOf(k, 'guide');
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused: ${JSON.stringify(b.refusals)}`);
   const hidden = blocks.filter((b) => b.drawn === false).map((b) => b.heading);
-  assert.deepEqual(hidden, ['Blocked', 'Taken by agents', 'Choices made', 'Done lately']);
+  assert.deepEqual(hidden, ['Blocked', 'Steps done, by week', 'Taken by agents', 'Choices made', 'Done lately']);
   const sofar = block(blocks, 'So far');
   assert.deepEqual(sofar.readings?.map((r) => r.reading.value), [0, 5, 0, 2]);
   assert.equal(block(blocks, 'Where you are').rows?.length, 1);
@@ -172,7 +172,7 @@ test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what
   const page = pageOf(k, own);
   for (const b of page) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual(block(page, 'What helps').rows?.map((r) => r.fields.name), ['Three shops like yours to learn from']);
-  assert.equal(block(page, 'Steps to take').rows?.length, 2);
+  assert.equal(block(page, 'Steps').rows?.length, 2);
 
   const home = pageOf(k, 'home-guide');
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);

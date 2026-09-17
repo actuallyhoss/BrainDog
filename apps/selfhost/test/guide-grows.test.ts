@@ -29,7 +29,7 @@ test('A GUIDE WHOSE IDEA STAGE IS OVER IS ASKED ONCE TO ADD PROJECTS AND WORK, a
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   const packs = () => sql.all<{ id: string }>('SELECT id FROM pack').map((p) => p.id).sort();
   assert.deepEqual(packs(), ['usecase-guide']);
-  const grows = async () => value<Filed>(await api.sparkPropose({}, owner)).filed.filter((f) => /Add Projects and Work/u.test(f.question));
+  const grows = async () => value<Filed>(await api.sparkPropose({}, owner)).filed.filter((f) => /run the project as well as guide it/u.test(f.question));
 
   type Row = { seq: number; fields: Record<string, unknown> };
   const milestones = value<{ rows: Row[] }>(await api.list({ register: 'milestones', limit: 50 }, owner)).rows;
