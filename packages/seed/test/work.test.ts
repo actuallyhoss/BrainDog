@@ -119,11 +119,12 @@ test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, 
   assert.ok(at >= 0, 'the handed-back task is not in the queue');
   assert.deepEqual([queue.changes?.[at]?.by, queue.changes?.[at]?.who], ['agent', 'agent:claude']);
 
-  /* FINISH: a person checks it and marks it done on the day, and it leaves the queue for Done lately. */
-  assert.ok(k.update('tasks', ref, { state: 'done', done_on: TODAY }, person).ok);
+  /* FINISH: a person checks it and marks it done, the record dates it, and it leaves the queue for Done lately. */
+  assert.ok(k.update('tasks', ref, { state: 'done' }, person).ok);
+  assert.equal(k.get(ref)!.fields.done_on, TODAY, 'the record fills the day it was finished');
   overview = opened(k, 'work');
   assert.ok(!block(overview, 'Waiting on you').rows.some((r) => r.fields.what === title));
-  assert.equal(block(overview, 'Done lately').rows[0]?.fields.what, title);
+  assert.ok(block(overview, 'Done lately').rows.some((r) => r.fields.what === title));
   const done = (block(overview, 'Right now').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
   assert.equal(done?.reading?.value, TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length + 1);
 });

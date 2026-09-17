@@ -50,7 +50,9 @@ export const TASKS: Fields[] = [
   { what: 'Move the Portage API to the new host', state: 'done', thing: 3, owner: 6, by: day(-24), done_on: day(-26), effort: days(2), note: '' },
   { what: 'Send the August invoices', state: 'done', thing: null, by: day(-31), done_on: day(-31), effort: days(0.3), note: '' },
   { what: 'Update the licence PDF template', state: 'done', thing: 1, agent: 'codex', by: day(-40), done_on: day(-45), effort: days(0.5), note: '' },
-  { what: 'Archive the old Marlow brand files', state: 'dropped', thing: 2, by: day(-30), effort: days(0.2), note: 'Marlow keeps its own archive.' },
+  { what: 'Archive the old Marlow brand files', state: 'dropped', thing: 2, by: day(-30), done_on: day(-30), effort: days(0.2), note: 'Marlow keeps its own archive.' },
+  /* FINISHED TODAY AND NOT DATED BY HAND: the record fills Done on, and the sample fills it the same way (`finished`). */
+  { what: 'Send the specimen proofs to Kiln', state: 'done', thing: 1, track: 3, by: day(1), effort: days(0.3), note: '' },
 ];
 
 /**
@@ -195,6 +197,9 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
     mobile: ['what', 'thing', 'state'],
     state: 'state',
     done: ['done', 'dropped'],
+    /* THE RECORD DATES THE FINISH: Done on is filled when a task moves to done and emptied when it is reopened, so the
+       weeks on the Overview count every finished task and not only the ones somebody dated. */
+    finished: 'done_on',
     pack: 'work',
     fields: [
       { id: 'what', label: 'Description', type: 'text', required: true, search: true },
@@ -215,7 +220,7 @@ export const WORK_REGISTERS: Record<string, SeedRegister> = {
       { id: 'agent', label: 'Agent', type: 'text', index: true },
       /* A TASK SPLIT INTO STEPS: each step points at the task it is part of. */
       { id: 'parent', label: 'Part of', type: 'ref', to: 'tasks', index: true },
-      /* THE DAY IT WAS FINISHED, set by whoever finishes it, so progress is counted by when work was done. */
+      /* THE DAY IT WAS FINISHED, filled by the record on the move to done unless the write says the day (`finished`). */
       { id: 'done_on', label: 'Done on', type: 'day', index: true },
       /* A task on no project is global. A link, like Owner, so Work installs on a record with no Projects and leaves it out. */
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true, scope: {} },

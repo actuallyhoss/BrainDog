@@ -64,8 +64,8 @@ import { cashSeries } from '@braindog/seed';
  * pack installs them.
  */
 export const PAGES = { ...SEED_PAGES, project: projectWithRunsOn(), ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
-import { NOW } from '@braindog/seed';
-import { sessionDeclaration, type Counted } from '@braindog/kernel';
+import { NOW, TODAY } from '@braindog/seed';
+import { sessionDeclaration, stampFinished, type Counted } from '@braindog/kernel';
 /* `find.ts` reads `REGISTERS` from this module; the cycle is fine in ESM because `answers` is only
    called at render time, and it is the point — the receipts count the way the record counts. */
 import { answers } from './find.ts';
@@ -116,6 +116,9 @@ function entriesOf(register: string): Entry[] {
     const fields: Record<string, unknown> = {};
     for (const f of declared) if (f.default !== undefined) fields[f.id] = f.default;
     for (const [key, value] of Object.entries(raw)) if (value !== undefined) fields[key] = value;
+    /* AND THE DAY A ROW WAS FINISHED, filled as the record's write path fills it on a create (`@braindog/kernel` `finished.ts`). */
+    const decl = REGISTERS[register];
+    if (decl) stampFinished(decl, null, fields, Object.keys(raw), TODAY);
     return { seq, fields: fields as Fields, version: 1 + (seq % 4), created: stamp(-seq * 37), by: 'you' };
   });
 }

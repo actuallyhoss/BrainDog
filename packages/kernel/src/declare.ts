@@ -1948,6 +1948,7 @@ function createFault(
  *             and never says which key names it; this build reads one, and `applyDeclarations`
  *             re-derives the column from it.
  *   `done`    the states that mean finished, which is how a row is drawn ticked.
+ *   `finished` a day field the write path fills when a row enters a `done` state and empties when it leaves.
  *   `icon` · `holds`  the rail's glyph and the register's one line, both drawn by `apps/web`.
  *   `seq_prefix`  the letters a row's spoken id starts with, `S` for `S42`; `get` resolves it, and
  *             `validate` refuses one another register already speaks.
@@ -1962,7 +1963,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'icon', 'holds', 'seq_prefix', 'scopes',
+  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes',
 ] as const;
 
 /**
@@ -2837,6 +2838,19 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   const state = decl.body.state;
   if (state !== undefined && (typeof state !== 'string' || !seen.has(state)))
     return bad('DECLARATION_INVALID', `${id} names ${String(state)} as its state, and has no such field.`, 'state', [...seen]);
+
+  /* THE FINISHED DAY IS A DAY FIELD OF A REGISTER WITH A STATE, or there is nothing to fill it on and nothing to fill. */
+  const finished = decl.body.finished;
+  if (finished !== undefined) {
+    const f = (decl.body.fields as readonly Record<string, unknown>[]).find((x) => x.id === finished);
+    if (typeof finished !== 'string' || !f || f.type !== 'day' || state === undefined)
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} names ${String(finished)} as the day a row was finished. That is a day field of a register that declares a state.`,
+        'finished',
+        (decl.body.fields as readonly Record<string, unknown>[]).filter((x) => x.type === 'day').map((x) => String(x.id)),
+      );
+  }
 
   /* `state` IS ALWAYS AN ENUM (`02 §1`, `04 §5`). A `state:` naming a `text` field gives the
      register a lifecycle with no transitions the record can check, so every `move` in every rule

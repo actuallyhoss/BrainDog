@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
-import { NOW, installSeed } from '@braindog/seed';
+import { NOW, TODAY, installSeed } from '@braindog/seed';
 
 import { page } from './api.ts';
+import { TASKS } from './data.ts';
 import { toSegments } from './blocks.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
@@ -118,4 +119,18 @@ test('TWO TASKS DUE ON ONE DAY ARE LISTED IN ONE ORDER BY BOTH ENGINES, newest f
   const order = (list: string[]) => list.filter((w) => pair.includes(w));
   assert.deepEqual(order(said(kb.rows)), pair, 'the record: the newer task first');
   assert.deepEqual(order(said(wb.entries)), order(said(kb.rows)), 'the sample agrees');
+});
+
+test('A TASK MADE DONE WITH NO DAY IS DATED TODAY BY BOTH ENGINES, and shows first under Done lately', async () => {
+  const k = await kernel;
+  const title = 'Send the specimen proofs to Kiln';
+  const listed = k.list({ register: 'tasks', limit: 200 });
+  assert.ok(listed.ok);
+  assert.equal(listed.value.rows.find((r) => r.fields.what === title)?.fields.done_on, TODAY, 'the record');
+  assert.equal(TASKS.find((t) => t.fields.what === title)?.fields.done_on, TODAY, 'the sample');
+  const record = k.page('work');
+  assert.ok(record.ok);
+  const said = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.what));
+  assert.equal(said(record.value.blocks.find((b) => b.heading === 'Done lately')!.rows)[0], title);
+  assert.equal(said(page('work')!.blocks.find((b) => b.heading === 'Done lately')!.entries)[0], title);
 });

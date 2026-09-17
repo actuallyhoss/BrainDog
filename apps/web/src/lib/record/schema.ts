@@ -113,6 +113,8 @@ export type RegisterDecl = {
   state?: string;
   /** Which state values are terminal, so `cleared` can say when the last one closed. */
   done?: readonly string[];
+  /** A day field the record fills when a row enters a `done` state and empties when it leaves one. */
+  finished?: string;
   fields: readonly FieldDecl[];
   /** Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b). */
   identity?: { mark: string; accent: string };

@@ -103,6 +103,7 @@ import {
   type Verdict,
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
+import { stampFinished } from './finished.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -213,6 +214,7 @@ export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBuc
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
+export { stampFinished, type FinishedDecl } from './finished.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -411,6 +413,8 @@ export type RegisterDecl = {
   state?: string;
   /** The states that mean finished. A row in one is `done` to every reader. */
   done?: readonly string[];
+  /** A day field the record fills when a row enters a `done` state and empties when it leaves one (`finished.ts`). */
+  finished?: string;
   /** A series has no spoken number: its rows are points, and nobody says a point out loud. */
   series?: boolean;
   /** What a row's spoken id starts with, `S` for `S42`. Absent or `#` is `register#42` only. */
@@ -1901,6 +1905,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (why) return no<Entry>('FORBIDDEN', why, { at: scoped.id });
         }
       }
+
+      /* ── the day a row was finished (`finished.ts`) ──
+         Filled when the row enters a done state and emptied when it leaves one, in the write itself, so the history
+         names whoever moved the row and not a mechanism after them. Today is the UTC day, as `resolveDay` is. */
+      if (!deleting && stampFinished(decl, current ? { state: current.state } : null, merged, touched, instant(clock.now()).slice(0, 10)) !== null && decl.finished)
+        touched.push(decl.finished);
 
       /* ── validate ── */
       for (const f of decl.fields) {

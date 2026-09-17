@@ -25,6 +25,8 @@ export type SeedRegister = {
   mobile: readonly [string, string, string];
   state?: string;
   done?: readonly string[];
+  /** A day field the record fills when a row enters a `done` state and empties when it leaves one. */
+  finished?: string;
   fields: readonly SeedField[];
   identity?: { mark: string; accent: string };
   icon?: string;
