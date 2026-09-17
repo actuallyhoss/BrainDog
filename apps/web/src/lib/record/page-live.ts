@@ -17,7 +17,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { isBucket, isStale, type Bars } from '@braindog/kernel';
+import { isBucket, isStale, type Bars, type MeasureSeries } from '@braindog/kernel';
 import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -375,6 +375,25 @@ function changeOf(changes: unknown, n: number): { by: string; at: string } | nul
   return { by, at: c.at };
 }
 
+/** A series the record sent, when it is one: a name, a unit, aligned buckets, and numbers or gaps. */
+function isSeries(v: unknown): v is MeasureSeries {
+  if (v === null || typeof v !== 'object') return false;
+  const m = v as Partial<MeasureSeries>;
+  const numbers = (a: unknown) => Array.isArray(a) && a.every((x) => x === null || (typeof x === 'number' && Number.isFinite(x)));
+  return (
+    typeof m.name === 'string' &&
+    typeof m.unit === 'string' &&
+    (m.bucket === 'day' || m.bucket === 'week') &&
+    Array.isArray(m.keys) &&
+    m.keys.every((k) => typeof k === 'string') &&
+    numbers(m.now) &&
+    numbers(m.was) &&
+    m.now!.length === m.keys.length &&
+    m.was!.length === m.keys.length &&
+    (m.latest === null || (typeof m.latest === 'object' && typeof m.latest?.value === 'number' && typeof m.latest.day === 'string' && typeof m.latest.at === 'string'))
+  );
+}
+
 /** One answered block as the page draws it. */
 export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number, me: string | null = null): LiveBlock {
   const {
@@ -412,6 +431,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     bars: barred,
     changes: changed,
     past: remembered,
+    measures: measured,
     ...rest
   } = b;
 
@@ -523,6 +543,13 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const register = registerOf(b);
   /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer. */
   if (!register || !REGISTERS[register]) return cannot;
+  /* THE NUMBERS A PROJECT REPORTED, worked out by the record: one series a measure, drawn as tiles or charts. */
+  if (kind === 'stat' || kind === 'lines') {
+    if (Array.isArray(measured)) {
+      const measures = measured.filter(isSeries);
+      return { ...shell, register, measures, shown: measures.length, total: matched };
+    }
+  }
   /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer. */
   const reduces = REDUCES.has(kind);
   if (reduces && got.length < matched) return cannot;

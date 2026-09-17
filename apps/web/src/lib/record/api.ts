@@ -54,7 +54,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type SeriesLine } from '@braindog/kernel';
+import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type SeriesLine } from '@braindog/kernel';
 import { meetsTarget, noteOf, read, targetLine, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
@@ -1550,6 +1550,8 @@ export type BlockResult = PageBlock & {
   walk?: Walk;
   /** A `series` block's buckets and each line's value in them, as the record's `barsOf` lines them up. */
   bars?: Bars;
+  /** A `stat` or `lines` over readings: one series a measure, as the record's `measureSeries` works them out. */
+  measures?: MeasureSeries[];
   /** A forecast's `recorded:` series over the ninety days before today, oldest first. */
   past?: readonly { at: string; value: number }[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
@@ -1839,6 +1841,8 @@ const READS = new Set([
   'lead',
   /* A series's lines and its reach. */
   'series', 'back', 'ahead', 'net',
+  /* A stat or lines over readings: whether a point is a day or a week. */
+  'bucket',
   /* A forecast's remembered figure and its knobs, its late mark and its warning reach. */
   'recorded', 'knobs', 'late', 'under',
   /* A bar's or a split's row for what no part holds. */

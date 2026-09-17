@@ -28,6 +28,7 @@ import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
+import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
 
 export type PageBlock = {
   kind: string;
@@ -87,6 +88,8 @@ export type PageBlock = {
   series?: SeriesLine[];
   back?: number;
   ahead?: number;
+  /** A `stat` or `lines` over readings: whether a point is a day or a week. A day when absent. */
+  bucket?: string;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */
   net?: boolean;
   /**
@@ -130,6 +133,8 @@ const READS = new Set([
   'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
   /* A `series`'s lines and reach, and the bars it answers with. */
   'series', 'back', 'ahead', 'net', 'bars',
+  /* A `stat` or `lines` over readings: its bucket, and the series it answers with. */
+  'bucket', 'measures',
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
   /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
@@ -174,6 +179,8 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `series` block's buckets and each line's value in them. */
   bars?: Bars;
+  /** A `stat` or `lines` over a register of readings: one series a measure, newest reading first (`measures.ts`). */
+  measures?: MeasureSeries[];
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
   /** Aligned with `rows`, when a column is `changed`: who changed each row last, as a kind of actor and by name, and when. */
@@ -250,6 +257,21 @@ export type PageDeps = {
   sessionsLive?: () => Entry[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
+  /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
+  tz?: string;
+  /**
+   * The readings a `stat` or `lines` over a register draws: the named fields of every row the predicate admits whose
+   * `when` is on or after `since`, and the newest reading of each measure whenever it was.
+   */
+  readings?: (q: {
+    register: string;
+    where?: Predicate | undefined;
+    when: string;
+    value: string;
+    name?: string;
+    unit?: string;
+    since: string;
+  }) => Result<{ readings: RawReading[]; latest: RawReading[] }>;
   /** A series' daily points from one day to another, both included, oldest first (`metric_point`). */
   points?: (series: string, from: string, to: string) => { at: string; value: number }[];
 };
@@ -604,6 +626,34 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+
+  /* THE NUMBERS A PROJECT REPORTED ARE WORKED OUT HERE, NOT IN THE BROWSER. A `stat` or `lines` over a register names
+     which field is when, which the value, and optionally the measure's name and unit, and the record hands back one
+     series a measure over the period and the one before, bucketed by the record's local day or week (`measures.ts`).
+     A year of hourly polls is a few hundred numbers on the wire rather than every reading. */
+  if ((block.kind === 'stat' || block.kind === 'lines') && deps.readings && (block.columns?.length ?? 0) >= 2) {
+    const [when, val, name, unit] = (block.columns ?? []).map((c) => c.field);
+    const missing = [when, val, name, unit].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
+    if (missing.length)
+      return {
+        ...base,
+        refusals: also({ code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${missing.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
+      };
+    if (block.bucket !== undefined && !(MEASURE_BUCKETS as readonly unknown[]).includes(block.bucket))
+      return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `bucket: is ${MEASURE_BUCKETS.join(' or ')}.`, at: 'bucket' }) };
+    const tz = readableZone(deps.tz);
+    const window = measureWindow(deps.ctx.nowMs, block.back, measureBucket(block.bucket), tz);
+    const read = deps.readings({ register, where: said.predicate, when: when!, value: val!, ...(name ? { name } : {}), ...(unit ? { unit } : {}), since: window.since });
+    if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
+    const measures = measureSeries([...read.value.latest, ...read.value.readings], {
+      nowMs: deps.ctx.nowMs,
+      back: block.back,
+      bucket: block.bucket,
+      tz,
+      fallback: block.heading ?? '',
+    });
+    return { ...base, measures, matched: read.value.readings.length };
+  }
 
   /* WHERE A ROW APPLIES IS THE REGISTER'S SCOPE FIELD, and nothing else can answer it. Both keys that
      ask are checked before any query, so a block that cannot say which project draws nothing rather

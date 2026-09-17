@@ -1742,3 +1742,30 @@ test('MINT, LOOK, ACCEPT, AND THE LINK IS SPENT: the whole of an invitation thro
   assert.equal(refusal(await api.acceptInvite({ token: again.token, person: { id: 'p_3', email: 'cy@example.com' } })).code, 'UNAUTHORIZED');
   assert.equal(api.kernel.access('p_3'), null);
 });
+
+test('THE NUMBERS A LIST HOLDS ARE BLANKED like its rows for a caller who may not read it', async () => {
+  const { api, sql } = await record();
+  const out = await api.kernel.install([
+    {
+      id: 'register.points',
+      kind: 'register' as const,
+      body: { id: 'points', name: 'Points', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'value', type: 'decimal' }, { id: 'at', type: 'instant' }] } as never,
+    },
+    {
+      id: 'page.numbers',
+      kind: 'page' as const,
+      body: { page: 'numbers', title: 'Numbers', blocks: [{ kind: 'lines', source: 'register.points', columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }] }] } as never,
+    },
+  ]);
+  assert.ok(out.ok);
+  value(await api.create({ register: 'points', fields: { name: 'Revenue', value: 4200, at: new Date(NOW).toISOString() } }, owner));
+  type Drawn = { blocks: { measures?: { name: string }[]; refusals?: unknown[] }[] };
+  assert.deepEqual(value<Drawn>(await api.page({ slug: 'numbers' }, owner)).blocks[0]?.measures?.map((m) => m.name), ['Revenue']);
+  const asked = await api.page({ slug: 'numbers' }, { ...owner, registers: ['notes'] } as CallContext);
+  if (asked.ok) {
+    const [b] = (asked.value as Drawn).blocks;
+    assert.deepEqual(b?.measures, [], 'a series over a list the caller cannot read was handed over');
+    assert.ok((b?.refusals ?? []).length > 0);
+  }
+  sql.close();
+});

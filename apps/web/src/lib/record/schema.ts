@@ -298,6 +298,8 @@ export type PageBlock = {
   /** A `series`'s reach, in buckets: back from the current one, including it, and ahead of it. */
   back?: number;
   ahead?: number;
+  /** A `stat` or `lines` over readings: whether a point is a day or a week. */
+  bucket?: string;
   /** A `series`'s: draw what was left, in minus out, as a line. */
   net?: boolean;
   /** A `forecast`'s: the series its opening figure is remembered in, drawn before today. */

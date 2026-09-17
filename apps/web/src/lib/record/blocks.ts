@@ -527,10 +527,15 @@ function sectionRow(block: BlockResult): string {
  * A SECTION IS THE EXCEPTION, because its heading is the whole block: the renderer draws it as a
  * heading rather than a caption, and `blocks.css` takes the bar away over it so it is said once.
  */
+/** The series a `stat` or `lines` over readings draws: the record's, or worked out here from the sample's rows. */
+const measuresFor = (block: BlockResult) =>
+  block.measures ??
+  measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? '', { bucket: block.bucket });
+
 export function toSegments(block: BlockResult) {
   /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
-  if (block.kind === 'lines' && block.register && !block.authored?.length)
-    return parse(linesText(measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? '')), { page: true });
+  if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length)
+    return parse(linesText(measuresFor(block)), { page: true });
   const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
   const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : '';
@@ -560,8 +565,8 @@ export function toSegments(block: BlockResult) {
     ? block.metrics.map(
         (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
       )
-    : block.kind === 'stat' && block.register
-      ? tileRows(measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? ''))
+    : block.kind === 'stat' && (block.register || block.measures)
+      ? tileRows(measuresFor(block))
     : block.kind === 'bar' || block.kind === 'split'
       ? block.parts
         ? partsRows(block)

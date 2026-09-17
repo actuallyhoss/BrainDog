@@ -201,6 +201,8 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
+export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
+export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
@@ -2453,6 +2455,26 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return out.ok ? out.value : null;
     },
     ctx: evalContext(),
+    tz: recordIdentity(sql)?.tz ?? 'UTC',
+    /* THE FOUR FIELDS A MEASURE NEEDS AND NOTHING ELSE, by the same expressions an index on them is built from, and the
+       newest reading of each measure beside them so a measure that went quiet still says when it last spoke. */
+    readings: (q) => {
+      if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+      const schema = schemaOf(q.register);
+      const c = compile(q.where, schema);
+      if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+      const at = fieldSqlIn(schema, q.when);
+      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit`;
+      const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
+      const readings = sql.all<{ at: unknown; value: unknown; name: unknown; unit: unknown }>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since);
+      const latest = sql.all<{ at: unknown; value: unknown; name: unknown; unit: unknown }>(
+        `SELECT at, value, name, unit FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name)`,
+        q.register,
+        ...c.params,
+        q.since,
+      );
+      return ok({ readings, latest });
+    },
     points: (series, from, to) =>
       sql.all<{ at: string; value: number }>(
         "SELECT at, value FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ? ORDER BY at",

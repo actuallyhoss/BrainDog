@@ -587,9 +587,9 @@ export const copy = {
   seriesAxis: { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year' } as Record<string, string>,
   seriesWeekOf: (day: string) => `Week of ${day}`,
   /* A MEASURE A PROJECT REPORTS, as a tile and a line (`record/measures.ts`): the period before, and the change against it. */
-  measurePrevious: (days: number) => `Previous ${days} days`,
-  measureAgainst: (change: string, days: number) => `${change} on the previous ${days} days`,
-  measureNothingBefore: (days: number) => `Nothing reported in the ${days} days before`,
+  measurePrevious: (n: number, weeks = false) => `Previous ${n} ${weeks ? 'weeks' : 'days'}`,
+  measureAgainst: (change: string, n: number, weeks = false) => `${change} on the previous ${n} ${weeks ? 'weeks' : 'days'}`,
+  measureNothingBefore: (n: number, weeks = false) => `Nothing reported in the ${n} ${weeks ? 'weeks' : 'days'} before`,
   measureLastOn: (day: string) => `Last reported ${day}`,
   /* SEND NUMBERS HERE (`routes/p/[slug]/Reporting.svelte`): the seed's heading, which the panel is drawn under, and what
      a report key can and cannot do, said before anybody makes one. */

@@ -27,9 +27,9 @@ test('one reading a day, the last; the period and the one before; newest measure
     point('Monthly recurring revenue', 4000, day(16), 'GBP'),
     point('Monthly recurring revenue', 3600, new Date(Date.UTC(2026, 7, 17, 9)).toISOString(), 'GBP'),
   ];
-  const [signups, revenue] = measuresOf(rows, FIELDS, NOW, 7, 'Numbers');
+  const [signups, revenue] = measuresOf(rows, FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' });
   assert.equal(signups!.name, 'Sign-ups');
-  assert.deepEqual(signups!.days, ['2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17']);
+  assert.deepEqual(signups!.keys, ['2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17']);
   assert.deepEqual(signups!.now, [null, null, null, null, null, null, 12], 'the later reading of the 17th wins, and a gap is null');
   assert.deepEqual(signups!.was, [null, null, null, null, null, null, 9], 'the 10th is the last day of the week before, beside the 17th');
   assert.equal(revenue!.unit, 'GBP');
@@ -39,20 +39,20 @@ test('one reading a day, the last; the period and the one before; newest measure
 
 test('a tile says the newest figure, the change against the period before, and draws the period as its line', () => {
   const rows = [point('Revenue', 4200, day(17), 'GBP'), point('Revenue', 3900, day(10), 'GBP')];
-  const [m] = measuresOf(rows, FIELDS, NOW, 7, 'Numbers');
+  const [m] = measuresOf(rows, FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' });
   assert.equal(changeLine(m!), '+7.7% on the previous 7 days');
   const [row] = tileRows([m!]);
   assert.equal(row, 'Revenue | GBP 4,200.00 | +7.7% on the previous 7 days | - - - - - - 4200');
   assert.equal(figureOf(1204, 'users'), '1,204 users');
-  const [alone] = measuresOf([point('Installs', 3, day(17))], FIELDS, NOW, 7, 'Numbers');
+  const [alone] = measuresOf([point('Installs', 3, day(17))], FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' });
   assert.equal(changeLine(alone!), 'Nothing reported in the 7 days before');
-  const [old] = measuresOf([point('Installs', 3, day(1))], FIELDS, NOW, 7, 'Numbers');
+  const [old] = measuresOf([point('Installs', 3, day(1))], FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' });
   assert.equal(changeLine(old!), 'Last reported 1 Sep');
 });
 
 test('a chart a measure, each a lines fence the renderer draws, headed by the measure', () => {
   const rows = [point('Revenue', 4200, day(17), 'GBP'), point('Revenue', 3900, day(10), 'GBP'), point('Users', 120, day(16))];
-  const text = linesText(measuresOf(rows, FIELDS, NOW, 7, 'Numbers'));
+  const text = linesText(measuresOf(rows, FIELDS, NOW, 7, 'Numbers', { tz: 'UTC' }));
   const drawn = parse(text, { page: true }).filter((s): s is Block => s.type === 'block');
   assert.deepEqual(drawn.map((b) => [b.kind, b.heading]), [['lines', 'Revenue'], ['lines', 'Users']]);
   assert.equal(drawn[0]!.rows[0]!.cells.join(' | '), 'Day | Revenue | was: Previous 7 days');
@@ -110,6 +110,21 @@ test('a live stat and a live lines block over a register draw tiles and charts, 
   const charts = toSegments(lines).filter((s): s is Block => s.type === 'block');
   assert.equal(charts.length, 1);
   assert.equal(charts[0]!.kind, 'lines');
+});
+
+test('a live block the record answered with series draws them, and never its own copy of the rows', () => {
+  REGISTERS.datapoints = DATAPOINTS;
+  const keys = ['2026-08-31', '2026-09-07', '2026-09-14'];
+  const series = { name: 'Users', unit: '', bucket: 'week', keys, now: [100, null, 140], was: [80, 90, 95], latest: { value: 140, at: day(16), day: '2026-09-16' } };
+  const lines = blockOf(answered('lines', 'register.datapoints', FIELDS, [], { measures: [series, { name: 'broken' }] }) as never, new Map(), NOW);
+  assert.equal(lines.measures?.length, 1, 'a series in a shape this cannot read is left off');
+  const [chart] = toSegments(lines).filter((s): s is Block => s.type === 'block');
+  assert.equal(chart!.heading, 'Users');
+  assert.equal(chart!.rows[0]!.cells.join(' | '), 'Week | Users | was: Previous 3 weeks');
+  assert.equal(chart!.rows[3]!.cells.join(' | '), '14 Sep | 140 | 95');
+  const stat = blockOf(answered('stat', 'register.datapoints', FIELDS, [], { measures: [series] }) as never, new Map(), NOW);
+  const [tiles] = toSegments(stat).filter((s): s is Block => s.type === 'block');
+  assert.equal(tiles!.rows[0]!.cells.slice(0, 3).join(' | '), 'Users | 140 | +47.4% on the previous 3 weeks');
 });
 
 test('a bar over a list of links adds up the money in the rows each row names', () => {
