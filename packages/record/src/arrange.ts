@@ -20,7 +20,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { labelsOf, laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
-import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
+import { configValue, ulids, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
  * One thing a host offers to install: a pack, or a use case and the modules it builds on.
@@ -126,7 +126,10 @@ export const speakingNow = (kernel: Kernel): string | null => speakingPack(speak
  * set not to, only where that differs. A pack that refuses the setting is passed over; the rule still names one speaker.
  */
 export function writeVoice(kernel: Kernel, speaker: string, actor: string): void {
-  for (const w of voiceWrites(speakingStates(kernel), speaker)) kernel.setPackConfig(w.id, { [SPEAKS]: w.speaks }, { actor });
+  /* ONE BATCH FOR THE ANSWER, so a reader of the log (Home's feed) reads these lines as one change and never pairs them with
+     another write's by where they sit. */
+  const batch = ulids(() => Date.now())();
+  for (const w of voiceWrites(speakingStates(kernel), speaker)) kernel.setPackConfig(w.id, { [SPEAKS]: w.speaks }, { actor, batch });
 }
 
 const isMap = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);

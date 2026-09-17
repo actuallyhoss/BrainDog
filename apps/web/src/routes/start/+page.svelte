@@ -26,7 +26,7 @@
 <script lang="ts">
   import { onDestroy, tick, untrack } from 'svelte';
   import { createClient } from '@braindog/client';
-  import { SPEAKS, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
+  import { SPEAKS, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
@@ -422,7 +422,8 @@
             const read = await client.packConfig({ id });
             return read.ok ? ((read.value as { values?: Record<string, unknown> }).values ?? null) : null;
           });
-          for (const w of voiceWrites(states, `usecase-${u.usecase}`)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks } }).catch(() => null);
+          const batch = voiceBatch();
+          for (const w of voiceWrites(states, `usecase-${u.usecase}`)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks }, batch }).catch(() => null);
         }
       }
 

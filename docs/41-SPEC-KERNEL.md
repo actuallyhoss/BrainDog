@@ -696,7 +696,7 @@ is `coerce` for a field of that type, then enum membership (`ENUM_VALUE_UNKNOWN`
 (`OUT_OF_BOUNDS`). `fillConfig` replaces each `{{config:<key>}}` in a body, and `validate` refuses `FIELD_UNKNOWN` at
 the placeholder for a body that still carries one, so only the pack path, which fills them, installs such a body.
 
-`setPackConfig(id, values)`: the pack must be known (`DECLARATION_UNKNOWN`); `values` is a non-empty map
+`setPackConfig(id, values, { actor?, batch? })` (`batch` is written on the event, so the lines of one change share it): the pack must be known (`DECLARATION_UNKNOWN`); `values` is a non-empty map
 (`REQUIRED_MISSING`) of declared keys (`FIELD_UNKNOWN`, `allowed` the declared keys); each value passes `configValue`,
 and `null` removes the chosen value so the default applies. When something changed, one `transaction()` rewrites
 `pack.manifest.config_values` and inserts one `edit` event, `target = 'pack:<id>'`, `target_kind = 'pack'`, `from_v` and

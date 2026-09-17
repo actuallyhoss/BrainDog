@@ -122,28 +122,36 @@ test("a pack's settings saved are said as what they did, never as \"Edit\"", () 
 
 test('a use case added beside another says so, and "speaks" is said only when the voice moves', () => {
   const texts = (lines: Record<string, unknown>[]) => newsOf(lines.map((l, i) => line({ note: null, rowid: 100 - i, ...l })) as never, null).map((n) => n.text);
-  const voice = (id: string, from: boolean | null, to: boolean) => ({ kind: 'edit', target_kind: 'pack', target: `pack:usecase-${id}`, from: { speaks: from }, to: { speaks: to } });
+  const voice = (id: string, from: boolean | null, to: boolean, batch: string | null = null) => ({ kind: 'edit', target_kind: 'pack', target: `pack:usecase-${id}`, from: { speaks: from }, to: { speaks: to }, batch });
   const installed = (id: string) => ({ kind: 'install', target_kind: 'pack', target: `pack:usecase-${id}` });
   /* Newest first, as the log sends them. Personal went in beside Student, which spoke unwritten. */
-  assert.deepEqual(texts([voice('personal', null, false), voice('student', null, true), installed('personal'), installed('student')]), [
+  assert.deepEqual(texts([voice('personal', null, false, 'A'), voice('student', null, true, 'A'), installed('personal'), installed('student')]), [
     'Personal added beside Student',
     'Added the Personal use case',
     'Added the Student use case',
   ]);
   /* A third beside a voice already written down names the one that spoke before. */
-  assert.deepEqual(texts([voice('team', null, false), installed('team'), voice('personal', null, false), voice('student', null, true)]), [
+  assert.deepEqual(texts([voice('team', null, false, 'B'), installed('team'), voice('personal', null, false, 'A'), voice('student', null, true, 'A')]), [
     'Team board added beside Student',
     'Added the Team board use case',
     'Personal added beside Student',
   ]);
   /* A real switch: the one that spoke is set not to. */
-  assert.deepEqual(texts([voice('student', true, false), voice('personal', false, true)]), ['Personal speaks for this BrainDog now']);
+  assert.deepEqual(texts([voice('student', true, false, 'A'), voice('personal', false, true, 'A')]), ['Personal speaks for this BrainDog now']);
   /* Switched to on arrival, when the one before had never been written down. */
-  assert.deepEqual(texts([voice('team', null, true), voice('student', null, false), installed('team'), installed('student')]), [
+  assert.deepEqual(texts([voice('team', null, true, 'A'), voice('student', null, false, 'A'), installed('team'), installed('student')]), [
     'Team board speaks for this BrainDog now',
     'Added the Team board use case',
     'Added the Student use case',
   ]);
+
+  /* TWO WRITES, NOTHING LOGGED BETWEEN THEM, ARE TWO CHANGES. A switch to Student, then Team board added beside it: read by
+     where the lines sit, the three were one switch, and Team board's line was dropped. */
+  const twoWrites = [voice('team', null, false, 'B'), voice('student', false, true, 'A'), voice('personal', true, false, 'A')];
+  assert.deepEqual(texts(twoWrites), ['Team board added beside Student', 'Student speaks for this BrainDog now']);
+  /* The lines of one write are read together wherever they sit, and a line with no batch is read alone. */
+  assert.deepEqual(texts([voice('personal', null, false, 'A'), installed('personal'), voice('student', null, true, 'A')]), ['Personal added beside Student', 'Added the Personal use case']);
+  assert.deepEqual(texts([voice('personal', null, false), voice('student', null, true)]), ['Personal added beside Student']);
 });
 
 test('what was applied, kept on a decision, is not a line of its own in the feed', () => {

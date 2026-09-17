@@ -74,6 +74,7 @@ import {
   type InboxLine,
   type ArrivalSettled,
   setupCollapser,
+  isUlid,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -2721,14 +2722,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NOTHING INSTALLED CHANGES HERE. A declaration holds the value it was installed with, and reads
      * the new one the next time the pack is planned and installed. `null` puts a setting back to its
      * default. An owner or admin in a browser session, like every other pack method.
+     *
+     * `batch`, A ULID, JOINS SEVERAL CALLS INTO ONE CHANGE in the log: the app writes a use case's voice down as one
+     * setting per pack, and the feed reads the lines one write made by their batch, never by where they sit.
      */
-    async setPackConfig(args: { id: string; values: Record<string, unknown> }, ctx: CallContext) {
+    async setPackConfig(args: { id: string; values: Record<string, unknown>; batch?: string }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'values']);
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['id', 'values', 'batch']);
       if (extra) return { ok: false as const, refusal: extra };
       if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
-      return tail(kernel.setPackConfig(args.id, args.values, { actor: actorOf(ctx) }));
+      if (args.batch !== undefined && (typeof args.batch !== 'string' || !isUlid(args.batch)))
+        return no('VALUE_MALFORMED', 'batch is a ULID shared by the calls that make one change, such as 01K5B3M2Q8ZC4XJ7N9TVRHW6YD.', { at: 'batch' });
+      return tail(kernel.setPackConfig(args.id, args.values, { actor: actorOf(ctx), ...(args.batch === undefined ? {} : { batch: args.batch }) }));
     },
 
     /**

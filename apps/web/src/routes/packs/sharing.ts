@@ -17,7 +17,7 @@ import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
-import { SPEAKS, speaking, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
+import { SPEAKS, speaking, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
 import { PACKS, REGISTERS } from '../../lib/record/data.ts';
@@ -46,7 +46,7 @@ export type SharingClient = {
   enablePack(args: { id: string }): Promise<Wire<unknown>>;
   disablePack(args: { id: string; alsoDisable?: string[] }): Promise<Wire<unknown>>;
   packConfig(args: { id: string }): Promise<Wire<unknown>>;
-  setPackConfig(args: { id: string; values: Record<string, unknown> }): Promise<Wire<unknown>>;
+  setPackConfig(args: { id: string; values: Record<string, unknown>; batch?: string }): Promise<Wire<unknown>>;
 };
 
 const refusalOf = (r: Wire<unknown>): Refusal =>
@@ -411,7 +411,8 @@ export async function keepVoice(client: Pick<SharingClient, 'setPackConfig'>, st
   const now = speaking(states.filter((p) => p.id !== added));
   const speaker = choice === 'speaks' || now === null ? added : now;
   const after = [...states.filter((p) => p.id !== added), { id: added, disabled_at: null, speaks: null }];
-  for (const w of voiceWrites(after, speaker)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks } }).catch(() => null);
+  const batch = voiceBatch();
+  for (const w of voiceWrites(after, speaker)) await client.setPackConfig({ id: w.id, values: { [SPEAKS]: w.speaks }, batch }).catch(() => null);
 }
 
 /** What a browse card offers for a use case on this record. */
@@ -453,10 +454,11 @@ export async function switchTo(client: SharingClient, id: string, states: readon
     const on = await client.enablePack({ id: `usecase-${id}` });
     if (!on.ok) return { ok: false, fix: refusalOf(on).fix };
     /* A USE CASE THAT CAN BE SET TO SPEAK IS, and the others stay on beside it with their lists. */
-    const set = await client.setPackConfig({ id: `usecase-${id}`, values: { [SPEAKS]: true } }).catch(() => null);
+    const batch = voiceBatch();
+    const set = await client.setPackConfig({ id: `usecase-${id}`, values: { [SPEAKS]: true }, batch }).catch(() => null);
     if (set?.ok) {
       for (const s of states)
-        if (s.id.startsWith('usecase-') && s.id !== `usecase-${id}` && s.disabled_at === null) await client.setPackConfig({ id: s.id, values: { [SPEAKS]: false } }).catch(() => null);
+        if (s.id.startsWith('usecase-') && s.id !== `usecase-${id}` && s.disabled_at === null) await client.setPackConfig({ id: s.id, values: { [SPEAKS]: false }, batch }).catch(() => null);
       return { ok: true };
     }
   }

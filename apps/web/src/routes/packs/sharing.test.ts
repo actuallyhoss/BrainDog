@@ -221,10 +221,13 @@ test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READ
 test('SWITCHING TO A USE CASE THAT CAN SPEAK SETS IT TO, and keeps the others on beside it', async () => {
   const { client, calls } = stub();
   assert.deepEqual(await switchTo(client, 'team', [state('usecase-student'), state('usecase-team')], true), { ok: true });
+  /* ONE CHANGE: both settings carry the same batch, so the feed reads them together. */
+  const batch = (calls[1]?.[1] as { batch?: string }).batch;
+  assert.match(String(batch), /^[0-9A-HJKMNP-TV-Z]{26}$/u);
   assert.deepEqual(calls, [
     ['enablePack', { id: 'usecase-team' }],
-    ['setPackConfig', { id: 'usecase-team', values: { speaks: true } }],
-    ['setPackConfig', { id: 'usecase-student', values: { speaks: false } }],
+    ['setPackConfig', { id: 'usecase-team', values: { speaks: true }, batch }],
+    ['setPackConfig', { id: 'usecase-student', values: { speaks: false }, batch }],
   ]);
 });
 

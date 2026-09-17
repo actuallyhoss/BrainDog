@@ -505,6 +505,8 @@ export type EventLine = {
   from: Json | null;
   to: Json | null;
   note: string | null;
+  /** The write that caused it: every line one write made shares it, and `null` for a line written on its own. */
+  batch: string | null;
 };
 
 /**
@@ -3586,8 +3588,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           from_v: string | null;
           to_v: string | null;
           note: string | null;
+          batch: string | null;
         }>(
-          'SELECT rowid, id, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event WHERE rowid < ? ORDER BY rowid DESC LIMIT ?',
+          'SELECT rowid, id, ts, actor, kind, target, target_kind, field, from_v, to_v, note, batch FROM event WHERE rowid < ? ORDER BY rowid DESC LIMIT ?',
           before ?? Number.MAX_SAFE_INTEGER,
           limit,
         )
@@ -3603,6 +3606,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           from: read(e.from_v),
           to: read(e.to_v),
           note: e.note,
+          batch: e.batch,
         })),
 
     /**
@@ -4284,7 +4288,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * Set some of a pack's settings, checked against the manifest, with one `edit` event.
      * Nothing installed changes: a declaration reads a setting when its pack is next planned and installed.
      */
-    setPackConfig(id: string, values: unknown, opts: { actor?: string } = {}) {
+    setPackConfig(id: string, values: unknown, opts: { actor?: string; batch?: string } = {}) {
       const refused = schemaRefusal(state);
       if (refused) return refused;
       return writePackConfig(sql, clock.now(), id, values, opts, transaction, mint);

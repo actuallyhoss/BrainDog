@@ -333,6 +333,19 @@ test('THE OWNER INSTALLING A USE CASE BESIDE ONE SPEAKING KEEPS THAT VOICE, even
   assert.equal(said.voice.pack, 'usecase-writing');
   const held = await Promise.all(['usecase-art', 'usecase-study', 'usecase-writing'].map(async (id) => value<{ values: Record<string, unknown> }>(await api.packConfig({ id }, owner)).values.speaks));
   assert.deepEqual(held, [false, false, true]);
+
+  /* THE ANSWER WRITTEN DOWN IS ONE CHANGE IN THE LOG: every line of one write shares its batch, and no other write's. */
+  const lines = api.kernel.eventsBefore(null, 50).filter((e) => e.kind === 'edit' && e.target_kind === 'pack' && JSON.stringify(e.to).includes('speaks'));
+  assert.ok(lines.length >= 3, JSON.stringify(lines));
+  assert.ok(lines.every((e) => typeof e.batch === 'string' && e.batch.length === 26), 'a voice line was written with no batch');
+  assert.ok(new Set(lines.map((e) => e.batch)).size >= 2, 'two installs were written as one change');
+
+  /* AND THE APP'S OWN CALLS JOIN BY THE BATCH THEY SEND, which is a ULID or refused. */
+  assert.equal(refusal(await api.setPackConfig({ id: 'usecase-art', values: { speaks: true }, batch: 'next to the last one' }, owner)).code, 'VALUE_MALFORMED');
+  const batch = '01K5B3M2Q8ZC4XJ7N9TVRHW6YD';
+  value(await api.setPackConfig({ id: 'usecase-art', values: { speaks: true }, batch }, owner));
+  value(await api.setPackConfig({ id: 'usecase-writing', values: { speaks: false }, batch }, owner));
+  assert.deepEqual(api.kernel.eventsBefore(null, 2).map((e) => e.batch), [batch, batch]);
   sql.close();
 });
 

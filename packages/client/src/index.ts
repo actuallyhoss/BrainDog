@@ -80,6 +80,8 @@ export type EventLine = {
   from: unknown;
   to: unknown;
   note: string | null;
+  /** The write that caused it, shared by every line that write made; `null` for a line written on its own. Absent from an older host. */
+  batch?: string | null;
   /** The row's register and number, when the event is about a row. */
   register: string | null;
   seq: number | null;
@@ -599,7 +601,7 @@ export function createClient(options: ClientOptions) {
     uninstallPack: (args: { id: string }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
     packConfig: (args: { id: string }) => call<unknown>('packConfig', args as Record<string, unknown>),
     /** Only the settings that changed; `null` puts one back to its default. */
-    setPackConfig: (args: { id: string; values: Record<string, unknown> }) => call<unknown>('setPackConfig', args as Record<string, unknown>),
+    setPackConfig: (args: { id: string; values: Record<string, unknown>; batch?: string }) => call<unknown>('setPackConfig', args as Record<string, unknown>),
     /** Everything the person holds, not a patch: a register left out is taken away. */
     invite: (args: {
       person: string;

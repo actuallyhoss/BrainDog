@@ -108,6 +108,18 @@ export function voiceWrites(packs: readonly SpeakingState[], speaker: string): {
 }
 
 /**
+ * ONE CHANGE'S BATCH, a ULID: the voice is written down one pack at a time, and every call of one answer carries the same
+ * batch so the log (Home's feed) reads them as one change and never pairs them with another write's by where they sit.
+ */
+export function voiceBatch(now: number = Date.now()): string {
+  const crockford = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  let time = '';
+  for (let t = now, i = 0; i < 10; i++, t = Math.floor(t / 32)) time = crockford[t % 32] + time;
+  const random = crypto.getRandomValues(new Uint8Array(16));
+  return time + [...random].map((b) => crockford[b % 32]).join('');
+}
+
+/**
  * THE WORDS A RECORD GIVES ITS LISTS, FIELDS AND STATES (`loop/research-spark.md` S8), by label key: `tickets`,
  * `people.role`, `people.role.collaborator`. Held as the use-case pack's `label_*` settings, where a person can
  * change them, and read in place of the declaration's own word. A key left out reads the declaration's word.

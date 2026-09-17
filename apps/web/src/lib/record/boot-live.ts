@@ -149,7 +149,8 @@ function speaksOf(e: EventLine): { id: string; from: unknown; to: boolean } | nu
  * (`record` `writeVoice`): the one speaking set to speak, the one added set not to. Said line by line, a use case going
  * beside Student put "Student speaks for this BrainDog now" in the feed, which reads as a switch.
  *
- * So the lines one write made, which sit next to each other in the log, are read together. The voice MOVED only when a use
+ * So the lines one write made are read together, BY THE BATCH THE WRITE GAVE THEM and never by where they sit: two separate
+ * writes with nothing logged between them are two changes. A line with no batch (written before there was one) is read alone. The voice MOVED only when a use
  * case that spoke was set not to, one set not to was set to, or the one set to speak is the newest of them to arrive. Then
  * the new speaker's line says "speaks" and the old one's line is not drawn. Otherwise the use case set not to speak reads
  * "Personal added beside Student", and the speaker's line, which changed nothing a person sees, is not drawn.
@@ -162,14 +163,13 @@ function voiceTexts(events: readonly EventLine[]): Map<number, string | null> {
     const at = events.findIndex((e, i) => i >= from && e.kind === 'install' && e.target === `pack:${id}`);
     return at === -1 ? Number.POSITIVE_INFINITY : at;
   };
-  for (let i = 0; i < events.length; ) {
-    if (!speaksOf(events[i]!)) {
-      i += 1;
-      continue;
-    }
-    let end = i;
-    while (end + 1 < events.length && speaksOf(events[end + 1]!)) end += 1;
-    const group = events.slice(i, end + 1).map((e, k) => ({ at: i + k, ...speaksOf(e)! }));
+  const read = new Set<number>();
+  for (let i = 0; i < events.length; i += 1) {
+    if (read.has(i) || !speaksOf(events[i]!)) continue;
+    const batch = events[i]!.batch ?? null;
+    const group = events.flatMap((e, k) => (k === i || (batch !== null && e.batch === batch && speaksOf(e)) ? [{ at: k, ...speaksOf(e)! }] : []));
+    for (const g of group) read.add(g.at);
+    const end = Math.max(...group.map((g) => g.at));
     const on = group.filter((g) => g.to);
     const off = group.filter((g) => !g.to);
     /* Newest first, so the smaller index is the later arrival. */
@@ -184,7 +184,6 @@ function voiceTexts(events: readonly EventLine[]): Map<number, string | null> {
       for (const g of on) out.set(g.at, null);
       for (const g of off) out.set(g.at, said ? copy.useCaseAddedBeside(nameOfPack(g.id), nameOfPack(said)) : copy.useCaseBeside(nameOfPack(g.id)));
     }
-    i = end + 1;
   }
   return out;
 }

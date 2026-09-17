@@ -3829,7 +3829,7 @@ export function writePackConfig(
   now: number,
   id: string,
   values: unknown,
-  opts: { actor?: string },
+  opts: { actor?: string; batch?: string },
   transaction: Tx,
   mint: () => string,
 ): Result<PackConfig & { changed: string[]; said: string }> {
@@ -3874,13 +3874,14 @@ export function writePackConfig(
   transaction(() => {
     sql.exec('UPDATE pack SET manifest = ? WHERE id = ?', jcs(manifest as Json), id);
     sql.exec(
-      "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v) VALUES (?, ?, ?, 'edit', ?, 'pack', ?, ?)",
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, batch) VALUES (?, ?, ?, 'edit', ?, 'pack', ?, ?, ?)",
       mint(),
       at,
       opts.actor ?? 'system',
       `pack:${id}`,
       jcs(Object.fromEntries(changed.map((k) => [k, current.value.values[k] ?? null])) as Json),
       jcs(Object.fromEntries(changed.map((k) => [k, next[k] ?? null])) as Json),
+      opts.batch ?? null,
     );
   });
 
