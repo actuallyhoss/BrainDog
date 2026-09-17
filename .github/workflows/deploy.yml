@@ -62,7 +62,9 @@ jobs:
 
     # Pinned for the reason `ci.yml` gives: `ubuntu-latest` rolls silently, and a deploy is the
     # worst place to learn that the image changed.
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     timeout-minutes: 20
 
     steps:

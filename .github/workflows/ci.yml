@@ -45,7 +45,9 @@ jobs:
     # build and a different font set. `gates.yml` is where that actually changes a measurement, and
     # the two workflows agree on the runner so a red gate there can be reproduced from a green run
     # here.
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # 52 §7 budgets this workflow at 20 minutes. It runs in about five; the budget is the ceiling at
     # which a hung browser or a wedged install is killed rather than left to burn six hours.
     timeout-minutes: 20
@@ -88,7 +90,9 @@ jobs:
     # still produces a product — and until `gates.yml` runs on merge, nothing else on a pull request
     # does. `adapter-static` with `strict: true` fails here when a route quietly stops prerendering,
     # which is the defect that ships as a blank page rather than as an error.
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants) and
     # one for the site.
     timeout-minutes: 15

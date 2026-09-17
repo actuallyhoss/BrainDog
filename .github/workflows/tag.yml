@@ -51,7 +51,9 @@ jobs:
   # and the source gates, on the tagged tree. The browser gates are not here; `gates.yml` owns them,
   # and nineteen minutes of them on a tag is nineteen minutes nobody waits for.
   verify:
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +74,9 @@ jobs:
   app:
     needs: verify
     if: startsWith(github.ref_name, 'v')
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +96,9 @@ jobs:
   packages:
     needs: verify
     if: startsWith(github.ref_name, 'render-v') || startsWith(github.ref_name, 'cli-v')
-    runs-on: ubuntu-24.04
+    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
+    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     timeout-minutes: 20
     permissions:
       contents: read
