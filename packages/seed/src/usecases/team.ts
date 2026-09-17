@@ -292,7 +292,11 @@ export const TEAM = {
 };
 
 /** The tickets a team's record starts with, on Work's tasks (`install.ts` gives them to Work for this use case). */
+/** The project the example tickets are for, so Projects and every Project column has something to say on the first day. */
+const TEAM_PROJECT = 'The customer app';
+
 export const TEAM_EXAMPLES: readonly Body[] = [
+  { register: 'things', fields: { name: TEAM_PROJECT, lane: 'building', health: 'on_track', next: 'Agree what goes in the next cycle', since: '-60d' } },
   { register: 'tasks', fields: { what: 'Write the release notes', state: 'doing', priority: 'normal', agent: 'claude' } },
   { register: 'tasks', fields: { what: 'Agree what goes in the next cycle', state: 'open', priority: 'high', by: '+3d' } },
   { register: 'tasks', fields: { what: 'Fix the sign-in link that expires too soon', state: 'review', priority: 'urgent', agent: 'claude' } },
@@ -301,13 +305,22 @@ export const TEAM_EXAMPLES: readonly Body[] = [
   { register: 'tasks', fields: { what: 'Let a teammate export the board as a spreadsheet', state: 'backlog', priority: 'low' } },
 ];
 
-/** The planned tickets linked to their ticket and to the example cycle once both are in (`links.ts`). */
-export const TEAM_PLAN_LINKS = (TEAM.pack.seeds as { register: string; fields: Body }[])
-  .filter((s) => s.register === 'cycle_plan')
-  .flatMap((s) => [
-    { register: 'cycle_plan', title: String(s.fields.what), field: 'task', to: 'tasks', target: String(s.fields.what) },
-    { register: 'cycle_plan', title: String(s.fields.what), field: 'cycle', to: 'cycles', target: 'Cycle 1' },
-  ]);
+/** The planned tickets linked to their ticket and to the example cycle once both are in, and each ticket to the project (`links.ts`). */
+export const TEAM_PLAN_LINKS = [
+  ...(TEAM.pack.seeds as { register: string; fields: Body }[])
+    .filter((s) => s.register === 'cycle_plan')
+    .flatMap((s) => [
+      { register: 'cycle_plan', title: String(s.fields.what), field: 'task', to: 'tasks', target: String(s.fields.what) },
+      { register: 'cycle_plan', title: String(s.fields.what), field: 'cycle', to: 'cycles', target: 'Cycle 1' },
+    ]),
+  ...TEAM_EXAMPLES.filter((s) => s.register === 'tasks').map((s) => ({
+    register: 'tasks',
+    title: String((s.fields as Body).what),
+    field: 'thing',
+    to: 'things',
+    target: TEAM_PROJECT,
+  })),
+];
 
 /* ── a record that had Team before 2.0.0 ─────────────────────────────────── */
 

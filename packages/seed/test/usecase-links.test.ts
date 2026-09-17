@@ -10,7 +10,7 @@ import { install, normalise, plan, type Host, type Installed, type Pack } from '
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
-import { NOW, firstPartyManifest } from '../src/index.ts';
+import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument, moduleExamples } from '../src/usecases/install.ts';
 import { carryForward, exampleLinks, linkExamples, titleFieldOf, type CarryIo, type LinkIo, type LinkRow } from '../src/usecases/links.ts';
@@ -32,7 +32,8 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
     const pack = packOf(u.usecase);
     for (const l of exampleLinks(u.usecase)) {
       counted += 1;
-      const decl = pack.declarations?.find((d) => d.register === l.register);
+      /* A LIST A MODULE HOLDS COUNTS TOO: a team's tickets are Work's tasks. */
+      const decl = [...(pack.declarations ?? []), ...u.modules.flatMap((m) => (firstPartyDocument(m)?.declarations ?? []) as Body[])].find((d) => d.register === l.register && d.page === undefined);
       const field = (decl?.fields as Body[] | undefined)?.find((f) => f.id === l.field);
       if (l.list) assert.equal(`${String(field?.type)} of ${String(field?.of)}`, 'list of ref', `${u.usecase}: ${l.register}.${l.field}`);
       else assert.equal(field?.type, 'ref', `${u.usecase}: ${l.register}.${l.field}`);
