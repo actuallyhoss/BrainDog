@@ -123,6 +123,9 @@ const escapeWord = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
  * Projects, so onboarding does not install a module for a phrase the use case claims (`apps/web/src/lib/shape.ts` `heardFor`).
  */
 export function claimedBy(u: UseCase, said: string): (span: { at: number; text: string }) => boolean {
+  /* A USE CASE THAT CARRIES NOTHING CLAIMS NOTHING. Small business is whichever modules the sentence names, so "I send
+     invoices" said to it is Money, and claiming the word left a bakery with People alone. */
+  if (!u.pack && u.modules.length === 0) return () => false;
   const lower = said.toLowerCase();
   const taken: [number, number][] = [];
   for (const signal of [...u.signals, ...(FORM_WORDS[u.usecase] ?? [])])

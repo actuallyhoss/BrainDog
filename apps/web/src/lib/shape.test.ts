@@ -245,4 +245,7 @@ test('A PROJECT THE GUIDE IS FOR ASKS FOR NO MODULE: "an Etsy shop" said to the 
   const founder = 'I run two startups and track our projects and invoices';
   const f = arrange(founder).pick!;
   assert.ok(toTurnOn(heardFor(read(founder), claimedBy(f, founder)), false).includes('money-core'), founder);
+  /* AND SMALL BUSINESS, WHICH CARRIES NO MODULE OF ITS OWN, CLAIMS NONE OF ITS WORDS: its invoices are Money. */
+  const bakery = 'A bakery, I send invoices to cafes';
+  assert.ok(toTurnOn(heardFor(read(bakery), claimedBy(useCase('business')!, bakery)), false).includes('money-core'), bakery);
 });
