@@ -27,7 +27,15 @@
     live,
     installed,
     oninstalled,
-  }: { client: ReturnType<typeof createClient> | null; live: boolean; installed: readonly PackState[]; oninstalled: () => void } = $props();
+    given = null,
+  }: {
+    client: ReturnType<typeof createClient> | null;
+    live: boolean;
+    installed: readonly PackState[];
+    oninstalled: () => void;
+    /** A file already fetched and checked elsewhere (a catalogue's), planned at once with no picker drawn. */
+    given?: { text: string; ref: string } | null;
+  } = $props();
 
   let picker = $state<HTMLInputElement | null>(null);
   let address = $state('');
@@ -80,6 +88,14 @@
     }
   }
 
+  /* A GIVEN FILE IS PLANNED ONCE PER FILE, and again only when a different one is handed in. */
+  let planned: string | null = null;
+  $effect(() => {
+    if (!given || !client || given.text === planned) return;
+    planned = given.text;
+    void planText(given.text, 'url', given.ref);
+  });
+
   async function fromAddress() {
     if (busy || address.trim() === '') return;
     busy = true;
@@ -120,7 +136,7 @@
 </script>
 
 <div class="shared-in">
-  <div class="shared-row">
+  {#if !given}<div class="shared-row">
     <Button weight="quiet" disabled={busy} onclick={() => picker?.click()}><Icon name="download" size="s" />{copy.chooseFile}</Button>
     <input bind:this={picker} class="file-pick" type="file" accept=".json,application/json" tabindex="-1" aria-hidden="true" onchange={(e) => void fromFile(e.currentTarget.files?.[0])} />
     <form
@@ -134,7 +150,7 @@
       <div class="field address"><input id="shared-address" class="field-input" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" bind:value={address} /></div>
       <Button weight="bare" type="submit" disabled={busy || address.trim() === ''}>{busy ? copy.shareReading : copy.readAddress}</Button>
     </form>
-  </div>
+  </div>{/if}
   {#if said}<p class="shared-said" role="status">{said}{#if code}<span class="shared-code">{copy.refusalCode(code)}</span>{/if}</p>{/if}
   {#if plan}<SharedPlan {plan} {busy} voice={asked} bind:choice bind:relabel oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
 </div>

@@ -27,8 +27,15 @@
   import Offer from '../Offer.svelte';
   import { moduleTitle } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
+  import CatalogueDetail from './CatalogueDetail.svelte';
+  import { readHostCatalogue } from '../catalogue.ts';
+  import type { CatalogueEntry } from '@braindog/declare/catalogue';
 
-  const u = $derived(useCase(page.params.id ?? '') ?? null);
+  /* A CATALOGUE'S USE CASE IS ASKED FOR BY NAME (`?from=catalogue`), so one published under a built-in's id is still reachable. */
+  const fromCatalogue = $derived(page.url.searchParams.get('from') === 'catalogue');
+  const u = $derived(fromCatalogue ? null : (useCase(page.params.id ?? '') ?? null));
+  let entry = $state.raw<CatalogueEntry | null>(null);
+  let looked = $state(false);
   const preview = $derived(u ? previewOf(u) : null);
   const installs = $derived(u ? installsOf(u) : null);
   const voice = $derived(u ? (Object.entries(u.voice) as [VoiceKey, string][]) : []);
@@ -45,6 +52,10 @@
   }
 
   onMount(() => {
+    void readHostCatalogue(fetch).then((got) => {
+      entry = got.ok ? (got.index?.entries.find((e) => e.id === page.params.id) ?? null) : null;
+      looked = true;
+    });
     void read(async () => {
       client = createClient({ base: location.origin });
       const chosen = await choose(client, !page.data.live);
@@ -62,19 +73,22 @@
      `drew('empty')` itself, whose `s.empties++` reads what it writes, so the effect depended on itself and threw
      `effect_update_depth_exceeded`: an unknown id drew its sentence and never settled. */
   $effect(() => {
-    if (u) drew('ready');
+    if (u || entry) drew('ready');
   });
 </script>
 
-<svelte:head><title>{titleOf(u?.title ?? copy.useCases)}</title></svelte:head>
+<svelte:head><title>{titleOf(u?.title ?? entry?.title ?? copy.useCases)}</title></svelte:head>
 
-<PageHead icon="packs" title={u?.title ?? copy.useCases} />
+<PageHead icon="packs" title={u?.title ?? entry?.title ?? copy.useCases} />
 
 <div class="page">
   <Button weight="bare" href="/packs/browse"><Icon name="back" size="s" />{copy.useCaseAll}</Button>
 
-  {#if !u || !preview || !installs}
-    <Empty kind="no-results" title={copy.useCaseMissing} />
+  {#if !u && entry}
+    {#if refused}<Empty kind="error" title={refused} />{/if}
+    <CatalogueDetail {entry} {client} {live} {states} onchanged={reread} />
+  {:else if !u || !preview || !installs}
+    {#if looked || u}<Empty kind="no-results" title={copy.useCaseMissing} />{/if}
   {:else}
     {#if refused}<Empty kind="error" title={refused} />{/if}
 

@@ -26,6 +26,9 @@
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import Offer from './Offer.svelte';
   import Preview from './Preview.svelte';
+  import CatalogueCard from './CatalogueCard.svelte';
+  import { readHostCatalogue } from './catalogue.ts';
+  import type { CatalogueIndex } from '@braindog/declare/catalogue';
 
   const cards = USE_CASES.map((u) => ({ u, preview: previewOf(u) }));
 
@@ -34,6 +37,9 @@
   let live = $state(false);
   let states = $state<PackState[]>([]);
   let refused = $state<string | null>(null);
+  /* THIS HOST'S CATALOGUE, when it serves one (`BRAINDOG_CATALOGUE`); none is not an error. */
+  let catalogue = $state.raw<CatalogueIndex | null>(null);
+  let catalogueRefused = $state<string | null>(null);
 
   async function reread() {
     const again = await source?.packs();
@@ -41,6 +47,10 @@
   }
 
   onMount(() => {
+    void readHostCatalogue(fetch).then((got) => {
+      if (got.ok) catalogue = got.index;
+      else catalogueRefused = got.fix;
+    });
     void read(async () => {
       client = createClient({ base: location.origin });
       const chosen = await choose(client, !page.data.live);
@@ -85,6 +95,18 @@
       </li>
     {/each}
   </ul>
+
+  {#if catalogueRefused}
+    <Empty kind="error" title={catalogueRefused} />
+  {:else if catalogue && catalogue.entries.length > 0}
+    <section class="catalogue" aria-labelledby="catalogue-h">
+      <h2 class="catalogue-h" id="catalogue-h">{copy.catalogueHeading}</h2>
+      <p class="blurb">{copy.catalogueBlurb}</p>
+      <ul class="cards fill">
+        {#each catalogue.entries as entry (entry.id)}<CatalogueCard {entry} />{/each}
+      </ul>
+    </section>
+  {/if}
 </div>
 
 <style>
@@ -110,6 +132,24 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  /* A CATALOGUE OF ONE keeps a card's width rather than stretching across the page. */
+  .cards.fill {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  }
+
+  .catalogue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-4);
+  }
+
+  .catalogue-h {
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 600;
   }
 
   .card {
