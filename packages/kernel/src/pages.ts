@@ -27,7 +27,7 @@ import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { runway, type Leg, type Runway } from './forecast.ts';
+import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
 
@@ -273,7 +273,7 @@ export type PageDeps = {
   titleOf: (register: string) => string | null;
   /** The cash walk, when a block names it. */
   /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
-  runway: (opening: number, legs: readonly Leg[], horizon?: number, only?: string) => Runway | null;
+  runway: (opening: number, legs: readonly Leg[], horizon?: number, only?: Only) => Runway | null;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -597,24 +597,40 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
        each walks that currency's part of the opening through that currency's movements, and a crossing day is a day in
        one currency. A converted opening is walked as one, and a movement it cannot convert still says which rate. */
     if (Array.isArray(block.from) && (opened.parts || opened.value !== null)) {
+      const home = deps.ctx.fx?.().home ?? null;
       const whole = opened.parts ? null : deps.runway(opened.value!, block.from, block.horizon);
+      /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT: the home walk draws everything it can convert,
+         and each currency with no rate walks on its own beside it, from nothing, so no movement is left out. */
+      const lacking =
+        whole && home !== null && !opened.parts && (opened.unit === null || opened.unit === home) && whole.missing?.length
+          ? [...new Set(whole.missing.map((pair) => pair.split(' to ')[0]!))].sort()
+          : [];
       const apart =
         opened.parts !== undefined ||
+        lacking.length > 0 ||
         (whole !== null && !opened.converted && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
       if (apart) {
         const moving = whole ?? deps.runway(0, block.from, block.horizon);
         const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...(moving?.mixed ?? []), ...(moving?.currency ? [moving.currency] : [])])]
           .filter((c) => /^[A-Z]{3}$/u.test(c))
           .sort();
-        const walks = currencies.flatMap((c) => {
-          const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
-          const one = deps.runway(from, block.from!, block.horizon, c);
-          return one ? [one] : [];
-        });
+        const homeWalk = lacking.length ? deps.runway(opened.value!, block.from, block.horizon, { except: lacking }) : null;
+        const walks = lacking.length
+          ? [
+              ...(homeWalk ? [{ ...homeWalk, currency: homeWalk.currency ?? home }] : []),
+              ...lacking.flatMap((c) => {
+                const one = deps.runway(0, block.from!, block.horizon, c);
+                return one ? [one] : [];
+              }),
+            ]
+          : currencies.flatMap((c) => {
+              const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
+              const one = deps.runway(from, block.from!, block.horizon, c);
+              return one ? [one] : [];
+            });
         if (walks.length > 0) {
           const late = latenessOf(deps, block);
           if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
-          const home = deps.ctx.fx?.().home ?? null;
           const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();
           return {
             ...base,

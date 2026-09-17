@@ -126,7 +126,10 @@ const SKIP_CAP = EVERY_CAP + 1_200;
  */
 const HORIZON_CAP = 3650;
 
-export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[], horizonDays = 180, only?: string): Result<Runway> {
+/** Which movements a walk reads: one currency's, unconverted, or every one but those in `except`, converted as usual. */
+export type Only = string | { except: readonly string[] };
+
+export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[], horizonDays = 180, only?: Only): Result<Runway> {
   /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
      with nothing checked. A refusal is a value here as everywhere else, so a horizon this walk
      cannot carry is a sentence rather than a walk that quietly stops early or a loop that does not
@@ -276,12 +279,17 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
   /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, each at the rate as of the day it happens, a day
      ahead at the newest rate there is (`fx.ts`). A walk that cannot convert one of them says which rate it lacks. */
   /* ONE CURRENCY OF A WALK DRAWN ONCE PER CURRENCY (`only`): that currency's movements, as they are, and never converted. */
-  if (only !== undefined) {
+  if (typeof only === 'string') {
     for (let i = movements.length - 1; i >= 0; i -= 1) if (movements[i]!.currency !== only) movements.splice(i, 1);
     seen.clear();
     seen.add(only);
   }
-  const held = only === undefined ? (deps.ctx.fx?.() ?? { home: null, rates: [] }) : { home: null, rates: [] };
+  /* AND THE HOME WALK BESIDE THEM (`except`): every movement but those in a currency with no rate, which walk on their own. */
+  if (only !== undefined && typeof only !== 'string') {
+    for (let i = movements.length - 1; i >= 0; i -= 1) if (only.except.includes(movements[i]!.currency)) movements.splice(i, 1);
+    for (const c of only.except) seen.delete(c);
+  }
+  const held = typeof only === 'string' ? { home: null, rates: [] } : (deps.ctx.fx?.() ?? { home: null, rates: [] });
   let mixed = seen.size > 1 ? [...seen].sort() : [];
   let currency = mixed.length ? null : ([...seen][0] ?? null);
   let converted: Runway['converted'];

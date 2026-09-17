@@ -179,7 +179,10 @@ const HORIZON_CAP = 3650;
  * A `part` obligation counts in full. It is the honest direction for a balance you are asking not to
  * go under: the part already paid is not in the opening figure either.
  */
-export function runway(opening: number, legs: readonly Leg[], horizon = 180, only?: string): Runway {
+/** Which movements a walk reads: one currency's, unconverted, or every one but those in `except`, converted as usual. */
+export type Only = string | { except: readonly string[] };
+
+export function runway(opening: number, legs: readonly Leg[], horizon = 180, only?: Only): Runway {
   /* THE HORIZON IS A NUMBER SOMEBODY TYPED IN A DECLARATION, and it was multiplied into a timestamp
      with nothing checked at all. A refusal is a value here as everywhere else, so a horizon this
      walk cannot carry is a sentence rather than a table drawn over a window that is not a window. */
@@ -298,12 +301,17 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180, onl
   /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, each at the rate as of its day, as the kernel's walk
      does; one that cannot be converted leaves the walk with no steps and a sentence naming the rate. */
   /* ONE CURRENCY OF A WALK DRAWN ONCE PER CURRENCY (`only`): that currency's movements, as they are, as the kernel's. */
-  if (only !== undefined && !bare) {
+  if (typeof only === 'string' && !bare) {
     for (let i = movements.length - 1; i >= 0; i -= 1) if (movements[i]!.currency !== only) movements.splice(i, 1);
     seen.clear();
     seen.add(only);
   }
-  const held = only === undefined ? fxNow() : { home: null, rates: [] };
+  /* AND THE HOME WALK BESIDE THEM (`except`): every movement but those in a currency with no rate, which walk on their own. */
+  if (only !== undefined && typeof only !== 'string') {
+    for (let i = movements.length - 1; i >= 0; i -= 1) if (only.except.includes(movements[i]!.currency)) movements.splice(i, 1);
+    for (const c of only.except) seen.delete(c);
+  }
+  const held = typeof only === 'string' ? { home: null, rates: [] } : fxNow();
   const home = held.home;
   if (!bare && home !== null && seen.size > 0 && (seen.size > 1 || !seen.has(home))) {
     const missing = new Set<string>();

@@ -1647,7 +1647,19 @@ export type FeedRow = {
 function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks: ReturnType<typeof runway>[]; note: string | null } | null {
   const legs = b.from ?? [];
   if (!Array.isArray(b.from) || (!opened.parts && opened.value === null)) return null;
+  const home = fxNow().home;
   const whole = opened.parts ? null : runway(opened.value!, legs, b.horizon);
+  /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT, as the record's `pages.ts` draws it: the home walk
+     of everything that converts, and each currency with no rate on its own beside it, from nothing. */
+  const lacking =
+    whole && home !== null && !opened.parts && (opened.unit === null || opened.unit === home) && whole.missing?.length
+      ? [...new Set(whole.missing.map((pair) => pair.split(' to ')[0]!))].sort()
+      : [];
+  if (lacking.length) {
+    const main = runway(opened.value!, legs, b.horizon, { except: lacking });
+    const walks = [{ ...main, currency: main.currency ?? home }, ...lacking.map((c) => runway(0, legs, b.horizon, c))];
+    return { walks, note: walksNote(home, whole!.missing!, walks.length) };
+  }
   const apart =
     opened.parts !== undefined ||
     (whole !== null && !opened.converted && !whole.mixed.includes(BARE) && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
@@ -1660,7 +1672,7 @@ function splitWalks(opened: ReturnType<typeof openingOf>, b: PageBlock): { walks
   const walks = currencies.map((c) => runway(opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0, legs, b.horizon, c));
   if (walks.length === 0) return null;
   const missing = [...new Set([...(opened.missing ?? []), ...(moving.missing ?? [])])].sort();
-  return { walks, note: walksNote(fxNow().home, missing, walks.length) };
+  return { walks, note: walksNote(home, missing, walks.length) };
 }
 
 /**

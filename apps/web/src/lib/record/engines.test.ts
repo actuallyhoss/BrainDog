@@ -18,6 +18,7 @@ import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
 import { read as webRead, withFx, type MetricDecl as WebMetric } from './metrics.ts';
 import type { PageBlock } from './schema.ts';
+import { copy } from '../copy.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
 
@@ -393,6 +394,53 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
   } finally {
     put();
     ROWS.accounts = accounts;
+    ROWS.fx = rates;
+  }
+});
+
+test('A WALK WHOSE OPENING CONVERTS AND A BILL WITH NO RATE is the same walks in both engines: the home walk and the bill’s own', async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok);
+  k.rememberPack({ id: 'money-core', version: '1.0.0', source: 'local', ref: null, manifest: JSON.stringify({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }), checksum: 'not-a-real-checksum' });
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const soon = new Date(NOW + 10 * 86_400_000).toISOString().slice(0, 10);
+  const account = { name: 'CIB', kind: 'bank', balance: { amount: 5_200_000, currency: 'EGP' }, as_of: today, liquid: true };
+  const bill = { what: 'Tokyo hosting', direction: 'owed_by_me', amount: { amount: 12_000, currency: 'JPY' }, due: soon, state: 'open' };
+  const quotes = [
+    { currency: 'USD', base: 'EGP', rate: 48.5, as_of: today },
+    { currency: 'GBP', base: 'EGP', rate: 64.2, as_of: today },
+  ];
+  assert.ok(k.create('accounts', account, { actor: 'p_1' }).ok);
+  assert.ok(k.create('obligations', bill, { actor: 'p_1' }).ok);
+  for (const fields of quotes) assert.ok(k.create('fx', fields, { actor: 'p_1' }).ok);
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  const accounts = ROWS.accounts!;
+  const obligations = ROWS.obligations!;
+  const rates = ROWS.fx ?? [];
+  const model = accounts[0]!;
+  ROWS.accounts = [...accounts, { ...model, seq: accounts.length + 1, fields: account }];
+  ROWS.obligations = [...obligations, { ...obligations[0]!, seq: obligations.length + 1, fields: bill }];
+  ROWS.fx = quotes.map((fields, i) => ({ ...model, id: `fx_${i}`, seq: i + 1, fields }));
+  const put = withFx(() => ({ home: 'EGP', rates: ratesFrom((ROWS.fx ?? []).map((e) => e.fields)) }));
+  try {
+    const kernel = k.page('money');
+    assert.ok(kernel.ok, JSON.stringify(kernel));
+    const kb = kernel.value.blocks.find((b) => b.heading === 'Cash ahead');
+    const wb = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
+    assert.ok(kb && wb, 'the Cash ahead forecast is gone; this test is about it');
+    const shape = (walks: readonly { currency: string | null; from: number; steps: readonly { day: string; label: string; delta: number; balance: number }[] }[] | undefined) =>
+      walks?.map((w) => ({ currency: w.currency, from: w.from, steps: w.steps.map((s) => [s.day, s.label, s.delta, s.balance]) }));
+    assert.deepEqual(kb.refusals, [], JSON.stringify(kb.refusals));
+    assert.deepEqual(wb.refusals, []);
+    assert.deepEqual(kb.walks?.map((w) => w.currency), ['EGP', 'JPY'], 'the home walk, then the bill with no rate');
+    assert.deepEqual(kb.walks?.[1]?.steps.map((s) => s.label), ['Tokyo hosting']);
+    assert.deepEqual(shape(wb.walks), shape(kb.walks));
+    assert.deepEqual(kb.walkFx, { home: 'EGP', missing: ['JPY to EGP'] });
+    assert.equal(wb.walkNote, copy.figureNoRate('JPY to EGP'));
+  } finally {
+    put();
+    ROWS.accounts = accounts;
+    ROWS.obligations = obligations;
     ROWS.fx = rates;
   }
 });

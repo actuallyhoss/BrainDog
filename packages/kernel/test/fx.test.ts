@@ -448,3 +448,41 @@ test('THE CURRENT MONTH IS WHAT WAS PAID SO FAR AND WHAT IS STILL DUE IN IT, and
   assert.deepEqual(none.values, [[100_000, 40_000, 60_000]]);
   assert.deepEqual(none.states, ['', 'partial', 'ahead']);
 });
+
+test('AN OPENING THAT CONVERTS AND A BILL WITH NO RATE: the home walk draws what converts, and the bill walks on its own', async () => {
+  const { k, sql } = await founder();
+  assert.ok(
+    (
+      await k.install([
+        { id: 'metric.cash-now', kind: 'metric', body: Object.fromEntries(Object.entries(CASH).filter(([key]) => key !== 'group_by')) } as unknown as Declaration,
+        {
+          id: 'register.bills',
+          kind: 'register',
+          body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }, { id: 'due', type: 'day', required: true }] },
+        } as unknown as Declaration,
+      ])
+    ).ok,
+  );
+  for (const row of [
+    { what: 'Rent', amount: { amount: 2_000_000, currency: 'EGP' }, due: '2026-09-25' },
+    { what: 'Hosting', amount: { amount: 400_000, currency: 'USD' }, due: '2026-09-20' },
+    { what: 'Domain', amount: { amount: 1_200, currency: 'GBP' }, due: '2026-09-22' },
+  ])
+    assert.ok(k.create('bills', row, { actor: 'p_1' }).ok);
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-01' }, { actor: 'p_1' }).ok);
+  const block = { kind: 'forecast', source: 'forecast.runway', opening: { metric: 'cash-now' }, from: [{ register: 'bills', on: 'due', amount: 'amount' }], horizon: 30 };
+
+  const out = k.block(block as never);
+  assert.deepEqual(out.refusals, []);
+  assert.equal(out.walk, undefined, 'not one walk while a bill has no rate');
+  assert.deepEqual(
+    out.walks?.map((w) => ({ currency: w.currency, from: w.from, steps: w.steps.map((s) => [s.label, s.delta]) })),
+    [
+      { currency: 'EGP', from: 5_200_000 + 17_502_500, steps: [['Hosting', -20_000_000], ['Rent', -2_000_000]] },
+      { currency: 'GBP', from: 0, steps: [['Domain', -1_200]] },
+    ],
+  );
+  assert.deepEqual(out.walkFx, { home: 'EGP', missing: ['GBP to EGP'] });
+  sql.close();
+});
