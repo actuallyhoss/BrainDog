@@ -16,7 +16,7 @@ const gbp = (amount: number) => ({ amount, currency: 'GBP' });
  */
 export const BUSINESS_EXAMPLES = [
   { register: 'accounts', fields: { name: 'Business current account', kind: 'bank', balance: gbp(412_000), as_of: '0d', liquid: true } },
-  { register: 'obligations', fields: { what: 'Invoice 2026-014', direction: 'owed_to_me', amount: gbp(85_000), due: '+11d', state: 'open', category: 'client_work' } },
+  { register: 'obligations', fields: { what: 'Invoice 2026-014', direction: 'owed_to_me', amount: gbp(85_000), due: '+4d', state: 'open', category: 'client_work' } },
   { register: 'things', fields: { name: 'Wholesale orders', lane: 'earning', since: '-120d' } },
   { register: 'tasks', fields: { what: 'Send this month invoices', state: 'open', by: '+4d' } },
   { register: 'services', fields: { name: 'Accounting software', kind: 'saas', state: 'live', cost: gbp(2_400), cycle: 'monthly', renews: '+21d' } },
