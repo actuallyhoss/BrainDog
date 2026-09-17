@@ -2633,6 +2633,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       read: deps.read,
       list: deps.list,
       schemaOf: deps.schemaOf,
+      listOf: (register) => {
+        const decl = registers.get(register) as (RegisterDecl & { one?: unknown }) | undefined;
+        return decl ? { title: decl.title, ...(typeof decl.one === 'string' ? { one: decl.one } : {}) } : null;
+      },
       ctx: deps.ctx,
       /* THE OWNERS, BY ADDRESS. A digest with nowhere to go is not sent rather than sent to the
          first person the record can name — which on a shared record would be somebody else. */

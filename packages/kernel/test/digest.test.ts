@@ -23,6 +23,7 @@ const OBLIGATIONS: Declaration = {
   body: {
     id: 'obligations',
     name: 'Obligations',
+    one: 'obligation',
     title: 'what',
     fields: [
       { id: 'what', type: 'text', required: true },
@@ -202,6 +203,17 @@ test('A SECTION WITH NO ROWS IS DROPPED, not printed as a heading over nothing',
   assert.ok(!only.includes('## Paid'), 'an empty section printed its heading anyway');
   sql.close();
   bare.sql.close();
+});
+
+test('A COLUMN WITH NO LABEL OVER THE LIST’S TITLE IS HEADED BY WHAT ONE ROW IS CALLED, as a page heads it', async () => {
+  const { k, sql, clock } = await record();
+  arm(sql, NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+  const text = (JSON.parse(outbox(sql)[0]!.payload) as { text: string }).text;
+  assert.ok(text.includes('seq | Obligation | amount | due'), text);
+  assert.ok(!text.includes('| what |'), 'the title column is headed by its field id');
+  sql.close();
 });
 
 test('A DIGEST WITH NOTHING IN IT IS NOT SENT', async () => {

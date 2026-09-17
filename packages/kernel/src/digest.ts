@@ -76,6 +76,8 @@ export type DigestDeps = {
     limit?: number;
   }) => Result<{ rows: Entry[]; matched: number }>;
   schemaOf: (register: string) => Schema | null;
+  /** A list's title field and what one row of it is called, so a column with no label is headed as a page heads it. */
+  listOf?: (register: string) => { title: string; one?: string } | null;
   ctx: EvalContext;
   /** Where an email would go: the owners, by address. Empty means the email channel cannot fire. */
   owners: () => string[];
@@ -180,10 +182,21 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
     }
     if (listed.value.rows.length === 0 && section.omit_when_empty) continue;
 
-    out.push({ ...base, rows: listed.value.rows, ...(section.columns ? { columns: section.columns } : {}) });
+    out.push({ ...base, rows: listed.value.rows, ...(section.columns ? { columns: headed(section.columns, deps.listOf?.(register) ?? null) } : {}) });
   }
 
   return out;
+}
+
+/**
+ * THE COLUMNS WITH A HEADING EACH, as a page heads them: a label when one is given, and a column over the list's title
+ * with none is headed by what one row is called, so an email reads Task and not `what`. Any other column keeps its id.
+ */
+function headed(columns: readonly { field: string; label?: string }[], list: { title: string; one?: string } | null): { field: string; label?: string }[] {
+  return columns.map((c) => {
+    if (typeof c.label === 'string' || !list || list.title !== c.field || typeof list.one !== 'string' || list.one === '') return c;
+    return { ...c, label: list.one.charAt(0).toUpperCase() + list.one.slice(1) };
+  });
 }
 
 export type Sent = { sections: number; channels: Channel[]; skipped: boolean };
