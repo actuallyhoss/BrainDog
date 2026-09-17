@@ -226,6 +226,11 @@ export type ForecastPlan = {
   /** The top and the bottom of the value axis, written like the opening figure. */
   top: string;
   bottom: string;
+  /**
+   * Whether the walk ends higher than it starts. The bottom of the axis is written in the corner the walk is not near: the
+   * near one when it falls, the far one when it rises, where a rising walk started from the bottom and drew over it.
+   */
+  rises: boolean;
   sentence: string;
 };
 
@@ -303,6 +308,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     hi,
     top: figure(hi),
     bottom: figure(lo),
+    rises: (shown.days.filter((p) => p.day <= end).at(-1)?.balance ?? model.opening) > (model.past[0]?.value ?? model.opening),
     sentence: `${sentence}.`,
   };
 }

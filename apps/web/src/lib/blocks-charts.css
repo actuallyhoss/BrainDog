@@ -1026,7 +1026,7 @@
 
   .forecast-plot {
     position: relative;
-    margin-block-start: var(--sp-5);
+    margin-block-start: calc(var(--sp-5) + var(--sp-2));
     margin-inline: var(--sp-2);
     touch-action: pan-y;
   }
@@ -1100,7 +1100,8 @@
     position: absolute;
     inset-block-start: 0;
     inset-inline-start: calc(var(--at) * 100%);
-    translate: -50% -100%;
+    /* CLEAR OF THE CHART'S TOP EDGE, where a walk at its highest runs: at 390 the dashed line ran into "1 Jan". */
+    translate: -50% calc(-100% - var(--sp-2));
     color: var(--ink);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
@@ -1161,12 +1162,21 @@
   .forecast-top {
     inset-block-start: 0;
     inset-inline-end: 0;
-    translate: 0 -100%;
+    translate: 0 calc(-100% - var(--sp-2));
   }
 
   .forecast-bottom {
     inset-block-end: 0;
     inset-inline-start: 0;
+  }
+
+  /* A WALK THAT RISES starts in the near corner, and drew its line and its first dot over the bottom of the axis. */
+  .forecast-plot[data-rises] .forecast-bottom {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+    /* A payday's stem may stand in that corner, and passes behind the figure rather than through it. */
+    padding-inline-start: var(--sp-1);
+    background: var(--bg);
   }
 
   .forecast-ticks {

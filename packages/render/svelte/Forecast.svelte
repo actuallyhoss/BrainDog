@@ -124,6 +124,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="forecast-plot"
+      data-rises={plan.rises ? '' : undefined}
       onpointerdown={grab}
       onpointermove={track}
       onpointerleave={() => (scrub = null)}
@@ -141,7 +142,7 @@
         <path class="forecast-low" d={plan.low} vector-effect="non-scaling-stroke"></path>
         {#if plan.cross}<path class="forecast-cross" d={plan.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
       </svg>
-      {#if plan.cross}<span class="forecast-pin" style="--at:{plan.cross.at}" aria-hidden="true">{TONES.warn.glyph}{plan.cross.day}</span>{/if}
+      {#if plan.cross}<span class="forecast-pin" style="--at:{plan.cross.at}" aria-hidden="true">{TONES.warn.glyph} {plan.cross.day}</span>{/if}
       {#if readout}
         <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
           <span class="forecast-readout-day">{readout.day}</span>
