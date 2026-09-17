@@ -55,7 +55,7 @@ import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
-import { fxNote, meetsTarget, offTarget, noteOf, read, targetLine, windowMs, withParam } from './metrics.ts';
+import { fxNote, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -1155,8 +1155,9 @@ export function metric(id: string): Metric {
    */
   const empty = reading.held === 0;
 
+  /* A FIGURE CONVERTED OUT OF ITS DECLARED CURRENCY IS JUDGED AGAINST ITS TARGET CONVERTED, and has no verdict without a rate. */
   const off = offTarget(decl, reading.unit);
-  const met = empty || off ? null : meetsTarget(decl, reading.value);
+  const met = empty ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value) : null) : meetsTarget(decl, reading.value);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
   /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be
@@ -1186,7 +1187,7 @@ export function metric(id: string): Metric {
       ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name)
       : reading.parts
         ? (across ?? '')
-        : `${off ? '' : targetLine(decl)}${move}${across ? ` · ${across}` : ''}`.replace(/^ · /u, ''),
+        : `${targetSaid(decl, reading)}${move}${across ? ` · ${across}` : ''}`.replace(/^ · /u, ''),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     /**
      * AND A FIGURE OVER AN EMPTY REGISTER IS NOT A DOOR EITHER.

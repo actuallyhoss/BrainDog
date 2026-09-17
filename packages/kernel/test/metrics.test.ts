@@ -251,17 +251,18 @@ test('A FORMAT THAT CONTRADICTS THE ROWS IS NEVER PRINTED UNDER IT: the rows are
      figure OF, so when they disagree the declaration is wrong. This side checked neither: a sum of
      sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
      refusal, and every renderer formats from `decl.format`, so it reached a screen as USD 168,794.00
-     over rows that are in pounds. A sum is now the pounds, as a part, with the rate it would need;
-     an average, which is not converted, is still refused. */
+     over rows that are in pounds. A sum is now the pounds, as a part, with the rate it would need,
+     and so is an average. */
   const { k, sql } = await record();
   const out = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never));
   assert.equal(out.value, null, 'a sterling sum was read under a dollar format');
   assert.deepEqual(out.parts, [{ currency: 'GBP', amount: 2_945_000 }]);
   assert.deepEqual(out.fx?.missing, [], 'no home currency was chosen, so no rate is what is missing');
 
-  const avg = k.metric({ ...OVERDUE, where: undefined, value: { avg: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never);
-  assert.equal(avg.ok, false);
-  assert.match(fixOf(avg) ?? '', /the rows are in GBP and the format says USD/u);
+  const avg = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { avg: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never));
+  assert.equal(avg.value, null, 'a sterling average was read under a dollar format');
+  assert.deepEqual(avg.parts, [{ currency: 'GBP', amount: 2_945_000 / 5 }]);
+  void fixOf;
 
   /* AND THE FORMAT THAT AGREES IS UNTOUCHED, so the check is about a contradiction rather than
      about declaring a currency at all. */
@@ -297,7 +298,7 @@ test('A DIFF WHOSE OTHER HALF READ NOTHING IS THE FIRST HALF, and it refused MIX
   sql.close();
 });
 
-test('AND A RATIO OF TWO CURRENCIES STILL IS NOT, in its own code', async () => {
+test('AND A RATIO OF TWO CURRENCIES IS ONE RATIO PER CURRENCY, never one number', async () => {
   /* `04 §5` names this one and names it narrowly: "a `ratio` of two different CURRENCIES", with the
      repair "revenue is USD, spend is EGP. Name an fx source, or scope the predicate to one
      currency". GBP over USD is a number with no meaning; GBP over hours is a rate. Both arms of
@@ -307,7 +308,7 @@ test('AND A RATIO OF TWO CURRENCIES STILL IS NOT, in its own code', async () => 
   assert.ok(
     k.create('obligations', { what: 'Euro one', direction: 'owed_to_me', amount: { amount: 100_000, currency: 'EUR' }, due: day(-1), state: 'open' }, { actor: 'p_1' }).ok,
   );
-  const out = refusal(
+  const out = value<Reading>(
     k.metric({
       ...OVERDUE,
       where: undefined,
@@ -316,10 +317,11 @@ test('AND A RATIO OF TWO CURRENCIES STILL IS NOT, in its own code', async () => 
       target: { gte: 0 },
     } as never),
   );
-  /* Both halves read the same field over the same `where`, so this refuses as a mixed SUM before it
-     reaches the two-halves check. That is the right refusal and the right code: the rows really are
-     in two currencies, which is what `MIXED_CURRENCY` names. */
-  assert.ok(out.code === 'RATIO_MIXED_CURRENCY' || out.code === 'MIXED_CURRENCY', out.code);
+  /* With no rate the rows in each currency are divided among themselves, so the answer is a ratio in euros and one in
+     pounds, and never the two added (`fx.ts` `pairParts`). */
+  assert.equal(out.value, null);
+  assert.deepEqual(out.parts?.map((p) => p.currency), ['EUR', 'GBP']);
+  void refusal;
   sql.close();
 });
 

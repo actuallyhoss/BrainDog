@@ -192,10 +192,11 @@ test('and a sum whose format disagrees with its rows is said in the rows’ curr
   assert.equal(out.value, null);
   assert.equal(out.parts?.[0]?.currency, 'GBP');
   assert.match(out.shown, /^GBP /u);
-  /* AN AVERAGE IS NOT CONVERTED, so it is still refused. */
+  /* AND SO IS AN AVERAGE: the rows' own currency, as a part, never relabelled. */
   const avg = read({ ...decl, value: { avg: 'amount' }, format: 'money.JPY' });
   assert.equal(avg.value, null);
-  assert.match(avg.why, /the rows are in GBP and the format says JPY/);
+  assert.equal(avg.parts?.[0]?.currency, 'GBP');
+  assert.match(avg.shown, /^GBP /u);
 });
 
 test('A BAR OVER TWO CURRENCIES IS ONE BAR A CURRENCY, each under its code', () => {

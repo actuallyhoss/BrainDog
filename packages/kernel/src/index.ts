@@ -209,9 +209,9 @@ export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBuc
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
-export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, largestFirst, meets, scorePrediction, snapshot, targetOf, windowMs } from './metrics.ts';
-export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, partsOf, rateFor, ratesFrom } from './fx.ts';
-export type { Across, Amount, Part, Rate } from './fx.ts';
+export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetInto, targetOf, windowMs } from './metrics.ts';
+export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
+export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export {
   CHANNELS,
@@ -260,7 +260,7 @@ export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
-export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, Value } from './metrics.ts';
+export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';

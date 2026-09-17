@@ -279,3 +279,98 @@ test('A PAIR NOBODY QUOTES IS READ THROUGH ONE BOTH ARE QUOTED AGAINST, as old a
   /* A pound is 1/0.75 dollars, and a dollar is 50 Egyptian pounds: GBP 10.00 is EGP 666.67. */
   assert.equal(convertMinor(1_000, 'GBP', 'EGP', r!.rate), 66_667);
 });
+
+test('AN AVERAGE, A LEAST AND A MOST ACROSS CURRENCIES are each currency’s own with no rate, and of the converted amounts with one', async () => {
+  const { k, sql } = await founder();
+  const of = (value: object) => read(k, { ...CASH, metric: 'cash-read', value });
+
+  assert.deepEqual(of({ avg: 'balance' }).parts, [
+    { currency: 'EGP', amount: 5_200_000 },
+    { currency: 'USD', amount: 175_025 },
+  ]);
+  assert.deepEqual(of({ min: 'balance' }).parts, [
+    { currency: 'EGP', amount: 5_200_000 },
+    { currency: 'USD', amount: 10_050 },
+  ]);
+  const most = of({ max: 'balance' });
+  assert.equal(most.value, null);
+  assert.deepEqual(most.parts, [
+    { currency: 'EGP', amount: 5_200_000 },
+    { currency: 'USD', amount: 340_000 },
+  ]);
+  assert.deepEqual(most.fx, { into: 'GBP', home: null, asOf: null, forward: false, missing: [] });
+
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.deepEqual(of({ avg: 'balance' }).fx?.missing, ['USD to EGP']);
+  for (const r of [
+    { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-09-01' },
+    { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-15' },
+  ])
+    assert.ok(k.create('fx', r, { actor: 'p_1' }).ok);
+  /* Each amount at its own day's rate first: 5,200,000, 16,320,000 and 502,500 piastres. */
+  const avg = of({ avg: 'balance' });
+  assert.equal(avg.value, (5_200_000 + 16_320_000 + 502_500) / 3);
+  assert.equal(avg.unit, 'EGP');
+  assert.equal(avg.parts, undefined);
+  assert.deepEqual(avg.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
+  assert.equal(of({ min: 'balance' }).value, 502_500);
+  assert.equal(of({ max: 'balance' }).value, 16_320_000);
+  sql.close();
+});
+
+test('A RATIO AND A DIFF ACROSS CURRENCIES are one per currency with no rate, and of the converted halves with one', async () => {
+  const { k, sql } = await founder();
+  const spread = { ...CASH, metric: 'cash-spread', value: { diff: { of: { sum: 'balance' }, per: { min: 'balance' } } } };
+  const each = { ...CASH, metric: 'cash-each', value: { ratio: { of: { sum: 'balance' }, per: { count: 'id' } } } };
+
+  const apart = read(k, spread);
+  assert.equal(apart.value, null);
+  assert.deepEqual(apart.parts, [
+    { currency: 'EGP', amount: 0 },
+    { currency: 'USD', amount: 340_000 },
+  ]);
+  /* A count has no currency, so it is counted over the rows of the currency the other half is in. */
+  assert.deepEqual(read(k, each).parts, [
+    { currency: 'EGP', amount: 5_200_000 },
+    { currency: 'USD', amount: 175_025 },
+  ]);
+
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.deepEqual(read(k, spread).fx?.missing, ['USD to EGP'], 'still one per currency, and the rate it lacks named');
+  for (const r of [
+    { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-09-01' },
+    { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-15' },
+  ])
+    assert.ok(k.create('fx', r, { actor: 'p_1' }).ok);
+  const converted = read(k, spread);
+  assert.equal(converted.value, 5_200_000 + 16_320_000 + 502_500 - 502_500);
+  assert.equal(converted.unit, 'EGP');
+  assert.equal(converted.parts, undefined);
+  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
+  assert.equal(read(k, each).value, (5_200_000 + 16_320_000 + 502_500) / 3);
+  sql.close();
+});
+
+test('A TARGET IN THE DECLARED CURRENCY IS CONVERTED AT THE LATEST RATE, and judges the converted figure; with no rate there is no verdict', async () => {
+  const { k, sql } = await founder();
+  const cash = { ...CASH, target: { gte: 10_000_000 } };
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-01' }, { actor: 'p_1' }).ok);
+
+  const unjudged = read(k, cash);
+  assert.equal(unjudged.unit, 'EGP');
+  assert.equal(unjudged.targetIn, undefined, 'no rate from sterling, so no target in pounds');
+  assert.equal(unjudged.met, null);
+
+  for (const r of [
+    { currency: 'GBP', base: 'EGP', rate: 60, as_of: '2026-09-02' },
+    { currency: 'GBP', base: 'EGP', rate: 64, as_of: '2026-09-12' },
+  ])
+    assert.ok(k.create('fx', r, { actor: 'p_1' }).ok);
+  const judged = read(k, cash);
+  /* 100,000 pounds sterling at the latest rate, 64, is 6,400,000 Egyptian pounds. */
+  assert.deepEqual(judged.targetIn, { currency: 'EGP', target: { gte: 640_000_000 }, asOf: '2026-09-12', forward: false });
+  assert.equal(judged.met, false);
+  assert.equal(read(k, { ...cash, target: { lte: 640_000_000 } }).met, true);
+  sql.close();
+});

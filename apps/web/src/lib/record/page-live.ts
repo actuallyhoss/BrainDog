@@ -17,7 +17,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part } from '@braindog/kernel';
+import { isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type TargetIn } from '@braindog/kernel';
 import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -41,7 +41,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, fxNote, hrefFor, offTarget, noteOf, partsText, targetLine, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, noteOf, partsShown, targetSaid, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
@@ -69,6 +69,8 @@ type Reading = {
   /** Money in several currencies not added up, and how a figure across currencies was read. */
   parts?: Part[];
   fx?: FxRead;
+  /** A figure converted out of its declared currency: its target, converted at the latest rate. */
+  targetIn?: TargetIn;
 };
 
 type Row = RecordRow & { updated_at?: string };
@@ -250,7 +252,7 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
         })
       : fallback;
   if (r && r.parts && !cell.refusal && r.refusals.length === 0)
-    return { id: cell.metric, label, value: partsText(r.parts), note: [said(''), across].filter(Boolean).join(' · ') };
+    return { id: cell.metric, label, value: partsShown(decl?.format, r.parts), note: [said(''), across].filter(Boolean).join(' · ') };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const met = r.rows === 0 ? null : r.met;
@@ -269,7 +271,7 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    note: [said(decl && !offTarget(decl, r.unit) ? targetLine(decl) : ''), across].filter(Boolean).join(' · '),
+    note: [said(decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };

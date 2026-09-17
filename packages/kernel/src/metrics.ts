@@ -28,7 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { across, dayFieldOf, type Part, type Rate } from './fx.ts';
+import { across, convertMinor, dayFieldOf, pairParts, rateFor, type Part, type Rate, type Reduce } from './fx.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -166,7 +166,32 @@ export type Reading = {
   parts?: Part[];
   /** Present when the rows were in a currency other than the one the figure is added up in: converted, or in `parts`. */
   fx?: FxRead;
+  /**
+   * A MONEY FIGURE CONVERTED OUT OF THE CURRENCY IT DECLARES HAS ITS TARGET CONVERTED TOO, at the latest rate from that
+   * currency into this one, and `met` is read against it. Absent when there is no such rate, and then `met` is `null`.
+   */
+  targetIn?: TargetIn;
 };
+
+/** A target converted into the currency a figure was added up in: the bound, and the rate's day. */
+export type TargetIn = { currency: string; target: { lte: number } | { gte: number }; asOf: string; forward: boolean };
+
+/**
+ * A declared target in another currency, at the latest rate as of `today` (`fx.ts` `rateFor`), or `null` with no rate.
+ * Exported so the browser's reader converts a target exactly as the record does.
+ */
+export function targetInto(
+  target: { lte: number } | { gte: number },
+  from: string,
+  into: string,
+  rates: readonly Rate[],
+  today: string,
+): TargetIn | null {
+  const r = rateFor(rates, from, into, today);
+  if (!r) return null;
+  const bound = convertMinor('lte' in target ? target.lte : target.gte, from, into, r.rate);
+  return { currency: into, target: 'lte' in target ? { lte: bound } : { gte: bound }, asOf: r.as_of, forward: r.forward };
+}
 
 const WINDOW = /^(\d{1,4})([dwm])$/;
 const DAY = 86_400_000;
@@ -507,12 +532,17 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const grouped = decl.group_by === undefined ? null : groupsOf(sql, said.predicate, schema, decl, ctx, fx);
   if (grouped && !grouped.ok) return grouped;
 
+  /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency is judged against the
+     target converted at the latest rate, and has no verdict when there is none. */
+  const moved = declared !== null && now.value.unit !== null && now.value.unit !== declared;
+  const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetInto(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
+  const judged = moved ? targetIn?.target : decl.target;
   return ok({
     ...now.value,
     delta,
     why,
-    /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency has no verdict. */
-    met: now.value.value === null || !decl.target || (declared !== null && now.value.unit !== null && now.value.unit !== declared) ? null : meets(now.value.value, decl.target),
+    met: now.value.value === null || !judged ? null : meets(now.value.value, judged),
+    ...(targetIn ? { targetIn } : {}),
     ...(grouped ? grouped.value : {}),
   });
 }
@@ -643,7 +673,25 @@ function read(
     const per = one(sql, schema, pair.per, where, params, lookups, fx);
     if (!of.ok) return of;
     if (!per.ok) return per;
-    /* A HALF IN PARTS IS NOT ONE NUMBER, so a ratio or a diff of it is not one either, and it says which currencies. */
+    /* A HALF IN PARTS, OR TWO HALVES IN TWO CURRENCIES, IS THE FIGURE ONCE PER CURRENCY: each half read again over the rows
+       in that currency, unconverted, and subtracted or divided there (`fx.ts` `pairParts`). A converted pair is in one
+       currency by now and falls through to the arithmetic below. */
+    const code = (u: string | null | undefined): u is string => typeof u === 'string' && /^[A-Z]{3}$/u.test(u);
+    const apart = Boolean(of.value.parts || per.value.parts) || (code(of.value.unit) && code(per.value.unit) && of.value.unit !== per.value.unit);
+    if (apart) {
+      const currencies = [of.value, per.value].flatMap((h) => h.parts?.map((p) => p.currency) ?? (code(h.unit) ? [h.unit] : []));
+      const ofField = moneyFieldOf(schema, pair.of);
+      const perField = moneyFieldOf(schema, pair.per);
+      const inCurrency = (agg: Aggregation, field: string | null, currency: string): number | null => {
+        if (field === null) return null;
+        const got = one(sql, schema, agg, `${where} AND json_extract(fields, '${jsonPath(field)}.currency') = ?`, [...params, currency], lookups);
+        return got.ok ? got.value.value : null;
+      };
+      const parts = pairParts(currencies, ratio, (c) => ({ of: inCurrency(pair.of, ofField ?? perField, c), per: inCurrency(pair.per, perField ?? ofField, c) }));
+      const said = fxOfPair(fx, of.value.fx, per.value.fx, false);
+      if (parts.length) return ok({ value: null, unit: null, rows: of.value.rows, refusals: [], parts, ...(said ? { fx: said } : fx ? { fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: [] } } : {}) });
+    }
+    /* A HALF IN PARTS WITH NO CURRENCY BOTH HALVES ARE IN is not one number, and it says which currencies. */
     const split = of.value.parts ?? per.value.parts;
     if (split)
       return no<Read>(
@@ -725,7 +773,8 @@ function read(
     const value = a === null || b === null ? null : 'ratio' in decl.value ? (b === 0 ? null : a / b) : a - b;
     /* EITHER HALF'S UNIT, because the two agree or the check above refused. It was the first half's,
        so nothing received less GBP 50.00 paid read a bare -5000 with no currency. */
-    return ok({ value, unit: 'ratio' in decl.value ? null : (of.value.unit ?? per.value.unit), rows: of.value.rows, refusals: [] });
+    const converted = fxOfPair(fx, of.value.fx, per.value.fx, true);
+    return ok({ value, unit: 'ratio' in decl.value ? rateUnit(of.value.unit, per.value.unit) : (of.value.unit ?? per.value.unit), rows: of.value.rows, refusals: [], ...(converted ? { fx: converted } : {}) });
   }
 
   return one(sql, schema, decl.value, where, params, lookups, fx);
@@ -864,12 +913,13 @@ function aggregate(
     /* A SUM OF MONEY IN A CURRENCY OTHER THAN THE ONE THE FIGURE IS ADDED UP IN is read row by row, each amount with
        the day its row is about, and converted at the rate as of that day, or said one amount per currency (`fx.ts`). */
     const foreign = groups.length > 1 || (fx?.into != null && groups[0]!.u !== fx.into);
-    if (money && fx && kind === 'sum' && foreign && groups.every((g) => g.u !== null)) {
+    /* AND SO IS AN AVERAGE, A LEAST OR A MOST: each amount converted first, or each currency's own, never across two. */
+    if (money && fx && REDUCIBLE.has(kind) && foreign && groups.every((g) => g.u !== null)) {
       const dated = fx.day ? `json_extract(fields, '${jsonPath(fx.day)}')` : 'NULL';
       const amounts = sql
         .all<{ u: string; v: number; d: string | null }>(`SELECT ${unitExpr} AS u, ${expr} AS v, ${dated} AS d FROM entry WHERE ${where} AND ${expr} IS NOT NULL`, ...params)
         .map((r) => ({ currency: String(r.u), amount: Number(r.v), day: typeof r.d === 'string' ? r.d : null }));
-      const said = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null);
+      const said = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null, kind as Reduce);
       if (said.kind === 'one') return ok({ value: said.amount, unit: said.currency, rows, refusals: [] });
       if (said.kind === 'converted')
         return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, missing: [] } });
@@ -908,6 +958,36 @@ function aggregate(
     return ok({ value: Number.isFinite(at) ? Math.round(at / 86_400_000) : null, unit: null, rows, refusals: [] });
   }
   return ok({ value: out?.v === null || out?.v === undefined ? null : Number(out.v), unit: null, rows, refusals: [] });
+}
+
+/** The aggregations money across currencies is converted for, or read one currency at a time. */
+const REDUCIBLE = new Set(['sum', 'avg', 'min', 'max']);
+
+/** The money field an aggregation reads, or `null` when it reads a count or a field that is not money. */
+function moneyFieldOf(schema: Schema, agg: Aggregation): string | null {
+  const [, operand] = Object.entries(agg)[0] as [string, string | Product];
+  const field = typeof operand === 'object' && operand !== null ? operand.product[0] : operand;
+  return schema.fields[field]?.type === 'money' ? field : null;
+}
+
+/**
+ * The unit of a ratio: money over a count is money, so an average invoice converted into pounds is in pounds and is never
+ * written under the currency the figure declares. Pounds over pounds, or anything over hours, has no unit.
+ * Exported for the browser's reader.
+ */
+export const rateUnit = (of: string | null, per: string | null): string | null => (of !== null && /^[A-Z]{3}$/u.test(of) && per === null ? of : null);
+
+/** How the two halves of a ratio or a diff were read across currencies, as one: the newest rate, and every pair missing. Exported for the browser's reader. */
+export function fxOfPair(into: { into: string | null; home: string | null } | undefined, a: FxRead | undefined, b: FxRead | undefined, converted: boolean): FxRead | undefined {
+  if (!a && !b) return undefined;
+  const asOf = converted ? ([a?.asOf, b?.asOf].filter((d): d is string => typeof d === 'string').sort().at(-1) ?? null) : null;
+  return {
+    into: into?.into ?? a?.into ?? b?.into ?? null,
+    home: into?.home ?? a?.home ?? b?.home ?? null,
+    asOf,
+    forward: converted && Boolean(a?.forward || b?.forward),
+    missing: [...new Set([...(a?.missing ?? []), ...(b?.missing ?? [])])].sort(),
+  };
 }
 
 /** The field types `sum`, `avg`, `min` and `max` read as numbers. A `bool` is one or zero. */

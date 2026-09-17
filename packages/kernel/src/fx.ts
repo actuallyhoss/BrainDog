@@ -110,23 +110,27 @@ export function convertMinor(amount: number, from: string, to: string, rate: num
  * `convert` IS WHETHER ANYBODY CHOSE A CURRENCY TO ADD UP IN. A figure declares a currency so it can be written, and a
  * person who never said sterling is not handed their dollars in sterling because two rates happen to reach it. Without
  * one, amounts not in `into` are parts, and no pair is named, because the missing thing is the home currency.
+ *
+ * `kind` IS HOW THE AMOUNTS ARE ADDED UP: a sum, an average, the least or the most. Converted, each amount is converted
+ * at its own day's rate and rounded once before the average is taken, so a least in pounds is the least of the pounds
+ * each row was worth; in parts, each currency's amounts are averaged, or the least taken, among themselves.
  */
-export function across(amounts: readonly Amount[], into: string | null, rates: readonly Rate[], today: string, convert = true): Across {
+export function across(amounts: readonly Amount[], into: string | null, rates: readonly Rate[], today: string, convert = true, kind: Reduce = 'sum'): Across {
   const seen = new Set(amounts.map((a) => a.currency));
   if (seen.size === 0) return { kind: 'one', currency: into, amount: 0 };
   if (seen.size === 1 && (into === null || seen.has(into))) {
     const [only] = seen;
-    return { kind: 'one', currency: only!, amount: amounts.reduce((n, a) => n + a.amount, 0) };
+    return { kind: 'one', currency: only!, amount: reduceOf(kind, amounts.map((a) => a.amount)) ?? 0 };
   }
 
   const missing = new Set<string>();
-  let total = 0;
+  const converted: number[] = [];
   let asOf = '';
   let forward = false;
   if (into !== null && convert)
     for (const a of amounts) {
       if (a.currency === into) {
-        total += a.amount;
+        converted.push(a.amount);
         continue;
       }
       const r = rateFor(rates, a.currency, into, (a.day ?? today).slice(0, 10));
@@ -134,19 +138,50 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
         missing.add(`${a.currency} to ${into}`);
         continue;
       }
-      total += convertMinor(a.amount, a.currency, into, r.rate);
+      converted.push(convertMinor(a.amount, a.currency, into, r.rate));
       if (r.as_of > asOf) asOf = r.as_of;
       forward ||= r.forward;
     }
-  if (into !== null && convert && missing.size === 0) return { kind: 'converted', currency: into, amount: total, asOf, forward };
-  return { kind: 'parts', parts: partsOf(amounts), missing: [...missing].sort() };
+  if (into !== null && convert && missing.size === 0) return { kind: 'converted', currency: into, amount: reduceOf(kind, converted) ?? 0, asOf, forward };
+  return { kind: 'parts', parts: partsOf(amounts, kind), missing: [...missing].sort() };
 }
 
-/** Each currency's sum, in code order. */
-export function partsOf(amounts: readonly Amount[]): Part[] {
-  const sums = new Map<string, number>();
-  for (const a of amounts) sums.set(a.currency, (sums.get(a.currency) ?? 0) + a.amount);
-  return [...sums].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([currency, amount]) => ({ currency, amount }));
+/** How a figure adds its amounts up. */
+export type Reduce = 'sum' | 'avg' | 'min' | 'max';
+
+/** A sum, an average, a least or a most of numbers. A sum of nothing is zero; the others of nothing are `null`. */
+export function reduceOf(kind: Reduce, values: readonly number[]): number | null {
+  if (kind === 'sum') return values.reduce((n, v) => n + v, 0);
+  if (values.length === 0) return null;
+  if (kind === 'avg') return values.reduce((n, v) => n + v, 0) / values.length;
+  return kind === 'min' ? Math.min(...values) : Math.max(...values);
+}
+
+/** Each currency's sum, or average, least or most, in code order. */
+export function partsOf(amounts: readonly Amount[], kind: Reduce = 'sum'): Part[] {
+  const held = new Map<string, number[]>();
+  for (const a of amounts) held.set(a.currency, [...(held.get(a.currency) ?? []), a.amount]);
+  return [...held]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([currency, values]) => ({ currency, amount: reduceOf(kind, values) ?? 0 }));
+}
+
+/**
+ * A ratio or a difference of two figures, one amount per currency: each half read over the rows in that currency.
+ *
+ * TWO CURRENCIES ARE NEVER SUBTRACTED OR DIVIDED, so a figure whose halves are in parts, or in two different currencies,
+ * is the same figure once per currency. `halves` reads both halves over the rows in one currency, unconverted. A currency
+ * in which a half has nothing to read, or a ratio's denominator is zero, has no part; no part at all is `[]`, and the
+ * caller refuses, because then there is no currency both halves are in.
+ */
+export function pairParts(currencies: Iterable<string>, ratio: boolean, halves: (currency: string) => { of: number | null; per: number | null }): Part[] {
+  const out: Part[] = [];
+  for (const currency of [...new Set(currencies)].sort()) {
+    const { of, per } = halves(currency);
+    if (of === null || per === null || (ratio && per === 0)) continue;
+    out.push({ currency, amount: ratio ? of / per : of - per });
+  }
+  return out;
 }
 
 /**

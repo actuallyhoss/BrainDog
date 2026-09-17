@@ -334,6 +334,12 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
   const decls: WebMetric[] = [
     { metric: 'cash-now', name: 'Cash now', source: 'register.accounts', where: 'liquid is true', value: { sum: 'balance' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
     { metric: 'cash-by-kind', name: 'Cash by kind', source: 'register.accounts', value: { sum: 'balance' }, group_by: 'kind', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+    /* AN AVERAGE, A LEAST, A MOST, A DIFF AND A RATIO: each currency's own with no rate, of converted amounts with one. */
+    { metric: 'cash-avg', name: 'Average balance', source: 'register.accounts', where: 'liquid is true', value: { avg: 'balance' }, format: 'money.GBP', target: { gte: 5_000_000 }, window: '30d', compare: 'none' },
+    { metric: 'cash-min', name: 'Smallest balance', source: 'register.accounts', where: 'liquid is true', value: { min: 'balance' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+    { metric: 'cash-max', name: 'Largest balance', source: 'register.accounts', where: 'liquid is true', value: { max: 'balance' }, format: 'money.GBP', target: { lte: 100_000_000 }, window: '30d', compare: 'none' },
+    { metric: 'cash-spread', name: 'Spread', source: 'register.accounts', where: 'liquid is true', value: { diff: { of: { max: 'balance' }, per: { min: 'balance' } } }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+    { metric: 'cash-each', name: 'Per account', source: 'register.accounts', where: 'liquid is true', value: { ratio: { of: { sum: 'balance' }, per: { count: 'id' } } }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
   ];
   const same = (label: string) => {
     for (const decl of decls) {
@@ -345,6 +351,7 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
       assert.deepEqual(web.parts, kernel.value.parts, `${label}, ${decl.metric}: the parts`);
       assert.deepEqual(web.fx, kernel.value.fx, `${label}, ${decl.metric}: how it was read`);
       assert.deepEqual(web.groups, kernel.value.groups, `${label}, ${decl.metric}: the groups`);
+      assert.deepEqual(web.targetIn, kernel.value.targetIn, `${label}, ${decl.metric}: the target, converted`);
     }
     return k.metric(decls[0] as never);
   };
@@ -353,6 +360,10 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
   try {
     const bare = same('no home currency');
     assert.ok(bare.ok && bare.value.parts && bare.value.parts.length === 3, 'sterling, dollars and pounds');
+    for (const id of ['cash-avg', 'cash-min', 'cash-max', 'cash-spread', 'cash-each']) {
+      const r = webRead(decls.find((d) => d.metric === id)!);
+      assert.equal(r.parts?.length, 3, `${id} with no home currency is one amount per currency`);
+    }
 
     home = 'EGP';
     assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
@@ -372,6 +383,13 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
     assert.equal(converted.value.unit, 'EGP');
     assert.equal(typeof converted.value.value, 'number');
     assert.equal(Number.isInteger(converted.value.value), true, 'minor units are whole');
+    for (const id of ['cash-avg', 'cash-min', 'cash-max', 'cash-spread', 'cash-each']) {
+      const r = webRead(decls.find((d) => d.metric === id)!);
+      assert.equal(r.parts, undefined, `${id} converted is one amount`);
+      assert.equal(typeof r.value, 'number', `${id} converted is a number`);
+      assert.equal(r.unit, 'EGP', `${id} converted is in pounds, never under the sterling format`);
+      assert.ok(r.targetIn?.currency === 'EGP', `${id}: its sterling target is converted into pounds`);
+    }
   } finally {
     put();
     ROWS.accounts = accounts;

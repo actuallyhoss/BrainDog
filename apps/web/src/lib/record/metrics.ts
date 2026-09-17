@@ -34,14 +34,20 @@ import {
   bucketRun,
   bucketState,
   dayFieldOf,
+  fxOfPair,
   isBucket,
   largestFirst,
+  pairParts,
+  rateUnit,
   ratesFrom,
+  targetInto,
   type Bucket,
   type FxRead,
   type Group,
   type Part,
   type Rate,
+  type Reduce,
+  type TargetIn,
 } from '@braindog/kernel';
 import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
@@ -165,6 +171,8 @@ export type Reading = {
   parts?: Part[];
   /** How a figure across currencies was read, as the record's `fx` says it. */
   fx?: FxRead;
+  /** A figure converted out of its declared currency: its target converted too, as the record's `targetIn` says it. */
+  targetIn?: TargetIn;
 };
 
 const DAY_MS = 86_400_000;
@@ -203,13 +211,14 @@ type Figure = { value: number | null; unit: string | null; parts?: Part[]; fx?: 
  * currency, as the record's `aggregate` does. Everything else is `evaluateValue`, and the checks in `read` refuse it.
  */
 function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
+  if ('ratio' in value || 'diff' in value) return pairOf(rows, value, fx);
   const n = evaluateValue(rows, value);
-  if ('ratio' in value || 'diff' in value) return { value: n, unit: null };
   const seen = currenciesOf(rows, value);
   const only = seen.size === 1 ? [...seen][0]! : null;
   const unit = only === BARE ? null : only;
-  if (!('sum' in value) || seen.has(BARE) || seen.size === 0 || !(seen.size > 1 || (fx.into !== null && only !== fx.into))) return { value: n, unit };
-  const field = value.sum;
+  const kind: Reduce | null = 'sum' in value ? 'sum' : 'avg' in value ? 'avg' : 'min' in value ? 'min' : 'max' in value ? 'max' : null;
+  if (kind === null || seen.has(BARE) || seen.size === 0 || !(seen.size > 1 || (fx.into !== null && only !== fx.into))) return { value: n, unit };
+  const field = (value as Record<Reduce, Operand>)[kind];
   const id = typeof field === 'string' ? field : field.product[0];
   const amounts = rows.flatMap((e) => {
     const currency = currencyOf(e.fields[id]);
@@ -217,10 +226,59 @@ function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
     const at = fx.day ? e.fields[fx.day] : null;
     return currency === null || amount === null ? [] : [{ currency, amount, day: typeof at === 'string' ? at.slice(0, 10) : null }];
   });
-  const got = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null);
+  const got = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null, kind);
   if (got.kind === 'one') return { value: got.amount, unit: got.currency };
   if (got.kind === 'converted') return { value: got.amount, unit: got.currency, fx: { into: fx.into, home: fx.home, asOf: got.asOf, forward: got.forward, missing: [] } };
   return { value: null, unit: null, parts: got.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: got.missing } };
+}
+
+/** The field an aggregation reads, whatever it multiplies it by. `id` for a count of rows. */
+const fieldOf = (agg: Aggregation): string => {
+  const op = 'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
+  return typeof op === 'string' ? op : op.product[0];
+};
+
+/**
+ * A ratio or a diff over rows, as the record's `read` reads one: each half in the currency the figure is added up in,
+ * or, when a half is in parts or the halves are in two currencies, once per currency over the rows in it (`pairParts`).
+ */
+function pairOf(rows: Entry[], value: Extract<Value, { ratio: unknown } | { diff: unknown }>, fx: Fx): Figure {
+  const ratio = 'ratio' in value;
+  const pair = 'ratio' in value ? value.ratio : value.diff;
+  const of = figureOf(rows, pair.of, fx);
+  const per = figureOf(rows, pair.per, fx);
+  const code = (u: string | null | undefined): u is string => typeof u === 'string' && /^[A-Z]{3}$/u.test(u);
+  if (of.parts || per.parts || (code(of.unit) && code(per.unit) && of.unit !== per.unit)) {
+    const currencies = [of, per].flatMap((h) => h.parts?.map((p) => p.currency) ?? (code(h.unit) ? [h.unit] : []));
+    const moneyField = (agg: Aggregation): string | null => {
+      const f = fieldOf(agg);
+      return rows.some((e) => currencyOf(e.fields[f]) !== null) ? f : null;
+    };
+    const ofField = moneyField(pair.of);
+    const perField = moneyField(pair.per);
+    const inCurrency = (agg: Aggregation, field: string | null, currency: string): number | null =>
+      field === null ? null : aggregate(rows.filter((e) => currencyOf(e.fields[field]) === currency), agg);
+    const parts = pairParts(currencies, ratio, (c) => ({ of: inCurrency(pair.of, ofField ?? perField, c), per: inCurrency(pair.per, perField ?? ofField, c) }));
+    if (parts.length)
+      return { value: null, unit: null, parts, fx: fxOfPair(fx, of.fx, per.fx, false) ?? { into: fx.into, home: fx.home, asOf: null, forward: false, missing: [] } };
+    return { value: null, unit: null };
+  }
+  const a = of.value;
+  const b = per.value;
+  const n = a === null || b === null ? null : ratio ? (b === 0 ? null : a / b) : a - b;
+  const converted = fxOfPair(fx, of.fx, per.fx, true);
+  return { value: n, unit: ratio ? rateUnit(of.unit, per.unit) : (of.unit ?? per.unit), ...(converted ? { fx: converted } : {}) };
+}
+
+/**
+ * A figure's target line, in the currency the figure is written in: the declared one, or converted into the one it was
+ * added up in and saying so. Empty when the figure is in another currency and no rate converts its target.
+ */
+export function targetSaid(decl: MetricDecl, r: { unit?: string | null | undefined; targetIn?: TargetIn | undefined }): string {
+  if (!offTarget(decl, r.unit)) return targetLine(decl);
+  if (!r.targetIn) return '';
+  const from = decl.format!.slice('money.'.length);
+  return copy.targetConverted(targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target }), from);
 }
 
 /**
@@ -244,6 +302,13 @@ export const offTarget = (decl: { format?: string | undefined } | undefined, uni
 
 /** Amounts in several currencies as one line of text, each written in its own: `EGP 52,000.00 · USD 3,400.00`. */
 export const partsText = (parts: readonly Part[]): string => parts.map((p) => money(Math.round(p.amount), p.currency)).join(' · ');
+
+/**
+ * A figure's parts as its format writes them: money in each currency, or a share or a count with the currency it is of,
+ * `EGP 35% · USD 40%`, because a ratio of pounds to pounds is not an amount of pounds.
+ */
+export const partsShown = (shape: string | undefined, parts: readonly Part[]): string =>
+  !shape || shape.startsWith('money.') ? partsText(parts) : parts.map((p) => `${p.currency} ${format(shape, p.amount)}`).join(' · ');
 const WINDOW = /^(\d{1,4})([dwm])$/;
 
 /** A window as milliseconds, or `null` when it is not one. */
@@ -734,6 +799,11 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   }
 
   const value = figure.value;
+  /* A FIGURE CONVERTED OUT OF THE CURRENCY IT DECLARES is judged against its target converted at the latest rate. */
+  const targetIn =
+    declared && figure.unit && figure.unit !== declared && /^[A-Z]{3}$/u.test(figure.unit) && decl.target
+      ? targetInto(decl.target, declared, figure.unit, fx.rates, fx.today)
+      : null;
 
   /**
    * AND WHETHER THERE IS A COMPARISON AT ALL, WHICH IS NOT THE SAME AS THERE BEING NO MOVEMENT.
@@ -811,7 +881,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   return {
     value,
     /* A FIGURE IN PARTS IS WRITTEN AS ITS PARTS, and one converted into a currency other than the declared one in that. */
-    shown: figure.parts ? partsText(figure.parts) : figure.unit && declared && figure.unit !== declared ? money(Math.round(value ?? 0), figure.unit) : format(decl.format, value),
+    shown: figure.parts ? partsShown(decl.format, figure.parts) : figure.unit && declared && figure.unit !== declared ? money(Math.round(value ?? 0), figure.unit) : format(decl.format, value),
     rows: rows.length,
     held: all.length,
     delta,
@@ -822,6 +892,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     unit: figure.unit,
     ...(figure.parts ? { parts: figure.parts } : {}),
     ...(figure.fx ? { fx: figure.fx } : {}),
+    ...(targetIn ? { targetIn } : {}),
     ...(decl.group_by === undefined ? {} : groupsOf(rows, decl, now, fx)),
   };
 }

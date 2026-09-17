@@ -83,22 +83,28 @@ const METRIC = (over: Partial<MetricDecl> = {}): MetricDecl => ({
 
 /* ── 1 · a diff across two currencies ────────────────────────────────────── */
 
-test('A DIFF OF TWO CURRENCIES IS REFUSED, not answered in the numerator’s', async () => {
+test('A DIFF OF TWO CURRENCIES IS NOT ANSWERED IN THE NUMERATOR’S: it is one difference per currency', async () => {
   /* Each half was checked for a mixed currency inside itself and neither against the other, so
      GBP minus USD came out as a number labelled GBP — the failure this file's header is written
-     against, arrived at through the guard against it. */
+     against, arrived at through the guard against it. It was then refused; with no rate it is now
+     the same difference once per currency, and never one number. */
   const { k, sql } = await record();
   assert.ok(k.create('books', { name: 'a', amount: gbp(16_000), state: 'open' }, { actor: 'p_1' }).ok);
   assert.ok(k.create('books', { name: 'b', amount: usd(4_500), state: 'paid' }, { actor: 'p_1' }).ok);
 
-  const out = refusal(
+  const out = value<Reading>(
     k.metric(
       METRIC({
         value: { diff: { of: { sum: 'amount' }, per: { sum: 'amount' } } },
       }),
     ),
   );
-  void out;
+  assert.equal(out.value, null);
+  assert.deepEqual(out.parts, [
+    { currency: 'GBP', amount: 0 },
+    { currency: 'USD', amount: 0 },
+  ]);
+  void refusal;
 
   // One read, two currencies and no rate: not a number, one amount per currency.
   const both = value<Reading>(k.metric(METRIC({ value: { sum: 'amount' } })));
