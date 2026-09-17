@@ -44,6 +44,20 @@ export type Audience = (typeof AUDIENCES)[number];
 /** The first-party packs a use case may name as modules. The seed's test holds this to its own list. */
 export const MODULES = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 
+/**
+ * The lists each first-party module provides, by id, and the name a person knows it by. A shared use case may not declare
+ * one of these unless it installs that module (`readShared`), because the record reads some of them as the module's own:
+ * `boot` names members to whoever may read People. Held equal to the modules' manifests by `packages/seed`'s tests.
+ */
+export const MODULE_LISTS: Readonly<Record<(typeof MODULES)[number], { name: string; lists: readonly string[] }>> = {
+  portfolio: { name: 'Portfolio', lists: ['things'] },
+  people: { name: 'People', lists: ['people'] },
+  'money-core': { name: 'Money', lists: ['accounts', 'obligations'] },
+  estate: { name: 'Estate', lists: ['services'] },
+  work: { name: 'Work', lists: ['tasks', 'tracks', 'updates'] },
+  agents: { name: 'Agents', lists: ['credentials', 'learnings', 'skills', 'tools'] },
+};
+
 export type UseCase = {
   usecase: string;
   version: string;

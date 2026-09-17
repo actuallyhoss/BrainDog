@@ -7,11 +7,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { MODULE_LISTS, install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { FIRST_PARTY, NOW, crossPack, firstPartyDocument, firstPartyManifest, packDocument } from '../src/index.ts';
+import { AGENTS_PACK, FIRST_PARTY, NOW, crossPack, firstPartyDocument, firstPartyManifest, packDocument } from '../src/index.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -141,4 +141,14 @@ test('INSTALLED IN ORDER ON AN EMPTY RECORD, each through its own plan, they mak
 
   one.sql.close();
   whole.sql.close();
+});
+
+test("THE LISTS A SHARED USE CASE MAY NOT DECLARE ARE THE MODULES' OWN, as their manifests provide them", () => {
+  /* `readShared` refuses a list a first-party module provides unless the use case installs that module, from
+     `MODULE_LISTS` in `@braindog/declare`, which cannot read this package. So the two are held equal here. */
+  for (const id of FIRST_PARTY) {
+    const provided = firstPartyManifest(id).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
+    assert.deepEqual([...MODULE_LISTS[id].lists].sort(), provided.sort(), id);
+  }
+  assert.deepEqual([...MODULE_LISTS.agents.lists].sort(), Object.keys(AGENTS_PACK.registers).sort(), 'agents');
 });

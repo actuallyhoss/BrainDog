@@ -7,6 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  MODULES,
+  MODULE_LISTS,
   SHARED_MOST_BYTES,
   exampleFields,
   exportUseCase,
@@ -236,4 +238,22 @@ test('THE CARRIED PACK KEEPS THE VERSION IT WAS LAST SHARED AS, as a setting bes
 test('AN UNKNOWN KEY AT THE TOP IS REFUSED BY THE FORMAT', async () => {
   const doc = value<Record<string, unknown>>(exportUseCase(PARTS));
   assert.equal(refused(await readShared({ ...doc, script: 'run()' })).code, 'FIELD_UNKNOWN');
+});
+
+test('A LIST WITH THE ID OF A FIRST-PARTY MODULE IT DOES NOT INSTALL IS REFUSED, so a use case cannot stand in for People', async () => {
+  /* `boot` names members to whoever may read People, and a file declaring its own `people` on a record without the
+     module would have been that list. Any module's list is refused the same way, by the module that owns it. */
+  const PEOPLE_LIKE = { register: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+  const SKILLS_LIKE = { register: 'skills', name: 'Skills', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+  for (const [decl, module] of [[PEOPLE_LIKE, 'People'], [SKILLS_LIKE, 'Agents']] as const) {
+    const doc = value<Record<string, unknown>>(exportUseCase({ ...PARTS, declarations: [COURSES, decl], examples: [] }));
+    const r = refused(await readShared(JSON.stringify(doc)));
+    assert.equal(`${r.code} at ${r.at}`, `PROVIDES_CONFLICT at register.${decl.register}`);
+    assert.match(r.fix, new RegExp(`belongs to the ${module} module`));
+  }
+  assert.deepEqual(Object.keys(MODULE_LISTS), [...MODULES]);
+
+  /* A USE CASE THAT INSTALLS THE MODULE IS NOT REFUSED HERE: installing it is, as a declaration another pack holds. */
+  const withModule = value<Record<string, unknown>>(exportUseCase({ ...PARTS, modules: ['people'], declarations: [COURSES, PEOPLE_LIKE], examples: [] }));
+  value(await readShared(JSON.stringify(withModule)));
 });

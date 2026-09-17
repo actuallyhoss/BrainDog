@@ -535,9 +535,30 @@ test('A PAGE OF GOVERNANCE IS FILLED FROM WHAT THE CALLER MAY SEE, not trimmed f
   sql.close();
 });
 
+test("THE PEOPLE LIST THAT NAMES THEM IS THE PEOPLE MODULE'S, not any list somebody called people", async () => {
+  /* A shared use case on a record without the People module could declare a list with the id `people` and invite
+     somebody to it, and `boot` read the id alone. Now the list must be owned by the first-party pack. */
+  for (const [pack, named] of [['usecase-club', false], ['people', true]] as const) {
+    const { api, sql } = await record();
+    const list = { id: 'register.people', kind: 'register' as const, pack, body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never };
+    assert.ok((await api.kernel.install([list])).ok);
+    value(await api.invite({ person: 'p_2', name: 'Bo', level: 'read' } as never, owner));
+    value(await api.invite({ person: 'p_4', name: 'Di', registers: { people: 'read' } } as never, owner));
+    const held = (id: string): CallContext => {
+      const a = api.kernel.access(id)!;
+      return { principal: { kind: 'person', id, level: a.level }, registers: a.registers ?? '*', levels: a.levels };
+    };
+    const namesOf = async (ctx: CallContext) => (value<Boot>(await api.boot(ctx)) as Boot & { names?: Record<string, string> }).names;
+    assert.deepEqual(await namesOf(owner), { p_2: 'Bo', p_4: 'Di' }, pack);
+    for (const id of ['p_2', 'p_4'])
+      assert.deepEqual(await namesOf(held(id)), named ? { p_2: 'Bo', p_4: 'Di' } : undefined, `${id} on a people list owned by ${pack}`);
+    sql.close();
+  }
+});
+
 test('BOOT NAMES WHO IS ON THE RECORD to the owner and to a member who may read People, and never an address', async () => {
   const { api, sql } = await record();
-  const PEOPLE_LIST = { id: 'register.people', kind: 'register' as const, body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never };
+  const PEOPLE_LIST = { id: 'register.people', kind: 'register' as const, pack: 'people', body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never };
   const namesOf = async (ctx: CallContext) => (value<Boot>(await api.boot(ctx)) as Boot & { names?: Record<string, string> }).names;
   value(await api.invite({ person: 'p_2', name: 'Bo', email: 'bo@example.com', level: 'read' } as never, owner));
   value(await api.invite({ person: 'p_3', name: 'Cy', registers: { obligations: 'read' } } as never, owner));

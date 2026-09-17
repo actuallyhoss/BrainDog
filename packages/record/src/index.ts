@@ -1289,9 +1289,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * as "Someone on this record", because the one read with names in it, `members`, is ADMIN: it carries every address.
    * The owner reads the membership list, and a member who may read People reads the people the record knows, so each of
    * them is told the names and nothing else. Anybody else still reads Someone (`20 §1`, the ceiling; `members`, the addresses).
+   *
+   * PEOPLE IS THE FIRST-PARTY MODULE, NOT A LIST WITH THAT ID. A shared use case on a record without the module could
+   * declare its own `people` and invite somebody to it, so the list must be owned by the `people` pack and that pack on.
    */
   const namesFor = (ctx: CallContext): Record<string, string> | null => {
-    const mayKnow = allows(ctx, 'owner') === null || (kernel.register(PEOPLE) !== undefined && readable(ctx, PEOPLE) === null);
+    const peopleModule = () =>
+      kernel.register(PEOPLE) !== undefined && kernel.packStates().some((p) => p.id === PEOPLE && p.disabled_at === null && p.registers.includes(PEOPLE));
+    const mayKnow = allows(ctx, 'owner') === null || (readable(ctx, PEOPLE) === null && peopleModule());
     if (!mayKnow) return null;
     return Object.fromEntries(kernel.members().flatMap((m) => (typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()]] : [])));
   };
