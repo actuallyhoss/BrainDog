@@ -3775,13 +3775,20 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   const value = values[target.setting];
   const currency = typeof decl.format === 'string' ? /^money\.([A-Z]{3})$/u.exec(decl.format)?.[1] : undefined;
   let bound: number | null = null;
+  let typedIn: string | null = null;
   if (said?.type === 'number' && typeof value === 'number' && Number.isFinite(value)) bound = value;
   if (said?.type === 'money' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
     const money = value as { amount?: unknown; currency?: unknown };
     if (typeof money.amount === 'number' && money.currency === currency) bound = money.amount;
+    /* OR IN THE HOME CURRENCY, which is what a person whose money is in pounds types a limit in. The target carries its
+       currency, and the figure, added up in that currency, is held to it as it is (`metrics.ts` `targetFor`). */
+    else if (typeof money.amount === 'number' && typeof money.currency === 'string' && money.currency === homeCurrency(sql)) {
+      bound = money.amount;
+      typedIn = money.currency;
+    }
   }
   if (bound === null) return decl;
-  return { ...decl, target: { ...target, [typeof target.gte === 'number' ? 'gte' : 'lte']: bound } };
+  return { ...decl, target: { ...target, [typeof target.gte === 'number' ? 'gte' : 'lte']: bound, ...(typedIn ? { currency: typedIn } : {}) } };
 }
 
 /**

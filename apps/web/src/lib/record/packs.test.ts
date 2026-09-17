@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import {
   blocked,
   changesOf,
+  currencyOf,
+  heldElsewhere,
   choose,
   draftOf,
   fieldAt,
@@ -364,4 +366,19 @@ test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE C
   assert.equal(money.seeds, undefined, 'an update would write example bills into a record already holding Money');
   assert.ok(JSON.stringify(money.declarations).includes('Pay comes in late by'));
   assert.deepEqual((money.config as Record<string, { default: unknown }>).most_out_30d?.default, { amount: 250_000, currency: 'GBP' });
+});
+
+test("MONEY'S SUMS ARE TYPED IN THE HOME CURRENCY once one is chosen, and one still held in sterling has not moved until typed over", async () => {
+  const sterling = await settingsOf();
+  const money: PackConfig = { ...sterling, values: { ...sterling.values, home_currency: 'EGP' } };
+  assert.equal(currencyOf(money, 'most_out_30d'), 'EGP');
+  assert.equal(currencyOf(sterling, 'most_out_30d'), 'GBP', 'the sample is at home in sterling, as its sums are');
+  assert.equal(currencyOf(EVERY_TYPE, 'late_fee'), 'GBP', 'an add-on with no home currency types a sum in its own');
+  const drafts = Object.fromEntries(Object.entries(money.config).map(([k, d]) => [k, draftOf(d, money.values[k], currencyOf(money, k))]));
+  assert.equal(drafts.most_out_30d?.text, '', 'a sterling sum is not drawn as pounds');
+  assert.equal(heldElsewhere(money, 'most_out_30d'), 'GBP 50,000.00', 'what holds until then is said in the box');
+  assert.equal(heldElsewhere(sterling, 'most_out_30d'), null);
+  assert.deepEqual(changesOf(money, drafts), { values: {}, wrong: {} }, 'nothing typed is nothing sent');
+  assert.deepEqual(changesOf(money, draftsOf(money)), { values: {}, wrong: {} }, 'nor a box still drawn in sterling before the home was chosen');
+  assert.deepEqual(changesOf(money, { ...drafts, most_out_30d: { ...drafts.most_out_30d!, text: '2,500,000' } }).values, { most_out_30d: { amount: 250_000_000, currency: 'EGP' } });
 });

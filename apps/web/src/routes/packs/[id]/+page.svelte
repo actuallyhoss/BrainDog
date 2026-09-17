@@ -28,6 +28,7 @@
     changesOf,
     currencyOf,
     draftOf,
+    heldElsewhere,
     fieldAt,
     isDefault,
     labelOf,
@@ -73,7 +74,9 @@
   function show(s: PackConfig, keys: readonly string[] = Object.keys(s.config)) {
     settings = s;
     const next = { ...drafts };
-    for (const k of keys) if (s.config[k]) next[k] = draftOf(s.config[k], s.values[k]);
+    /* A NEW HOME CURRENCY CHANGES WHAT EVERY SUM IS TYPED IN, so every box is drawn again. */
+    const redraw = keys.includes('home_currency') ? Object.keys(s.config) : keys;
+    for (const k of redraw) if (s.config[k]) next[k] = draftOf(s.config[k], s.values[k], currencyOf(s, k));
     drafts = next;
   }
 
@@ -273,6 +276,7 @@
                         id="set-{key}"
                         type="text"
                         inputmode="decimal"
+                        placeholder={heldElsewhere(settings, key) ?? undefined}
                         value={d.text}
                         oninput={(e) => (d.text = typed(e))}
                         aria-invalid={why ? 'true' : undefined}

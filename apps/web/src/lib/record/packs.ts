@@ -273,6 +273,10 @@ export const labelOf = (key: string, decl: ConfigDecl): string =>
  * money setting's in the same add-on. Printed beside the box and never typed, as the row form does.
  */
 export function currencyOf(settings: PackConfig, key: string): string | null {
+  /* AN ADD-ON THAT DECLARES A HOME CURRENCY TAKES ITS SUMS IN IT once one is chosen, so a person whose money is in pounds
+     types a limit in pounds; the record holds a figure to it in that currency (`declare.ts` `liveTarget`). */
+  const home = typeof settings.values.home_currency === 'string' ? settings.values.home_currency.trim().toUpperCase() : '';
+  if (settings.config.home_currency && settings.config[key]?.type === 'money' && /^[A-Z]{3}$/u.test(home)) return home;
   const own = [settings.values[key], settings.config[key]?.default].find(isMoney);
   if (own) return own.currency;
   for (const [k, d] of Object.entries(settings.config)) {
@@ -282,10 +286,22 @@ export function currencyOf(settings: PackConfig, key: string): string | null {
   return null;
 }
 
-/** The control's starting state for a stored value. */
-export function draftOf(decl: ConfigDecl, value: unknown): Draft {
+/**
+ * A money setting still held in a currency other than the one its box is typed in, as it reads: `GBP 50,000.00`. Drawn
+ * faintly in the empty box, so a person sees the limit that holds until they type one in the box's currency.
+ */
+export function heldElsewhere(settings: PackConfig, key: string): string | null {
+  const value = settings.values[key];
+  const currency = currencyOf(settings, key);
+  if (!isMoney(value) || currency === null || value.currency === currency) return null;
+  return `${value.currency} ${draftOf(settings.config[key]!, value).text}`;
+}
+
+/** The control's starting state for a stored value. A sum in another currency than the box's starts empty. */
+export function draftOf(decl: ConfigDecl, value: unknown, currency: string | null = null): Draft {
   const blank: Draft = { text: '', on: false, unit: 'days' };
   if (value === null || value === undefined) return blank;
+  if (decl.type === 'money' && currency !== null && isMoney(value) && value.currency !== currency) return blank;
   switch (decl.type) {
     case 'bool':
       return { ...blank, on: value === true };
@@ -354,7 +370,11 @@ export function changesOf(settings: PackConfig, drafts: Readonly<Record<string, 
   for (const [key, decl] of Object.entries(settings.config)) {
     const draft = drafts[key];
     if (!draft) continue;
-    const out = valueOf(decl, draft, currencyOf(settings, key));
+    const currency = currencyOf(settings, key);
+    /* A SUM STILL HELD IN ANOTHER CURRENCY HAS NOT MOVED until something is typed over it in the box's currency. */
+    const stored = settings.values[key];
+    if (decl.type === 'money' && currency !== null && isMoney(stored) && stored.currency !== currency && (draft.text.trim() === '' || draft.text === draftOf(decl, stored).text)) continue;
+    const out = valueOf(decl, draft, currency);
     if (!out.ok) wrong[key] = out.why;
     else if (!same(out.value, settings.values[key])) values[key] = out.value;
   }

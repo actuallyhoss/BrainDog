@@ -174,7 +174,41 @@ export type Reading = {
 };
 
 /** A target converted into the currency a figure was added up in: the bound, and the rate's day. */
-export type TargetIn = { currency: string; target: { lte: number } | { gte: number }; asOf: string; forward: boolean };
+export type TargetIn = {
+  currency: string;
+  target: { lte: number } | { gte: number };
+  asOf: string;
+  forward: boolean;
+  /** The currency the target was set in, when it is not the one the figure declares: the home currency a person typed it in. */
+  from?: string;
+};
+
+/**
+ * The currency a target is in: the one its setting was typed in (`currency`, put there when a setting is read), else the
+ * figure's declared one.
+ */
+export const targetCurrency = (target: unknown, declared: string | null): string | null => {
+  const said = target !== null && typeof target === 'object' ? (target as { currency?: unknown }).currency : undefined;
+  return typeof said === 'string' && /^[A-Z]{3}$/u.test(said) ? said : declared;
+};
+
+/**
+ * A target in the currency a figure came back in: as it is when it was set in that currency, converted at the latest rate
+ * when it was set in another, or `null` with no rate. Shared by both engines.
+ */
+export function targetFor(
+  target: { lte: number } | { gte: number },
+  declared: string,
+  into: string,
+  rates: readonly Rate[],
+  today: string,
+): TargetIn | null {
+  const from = targetCurrency(target, declared)!;
+  const bound = 'lte' in target ? { lte: target.lte } : { gte: target.gte };
+  if (from === into) return { currency: into, target: bound, asOf: today, forward: false, from };
+  const got = targetInto(bound, from, into, rates, today);
+  return got && from !== declared ? { ...got, from } : got;
+}
 
 /**
  * A declared target in another currency, at the latest rate as of `today` (`fx.ts` `rateFor`), or `null` with no rate.
@@ -535,7 +569,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   /* A TARGET IS IN THE CURRENCY THE FIGURE DECLARES, so a figure converted into another currency is judged against the
      target converted at the latest rate, and has no verdict when there is none. */
   const moved = declared !== null && now.value.unit !== null && now.value.unit !== declared;
-  const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetInto(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
+  const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetFor(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
   const judged = moved ? targetIn?.target : decl.target;
   return ok({
     ...now.value,

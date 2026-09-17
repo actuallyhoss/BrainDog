@@ -20,7 +20,7 @@ import { PAGES } from './data.ts';
 import { toSegments, walkTables } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf, currencyOf, drawn, homeOf, merge, symbolText, total } from './money.ts';
-import { fxNote, read, withFx, type MetricDecl } from './metrics.ts';
+import { fxNote, read, targetSaid, withFx, type MetricDecl } from './metrics.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
 import { runway } from './forecast.ts';
@@ -375,4 +375,13 @@ test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () =
   const said = resolverOf({ 'late-in': [{ amount: 123_400, currency: 'EUR' }, { amount: 5_000, currency: 'GBP' }], odd: [{ amount: 1 }] });
   assert.equal(said('late-in')?.replace(/\s/gu, ' '), 'EUR 1,234.00 · GBP 50.00');
   assert.equal(said('odd'), null, 'what is not money is not written as money');
+});
+
+test('A TARGET TYPED IN THE HOME CURRENCY IS SAID AS TYPED, and one converted says from which', () => {
+  const decl = { ...METRICS['out-30d']!, target: { lte: 2_000_000 } } as MetricDecl;
+  const typed = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, from: 'EGP' } });
+  const converted = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false } });
+  assert.ok(typed.includes('20,000.00'), typed);
+  assert.ok(!typed.includes('converted'), typed);
+  assert.ok(converted.includes('GBP'), converted);
 });

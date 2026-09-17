@@ -40,7 +40,7 @@ import {
   pairParts,
   rateUnit,
   ratesFrom,
-  targetInto,
+  targetFor,
   type Bucket,
   type FxRead,
   type Group,
@@ -277,11 +277,11 @@ function pairOf(rows: Entry[], value: Extract<Value, { ratio: unknown } | { diff
 export function targetSaid(decl: MetricDecl, r: { unit?: string | null | undefined; targetIn?: TargetIn | undefined }): string {
   if (!offTarget(decl, r.unit)) return targetLine(decl);
   if (!r.targetIn) return '';
-  const from = decl.format!.slice('money.'.length);
+  const from = r.targetIn.from ?? decl.format!.slice('money.'.length);
   const line = targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target });
-  /* NOTHING IS NOTHING IN EVERY CURRENCY, so a bound of zero is not said to be converted. */
+  /* NOTHING IS NOTHING IN EVERY CURRENCY, so a bound of zero is not said to be converted; nor is one typed in this currency. */
   const bound = 'lte' in r.targetIn.target ? r.targetIn.target.lte : r.targetIn.target.gte;
-  return bound === 0 ? line : copy.targetConverted(line, from);
+  return bound === 0 || from === r.targetIn.currency ? line : copy.targetConverted(line, from);
 }
 
 /**
@@ -809,7 +809,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   /* A FIGURE CONVERTED OUT OF THE CURRENCY IT DECLARES is judged against its target converted at the latest rate. */
   const targetIn =
     declared && figure.unit && figure.unit !== declared && /^[A-Z]{3}$/u.test(figure.unit) && decl.target
-      ? targetInto(decl.target, declared, figure.unit, fx.rates, fx.today)
+      ? targetFor(decl.target, declared, figure.unit, fx.rates, fx.today)
       : null;
 
   /**

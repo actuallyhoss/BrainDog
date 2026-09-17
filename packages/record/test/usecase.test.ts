@@ -356,3 +356,52 @@ test('A MODULE ALREADY HERE IS PLANNED IN THE USE CASE\'S WORDS WHEN ITS DOCUMEN
   a.sql.close();
   sql.close();
 });
+
+test('A TARGET SETTING TYPED IN THE HOME CURRENCY holds the figure added up in it, as typed and not converted', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const doc = {
+    pack: 'money-home',
+    version: '1.0.0',
+    summary: 'Spending, held to a sum in the home currency.',
+    author: 'Me',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    config: {
+      home_currency: { type: 'text', label: 'Home currency' },
+      most_spent: { type: 'money', label: 'Most spent', default: { amount: 10_000, currency: 'GBP' } },
+    },
+    declarations: [
+      { register: 'spends', name: 'Spends', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money', required: true }] },
+      {
+        register: 'fx',
+        name: 'Rates',
+        title: 'currency',
+        fields: [
+          { id: 'currency', type: 'text', required: true },
+          { id: 'base', type: 'text', required: true },
+          { id: 'rate', type: 'decimal', required: true },
+          { id: 'as_of', type: 'day', required: true },
+        ],
+      },
+      { metric: 'spent', name: 'Spent', source: 'register.spends', value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 10_000, setting: 'most_spent' }, window: '30d', compare: 'none' },
+    ],
+  };
+  await install(api, doc);
+  value(await api.create({ register: 'spends', fields: { what: 'Rent', amount: { amount: 25_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'fx', fields: { currency: 'GBP', base: 'EGP', rate: 60, as_of: '2026-09-01' } }, owner));
+  type Reading = { unit: string | null; value: number | null; met: boolean | null; targetIn?: { currency: string; target: { lte?: number }; from?: string } };
+  const cell = () => (api.kernel.block({ kind: 'stat', cells: [{ metric: 'spent' }] }) as { readings: { reading: Reading | null }[] }).readings[0]!.reading!;
+
+  value(await api.setPackConfig({ id: 'money-home', values: { home_currency: 'EGP' } }, owner));
+  assert.equal(cell().unit, 'EGP');
+  assert.deepEqual(cell().targetIn?.target, { lte: 600_000 }, 'the sterling default, converted at the latest rate');
+  assert.equal(cell().targetIn?.from, undefined);
+
+  value(await api.setPackConfig({ id: 'money-home', values: { most_spent: { amount: 2_000_000, currency: 'EGP' } } }, owner));
+  const held = cell();
+  assert.equal(held.value, 1_500_000);
+  assert.deepEqual(held.targetIn, { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, from: 'EGP' }, 'typed in pounds, held in pounds');
+  assert.equal(held.met, true);
+  sql.close();
+});
