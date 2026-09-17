@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normaliseUseCase, useCasePack } from '@braindog/declare';
+import { labelSetting, normaliseUseCase, useCasePack } from '@braindog/declare';
 
 import { createRecordApi, type CallContext, type CatalogueEntry } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -53,6 +53,9 @@ const WORK = {
   ],
 };
 
+/** A label whose setting name would pass 32 characters, so it is kept as `lk_<hash>`. */
+const LONG_LABEL = 'courses.submission_state.handed_in_after_deadline';
+
 const STUDY = (() => {
   const u = normaliseUseCase({
     usecase: 'study',
@@ -66,6 +69,7 @@ const STUDY = (() => {
     signals: ['homework'],
     modules: ['work'],
     voice: { home: 'Today', needs_you: 'Coming up' },
+    labels: { [LONG_LABEL]: 'Handed in late' },
     pack: {
       pack: 'usecase-study',
       version: '1.0.0',
@@ -296,4 +300,18 @@ test('A USE CASE GOES BESIDE THE ONE SPEAKING BY THE VOICE RULE, and one that wo
   const now = value<{ voice: { pack: string } }>(await api.arrangement({}, agent));
   assert.equal(now.voice.pack, 'usecase-study', 'the voice stayed with the use case it went beside');
   sql.close();
+});
+
+test('A LONG LABEL IS FILED WITH ITS TITLE, so Decide never says its hashed setting name', async () => {
+  const { api } = await record();
+  const hashed = labelSetting(LONG_LABEL);
+  assert.match(hashed, /^lk_[0-9a-f]{8}$/u);
+  const arranged = value<{ id: string }>(
+    await api.propose(
+      { question: 'Arrange for studies?', body_kind: 'arrange', body: { why: ['Studying.'], usecase: 'study', settings: [{ pack: 'usecase-study', values: { [hashed]: 'Late', voice_home: 'Desk' } }] } } as never,
+      agent,
+    ),
+  );
+  const filed = value<{ body: { settings: { titles?: Record<string, string> }[] } }>(await api.governance({ id: arranged.id }, owner));
+  assert.deepEqual(filed.body.settings[0]?.titles, { [hashed]: 'Label: courses, submission state, handed in after deadline' });
 });

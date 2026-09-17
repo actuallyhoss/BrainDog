@@ -274,7 +274,10 @@ export function arranger(d: ArrangeDeps) {
       if (!fits.ok) return fits as Result<Body>;
     }
     const before = Object.fromEntries(Object.keys(values).map((key) => [key, current[key] ?? (coming ? (config[key]?.default ?? null) : null)]));
-    return ok({ pack, values, before });
+    /* A LONG LABEL IS KEPT AS `lk_<hash>`, which says nothing to the owner, and Decide has no declared settings to read it
+       through when the pack is not on yet. Its title goes with it, as the setting was declared. */
+    const titles = Object.fromEntries(Object.keys(values).flatMap((key) => (/^lk_[0-9a-f]{8}$/u.test(key) && typeof config[key]?.label === 'string' ? [[key, config[key].label]] : [])));
+    return ok({ pack, values, before, ...(Object.keys(titles).length === 0 ? {} : { titles }) });
   }
 
   /** `{"voice":{"home":"Today"}}` as the settings of the use case's pack: the one being installed, or the one on. */

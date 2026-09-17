@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { appliedLines, arrangedOf, callOf, partialOf } from './arranged.ts';
+import { labelSetting } from '../../../lib/voice.ts';
 
 const STUDENT = {
   usecase: 'student',
@@ -132,4 +133,17 @@ test('A USE CASE BESIDE THE ONE SPEAKING IS SAID, and in the same voice', () => 
   const packs = out?.parts.find((p) => p.part === 'packs');
   assert.ok(packs?.part === 'packs');
   assert.ok(packs.lines.includes('Adds Student beside it, in the same voice'), JSON.stringify(packs.lines));
+});
+
+test('a long label is said by the title filed with it, and never by its hashed setting name', () => {
+  const hashed = labelSetting('obligations.category.client_work');
+  const out = arrangedOf(
+    'settings',
+    { pack: 'usecase-personal', values: { [hashed]: 'Pay', lk_deadbeef: 'Old' }, before: { [hashed]: '' }, titles: { [hashed]: 'Label: obligations, category, client work' } },
+    { lists: new Map([['obligations', 'Bills']]) },
+  );
+  assert.deepEqual(
+    out?.parts.map((p) => ('lines' in p ? p.lines : [])),
+    [['In Bills, “Client work” will be called “Pay”'], ['Personal: A label will be Old']],
+  );
 });

@@ -2021,6 +2021,8 @@ export const copy = {
     was === null ? `${pack}: ${setting} will be ${value}` : `${pack}: ${setting} will be ${value}, where it is ${was} now`,
   arrangeCountPages: (n: number) => `${n} new ${n === 1 ? 'page' : 'pages'}`,
   arrangeCountLists: (n: number) => `${n} new ${n === 1 ? 'list' : 'lists'}`,
+  /** A long label filed before its title was, so only its hashed setting name is known. */
+  arrangeLongLabel: 'A label',
   arrangeCountOther: (n: number) => `${n} more ${n === 1 ? 'change' : 'changes'}`,
   arrangeCountWords: (n: number) => `${n} ${n === 1 ? 'word changes' : 'words change'}`,
   arrangeLeadSummary: (lead: string, summary: string) => `${lead}: ${summary}`,

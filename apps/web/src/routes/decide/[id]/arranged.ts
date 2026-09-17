@@ -15,7 +15,7 @@
  * own name for it when the screen has one, and every sentence is `copy.ts`'s.
  */
 import { copy } from '../../../lib/copy.ts';
-import { VOICE_LINES, type VoiceKey } from '../../../lib/voice.ts';
+import { labelsOf, VOICE_LINES, type VoiceKey } from '../../../lib/voice.ts';
 import { appearsOf, type Appears } from './proposed.ts';
 
 type Row = Record<string, unknown>;
@@ -165,8 +165,17 @@ function settingsLines(s: Row, installing: readonly string[], ctx: Context, body
       else out.words.push(nav ? copy.arrangeCalled(now, text(value)) : copy.arrangeReads(now, text(value)));
       continue;
     }
-    if (key.startsWith('label_')) {
-      const [list = '', field, one] = key.slice('label_'.length).split('__');
+    /* A LONG LABEL IS `lk_<hash>`, read back through the title the record filed with it, never said as its hash. */
+    const hashed = /^lk_[0-9a-f]{8}$/u.test(key);
+    const title = hashed && isRow(s.titles) ? text(s.titles[key]) : '';
+    const labelKey = key.startsWith('label_') ? key.slice('label_'.length).split('__').join('.') : title ? (Object.keys(labelsOf({ [key]: 'x' }, { [key]: { label: title } }))[0] ?? '') : '';
+    if (hashed && !labelKey.match(/^[a-z0-9_.]+$/u)) {
+      const named = title ? words(title.replace(/^Label: /u, '')) : copy.arrangeLongLabel;
+      out.other.push(copy.arrangeSettingTo(packName(text(s.pack), body), named, quoted(value), key in before ? quoted(before[key]) : null));
+      continue;
+    }
+    if (labelKey) {
+      const [list = '', field, one] = labelKey.split('.');
       const called = value === null ? copy.arrangeDefault : text(value);
       if (field === undefined) out.words.push(copy.arrangeListCalled(was || listName(list, ctx), called));
       else if (one === undefined) out.words.push(copy.arrangeFieldCalled(listName(list, ctx), was || copy.valueWord(field), called));
