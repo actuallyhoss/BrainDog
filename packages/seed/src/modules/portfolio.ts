@@ -309,6 +309,16 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: '{{name}} runs on nothing you pay for.',
       },
       {
+        /* WHAT IS WRITTEN ABOUT THE PROJECT: its plan, what blocks it and what was decided, as the row's note holds it,
+           blocks and all. A project nobody has written about says so. */
+        kind: 'note',
+        document: true,
+        heading: 'Notes',
+        span: 12,
+        body: '{{note}}',
+        empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
+      },
+      {
         /**
          * A `code` block is authored rather than projected: `body` is the whole of it, verbatim. It
          * is on a project page because the question "how do I point an agent at this one" is asked

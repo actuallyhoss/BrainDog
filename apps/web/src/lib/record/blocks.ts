@@ -698,6 +698,12 @@ export function toSegments(block: BlockResult): ReturnType<typeof parse> {
 }
 
 function drawSegments(block: BlockResult): ReturnType<typeof parse> {
+  /* A NOTE THAT IS A WHOLE DOCUMENT, such as the plan and the decisions written on a project, is drawn as that document,
+     blocks and all. One the row has not written yet is still its placeholder, and draws nothing, so `empty:` says so. */
+  if (block.kind === 'note' && block.document) {
+    const body = (block.body ?? '').trim();
+    return body === '' || /^\{\{\w+\}\}$/u.test(body) ? [] : parse(body, { page: true });
+  }
   /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
   if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length)
     return parse(linesText(measuresFor(block)), { page: true });

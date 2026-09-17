@@ -524,6 +524,10 @@
       <p class="cost-age">{governed.closed(question.id)}</p>
     {:else}
       <section class="cost">
+        {#if question.context}
+          <h2 class="cost-label">{copy.whyAsked}</h2>
+          <p class="cost-body context">{symbolText(question.context)}</p>
+        {/if}
         {#if question.cost}
           <h2 class="cost-label">{copy.costOfDelay}</h2>
           <p class="cost-body">{symbolText(question.cost)}</p>
@@ -662,6 +666,12 @@
   .cost-body {
     margin-block-start: var(--sp-1);
     color: var(--ink);
+  }
+
+  /* THE REASONING KEEPS ITS LINES, and the cost heading after it has room above it. */
+  .context {
+    white-space: pre-line;
+    margin-block-end: var(--sp-3);
   }
 
   .cost-age {

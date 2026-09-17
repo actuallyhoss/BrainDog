@@ -296,3 +296,9 @@ test('an arrangement reads the pages it changes as they stand, and not the ones 
   assert.deepEqual(got, { 'page.money': { title: 'Money', blocks: [{ kind: 'table', heading: 'Bills due' }] } });
   assert.deepEqual(calls.map((c) => c.args), [{ page: 'money' }, { page: 'gone' }]);
 });
+
+test('A QUESTION CARRIES THE REASONING IT WAS OPENED WITH, and one opened with none carries nothing', () => {
+  const asked = questionOf({ id: 'SG4', body_kind: 'options', body: { options: [{ id: 'a', label: 'Ship it' }], context: '  Two clients asked for it this week.  ' }, opened_at: '' }, 'Ship dark mode?', 1);
+  assert.equal(asked.context, 'Two clients asked for it this week.');
+  assert.equal('context' in questionOf({ id: 'SG5', body_kind: 'options', body: { options: [], context: '   ' }, opened_at: '' }, 'Q', 2), false);
+});

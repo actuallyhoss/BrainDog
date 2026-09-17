@@ -432,6 +432,8 @@ export const copy = {
   openQuestions: 'Open questions',
   rankedBy: 'Ranked by the cost of being wrong',
   costOfDelay: 'Cost of deciding late',
+  /** The heading over the reasoning a question was opened with. */
+  whyAsked: 'Why this is asked',
   theOptions: 'The options',
   recommended: 'Suggested',
   /* VERB + NOUN, which `19 §2` asks for and "Choose this" is not — it is verb plus pronoun, and

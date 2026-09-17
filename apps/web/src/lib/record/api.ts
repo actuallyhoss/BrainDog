@@ -1889,6 +1889,8 @@ const READS = new Set([
   'stale',
   /* A progress budget's figure of what was spent, and a goal's of what was logged toward it. */
   'spent', 'toward',
+  /* A note whose body is a whole document. */
+  'document',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {

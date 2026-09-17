@@ -279,6 +279,8 @@ export type PageBlock = {
   empty?: string;
   tone?: 'good' | 'warn' | 'bad' | 'info';
   body?: string;
+  /** A `note`'s body is a whole document, with its own blocks, drawn as the row page draws it: a project's `{{note}}`. */
+  document?: boolean;
   /**
    * Draw this block only when a figure says so. Evaluated at render, never compiled.
    *
@@ -370,6 +372,8 @@ export type Question = {
   opened: string;
   entity?: string;
   options: readonly { key: string; title: string; body: string; recommended?: boolean }[];
+  /** Why it is being asked: the reasoning whoever opened it wrote down with it. Absent when they wrote none. */
+  context?: string;
   /** Set once, with a mandatory reason, and then the row is immutable. */
   decided?: { option: string; reason: string; by: string; at: string };
 };

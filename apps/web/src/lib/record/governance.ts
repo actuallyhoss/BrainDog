@@ -103,7 +103,9 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
           { key: 'accept', title: copy.acceptIt, body: '' },
           { key: 'reject', title: copy.rejectIt, body: '' },
         ];
-  return { id, title: asked?.trim() || id, cost: '', rank, opened: text(row.opened_at), options };
+  /* THE REASONING IS THE QUESTION'S, written by whoever opened it (`body.context`), and it is drawn above the options. */
+  const context = text(body.context).trim();
+  return { id, title: asked?.trim() || id, cost: '', rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
 }
 
 /**

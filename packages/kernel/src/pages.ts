@@ -106,6 +106,8 @@ export type PageBlock = {
   under?: number;
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
+  /** A `note`'s: its body is a whole document, drawn with the blocks written in it, such as a project's `{{note}}`. */
+  document?: boolean;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
   stale?: { field: string; after: string };
   /**
@@ -158,6 +160,9 @@ const READS = new Set([
   /* A `progress` budget's figure of what was spent, grouped by the word its rows are, and a goal's of what was logged
      toward it, grouped by the row. */
   'spent', 'toward',
+  /* A `note` whose body is a whole document, a row's own plan with its blocks in it; and the rates a bar or a split
+     answers with. */
+  'document', 'fx',
 ]);
 
 export type PageDecl = {
