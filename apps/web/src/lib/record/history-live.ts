@@ -63,6 +63,21 @@ const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
 export const linesOf = (register: string, events: readonly Event[]): Line[] =>
   events.map((e) => ({ by: actor(e.actor), note: noteOf(register, e), at: e.ts })).reverse();
 
+/**
+ * The names of the people on this record, by id, for saying who did what. `members` is the owner's to read, so anybody
+ * else, a refusal and the sample all get an empty map, and each person is said as You or Someone on this record.
+ */
+export async function readNames(base: string, io?: Fetch): Promise<ReadonlyMap<string, string>> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.members().catch(() => null);
+  if (!out?.ok || !Array.isArray(out.value)) return new Map();
+  return new Map(
+    (out.value as { person_id?: unknown; name?: unknown }[]).flatMap((m) =>
+      typeof m.person_id === 'string' && typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()] as const] : [],
+    ),
+  );
+}
+
 /** One row's history. A row with no number the record could hold (a pending one) asks nothing. */
 export async function readHistory(base: string, register: string, seq: number, io?: Fetch): Promise<Told> {
   if (!Number.isInteger(seq) || seq < 1) return { from: 'sample', lines: [], now: NOW };

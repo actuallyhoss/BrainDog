@@ -22,7 +22,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { actorOf, backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values } from '$lib/record/api.ts';
+  import { backlinks, currencyFor, dirOf, display, entry, iconFor, identityOf, labelOf, NOW, readableFields, REGISTERS, toneOf, values, whoDid } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -33,7 +33,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import { Table } from 'braindog-render/svelte';
-  import { readHistory, type Told } from '$lib/record/history-live.ts';
+  import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
@@ -381,6 +381,19 @@
   const history = $derived(told && told.from !== 'refused' ? told.lines : []);
   /* THE RECORD'S ROW DOES NOT SAY WHO ADDED IT; its oldest event does. */
   const addedBy = $derived(live ? (history.at(-1)?.by ?? '') : (row?.by ?? ''));
+
+  /* WHO, BY NAME: the reader is You, and the record's members are asked for once, only when somebody else is in the
+     history, so a row only you have touched costs no read. */
+  const me = $derived(String(page.data.me?.person ?? ''));
+  let people = $state<ReadonlyMap<string, string>>(new Map());
+  let namesAsked = false;
+  $effect(() => {
+    if (!live || namesAsked) return;
+    if (!history.some((e) => /^p_/u.test(e.by) && e.by !== me)) return;
+    namesAsked = true;
+    void readNames(location.origin).then((m) => (people = m));
+  });
+  const addedWho = $derived(addedBy ? whoDid(addedBy, me || null, people) : null);
 
   const stateValue = $derived(decl?.state ? String(row?.fields[decl.state] ?? '') : '');
   const tone = $derived(decl?.done?.includes(stateValue) ? ('good' as const) : undefined);
@@ -794,7 +807,7 @@
           <!-- IN WORDS, like the other two surfaces that answer "who changed my record". `actorOf`
                moved into `api.ts` when Home and `/audit` were found spelling the same two actors two
                ways; this route was the third. -->
-          <dd>{since(row.created, clock)}{#if addedBy}{' by '}{actorOf(addedBy)}{/if}</dd>
+          <dd>{#if addedWho}{copy.rowAddedBy(since(row.created, clock), addedWho.you ? copy.rowByYou : addedWho.person && addedWho.name === copy.feedSomeone ? copy.rowBySomeone : addedWho.name)}{:else}{since(row.created, clock)}{/if}</dd>
         </dl>
 
         {#if !unwritten}
@@ -814,10 +827,10 @@
           <h2 class="side-title">History</h2>
           <ol class="history">
             {#each history as e}
-              {@const who = actorOf(e.by)}
+              {@const who = whoDid(e.by, me || null, people)}
               <li>
-                <Face name={who} you={who === 'you'} size="s" />
-                <span class="history-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
+                <Face name={who.name} you={who.you} size="s" />
+                <span class="history-by">{who.name.charAt(0).toUpperCase() + who.name.slice(1)}</span>
                 <span class="history-note">{e.note}</span>
                 <span class="history-when">{since(e.at, clock)}</span>
               </li>
@@ -1146,8 +1159,10 @@
   }
 
   .meta dd {
+    min-inline-size: 0;
     margin: 0;
     font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   .number {
@@ -1215,9 +1230,12 @@
     grid-row: 1 / span 2;
   }
 
+  /* A NAME WRAPS RATHER THAN RUNNING UNDER THE TIME beside it: a long name, or an id nobody could name. */
   .history-by {
     grid-column: 2;
     grid-row: 1;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 600;

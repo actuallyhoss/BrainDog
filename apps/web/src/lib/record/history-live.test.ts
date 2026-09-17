@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { display, NOW, REGISTERS } from './api.ts';
-import { noteOf, readHistory, sampleLines, type Fetch } from './history-live.ts';
+import { display, NOW, REGISTERS, whoDid } from './api.ts';
+import { noteOf, readHistory, readNames, sampleLines, type Fetch } from './history-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -91,4 +91,29 @@ test('a link is said without the id it is held as, which names nothing to a read
   assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: null, to: `cycles#${ulid}` }), 'cycle set');
   assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: ulid, to: '01M2PAZRWJZEGEEV41P8PR2H2Z' }), 'cycle changed');
   assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: ulid, to: null }), 'cycle cleared');
+});
+
+test('WHO DID IT IS SAID BY NAME, and never as a person\'s id: You, the name the record has, or Someone on this record', () => {
+  const me = 'p_01M2PAKF00EG11XPVBJ3PM4ZN8';
+  const other = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+  const stranger = 'p_01M2PB0000000000000000000A';
+  const names = new Map([[other, 'Ada Lovelace']]);
+  assert.deepEqual(whoDid(me, me, names), { name: 'You', you: true, person: true });
+  assert.deepEqual(whoDid(other, me, names), { name: 'Ada Lovelace', you: false, person: true });
+  assert.deepEqual(whoDid(stranger, me, names), { name: 'Someone on this record', you: false, person: true });
+  assert.deepEqual(whoDid(stranger, null), { name: 'Someone on this record', you: false, person: true });
+  assert.equal(whoDid('rule.renewal', me).name, 'renewal rule');
+  assert.equal(whoDid('agent:claude', me).name, 'claude');
+  assert.equal(whoDid('you', null).you, true, 'the sample\'s own writes are not the reader\'s');
+});
+
+test('THE NAMES ARE THE MEMBERS THE RECORD ANSWERS, and a refusal is no names rather than an error', async () => {
+  const members = [
+    { person_id: 'p_01M2PAZ28BN3FTKQB266DVT4HX', name: 'Ada Lovelace', email: null, level: 'owner', scoped: [], seen_at: null, suspended_at: null },
+    { person_id: 'p_01M2PB0000000000000000000A', name: '  ', email: null, level: 'read', scoped: [], seen_at: null, suspended_at: null },
+  ];
+  const answered = await readNames('https://x.example', (async () => new Response(JSON.stringify({ ok: true, value: members }), { status: 200, headers: { 'content-type': 'application/json' } })) as never);
+  assert.deepEqual([...answered], [['p_01M2PAZ28BN3FTKQB266DVT4HX', 'Ada Lovelace']]);
+  const refused = await readNames('https://x.example', (async () => new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Owners only.' } }), { status: 403, headers: { 'content-type': 'application/json' } })) as never);
+  assert.equal(refused.size, 0);
 });

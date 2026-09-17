@@ -2353,8 +2353,27 @@ export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockRe
  * WHO DID IT, AS A PERSON READS IT. A live record signs a person's write with their id, and a feed drew
  * `p_01M2PAZ28BN3FTKQB266DVT4HX` beside every line: the reader is You, and anybody else is somebody on the record.
  */
-export const feedWho = (who: string, me: string | null): string =>
-  me !== null && who === me ? copy.feedYou : /^p_[0-9A-Z]{20,}$/u.test(who) ? copy.feedSomeone : actorOf(who);
+export const feedWho = (who: string, me: string | null, names: ReadonlyMap<string, string> = new Map()): string => {
+  const said = whoDid(who, me, names);
+  return said.you && me === null ? actorOf(who) : said.name;
+};
+
+/** A person's id as the record signs a write with it: `p_` and a ULID. */
+const PERSON_ID = /^p_[0-9A-Z]{20,}$/u;
+
+/**
+ * WHO DID IT, BY NAME WHERE THE RECORD HAS ONE. A row's page printed `p_01M2PAZ…` under Added and down its History, and
+ * the id ran over "just now" beside it. The reader is You; a person the record names is that name; any other person is
+ * Someone on this record; a rule, an agent, the assistant and the record itself are said as `actorOf` says them.
+ */
+export function whoDid(who: string, me: string | null, names: ReadonlyMap<string, string> = new Map()): { name: string; you: boolean; person: boolean } {
+  /* THE SAMPLE SIGNS THE READER'S OWN WRITES `you`. */
+  if ((me !== null && me !== '' && who === me) || who === 'you') return { name: copy.feedYou, you: true, person: true };
+  const named = names.get(who);
+  if (named) return { name: named, you: false, person: true };
+  if (PERSON_ID.test(who)) return { name: copy.feedSomeone, you: false, person: true };
+  return { name: actorOf(who), you: false, person: false };
+}
 
 /**
  * WHAT IT WAS DONE TO, when that is not a row: a feed drew "installed pack:usecase-team" and "suggested suggestion:SG1".
