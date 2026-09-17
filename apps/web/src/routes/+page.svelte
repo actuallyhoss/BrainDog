@@ -35,13 +35,18 @@
 
   let { data } = $props();
 
-  /* THE RECORD'S DAY ON A LIVE RECORD, and the sample's frozen one otherwise. */
+  /**
+   * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday 16 September at two in the morning of the 17th,
+   * because it named the day in UTC. The record's own `tz` is not read, because every host provisions `UTC` and nobody
+   * sets it, so it cannot be told from a zone somebody chose. The sample's frozen day stays in UTC, so it reads the
+   * same everywhere.
+   */
   const today = $derived(
     new Date(data.now).toLocaleDateString('en-GB', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
-      timeZone: 'UTC',
+      ...(data.live ? {} : { timeZone: 'UTC' }),
     }),
   );
 
