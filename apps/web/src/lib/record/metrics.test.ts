@@ -779,3 +779,16 @@ test('A FRACTIONAL FACTOR ROUNDS PER ROW, as the record does, so the two engines
      rounded it read £10,416.17 here and £10,416.16 on a record. */
   assert.equal(metric('every-month-out').value, 'GBP 10,416.16');
 });
+
+test('A NOTE THAT ONLY SAYS NOUGHT IS NOT SAID: a clause whose figures are all 0 goes, in both engines', async () => {
+  const { noteOf } = await import('./metrics.ts');
+  const zero = format('int', 0);
+  assert.equal(zero, '0');
+  const figures: Record<string, string> = { agents: zero, later: zero, overdue: '2', big: '1,200' };
+  const said = (id: string) => figures[id] ?? null;
+  assert.equal(noteOf('{{agents}} with an agent, {{later}} kept for later', said), '');
+  assert.equal(noteOf('{{agents}} with an agent, {{overdue}} kept for later', said), '2 kept for later');
+  assert.equal(noteOf('{{overdue}} past their date, {{big}} in all', said), '2 past their date, 1,200 in all');
+  assert.equal(noteOf('to check, or blocked', said), 'to check, or blocked');
+  assert.equal(noteOf('{{agents}} of them by an agent', said), '');
+});

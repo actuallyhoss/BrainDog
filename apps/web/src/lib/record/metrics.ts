@@ -983,7 +983,16 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number, fx: Fx): Pick<Re
  * one plural the sentence needs: `1 account`, `2 accounts`.
  */
 export function noteOf(template: string, said: (id: string) => string | null): string {
-  return template
+  /* A CLAUSE THAT ONLY SAYS NOUGHT IS LEFT OUT. "0 with an agent, 0 kept for later" under a new record's Open tasks is
+     two things to read that say nothing; a clause whose every figure is 0 goes, and a note with none left is empty.
+     The template's own commas are the clauses, split before a figure like 1,200 is written in. */
+  const FIGURE = /\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu;
+  const kept = template.split(/,\s+/u).filter((clause) => {
+    const ids = [...clause.matchAll(FIGURE)].map((m) => m[1]!);
+    return ids.length === 0 || ids.some((id) => said(id) !== '0');
+  });
+  return kept
+    .join(', ')
     .replace(/\{\{\s*([a-z][a-z0-9_-]*)\s*\}\}/gu, (_, id: string) => said(id) ?? '—')
     .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : `${word}s`}`)
     .replace(/([A-Za-z]+)\(s\)/gu, '$1s');
