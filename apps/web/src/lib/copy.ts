@@ -644,6 +644,10 @@ export const copy = {
   recordEmpty: 'Nothing in the record yet.',
   /** A use case's pack going in or out, in the feed: "Added the Student use case". */
   useCaseEvent: (verb: string, name: string) => `${verb} the ${name} use case`,
+  /** A pack's settings saved, said as what changed: which use case speaks, or that the settings did. */
+  useCaseSpeaks: (name: string) => `${name} speaks for this BrainDog now`,
+  useCaseBeside: (name: string) => `${name} goes beside the voice already here`,
+  settingsChanged: (name: string) => `Changed the settings of ${name}`,
   /** A record setting itself up, said as one line of the feed: "Set up Personal with 40 example rows". */
   setUpWith: (name: string, rows: number) => `Set up ${name} with ${rows} example ${rows === 1 ? 'row' : 'rows'}`,
   setUpRows: (rows: number) => `Added ${rows} example ${rows === 1 ? 'row' : 'rows'}`,

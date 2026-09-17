@@ -107,6 +107,17 @@ const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  */
 const PACK_VERB: Record<string, string> = { install: 'Added', uninstall: 'Removed', upgrade: 'Updated', retire: 'Retired' };
 function packText(e: EventLine): string | null {
+  /* A PACK'S SETTINGS SAVED reached Home as "Edit". Said as what it did: a use case chosen to speak, or kept beside. */
+  if (e.kind === 'edit' && e.target_kind === 'pack' && e.target) {
+    const id = e.target.replace(/^pack:/u, '');
+    const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
+    const name = usecase ? useCaseName(usecase) : (PACKS.find((p) => p.id === id)?.name ?? id);
+    const to = typeof e.to === 'object' && e.to !== null && !Array.isArray(e.to) ? (e.to as Record<string, unknown>) : {};
+    const only = Object.keys(to).length === 1;
+    if (usecase && only && to.speaks === true) return copy.useCaseSpeaks(name);
+    if (usecase && only && to.speaks === false) return copy.useCaseBeside(name);
+    return copy.settingsChanged(name);
+  }
   const verb = PACK_VERB[e.kind];
   if (e.target_kind !== 'pack' || !verb || !e.target) return null;
   const id = e.target.replace(/^pack:/u, '');

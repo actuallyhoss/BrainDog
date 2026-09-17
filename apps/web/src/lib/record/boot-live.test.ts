@@ -112,6 +112,13 @@ test("an export's note is said as a sentence, not in the kernel's words", () => 
   assert.equal(at('sections header, data, grants redacted'), 'Exported part of the record');
 });
 
+test("a pack's settings saved are said as what they did, never as \"Edit\"", () => {
+  const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'edit', note: null, target_kind: 'pack', ...over })] as never, null)[0]?.text;
+  assert.equal(at({ target: 'pack:usecase-personal', to: { speaks: true } }), 'Personal speaks for this BrainDog now');
+  assert.equal(at({ target: 'pack:usecase-personal', to: { speaks: false } }), 'Personal goes beside the voice already here');
+  assert.equal(at({ target: 'pack:usecase-personal', to: { label_goals: 'Aims' } }), 'Changed the settings of Personal');
+});
+
 test('access given or taken away reads as a sentence, never as "Access grant"', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'access.grant', note: null, ...over })] as never, null)[0]?.text;
   assert.equal(at({ target_kind: 'member', field: '*', to: 'owner' }), 'Gave someone owner access to this record');

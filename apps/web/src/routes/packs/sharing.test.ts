@@ -223,7 +223,6 @@ test('SWITCHING TO A USE CASE THAT CAN SPEAK SETS IT TO, and keeps the others on
   assert.deepEqual(calls, [
     ['enablePack', { id: 'usecase-team' }],
     ['setPackConfig', { id: 'usecase-team', values: { speaks: true } }],
-    ['setPackConfig', { id: 'usecase-team', values: { speaks: true } }],
     ['setPackConfig', { id: 'usecase-student', values: { speaks: false } }],
   ]);
 });
@@ -235,14 +234,20 @@ test('A SECOND USE CASE ASKS WHOSE VOICE IS KEPT, and the answer is kept whichev
   assert.deepEqual(voiceQuestion(student, 'personal'), { now: 'student', rule: 'speaks' });
   assert.deepEqual(voiceQuestion(student, 'team'), { now: 'student', rule: 'beside' });
 
-  /* BESIDE, THOUGH PERSONAL SORTS FIRST: Student is set to speak and Personal set not to. */
-  const beside = stub();
-  await keepVoice(beside.client, student, 'personal', 'beside');
-  assert.deepEqual(new Map(beside.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks])), new Map([['usecase-personal', false], ['usecase-student', true]]));
-  /* TAKING IT OVER. */
-  const take = stub();
-  await keepVoice(take.client, student, 'personal', 'speaks');
-  assert.deepEqual(new Map(take.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks])), new Map([['usecase-personal', true], ['usecase-student', false]]));
+  /* ONLY WHAT THE RULE WOULD NOT DO: beside, though Personal sorts first, sets Personal not to speak, and nothing else. */
+  const written = async (states: Parameters<typeof keepVoice>[1], adding: string, choice: 'speaks' | 'beside') => {
+    const s = stub();
+    await keepVoice(s.client, states, adding, choice);
+    return s.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks]);
+  };
+  assert.deepEqual(await written(student, 'personal', 'beside'), [['usecase-personal', false]]);
+  assert.deepEqual(await written(student, 'personal', 'speaks'), [], 'Personal speaks unasked');
+  assert.deepEqual(await written(student, 'team', 'beside'), [], 'Team goes beside unasked');
+  assert.deepEqual(await written(student, 'team', 'speaks'), [['usecase-team', true]]);
+  /* ONE ALREADY CHOSEN TO SPEAK IS SET NOT TO when another takes the voice over. */
+  const chosen = [{ ...state('usecase-student'), speaks: true }];
+  assert.deepEqual(voiceQuestion(chosen, 'personal'), { now: 'student', rule: 'beside' });
+  assert.deepEqual(await written(chosen, 'personal', 'speaks'), [['usecase-personal', true], ['usecase-student', false]]);
 
   /* READ BACK, THE RULE SPEAKS AS CHOSEN, and a card offers Switch to the one put beside. */
   const held: Record<string, boolean> = { 'usecase-personal': false, 'usecase-student': true };

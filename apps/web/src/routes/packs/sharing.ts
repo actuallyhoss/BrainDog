@@ -16,7 +16,7 @@ import { carryForward, linkExamples, type ExampleLink } from '@braindog/seed/use
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
-import { SPEAKS, speaking, voiceWhenAdding, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
+import { SPEAKS, speaking, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
 
@@ -352,20 +352,26 @@ export const speakingStates = (client: Pick<SharingClient, 'packConfig'>, states
 export function voiceQuestion(states: readonly SpeakingState[], adding: string): { now: string; rule: 'speaks' | 'beside' } | null {
   const now = speaking(states);
   if (now === null || now === `usecase-${adding}`) return null;
-  return { now: now.slice('usecase-'.length), rule: voiceWhenAdding(states, adding) };
+  return { now: now.slice('usecase-'.length), rule: unasked(states, adding) };
 }
 
+/** What the rule does if nobody chooses: whether the use case added speaks once it is on beside the others. */
+const unasked = (states: readonly SpeakingState[], adding: string): 'speaks' | 'beside' =>
+  speaking([...states.filter((p) => p.id !== `usecase-${adding}`), { id: `usecase-${adding}`, disabled_at: null }]) === `usecase-${adding}` ? 'speaks' : 'beside';
+
 /**
- * Keep the person's answer once the use case is in, as each pack's `speaks` setting: the one chosen to speak is set to, and
- * every other use case switched on is set not to, so the rule reads the choice whatever the ids. A pack that has no such
- * setting (one installed before it existed) is passed over; the rule's order by id still stands for it.
+ * Keep the person's answer once the use case is in, as the `speaks` setting, writing only what the rule would not do on
+ * its own: nothing when the answer is what happens unasked, the added use case set to speak or not to otherwise, and one
+ * already set to speak set not to when another takes the voice over. Called after the examples are linked, so the setup
+ * stays one line of the feed. A pack that has no such setting (one installed before it existed) is passed over.
  */
 export async function keepVoice(client: Pick<SharingClient, 'setPackConfig'>, states: readonly SpeakingState[], adding: string, choice: 'speaks' | 'beside'): Promise<void> {
   const added = `usecase-${adding}`;
-  const now = speaking(states);
-  const lead = choice === 'speaks' ? added : now;
-  const others = new Set([added, ...states.filter((p) => p.id.startsWith('usecase-') && p.disabled_at === null).map((p) => p.id)]);
-  for (const id of others) await client.setPackConfig({ id, values: { [SPEAKS]: id === lead } }).catch(() => null);
+  const set = (id: string, speaks: boolean) => client.setPackConfig({ id, values: { [SPEAKS]: speaks } }).catch(() => null);
+  if (choice === 'speaks') {
+    if (unasked(states, adding) !== 'speaks') await set(added, true);
+    for (const p of states) if (p.id !== added && p.disabled_at === null && p.speaks === true) await set(p.id, false);
+  } else if (unasked(states, adding) === 'speaks') await set(added, false);
 }
 
 /** What a browse card offers for a use case on this record. */
@@ -409,7 +415,8 @@ export async function switchTo(client: SharingClient, id: string, states: readon
     /* A USE CASE THAT CAN BE SET TO SPEAK IS, and the others stay on beside it with their lists. */
     const set = await client.setPackConfig({ id: `usecase-${id}`, values: { [SPEAKS]: true } }).catch(() => null);
     if (set?.ok) {
-      await keepVoice(client, states, id, 'speaks');
+      for (const s of states)
+        if (s.id.startsWith('usecase-') && s.id !== `usecase-${id}` && s.disabled_at === null) await client.setPackConfig({ id: s.id, values: { [SPEAKS]: false } }).catch(() => null);
       return { ok: true };
     }
   }

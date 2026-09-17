@@ -76,8 +76,8 @@
     try {
       const out = await installShared(client, p);
       if (out.ok) {
-        if (asked) await keepVoice(client, heard, p.usecase.id, choice);
         const after = await afterInstall(client, p, pref.read().nav ?? []);
+        if (asked) await keepVoice(client, heard, p.usecase.id, choice);
         if (after.nav) pref.write({ nav: after.nav });
         toasts.push(copy.shareInstalled(p.usecase.title), { intent: 'good' });
         plan = null;
