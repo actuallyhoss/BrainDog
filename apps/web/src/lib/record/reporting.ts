@@ -14,31 +14,40 @@ export const READINGS = 'datapoints';
 const NEEDS = ['name', 'value', 'at'] as const;
 
 /** What a key for this row is bound to: the row itself, by the field that points at its list, and where it came from. */
-export type Binding = { fixed: Record<string, string>; stamp: 'at' };
+export type Binding = { fixed: Record<string, string | null>; stamp: 'at' };
 
 type Field = { id?: unknown; type?: unknown; to?: unknown; values?: unknown };
 
-/** Whether a list's fields can take reported numbers, and which of its fields points at `register`. */
-export function bindable(fields: readonly Field[], register: string): { field: string; source: boolean } | null {
+/**
+ * Whether a list's fields can take reported numbers, which of its fields points at `register`, and every other field that
+ * points at a row, which a key for this row fixes too.
+ */
+export function bindable(fields: readonly Field[], register: string): { field: string; source: boolean; links: string[] } | null {
   const ids = new Set(fields.map((f) => f.id));
   if (!NEEDS.every((n) => ids.has(n))) return null;
   const link = fields.find((f) => f.type === 'ref' && f.to === register);
   if (!link || typeof link.id !== 'string') return null;
   const source = fields.find((f) => f.id === 'source');
-  return { field: link.id, source: Array.isArray(source?.values) && source.values.includes('reported') };
+  const links = fields.flatMap((f) => (f.type === 'ref' && typeof f.id === 'string' && f.id !== link.id ? [f.id] : []));
+  return { field: link.id, source: Array.isArray(source?.values) && source.values.includes('reported'), links };
 }
 
 /**
  * The fixed fields of a key for one row: the row, by its spoken id, the organisation that lists it when it is a
  * project one lists, and `reported` as its source when the list says where a number came from.
+ *
+ * EVERY OTHER LINK IS FIXED EMPTY. A key for Northwind fixed only `organisation`, so whoever held it could send
+ * `thing: things#4`, a project of another organisation, and the number landed on that project's page. A key reports for
+ * the row it was made for and points at nothing else.
  */
 export function bindingOf(
   field: string,
   spoken: string,
-  opts: { source: boolean; organisation?: string | null },
+  opts: { source: boolean; organisation?: string | null; links?: readonly string[] },
 ): Binding {
   return {
     fixed: {
+      ...Object.fromEntries((opts.links ?? []).map((id) => [id, null])),
       [field]: spoken,
       ...(opts.organisation ? { organisation: opts.organisation } : {}),
       ...(opts.source ? { source: 'reported' } : {}),

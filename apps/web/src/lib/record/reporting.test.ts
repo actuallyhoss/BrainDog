@@ -16,8 +16,8 @@ const DATAPOINTS = [
 ];
 
 test('a list takes reported numbers when it has a name, a value and a time, and a field that points at the row', () => {
-  assert.deepEqual(bindable(DATAPOINTS, 'organisations'), { field: 'organisation', source: true });
-  assert.deepEqual(bindable(DATAPOINTS, 'things'), { field: 'thing', source: true });
+  assert.deepEqual(bindable(DATAPOINTS, 'organisations'), { field: 'organisation', source: true, links: ['thing'] });
+  assert.deepEqual(bindable(DATAPOINTS, 'things'), { field: 'thing', source: true, links: ['organisation'] });
   assert.equal(bindable(DATAPOINTS, 'people'), null, 'nothing points at people');
   assert.equal(bindable(DATAPOINTS.filter((f) => f.id !== 'at'), 'things'), null, 'a reading with no time is not one');
 });
@@ -28,6 +28,18 @@ test('the key is bound to the row, to the organisation that lists a project, and
     stamp: 'at',
   });
   assert.deepEqual(bindingOf('organisation', 'organisations#2', { source: false }).fixed, { organisation: 'organisations#2' });
+  /* A KEY POINTS AT NOTHING BUT ITS ROW: an organisation's key sent `thing: things#4`, another organisation's project,
+     and the number landed on that project's page. */
+  assert.deepEqual(bindingOf('organisation', 'organisations#2', { source: true, links: ['thing'] }).fixed, {
+    thing: null,
+    organisation: 'organisations#2',
+    source: 'reported',
+  });
+  assert.deepEqual(bindingOf('thing', 'things#3', { source: false, organisation: null, links: ['organisation'] }).fixed, { organisation: null, thing: 'things#3' });
+  assert.deepEqual(bindingOf('thing', 'things#3', { source: false, organisation: 'organisations#1', links: ['organisation'] }).fixed, {
+    organisation: 'organisations#1',
+    thing: 'things#3',
+  });
   assert.equal(keyFor({ organisation: 'organisations#2' }, 'organisation', 'organisations#2'), true);
   assert.equal(keyFor({ organisation: 'organisations#1' }, 'organisation', 'organisations#2'), false);
   const orgs = [

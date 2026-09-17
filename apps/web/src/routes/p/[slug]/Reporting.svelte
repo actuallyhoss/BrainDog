@@ -59,7 +59,7 @@
       const id = row.ok ? (row.value as { id?: unknown }).id : null;
       if (typeof id === 'string' && orgs.ok) organisation = organisationOf(orgs.value.rows as never, id);
     }
-    binding = bindingOf(bound.field, spoken, { source: bound.source, organisation });
+    binding = bindingOf(bound.field, spoken, { source: bound.source, organisation, links: bound.links });
     await list(client);
     from = 'ready';
   }
