@@ -600,7 +600,15 @@
   .bridge-numbers,
   .split-numbers,
   .spark-numbers {
-    margin-inline: var(--sp-2);
+    /* THE FOLD SCROLLS SIDEWAYS, AND THE PAGE DOES NOT. A month to a column is wider than a phone, and a series table
+       held Money and a shared page at 375px on a 320px screen, the whole document sliding under the thumb. A table
+       that is wider than its place scrolls inside it, as the register grid's region does. The padding is room for
+       the summary's focus ring, which the scroll box would otherwise clip, and the margins put the words back where
+       they were. */
+    overflow-x: auto;
+    margin-block: calc(-1 * var(--sp-1));
+    margin-inline: var(--sp-1);
+    padding: var(--sp-1);
   }
 
   .series-toggle,
@@ -704,6 +712,13 @@
   .spark-table th:first-child,
   .forecast-table td:nth-child(2) {
     text-align: start;
+  }
+
+  /* WHAT GIVES WAY, AND NOTHING ELSE CAN. The forecast's table has four columns, three of them a day and two amounts
+     that cannot break, and a description as long as `Invoice 2026-046: retainer, August · overdue`, which held the
+     table at 360px on a 320px phone and slid a shared page sideways. A word in it breaks only when it cannot fit. */
+  .forecast-table td:nth-child(2) {
+    overflow-wrap: anywhere;
   }
 
   .series-said {
