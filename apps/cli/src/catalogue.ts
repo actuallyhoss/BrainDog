@@ -428,7 +428,7 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
     io.say('The scratch record for the preview could not be created.');
     return 1;
   }
-  io.out(`Previewing ${read.shared.usecase.title} ${read.shared.usecase.version} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.shared.usecase.usecase} and press Install. Stop with Ctrl+C; the scratch record is removed.`);
+  io.out(`Previewing ${read.shared.usecase.title} ${read.shared.usecase.version} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.shared.usecase.usecase}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;
