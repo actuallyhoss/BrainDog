@@ -1986,6 +1986,21 @@
     gap: var(--sp-2);
   }
 
+  /* SMALL MULTIPLES: a full-width block that draws several measures sets them two across on a wide screen, each
+     chart as tall as one, so a portfolio reads as a page and not a scroll. Anything else in the block spans both. */
+  @media (min-width: 1100px) {
+    .block-slot[data-stacked]:has(> .block[data-kind='lines'] ~ .block[data-kind='lines']) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-7);
+      align-items: start;
+    }
+
+    .block-slot[data-stacked]:has(> .block[data-kind='lines'] ~ .block[data-kind='lines']) > :not(.block[data-kind='lines']) {
+      grid-column: 1 / -1;
+    }
+  }
+
   .lines-lead {
     display: flex;
     flex-wrap: wrap;
@@ -2050,8 +2065,8 @@
 
   .lines-plot {
     position: relative;
-    margin-block-start: var(--sp-5);
-    margin-inline: var(--sp-2);
+    margin-block-start: var(--sp-4);
+    margin-inline: var(--sp-2) calc(var(--sp-2) + 10ch);
     touch-action: pan-y;
   }
 
@@ -2096,7 +2111,8 @@
   .lines-top,
   .lines-bottom {
     position: absolute;
-    inset-inline-start: 0;
+    white-space: nowrap;
+    inset-inline-start: calc(100% + var(--sp-2));
     color: var(--dim);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
@@ -2105,11 +2121,12 @@
 
   .lines-top {
     inset-block-start: 0;
-    translate: 0 -100%;
+    translate: 0 -50%;
   }
 
   .lines-bottom {
     inset-block-end: 0;
+    translate: 0 50%;
   }
 
   .lines-rule {
@@ -2166,7 +2183,7 @@
     block-size: 1.5em;
     margin: 0;
     margin-block-start: var(--sp-2);
-    margin-inline: var(--sp-2);
+    margin-inline: var(--sp-2) calc(var(--sp-2) + 10ch);
     padding: 0;
     list-style: none;
   }

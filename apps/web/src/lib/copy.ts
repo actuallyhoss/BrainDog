@@ -591,6 +591,19 @@ export const copy = {
   measureAgainst: (change: string, days: number) => `${change} on the previous ${days} days`,
   measureNothingBefore: (days: number) => `Nothing reported in the ${days} days before`,
   measureLastOn: (day: string) => `Last reported ${day}`,
+  /* SEND NUMBERS HERE (`routes/p/[slug]/Reporting.svelte`): the seed's heading, which the panel is drawn under, and what
+     a report key can and cannot do, said before anybody makes one. */
+  reportHeading: 'Send numbers here',
+  reportWhy: (title: string) =>
+    `A project sends its numbers to ${title} with a report key. The key can only add numbers for ${title}: it cannot read anything, or write anywhere else.`,
+  reportLine: 'Send one number from the project, or from a scheduled job on its server',
+  reportPlaceholder: '<report key>',
+  reportMake: 'Make a report key',
+  reportKeys: 'Report keys',
+  reportRevoked: 'Revoked. The key stops working now.',
+  reportUnread: 'The report keys could not be read just now.',
+  reportPoll:
+    'Or let BrainDog fetch them: if the project answers its numbers as JSON at an https address, ask your agent to propose a poll of it. You approve the address and how often once, and the numbers arrive on their own.',
   /* A BALANCE NOBODY HAS UPDATED IN A WHILE says so beside its date, with the watch glyph. */
   outOfDate: (day: string) => `${day}, out of date`,
   /* A ROUNDED ZERO IS NOT A DIRECTION. "up 0%" gives a reader a way and a distance of nothing. */

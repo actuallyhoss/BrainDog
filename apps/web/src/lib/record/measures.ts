@@ -165,7 +165,9 @@ export function changeLine(m: Measure): string {
  */
 export function tileRows(measures: readonly Measure[]): string[] {
   return measures.slice(0, TILES_MOST).map((m) => {
-    const figure = m.latest ? figureOf(m.latest.value, m.unit) : '';
+    /* A TILE'S FIGURE KEEPS ITS CURRENCY AND DROPS ANY OTHER UNIT, which its name already says: "476 customers" under
+       "Active customers" is a tile wrapped over two lines to say one word twice. */
+    const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
     const trend = m.now.some((v) => v !== null) ? ` | ${m.now.map((v) => (v === null ? '-' : String(v))).join(' ')}` : '';
     return `${escapeCell(m.name)} | ${escapeCell(figure)} | ${escapeCell(changeLine(m))}${trend}`;
   });

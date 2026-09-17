@@ -33,6 +33,7 @@
   import BlockBar from '$lib/ui/BlockBar.svelte';
   import AddBlock from '$lib/ui/AddBlock.svelte';
   import Actions from './Actions.svelte';
+  import Reporting from './Reporting.svelte';
   import { words as actionWords } from '$lib/record/actions.ts';
   import { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropIndex, spanOf as declaredSpan } from '$lib/record/arrange.ts';
@@ -809,6 +810,12 @@
                  above its keys, tools and skills. Not while arranging: a list that fetches is not a block to move. -->
             {#if block.kind === 'section' && block.heading === actionWords.runsOn && param && !arranging}
               <Actions project={param.title} />
+              <!-- A PROJECT'S OWN KEY FOR ITS NUMBERS, beside what it runs on, when the record keeps a list of them. -->
+              <Reporting register={param.register} seq={param.seq} title={param.title} />
+            {/if}
+            <!-- AN ORGANISATION'S "Send numbers here": the key its projects report with, and the line that uses it. -->
+            {#if block.kind === 'section' && block.heading === copy.reportHeading && param && !arranging}
+              <Reporting register={param.register} seq={param.seq} title={param.title} />
             {/if}
             {#if !drawn.refusal && !block.cannot && block.total > block.shown}
               {@const to = openHref(block)}
