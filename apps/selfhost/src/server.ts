@@ -473,6 +473,12 @@ export async function start(options: {
    * labelled `spark`; it is opened on each call and never kept (`spark.ts`). `send` is for tests.
    */
   spark?: SparkConfig | undefined;
+  /**
+   * How often to ask whether Spark is due its daily look (`sparkTick`, at most once a UTC day, unless the owner turned it off).
+   * OFF UNLESS ASKED, as the actions are, so a test that fills a record does not find questions it did not file. `main.ts`
+   * asks hourly.
+   */
+  sparkTickMs?: number | undefined;
 } & (
     | {
         /**
@@ -542,6 +548,7 @@ export async function start(options: {
     gone = true;
     scheduler.stop();
     if (ticker) clearInterval(ticker);
+    if (sparkTicker) clearInterval(sparkTicker);
     const record = sql.one<{ id: string }>('SELECT id FROM record WHERE singleton = 1')?.id;
     sql.close();
     if (record && ledger) ledger.close(record);
@@ -562,6 +569,8 @@ export async function start(options: {
      the alarm drains the record when it fires. The scheduler is built first and the record is what
      it drains, which is why this one binding is written before the thing it names exists. */
   let api!: Awaited<ReturnType<typeof createRecordApi>>;
+  /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
+  const sparkModel = sparkModelFor(options.spark ?? sparkFromEnv(env), () => api, options.keys);
 
   /**
    * Drain everything due, then re-arm.
@@ -701,14 +710,13 @@ export async function start(options: {
     /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
     readAddress: sharedReader(options.shared),
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
-    sparkModel: sparkModelFor(options.spark ?? sparkFromEnv(env), () => api, options.keys),
+    sparkModel,
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
-       No `SPARK_ENDPOINT`: `31 §2` has this host at rank 21 and `spark` at 13 and unbuilt, so
-       claiming a Spark here would be claiming something nothing serves. */
+       `spark` is whether a model is behind Spark here: an endpoint, and a key to call it with or none needed. */
     snapshots: kept,
-    destroy,    build: { app: buildApp, spark: false },
+    destroy,    build: { app: buildApp, spark: sparkModel !== undefined },
   });
 
   const refused = api.kernel.refused();
@@ -726,6 +734,20 @@ export async function start(options: {
      a process that died holding it. */
   const ticker = options.pollMs === 0 ? null : setInterval(() => void poll(), options.pollMs ?? 15_000);
   ticker?.unref?.();
+
+  /* SPARK'S DAILY LOOK. The record decides whether it is due; this only asks, now and then every `sparkTickMs`. A look that
+     throws is logged and waits for tomorrow, because the day was kept before the work. */
+  const spark = async (): Promise<void> => {
+    if (gone) return;
+    try {
+      await api.sparkTick();
+    } catch (e) {
+      console.error('spark:', e instanceof Error ? e.message : String(e));
+    }
+  };
+  const sparkTicker = options.sparkTickMs ? setInterval(() => void spark(), options.sparkTickMs) : null;
+  sparkTicker?.unref?.();
+  if (sparkTicker) void spark();
 
   /* Arm from what the record already holds. A record reopened after a week has reminders whose time
      came while nothing was running, and an alarm nobody set is a schedule that never restarts. */
@@ -900,6 +922,7 @@ export async function start(options: {
       new Promise<void>((r) => {
         scheduler.stop();
         if (ticker) clearInterval(ticker);
+        if (sparkTicker) clearInterval(sparkTicker);
         server.close(() => (gone || sql.close(), dirSql.close(), r()));
       }),
   };

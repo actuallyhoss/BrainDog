@@ -452,6 +452,8 @@ async function serve(): Promise<void> {
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
     /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
     actions: {},
+    /* SPARK LOOKS ONCE A DAY on its own unless the owner turned that off; asking hourly is how a day is noticed. */
+    sparkTickMs: 3_600_000,
   });
   /* `importKey` copied it, so these are the last copies this process holds as bytes. */
   sessionKey.fill(0);

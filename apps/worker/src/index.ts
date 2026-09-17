@@ -33,6 +33,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
+import { sparkLook, workerSparkModel } from './spark.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
@@ -70,6 +71,8 @@ type Env = {
   BRAINDOG_BUILD?: string;
   /** Empty when no Spark is wired, so `/api/spark/*` is not routed at all (`33 §4`). */
   SPARK_ENDPOINT?: string;
+  /** The model name the Spark endpoint expects, when it expects one. The key is the person's own, from the vault (`spark.ts`). */
+  SPARK_MODEL?: string;
   /**
    * The one record an anonymous GET reads, for the public demo, or empty for none. `demoRecord` in
    * `route.ts` is the whole of what it opens. Declared empty in `wrangler.jsonc`, like
@@ -178,6 +181,8 @@ export class Record$ extends DurableObject<Env> {
   /** Migrate, then arm. Both before any request is answered, which is what the block is for. */
   async #open(): Promise<RecordApi> {
     let api!: RecordApi;
+    /* SPARK'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`spark.ts`). */
+    const sparkModel = workerSparkModel(this.env, () => api);
     await this.ctx.blockConcurrencyWhile(async () => {
       api = await createRecordApi({
         sql: storageSql(this.ctx.storage),
@@ -190,8 +195,9 @@ export class Record$ extends DurableObject<Env> {
            comparing against the empty string and finding it merely unequal. */
         build: {
           app: this.env.BRAINDOG_BUILD ?? '',
-          spark: Boolean(this.env.SPARK_ENDPOINT),
+          spark: sparkModel !== undefined,
         },
+        sparkModel,
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. */
@@ -248,6 +254,7 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     await api.kernel.drain(this.#alarm);
     await this.#act(api);
+    await sparkLook(api);
   }
 
   /**
@@ -477,6 +484,8 @@ export class Record$ extends DurableObject<Env> {
       return json(out, httpStatus(out));
     }
 
+    /* SPARK'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */
+    this.ctx.waitUntil(sparkLook(api));
     return serveApi(request, handlersFor(api), ctx);
   }
 }

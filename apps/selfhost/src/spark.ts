@@ -6,47 +6,31 @@
  *
  * THE KEY IS THE HOST'S OR THE PERSON'S, NEVER THE RECORD'S TO READ. `SPARK_KEY` in the environment, when the operator set one;
  * otherwise the person's own key in the vault under the label `spark`, opened through this host's key store on each call
- * (`actions.ts` `keyOpener`, which counts the opening under a `grant.read` event). Neither is written anywhere.
+ * (`actions.ts` `keyOpener`, which counts the opening under a `grant.read` event). Neither is written anywhere. The builder is
+ * `@braindog/host/spark`'s, the one the Worker uses too.
  */
 
-import { endpointModel } from '@braindog/host/spark';
+import { SPARK_KEY_LABEL, sparkFromEnv as fromEnv, sparkModelOf, type SparkHostConfig } from '@braindog/host/spark';
 import type { RecordApi, SparkModel } from '@braindog/record';
 
 import { keyOpener } from './actions.ts';
 import type { KeyStore } from './keys.ts';
 
-/** The vault label a person's own model key is kept under. */
-export const SPARK_KEY_LABEL = 'spark';
+export { SPARK_KEY_LABEL };
 
-export type SparkConfig = {
-  url: string;
-  model?: string | undefined;
-  /** The operator's key. Absent, the vault's `spark` key, if the person put one there. */
-  key?: string | undefined;
+export type SparkConfig = SparkHostConfig & {
   send?: ((input: URL, init: RequestInit) => Promise<Response>) | undefined;
 };
 
 /** `SPARK_ENDPOINT`, `SPARK_MODEL`, `SPARK_KEY`, or nothing. */
-export function sparkFromEnv(env: Record<string, string | undefined>): SparkConfig | undefined {
-  const url = env.SPARK_ENDPOINT?.trim();
-  if (!url) return undefined;
-  return { url, model: env.SPARK_MODEL?.trim() || undefined, key: env.SPARK_KEY || undefined };
-}
+export const sparkFromEnv = (env: Record<string, string | undefined>): SparkConfig | undefined => fromEnv(env);
 
 /** The model the record is handed, or `undefined`. An address that is not http or https is refused at boot, loudly. */
 export function sparkModelFor(config: SparkConfig | undefined, api: () => RecordApi, store: KeyStore | undefined): SparkModel | undefined {
   if (!config) return undefined;
-  const own = async (): Promise<string | null> => {
-    const grant = api()
-      .kernel.grants()
-      .find((g) => g.label === SPARK_KEY_LABEL && g.revoked_at === null);
-    return grant ? keyOpener(api(), store)(grant) : null;
-  };
-  return endpointModel({
-    url: config.url,
-    model: config.model,
-    key: config.key !== undefined ? async () => config.key ?? null : own,
+  return sparkModelOf(config, {
+    grants: () => api().kernel.grants(),
+    openKey: (grant) => keyOpener(api(), store)(grant),
     send: config.send ?? ((input, init) => fetch(input, init)),
-    name: 'endpoint',
   });
 }
