@@ -9,9 +9,11 @@
  * plan names the host, how often, and the key it sends (`loop/DIRECTION.md` §0b). Nothing here calls anything; the
  * runner does, from the declaration, and refuses a private or local address as it refuses every other.
  *
- * ONE POLL PER MEASURE. A `poll` fills one row from one answer, so three measures are three polls of the same
- * address, each on its own interval and its own change check. The address, the key and the interval are the
- * same on all of them, so the plan prints one line per measure with the same host.
+ * ONE POLL PER ADDRESS. Its `map` is a list, one map a measure, so three measures at one address are one request
+ * an interval, and each number becomes its own datapoint from that one answer. The plan prints one line for it.
+ *
+ * A KEY ONLY WHEN THE ADDRESS NEEDS ONE. An address that answers anybody is polled with no key, so nothing has to be
+ * put in the vault for it. The owner's approval at install and the refusal of a private address are the same either way.
  */
 
 export type PolledMeasure = {
@@ -30,8 +32,8 @@ export type PollSpec = {
   id: string;
   /** The whole `https://` address. A literal host, never computed. */
   url: string;
-  /** The label of the key in the vault the request sends. */
-  grant: string;
+  /** The label of the key in the vault the request sends, or absent for an address that needs none. */
+  grant?: string;
   /** `15m` or longer. */
   every: string;
   /** The project the numbers are about, as a row id or its spoken id (`things#1`). */
@@ -50,37 +52,32 @@ const ident = (text: string): string =>
     .replace(/_+/g, '_');
 
 /**
- * The pack document for one polled project.
+ * The pack document for one polled address.
  *
  * `project` goes on the declaration too, so the meter counts the runs against that project, and the datapoint's
  * `thing` is the same project; `organisation` only fills the row.
  */
 export function pollPack(spec: PollSpec): Record<string, unknown> {
-  const base = ident(spec.id).slice(0, 12) || 'project';
-  const used = new Set<string>();
-  const declarations = spec.measures.map((m, i) => {
-    let ingest = `poll_${base}_${ident(m.name).slice(0, 14) || String(i + 1)}`.replace(/_+$/g, '').slice(0, 32);
-    while (used.has(ingest)) ingest = `${ingest.slice(0, 29)}_${i + 1}`;
-    used.add(ingest);
-    return {
-      ingest,
+  const declarations = [
+    {
+      ingest: `poll_${ident(spec.id).slice(0, 27) || 'project'}`.replace(/_+$/g, ''),
       channel: 'poll',
       url: spec.url,
       every: spec.every,
-      grant: spec.grant,
+      ...(spec.grant === undefined || spec.grant.trim() === '' ? {} : { grant: spec.grant.trim() }),
       ...(spec.project === undefined ? {} : { project: spec.project }),
-      map: {
+      map: spec.measures.map((m) => ({
         name: { value: m.name },
         value: { path: m.path, type: m.type ?? 'decimal' },
-        ...(m.unit === undefined ? {} : { unit: { value: m.unit } }),
+        ...(m.unit === undefined || m.unit === '' ? {} : { unit: { value: m.unit } }),
         ...(spec.project === undefined ? {} : { thing: { value: spec.project } }),
         ...(spec.organisation === undefined ? {} : { organisation: { value: spec.organisation } }),
         source: { value: 'polled' },
         at: { arrived: true },
-      },
+      })),
       writes: { register: 'datapoints' },
-    };
-  });
+    },
+  ];
   return {
     pack: `poll-${spec.id}`,
     version: '1.0.0',

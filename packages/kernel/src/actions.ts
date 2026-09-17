@@ -63,8 +63,8 @@ export type ActionDecl = {
   /** `pull` only, `42 §4.7`: where it fetches when it does not say `url:`. */
   fetch?: { base?: string; path?: string };
   extract?: Record<string, unknown>;
-  /** A JSON answer read by paths, in place of `extract` (`map.ts`). */
-  map?: Record<string, unknown>;
+  /** A JSON answer read by paths, in place of `extract` (`map.ts`). A poll's may be a list, one row a map, from one answer. */
+  map?: Record<string, unknown> | Record<string, unknown>[];
   writes?: { register?: string };
 };
 
@@ -222,8 +222,10 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
   if (decl.trigger === 'rule') return null;
   const every = Math.max(intervalMs(decl.every ?? '') ?? FLOOR_MS, FLOOR_MS);
 
-  const key = keyNamed(deps.sql, decl.grant);
-  if (!key) {
+  /* A POLL THAT NAMES NO KEY SENDS NONE, so there is nothing in the vault to miss. */
+  const keyless = decl.channel === 'poll' && (decl.grant === undefined || decl.grant === '');
+  const key = keyless ? null : keyNamed(deps.sql, decl.grant);
+  if (!keyless && !key) {
     deps.sql.exec("UPDATE schedule SET state = 'paused' WHERE id = ?", row.id);
     deps.notify({
       actor: `ingest:${row.key}`,
@@ -240,7 +242,7 @@ export function fireAction(deps: ActionDeps, row: { id: string; kind: string; ke
     row.kind,
     row.key,
   );
-  if (!busy) deps.enqueue({ channel: row.kind, ingest: row.key, grant: key.id });
+  if (!busy) deps.enqueue({ channel: row.kind, ingest: row.key, ...(key ? { grant: key.id } : {}) });
 
   return deps.nowMs + every + actionJitterMs(deps.recordId, pack, row.key, every);
 }
@@ -523,10 +525,15 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
       /* A POLL'S ARRIVALS ARE KEYED BY RUN, so an answer that goes A, B and back to A is three changes and
          not a redelivery of the first. A PULL'S ARE KEYED BY CONTENT, so the same page twice is one row. */
       const sha = channel === 'poll' ? `${ingest}:${hash}:${job.id}` : `${ingest}:${hash}`;
-      const arrived = deps.arrive(decl, answer.body, sha);
-      if (!arrived.ok) {
+      /* ONE ANSWER, SEVERAL ROWS: a poll whose map is a list hands the same answer in once a map, so three numbers at
+         one address cost one request. Each arrival is its own, keyed by its place in the list. */
+      const arrivals = Array.isArray(decl.map)
+        ? decl.map.map((map, i) => deps.arrive({ ...decl, map }, answer.body, `${sha}:${i}`))
+        : [deps.arrive(decl, answer.body, sha)];
+      const failed = arrivals.find((a) => !a.ok);
+      if (failed) {
         outcome = 'refused';
-        say = `${ingest} ran, and its answer could not be written: ${'refusal' in arrived ? arrived.refusal.fix : 'the record refused it'}`;
+        say = `${ingest} ran, and its answer could not be written: ${'refusal' in failed ? failed.refusal.fix : 'the record refused it'}`;
       }
     }
 

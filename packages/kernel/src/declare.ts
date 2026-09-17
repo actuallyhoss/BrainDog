@@ -1228,15 +1228,21 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
      grammar reaches nothing rather than throwing, so the mapped field is absent, the row is written
      without it, and the connector reports a successful page. */
   if (body.map !== undefined) {
-    const map = body.map;
-    if (map === null || typeof map !== 'object' || Array.isArray(map))
-      return bad('DECLARATION_INVALID', `${id}'s map is one entry per field.`, 'map');
+    /* A POLL MAY FILL SEVERAL ROWS FROM ONE ANSWER: a list of maps, one row each, so three numbers at one address are one
+       request an interval and not three. Each map in the list is held to exactly what a single map is. */
+    const maps: unknown[] = body.channel === 'poll' && Array.isArray(body.map) ? body.map : [body.map];
+    if (body.channel === 'poll' && Array.isArray(body.map) && (maps.length === 0 || maps.length > POLL_MAPS_MOST))
+      return bad('DECLARATION_INVALID', `${id}'s map is one map, or a list of 1 to ${POLL_MAPS_MOST} maps, each filling one row.`, 'map');
     if (body.extract !== undefined)
       return bad('DECLARATION_INVALID', `${id} carries both extract and map. Read text with extract, or a JSON answer with map, and not both.`, 'map');
+    for (const [i, map] of maps.entries()) {
+    const where = Array.isArray(body.map) ? `map[${i}]` : 'map';
+    if (map === null || typeof map !== 'object' || Array.isArray(map))
+      return bad('DECLARATION_INVALID', `${id}'s ${where} is one entry per field.`, where);
     /* A POLL'S MAP FILLS ONE ROW, and is held to `mappingFault` whole. A PULL'S is a connector's, whose `read.rows`
        may expand a list, so its paths keep the grammar check they had and a stated value or `arrived` is checked as one. */
     for (const [field, entry] of Object.entries(map as Record<string, { path?: unknown }>)) {
-      const at = `${id}.map.${field}`;
+      const at = `${id}.${where}.${field}`;
       if (body.channel === 'poll' || entry === null || typeof entry !== 'object' || !('path' in entry)) {
         const wrong = mappingFault(entry, at);
         if (wrong) return wrong;
@@ -1247,6 +1253,7 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
         const wrong = pathFault(path, `${at}.path`);
         if (wrong) return wrong;
       }
+    }
     }
   }
 
@@ -1301,6 +1308,8 @@ const BODY_BYTES = 8_192;
 const CALL_TRIGGERS = ['schedule', 'rule', 'both'] as const;
 /** The most fields one call sends. Each is printed in the install diff. */
 const SENDS_CEILING = 32;
+/** The most rows one poll fills from one answer, one map each. */
+export const POLL_MAPS_MOST = 20;
 /** `<register>.<field>`, both in the identifier grammar. */
 const SENDS_NAME = /^([a-z][a-z0-9_]{0,31})\.([a-z][a-z0-9_]{0,31})$/;
 
@@ -1429,7 +1438,11 @@ function actionFault(decl: Declaration, channel: 'call' | 'poll', installed?: Kn
   const inUrl = substitutionFault(body.url.slice('https://'.length + authority.length));
   if (inUrl) return bad('ACTION_EVALUATES', inUrl, 'url');
 
-  if (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40)
+  /* A POLL OF AN ADDRESS THAT NEEDS NO KEY SENDS NONE, so it names none: a public JSON answer is read as anybody reads
+     it, and making the owner put a key in the vault for it would be a key that opens nothing. A call always sends one,
+     because it writes to somebody else's service. A key that is named is still held to its label's shape. */
+  const keyless = channel === 'poll' && body.grant === undefined;
+  if (!keyless && (typeof body.grant !== 'string' || body.grant.trim() === '' || body.grant.length > 40))
     return bad('ACTION_GRANT_MISSING', `${id} names no key. Write grant: and the label of the key in the vault it sends.`, 'grant');
 
   /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and one that wrote a clock anyway would read as running on it. */

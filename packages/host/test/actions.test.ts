@@ -285,3 +285,13 @@ test('HOLDING TELLS THE LEDGER HOW MANY RUNS THIS PASS HAS ALREADY LET THROUGH, 
   assert.deepEqual(asked, [0, 1, 2, 2]);
   assert.equal(sent, 2, 'a pass sent past the allowance, because nothing it let through counted until it was metered');
 });
+
+test('A POLL THAT SENDS NO KEY IS STILL REFUSED A PRIVATE OR LOCAL ADDRESS, and nothing is sent', async () => {
+  for (const written of ['https://127.0.0.1:5932', 'https://localhost', 'https://192.168.1.10']) {
+    const origin = new URL(written).origin;
+    const net = wire<object>(new Response('{"mrr":1}'));
+    const answer = await sendAction({ origins: declaring(origin), openKey: null, send: net.send, pin: async () => ({}) })(request({ url: `${origin}/numbers.json`, origin, grant: null }));
+    assert.equal(codeOf(answer), 'PULL_ORIGIN_REFUSED', origin);
+    assert.equal(net.calls.length, 0, `${origin} was sent to`);
+  }
+});

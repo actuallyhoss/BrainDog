@@ -78,28 +78,41 @@ const SPEC = {
   ],
 };
 
-test('THE POLL PACK IS ONE POLL PER MEASURE, each writing a datapoint by paths', () => {
+test('THE POLL PACK IS ONE POLL PER ADDRESS, a map a measure, each writing a datapoint by paths', () => {
   const doc = pollPack(SPEC) as { pack: string; requires: { packs: Record<string, string> }; declarations: Record<string, unknown>[] };
   assert.equal(doc.pack, 'poll-northwind');
   assert.deepEqual(doc.requires.packs, { 'usecase-founder': '^1.0.0' });
+  assert.equal(doc.declarations.length, 1);
   assert.deepEqual(doc.declarations[0], {
-    ingest: 'poll_northwind_monthly_recurr',
+    ingest: 'poll_northwind',
     channel: 'poll',
     url: 'https://stats.northwind.example/v1/numbers.json',
     every: '1h',
     grant: 'northwind stats',
     project: 'things#1',
-    map: {
-      name: { value: 'Monthly recurring revenue' },
-      value: { path: 'data.mrr', type: 'decimal' },
-      unit: { value: 'GBP' },
-      thing: { value: 'things#1' },
-      source: { value: 'polled' },
-      at: { arrived: true },
-    },
+    map: [
+      {
+        name: { value: 'Monthly recurring revenue' },
+        value: { path: 'data.mrr', type: 'decimal' },
+        unit: { value: 'GBP' },
+        thing: { value: 'things#1' },
+        source: { value: 'polled' },
+        at: { arrived: true },
+      },
+      {
+        name: { value: 'Active users' },
+        value: { path: 'data.users', type: 'int' },
+        unit: { value: 'users' },
+        thing: { value: 'things#1' },
+        source: { value: 'polled' },
+        at: { arrived: true },
+      },
+    ],
     writes: { register: 'datapoints' },
   });
-  assert.equal(doc.declarations[1]!.ingest, 'poll_northwind_active_users');
+  /* A PUBLIC ADDRESS NAMES NO KEY. */
+  const { grant: _, ...open } = SPEC;
+  assert.equal('grant' in (pollPack(open) as { declarations: Record<string, unknown>[] }).declarations[0]!, false);
 });
 
 test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF THE OWNER, installs once approved, and fills datapoints', async () => {
@@ -110,12 +123,9 @@ test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF TH
   const pack = value<Pack>(await normalise(pollPack(SPEC), { kind: 'local' }));
   const diff = await plan(pack, stateOf(k));
   /* THE OWNER'S APPROVAL AT INSTALL: the host, how often, the key, and the project it runs for, per measure. */
-  const key = (ingest: string) => `${ingest} runs for the project things#1 and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`;
   assert.deepEqual(diff.approve, [
     'CALLS OUT stats.northwind.example · every 1h · grant "northwind stats"',
-    key('poll_northwind_monthly_recurr'),
-    'CALLS OUT stats.northwind.example · every 1h · grant "northwind stats"',
-    key('poll_northwind_active_users'),
+    `poll_northwind runs for the project things#1 and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`,
   ]);
   /* NOT APPROVED IS NOT INSTALLED. */
   const unapproved = await install(pack, diff, hostFor(k), diff.planHash);
@@ -129,8 +139,8 @@ test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF TH
     seen.push(request.url);
     return answers[0]!;
   });
-  assert.equal(run.ran, 2);
-  assert.deepEqual(seen, [SPEC.url, SPEC.url]);
+  assert.equal(run.ran, 1, 'one address, one request');
+  assert.deepEqual(seen, [SPEC.url]);
   assert.equal(k.count('datapoints'), before + 2);
 
   const rows = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'datapoints', where: { field: 'source', is: 'polled' } as never, limit: 10 })).rows;
@@ -144,5 +154,22 @@ test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF TH
   /* The same answer an interval later writes nothing. */
   clock.advance(2 * HOUR);
   await k.runActions(async () => answers[0]!);
+  assert.equal(k.count('datapoints'), before + 2);
+});
+
+test('A PUBLIC ADDRESS IS POLLED WITH NO KEY IN THE VAULT, once approved, and never without approval', async () => {
+  const { k } = await founder();
+  const { grant: _, project: __, ...rest } = SPEC;
+  const pack = value<Pack>(await normalise(pollPack({ ...rest, organisation: 'organisations#1' }), { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  assert.deepEqual(diff.approve, ['CALLS OUT stats.northwind.example · every 1h · grant "none"']);
+  assert.equal((await install(pack, diff, hostFor(k), diff.planHash)).ok, false);
+  value(await install(pack, diff, hostFor(k), diff.planHash, diff.approve));
+
+  const before = k.count('datapoints');
+  const grants: unknown[] = [];
+  const run = await k.runActions(async (request) => (grants.push(request.grant), { status: 200, body: '{"data":{"mrr":12,"users":3}}', bytes: 28, ms: 3, requests: 1 }));
+  assert.deepEqual({ ran: run.ran, paused: run.paused }, { ran: 1, paused: 0 });
+  assert.deepEqual(grants, [null]);
   assert.equal(k.count('datapoints'), before + 2);
 });

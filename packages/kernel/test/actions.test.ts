@@ -138,7 +138,9 @@ test('A CALL OR A POLL IS REFUSED AT INSTALL, each fault with its own code', asy
   assert.equal(await refusedWith(POLL({ url: 'http://api.example.test/v1/balance' })), 'ACTION_NOT_HTTPS');
   assert.equal(await refusedWith(CALL({ url: 'https://{grant.host}/in' })), 'ACTION_HOST_COMPUTED');
   assert.equal(await refusedWith(CALL({ url: 'https://user@hooks.example.test/in' })), 'ACTION_HOST_COMPUTED');
-  assert.equal(await refusedWith(POLL({ grant: undefined })), 'ACTION_GRANT_MISSING');
+  /* A CALL ALWAYS NAMES ITS KEY. A POLL OF AN ADDRESS THAT NEEDS NONE NAMES NONE (`poll-maps.test.ts`). */
+  assert.equal(await refusedWith(CALL({ grant: undefined })), 'ACTION_GRANT_MISSING');
+  assert.equal(await refusedWith(POLL({ grant: '' })), 'ACTION_GRANT_MISSING');
   assert.equal(await refusedWith(POLL({ every: '5m' })), 'ACTION_INTERVAL_TOO_SHORT');
   /* THE PROVIDER'S HIGHER FLOOR, and not only ours. */
   assert.equal(await refusedWith(POLL({ every: '30m', floor: '1h' })), 'ACTION_INTERVAL_TOO_SHORT');
