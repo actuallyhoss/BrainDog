@@ -21,6 +21,7 @@ import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
+import { formGuide, type FormedPlan } from './guide-kinds.ts';
 import { PERSONAL_EXAMPLES, PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
 import { TEAM_EXAMPLES } from './team.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
@@ -98,9 +99,28 @@ export function moduleManifest(id: string): { requires: readonly string[]; provi
   return (FIRST_PARTY as readonly string[]).includes(id) ? firstPartyManifest(id as FirstPartyId) : null;
 }
 
-/** The pack a use case carries, with its voice as settings and its examples' days counted from today, or `null`. */
-export function carriedDocument(u: UseCase, today: string): Body | null {
-  return useCaseDocument(u.usecase, today);
+/**
+ * WHAT A USE CASE FORMS AROUND WHAT THE PERSON SAID, by its id: the guide's plan for a podcast, a shop or an app
+ * (`guide-kinds.ts`). A use case not listed, or a sentence that names nothing it knows, forms nothing and keeps its examples.
+ */
+const FORMS: Readonly<Record<string, (said: string) => FormedPlan | null>> = { guide: formGuide };
+
+/** The example rows a use case forms around a sentence, with how they point at each other, or `null`. */
+export const formedFor = (u: UseCase, said: string | null | undefined): FormedPlan | null =>
+  said && said.trim() ? (FORMS[u.usecase]?.(said) ?? null) : null;
+
+export type { FormedPlan };
+
+/**
+ * The pack a use case carries, with its voice as settings and its examples' days counted from today, or `null`. Given what
+ * the person said, a use case that forms around it carries that plan as its examples instead of its own (`formedFor`).
+ */
+export function carriedDocument(u: UseCase, today: string, said?: string | null): Body | null {
+  const formed = formedFor(u, said);
+  if (!formed) return useCaseDocument(u.usecase, today);
+  const doc = useCaseDocument(u.usecase, '1970-01-01');
+  if (!doc) return null;
+  return dated({ ...doc, seeds: formed.seeds }, today);
 }
 
 /** The example rows a use case gives the modules it names, for a test or a proposal to show. */

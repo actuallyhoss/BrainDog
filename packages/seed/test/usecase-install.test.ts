@@ -208,7 +208,8 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   assert.equal(guide.k.count('milestones'), 6, 'the guide opens on the six milestones a project passes');
   assert.equal(guide.k.count('steps'), 3);
   const home = value<{ blocks: Drawn[] }>(guide.k.page(homePageOf('guide'))).blocks;
-  assert.deepEqual(home.map((b) => b.heading), ['Where you are', 'Your next steps', 'Waiting on you']);
+  /* BLOCKED APPEARS WHEN A STEP IS (`when:`), so a new guide's Home is the three that have something in them. */
+  assert.deepEqual(home.filter((b) => (b as { drawn?: boolean }).drawn !== false).map((b) => b.heading), ['Where you are', 'Your next steps', 'Waiting on you']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(home[0]!.rows?.length, 1, 'one milestone is underway');
   guide.sql.close();
