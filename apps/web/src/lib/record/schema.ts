@@ -310,6 +310,8 @@ export type PageBlock = {
   knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
+  /** A `progress` budget's: the figure, grouped by a word, of what was spent against each row's limit. */
+  spent?: string;
   /** A `forecast`'s: the figure its late knob marks, how late money has come in on average. */
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */
@@ -504,7 +506,7 @@ export type PackInfo = {
  * count of what a block draws is computed. Those two disagreeing is a slice line saying "Showing 5
  * of 38" over a chart with all thirty-eight rows in it.
  */
-export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'section', 'split']);
+export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'section', 'split']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

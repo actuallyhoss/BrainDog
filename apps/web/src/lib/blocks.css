@@ -67,6 +67,8 @@
   .split-label,
   .split-value,
   .split-note,
+  .progress-label,
+  .progress-note,
   .bridge-label,
   .bridge-value,
   .bridge-note,
@@ -1851,9 +1853,120 @@
     font-size: var(--t-sm);
   }
 
+  /* `progress`: a track a row, filled toward its target. The label and the figure on one line, the track under them,
+     then what is left and the note. The fill is ink until the row carries an intent: a goal reached, a budget close to or
+     past its limit. Past a limit the track is the spending, a hairline marks the limit, and the part after it is the
+     intent's fill with the ground showing through as stripes, so the overspend is found by its place, not only its hue. */
+  .progress {
+    gap: var(--sp-2);
+  }
+
+  .progress-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'label figure share'
+      'track track track'
+      'left note note';
+    gap: var(--sp-1) var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--t-sm);
+  }
+
+  .progress-label {
+    grid-area: label;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .progress-figure {
+    grid-area: figure;
+    display: inline-flex;
+    gap: var(--sp-1);
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .progress-value {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .progress-share {
+    grid-area: share;
+    min-inline-size: 4ch;
+    color: var(--ink2);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+
+  .progress-track {
+    grid-area: track;
+    position: relative;
+    display: block;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: calc(var(--fill) * 100%);
+    border-radius: var(--r-pill);
+    background: var(--tone-fill, var(--ink2));
+  }
+
+  .progress-over {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: calc(var(--limit) * 100%) 0;
+    border-inline-start: 2px solid var(--bg);
+    background: repeating-linear-gradient(135deg, var(--tone, var(--ink)) 0 3px, transparent 3px 6px);
+  }
+
+  .progress-left {
+    grid-area: left;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-row[data-intent] > .progress-left {
+    color: var(--tone);
+  }
+
+  .progress-note {
+    grid-area: note;
+    color: var(--dim);
+    text-align: end;
+  }
+
+  /* The intent is drawn on the track and in what is left, so the glyph keeps its name for a screen reader and draws nothing. */
+  .progress-row > .glyph {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .progress-empty {
+    margin-inline: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
   .series-numbers,
   .lines-numbers,
+  .progress-numbers,
   .forecast-numbers,
   .bridge-numbers,
   .split-numbers,
@@ -1863,6 +1976,7 @@
 
   .series-toggle,
   .lines-toggle,
+  .progress-toggle,
   .forecast-toggle,
   .bridge-toggle,
   .split-toggle,
@@ -1878,6 +1992,7 @@
 
   .series-toggle::-webkit-details-marker,
   .lines-toggle::-webkit-details-marker,
+  .progress-toggle::-webkit-details-marker,
   .forecast-toggle::-webkit-details-marker,
   .bridge-toggle::-webkit-details-marker,
   .split-toggle::-webkit-details-marker,
@@ -1887,6 +2002,7 @@
 
   .series-toggle:hover,
   .lines-toggle:hover,
+  .progress-toggle:hover,
   .forecast-toggle:hover,
   .bridge-toggle:hover,
   .split-toggle:hover,
@@ -1897,6 +2013,7 @@
   @media (pointer: coarse) {
     .series-toggle,
     .lines-toggle,
+    .progress-toggle,
     .forecast-toggle,
     .bridge-toggle,
     .split-toggle,
@@ -1907,6 +2024,7 @@
 
   .series-table,
   .lines-table,
+  .progress-table,
   .forecast-table,
   .bridge-table,
   .split-table,
@@ -1919,7 +2037,9 @@
   .series-table th,
   .series-table td,
   .lines-table th,
+  .progress-table th,
   .lines-table td,
+  .progress-table td,
   .forecast-table th,
   .forecast-table td,
   .bridge-table th,
@@ -1937,6 +2057,7 @@
 
   .series-table thead th,
   .lines-table thead th,
+  .progress-table thead th,
   .forecast-table thead th,
   .bridge-table thead th,
   .split-table thead th,
@@ -1947,6 +2068,7 @@
 
   .series-table th:first-child,
   .lines-table th:first-child,
+  .progress-table th:first-child,
   .forecast-table th:first-child,
   .bridge-table th:first-child,
   .split-table th:first-child,

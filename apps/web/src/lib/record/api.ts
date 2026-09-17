@@ -1558,6 +1558,8 @@ export type BlockResult = PageBlock & {
   lateness?: number | null;
   /** A `bar` over a list of links: the money each linked row holds, by the row's id, which the bar adds up per row. */
   linked?: Readonly<Record<string, unknown>>;
+  /** A `progress` budget: what its `spent:` figure read, each part by the raw value of the word it groups by. */
+  spentBy?: { metric: string; unit: string | null; groups: { key: string; value: number | null }[] };
 };
 
 /** The kernel's `FeedRow` (`packages/kernel/src/pages.ts`), which this engine must agree with. */
@@ -1849,6 +1851,8 @@ const READS = new Set([
   'unset',
   /* A card grid's out-of-date rule. */
   'stale',
+  /* A progress budget's figure of what was spent. */
+  'spent',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {

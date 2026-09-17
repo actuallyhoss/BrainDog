@@ -555,6 +555,15 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const reduces = REDUCES.has(kind);
   if (reduces && got.length < matched) return cannot;
 
+  /* A BUDGET IS DRAWN AGAINST WHAT ITS FIGURE SPENT, which the record read beside the rows; without it there is no budget to draw. */
+  const spent = (rest as { spent?: unknown }).spent;
+  let spentBy: LiveBlock['spentBy'];
+  if (kind === 'progress' && spent !== undefined) {
+    const reading = readings?.[0]?.reading;
+    if (typeof spent !== 'string' || !reading) return cannot;
+    spentBy = { metric: spent, unit: typeof reading.unit === 'string' ? reading.unit : null, groups: (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null })) };
+  }
+
   const live = b.source === 'sessions.live';
   const entries = got.map((r) => entryOf(register, r, refs));
   const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
@@ -575,6 +584,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     rows,
     shown: reduces ? matched : entries.length,
     total: matched,
+    ...(spentBy === undefined ? {} : { spentBy }),
     ...(inherited === undefined ? {} : { inherited }),
     ...(live ? { quiet: got.map((r) => isStale({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
   };

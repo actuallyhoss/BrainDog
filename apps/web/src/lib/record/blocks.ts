@@ -137,6 +137,55 @@ function barRows(block: BlockResult): string[] {
   return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown)];
 }
 
+/**
+ * A `progress` over a register: a track a row, in one of three readings of its columns.
+ *
+ * A BUDGET (`spent:`) sets each row's limit, its second column, against the part of the figure whose key is the row's
+ * first column as stored, so Groceries is set against what the figure grouped as `groceries`, and a category nothing was
+ * spent in is at zero. A COUNT, when the second column is a yes or no, groups the rows by the first and fills each group
+ * by how many say yes: a project by its steps done. Otherwise each row is its own track, value against target, and a row
+ * with no target has nothing to fill toward and is left out. `limit:` is how many tracks.
+ */
+function progressRows(block: BlockResult): string[] {
+  const register = block.register ?? '';
+  const [label, value, target, note] = block.columns.map((c) => c.field);
+  if (!label || !value) return [];
+  const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v) ?? '') : '');
+  const cap = (rows: string[]) => (block.limit === undefined ? rows : rows.slice(0, Math.max(0, block.limit)));
+
+  if (block.spentBy) {
+    const spent = block.spentBy;
+    return cap(
+      block.matched.map((e) => {
+        const limit = e.fields[value];
+        const currency = spent.unit ?? currencyOf(limit) ?? null;
+        const part = spent.groups.find((g) => g.key === String(e.fields[label] ?? ''))?.value ?? 0;
+        const figure = currency ? money(Math.round(part), currency) : String(part);
+        return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | `;
+      }),
+    );
+  }
+
+  if (REGISTERS[register]?.fields.find((f) => f.id === value)?.type === 'bool') {
+    const groups = new Map<string, { done: number; all: number }>();
+    for (const e of block.matched) {
+      const key = display(register, label, e.fields[label]) ?? REST;
+      const g = groups.get(key) ?? { done: 0, all: 0 };
+      g.all += 1;
+      if (e.fields[value] === true) g.done += 1;
+      groups.set(key, g);
+    }
+    return cap([...groups].map(([key, g]) => `${escapeCell(key)} | ${g.done} | ${g.all} | `));
+  }
+
+  if (!target) return [];
+  return cap(
+    block.matched
+      .filter((e) => e.fields[target] !== null && e.fields[target] !== undefined && e.fields[target] !== '')
+      .map((e) => `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(said(value, e.fields[value]))} | ${escapeCell(said(target, e.fields[target]))} | ${escapeCell(said(note, e.fields[note ?? '']))}`),
+  );
+}
+
 /** Two clauses of a sentence predicate as one. */
 const joined = (where: string | undefined, clause: string): string => (where?.trim() ? `${where}, ${clause}` : clause);
 
@@ -538,7 +587,7 @@ export function toSegments(block: BlockResult) {
     return parse(linesText(measuresFor(block)), { page: true });
   const heading = block.kind === 'section' && block.heading ? ` | ${escapeCell(block.heading)}` : '';
   /* THE HERO FIGURE IS A FORM OF `stat`, written after the kind: ```stat lead. */
-  const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : '';
+  const form = block.kind === 'stat' && block.lead ? ' lead' : block.kind === 'series' && block.net ? ' net' : block.kind === 'progress' && block.spent ? ' budget' : '';
   const head = `${block.kind}${form}${heading || (block.tone ? ` |  | ${block.tone}` : '')}`;
   const spec = isKind(block.kind) ? KINDS[block.kind] : undefined;
 
@@ -585,6 +634,8 @@ export function toSegments(block: BlockResult) {
         ? chipsRows(block)
       : block.kind === 'gauge'
         ? gaugeRows(block)
+      : block.kind === 'progress' && block.register
+        ? progressRows(block)
       : block.kind === 'cards'
         ? cardsRows(block)
       : block.kind === 'section'
@@ -601,7 +652,7 @@ export function toSegments(block: BlockResult) {
     !conflicted &&
     !block.authored?.length &&
     !block.metrics &&
-    !['bar', 'split', 'chips', 'gauge', 'cards', 'section', 'stat'].includes(block.kind) &&
+    !['bar', 'split', 'chips', 'gauge', 'progress', 'cards', 'section', 'stat'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
   return projected && block.register
     ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)
