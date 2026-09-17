@@ -24,7 +24,7 @@ import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSent
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
-import { PROGRESS_LIMIT, PROGRESS_NONE, PROGRESS_OF, PROGRESS_PART, PROGRESS_SHARE, PROGRESS_SO_FAR, PROGRESS_SPENT, PROGRESS_TARGET, progressPlan, progressSentence } from './progress.ts';
+import { PROGRESS_NONE, PROGRESS_OF, progressPlan, progressSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
@@ -690,14 +690,9 @@ function progress(b: Block, o: RenderOptions): string {
         })
         .join('')
     : `<p class="progress-empty">${escape(PROGRESS_NONE)}</p>`;
-  const numbers = b.rows.length
-    ? numbersFold(
-        'progress',
-        [PROGRESS_PART, form === 'budget' ? PROGRESS_SPENT : PROGRESS_SO_FAR, form === 'budget' ? PROGRESS_LIMIT : PROGRESS_TARGET, PROGRESS_SHARE],
-        b.rows.map((r, i) => [said(r, 0) || PROGRESS_PART, said(r, 1) || MISSING, said(r, 2) || MISSING, plan[i]!.share]),
-      )
-    : '';
-  return `<div class="prop progress"${form === 'budget' ? ' data-form="budget"' : ''}>${body}${numbers}</div>`;
+  /* NO FOLD OF NUMBERS: every row already says its figure, its target and its share as text, so a fold under the bars
+     repeated them behind a stray "The numbers". */
+  return `<div class="prop progress"${form === 'budget' ? ' data-form="budget"' : ''}>${body}</div>`;
 }
 
 /**
@@ -774,7 +769,7 @@ function series(b: Block, o: RenderOptions): string {
         )
         .join('')}</ol>`;
   const numbers = plan.buckets.length
-    ? `<details class="series-numbers"><summary class="series-toggle">${SERIES_NUMBERS}</summary><table class="series-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.series
+    ? `<div class="series-numbers"><table class="series-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.series
         .map((s) => `<th scope="col">${escape(s.label)}</th>`)
         .join('')}${net ? `<th scope="col">${SERIES_NET}</th>` : ''}</tr></thead><tbody>${plan.buckets
         .map(
@@ -783,7 +778,7 @@ function series(b: Block, o: RenderOptions): string {
               .map((v) => `<td class="num">${escape(v)}</td>`)
               .join('')}${net ? `<td class="num">${escape(k.net)}</td>` : ''}</tr>`,
         )
-        .join('')}</tbody></table></details>`
+        .join('')}</tbody></table></div>`
     : '';
   return `<div class="prop series" style="--cells:${plan.buckets.length}">${legend}${chart}${numbers}</div>`;
 }

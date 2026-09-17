@@ -1,23 +1,16 @@
 <!--
   `progress`: one track a row, filled toward its target, the value of the target, the share, what is left, and the
-  numbers in a fold. The `budget` form marks spending past the limit beyond a line at the limit. `src/progress.ts`
+  figures as text. The `budget` form marks spending past the limit beyond a line at the limit. `src/progress.ts`
   decides every fill and every word; `progress` in `src/html.ts` is this file's twin.
 -->
 <script lang="ts">
   import { inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
   import {
-    PROGRESS_LIMIT,
     PROGRESS_NONE,
     PROGRESS_OF,
-    PROGRESS_PART,
-    PROGRESS_SHARE,
-    PROGRESS_SO_FAR,
-    PROGRESS_SPENT,
-    PROGRESS_TARGET,
     progressPlan,
     progressSentence,
   } from '../src/progress.ts';
-  import { SERIES_NUMBERS } from '../src/series.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -51,29 +44,6 @@
         {/if}
       </div>
     {/each}
-    <details class="progress-numbers">
-      <summary class="progress-toggle">{SERIES_NUMBERS}</summary>
-      <table class="progress-table">
-        <thead>
-          <tr>
-            <th scope="col">{PROGRESS_PART}</th>
-            <th scope="col">{form === 'budget' ? PROGRESS_SPENT : PROGRESS_SO_FAR}</th>
-            <th scope="col">{form === 'budget' ? PROGRESS_LIMIT : PROGRESS_TARGET}</th>
-            <th scope="col">{PROGRESS_SHARE}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each block.rows as row, i}
-            <tr>
-              <th scope="row">{said(row, 0) || PROGRESS_PART}</th>
-              <td class="num">{said(row, 1) || MISSING}</td>
-              <td class="num">{said(row, 2) || MISSING}</td>
-              <td class="num">{plan[i]!.share}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </details>
   {:else}
     <p class="progress-empty">{PROGRESS_NONE}</p>
   {/if}

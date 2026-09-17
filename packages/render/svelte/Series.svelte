@@ -1,11 +1,11 @@
 <!--
   `series`: bars by bucket over a zero rule, money in above and money out below, the `net` form's
-  line, the bucket labels, and the numbers in a fold. `src/series.ts` decides every bar and every
+  line, the bucket labels, and the numbers in a table for a screen reader. `src/series.ts` decides every bar and every
   printed figure; `series` in `src/html.ts` is this file's twin.
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { SERIES_NET, SERIES_NONE, SERIES_NUMBERS, seriesPlan } from '../src/series.ts';
+  import { SERIES_NET, SERIES_NONE, seriesPlan } from '../src/series.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -45,8 +45,9 @@
     </ol>
   {/if}
   {#if plan.buckets.length}
-    <details class="series-numbers">
-      <summary class="series-toggle">{SERIES_NUMBERS}</summary>
+    <!-- THE BARS' NUMBERS, for a screen reader: a table nobody sees, since a fold headed "The numbers" under every chart
+         read as a stray caption. -->
+    <div class="series-numbers">
       <table class="series-table">
         <thead>
           <tr>
@@ -65,6 +66,6 @@
           {/each}
         </tbody>
       </table>
-    </details>
+    </div>
   {/if}
 </div>

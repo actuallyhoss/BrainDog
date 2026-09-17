@@ -45,6 +45,7 @@ test('the fence reads the budget form and a note, and draws a track, the share a
   assert.match(html, /<span class="progress-over" style="--limit:0\.86"><\/span>/u);
   assert.match(html, /£20\.00 over/u);
   assert.match(html, /<span class="progress-note">this month<\/span>/u);
-  assert.match(html, /<details class="progress-numbers">/u);
+  /* The rows say their numbers, so there is no fold repeating them under a stray "The numbers". */
+  assert.doesNotMatch(html, /progress-numbers|The numbers/u);
   assert.equal(progressSentence('Bike', '3', '7', '43%'), 'Bike: 3 of 7, 43%');
 });

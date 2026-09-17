@@ -600,10 +600,19 @@
     font-size: var(--t-sm);
   }
 
+  /* A SERIES' NUMBERS ARE FOR A SCREEN READER. A fold headed "The numbers" under a weekly count read as a stray caption,
+     so the table is kept out of sight and in the document. */
+  .series-numbers {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* THE NUMBERS, the same figures as the chart, in a fold a keyboard and a screen reader can open. */
-  .series-numbers,
   .lines-numbers,
-  .progress-numbers,
   .forecast-numbers,
   .bridge-numbers,
   .split-numbers,
@@ -619,9 +628,7 @@
     padding: var(--sp-1);
   }
 
-  .series-toggle,
   .lines-toggle,
-  .progress-toggle,
   .forecast-toggle,
   .bridge-toggle,
   .split-toggle,
@@ -635,9 +642,7 @@
     cursor: pointer;
   }
 
-  .series-toggle::-webkit-details-marker,
   .lines-toggle::-webkit-details-marker,
-  .progress-toggle::-webkit-details-marker,
   .forecast-toggle::-webkit-details-marker,
   .bridge-toggle::-webkit-details-marker,
   .split-toggle::-webkit-details-marker,
@@ -645,9 +650,7 @@
     display: none;
   }
 
-  .series-toggle:hover,
   .lines-toggle:hover,
-  .progress-toggle:hover,
   .forecast-toggle:hover,
   .bridge-toggle:hover,
   .split-toggle:hover,
@@ -656,9 +659,7 @@
   }
 
   @media (pointer: coarse) {
-    .series-toggle,
     .lines-toggle,
-    .progress-toggle,
     .forecast-toggle,
     .bridge-toggle,
     .split-toggle,
@@ -669,7 +670,6 @@
 
   .series-table,
   .lines-table,
-  .progress-table,
   .forecast-table,
   .bridge-table,
   .split-table,
@@ -682,9 +682,7 @@
   .series-table th,
   .series-table td,
   .lines-table th,
-  .progress-table th,
   .lines-table td,
-  .progress-table td,
   .forecast-table th,
   .forecast-table td,
   .bridge-table th,
@@ -702,7 +700,6 @@
 
   .series-table thead th,
   .lines-table thead th,
-  .progress-table thead th,
   .forecast-table thead th,
   .bridge-table thead th,
   .split-table thead th,
@@ -713,7 +710,6 @@
 
   .series-table th:first-child,
   .lines-table th:first-child,
-  .progress-table th:first-child,
   .forecast-table th:first-child,
   .bridge-table th:first-child,
   .split-table th:first-child,
