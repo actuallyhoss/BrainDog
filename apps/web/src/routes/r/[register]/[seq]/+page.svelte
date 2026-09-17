@@ -12,6 +12,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
+  import { listFromDraft, listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf } from '$lib/record/money.ts';
   import { exponentOf, holeLabel, relative, since, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
@@ -220,6 +221,8 @@
   /** The value as a box holds it: money in major units, everything else as the record stores it. */
   function draftOf(f: FieldDecl, value: unknown): string {
     if (value === null || value === undefined) return '';
+    /* A LIST IS TYPED AS ITS TAGS WITH COMMAS, and the tags the record keeps for itself are not in the box (`tags.ts`). */
+    if (Array.isArray(value)) return listLine(value) ?? '';
     if (f.type !== 'money') return String(value);
     const minor = amountOf(value);
     if (minor === null) return '';
@@ -288,6 +291,7 @@
   function patchOf(f: FieldDecl): Fields {
     if (f.type === 'bool') return { [f.id]: ticked };
     const raw = draft.trim();
+    if ((f.type as string) === 'list' || Array.isArray(row?.fields[f.id])) return { [f.id]: listFromDraft(raw, row?.fields[f.id]) };
     if (f.type !== 'money') return { [f.id]: raw };
     if (raw === '') return { [f.id]: null };
     const currency = currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP';
@@ -433,7 +437,7 @@
   /* TWO OR MORE EMPTY FIELDS FOLD INTO ONE LINE (DESIGN-SYSTEM APPENDIX C10). A person with four unset
      fields was a column of four "Not set" rows, each with a rule under it; the line names them, and on
      a record you can write to each name opens its field. */
-  const unsetValue = (v: unknown) => v === null || v === undefined || v === '';
+  const unsetValue = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && listLine(v) === null);
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
   const shownFields = $derived(unsetFields.length >= 2 ? listed.filter((f) => !unsetFields.includes(f)) : listed);
 
@@ -670,7 +674,7 @@
                   </form>
                   {#if problem}<p class="edit-why">{problem}</p>{/if}
                 {:else}
-                  {#if value === null || value === undefined || value === ''}
+                  {#if unsetValue(value)}
                     <span class="missing">{copy.editNotSet}</span>
                   {:else if f.type === 'money'}
                     <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} weight="strong" />

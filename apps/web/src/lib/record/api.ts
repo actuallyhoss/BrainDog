@@ -60,6 +60,7 @@ import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, 
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
+import { listLine } from './tags.ts';
 
 /**
  * The currency the rows of one money field are in, or `null` when they are not all one.
@@ -363,6 +364,8 @@ export function display(
   names?: Names,
 ): string | null {
   if (value === null || value === undefined || value === '') return null;
+  /* A LIST READS AS ITS ELEMENTS, and never with the tags the record keeps for itself (`tags.ts`). */
+  if (Array.isArray(value)) return listLine(value);
   const f = decl(register, field);
   if (!f) return String(value);
   switch (f.type) {
