@@ -12,7 +12,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
-import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+import { carriedDocument, dayOf, moduleDocument, moduleExamples } from '../src/usecases/install.ts';
 import { exampleLinks, linkExamples, titleFieldOf, type LinkIo, type LinkRow } from '../src/usecases/links.ts';
 
 const TODAY = dayOf(NOW);
@@ -37,7 +37,10 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
       assert.equal(field?.type, 'ref', `${u.usecase}: ${l.register}.${l.field}`);
       assert.equal(field?.to, l.to, `${u.usecase}: ${l.register}.${l.field} points at ${String(field?.to)}`);
       const seeded = (register: string, title: string) =>
-        (pack.seeds ?? []).some((s) => s.register === register && s.fields[titleFieldOf(u.usecase, register) ?? ''] === title);
+        /* A MODULE'S EXAMPLES COUNT TOO, so a person's step can point at a project Projects was given for this use case. */
+        [...(pack.seeds ?? []), ...(moduleExamples(u) as { register: string; fields: Body }[])].some(
+          (s) => s.register === register && s.fields[titleFieldOf(u.usecase, register) ?? ''] === title,
+        );
       assert.ok(seeded(l.register, l.title), `${u.usecase}: no example ${l.register} titled ${l.title}`);
       assert.ok(seeded(l.to, l.target), `${u.usecase}: no example ${l.to} titled ${l.target}`);
     }

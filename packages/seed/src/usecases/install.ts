@@ -19,12 +19,13 @@ import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
+import { PERSONAL_EXAMPLES } from './personal.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
 
 type Body = Record<string, unknown>;
 
 /** The example rows each use case gives the first-party modules it names. A use case not listed gives none. */
-const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { founder: FOUNDER_EXAMPLES };
+const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { founder: FOUNDER_EXAMPLES, personal: PERSONAL_EXAMPLES };
 
 /** The page a use case's Home is, by the id of the pack it carries or the use case's own id. */
 export const homePageOf = (id: string): string => `home-${id.replace(/^usecase-/u, '')}`;

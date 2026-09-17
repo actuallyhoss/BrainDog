@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { SEEDS_PER_REGISTER, install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
@@ -103,13 +103,13 @@ test('WITH NO USE CASE, A MODULE CARRIES THE SAMPLE ROWS AS IT ALWAYS DID', () =
     assert.deepEqual(moduleDocument(null, id, { today: TODAY }), firstPartyDocument(id), id);
 });
 
-test('A MODULE EXAMPLE IS FOR A LIST OF A MODULE THE USE CASE NAMES, one per list', () => {
+test('A MODULE EXAMPLE IS FOR A LIST OF A MODULE THE USE CASE NAMES, at most eight per list', () => {
   for (const u of USE_CASES) {
     const lists = new Set(
       u.modules.flatMap((m) => (m === 'agents' ? [] : firstPartyManifest(m as never).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice(9)))),
     );
     const registers = moduleExamples(u).map((e) => String(e.register));
-    assert.equal(new Set(registers).size, registers.length, `${u.usecase} gives a list two examples`);
+    for (const r of new Set(registers)) assert.ok(registers.filter((x) => x === r).length <= SEEDS_PER_REGISTER, `${u.usecase} gives ${r} more than ${SEEDS_PER_REGISTER} examples`);
     for (const r of registers) assert.ok(lists.has(r), `${u.usecase} gives ${r} an example, and names no module that holds it`);
   }
 });
@@ -134,6 +134,16 @@ test('A FOUNDER RECORD HOLDS FOUNDER ROWS in every module, and nothing of the st
   assert.ok(!rows.some((r) => STUDIO.test(JSON.stringify(r.fields))), 'a studio row reached a founder record');
   for (const list of ['things', 'accounts', 'obligations', 'tracks', 'tasks', 'organisations', 'datapoints']) assert.equal(k.count(list), 1, list);
   assert.equal(k.count('people'), 0);
+  sql.close();
+});
+
+test('A PERSONAL RECORD HOLDS ROWS OF A PERSON: accounts, bills, spending, a budget, goals and projects, and no business words', async () => {
+  const { k, sql } = await made('personal');
+  const rows = everyRow(k);
+  assert.ok(!rows.some((r) => STUDIO.test(JSON.stringify(r.fields))), 'a studio row reached a personal record');
+  assert.ok(!rows.some((r) => /client|invoice|runway|contractor/iu.test(JSON.stringify(r.fields))), 'a business word reached a personal record');
+  const counts = Object.fromEntries(['accounts', 'obligations', 'things', 'spending', 'budgets', 'savings_goals', 'goals', 'project_steps', 'people'].map((l) => [l, k.count(l)]));
+  assert.deepEqual(counts, { accounts: 3, obligations: 8, things: 3, spending: 8, budgets: 6, savings_goals: 3, goals: 4, project_steps: 7, people: 0 });
   sql.close();
 });
 
@@ -181,6 +191,25 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   guide.sql.close();
 });
 
+test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOALS AND PROJECTS, and every page reads', async () => {
+  const { k, sql } = await made('personal');
+  const home = value<{ blocks: (Drawn & { kind: string })[] }>(k.page(homePageOf('personal'))).blocks;
+  assert.deepEqual(home.map((b) => b.heading), ['This month', 'Spending against your budget', 'Bills due this week', 'Savings goals', 'Projects in motion', 'Goals and habits']);
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  const cells = new Map((home[0]!.readings ?? []).map((r) => [r.metric, r.reading?.value ?? null]));
+  /* THE MONTH STARTS ON ITS FIRST DAY: the record is made on 3 September, so the shop on the 1st counts and the cinema on
+     31 August does not. */
+  assert.equal(cells.get('spent-this-month'), 2_135 + 1_860 + 6_420);
+  assert.equal(cells.get('budget-each-month'), 30_000 + 8_000 + 6_000 + 5_000 + 4_000 + 5_000);
+  assert.equal(cells.get('bills-this-week'), 85_000 + 1_800 + 1_099);
+  assert.equal(home[2]!.rows?.length, 3, 'rent, the phone and the streaming subscription are due this week');
+  for (const slug of ['spending', 'goals', 'projects', 'restore-the-old-road-bike']) {
+    const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
+    for (const b of page) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading} was refused`);
+  }
+  sql.close();
+});
+
 test('THE HOUSE HOME IS A DECLARED PAGE TOO: Money declares `home`, the figures then what is due this week', async () => {
   const { k, sql } = await record();
   for (const m of ['portfolio', 'people', 'money-core'] as const) await put(k, moduleDocument(null, m, { today: TODAY }));
@@ -194,7 +223,7 @@ test('THE HOUSE HOME IS A DECLARED PAGE TOO: Money declares `home`, the figures 
 });
 
 test('HOME IS NOT ON THE RAIL: a use case declares its Home page with no nav', () => {
-  for (const id of ['student', 'founder', 'team', 'guide']) {
+  for (const id of ['student', 'founder', 'team', 'guide', 'personal']) {
     const doc = carriedDocument(useCase(id)!, TODAY) as { declarations: { page?: string; nav?: unknown }[] };
     const home = doc.declarations.find((d) => d.page === homePageOf(id));
     assert.ok(home, `${id} declares no Home`);

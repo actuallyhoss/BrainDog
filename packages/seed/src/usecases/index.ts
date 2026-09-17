@@ -16,6 +16,7 @@ import { BUSINESS } from './business.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER } from './founder.ts';
 import { GUIDE } from './guide.ts';
+import { PERSONAL } from './personal.ts';
 import { STUDENT } from './student.ts';
 import { TEAM } from './team.ts';
 
@@ -30,7 +31,7 @@ function checked(doc: unknown): UseCase {
 }
 
 /** In the order a tie is broken: the most specific first, and the business setup last. */
-export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
+export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(PERSONAL), checked(BUSINESS)];
 
 export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) => u.usecase === id);
 
@@ -78,6 +79,29 @@ export function arrange(said: string, catalogue: readonly UseCase[] = USE_CASES)
     .map(({ usecase, score, why }) => ({ usecase, score, why }));
   const top = ranked[0];
   return { pick: top && top.score > 0 ? top.usecase : null, ranked };
+}
+
+/**
+ * THE OTHER USE CASES A PERSON'S RECORD TAKES BESIDE THE ONE PROPOSED, for one person who said more than one thing about
+ * their own life: "my budget, my running and my coursework" is Personal with Student's lists beside it. Only between use
+ * cases for an individual that carry a pack, only when the sentence was heard saying so, and never two that declare the
+ * same list or page, so neither install can refuse the other. The proposed one speaks: its voice is installed first.
+ */
+export function alongside(arranged: Arrangement, proposed: UseCase | null): UseCase[] {
+  if (!proposed || proposed.audience !== 'individual' || proposed.pack === null) return [];
+  const ids = (u: UseCase): Set<string> =>
+    new Set(((u.pack?.declarations ?? []) as Record<string, unknown>[]).flatMap((d) => [d.register, d.page, d.metric].filter((x): x is string => typeof x === 'string')));
+  const taken = ids(proposed);
+  const out: UseCase[] = [];
+  for (const r of arranged.ranked) {
+    const u = r.usecase;
+    if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null) continue;
+    const mine = ids(u);
+    if ([...mine].some((id) => taken.has(id))) continue;
+    for (const id of mine) taken.add(id);
+    out.push(u);
+  }
+  return out;
 }
 
 /** First-party packs in install order: every list a later one points at comes earlier. */

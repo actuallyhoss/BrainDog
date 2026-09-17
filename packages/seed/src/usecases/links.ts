@@ -11,7 +11,9 @@
  * A write that is refused is skipped: an unlinked example is not worth failing an install over.
  */
 
+import { firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
+import { PERSONAL_STEP_PROJECTS } from './personal.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
@@ -31,6 +33,12 @@ const COURSE = 'Introduction to statistics';
 const CYCLE = 'Cycle 1';
 
 const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
+  /* A PERSON'S STEPS POINT AT PROJECTS AND A GOAL AT AN ACCOUNT, lists Money and Projects hold, so their examples are the
+     ones `install.ts` gives those modules for this use case. */
+  personal: [
+    ...PERSONAL_STEP_PROJECTS.map(([title, project]) => ({ register: 'project_steps', title, field: 'thing', to: 'things', target: project })),
+    { register: 'savings_goals', title: 'Rainy day fund', field: 'account', to: 'accounts', target: 'Savings account' },
+  ],
   student: [
     { register: 'assignments', title: 'Problem set 1: probability', field: 'course', to: 'courses', target: COURSE },
     { register: 'study_sessions', title: 'Go over the lecture on conditional probability', field: 'course', to: 'courses', target: COURSE },
@@ -54,9 +62,13 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
 /** The links a use case makes between its examples, by its id (`student`, or `usecase-student`). None for most. */
 export const exampleLinks = (usecase: string): readonly ExampleLink[] => LINKS[usecase.replace(/^usecase-/u, '')] ?? [];
 
-/** The field a list's rows are titled by, read off the pack the use case carries. */
+/** The field a list's rows are titled by, read off the pack the use case carries or a first-party module it builds on. */
 export function titleFieldOf(usecase: string, register: string): string | undefined {
-  const declarations = (useCase(usecase.replace(/^usecase-/u, ''))?.pack?.declarations ?? []) as Record<string, unknown>[];
+  const u = useCase(usecase.replace(/^usecase-/u, ''));
+  const declarations = [
+    ...((u?.pack?.declarations ?? []) as Record<string, unknown>[]),
+    ...(u?.modules ?? []).flatMap((m) => (firstPartyDocument(m)?.declarations ?? []) as Record<string, unknown>[]),
+  ];
   const title = declarations.find((d) => d.register === register && d.page === undefined)?.title;
   return typeof title === 'string' ? title : undefined;
 }

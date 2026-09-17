@@ -9,6 +9,7 @@ export const USE_CASE_NAMES: Readonly<Record<string, string>> = {
   founder: 'Solo founder',
   team: 'Team board',
   guide: 'New project guide',
+  personal: 'Personal',
   business: 'Small business',
 };
 

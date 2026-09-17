@@ -12,7 +12,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY, NOW, firstPartyDocument } from '../src/index.ts';
-import { MODULE_ORDER, USE_CASES, arrange, listsOf, modulesFor, pagesOf, useCase, useCaseDocument } from '../src/usecases/index.ts';
+import { MODULE_ORDER, USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, useCase, useCaseDocument } from '../src/usecases/index.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -94,6 +94,11 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
     { page: 'agent-work', title: 'Agent work', section: 'Board' },
   ]);
   assert.deepEqual(pagesOf(useCase('guide')!), [{ page: 'guide', title: 'Guide', section: 'Guide' }]);
+  assert.deepEqual(pagesOf(useCase('personal')!), [
+    { page: 'spending', title: 'Spending', section: 'Money' },
+    { page: 'goals', title: 'Goals', section: 'Goals' },
+    { page: 'projects', title: 'Projects', section: 'Projects' },
+  ]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);
@@ -139,7 +144,7 @@ const SENTENCES: [string, string | null][] = [
   ['Dashboard', 'founder'],
   ['STUDENT', 'student'],
   ['side-projects', null],
-  ['my running club', null],
+  ['my running club', 'personal'],
   ['I run the product team at a 200-person company and our agents take tickets', 'team'],
   ['a product manager with a backlog and two-week sprints', 'team'],
   ['our engineering team lives in Jira and wants agents on the tickets', 'team'],
@@ -160,9 +165,19 @@ const SENTENCES: [string, string | null][] = [
   ['a band', 'guide'],
   ['where to start with a blog', 'guide'],
   ["I'm starting something new", 'guide'],
+  ['I want to get my money under control and keep track of my side projects and running', 'personal'],
+  ['personal finance and a monthly budget', 'personal'],
+  ['saving up for a trip and paying my bills on time', 'personal'],
+  ['my habits and goals for the year', 'personal'],
+  ['training for a marathon', 'personal'],
+  ['a couple of side projects and my spending', 'personal'],
+  ['life admin: rent, groceries and the gym', 'personal'],
+  ['household budget for the family', 'personal'],
+  ['hobbies', 'personal'],
+  ['getting out of debt', 'personal'],
 ];
 
-test('SIXTY SENTENCES LAND ON THE USE CASE THEY DESCRIBE', () => {
+test('SEVENTY SENTENCES LAND ON THE USE CASE THEY DESCRIBE', () => {
   for (const [said, want] of SENTENCES) assert.equal(arrange(said).pick?.usecase ?? null, want, JSON.stringify(said));
 });
 
@@ -175,7 +190,7 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
   const mixed = arrange('a student who freelances for clients on the side');
   assert.deepEqual(
     mixed.ranked.map((r) => [r.usecase.usecase, r.score]),
-    [['student', 1], ['business', 1], ['founder', 0], ['team', 0], ['guide', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
+    [['student', 1], ['business', 1], ['founder', 0], ['team', 0], ['guide', 0], ['personal', 0]].sort((a, b) => (b[1] as number) - (a[1] as number)) as [string, number][],
   );
 });
 
@@ -198,4 +213,16 @@ test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS (S8)',
     }
   }
   assert.ok(some > 0);
+});
+
+test('STUDIES COME BESIDE A PERSONAL RECORD WHEN THE SENTENCE MENTIONS THEM, and only for an individual', () => {
+  const said = 'my budget, my running and my uni coursework';
+  const a = arrange(said);
+  const personal = useCase('personal')!;
+  const student = useCase('student')!;
+  assert.deepEqual(alongside(a, personal).map((u) => u.usecase), ['student']);
+  assert.deepEqual(alongside(a, student).map((u) => u.usecase), ['personal']);
+  assert.deepEqual(alongside(arrange('I want to get my money under control and keep track of my side projects and running'), personal), []);
+  assert.deepEqual(alongside(arrange('a founder who is also a student'), useCase('founder')!), [], 'a founder is not an individual record');
+  assert.deepEqual(alongside(a, null), []);
 });
