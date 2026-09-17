@@ -32,6 +32,7 @@
   import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { carriedDocument, dayOf, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
+  import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
   import { choose as recordOrSample } from '$lib/record/packs.ts';
@@ -389,7 +390,21 @@
           const planHash = planned.ok ? ((planned.value as { diff?: { planHash?: string } }).diff?.planHash ?? '') : '';
           const done = planned.ok ? await client.call('installPack', { doc, planHash }) : planned;
           if (!done.ok) out.refused.push(firstRun.shapeNotAdded(u.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
-          else out.added.push(...names);
+          else {
+            out.added.push(...names);
+            /* A SEED CARRIES NO LINK (42 §5.2), so the examples are pointed at each other now they are in: a student's
+               assignment at its course, a guide's step at its milestone (`links.ts`). A refused link is skipped. */
+            await linkExamples(
+              {
+                rows: async (register) => {
+                  const read = await client.list({ register, limit: 200 });
+                  return read.ok ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
+                },
+                link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+              },
+              u.usecase,
+            );
+          }
         }
       }
 

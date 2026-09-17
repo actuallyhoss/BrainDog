@@ -128,7 +128,21 @@ test('AN AGENT READS HOW THE RECORD IS ARRANGED IN ONE COMPACT ANSWER, and the g
 });
 
 test('A TOKEN PROPOSES INSTALLING A USE CASE, IS SHOWN WHAT IT WOULD DO, AND ONLY THE OWNER INSTALLS IT', async () => {
-  const { api, sql } = await record();
+  /* THE ENTRY'S OWN STEP RUNS ONCE ITS PACK IS IN, reading the list it just made; one that throws leaves the install. */
+  const after: string[] = [];
+  const { api, sql } = await record(
+    CATALOGUE.map((e) =>
+      e.kind !== 'usecase'
+        ? e
+        : {
+            ...e,
+            afterInstall: async (io) => {
+              after.push(`courses:${String((await io.rows('courses'))?.length)}`, `nothing:${String(await io.rows('nothing'))}`);
+              throw new Error('a link that would not land');
+            },
+          },
+    ),
+  );
   const filed = value<{ id: string }>(
     await api.propose({ question: 'Set this BrainDog up for studying?', body_kind: 'pack', body: { install: 'study', approve: ['CALLS OUT evil.example'], plan: [] } } as never, agent),
   );
@@ -148,6 +162,7 @@ test('A TOKEN PROPOSES INSTALLING A USE CASE, IS SHOWN WHAT IT WOULD DO, AND ONL
 
   const done = value<{ applied: { installed: string[] } }>(await api.decide(accept(filed.id), owner));
   assert.deepEqual(done.applied.installed, ['work', 'usecase-study']);
+  assert.deepEqual(after, ['courses:0', 'nothing:null']);
   assert.deepEqual(api.kernel.packStates().map((p) => p.id), ['usecase-study', 'work']);
   assert.equal(value<{ status: string }>(await api.governance({ id: filed.id }, owner)).status, 'resolved');
   sql.close();

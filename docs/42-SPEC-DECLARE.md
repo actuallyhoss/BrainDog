@@ -885,7 +885,7 @@ CI rows this package feeds (33 §8): `refusal-fixtures` · `closed-lists` · `gr
 - `ponytail:` `diffSummary` says `body changed` for every kind but register and page; per-kind summaries when the diff screen needs them.
 - `ponytail:` no `inputs:` key and no `!input` substitution; add with the pack builder (21 §9).
 - `ponytail:` two warnings only (`one:` absent, a register with no seed); a warnings vocabulary when a third is needed.
-- `ponytail:` a seed carries no `ref`, `secret` or `file` value; `$seed:<register>` references when a first-party pack needs a linked example.
+- `ponytail:` a seed carries no `ref`, `secret` or `file` value, and that stands. A first-party use case links its examples after the install instead, outside this package and the kernel: the installer that put them in (onboarding, or an accepted proposal through the catalogue entry's `afterInstall`) finds each example row by its title and sets the link through the ordinary write path, only on a row marked `example` whose field is empty, skipping a refused write (`packages/seed/src/usecases/links.ts`). `$seed:<register>` references in the format when a pack from outside needs a linked example.
 - `ponytail:` `FIELD_TYPE_UNKNOWN`'s suggestion is a sixteen-entry synonym table plus Levenshtein ≤ 2.
 - `ponytail:` `license` and `Tz` are checked by syntax, not against the SPDX list or the IANA database.
 - `ponytail:` `checksum` is WebCrypto and async, so `plan` and `install` are async; a 60-line pure SHA-256 if a synchronous path is ever needed.

@@ -42,6 +42,17 @@ export type CatalogueEntry = {
    * that use case's example rows as onboarding gives them, or none.
    */
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
+  /**
+   * What the installer does once the pack is in, through the ordinary write path: a use case links its example rows
+   * to each other by title, because a seed carries no link (42 §5.2). OPTIONAL, and never a reason to fail the install.
+   */
+  afterInstall?: (io: RowIo) => Promise<unknown>;
+};
+
+/** The rows of a list, and one link set on one row, as the owner who accepted. */
+export type RowIo = {
+  rows: (register: string) => Promise<readonly { seq: number | null; fields: Record<string, unknown> }[] | null>;
+  link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean>;
 };
 
 type Body = Record<string, unknown>;
@@ -399,6 +410,21 @@ export function arranger(d: ArrangeDeps) {
    * settings. The first that will not land stops the rest and is the answer, and the caller reopens the
    * question with what was already done in its sentence.
    */
+  /** The catalogue entry's own step after its pack is in. A throw or a refusal in it leaves the install as it is. */
+  async function afterInstall(id: string, actor: string): Promise<void> {
+    const step = entryOf(id)?.afterInstall;
+    if (!step) return;
+    const io: RowIo = {
+      rows: async (register) => {
+        const read = kernel.list({ register, limit: 200 });
+        return read.ok ? read.value.rows : null;
+      },
+      link: async (register, seq, field, spoken) =>
+        kernel.update(register, `${register}#${seq}`, { [field]: spoken }, { actor, cascade: false, note: 'Linked an example to the example it belongs with.' }).ok,
+    };
+    await step(io).catch(() => undefined);
+  }
+
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string): Promise<Result<Body>> {
     const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[] } = {
       installed: [],
@@ -438,6 +464,7 @@ export function arranger(d: ArrangeDeps) {
       const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
       done.installed.push(id);
+      await afterInstall(id, actor);
     }
     for (const id of enable) {
       if (on(id)) continue;

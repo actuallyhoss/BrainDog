@@ -78,7 +78,7 @@ import type { Predicate } from '@braindog/where';
 import { arranger, type CatalogueEntry } from './arrange.ts';
 import { grammarOf } from './grammar.ts';
 
-export type { CatalogueEntry } from './arrange.ts';
+export type { CatalogueEntry, RowIo } from './arrange.ts';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
