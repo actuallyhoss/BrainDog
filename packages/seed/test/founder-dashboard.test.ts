@@ -107,6 +107,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, 
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
     'At a glance',
+    'Where it stands',
+    'Waiting on you',
     'What is open',
     'Agents',
     'Money',
@@ -118,8 +120,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, 
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal((blocks[0] as unknown as { cells: unknown[] }).cells.length, 2, 'what it costs a year needs Estate, so that figure is left out');
-  assert.equal((blocks[3] as unknown as { span: number }).span, 12, 'the money table takes the width the services list had');
+  assert.equal((blocks[5] as unknown as { span: number }).span, 12, 'the money table takes the width the services list had');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
-  assert.equal((blocks[4] as unknown as { document?: boolean }).document, true);
-  assert.deepEqual(blocks[6]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
+  assert.equal((blocks[6] as unknown as { document?: boolean }).document, true);
+  assert.deepEqual(blocks[8]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

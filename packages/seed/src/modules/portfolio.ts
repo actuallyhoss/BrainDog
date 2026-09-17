@@ -5,7 +5,7 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { LOOKUPS, OPEN, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
+import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
 /* ── things, and their frozen identity hues ───────────────────────────────
    The hue is chosen at create by the theme's `nextAccentHue` and written once. The kernel never
@@ -110,10 +110,12 @@ export const THINGS: Fields[] = [
      future roll-up reads. */
   /* Where each project's work happens. Kiln is on a Mac and Portage on a Windows desktop, so both
      path shapes are placed; Portage's repository is named bare, as its runs report it. */
-  { name: 'Kiln', lane: 'earning', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
-  { name: 'Marlow & Co', lane: 'earning', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
-  { name: 'Portage', lane: 'building', revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
-  { name: 'Tallow', lane: 'parked', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
+  /* HOW EACH ONE IS GOING, WHAT IS NEXT AND HOW FAR ALONG, kept current by whoever works on it: a person, or the agent named
+     on the row. Kiln waits on how it is licensed and Portage on where it sends from, so both are the ones that need a call. */
+  { name: 'Kiln', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
+  { name: 'Marlow & Co', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
+  { name: 'Portage', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
+  { name: 'Tallow', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
 ];
 
 export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
@@ -138,6 +140,21 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
       { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], index: true, required: true },
       { id: 'revenue', type: 'money' },
       { id: 'since', type: 'day' },
+      /* WHERE A PROJECT STANDS, in the words anybody working on it keeps current. The values are Work's thread health, so a
+         project and a thread say "at risk" the same way. */
+      {
+        id: 'health',
+        label: 'Health',
+        type: 'enum',
+        values: ['on_track', 'at_risk', 'off_track'],
+        labels: { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' },
+        index: true,
+      },
+      { id: 'next', label: 'Next step', type: 'text' },
+      { id: 'progress', label: 'How far along', type: 'decimal', unit: '%', min: 0, max: 100 },
+      { id: 'aim', label: 'Aiming for', type: 'day', index: true },
+      /* THE AGENT WORKING ON IT, by the name it signs its runs with, as a task names one. A delegate, never the owner. */
+      { id: 'agent', label: 'Agent', type: 'text', index: true },
       { id: 'mark', type: 'text' },
       { id: 'hue', type: 'int' },
       { id: 'note', type: 'document' },
@@ -147,7 +164,37 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
+/** A project somebody is working on: the ones with a page. */
+const LIVE = 'lane is building or earning';
+
+/** A count of projects, which is all the Overview's figures are. */
+const counted = (metric: string, name: string, where: string, target: Record<string, number> = { gte: 0 }): SeedMetric => ({
+  metric,
+  name,
+  source: 'register.things',
+  where,
+  value: { count: 'id' },
+  format: 'int',
+  target,
+  window: '30d',
+  compare: 'none',
+});
+
 export const PROJECT_METRICS: Record<string, SeedMetric> = {
+  /* ── the portfolio, over Projects alone ─────────────────────────────────────
+     Every figure here reads the projects list and nothing else, so the Overview works on a record that keeps only
+     projects: a student's passion projects, a founder's apps, a team's products, or one new project and its plan. */
+  'projects-live': counted('projects-live', 'In play', LIVE),
+  /* WHAT NEEDS A PERSON: a project somebody, or its agent, said is at risk or off track. */
+  'projects-need-you': counted('projects-need-you', 'Need you', `${LIVE}, health is at_risk or off_track`, { lte: 0 }),
+  'projects-with-agent': counted('projects-with-agent', 'With an agent', `${LIVE}, agent is set`),
+  'projects-aim-30d': counted('projects-aim-30d', 'Aiming within 30 days', `${LIVE}, aim after yesterday, aim before +31d`),
+  'projects-past-aim': counted('projects-past-aim', 'Past the day they aimed for', `${LIVE}, aim before today`, { lte: 0 }),
+  'projects-parked': counted('projects-parked', 'Parked', 'lane is parked'),
+  'projects-retired': counted('projects-retired', 'Finished', 'lane is retired'),
+  /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
+  'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
+
 
   /* ── the same three, narrowed by one ref ──────────────────────────────────
      PARAMETERISED, not copied. These were `kiln-open`, `kiln-owed` and `kiln-cost` with the name
@@ -193,7 +240,153 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   },
 };
 
+/**
+ * WHAT ASKS A PERSON ON ITS OWN: a project still in play whose day has passed. It writes nothing; the question lands on
+ * Decide, once per project and day, and the answer is theirs (move the day, or park it).
+ */
+export const PORTFOLIO_RULES: Record<string, SeedRule> = {
+  'project-past-aim': {
+    rule: 'project-past-aim',
+    pack: 'portfolio',
+    register: 'things',
+    when: `${LIVE}, aim before today`,
+    then: [{ suggest: { question: '{{name}} was aiming for {{ago:aim}}. Move the day, or park it?', options: ['Move the day', 'Park it'] } }],
+    once_per: ['entry', 'aim'],
+  },
+};
+
+const PROJECT = { field: 'name', label: 'Project', width: 'minmax(14ch,1fr)' } as const;
+
 export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
+  /**
+   * THE PORTFOLIO, LEADING WITH WHAT NEEDS YOU (`loop/research-modules.md` §2.5, `loop/DIRECTION.md` §3). "Which of my
+   * projects are moving, which need a call, and where my agents are": the figures, the queue of projects somebody said
+   * are at risk or off track with who said so, every project in play as a card, what agents hold, what is coming up, and
+   * the parked and finished ones folded away. Every block reads Projects alone, so it opens on any record that keeps them.
+   */
+  portfolio: {
+    page: 'portfolio',
+    title: 'Overview',
+    nav: { section: 'Projects', order: 5 },
+    icon: 'thing',
+    requires: ['register.things'],
+    pack: 'portfolio',
+    blocks: [
+      {
+        kind: 'stat',
+        lead: true,
+        heading: 'Right now',
+        span: 12,
+        cells: [
+          { metric: 'projects-live', label: 'In play', note: '{{projects-with-agent}} with an agent' },
+          { metric: 'projects-need-you', label: 'Need you', note: 'at risk or off track' },
+          { metric: 'projects-aim-30d', label: 'Aiming within 30 days', note: '{{projects-past-aim}} past their day' },
+          { metric: 'projects-parked', label: 'Parked', note: '{{projects-retired}} finished' },
+        ],
+      },
+      {
+        /* THE QUEUE: what somebody said is not going well, what is next, and who said it last, so a person sees whether
+           it was them, a colleague or an agent. */
+        kind: 'table',
+        heading: 'Needs you',
+        span: 8,
+        source: 'register.things',
+        where: `${LIVE}, health is at_risk or off_track`,
+        columns: [
+          PROJECT,
+          { field: 'health', label: 'Health', width: '12ch' },
+          { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
+          { field: 'changed', label: 'Changed by', width: '16ch' },
+        ],
+        order: [{ field: 'aim', dir: 'asc' }],
+        limit: 12,
+        empty: 'Nothing needs you. Every project in play is on track, or nobody has said otherwise.',
+      },
+      {
+        kind: 'split',
+        heading: 'How they are going',
+        span: 4,
+        source: 'metric.projects-by-health',
+        unset: 'Not said yet',
+        empty: 'No project is in play.',
+      },
+      {
+        kind: 'cards',
+        heading: 'In play',
+        span: 12,
+        source: 'register.things',
+        where: LIVE,
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'progress', label: 'How far along', as: 'ring' },
+          { field: 'health', label: 'Health', as: 'fact' },
+          { field: 'next', label: 'Next step', as: 'fact' },
+          { field: 'agent', label: 'Agent', as: 'who' },
+        ],
+        order: [{ field: 'name', dir: 'asc' }],
+        limit: 12,
+        empty: 'No project is in play. Add one, or set a parked one building.',
+      },
+      {
+        /* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
+        kind: 'table',
+        heading: 'With an agent',
+        span: 12,
+        source: 'register.things',
+        where: `${LIVE}, agent is set`,
+        columns: [
+          PROJECT,
+          { field: 'agent', label: 'Agent', width: '10ch' },
+          { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
+          { field: 'changed', label: 'Changed by', width: '16ch' },
+        ],
+        order: [{ field: 'name', dir: 'asc' }],
+        limit: 12,
+        empty: 'No agent holds a project. An agent takes one by setting itself as its agent.',
+      },
+      {
+        kind: 'table',
+        heading: 'Coming up',
+        span: 12,
+        source: 'register.things',
+        where: `${LIVE}, aim is set`,
+        columns: [
+          PROJECT,
+          { field: 'progress', label: 'How far along', width: '14ch', align: 'end' },
+          { field: 'aim', label: 'Aiming for', width: '14ch', align: 'end' },
+        ],
+        order: [{ field: 'aim', dir: 'asc' }],
+        limit: 8,
+        empty: 'No project in play has a day it is aiming for.',
+      },
+      {
+        kind: 'section',
+        heading: 'Parked and finished',
+        icon: 'thing',
+        span: 12,
+        fold: true,
+        source: 'register.things',
+        where: 'lane is parked or retired',
+      },
+      {
+        kind: 'table',
+        heading: 'Not in play',
+        span: 12,
+        source: 'register.things',
+        where: 'lane is parked or retired',
+        columns: [
+          PROJECT,
+          { field: 'lane', label: 'Status', width: '10ch' },
+          { field: 'next', label: 'Next', width: 'minmax(18ch,2fr)' },
+          { field: 'changed', label: 'Changed by', width: '16ch' },
+        ],
+        order: [{ field: 'name', dir: 'asc' }],
+        limit: 20,
+        empty: 'Nothing is parked or finished.',
+      },
+    ],
+  },
+
   /**
    * A PROJECT PAGE: every block filtered to one thing.
    *
@@ -228,7 +421,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     for: { register: 'things', where: 'lane is building or earning' },
     nav: { section: 'Projects', order: 10 },
     icon: 'thing',
-    requires: ['register.tasks', 'register.session', 'register.obligations', 'register.services'],
+    requires: ['register.things', 'register.tasks', 'register.session', 'register.obligations', 'register.services'],
     blocks: [
       {
         kind: 'stat',
@@ -239,6 +432,40 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { metric: 'project-owed:{{name}}', label: 'Owed to you' },
           { metric: 'project-cost:{{name}}', label: 'Costs a year' },
         ],
+      },
+      {
+        /* WHERE IT STANDS, as whoever works on it last said: how it is going, what is next, how far along, and the agent
+           on it. One card, because it is one project. */
+        kind: 'cards',
+        heading: 'Where it stands',
+        span: 5,
+        source: 'register.things',
+        where: 'name is {{name}}',
+        columns: [
+          { field: 'next', label: 'Next step', as: 'title' },
+          { field: 'progress', label: 'How far along', as: 'ring' },
+          { field: 'health', label: 'Health', as: 'fact' },
+          { field: 'aim', label: 'Aiming for', as: 'fact' },
+          { field: 'agent', label: 'Agent', as: 'who' },
+        ],
+        limit: 1,
+        empty: 'Nobody has said where {{name}} stands yet.',
+      },
+      {
+        /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last. */
+        kind: 'table',
+        heading: 'Waiting on you',
+        span: 7,
+        source: 'register.tasks',
+        where: 'thing is {{name}}, state is review or blocked',
+        columns: [
+          { field: 'what', label: 'Task', width: 'minmax(16ch,1fr)' },
+          { field: 'state', label: 'Status', width: '11ch' },
+          { field: 'changed', label: 'Changed by', width: '15ch' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 6,
+        empty: 'Nothing on {{name}} is waiting on you.',
       },
       {
         kind: 'todo',
@@ -260,9 +487,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
         source: 'register.session',
         /* BY `project`, WHICH HOLDS THE PROJECT'S SPOKEN ID, `things#1`. `{{spoken}}` is that id for the
-           row the template is about. The web's engine fills it; the kernel's `fill` in `pages.ts` does
-           not yet, and until it does this block draws nothing on a real record
-           (`pages-read.test.ts` holds it as a todo). */
+           row the template is about, filled by both engines. */
         where: 'project is {{spoken}}',
         order: [{ field: 'last_seen', dir: 'desc' }],
         limit: 6,
@@ -305,6 +530,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'name' }, { field: 'cost' }],
         source: 'register.services',
         where: 'thing is {{name}}',
+        /* WHAT RENEWS FIRST, FIRST. With no order the record listed the newest six and the sample the oldest. */
+        order: [{ field: 'renews', dir: 'asc' }],
         limit: 6,
         empty: '{{name}} runs on nothing you pay for.',
       },

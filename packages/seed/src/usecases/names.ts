@@ -44,6 +44,7 @@ export const moduleName = (id: string): string => {
 export const RULE_NAMES: Readonly<Record<string, string>> = {
   'invoice-late': 'Chase late payments',
   'cash-stale': 'Keep balances current',
+  'project-past-aim': 'Ask about a missed day',
 };
 
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */

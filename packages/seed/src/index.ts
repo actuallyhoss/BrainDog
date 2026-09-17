@@ -37,7 +37,7 @@ import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegis
 import { ACCOUNTS, MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
-import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
+import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
@@ -178,7 +178,7 @@ export const projectWithRunsOn = (): SeedPage => ({
 });
 
 /** The rules the modules ship with. */
-export const RULES: Record<string, SeedRule> = { ...MONEY_RULES };
+export const RULES: Record<string, SeedRule> = { ...MONEY_RULES, ...PORTFOLIO_RULES };
 
 export const ruleDeclarations = (): Declaration[] =>
   Object.values(RULES).map((body) => ({ id: `rule.${body.rule}`, kind: 'rule' as const, body: body as never }));

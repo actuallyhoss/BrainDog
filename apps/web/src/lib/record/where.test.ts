@@ -384,7 +384,7 @@ test('every filter a declared page prints is one the record reads back', () => {
       if (roundTrips(source.slice('register.'.length), block.where, `/p/${slug}`)) checked++;
     }
   }
-  assert.equal(checked, 16, `${checked} declared page filters round-tripped; sixteen compile today, Home's own and Work's among them`);
+  assert.equal(checked, 22, `${checked} declared page filters round-tripped; twenty-two compile today, Home's own, Work's and Projects' among them`);
 });
 
 test('and every filter a saved view prints', () => {
