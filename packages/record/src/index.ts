@@ -442,6 +442,11 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  * disagreeing with its own contract. A long session needs no second read: the offset between the
  * record's instant and the reader's is constant, and the reader's own clock ticks.
  */
+/** The keys `setPref` takes. A closed list, so a typo is refused rather than kept for ever. */
+export const PREF_KEYS = ['nav.order', 'nav.hidden'] as const;
+export type PrefKey = (typeof PREF_KEYS)[number];
+export type Prefs = { [K in PrefKey]?: string[] };
+
 export type Boot = {
   registers: { id: string; name: string; count: number }[];
   /** ISO 8601, UTC. The instant the record answered as of. */
@@ -453,7 +458,14 @@ export type Boot = {
   /** The record's own name, which the shell draws above everything else. `null` before it is provisioned. */
   record: { slug: string; name: string; locale: string } | null;
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
-  me: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: Level | null };
+  me: {
+    kind: 'person' | 'token' | 'system';
+    person: string | null;
+    name: string | null;
+    level: Level | null;
+    /** What this person arranged for themselves (`setPref`): the rail's order and the pages hidden from it. A person only. */
+    prefs?: Prefs;
+  };
   /** The pages the caller may open, as `pages` lists them, each with its place in the rail when it has one. */
   pages: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null; list: string | null }[];
   /**
@@ -1383,6 +1395,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         person,
         name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
         level: p.kind === 'system' ? null : p.level,
+        ...(p.kind === 'person' ? { prefs: kernel.prefsOf(p.id) as Prefs } : {}),
       },
       /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
       pages: kernel
@@ -2316,6 +2329,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('FORBIDDEN', 'A read mark belongs to a person, and a token is not one.', { at: 'principal' });
       const upTo = args?.upTo ?? kernel.newestEvent();
       return ok({ upTo, seen_at: kernel.markRead(ctx.principal.id, upTo) });
+    },
+
+    /**
+     * One thing this person arranged for themselves: `nav.order`, the rail's order, or `nav.hidden`, the pages taken
+     * out of it. Each is a list of addresses, and `null` takes it away. `boot` answers them on `me.prefs`.
+     *
+     * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
+     * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
+     */
+    async setPref(args: { key: string; value: unknown }, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.principal.kind !== 'person') return no('FORBIDDEN', 'What a rail shows belongs to a person, and a token is not one.', { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['key', 'value']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (!PREF_KEYS.includes(args?.key as PrefKey))
+        return no('VALUE_MALFORMED', `key is one of ${PREF_KEYS.join(' or ')}.`, { at: 'key', allowed: PREF_KEYS });
+      const value = args.value;
+      if (value !== null && !(Array.isArray(value) && value.length <= 500 && value.every((v) => typeof v === 'string' && v.startsWith('/') && v.length <= 300)))
+        return no('VALUE_MALFORMED', 'value is a list of at most 500 addresses, each starting with /, or null to take it away.', { at: 'value' });
+      const kept = value === null ? null : [...new Set(value as string[])];
+      kernel.setPref(ctx.principal.id, args.key, kept);
+      return ok({ key: args.key, value: kept });
     },
 
     /**

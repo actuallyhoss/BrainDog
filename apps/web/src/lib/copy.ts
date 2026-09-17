@@ -92,6 +92,17 @@ export const copy = {
      the page behind it (19 §3). */
   moveToTop: 'Move to top',
   hide: 'Hide',
+  /* HIDING A PAGE AND BRINGING IT BACK. Kept for the person on a record, on every device, and on this device with none. */
+  hiddenFromNav: (title: string) => `${title} is hidden from your nav.`,
+  shownInNav: (title: string) => `${title} is back in your nav.`,
+  hiddenCount: (n: number) => (n === 1 ? '1 page hidden' : `${n} pages hidden`),
+  showAgain: 'Show again',
+  showHidden: 'Show',
+  hiddenPages: 'Hidden from your nav',
+  hiddenPagesHint: 'A hidden page stays in the record, in search and in the palette. Show it again and it returns to the place it had.',
+  hiddenNone: 'Nothing is hidden.',
+  hiddenNoneWhy: 'Right-click a page in the nav, or press Shift+F10 on it, and choose Hide.',
+  perPerson: 'Kept for you on this record, on every device you sign in on.',
   removeBlock: 'Remove this block',
   addBlock: 'Add a block',
 

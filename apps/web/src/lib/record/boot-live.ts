@@ -36,7 +36,14 @@ type Sample = ReturnType<typeof boot>;
  * `upTo` is the newest line of what is new, which is what marking it all read sends.
  */
 export type Shell = Omit<Sample, 'me'> & {
-  me: { person: string; level: string; owner: boolean; records: { slug: string; name: string; level: string }[] };
+  me: {
+    person: string;
+    level: string;
+    owner: boolean;
+    records: { slug: string; name: string; level: string }[];
+    /** A person's own rail on this record (`nav-prefs.svelte.ts`). Absent on the sample and for a token. */
+    prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
+  };
   /**
    * Why the records this person can reach could not be listed, when they could not.
    *
@@ -328,7 +335,13 @@ export function layoutOf(b: Boot): Shell {
     names: { ...b.names },
     nav,
     pen: [],
-    me: { person: person ?? '', level, owner: level === 'owner', records: record ? [{ slug: record.slug, name: record.name, level }] : [] },
+    me: {
+      person: person ?? '',
+      level,
+      owner: level === 'owner',
+      records: record ? [{ slug: record.slug, name: record.name, level }] : [],
+      ...(b.me?.prefs ? { prefs: b.me.prefs } : {}),
+    },
     people: [],
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */
     questions: (b.waiting ?? []).map((w, i) => ({ id: w.id, title: w.question || w.id, cost: '', rank: i + 1, opened: w.opened_at, options: [] })),

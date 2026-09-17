@@ -184,6 +184,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   for (const person of personIds) {
     const held = sql.one<{ n: number }>('SELECT count(*) AS n FROM member WHERE person_id = ?', person)?.n ?? 0;
     sql.exec('DELETE FROM member WHERE person_id = ?', person);
+    /* AND WHAT THEY ARRANGED FOR THEMSELVES, which names them by id and is nobody else's. */
+    sql.exec('DELETE FROM pref WHERE person_id = ?', person);
     members += Number(held);
     sql.exec('UPDATE person SET email = ?, name = ? WHERE id = ?', ERASED, ERASED, person);
     people++;

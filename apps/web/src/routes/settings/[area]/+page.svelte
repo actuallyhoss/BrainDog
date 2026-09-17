@@ -25,6 +25,7 @@
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import {
     AUTH_METHODS, DEPLOYMENT, DEVICES, NOW, PACKS, PAGES, PASSKEYS, PEOPLE_ACCESS,
     REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, pages,
@@ -74,6 +75,15 @@
   const RECORD = $derived(shell.index.name);
   const SLUG = $derived(shell.index.slug);
   const me = $derived(shell.me);
+
+  /* THE PAGES THIS PERSON HID FROM THEIR NAV, by the name the rail gave them, and the way back. */
+  const hiddenPages = $derived(navPrefs.hidden.map((href) => ({ href, title: shell.nav.find((e) => e.href === href)?.title ?? href })));
+  function showAgain(p: { href: string; title: string }) {
+    void navPrefs.show(p.href).then((saved) => {
+      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
+      else toasts.push(copy.shownInNav(p.title), { undo: () => void navPrefs.hide(p.href) });
+    });
+  }
 
   /* Bytes as a person reads them — `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
@@ -1359,6 +1369,30 @@
           </ul>
         </Section>
       {/if}
+
+      <!-- THE WAY BACK FOR A HIDDEN PAGE, which the rail's "pages hidden" row opens at. -->
+      <div id="hidden">
+        <Section title={copy.hiddenPages} count={hiddenPages.length}>
+          <p class="hint">{copy.hiddenPagesHint}</p>
+          {#if hiddenPages.length === 0}
+            <Empty kind="cleared" title={copy.hiddenNone} body={copy.hiddenNoneWhy} />
+          {:else}
+            <ul class="ledger ledger-glyph">
+              {#each hiddenPages as p (p.href)}
+                <li>
+                  <div class="line">
+                    <span class="seq"><Icon name="doc" size="s" /></span>
+                    <span class="line-main"><span class="line-title">{p.title}</span></span>
+                    <span class="line-amount"></span>
+                    <span class="line-when"><Button weight="quiet" onclick={() => showAgain(p)}>{copy.showAgain}</Button></span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+          <p class="hint">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
+        </Section>
+      </div>
 
       <Section title={copy.suggestPages}>
         <div class="switch-row">

@@ -3614,6 +3614,29 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       );
     },
 
+    /**
+     * What one person arranged for themselves, key by key (`pref`, migration 9). Not an event, for the reason a read
+     * mark is not one.
+     */
+    prefsOf: (person: string): Record<string, unknown> =>
+      Object.fromEntries(
+        sql.all<{ key: string; value: string }>('SELECT key, value FROM pref WHERE person_id = ? ORDER BY key', person).map((r) => [r.key, JSON.parse(r.value)]),
+      ),
+
+    /** Set one, or with `null` take it away. The value is checked by the record before it reaches here. */
+    setPref: (person: string, key: string, value: unknown): void => {
+      if (value === null) sql.exec('DELETE FROM pref WHERE person_id = ? AND key = ?', person, key);
+      else
+        sql.exec(
+          `INSERT INTO pref (person_id, key, value, updated_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT (person_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+          person,
+          key,
+          JSON.stringify(value),
+          instant(clock.now()),
+        );
+    },
+
     /** The newest event, which is what a client that has read everything passes as `upTo`. */
     newestEvent: (): number => Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0),
 

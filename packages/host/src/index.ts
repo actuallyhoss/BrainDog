@@ -190,6 +190,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this record, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
+  { name: 'setPref', group: 'DATA', writes: true, what: 'Your own rail: its order, or the pages hidden from it. A person only, and not an event.' },
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'report', group: 'DATA', writes: true, what: 'Rows a project sends with its report key, one or up to a hundred, into the list the key is bound to. A report key reaches this and nothing else.' },
@@ -369,6 +370,7 @@ export type RecordSurface = {
   whoami(ctx: never): Promise<Result<unknown>>;
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number } | undefined, ctx: never): Promise<Result<unknown>>;
+  setPref(args: never, ctx: never): Promise<Result<unknown>>;
   log(args: never, ctx: never): Promise<Result<unknown>>;
   governance(args: never, ctx: never): Promise<Result<unknown>>;
   propose(args: never, ctx: never): Promise<Result<unknown>>;
@@ -450,6 +452,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     whoami: (_a, ctx) => api.whoami(ctx as never),
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
     markRead: (a, ctx) => api.markRead(a as { upTo?: number } | undefined, ctx as never),
+    setPref: (a, ctx) => api.setPref(a as never, ctx as never),
     log: (a, ctx) => api.log(a as never, ctx as never),
     governance: (a, ctx) => api.governance(a as never, ctx as never),
     propose: (a, ctx) => api.propose(a as never, ctx as never),

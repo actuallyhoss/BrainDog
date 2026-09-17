@@ -22,6 +22,7 @@ import scheduleActions0005 from './migrations/0005_schedule_actions.ts';
 import invitation0006 from './migrations/0006_invitation.ts';
 import view0007 from './migrations/0007_view.ts';
 import arrange0008 from './migrations/0008_arrange.ts';
+import pref0009 from './migrations/0009_pref.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -35,6 +36,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 6, slug: 'invitation', sql: invitation0006 },
   { version: 7, slug: 'view', sql: view0007 },
   { version: 8, slug: 'arrange', sql: arrange0008 },
+  { version: 9, slug: 'pref', sql: pref0009 },
 ];
 
 /**
@@ -47,6 +49,7 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 7 adds `view`, `local` for the same reason and at the same price: a saved view does not
  * travel in an export, and carrying one means a travelling table and a format revision.
  * Migration 8 rebuilds `suggestion` with three more bodies; an older file carries only the four it still takes.
+ * Migration 9 adds `pref` and `pack_removed`, both `local`, so no file carries either.
  */
 export const FORMAT_VERSION = 1 as const;
 

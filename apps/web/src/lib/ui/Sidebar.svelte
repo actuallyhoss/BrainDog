@@ -34,6 +34,7 @@
   import { said } from '../voice.svelte.ts';
   import { arrange, orderLists } from '../nav.ts';
   import * as pref from '../pref.ts';
+  import { navPrefs, type Saved } from '../nav-prefs.svelte.ts';
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
   import Icon, { type IconName } from './Icon.svelte';
@@ -124,8 +125,27 @@
    * 19 §3 asks for that by name: hiding an item and showing it again returns it to its stored place,
    * never to the end. Empty means "as declared", so a record that has never been rearranged carries
    * no arrangement at all rather than a copy of its own defaults.
+   *
+   * BOTH ARE THE PERSON'S, on a record: `navPrefs` sends each change to `setPref` and `boot` answers them on every
+   * device. With no record they stay on this one.
    */
-  let arrangement = $state<string[]>(pref.read().nav ?? []);
+  const arrangement = $derived(navPrefs.order);
+
+  /* A CHANGE THE RECORD REFUSED IS ALREADY PUT BACK on screen; this says why. */
+  const refusedSay = (saved: Saved) => {
+    if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
+  };
+
+  /**
+   * TAKE A PAGE OUT OF THE RAIL, and say where it went. It stays in the record, in search and in the palette, and
+   * Settings, Navigation lists it with Show again, which is also what the toast's Undo does.
+   */
+  function hide(entry: NavEntry) {
+    void navPrefs.hide(entry.href).then((saved) => {
+      if (saved.from === 'refused') return refusedSay(saved);
+      toasts.push(copy.hiddenFromNav(entry.title), { undo: () => void navPrefs.show(entry.href).then(refusedSay) });
+    });
+  }
 
   /**
    * Keep the order, because this header claims it is kept.
@@ -143,11 +163,13 @@
     /* THE LISTS' ORDER RIDES IN THE SAME PREFERENCE (`orderLists`), and a move here only knows the pages, so the list
        addresses already held are kept rather than dropped by the next Move up. */
     const kept = arrangement.filter((href) => href.startsWith('/r/') && !next.includes(href));
-    arrangement = [...next, ...kept];
-    pref.write({ nav: arrangement });
+    void navPrefs.setOrder([...next, ...kept]).then(refusedSay);
   };
 
-  const sections = $derived(arrange(nav, arrangement));
+  /* A HIDDEN PAGE IS NOT DRAWN, and the count below says how many are not, so the way back is on the rail itself. */
+  const shown = $derived(nav.filter((e) => !navPrefs.hidden.includes(e.href)));
+  const hiddenHere = $derived(nav.length - shown.length);
+  const sections = $derived(arrange(shown, arrangement));
   const lists = $derived(orderLists(registers, arrangement));
 
   /* THE FLAT LIST IN RENDER ORDER, and it is derived FROM what renders rather than beside it. The
@@ -556,6 +578,15 @@
     </ul>
     {/if}
 
+    {#if hiddenHere > 0}
+      <!-- THE WAY BACK, WHERE THE PAGE WAS. A page hidden from the rail is findable from the rail. -->
+      <a class="pen tap" href="/settings/navigation#hidden" data-label={copy.hiddenCount(hiddenHere)} data-hidden-row>
+        <Icon name="eye" size="m" />
+        <span class="pen-text">{copy.hiddenCount(hiddenHere)}</span>
+        <span class="pen-action">{copy.showHidden}</span>
+      </a>
+    {/if}
+
     {#if pen.length}
       <!-- A holding pen. An update that adds a page lands HIDDEN and nothing moves; re-showing one
            returns it to its stored order, never to the end of the list (19 §3). -->
@@ -609,9 +640,9 @@
   </div>
 
   <!-- EVERY ITEM IS A KEY THAT ALREADY EXISTS, the same rule the row menu follows: the menu is not
-       a second set of capabilities, it is the same set, discoverable by looking. Hide is the one
-       that says what it would have done instead of doing it — the mock has nowhere to bring a
-       hidden item back from, and an irreversible control in a mock-up is a trap. -->
+       a second set of capabilities, it is the same set, discoverable by looking. Hide takes the page
+       out of the rail and keeps it: Undo in the toast, the hidden row at the foot of the list, and
+       Settings, Navigation all bring it back to the place it had. -->
   <RowMenu
     open={menuFor !== null}
     at={menuAt}
@@ -641,7 +672,12 @@
         class="mi"
         role="menuitem"
         type="button"
-        onclick={() => toasts.push(copy.notWritten(`${entry.title} would be hidden from your nav`), { intent: 'warn' })}
+        onclick={() => {
+          /* TAKEN BEFORE THE MENU CLOSES: `entry` is read from `menuFor`, which closing empties. */
+          const leaving = entry;
+          menuFor = null;
+          hide(leaving);
+        }}
       >
         <Icon name="ban" size="s" />
         <span class="mi-name">{copy.hide}</span>

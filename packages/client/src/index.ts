@@ -58,7 +58,14 @@ export type Boot = {
   /** The record's own name, or `null` for one that was never provisioned. */
   record?: { slug: string; name: string; locale: string } | null;
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
-  me?: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: string | null };
+  me?: {
+    kind: 'person' | 'token' | 'system';
+    person: string | null;
+    name: string | null;
+    level: string | null;
+    /** A person's own rail, as `setPref` kept it: the order and the pages hidden. Absent for anybody else. */
+    prefs?: { 'nav.order'?: string[]; 'nav.hidden'?: string[] };
+  };
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
   /** The pages the caller may open, each with its place in the rail when it has one. */
@@ -652,6 +659,9 @@ export function createClient(options: ClientOptions) {
     markRead: (upTo?: number) =>
       call<{ upTo: number; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
     log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
+    /** The reader's own rail: `nav.order` or `nav.hidden`, a list of addresses, or `null` to take it away. */
+    setPref: (key: 'nav.order' | 'nav.hidden', value: string[] | null) =>
+      call<{ key: string; value: string[] | null }>('setPref', { key, value }),
 
     /* A RUN'S THREE. `attach` and `handoff` are an agent's, and the host reads which run from the session
        headers the caller's own `fetch` sends; `sessionsLive` is anybody's who may read the register. */

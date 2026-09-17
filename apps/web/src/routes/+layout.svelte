@@ -60,6 +60,7 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { arrange, orderLists } from '$lib/nav.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { beforeNavigate, goto } from '$app/navigation';
@@ -97,9 +98,12 @@
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return placed.size ? data.nav.filter((n) => !placed.has(n.href)) : data.nav;
   });
-  const grouped = $derived(arrange(railNav, pref.read().nav ?? []));
+  /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
+  $effect.pre(() => navPrefs.adopt(data.me.prefs, location.origin));
+  /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
+  const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
   /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
-  const moreLists = $derived(orderLists(data.index.registers, pref.read().nav ?? []));
+  const moreLists = $derived(orderLists(data.index.registers, navPrefs.order));
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN. This indexed the raw list, so after a reorder the digit
      printed beside a rail row and the row the digit opened were different pages. */
