@@ -2051,6 +2051,9 @@ export const copy = {
   /* What points at this row, when the record refuses that read alone: the sections are absent and the
      reason is said once, rather than the page looking like nothing points here. */
   linksRefused: 'What points at this row could not be read.',
+  /* WHICH FIELD POINTS HERE, and only where two of one list's fields do: a milestone's page headed its choices
+     "Choices milestone 1", which is the field's id read as part of the heading. */
+  linkedThrough: (field: string) => `through ${field.toLowerCase()}`,
   /* Lane O: the page's source as a file. The name is on the button because the name is the point —
      one page, one file, called what the declaration's first line calls it. */
   pageSourceSave: (file: string) => `Download ${file}`,

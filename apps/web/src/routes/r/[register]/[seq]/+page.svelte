@@ -761,13 +761,15 @@
         {/each}
 
         {#each incoming.map(idLast) as rel}
+          {@const twice = incoming.filter((r) => r.name === rel.name).length > 1}
           <!-- One section per RELATION, not per register: two fields of one register can point at
                the same place and mean different things — an update's `track` is what it is about
                and its `supersedes` is what it replaces. -->
           <section class="incoming">
             <h2 class="incoming-title">
               {rel.name}
-              <span class="incoming-label">{rel.label.toLowerCase()}</span>
+              <!-- The field only where it tells two sections apart; elsewhere it read as part of the heading. -->
+              {#if twice}<span class="incoming-label">{copy.linkedThrough(rel.label)}</span>{/if}
               <span class="incoming-count num">{rel.total}</span>
             </h2>
             <Table columns={rel.columns} rows={rel.rows} total={rel.total} label="{rel.name} · {rel.label}" />
