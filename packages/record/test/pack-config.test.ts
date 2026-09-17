@@ -158,3 +158,43 @@ test('a use case installed before speaks existed reads as declaring it, with the
   assert.equal(value<Config>(await api.packConfig({ id: 'usecase-personal' }, reader)).values.speaks, false);
   assert.equal(value<Config>(await api.packConfig({ id: 'usecase-personal' }, reader)).values.voice_home_title, 'personal home');
 });
+
+test('AN UPDATE FROM AN OLDER VERSION CARRIES WHAT IT KEPT TYPED, through the record, for any caller', async () => {
+  const { carryForward } = await import('../../seed/src/usecases/links.ts');
+  const doc = (version: string) => ({
+    pack: 'usecase-personal',
+    version,
+    summary: 'Goals, and what is logged toward them.',
+    author: 'Test Author',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [
+      { register: 'goals', name: 'Goals', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'done', type: 'int' }] },
+      { register: 'goal_log', name: 'Log', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'goal', type: 'ref', to: 'goals' }, { id: 'amount', type: 'int' }, { id: 'on', type: 'day' }] },
+    ],
+  });
+  const sql = openSqlite();
+  const catalogue = [{ id: 'usecase-personal', kind: 'usecase' as const, title: 'Personal', summary: '', modules: [], doc: () => null, carry: (io: unknown, from: string) => carryForward(io as never, 'personal', from, '2026-09-15') }];
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), catalogue });
+  const put = async (d: unknown) => {
+    const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc: d }, owner));
+    value(await api.installPack({ doc: d, planHash: planned.diff.planHash }, owner));
+  };
+  await put(doc('1.0.0'));
+  value(await api.create({ register: 'goals', fields: { what: 'Swim 20 lengths', done: 12 } }, owner));
+  type Rows = { rows: { seq: number; fields: Record<string, unknown> }[] };
+  assert.equal(value<Rows>(await api.list({ register: 'goal_log' }, owner)).rows.length, 0, 'an install carried something');
+
+  await put(doc('1.2.0'));
+  const log = value<Rows>(await api.list({ register: 'goal_log' }, owner)).rows;
+  assert.equal(log.length, 1);
+  assert.equal(log[0]!.fields.what, 'So far, before the log');
+  assert.equal(log[0]!.fields.amount, 12);
+  assert.equal(log[0]!.fields.on, '2026-09-15');
+  assert.equal(value<Rows>(await api.list({ register: 'goals' }, owner)).rows[0]!.fields.done ?? null, null, 'the typed number was kept and would count twice');
+
+  /* AND ONCE: the same update again moves nothing more. */
+  await put({ ...doc('1.2.1') });
+  assert.equal(value<Rows>(await api.list({ register: 'goal_log' }, owner)).rows.length, 1);
+  sql.close();
+});

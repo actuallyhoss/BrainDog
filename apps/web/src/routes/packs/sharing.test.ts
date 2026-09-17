@@ -268,24 +268,18 @@ test('A USE CASE HELD AT AN EARLIER VERSION IS OFFERED AS AN UPDATE, not said to
   assert.equal(olderThan('2.0.0', '1.10.0'), false);
 });
 
-test('AN UPDATE FROM BEFORE THE LOG CARRIES A GOAL TYPED PROGRESS INTO ONE ROW, and an install carries nothing', async () => {
+test('AFTER AN UPDATE THE TAB ONLY LINKS: what an older version kept typed is carried by the record', async () => {
   const rows: Record<string, { seq: number; fields: Record<string, unknown> }[]> = { goals: [{ seq: 2, fields: { what: 'Swim 20 lengths', done: 12 } }] };
   const writes: unknown[] = [];
   const client = {
     list: async ({ register }: { register: string }) => ok({ rows: rows[register] ?? [] }),
     update: async (args: { register: string; seq: number; patch: Record<string, unknown> }) => (writes.push(['update', args]), ok({})),
-    create: async (args: { register: string; fields: Record<string, unknown> }) => (writes.push(['create', args]), ok({})),
   };
   const base = sharedPlanOf(ANSWER)!;
-  const personal = (installed: string | null) => ({ ...base, usecase: { ...base.usecase, id: 'personal' }, packs: base.packs.map((p) => ({ ...p, installedVersion: installed })) });
-  assert.equal((await afterInstall(client, personal(null), [], '2026-09-17')).carried, 0);
-  assert.equal((await afterInstall(client, personal('1.2.0'), [], '2026-09-17')).carried, 0);
-  const out = await afterInstall(client, personal('1.0.0'), [], '2026-09-17');
-  assert.equal(out.carried, 1);
-  assert.deepEqual(writes.slice(0, 2), [
-    ['create', { register: 'goal_log', fields: { what: 'So far, before the log', goal: 'goals#2', amount: 12, on: '2026-09-17' } }],
-    ['update', { register: 'goals', seq: 2, patch: { done: null } }],
-  ]);
+  const personal = { ...base, usecase: { ...base.usecase, id: 'personal' }, packs: base.packs.map((p) => ({ ...p, installedVersion: '1.0.0' })) };
+  const out = await afterInstall(client, personal, []);
+  assert.equal(Object.hasOwn(out, 'carried'), false);
+  assert.equal(writes.some((w) => JSON.stringify(w).includes('"done":null')), false, 'the tab emptied a typed number itself');
 });
 
 test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one that adds a list or installs does not', () => {

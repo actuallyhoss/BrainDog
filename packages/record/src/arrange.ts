@@ -47,6 +47,12 @@ export type CatalogueEntry = {
    * to each other by title, because a seed carries no link (42 §5.2). OPTIONAL, and never a reason to fail the install.
    */
   afterInstall?: (io: RowIo) => Promise<unknown>;
+  /**
+   * What an update from an older version moves: numbers the older version kept typed, written as the rows the newer one
+   * reads (`@braindog/seed` `carryForward`). Run wherever the record updates the pack, from the app, an agent's accepted
+   * proposal or any other caller, after the install and before its examples are linked. OPTIONAL, and never a reason to fail.
+   */
+  carry?: (io: CarryIo, from: string) => Promise<number>;
 };
 
 /** The rows of a list, and one link set on one row, as the owner who accepted. */
@@ -54,6 +60,37 @@ export type RowIo = {
   rows: (register: string) => Promise<readonly { seq: number | null; fields: Record<string, unknown> }[] | null>;
   link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean>;
 };
+
+/** A `RowIo` that also writes a row and empties one field, as the owner who pressed. */
+export type CarryIo = RowIo & {
+  create: (register: string, fields: Record<string, unknown>) => Promise<boolean>;
+  clear: (register: string, seq: number, field: string) => Promise<boolean>;
+};
+
+/** The ordinary write path as an install's steps use it, signed by `actor`. */
+export function rowIo(kernel: Kernel, actor: string): CarryIo {
+  return {
+    rows: async (register) => {
+      const read = kernel.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async (register, seq, field, spoken) =>
+      kernel.update(register, `${register}#${seq}`, { [field]: spoken }, { actor, cascade: false, note: 'Linked an example to the example it belongs with.' }).ok,
+    create: async (register, fields) => kernel.create(register, fields as never, { actor, note: 'Carried forward from before the update.' }).ok,
+    clear: async (register, seq, field) =>
+      kernel.update(register, `${register}#${seq}`, { [field]: null }, { actor, cascade: false, note: 'Carried forward into its own row.' }).ok,
+  };
+}
+
+/**
+ * The catalogue's carry for a pack just updated from `from`, when it has one. Answers how many were moved; nothing when the
+ * pack was new, the catalogue has no step, or the step throws.
+ */
+export async function carryUpdate(catalogue: readonly CatalogueEntry[], kernel: Kernel, id: string, from: string | null, actor: string): Promise<number> {
+  const step = from === null ? undefined : catalogue.find((e) => e.id === id)?.carry;
+  if (!step || from === null) return 0;
+  return step(rowIo(kernel, actor), from).catch(() => 0);
+}
 
 type Body = Record<string, unknown>;
 
@@ -449,15 +486,7 @@ export function arranger(d: ArrangeDeps) {
   async function afterInstall(id: string, actor: string): Promise<void> {
     const step = entryOf(id)?.afterInstall;
     if (!step) return;
-    const io: RowIo = {
-      rows: async (register) => {
-        const read = kernel.list({ register, limit: 200 });
-        return read.ok ? read.value.rows : null;
-      },
-      link: async (register, seq, field, spoken) =>
-        kernel.update(register, `${register}#${seq}`, { [field]: spoken }, { actor, cascade: false, note: 'Linked an example to the example it belongs with.' }).ok,
-    };
-    await step(io).catch(() => undefined);
+    await step(rowIo(kernel, actor)).catch(() => undefined);
   }
 
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string): Promise<Result<Body>> {
@@ -496,9 +525,11 @@ export function arranger(d: ArrangeDeps) {
       const unshown = diff.approve.filter((line) => !approved.includes(line));
       if (unshown.length > 0)
         return stopped(refuse('PLAN_STALE', `${id} now calls out something this proposal did not show: ${unshown.join('; ')}. Propose it again.`, 'body.approve'));
+      const from = state.packs.find((p) => p.id === id)?.version ?? null;
       const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
       done.installed.push(id);
+      await carryUpdate(d.catalogue, kernel, id, from, actor);
       await afterInstall(id, actor);
     }
     for (const id of enable) {

@@ -15,7 +15,7 @@ import type { CatalogueEntry } from '@braindog/record';
 import { AGENTS_PACK, FIRST_PARTY, agentsPackDocument, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
-import { linkExamples } from '@braindog/seed/usecases/links';
+import { carryForward, linkExamples } from '@braindog/seed/usecases/links';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -60,6 +60,8 @@ export function seedCatalogue(): CatalogueEntry[] {
     doc: () => useCaseDocument(u.usecase, today()),
     /* A SEED CARRIES NO LINK (42 §5.2), so the use case's examples are pointed at each other once they are in (`links.ts`). */
     afterInstall: (io) => linkExamples(io, u.usecase),
+    /* AN UPDATE FROM BEFORE A VERSION THAT READS WHAT IS LOGGED moves what was typed into the log (`links.ts`). */
+    carry: (io, from) => carryForward(io, u.usecase, from, today()),
   }));
   return [
     ...modules,
