@@ -1079,3 +1079,10 @@ test('a first-party rule acts under its name, and any other rule by its id in wo
   assert.equal(actorOf('rule.renewal'), 'renewal rule');
   assert.equal(actorOf('rule.late-reply'), 'late reply rule');
 });
+
+test("Student's Assignments list shows the course of each by default", async () => {
+  const { useCase } = await import('@braindog/seed/usecases');
+  const decl = ((useCase('student')?.pack?.declarations ?? []) as Record<string, unknown>[]).find((d) => d.register === 'assignments');
+  assert.ok(decl);
+  assert.deepEqual(columnsFor('assignments', decl as never).map((c) => c.field), ['seq', 'what', 'state', 'course', 'due']);
+});

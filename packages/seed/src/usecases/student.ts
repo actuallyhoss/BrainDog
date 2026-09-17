@@ -8,7 +8,7 @@
 
 export const STUDENT = {
   usecase: 'student',
-  version: '1.1.0',
+  version: '1.2.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -83,7 +83,8 @@ export const STUDENT = {
             required: true,
             index: true,
           },
-          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true },
+          /* THE COURSE MAKES AN ASSIGNMENT READABLE: "Problem set 1" is nobody's until it says whose, so the list shows it. */
+          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true, qualifies: 'what' },
           { id: 'due', label: 'Due', type: 'day', index: true, deadline: true, remind: ['-2d', '0d'] },
           { id: 'grade', label: 'Grade', type: 'text' },
           { id: 'note', label: 'Notes', type: 'document' },
@@ -100,7 +101,8 @@ export const STUDENT = {
         mobile: ['what', 'on', 'minutes'],
         fields: [
           { id: 'what', label: 'Session', type: 'text', required: true, search: true },
-          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true },
+          /* THE COURSE MAKES AN ASSIGNMENT READABLE: "Problem set 1" is nobody's until it says whose, so the list shows it. */
+          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true, qualifies: 'what' },
           { id: 'on', label: 'Day', type: 'day', required: true, index: true },
           { id: 'minutes', label: 'Minutes', type: 'int' },
           { id: 'done', label: 'Done', type: 'bool', index: true },
