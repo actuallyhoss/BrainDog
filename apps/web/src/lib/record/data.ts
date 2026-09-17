@@ -253,10 +253,13 @@ const FAILED_NIGHTS = SNAPSHOTS.filter((s) => s.failed !== null);
  * `copy.ts` still says so on the screen that explains the signing key; that is a fact about how a
  * backup is made rather than a second name for it.
  */
+/** A day as a person says it, "3 Sep", never `2026-09-03`. The seed says the same question the same way. */
+const spokenDay = (d: string): string => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
 const nightsSince = (snap: Snapshot): string => {
   const kept = SNAPSHOTS.filter((s) => s.failed === null && s.at < snap.at).map((s) => s.at).sort();
   const newest = kept[kept.length - 1];
-  return newest === undefined ? 'No backup has ever been taken' : `The newest backup is from ${newest}`;
+  return newest === undefined ? 'No backup has ever been taken' : `The newest backup is from ${spokenDay(newest)}`;
 };
 
 /* ── declared pages ───────────────────────────────────────────────────────── */
@@ -342,7 +345,7 @@ export const QUESTIONS: Question[] = [
     /* `backup` AND NOT `snapshot`, WHICH IS THE WORD SETTINGS SETTLED. The argument for it beside
        `nightsSince` names `snapshot` as well as `sealed copy`, and this question is on `/decide`
        and on Home: the two screens somebody sees first, carrying the third name for one thing. */
-    title: `The backup on ${snap.at} did not run`,
+    title: `The backup on ${spokenDay(snap.at)} did not run`,
     /* WHAT IT COSTS, in the terms this queue ranks by — and the cost of a missed night is the
        distance back to the last night that worked. */
     cost: `${nightsSince(snap)}, and the reason has not gone away: ${snap.failed ?? ''}. Tonight will fail the same way.`,
