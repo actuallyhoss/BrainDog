@@ -93,6 +93,17 @@ export function symbolFigure(text: string): string | null {
   return `${minus}${symbol}${coded.rest.slice(minus.length)}`;
 }
 
+/**
+ * HOW LONG A FIGURE IS, WHEN IT IS LONGER THAN A TILE HOLDS, so a stat steps it down inside its own cell rather than running
+ * into the next one (the host's stylesheet reads `--chars`). An amount never breaks inside itself and several amounts break
+ * between their ` · ` (a no-break space before the dot, so a line never starts with it), so the longest amount, as drawn, is what has to fit. `null` for a figure any tile holds.
+ */
+export function figureChars(text: string): number | null {
+  if (!text) return null;
+  const longest = Math.max(...text.split(/\s·\s/u).map((part) => (symbolFigure(part.trim()) ?? part.trim()).length));
+  return longest > 10 ? longest : null;
+}
+
 /** A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one. */
 export const symbolText = (text: string): string =>
   text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => symbolFigure(hit) ?? hit);

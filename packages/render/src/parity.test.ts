@@ -100,6 +100,7 @@ const SHAPES: Record<string, string> = {
     [...Array.from({ length: 9 }, (_, i) => `  line ${i + 1}`), '- line 10', '+ line ten', ...Array.from({ length: 10 }, (_, i) => `  line ${i + 11}`)].join('\n') +
     '\n```',
   'a diff with no change': '```diff\n  same\n  again\n```',
+  'a stat in several currencies, one amount too long for a tile': '```stat\nCash now | EGP 43,700.00 · £24,800.00 · USD 21,300.00 | In more than one currency\nUsers | 36\n```',
   'a lead stat with trends and a tone':
     '```stat lead | Money\nCash now | GBP 12,400.00 | in 2 accounts · as of 2 Sep | 18 20 - 24 | good\nComing in | GBP 4,800.00 | 5 invoices, 2 late\nGoing out | GBP 1,300.00 | 7 bills | 3 | warn\nEvery month | EGP 900.00 |  | 1 2 3 4\n```',
   'a split with a tone, a part with no number and a hole':
@@ -151,4 +152,16 @@ test('a forecast draws its knobs only where the host asks, and the rest of the t
   assert.match(knobs, /type="range"/u);
   assert.match(knobs, /aria-pressed/u);
   assert.doesNotMatch(render(Block, { props: { block } }).body, /type="range"/u);
+});
+
+test('a figure longer than a tile holds says its longest amount, as drawn, and a short one says nothing', async () => {
+  const { figureChars } = await import('./format.ts');
+  assert.equal(figureChars('GBP 12,400.00'), null, 'drawn as £12,400.00, which any tile holds');
+  assert.equal(figureChars('36'), null);
+  assert.equal(figureChars('EGP 43,700.00 · £24,800.00 · USD 21,300.00'), 13);
+  assert.equal(figureChars(''), null);
+  assert.equal(figureChars('E£43,700.00 EGP · £24,800.00'), 15, 'the no-break space before the dot still separates two amounts');
+  const html = toHTML([page('```stat\nCash now | EGP 43,700.00 · USD 1.00\nUsers | 36\n```')]);
+  assert.match(html, /<span class="cell-figure num" data-fit="" style="--chars:13">/u);
+  assert.match(html, /<span class="cell-figure num">36<\/span>/u);
 });

@@ -16,7 +16,7 @@
 
 import { KINDS, SPARKLINE_POINT, TONES, type Kind } from './kinds.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
-import { MISSING, day, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
+import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
@@ -211,7 +211,7 @@ function grid(b: Block, o: RenderOptions): string {
   const body = b.rows
     .map(
       (r) =>
-        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num">${
+        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1])}>${
           /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
              code at full size, and the two trees differed on every stat with an amount in it. */
           r.cells[1] ? amount(r.cells[1], o) : MISSING
@@ -482,6 +482,12 @@ function bridge(b: Block, o: RenderOptions): string {
  * An amount, drawn with its currency's symbol where it has one (`£4,800.00`), and otherwise with its
  * code in front, present and quiet, as `Grid.svelte` draws a stat's figure.
  */
+/** A long figure's length for its cell to fit it to (`figureChars`), or nothing. */
+function fitAttrs(value: string | null | undefined): string {
+  const chars = figureChars(value ?? '');
+  return chars === null ? '' : ` data-fit="" style="--chars:${String(chars)}"`;
+}
+
 function amount(value: string, o: RenderOptions): string {
   const symbol = symbolFigure(value);
   if (symbol) return escape(symbol);

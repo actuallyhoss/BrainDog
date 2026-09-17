@@ -12,7 +12,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { figureChars, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
@@ -372,6 +372,7 @@
            the way `Money` already sets a row's amount. -->
       {@const symbol = symbolFigure(row.cells[1] ?? '')}
       {@const coded = leadingCode(row.cells[1] ?? '')}
+      {@const chars = figureChars(row.cells[1] ?? '')}
       <svelte:element
         this={href ? 'a' : 'div'}
         class="cell"
@@ -380,7 +381,7 @@
         data-intent={row.tone}
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-        <span class="cell-figure num">
+        <span class="cell-figure num" data-fit={chars === null ? undefined : ''} style={chars === null ? undefined : `--chars:${chars}`}>
           {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span>
             <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text
               nodes={inline(row.cells[1], opts)}

@@ -127,4 +127,5 @@ export {
   leadingCode,
   symbolFigure,
   symbolText,
+  figureChars,
 } from './format.ts';

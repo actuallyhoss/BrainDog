@@ -384,6 +384,19 @@
     letter-spacing: -0.025em;
   }
 
+  /* A FIGURE LONGER THAN ITS TILE STEPS DOWN INSIDE IT, rather than running into the next tile: a balance in two or three
+     currencies on a Home column of four. The renderer marks such a figure and says the length of its longest amount
+     (`figureChars`), which never breaks inside itself; a figure any tile holds carries no mark and keeps its size. */
+  .block[data-kind='stat'] .cell {
+    container-type: inline-size;
+  }
+
+  .cell-figure[data-fit] {
+    /* The renderer says the length on the figure itself; this is only what a figure marked without one would use. */
+    --chars: 16;
+    font-size: min(var(--t-xl), calc(100cqi / (var(--chars) * 0.62)));
+  }
+
   /* FOUR FIGURES OR MORE GO TWO BY TWO IN A NARROW BLOCK. The block is its own container, so a stat
      in a narrow column of a wide page answers its own width, not the viewport's. */
   .block[data-kind='stat'] {
