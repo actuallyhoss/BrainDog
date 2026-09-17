@@ -11,7 +11,7 @@
 import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { hostKey, inTheClear, readHosts, saveHosts } from './http.ts';
+import { hostKey, inTheClear, isLoopback, readHosts, saveHosts } from './http.ts';
 
 export type LoginIo = {
   /** The hosts file the token is kept in. */
@@ -48,6 +48,20 @@ const seconds = (x: unknown, fallback: number, max: number): number =>
 
 /** A bearer is printable ASCII with no spaces; anything else is not one, whatever the host says. */
 const BEARER = /^[\x21-\x7e]{16,1024}$/;
+
+/**
+ * Whether an approval address is the typed host under another loopback name: `localhost` for `127.0.0.1`, on the same
+ * scheme and port. ONLY WHEN THE TYPED HOST IS THIS MACHINE, so a remote host never answers with another site.
+ */
+export function sameMachine(origin: string, typed: URL): boolean {
+  let other: URL;
+  try {
+    other = new URL(origin);
+  } catch {
+    return false;
+  }
+  return isLoopback(typed.hostname) && isLoopback(other.hostname) && other.protocol === typed.protocol && other.port === typed.port;
+}
 
 export async function login(raw: string, io: LoginIo): Promise<number> {
   const now = io.now ?? Date.now;
@@ -129,7 +143,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
     } catch {
       at = '';
     }
-    if (at !== url.origin) {
+    if (at !== url.origin && !sameMachine(at, url)) {
       io.say(`${key} gave an address on another site to approve this at, so no code was shown and nobody was signed in.`);
       return REFUSED;
     }

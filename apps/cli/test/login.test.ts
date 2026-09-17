@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readHosts } from '../src/http.ts';
-import { login } from '../src/login.ts';
+import { login, sameMachine } from '../src/login.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const TOKEN = 'rec_01TESTTESTTESTTESTTESTTEST.stub-bearer-never-printed-4c1d';
@@ -141,6 +141,27 @@ test('AN APPROVAL ADDRESS ON ANOTHER SITE IS REFUSED BEFORE ANY CODE IS SHOWN', 
   assert.ok(!out.stderr.includes('123'), 'the code was printed for a foreign address');
   assert.deepEqual(host.seen.map((s) => s.path), ['/auth/device'], 'it polled after refusing');
   assert.equal(existsSync(out.file), false);
+});
+
+test('A LOCAL SELF-HOST THAT CALLS ITSELF localhost is the same machine as 127.0.0.1, and the sign-in goes through', async (t) => {
+  const host = await stub(t, () => granted, (base) => `${base.replace('127.0.0.1', 'localhost')}/settings/agents`);
+  const out = await run(t, host.base);
+  assert.equal(out.code, 0, out.stderr);
+  assert.ok(out.stderr.includes('/settings/agents and enter  123 456'), out.stderr);
+  assert.equal(readHosts(out.file).hosts[host.base]?.token?.value, TOKEN);
+  hidden(out);
+});
+
+test('LOOPBACK NAMES ARE ONE HOST ONLY FOR THIS MACHINE: never for a remote host, another port or another scheme', () => {
+  assert.equal(sameMachine('http://localhost:5993', new URL('http://127.0.0.1:5993')), true);
+  assert.equal(sameMachine('http://127.0.0.1:5993', new URL('http://localhost:5993')), true);
+  assert.equal(sameMachine('http://[::1]:5993', new URL('http://localhost:5993')), true);
+  assert.equal(sameMachine('https://localhost', new URL('https://studio.example')), false);
+  assert.equal(sameMachine('http://localhost:5993', new URL('https://studio.example:5993')), false);
+  assert.equal(sameMachine('http://localhost:5994', new URL('http://127.0.0.1:5993')), false);
+  assert.equal(sameMachine('https://localhost:5993', new URL('http://127.0.0.1:5993')), false);
+  assert.equal(sameMachine('https://evil.example:5993', new URL('http://127.0.0.1:5993')), false);
+  assert.equal(sameMachine('not an address', new URL('http://127.0.0.1:5993')), false);
 });
 
 test('CTRL+C WHILE WAITING ENDS WITH ONE SENTENCE, A NON-ZERO EXIT, AND NOTHING SAVED', async (t) => {

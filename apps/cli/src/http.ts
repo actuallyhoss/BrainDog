@@ -67,6 +67,9 @@ export function saveHosts(file: string, hosts: HostsFile): void {
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+/** This machine by one of its names. */
+export const isLoopback = (hostname: string): boolean => LOOPBACK.has(hostname);
+
 /** http to anywhere but this machine, where a bearer would cross a network in the clear. */
 export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LOOPBACK.has(url.hostname);
 
