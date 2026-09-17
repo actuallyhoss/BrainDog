@@ -27,6 +27,9 @@ import { NOW, REGISTERS, ROWS } from './data.ts';
    copies of the word a screen prints are two words that drift, and this one is printed by
    `mixedFix` on both sides of the product. */
 import { BARE } from './metrics.ts';
+import { convertMinor, rateFor } from '@braindog/kernel';
+
+import { fxNow } from './metrics.ts';
 import { amountOf, currencyOf } from './money.ts';
 import { compile, matches, resolveDay } from './where.ts';
 import type { Entry } from './schema.ts';
@@ -194,7 +197,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
 
   const until = NOW + horizon * DAY_MS;
   const refusals: string[] = [];
-  const movements: { at: number; step: Omit<Step, 'balance'> }[] = [];
+  const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
   /** Whether any leg contributed a number with no currency on it. See the note at the check below. */
   let bare = false;
@@ -265,6 +268,7 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
         const late = r.day < iso(NOW);
         movements.push({
           at: late ? NOW : r.at,
+          currency: currency ?? '',
           step: {
             day: late ? new Date(NOW).toISOString().slice(0, 10) : r.day,
             label: `${label}${late ? ' \u00b7 overdue' : ''}`,
@@ -289,6 +293,32 @@ export function runway(opening: number, legs: readonly Leg[], horizon = 180): Ru
      money; a leg that is not pointed at money is not a smaller walk, it is a different question.
      `bare` alone is the condition, and the marker goes into the set so the sentence the screen
      already draws names what was wrong with it. */
+  /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, each at the rate as of its day, as the kernel's walk
+     does; one that cannot be converted leaves the walk with no steps and a sentence naming the rate. */
+  const held = fxNow();
+  const home = held.home;
+  if (!bare && home !== null && seen.size > 0 && (seen.size > 1 || !seen.has(home))) {
+    const missing = new Set<string>();
+    for (const m of movements) {
+      if (m.currency === home) continue;
+      const r = rateFor(held.rates, m.currency, home, m.step.day);
+      if (!r) missing.add(m.currency);
+      else m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, home, r.rate) };
+    }
+    if (missing.size)
+      return {
+        from: opening,
+        currency: null,
+        mixed: [...seen].sort(),
+        steps: [],
+        crossed: null,
+        days: null,
+        horizon,
+        refusals: [...refusals, `this walk reads ${[...seen].sort().join(' and ')} and adds it up in ${home}, and there is no rate yet from ${[...missing].sort().join(' or ')} to ${home}`],
+      };
+    seen.clear();
+    seen.add(home);
+  }
   if (bare) seen.add(BARE);
   const mixed = bare || seen.size > 1 ? [...seen].sort() : [];
   const currency = mixed.length ? null : ([...seen][0] ?? null);

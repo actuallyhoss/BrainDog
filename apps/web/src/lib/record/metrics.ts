@@ -27,9 +27,25 @@
  * URL, so they cannot disagree.
  */
 
-import { GROUP_CAP, bucketOf, bucketRun, bucketState, isBucket, largestFirst, type Bucket, type Group } from '@braindog/kernel';
-import { integer, money, shortDay } from 'braindog-render';
+import {
+  GROUP_CAP,
+  across,
+  bucketOf,
+  bucketRun,
+  bucketState,
+  dayFieldOf,
+  isBucket,
+  largestFirst,
+  ratesFrom,
+  type Bucket,
+  type FxRead,
+  type Group,
+  type Part,
+  type Rate,
+} from '@braindog/kernel';
+import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
+import { copy } from '../copy.ts';
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
@@ -143,9 +159,83 @@ export type Reading = {
   current?: string;
   /** Groups past the cap of fifty, left out. */
   more?: number;
+  /** The currency a money figure is in, as the record's `unit` says it; `null` for a plain figure or one in parts. */
+  unit?: string | null;
+  /** Money in more than one currency that was not added up: one amount per currency, and `value` is `null`. */
+  parts?: Part[];
+  /** How a figure across currencies was read, as the record's `fx` says it. */
+  fx?: FxRead;
 };
 
 const DAY_MS = 86_400_000;
+
+/* ── money across currencies ─────────────────────────────────────────────── */
+
+/**
+ * The home currency and the dated rates this build's figures read: the sample's `fx` rows, and no home currency.
+ *
+ * THE ARITHMETIC IS THE RECORD'S (`fx.ts`, imported), so a figure over the same rows at the same rates is the same
+ * minor unit in both engines. A test hands in a home currency with `withFx`, which is how the engines are held equal.
+ */
+let fxSource: () => { home: string | null; rates: readonly Rate[] } = () => ({ home: null, rates: ratesFrom((ROWS.fx ?? []).map((e) => e.fields)) });
+
+/** Read every figure with this home currency and these rates until the returned function puts the sample's back. */
+export function withFx(source: () => { home: string | null; rates: readonly Rate[] }): () => void {
+  const before = fxSource;
+  fxSource = source;
+  return () => {
+    fxSource = before;
+  };
+}
+
+/** The home currency and rates figures are read with now. */
+export const fxNow = (): { home: string | null; rates: readonly Rate[] } => fxSource();
+
+type Fx = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null };
+
+/** What a figure is, beside its number: the currency it is in, or its parts and how it was read. */
+type Figure = { value: number | null; unit: string | null; parts?: Part[]; fx?: FxRead };
+
+/**
+ * One value expression over rows, in the currency the figure is added up in.
+ *
+ * A SUM OF MONEY IN A CURRENCY OTHER THAN THAT ONE is converted at the rate as of each row's day, or said one amount per
+ * currency, as the record's `aggregate` does. Everything else is `evaluateValue`, and the checks in `read` refuse it.
+ */
+function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
+  const n = evaluateValue(rows, value);
+  if ('ratio' in value || 'diff' in value) return { value: n, unit: null };
+  const seen = currenciesOf(rows, value);
+  const only = seen.size === 1 ? [...seen][0]! : null;
+  const unit = only === BARE ? null : only;
+  if (!('sum' in value) || seen.has(BARE) || seen.size === 0 || !(seen.size > 1 || (fx.into !== null && only !== fx.into))) return { value: n, unit };
+  const field = value.sum;
+  const id = typeof field === 'string' ? field : field.product[0];
+  const amounts = rows.flatMap((e) => {
+    const currency = currencyOf(e.fields[id]);
+    const amount = operand(e, field);
+    const at = fx.day ? e.fields[fx.day] : null;
+    return currency === null || amount === null ? [] : [{ currency, amount, day: typeof at === 'string' ? at.slice(0, 10) : null }];
+  });
+  const got = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null);
+  if (got.kind === 'one') return { value: got.amount, unit: got.currency };
+  if (got.kind === 'converted') return { value: got.amount, unit: got.currency, fx: { into: fx.into, home: fx.home, asOf: got.asOf, forward: got.forward, missing: [] } };
+  return { value: null, unit: null, parts: got.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: got.missing } };
+}
+
+/**
+ * What a figure across currencies says under itself: why it is in parts, or as of which day's rates it was converted.
+ * `null` for a figure in one currency. Read from the record's reading or this build's, which carry the same keys.
+ */
+export function fxNote(r: { parts?: readonly Part[] | undefined; fx?: FxRead | undefined }): string | null {
+  if (!r.fx) return null;
+  if (r.parts) return r.fx.home !== null && r.fx.missing.length ? copy.figureNoRate(r.fx.missing.join(', ')) : copy.figureNoHome;
+  if (r.fx.asOf) return (r.fx.forward ? copy.figureConvertedForward : copy.figureConverted)(longDay(r.fx.asOf));
+  return null;
+}
+
+/** Amounts in several currencies as one line of text, each written in its own: `EGP 52,000.00 · USD 3,400.00`. */
+export const partsText = (parts: readonly Part[]): string => parts.map((p) => money(Math.round(p.amount), p.currency)).join(' · ');
 const WINDOW = /^(\d{1,4})([dwm])$/;
 
 /** A window as milliseconds, or `null` when it is not one. */
@@ -597,7 +687,19 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
      figure with one code beside it; a sum across two is a number of the right size in the wrong
      unit, and there is no screen on which anybody notices. */
   const seen = currenciesRead(rows, decl.value);
-  if (seen.size > 1) {
+  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const heldFx = fxSource();
+  const fx: Fx = {
+    into: heldFx.home ?? declared,
+    home: heldFx.home,
+    rates: heldFx.rates,
+    today: new Date(now).toISOString().slice(0, 10),
+    day: dayFieldOf(REGISTERS[register]?.fields ?? []),
+  };
+  /* A SUM ACROSS CURRENCIES IS CONVERTED OR SAID IN PARTS, before the refusals below, as the record reads it. */
+  const figure = figureOf(rows, decl.value, fx);
+  const acrossed = figure.parts !== undefined || figure.fx !== undefined;
+  if (seen.size > 1 && !acrossed) {
     const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
     return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
@@ -605,10 +707,9 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
      the figure; the rows are what it is a figure OF. When they disagree the declaration is wrong,
      and printing the rows' number under the declaration's code is the quiet version of that. */
-  const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
   const held = [...seen][0];
-  if (declared && held && declared !== held) {
-    const why = `${decl.metric}: the rows are in ${held} and the format says ${declared}`;
+  if (!acrossed && fx.into && declared && held && fx.into !== held) {
+    const why = `${decl.metric}: the rows are in ${held} and the format says ${fx.into}`;
     return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
@@ -624,7 +725,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
-  const value = evaluateValue(rows, decl.value);
+  const value = figure.value;
 
   /**
    * AND WHETHER THERE IS A COMPARISON AT ALL, WHICH IS NOT THE SAME AS THERE BEING NO MOVEMENT.
@@ -675,7 +776,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
          describing its own window to somebody who asked how much they owe. */
       unmeasured = 'not enough history to compare yet';
     } else {
-      const prior = evaluateValue(before, decl.value);
+      const prior = figureOf(before, decl.value, fx).value;
       if (prior === null || prior === 0 || value === null) {
         why = 'the window before has nothing to compare against';
         unmeasured = 'nothing to compare with yet';
@@ -701,7 +802,8 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
    */
   return {
     value,
-    shown: format(decl.format, value),
+    /* A FIGURE IN PARTS IS WRITTEN AS ITS PARTS, and one converted into a currency other than the declared one in that. */
+    shown: figure.parts ? partsText(figure.parts) : figure.unit && declared && figure.unit !== declared ? money(Math.round(value ?? 0), figure.unit) : format(decl.format, value),
     rows: rows.length,
     held: all.length,
     delta,
@@ -709,7 +811,10 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     unmeasured,
     refusals: [],
     href: hrefFor(decl),
-    ...(decl.group_by === undefined ? {} : groupsOf(rows, decl, now)),
+    unit: figure.unit,
+    ...(figure.parts ? { parts: figure.parts } : {}),
+    ...(figure.fx ? { fx: figure.fx } : {}),
+    ...(decl.group_by === undefined ? {} : groupsOf(rows, decl, now, fx)),
   };
 }
 
@@ -738,15 +843,23 @@ function groupingFaults(decl: MetricDecl, register: string | null): string[] {
  * THE SAME BUCKETS, IMPORTED FROM THE RECORD, so a bar labelled June holds the same rows here as there;
  * a bucket between the first and the last that nothing fell in is a gap with no value, never a zero.
  */
-function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, 'groups' | 'current' | 'more'> {
+function groupsOf(rows: Entry[], decl: MetricDecl, now: number, fx: Fx): Pick<Reading, 'groups' | 'current' | 'more'> {
   const by = decl.group_by!;
   const held = rows.filter((e) => carries(e, by));
-  const part = (key: string, of: Entry[]): Group => ({
-    key,
-    value: of.length === 0 ? null : evaluateValue(of, decl.value),
-    rows: of.length,
-    state: 'full',
-  });
+  const units = new Map<string, string | null>();
+  const part = (key: string, of: Entry[]): Group => {
+    const got: Figure = of.length === 0 ? { value: null, unit: null } : figureOf(of, decl.value, fx);
+    units.set(key, got.unit);
+    return { key, value: got.value, rows: of.length, ...(got.parts ? { parts: got.parts } : {}), state: 'full' };
+  };
+  /* ONE PART IN PARTS PUTS EVERY PART IN PARTS, as the record's `groupsOf` does. */
+  const inParts = (groups: Group[]): Group[] =>
+    !groups.some((g) => g.parts)
+      ? groups
+      : groups.map((g) => {
+          const unit = units.get(g.key);
+          return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
+        });
 
   if (decl.bucket !== undefined) {
     const bucket = decl.bucket;
@@ -764,7 +877,7 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, '
       const g = part(key, byKey.get(key) ?? []);
       return { ...g, state: bucketState(key, g.rows, current, key === run.keys[0] && run.more === 0) };
     });
-    return { groups, current, more: run.more };
+    return { groups: inParts(groups), current, more: run.more };
   }
 
   const byValue = new Map<string, Entry[]>();
@@ -772,7 +885,7 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number): Pick<Reading, '
     const key = String(e.fields[by]);
     byValue.set(key, [...(byValue.get(key) ?? []), e]);
   }
-  const groups = [...byValue.entries()].map(([key, of]) => part(key, of)).sort(largestFirst);
+  const groups = inParts([...byValue.entries()].map(([key, of]) => part(key, of))).sort(largestFirst);
   return { groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) };
 }
 

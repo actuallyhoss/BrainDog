@@ -34,13 +34,14 @@
  * inferring from the space available, not from the data).
  */
 
-import { money, parse, type Block } from 'braindog-render';
+import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
+import { day as longDay, money, parse, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { NOW, REGISTERS, ROWS, display, homeCurrency, type BlockResult } from './api.ts';
 import { copy } from '../copy.ts';
 import { declaredValue, registerHref } from './where.ts';
-import { format, windowMs } from './metrics.ts';
+import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
 import { linesText, measuresOf, tileRows } from './measures.ts';
@@ -219,7 +220,7 @@ function partsRows(block: BlockResult): string[] {
   const decl = METRICS[parts.metric];
   const register = decl?.source?.startsWith('register.') ? decl.source.slice('register.'.length) : '';
   const field = decl?.group_by ?? '';
-  const currency = decl?.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
+  const currency = parts.unit ?? (decl?.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null);
   const said = (v: number) => (currency ? money(Math.round(v), currency) : format(decl?.format, v));
   const limit = block.limit ?? parts.groups.length;
   const rows = parts.groups
@@ -601,7 +602,102 @@ const measuresFor = (block: BlockResult) =>
   block.measures ??
   measuresOf(block.entries, block.columns.map((c) => c.field), Date.parse(block.stale_at), block.back, block.heading ?? '', { bucket: block.bucket });
 
-export function toSegments(block: BlockResult) {
+/* ── money across currencies, on a chart ─────────────────────────────────── */
+
+/**
+ * A chart over money in more than one currency: converted into the home currency, or one chart a currency.
+ *
+ * TWO CURRENCIES ARE NEVER DRAWN ON ONE SCALE. A bar a currency beside another is a length about nothing, so a chart
+ * whose figures or rows could not all be added up in one currency is drawn once per currency, each under its code, and
+ * one converted says as of which day's rates. The arithmetic is the record's (`fx.ts`), with the rates the record sent
+ * beside the block, or the sample's.
+ */
+type Charted = { currency: string | null; block: BlockResult }[];
+
+function charted(block: BlockResult): { charts: Charted; converted: string | null } | null {
+  /* A SERIES THE RECORD LINED UP ONCE PER CURRENCY. */
+  if (block.kind === 'series' && block.bars?.split && block.bars.split.length > 0) {
+    const bars = block.bars;
+    const { split: lines, ...one } = bars;
+    return { charts: lines!.map((t) => ({ currency: t.unit, block: { ...block, bars: { ...one, unit: t.unit, values: t.values } } })), converted: null };
+  }
+  if (block.kind !== 'bar' && block.kind !== 'split') return null;
+  /* A FIGURE'S PARTS, where a part is in several currencies. */
+  const parts = block.parts;
+  if (parts) {
+    const units = [...new Set(parts.groups.flatMap((g) => (g.parts ?? []).map((p) => p.currency)))].sort();
+    if (units.length === 0) return null;
+    return {
+      charts: units.map((unit) => ({
+        currency: unit,
+        block: {
+          ...block,
+          parts: {
+            ...parts,
+            unit,
+            value: null,
+            groups: parts.groups.flatMap((g) => {
+              const amount = g.parts?.find((p) => p.currency === unit)?.amount;
+              return amount === undefined ? [] : [{ key: g.key, value: amount }];
+            }),
+          },
+        },
+      })),
+      converted: null,
+    };
+  }
+  /* A REGISTER'S ROWS, each amount in its own currency and dated by the list's first day. A list of links adds up
+     money another list holds, which is left to `barRows` as it was. */
+  const register = block.register ?? '';
+  const of = block.columns[1]?.field ?? 'amount';
+  if (!register || linkOf(register, of)) return null;
+  const seen = new Set(block.matched.map((e) => currencyOf(e.fields[of])).filter((c): c is string => c !== null));
+  const fx = block.fx ?? fxNow();
+  const home = fx.home;
+  if (seen.size === 0 || (seen.size === 1 && (home === null || seen.has(home)))) return null;
+  const day = dayFieldOf(REGISTERS[register]?.fields ?? []);
+  const dayOf = (e: BlockResult['matched'][number]): string => {
+    const v = day ? e.fields[day] : null;
+    return typeof v === 'string' ? v.slice(0, 10) : new Date(NOW).toISOString().slice(0, 10);
+  };
+  if (home !== null) {
+    const amounts = block.matched.flatMap((e) => {
+      const v = e.fields[of];
+      const c = currencyOf(v);
+      return c === null ? [] : [{ currency: c, amount: (v as { amount: number }).amount, day: dayOf(e) }];
+    });
+    const got = across(amounts, home, fx.rates, new Date(NOW).toISOString().slice(0, 10));
+    if (got.kind === 'converted') {
+      const matched = block.matched.map((e) => {
+        const v = e.fields[of];
+        const c = currencyOf(v);
+        if (c === null || c === home) return e;
+        const r = rateFor(fx.rates as Rate[], c, home, dayOf(e))!;
+        return { ...e, fields: { ...e.fields, [of]: { amount: convertMinor((v as { amount: number }).amount, c, home, r.rate), currency: home } } };
+      });
+      return { charts: [{ currency: null, block: { ...block, matched, fx: undefined } }], converted: got.asOf };
+    }
+  }
+  return {
+    charts: [...seen].sort().map((unit) => ({ currency: unit, block: { ...block, matched: block.matched.filter((e) => currencyOf(e.fields[of]) === unit), fx: undefined } })),
+    converted: null,
+  };
+}
+
+export function toSegments(block: BlockResult): ReturnType<typeof parse> {
+  const split = charted(block);
+  if (split) {
+    const one = split.charts.length === 1 && split.charts[0]!.currency === null;
+    return split.charts.flatMap(({ currency, block: part }) => [
+      ...(one || currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true })),
+      ...drawSegments(part),
+      ...(split.converted ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
+    ]);
+  }
+  return drawSegments(block);
+}
+
+function drawSegments(block: BlockResult): ReturnType<typeof parse> {
   /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
   if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length)
     return parse(linesText(measuresFor(block)), { page: true });

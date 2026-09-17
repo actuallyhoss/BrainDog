@@ -12,11 +12,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { isStale, openRecord, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
+import { isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
 import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
-import { read as webRead, type MetricDecl as WebMetric } from './metrics.ts';
+import { read as webRead, withFx, type MetricDecl as WebMetric } from './metrics.ts';
 import type { PageBlock } from './schema.ts';
 
 type Sql = Parameters<typeof openRecord>[0];
@@ -315,4 +315,66 @@ test('THE MONEY PAGE’S BARS BY MONTH are the same buckets and the same figures
   /* WHAT REPEATS IS IN EVERY MONTH AHEAD: the sample repeats costs, so no month ahead is left blank beside one that is not. */
   const ahead = k.bars.states.flatMap((s, i) => (s === 'ahead' ? [i] : []));
   for (const line of k.bars.values) assert.ok(ahead.every((i) => line[i] !== null), `a month ahead without what repeats: ${JSON.stringify(line)}`);
+});
+
+test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home currency, the pair it lacks, and converted', async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  assert.ok((await installSeed(k)).ok);
+  k.rememberPack({ id: 'money-core', version: '1.0.0', source: 'local', ref: null, manifest: JSON.stringify({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }), checksum: 'not-a-real-checksum' });
+  const today = new Date(NOW).toISOString().slice(0, 10);
+  const added = [
+    { name: 'CIB', kind: 'bank', balance: { amount: 5_200_055, currency: 'EGP' }, as_of: today, liquid: true },
+    { name: 'Mercury', kind: 'bank', balance: { amount: 340_001, currency: 'USD' }, as_of: today, liquid: true },
+  ];
+  for (const fields of added) assert.ok(k.create('accounts', fields, { actor: 'p_1' }).ok);
+  const model = ROWS.accounts![0]!;
+  const accounts = ROWS.accounts!;
+  const rates = ROWS.fx ?? [];
+  ROWS.accounts = [...accounts, ...added.map((fields, i) => ({ ...model, id: `acct_fx_${i}`, seq: accounts.length + i + 1, fields }))];
+  const decls: WebMetric[] = [
+    { metric: 'cash-now', name: 'Cash now', source: 'register.accounts', where: 'liquid is true', value: { sum: 'balance' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+    { metric: 'cash-by-kind', name: 'Cash by kind', source: 'register.accounts', value: { sum: 'balance' }, group_by: 'kind', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+  ];
+  const same = (label: string) => {
+    for (const decl of decls) {
+      const kernel = k.metric(decl as never);
+      assert.ok(kernel.ok, JSON.stringify(kernel));
+      const web = webRead(decl);
+      assert.deepEqual(web.refusals, [], web.refusals.join('; '));
+      assert.equal(web.value, kernel.value.value, `${label}, ${decl.metric}: the value`);
+      assert.deepEqual(web.parts, kernel.value.parts, `${label}, ${decl.metric}: the parts`);
+      assert.deepEqual(web.fx, kernel.value.fx, `${label}, ${decl.metric}: how it was read`);
+      assert.deepEqual(web.groups, kernel.value.groups, `${label}, ${decl.metric}: the groups`);
+    }
+    return k.metric(decls[0] as never);
+  };
+  let home: string | null = null;
+  const put = withFx(() => ({ home, rates: ratesFrom((ROWS.fx ?? []).map((e) => e.fields)) }));
+  try {
+    const bare = same('no home currency');
+    assert.ok(bare.ok && bare.value.parts && bare.value.parts.length === 3, 'sterling, dollars and pounds');
+
+    home = 'EGP';
+    assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+    const lacking = same('a home currency and no rates');
+    assert.ok(lacking.ok);
+    assert.deepEqual(lacking.value.fx?.missing, ['GBP to EGP', 'USD to EGP']);
+
+    /* TWO RATES AGAINST DOLLARS, so sterling goes through them, and amounts that round in minor units. */
+    const quotes = [
+      { currency: 'USD', base: 'EGP', rate: 48.6123, as_of: today },
+      { currency: 'USD', base: 'GBP', rate: 0.7391, as_of: today },
+    ];
+    for (const fields of quotes) assert.ok(k.create('fx', fields, { actor: 'p_1' }).ok);
+    ROWS.fx = quotes.map((fields, i) => ({ ...model, id: `fx_${i}`, seq: i + 1, fields }));
+    const converted = same('converted');
+    assert.ok(converted.ok);
+    assert.equal(converted.value.unit, 'EGP');
+    assert.equal(typeof converted.value.value, 'number');
+    assert.equal(Number.isInteger(converted.value.value), true, 'minor units are whole');
+  } finally {
+    put();
+    ROWS.accounts = accounts;
+    ROWS.fx = rates;
+  }
 });

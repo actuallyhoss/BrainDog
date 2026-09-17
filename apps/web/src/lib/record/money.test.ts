@@ -14,12 +14,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { currencyFor, display, page } from './api.ts';
+import { currencyFor, display, metric, page } from './api.ts';
 import { PAGES } from './data.ts';
 import { toSegments } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf, currencyOf, drawn, homeOf, merge, symbolText, total } from './money.ts';
-import { read, type MetricDecl } from './metrics.ts';
+import { fxNote, read, withFx, type MetricDecl } from './metrics.ts';
+import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
 import { runway } from './forecast.ts';
 import type { Entry } from './schema.ts';
@@ -130,21 +131,58 @@ const overduePayable = (e: Entry) =>
   (e.fields.state === 'open' || e.fields.state === 'part') &&
   String(e.fields.due) < TODAY;
 
-test('A TILE OVER TWO CURRENCIES SHOWS THE SENTENCE, not the sum', () => {
+test('A TILE OVER TWO CURRENCIES SHOWS EACH AMOUNT IN ITS OWN, never the sum and never a blank', () => {
   const decl = METRICS.overdue;
   assert.ok(decl, 'the overdue metric is gone, so this test is vacuous');
-  assert.ok(read(decl).value !== null, 'the tile does not read at all, so a refusal proves nothing');
+  const clean = read(decl);
+  assert.ok(clean.value !== null, 'the tile does not read at all, so parts prove nothing');
 
   withEuro('obligations', 'amount', overduePayable, () => {
     const out = read(decl);
     assert.equal(out.value, null, 'a sterling total and a euro row came back as one figure');
-    assert.equal(out.shown, '—');
-    assert.match(out.why, /EUR and GBP/);
-    assert.match(out.why, /never added/);
+    assert.deepEqual(out.parts, [
+      { currency: 'EUR', amount: 123_400 },
+      { currency: 'GBP', amount: clean.value },
+    ]);
+    assert.equal(out.shown, `EUR 1,234.00 · ${clean.shown}`);
+    assert.deepEqual(out.refusals, []);
+    assert.equal(fxNote(out), copy.figureNoHome);
+    /* THE TILE ON THE SCREEN is the parts and the reason. */
+    const tile = metric('overdue');
+    assert.equal(tile.value, out.shown);
+    assert.equal(tile.note, copy.figureNoHome);
   });
 });
 
-test('and a metric whose format disagrees with its rows is refused rather than relabelled', () => {
+test('WITH A HOME CURRENCY AND A RATE IT IS ONE FIGURE, converted as of the rate’s day; without the rate it names the pair', () => {
+  const decl = METRICS.overdue!;
+  const clean = read(decl);
+  withEuro('obligations', 'amount', overduePayable, () => {
+    const put = withFx(() => ({ home: 'GBP', rates: [] }));
+    try {
+      const lacking = read(decl);
+      assert.equal(lacking.value, null);
+      assert.deepEqual(lacking.fx?.missing, ['EUR to GBP']);
+      assert.equal(fxNote(lacking), copy.figureNoRate('EUR to GBP'));
+    } finally {
+      put();
+    }
+    const back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
+    try {
+      const out = read(decl);
+      /* EUR 1,234.00 at 0.855 is GBP 1,055.07, rounded once. */
+      assert.equal(out.value, (clean.value ?? 0) + 105_507);
+      assert.equal(out.unit, 'GBP');
+      assert.equal(out.parts, undefined);
+      assert.equal(out.fx?.asOf, '2020-01-01');
+      assert.match(metric('overdue').note, /Converted at rates as of 1 Jan 2020\./u);
+    } finally {
+      back();
+    }
+  });
+});
+
+test('and a sum whose format disagrees with its rows is said in the rows’ currency rather than relabelled', () => {
   // `format: money.GBP` says how to WRITE the figure; the rows are what it is a figure of. Printing
   // the rows' number under the declaration's code is the quiet version of getting this wrong.
   const decl: MetricDecl | undefined = METRICS.overdue;
@@ -152,26 +190,58 @@ test('and a metric whose format disagrees with its rows is refused rather than r
   assert.ok(decl.format?.startsWith('money.'), 'this test needs a money-formatted metric');
   const out = read({ ...decl, format: 'money.JPY' });
   assert.equal(out.value, null);
-  assert.match(out.why, /the rows are in GBP and the format says JPY/);
+  assert.equal(out.parts?.[0]?.currency, 'GBP');
+  assert.match(out.shown, /^GBP /u);
+  /* AN AVERAGE IS NOT CONVERTED, so it is still refused. */
+  const avg = read({ ...decl, value: { avg: 'amount' }, format: 'money.JPY' });
+  assert.equal(avg.value, null);
+  assert.match(avg.why, /the rows are in GBP and the format says JPY/);
 });
 
-test('A BAR WITH A MIXED GROUP SAYS SO IN THAT GROUP, and the others still read', () => {
+test('A BAR OVER TWO CURRENCIES IS ONE BAR A CURRENCY, each under its code', () => {
   const block = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
   assert.ok(block, 'the bar is gone; this test is about the bar');
 
   withEuro('obligations', 'amount', overduePayable, () => {
     const again = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
-    const cells = toSegments(again!)
-      .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
-      .map((r) => r.cells[1] ?? '');
-    assert.ok(
-      cells.some((c) => c.includes('never added')),
-      `no group said so: ${cells.join(' / ')}`,
-    );
-    assert.ok(
-      cells.some((c) => /^GBP /.test(c)),
-      'every other group stopped reading too',
-    );
+    const segments = toSegments(again!);
+    const charts = segments.filter((seg) => 'rows' in seg) as { rows: { cells: string[] }[] }[];
+    assert.equal(charts.length, 2, 'one chart a currency');
+    assert.ok(charts[0]!.rows.every((r) => /^EUR /u.test(r.cells[1] ?? '')), 'the euro chart holds only euros');
+    assert.ok(charts[1]!.rows.every((r) => /^GBP /u.test(r.cells[1] ?? '')), 'the sterling chart holds only pounds');
+    const said = JSON.stringify(segments);
+    assert.ok(said.includes(copy.inCurrency('EUR')) && said.includes(copy.inCurrency('GBP')), 'each chart says its currency');
+
+    /* AND ONE CHART, CONVERTED, once there is a home currency and a rate. */
+    const back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
+    try {
+      const one = toSegments(page('money')!.blocks.find((b) => b.heading === 'Where it goes, next 30 days')!);
+      assert.equal(one.filter((seg) => 'rows' in seg).length, 1);
+      assert.ok(JSON.stringify(one).includes(copy.figureConverted('1 Jan 2020')));
+    } finally {
+      back();
+    }
+  });
+});
+
+test('THE CASH WALK OVER TWO CURRENCIES WALKS IN THE HOME ONE, and names the rate it lacks', () => {
+  withEuro('obligations', 'amount', overduePayable, () => {
+    let back = withFx(() => ({ home: 'GBP', rates: [] }));
+    try {
+      const walk = runway(500_000, LEGS);
+      assert.deepEqual(walk.steps, []);
+      assert.match(walk.refusals.at(-1) ?? '', /no rate yet from EUR to GBP/u);
+    } finally {
+      back();
+    }
+    back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
+    try {
+      const walk = runway(500_000, LEGS);
+      assert.equal(walk.currency, 'GBP');
+      assert.ok(walk.steps.some((st) => st.delta === -105_507), 'the euro movement was walked in pounds');
+    } finally {
+      back();
+    }
   });
 });
 

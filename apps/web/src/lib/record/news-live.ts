@@ -9,7 +9,7 @@
  */
 
 import { createClient, type EventLine } from '@braindog/client';
-import { isEventKind } from '@braindog/kernel';
+import { isEventKind, type FxRead, type Part } from '@braindog/kernel';
 import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -18,7 +18,7 @@ import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
-import { format, hrefFor, targetLine } from './metrics.ts';
+import { format, fxNote, hrefFor, partsText, targetLine } from './metrics.ts';
 import type { AuditEvent, NewsItem } from './schema.ts';
 
 /** The three figures Home leads with, in the order it draws them. */
@@ -33,7 +33,7 @@ export const homeFigures = (lists: readonly { id: string }[], declared: boolean)
   !declared && lists.some((l) => l.id === 'obligations') ? HOME_FIGURES : [];
 
 /** A reading as the kernel's `metrics.ts` sends one, and only the keys read here. */
-type Reading = { value: number | null; unit: string | null; rows: number; met: boolean | null; refusals: unknown[] };
+type Reading = { value: number | null; unit: string | null; rows: number; met: boolean | null; refusals: unknown[]; parts?: Part[]; fx?: FxRead };
 
 type Said = { code: string; fix: string };
 
@@ -49,13 +49,16 @@ const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: un
 export function tileOf(id: string, r: Reading | null): Metric {
   const decl = METRICS[id];
   const label = decl?.name ?? id;
+  /* MONEY IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, and says why, as a page's tile does. */
+  const across = r ? fxNote(r) : null;
+  if (r?.parts && r.refusals.length === 0) return { id, label, value: partsText(r.parts), note: across ?? '' };
   if (!r || r.value === null || r.refusals.length) return { id, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const met = r.rows === 0 ? null : r.met;
   return {
     id,
     label,
     value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
-    note: decl ? targetLine(decl) : '',
+    note: [decl ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };

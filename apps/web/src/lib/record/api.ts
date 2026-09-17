@@ -54,8 +54,8 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type SeriesLine } from '@braindog/kernel';
-import { meetsTarget, noteOf, read, targetLine, windowMs, withParam } from './metrics.ts';
+import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
+import { fxNote, meetsTarget, noteOf, read, targetLine, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -114,7 +114,16 @@ export function openingOf(opening: PageBlock['opening']): { value: number | null
   if (!decl) return { value: null, unit: null, refusal: `There is no metric called ${opening.metric} for the walk to start from.` };
   const reading = read(decl);
   if (reading.refusals.length) return { value: null, unit: null, refusal: reading.refusals[0]! };
-  return { value: reading.value ?? 0, unit: currencyOfFormat(decl.format) };
+  /* A BALANCE IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS NOT ONE AMOUNT TO START FROM, as the record says. */
+  if (reading.parts) {
+    const missing = reading.fx?.missing ?? [];
+    return {
+      value: null,
+      unit: null,
+      refusal: `${opening.metric} is in ${reading.parts.map((p) => p.currency).join(' and ')}, and a walk starts from one amount. ${missing.length ? `There is no rate yet from ${missing.join(', ')}.` : 'Set a home currency and rates into it.'}`,
+    };
+  }
+  return { value: reading.value ?? 0, unit: reading.unit ?? currencyOfFormat(decl.format) };
 }
 
 /** `money.GBP` is sterling; any other format is not a currency. */
@@ -1166,11 +1175,17 @@ export function metric(id: string): Metric {
         ? ` · ${copy.aboutTheSame} ${reading.why}`
         : ` · ${reading.delta >= 0 ? 'up' : 'down'} ${pct}% ${reading.why}`;
 
+  /* MONEY IN SEVERAL CURRENCIES SAYS WHY IT IS IN PARTS, and a converted figure as of which day's rates. */
+  const across = fxNote(reading);
   return {
     id,
     label: decl.name,
     value: reading.shown,
-    note: empty ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name) : `${targetLine(decl)}${move}`,
+    note: empty
+      ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name)
+      : reading.parts && across
+        ? across
+        : `${targetLine(decl)}${move}${across ? ` · ${across}` : ''}`,
     tone: met === null ? undefined : met ? 'good' : 'warn',
     /**
      * AND A FIGURE OVER AN EMPTY REGISTER IS NOT A DOOR EITHER.
@@ -1500,6 +1515,8 @@ export function packDiff(pack: PackInfo): PackDiff {
 export type BlockResult = PageBlock & {
   /** A `bar` or `split` over a grouped figure: the whole, and each part by its key, largest first. */
   parts?: Parts;
+  /** A `bar` or `split` over rows: the record's home currency and dated rates, which it sends beside the rows. */
+  fx?: { home: string | null; rates: readonly Rate[] } | undefined;
   rows: TableRow[];
   columns: Column[];
   /** The rows this block DRAWS: the matched set cut to `limit:`, aligned one-to-one with `rows`. */
@@ -1664,7 +1681,17 @@ function seriesBlock(b: PageBlock): BlockResult {
       const r = read(decl as never);
       return r.refusals.length
         ? { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: r.refusals[0]! } }
-        : { ok: true, value: { groups: r.groups ?? [], current: r.current ?? '', value: r.value ?? null, unit: r.rows === 0 ? null : unitOfFormat((decl as { format?: string }).format) } };
+        : {
+            ok: true,
+            value: {
+              groups: r.groups ?? [],
+              current: r.current ?? '',
+              value: r.value ?? null,
+              /* THE CURRENCY THE FIGURE IS IN, which is the home one once converted; its parts when it is in several. */
+              unit: r.rows === 0 || r.parts ? null : (r.unit ?? unitOfFormat((decl as { format?: string }).format)),
+              ...(r.parts ? { parts: r.parts } : {}),
+            },
+          };
     },
   );
   const refusals = 'refusal' in got ? [got.refusal.fix] : [];
@@ -2190,7 +2217,14 @@ function inheritFor(register: string, all: Entry[], b: PageBlock): { entries: En
 
 /** The shell every block that is not a register's rows returns, so each says only what it adds. */
 /** A grouped figure's whole and its parts, as a `bar` or a `split` draws them. */
-export type Parts = { metric: string; value: number | null; groups: { key: string; value: number | null }[]; more: number };
+export type Parts = {
+  metric: string;
+  value: number | null;
+  groups: { key: string; value: number | null; parts?: Part[] }[];
+  more: number;
+  /** The currency the parts are in, which is the home one once converted; absent when the figure says its format's. */
+  unit?: string | null;
+};
 
 /**
  * A `bar` or a `split` over a grouped figure, as the record's `metricBlock` reads it: the figure's parts.
@@ -2206,8 +2240,8 @@ function partsBlock(b: PageBlock, id: string): BlockResult {
     return computed(b, [`source: a ${b.kind} over a figure draws its parts, so ${id} groups by a word, and a date cut into buckets is a series`]);
   const r = read(decl);
   if (r.refusals.length) return computed(b, r.refusals);
-  const groups = (r.groups ?? []).map((g) => ({ key: g.key, value: g.value }));
-  return { ...computed(b, []), parts: { metric: id, value: r.value, groups, more: r.more ?? 0 }, shown: groups.length, total: groups.length };
+  const groups = (r.groups ?? []).map((g) => ({ key: g.key, value: g.value, ...(g.parts ? { parts: g.parts } : {}) }));
+  return { ...computed(b, []), parts: { metric: id, value: r.value, groups, more: r.more ?? 0, unit: r.unit ?? null }, shown: groups.length, total: groups.length };
 }
 
 const computed = (b: PageBlock, refusals: string[]): BlockResult => ({

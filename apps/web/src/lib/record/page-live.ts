@@ -17,7 +17,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { isBucket, isStale, type Bars, type MeasureSeries } from '@braindog/kernel';
+import { isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part } from '@braindog/kernel';
 import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -41,7 +41,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, hrefFor, noteOf, targetLine, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, noteOf, partsText, targetLine, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import type { PageBlock, PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
@@ -64,8 +64,11 @@ type Reading = {
   met: boolean | null;
   refusals: Said[];
   /** A grouped figure's parts, and how many past the cap were not drawn. */
-  groups?: { key: string; value: number | null }[];
+  groups?: { key: string; value: number | null; parts?: Part[] }[];
   more?: number;
+  /** Money in several currencies not added up, and how a figure across currencies was read. */
+  parts?: Part[];
+  fx?: FxRead;
 };
 
 type Row = RecordRow & { updated_at?: string };
@@ -236,6 +239,18 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
   const decl = built && isTarget(held) ? { ...built, target: held } : built;
   const label = str(cell.label) ?? decl?.name ?? cell.metric;
   const r = cell.reading;
+  /* A FIGURE IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, never a blank, and says why it is not one number. */
+  const across = r ? fxNote(r) : null;
+  const said = (fallback: string) =>
+    typeof cell.note === 'string'
+      ? noteOf(cell.note, (id) => {
+          const v = values?.[id];
+          if (typeof v === 'number') return format(METRICS[id]?.format, v);
+          return resolverOf(values)(id);
+        })
+      : fallback;
+  if (r && r.parts && !cell.refusal && r.refusals.length === 0)
+    return { id: cell.metric, label, value: partsText(r.parts), note: [said(''), across].filter(Boolean).join(' · ') };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const met = r.rows === 0 ? null : r.met;
@@ -252,17 +267,9 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
       : /^[A-Z]{3}$/u.test(r.unit)
         ? money(Math.round(r.value), r.unit)
         : quantity(r.value, r.unit),
-    /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared. */
-    note:
-      typeof cell.note === 'string'
-        ? noteOf(cell.note, (id) => {
-            const v = values?.[id];
-            if (typeof v === 'number') return format(METRICS[id]?.format, v);
-            return resolverOf(values)(id);
-          })
-        : decl
-          ? targetLine(decl)
-          : '',
+    /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
+       figure says as of which day's rates. */
+    note: [said(decl ? targetLine(decl) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
   };
@@ -503,8 +510,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (typeof source === 'string' && source.startsWith('metric.')) {
     const reading = readings?.[0]?.reading;
     if (!reading) return cannot;
-    const groups = (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null }));
-    const parts = { metric: source.slice('metric.'.length), value: reading.value, groups, more: typeof reading.more === 'number' ? reading.more : 0 };
+    const groups = (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null, ...(Array.isArray(g.parts) ? { parts: g.parts } : {}) }));
+    const parts = { metric: source.slice('metric.'.length), value: reading.value, groups, more: typeof reading.more === 'number' ? reading.more : 0, unit: reading.unit };
     return { ...shell, parts, shown: groups.length, total: groups.length };
   }
   if (kind === 'series') {
