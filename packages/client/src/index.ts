@@ -324,6 +324,25 @@ export type Invited = { invitation: Invitation; token: string };
 /** `createToken`: the only copy of the bearer there will ever be. Show it once, and keep it nowhere. */
 export type MintedToken = { id: string; bearer: string; scope: string; expires_at: string };
 
+/** `createReportKey`: the only copy of a report key there will ever be. Show it once, and keep it nowhere. */
+export type MintedReportKey = { id: string; bearer: string; register: string; expires_at: string };
+
+/** `reportKeys`: one report key and what it is bound to. Never the key. */
+export type ReportKeyRow = {
+  id: string;
+  register: string;
+  fixed?: Record<string, unknown>;
+  stamp?: string;
+  name?: string;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+};
+
+/** `report`: the rows a report key wrote, in the order it sent them. */
+export type Reported = { register: string; written: { id: string; seq: number | null }[] };
+
 /** `snapshot` and `snapshots`: one copy of the whole record, by the id `restore` takes. */
 export type Snapshot = { id: string; at: string; bytes: number };
 
@@ -577,6 +596,12 @@ export function createClient(options: ClientOptions) {
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
     revokeToken: (args: { id: string }) => call<TokenRow>('revokeToken', args as Record<string, unknown>),
+    /** A token that sends rows to one list and reaches nothing else. Revoked with `revokeToken`. */
+    createReportKey: (args: { register: string; fixed?: Record<string, unknown>; stamp?: string; name?: string; days?: number }) =>
+      call<MintedReportKey>('createReportKey', args as Record<string, unknown>),
+    reportKeys: () => call<ReportKeyRow[]>('reportKeys'),
+    /** What a project sends with its report key: one row's fields, or `{ rows }` up to a hundred. */
+    report: (args: Record<string, unknown> | { rows: Record<string, unknown>[] }) => call<Reported>('report', args as Record<string, unknown>),
     /** The record as the lines of a `.brainl` file. Sealed bytes stay out unless the wrapping key is named. */
     export: (args: { sections?: ('header' | 'data' | 'origin' | 'governance')[]; redactGrants?: boolean; kek_id?: string } = {}) =>
       call<string[]>('export', args as Record<string, unknown>),

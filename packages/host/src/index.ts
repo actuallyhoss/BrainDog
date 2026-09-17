@@ -166,6 +166,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'listTokens', group: 'ADMIN', writes: false, what: 'Every agent token, with when it was last used. Never the token.' },
   { name: 'createToken', group: 'ADMIN', writes: true, what: 'Mint one. The secret is in the answer and is stored nowhere.' },
   { name: 'revokeToken', group: 'ADMIN', writes: true, what: 'Revoke one. The second call says the same as the first.' },
+  { name: 'createReportKey', group: 'ADMIN', writes: true, what: 'Mint a report key: a token that sends rows to one list, with the fields it always carries, and reaches nothing else. The secret is in the answer only.' },
+  { name: 'reportKeys', group: 'ADMIN', writes: false, what: 'Every report key, with the list it sends rows to and the fields it fixes. Never the key.' },
   { name: 'deviceApprove', group: 'ADMIN', writes: true, what: 'Let in the device showing these six digits. A sign-in in the last fifteen minutes.' },
   { name: 'listDevices', group: 'ADMIN', writes: false, what: 'Every device grant by its handle, with when it was last heard from. Never the id it polls with.' },
   { name: 'revokeDevice', group: 'ADMIN', writes: true, what: 'Revoke one device by its handle. A login grant takes its token with it.' },
@@ -182,6 +184,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
   { name: 'log', group: 'DATA', writes: true, what: 'A note against a row. It changes nothing and is still a write.' },
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
+  { name: 'report', group: 'DATA', writes: true, what: 'Rows a project sends with its report key, one or up to a hundred, into the list the key is bound to. A report key reaches this and nothing else.' },
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
@@ -383,6 +386,8 @@ export type RecordSurface = {
   listTokens(ctx: never): Promise<Result<unknown>>;
   createToken(args: never, ctx: never): Promise<Result<unknown>>;
   revokeToken(args: never, ctx: never): Promise<Result<unknown>>;
+  createReportKey(args: never, ctx: never): Promise<Result<unknown>>;
+  reportKeys(ctx: never): Promise<Result<unknown>>;
   deviceApprove(args: never, ctx: never): Promise<Result<unknown>>;
   listDevices(ctx: never): Promise<Result<unknown>>;
   revokeDevice(args: never, ctx: never): Promise<Result<unknown>>;
@@ -394,6 +399,7 @@ export type RecordSurface = {
   erase(args: never, ctx: never): Promise<Result<unknown>>;
   deleteRecord(args: never, ctx: never): Promise<Result<unknown>>;
   create(args: never, ctx: never): Promise<Result<unknown>>;
+  report(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
   attach(args: never, ctx: never): Promise<Result<unknown>>;
   handoff(args: never, ctx: never): Promise<Result<unknown>>;
@@ -456,6 +462,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     listTokens: (_a, ctx) => api.listTokens(ctx as never),
     createToken: (a, ctx) => api.createToken(a as never, ctx as never),
     revokeToken: (a, ctx) => api.revokeToken(a as never, ctx as never),
+    createReportKey: (a, ctx) => api.createReportKey(a as never, ctx as never),
+    reportKeys: (_a, ctx) => api.reportKeys(ctx as never),
     deviceApprove: (a, ctx) => api.deviceApprove(a as never, ctx as never),
     listDevices: (_a, ctx) => api.listDevices(ctx as never),
     revokeDevice: (a, ctx) => api.revokeDevice(a as never, ctx as never),
@@ -467,6 +475,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     erase: (a, ctx) => api.erase(a as never, ctx as never),
     deleteRecord: (a, ctx) => api.deleteRecord(a as never, ctx as never),
     create: (a, ctx) => api.create(a as never, ctx as never),
+    report: (a, ctx) => api.report(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
     attach: (a, ctx) => api.attach(a as never, ctx as never),
     handoff: (a, ctx) => api.handoff(a as never, ctx as never),

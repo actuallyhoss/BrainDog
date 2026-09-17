@@ -74,11 +74,14 @@ import {
   type ArrivalSettled,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
+import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, type CatalogueEntry } from './arrange.ts';
 import { grammarOf } from './grammar.ts';
+import { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
+export { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
@@ -681,8 +684,55 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (scheduler) await kernel.tail(scheduler);
     return out;
   };
+  /**
+   * The binding a report key carries, or `null` for any other caller (`report.ts`).
+   *
+   * READ FROM THE TOKEN'S OWN ROW AND NOT FROM THE CONTEXT, so a host cannot forget to say a token is a report
+   * key: both hosts build the principal from `verifyToken`, and the record looks the label up itself. Once per
+   * context, because one call asks the guard more than once.
+   */
+  const bindings = new WeakMap<CallContext, ReportBinding | null>();
+  const reportKeyOf = (ctx: CallContext): ReportBinding | null => {
+    if (ctx.principal.kind !== 'token') return null;
+    if (bindings.has(ctx)) return bindings.get(ctx) ?? null;
+    const row = sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', ctx.principal.id);
+    const binding = reportBindingOf(row?.label ?? null);
+    bindings.set(ctx, binding);
+    return binding;
+  };
+
+  /** What a report key is told by every method but `report`. */
+  const reportOnly = (binding: ReportBinding): Refusal => ({
+    code: 'FORBIDDEN',
+    fix: `This is a report key: it sends rows to ${binding.register || 'one list'} through report, and reads and changes nothing else. Use a token for anything more.`,
+    at: 'principal',
+    allowed: ['report'],
+  });
+
+  /**
+   * The register a `report` call is guarded against: the one its key is bound to.
+   *
+   * A NAME NO REGISTER CAN HAVE, because a register id starts with a letter and holds no space. `guard` reads it
+   * as "the register this key is bound to", which is the only register a report ever writes, and refuses it to
+   * any caller that is not a report key.
+   */
+  const BOUND = 'the bound register';
+
   /** Every method starts here: the ladder, then the ceiling, then the work. */
-  const guard = (ctx: CallContext, need: Need, register?: string): Refusal | null => {
+  const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
+    /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
+       so refusing it here is refusing it everywhere; `admin` and `vault` already refuse every token. */
+    const binding = reportKeyOf(ctx);
+    if (binding !== null && asked !== BOUND) return reportOnly(binding);
+    if (binding === null && asked === BOUND)
+      return {
+        code: 'FORBIDDEN',
+        fix: 'report takes rows from a report key only. To add a row with any other credential, use create.',
+        at: 'principal',
+        allowed: ['create'],
+      };
+    if (binding !== null && binding.register === '') return reportOnly(binding);
+    const register = binding !== null ? binding.register : asked;
     /* THE REGISTER'S OWN LEVEL WHEN IT HAS ONE, which is what makes a level per register a rule
        rather than a decoration. A bookkeeper with `read` on the record and `write` on one register
        is the point; so is an owner held to `read` on the one that carries the payroll. */
@@ -718,6 +768,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * between "may you ask this question at all" and "which rows are in the answer".
    */
   const scoped = (ctx: CallContext, need: Need): Refusal | null => {
+    const binding = reportKeyOf(ctx);
+    if (binding !== null) return reportOnly(binding);
     const p = ctx.principal;
     if (p.kind === 'system' || p.level !== null) return guard(ctx, need);
 
@@ -1608,6 +1660,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           }),
         ),
       );
+    },
+
+    /**
+     * Rows a project sends with its report key: one row's fields, or `{ rows: [...] }` up to a hundred.
+     *
+     * A REPORT KEY'S ONLY METHOD, and nothing else reaches it. Each row goes into the register the key is bound
+     * to, with the key's fixed fields over whatever was sent and its stamp filled when nothing was, through the
+     * same write path `create` takes, so a register's rules run on a reported row as on any other.
+     *
+     * ALL OR NOTHING. The rows are written in one transaction, and the first one refused undoes the rest, with
+     * `at` naming which row and which field. A project that retries a batch never leaves half of it behind.
+     *
+     * SIGNED BY THE KEY, NOT BY A RUN. A project posting a number has no session to be part of, so its writes
+     * carry `report:<token id>` as the ingest paths carry `ingest:<id>`, and no run is opened for each post.
+     */
+    async report(args: unknown, ctx: CallContext) {
+      const stop = guard(ctx, 'append', BOUND);
+      if (stop) return { ok: false as const, refusal: stop };
+      const binding = reportKeyOf(ctx)!;
+      const rows = reportedRows(args);
+      if (rows === null || rows.length === 0)
+        return no('VALUE_MALFORMED', 'report takes one row as its fields, or { rows: [ ... ] } with each row an object.', { at: 'rows' });
+      if (rows.length > REPORT_ROWS_MOST)
+        return no('OUT_OF_BOUNDS', `One report carries at most ${REPORT_ROWS_MOST} rows, and this one has ${rows.length}. Send them in batches.`, { at: 'rows' });
+      const decl = kernel.register(binding.register);
+      if (!decl) return no('REGISTER_UNKNOWN', `This key sends rows to ${binding.register}, and this record has no such list now.`, { at: 'register' });
+      const stampType = binding.stamp === undefined ? undefined : decl.fields.find((f) => f.id === binding.stamp)?.type;
+      const now = new Date(clock.now()).toISOString();
+      const batched = Array.isArray((args as { rows?: unknown }).rows);
+      const by = {
+        actor: `report:${ctx.principal.kind === 'token' ? ctx.principal.id : 'key'}`,
+        ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
+      };
+      const halted: { refusal: Refusal | null } = { refusal: null };
+      const written: { id: string; seq: number | null }[] = [];
+      const where = (i: number, at: string | undefined): string => (batched ? `rows[${i}]${at ? `.${at}` : ''}` : (at ?? 'fields'));
+      try {
+        kernel.transaction(() => {
+          for (const [i, sent] of rows.entries()) {
+            if (Object.hasOwn(sent, 'deleted_at')) {
+              halted.refusal = { code: 'FIELD_UNKNOWN', fix: 'deleted_at is kept by the record, and a reported row cannot arrive deleted.', at: where(i, 'deleted_at') };
+              throw halted;
+            }
+            const out = kernel.create(binding.register, reportedFields(binding, sent, now, stampType) as Patch, by);
+            if (!out.ok) {
+              const r: Refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record moved while this report was written. Send it again.' };
+              halted.refusal = { ...r, at: where(i, r.at) };
+              throw halted;
+            }
+            written.push({ id: out.value.id, seq: out.value.seq });
+          }
+        });
+      } catch (e) {
+        if (e !== halted) throw e;
+        return tail({ ok: false as const, refusal: halted.refusal! });
+      }
+      return tail(ok({ register: binding.register, written }));
     },
 
     async update(
@@ -2719,7 +2828,84 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             at: 'principal',
           },
         };
+      /* A REPORT KEY IS MADE BY `createReportKey` ONLY. Its label is its binding, so a token labelled like one
+         here would be a report key nobody chose the register of. */
+      if (typeof args?.label === 'string' && args.label.startsWith(REPORT_PREFIX))
+        return no('VALUE_MALFORMED', `A label that begins ${REPORT_PREFIX} belongs to a report key. Make one with createReportKey, or choose another label.`, { at: 'label' });
       return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
+    },
+
+    /**
+     * Mint a report key: a token that sends rows to one register and does nothing else (`report.ts`).
+     *
+     * OWNER-ONLY AND CREDENTIALED, for `createToken`'s reasons: it is a bearer that works from anywhere. The
+     * register must exist, and every field it fixes or stamps must be one that register declares, so a key is
+     * never bound to a name nothing can be written under. Values are checked when a row is written, by the
+     * same write path every row takes.
+     */
+    async createReportKey(
+      args: { register: string; fixed?: Record<string, JsonValue>; stamp?: string; name?: string; days?: number },
+      ctx: CallContext,
+    ) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.credentialed === false)
+        return {
+          ok: false as const,
+          refusal: {
+            code: 'NEEDS_BROWSER_SESSION',
+            fix: 'A report key works from anywhere, so minting one needs a credential. Set BRAINDOG_TOKEN and send it, or open this from the app.',
+            at: 'principal',
+          },
+        };
+      const missing = named(args);
+      if (missing) return { ok: false as const, refusal: missing };
+      const decl = kernel.register(args.register);
+      if (!decl) return no('REGISTER_UNKNOWN', `There is no list called ${args.register} for a report key to send rows to.`, { at: 'register' });
+      const declared = (id: string): boolean => decl.fields.some((f) => f.id === id && f.retired !== true);
+      const fixed = args.fixed ?? {};
+      if (fixed === null || typeof fixed !== 'object' || Array.isArray(fixed))
+        return no('VALUE_MALFORMED', 'fixed is one object: each field the key always sends, and its value.', { at: 'fixed' });
+      if (Object.keys(fixed).length > REPORT_FIXED_MOST)
+        return no('OUT_OF_BOUNDS', `A report key fixes at most ${REPORT_FIXED_MOST} fields.`, { at: 'fixed' });
+      for (const field of Object.keys(fixed))
+        if (!declared(field)) return no('FIELD_UNKNOWN', `${args.register} has no field called ${field} for a report key to fix.`, { at: `fixed.${field}` });
+      if (args.stamp !== undefined) {
+        const type = decl.fields.find((f) => f.id === args.stamp && f.retired !== true)?.type;
+        if (typeof args.stamp !== 'string' || type === undefined)
+          return no('FIELD_UNKNOWN', `${args.register} has no field called ${String(args.stamp)} to stamp with the moment a row arrives.`, { at: 'stamp' });
+        if (type !== 'instant' && type !== 'day')
+          return no('VALUE_MALFORMED', `${args.stamp} is a ${type} field, and a stamp is the moment a row arrives: an instant or a day.`, { at: 'stamp' });
+      }
+      if (args.name !== undefined && (typeof args.name !== 'string' || args.name.length > REPORT_NAME_MOST))
+        return no('OUT_OF_BOUNDS', `A report key's name is text of at most ${REPORT_NAME_MOST} characters.`, { at: 'name' });
+      const binding: ReportBinding = {
+        register: args.register,
+        ...(Object.keys(fixed).length === 0 ? {} : { fixed }),
+        ...(args.stamp === undefined ? {} : { stamp: args.stamp }),
+        ...(args.name === undefined || args.name === '' ? {} : { name: args.name }),
+      };
+      const minted = await kernel.createToken(actorOf(ctx), {
+        scope: 'write',
+        label: reportLabel(binding),
+        ...(args.days === undefined ? {} : { days: args.days }),
+      });
+      if (!minted.ok) return tail(minted);
+      return tail(ok({ id: minted.value.id, bearer: minted.value.bearer, register: args.register, expires_at: minted.value.expires_at }));
+    },
+
+    /** The report keys this record has issued, each with what it is bound to. Never a hash, never a bearer. */
+    async reportKeys(ctx: CallContext) {
+      const stop = admin(ctx, 'list the report keys this record has issued');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(
+        kernel.listTokens().flatMap((t) => {
+          const binding = reportBindingOf(t.label);
+          return binding === null
+            ? []
+            : [{ id: t.id, ...binding, created_at: t.created_at, last_used_at: t.last_used_at, expires_at: t.expires_at, revoked_at: t.revoked_at }];
+        }),
+      );
     },
 
     /** Every token, with a revoke button's worth of information and never the hash. */
