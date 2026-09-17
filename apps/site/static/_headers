@@ -1,0 +1,10 @@
+# Cloudflare Workers static assets read this file; it is not served.
+#
+# A hashed file never changes under its name, so a browser keeps it for a year and never asks again.
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The screenshots keep their names when they are taken again, so they are kept for a day and
+# refreshed in the background for a week after, rather than asked for on every page load.
+/shots/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

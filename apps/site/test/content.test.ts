@@ -372,3 +372,10 @@ test('the build writes 404.html, in the site shell and not indexed', when(exists
   assert.match(html, /name="robots" content="noindex"/);
   assert.match(html, /href="\/pricing"/);
 });
+
+/** THE HASHED FILES ARE CACHED FOR GOOD and the screenshots for a day; they were served max-age=0. */
+test('_headers caches hashed assets immutably and the screenshots for a day', () => {
+  const rules = readFileSync(new URL('../static/_headers', import.meta.url), 'utf8');
+  assert.match(rules, /^\/_app\/immutable\/\*\n {2}Cache-Control: public, max-age=31536000, immutable$/m);
+  assert.match(rules, /^\/shots\/\*\n {2}Cache-Control: public, max-age=86400\b/m);
+});

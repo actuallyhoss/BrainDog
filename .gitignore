@@ -10,6 +10,8 @@ build/
 *.sqlite
 _*
 __*
+# Cloudflare reads `_headers` from each app's static directory, so those two are kept.
+!apps/*/static/_headers
 .DS_Store
 
 # Screenshots a person looks at, regenerated on demand and never asserted on — see the two
