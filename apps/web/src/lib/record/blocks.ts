@@ -615,13 +615,15 @@ const measuresFor = (block: BlockResult) =>
 type Charted = { currency: string | null; block: BlockResult }[];
 
 function charted(block: BlockResult): { charts: Charted; converted: string | null; note?: string | null } | null {
-  /* A CASH WALK THE RECORD COULD NOT ADD UP, one walk a currency, each with its own table. */
-  if ((block.kind === 'forecast' || block.kind === 'bridge') && block.walks && block.walks.length > 0) {
+  /* A CASH WALK THE RECORD COULD NOT ADD UP, one walk a currency, each with its own table. A `table` over the walk is
+     one table a currency too, each cut to `limit:` as the one walk's is, rather than the first currency's alone. */
+  if (block.walks && block.walks.length > 0) {
     const today = block.stale_at.slice(0, 10);
+    const whole = block.kind === 'forecast' || block.kind === 'bridge';
     return {
       charts: block.walks.map((walk) => ({
         currency: walk.currency,
-        block: { ...block, walk, walks: undefined, ...walkTable(walk, walk.steps.length, today, false) },
+        block: { ...block, walk, walks: undefined, ...walkTable(walk, whole ? walk.steps.length : block.limit, today, false) },
       })),
       converted: null,
       note: block.walkNote ?? null,
@@ -694,6 +696,23 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
     charts: [...seen].sort().map((unit) => ({ currency: unit, block: { ...block, matched: block.matched.filter((e) => currencyOf(e.fields[of]) === unit), fx: undefined } })),
     converted: null,
   };
+}
+
+/**
+ * A `table` over a cash walk drawn once per currency: each currency's table under its code, and the reason said once after.
+ * `null` when the walk is one. The grid draws a table rather than the dialect, so the page draws these parts itself.
+ */
+export function walkTables(block: BlockResult): { said: ReturnType<typeof parse>; table?: Pick<BlockResult, 'columns' | 'rows' | 'total'> }[] | null {
+  if (block.kind !== 'table' || !block.walks?.length) return null;
+  const split = charted(block);
+  if (!split) return null;
+  return [
+    ...split.charts.map(({ currency, block: part }) => ({
+      said: currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true }),
+      table: { columns: part.columns, rows: part.rows, total: part.total },
+    })),
+    ...(split.note ? [{ said: parse(split.note, { page: true }) }] : []),
+  ];
 }
 
 export function toSegments(block: BlockResult): ReturnType<typeof parse> {

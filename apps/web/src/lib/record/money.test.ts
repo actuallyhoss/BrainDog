@@ -14,9 +14,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { currencyFor, display, metric, page } from './api.ts';
+import { currencyFor, display, metric, page, readBlock } from './api.ts';
 import { PAGES } from './data.ts';
-import { toSegments } from './blocks.ts';
+import { toSegments, walkTables } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
 import { amountOf, currencyOf, drawn, homeOf, merge, symbolText, total } from './money.ts';
 import { fxNote, read, withFx, type MetricDecl } from './metrics.ts';
@@ -315,5 +315,26 @@ test('A CASH WALK OVER TWO CURRENCIES WITH NO RATE IS ONE WALK A CURRENCY, each 
     const text = JSON.stringify(toSegments(block));
     assert.match(text, /In EUR/u);
     assert.match(text, /In GBP/u);
+  });
+});
+
+test('A TABLE OVER A CASH WALK IN TWO CURRENCIES IS ONE TABLE A CURRENCY, not the first currency alone', () => {
+  const liquid = (e: Entry) => e.fields.liquid === true || e.fields.liquid === undefined;
+  withEuro('accounts', 'balance', liquid, () => {
+    const forecast = page('money')?.blocks.find((b) => b.heading === 'Cash ahead');
+    assert.ok(forecast, 'the Cash ahead forecast is gone; this test is about it');
+    const { knobs: _knobs, late: _late, under: _under, recorded: _recorded, ...decl } = PAGES.money!.blocks.find((b) => b.heading === 'Cash ahead')!;
+    const block = readBlock({ ...decl, kind: 'table', limit: 3 } as never);
+    assert.deepEqual(block.walks?.map((w) => w.currency), ['EUR', 'GBP']);
+    const tables = walkTables(block);
+    assert.ok(tables, 'a table over a split walk is drawn apart');
+    const drawnTables = tables.filter((t) => t.table);
+    assert.equal(drawnTables.length, 2, 'every currency has its table');
+    assert.match(JSON.stringify(tables[0]!.said), /In EUR/u);
+    assert.match(JSON.stringify(tables[1]!.said), /In GBP/u);
+    assert.match(JSON.stringify(drawnTables[0]!.table!.rows[0]), /1,234\.00/u, 'the euro table opens from the euro part');
+    assert.ok(drawnTables[1]!.table!.rows.length <= 4, 'each is cut to limit: after its opening row');
+    assert.ok(JSON.stringify(tables.at(-1)!.said).includes(copy.figureNoHome.split(' ').slice(0, 3).join(' ')), 'the reason is said once, after the tables');
+    assert.equal(walkTables(forecast), null, 'a forecast is drawn through the dialect');
   });
 });

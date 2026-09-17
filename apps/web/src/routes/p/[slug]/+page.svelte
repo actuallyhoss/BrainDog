@@ -21,7 +21,7 @@
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { NOW, REGISTERS, heldBy, homeCurrency, hueOf, iconFor, page as readPage, pages as readPages, values, type BlockResult } from '$lib/record/api.ts';
   import { symbolText } from '$lib/record/money.ts';
-  import { draw, saidPlainly } from '$lib/record/blocks.ts';
+  import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { registerHref } from '$lib/record/where.ts';
   import type { PageBlock } from '$lib/record/schema.ts';
   import { PAGES } from '$lib/record/data.ts';
@@ -761,6 +761,12 @@
                   {#if act}<Button href={act.href}>{act.label}</Button>{/if}
                 {/snippet}
               </Empty>
+            {:else if block.kind === 'table' && walkTables(block)}
+              <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
+              {#each walkTables(block) ?? [] as part}
+                {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}{/each}
+                {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={block.heading} />{/if}
+              {/each}
             {:else if block.kind === 'table'}
               <Table columns={block.columns} rows={block.rows} total={block.total} label={block.heading} />
             {:else}
