@@ -72,7 +72,8 @@ test('projects keep their lane, mark, repos, plan and their own decisions, and t
   const p = plan();
   const lanternly = row(p, 'legacy:project:lanternly')!;
   assert.equal(lanternly.register, 'things');
-  assert.deepEqual({ ...lanternly.fields, note: undefined }, { name: 'Lanternly', lane: 'earning', hue: 212, mark: '◆', repos: ['example/lanternly-app'], note: undefined });
+  assert.deepEqual({ ...lanternly.fields, note: undefined }, { name: 'Lanternly', lane: 'earning', hue: 212, mark: '◆', repos: ['example/lanternly-app', 'lanternly-app'], note: undefined });
+  /* THE BARE NAME A SESSION WORKED IN is carried on the project whose repository ends in it, so the record places the run. */
   const note = String(lanternly.fields.note);
   for (const part of ['A reading-light subscription', '## Plan', '- Ship the annual plan', '## Blockers', '### D3: Monthly or annual first?', 'Why: It lifts cash']) assert.ok(note.includes(part), part);
   assert.ok(!note.includes('D4'), 'a decision on no project is not put on a project page');

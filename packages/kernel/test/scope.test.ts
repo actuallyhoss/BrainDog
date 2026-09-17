@@ -380,3 +380,14 @@ test('THE KERNEL’S REGISTER IS NOT RETIRED, alone or beside another', async ()
   assert.equal(k.register('tasks')?.name, 'Tasks', 'nothing else in the call was retired');
   sql.close();
 });
+
+test('A RUN WRITTEN BY HAND IS PLACED BY WHERE IT SAYS IT WORKED, and a caller still cannot name its project', async () => {
+  const { k, sql } = await record();
+  /* An import carrying a run over from another record: a person's write, with the repository and folder it worked in. */
+  value(k.create('session', { agent: 'claude', doing: 'Carried over', repo: 'braindog', state: 'done' }, OWNER));
+  assert.equal(k.get('S1')!.fields.project, 'things#1');
+  value(k.create('session', { agent: 'claude', doing: 'Somewhere else', cwd: 'D:\tmp', state: 'done' }, OWNER));
+  assert.equal(k.get('S2')!.fields.project, undefined, 'a run from nowhere a project names is global');
+  assert.equal(refusal(k.create('session', { agent: 'claude', doing: 'Named', project: 'things#2' }, OWNER)).code, 'IMMUTABLE_FIELD');
+  sql.close();
+});

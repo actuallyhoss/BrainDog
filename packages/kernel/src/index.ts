@@ -2018,6 +2018,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          person's, and any key could name it. */
       if (register === SESSION && !current && w.principal?.kind === 'token' && w.principal.token !== undefined)
         merged.token_id = w.principal.token;
+      /* A RUN WRITTEN BY HAND IS PLACED BY WHERE IT SAYS IT WORKED, as one the ladder opens is: an import or a person
+         carrying a run over from somewhere else names its repository and folder, and the record finds its project. A key's
+         run is placed by the ladder, and a stamped project is the ladder's. */
+      if (register === SESSION && !current && w.principal?.kind !== 'token' && merged.project === undefined) {
+        const said = (k: string) => (typeof merged[k] === 'string' ? (merged[k] as string) : undefined);
+        const placed = resolveProject(sql, registers, { remote: said('remote'), repo: said('repo'), cwd: said('cwd') }).project;
+        if (placed) merged.project = placed.spoken;
+      }
 
       if (!current) {
         const id = mint();
