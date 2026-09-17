@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { display, NOW, REGISTERS } from './api.ts';
-import { readHistory, sampleLines, type Fetch } from './history-live.ts';
+import { noteOf, readHistory, sampleLines, type Fetch } from './history-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -83,4 +83,12 @@ test('the row page reads its history through the live source, and nothing else t
   assert.doesNotMatch(page, /AUDIT\.filter/u, 'the history is read from the sample ledger again');
   assert.match(page, /from '\$lib\/record\/history-live\.ts'/u);
   assert.match(page, /<Empty kind="error" compact title=\{told\.fix\} \/>/u);
+});
+
+test('a link is said without the id it is held as, which names nothing to a reader', () => {
+  const at = '2026-09-17T00:00:00.000Z';
+  const ulid = '01M2PAZRWJZEGEEV41P8PR2H2Y';
+  assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: null, to: `cycles#${ulid}` }), 'cycle set');
+  assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: ulid, to: '01M2PAZRWJZEGEEV41P8PR2H2Z' }), 'cycle changed');
+  assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: ulid, to: null }), 'cycle cleared');
 });
