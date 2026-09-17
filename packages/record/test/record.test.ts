@@ -371,6 +371,40 @@ test('A PAGE OF WHAT AGENTS DID IS FOR WHOEVER MAY READ THE WHOLE RECORD, becaus
   sql.close();
 });
 
+test('A FEED KNOWS WHERE ITS READER LAST LOOKED, and names a deleted row by what it was last called', async () => {
+  const { api, sql, clock } = await record();
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok(
+    (
+      await api.kernel.install([
+        { id: 'page.log', kind: 'page' as const, body: { page: 'log', title: 'Log', blocks: [{ kind: 'feed', source: 'activity', since: 'seen', empty: 'Nothing yet.' }] } as never },
+      ])
+    ).ok,
+  );
+  type Feed = { blocks: { seen?: string | null; feed?: { kind: string | null; target: string | null; thing?: string }[] }[] };
+
+  /* NOBODY HAS LOOKED YET, so the mark is there and empty: the renderer's "not looked yet". */
+  const made = value<{ seq: number }>(await api.create({ register: 'notes', fields: { body: 'Ship it' } }, owner));
+  const first = value<Feed>(await api.page({ slug: 'log' }, owner));
+  assert.ok('seen' in (first.blocks[0] ?? {}), 'a feed that marks what is new came back with no mark at all');
+  assert.equal(first.blocks[0]?.seen, null);
+
+  /* MARKED READ, the feed carries the caller's own mark, and only the caller's. */
+  const marked = value<{ seen_at: string | null }>(await api.markRead(undefined, owner));
+  clock.advance(60_000);
+  assert.ok((await api.update({ register: 'notes', seq: made.seq, patch: { deleted_at: 'now' } }, owner)).ok);
+  const after = value<Feed>(await api.page({ slug: 'log' }, owner));
+  assert.equal(after.blocks[0]?.seen, marked.seen_at);
+  assert.equal(value<Feed>(await api.page({ slug: 'log' }, { principal: { kind: 'person', id: 'p_9', level: 'owner' } })).blocks[0]?.seen, null);
+
+  /* THE DELETE IS ON A ROW THAT IS GONE, and it is named as the row was, never `entry:<id>`. */
+  const deleted = after.blocks[0]?.feed?.find((r) => r.kind === 'delete');
+  assert.ok(deleted, 'the delete is not in the feed');
+  assert.equal(deleted.thing, 'Ship it');
+  assert.equal(deleted.target, `notes#${made.seq}`);
+  sql.close();
+});
+
 /* ── who the record says did it ──────────────────────────────────────────── */
 
 test('A TOKEN WRITES AS ITS RUN, never as itself and never as the person who holds it', async () => {

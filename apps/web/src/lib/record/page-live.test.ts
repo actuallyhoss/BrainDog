@@ -342,7 +342,7 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
     {
       kind: 'feed', source: 'activity', since: 'seen', rows: [], matched: 3, refusals: [], seen: '2026-09-16T09:00:00.000Z',
       feed: [
-        { by: 'agent', who: 'S12', count: 2, kind: 'update', target: 'things#1', note: null, at: '2026-09-16T11:00:00.000Z' },
+        { by: 'agent', who: 'S12', count: 2, kind: 'delete', target: 'things#1', note: null, at: '2026-09-16T11:00:00.000Z', thing: 'Kiln' },
         { by: 'you', who: 'p_1', count: 1, kind: 'create', target: 'obligations#7', note: 'Filed it', at: '2026-09-15T10:00:00.000Z' },
       ],
     },
@@ -353,6 +353,7 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.deepEqual(feed.rows.map((r) => r.cells[0]), ['agent', 'seen', 'you'], 'the read mark sits under the rows newer than it');
   assert.notEqual(feed.rows[1]!.cells[1], '', 'a reader with a read mark was drawn as one who has not looked');
   assert.equal(feed.rows[0]!.cells[2], '2');
+  assert.equal(feed.rows[0]!.cells[3], 'deleted Kiln', 'a row the record named was drawn by its id');
   assert.equal(feed.rows[2]!.cells[3], 'Filed it');
   assert.deepEqual([feed.shown, feed.total], [2, 3]);
   assert.doesNotThrow(() => toSegments(feed));

@@ -2490,7 +2490,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      *
      * NOT THE OWNER'S LINES. Keys, access, shares and members belong to the owner's own screens (the record's
      * `lineOf` holds them to an owner), and a page is read by whoever may open it, so they are left out here.
-     * The read mark is a person's, and the kernel does not know who is reading, so it is `null`.
+     * The read mark is a person's, and the kernel does not know who is reading, so it is `null` here and the record's `page` puts the reader's own in.
      */
     activity: (limit) => ({
       events: sql
@@ -2503,8 +2503,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         )
         .map((e) => {
           const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
-          const row = id === null ? null : byId(id);
-          if (!row) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: e.note === '--erased--' ? null : e.note };
+          /* A DELETED ROW IS NAMED BY WHAT IT WAS LAST CALLED: its line read `entry:01K…` once the row was gone. A row purged
+             from the table has no name left to give, so its line says what was done and to nothing. */
+          const row = id === null ? null : byId(id, true);
+          if (!row) return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note };
           const title = registers.get(row.register)?.title;
           const named = title ? row.fields[title] : undefined;
           return {

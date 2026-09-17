@@ -2314,7 +2314,7 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
 export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), r.note ?? [r.kind, r.target].filter(Boolean).join(' '), whenOf(r.at, now)],
+    cells: [r.by, r.who === null ? '' : actorOf(r.who), String(r.count), agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

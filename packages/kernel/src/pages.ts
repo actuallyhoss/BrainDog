@@ -914,7 +914,8 @@ export function feedRows(events: readonly ActivityEvent[], first?: number): Feed
   for (const e of events) {
     const last = bursts.at(-1);
     if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
-    else bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts });
+    else
+      bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts, ...(e.thing === undefined ? {} : { thing: e.thing }) });
   }
   if (first === undefined) return bursts;
   const cap = Math.min(50, Math.max(1, Math.floor(first)));

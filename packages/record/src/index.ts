@@ -1747,6 +1747,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               .blockRegisters(b)
               .map((register) => readable(ctx, register))
               .find((said) => said !== null);
+          /* WHERE THIS READER LAST LOOKED. The kernel does not know who is reading, so a feed that marks what is new came back
+             with `seen: null` and drew every line as unread; it is the caller's own read mark, the one Home's list moves. */
+          if (!beyond && b.source === 'activity' && 'seen' in b)
+            return { ...b, seen: kernel.members().find((m) => m.person_id === ctx.principal.id)?.seen_at ?? null };
           return beyond ? { ...b, rows: [], matched: 0, ...(b.readings ? { readings: [] } : {}), ...(b.values ? { values: {} } : {}), ...(b.feed ? { feed: [] } : {}), refusals: [beyond] } : b;
         }),
       });
