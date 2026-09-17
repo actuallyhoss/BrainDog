@@ -112,6 +112,12 @@ export type PageBlock = {
    * reads it beside the rows and the host sets each row against the part whose key is that row's value.
    */
   spent?: string;
+  /**
+   * A `progress` block's: the figure, grouped by a link to the block's own rows, that says how far each row has come, so
+   * a goal is moved by the rows logged against it rather than a number typed on it. Each row's target is its second
+   * column, set against the part whose key is that row.
+   */
+  toward?: string;
   /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
   drawn?: boolean;
 };
@@ -148,8 +154,9 @@ const READS = new Set([
   'late', 'under', 'lateness',
   /* A card grid's out-of-date rule. */
   'stale',
-  /* A `progress` budget's figure of what was spent, grouped by the word its rows are. */
-  'spent',
+  /* A `progress` budget's figure of what was spent, grouped by the word its rows are, and a goal's of what was logged
+     toward it, grouped by the row. */
+  'spent', 'toward',
 ]);
 
 export type PageDecl = {
@@ -751,9 +758,23 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
 
   const rows = listed.value.rows;
-  /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer. */
-  const spent = block.kind === 'progress' && block.spent !== undefined ? spentOf(deps, block.spent) : {};
+  /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer.
+     A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT the same way, the figure grouped by the row it points at. */
+  const figure = block.kind !== 'progress' ? undefined : block.spent !== undefined ? { id: block.spent, at: 'spent' } : block.toward !== undefined ? { id: block.toward, at: 'toward' } : undefined;
+  const spent = figure === undefined ? {} : spentOf(deps, figure.id, figure.at);
   if ('refusal' in spent) return { ...base, refusals: also(spent.refusal) };
+  /* A LIMIT AND WHAT WAS SPENT AGAINST IT ARE ONE CURRENCY, for the reason two currencies are never added: a EUR 50 limit
+     is not 90% used by GBP 45. */
+  const unit = 'readings' in spent ? (spent.readings[0]?.reading?.unit ?? null) : null;
+  const limitField = block.columns?.[1]?.field;
+  if (unit !== null && limitField !== undefined) {
+    const other = rows.map((r) => r.fields[limitField]).find((v): v is { currency: string } => typeof v === 'object' && v !== null && typeof (v as { currency?: unknown }).currency === 'string' && (v as { currency: string }).currency !== unit);
+    if (other)
+      return {
+        ...base,
+        refusals: also({ code: 'MIXED_CURRENCY', fix: `A row here is in ${other.currency} and ${figure?.id} is in ${unit}, and two currencies are never set against each other. Give the row's ${limitField} in ${unit}, or read a figure in ${other.currency}.`, at: figure?.at ?? 'spent' }),
+      };
+  }
   return {
     ...base,
     ...spent,
@@ -929,13 +950,13 @@ function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockRe
  * What a `progress` budget spent, as the figure it names: grouped by a word, never cut into date buckets, because each
  * part is set against the row whose value is its key.
  */
-function spentOf(deps: PageDeps, id: unknown): { readings: NonNullable<BlockResult['readings']> } | { refusal: Refusal } | Record<string, never> {
+function spentOf(deps: PageDeps, id: unknown, at = 'spent'): { readings: NonNullable<BlockResult['readings']> } | { refusal: Refusal } | Record<string, never> {
   if (typeof id !== 'string' || id === '')
-    return { refusal: { code: 'DECLARATION_INVALID', fix: 'spent: names a figure grouped by a word, such as spent-this-month.', at: 'spent' } };
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `${at}: names a figure grouped by a word, such as spent-this-month.`, at } };
   const decl = deps.metric(id);
-  if (!decl) return { refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id}.`, at: 'spent' } };
+  if (!decl) return { refusal: { code: 'METRIC_UNKNOWN', fix: `There is no metric called ${id}.`, at } };
   if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
-    return { refusal: { code: 'DECLARATION_INVALID', fix: `A budget sets each row against a part of ${id}, so it groups by a word, and a date cut into buckets is a series.`, at: 'spent' } };
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `A progress block sets each row against a part of ${id}, so it groups by a word, and a date cut into buckets is a series.`, at } };
   const read = deps.read(decl);
   if (!read.ok) return refused(read) ? { refusal: read.refusal } : {};
   if (read.value.refusals.length) return { refusal: read.value.refusals[0]! };

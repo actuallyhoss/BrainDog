@@ -756,7 +756,7 @@ compiler (ADR-058).
 #### Temporal literals
 
 A `day` literal is `YYYY-MM-DD`; an `instant` literal is RFC 3339. A **relative** literal is an anchor —
-`today` `tomorrow` `yesterday` `bom` `eom` `boy` `eoy` — or an offset `<sign><1–4 digits><d|w|m>`, where
+`today` `tomorrow` `yesterday` `bow` (the Monday of this week) `bom` `eom` `boy` `eoy` — or an offset `<sign><1–4 digits><d|w|m>`, where
 `m` is a calendar month, clamped (`+1m` from 31 January is 28 February). It is resolved **once, at
 compile time**, against `ctx.now` in `ctx.tz`, and every resolved literal is a bound parameter, never
 inline SQL. Against a `day` field an anchor resolves to a calendar day; against an `instant` field `today`

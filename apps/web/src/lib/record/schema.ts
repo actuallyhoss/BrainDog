@@ -312,6 +312,8 @@ export type PageBlock = {
   unset?: string;
   /** A `progress` budget's: the figure, grouped by a word, of what was spent against each row's limit. */
   spent?: string;
+  /** A `progress` goal's: the figure, grouped by a link to the block's rows, of what was logged toward each row's target. */
+  toward?: string;
   /** A `forecast`'s: the figure its late knob marks, how late money has come in on average. */
   late?: string;
   /** A `forecast`'s: say under the chart how many days are left when the walk goes under within this many days. */

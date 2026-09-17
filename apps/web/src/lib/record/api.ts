@@ -1558,8 +1558,11 @@ export type BlockResult = PageBlock & {
   lateness?: number | null;
   /** A `bar` over a list of links: the money each linked row holds, by the row's id, which the bar adds up per row. */
   linked?: Readonly<Record<string, unknown>>;
-  /** A `progress` budget: what its `spent:` figure read, each part by the raw value of the word it groups by. */
-  spentBy?: { metric: string; unit: string | null; groups: { key: string; value: number | null }[] };
+  /**
+   * A `progress` budget: what its `spent:` figure read, each part by the raw value of the word it groups by. With
+   * `toward`, a goal's `toward:` figure, each part keyed by the number of the row it was logged against.
+   */
+  spentBy?: { metric: string; unit: string | null; groups: { key: string; value: number | null }[]; toward?: boolean };
   /** On a live record: the record's own title for each row a ref on this block points at, so a group is never named from the sample. */
   names?: Names;
 };
@@ -1853,8 +1856,8 @@ const READS = new Set([
   'unset',
   /* A card grid's out-of-date rule. */
   'stale',
-  /* A progress budget's figure of what was spent. */
-  'spent',
+  /* A progress budget's figure of what was spent, and a goal's of what was logged toward it. */
+  'spent', 'toward',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -1894,6 +1897,30 @@ export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; val
 
   return { page: decl, blocks, values: values() };
 }
+
+/**
+ * What a `progress` block's `spent:` or `toward:` figure read, in parts, as the record answers it beside the rows; or the
+ * sentence that stops it. A limit in one currency and a figure in another are never set against each other.
+ */
+function progressFigure(b: PageBlock, rows: readonly Entry[]): { spentBy?: NonNullable<BlockResult['spentBy']>; refusal?: string } {
+  const id = b.spent ?? b.toward;
+  if (id === undefined) return {};
+  const at = b.spent === undefined ? 'toward' : 'spent';
+  const decl = METRICS[id];
+  if (!decl) return { refusal: `${at}: there is no metric called ${id}` };
+  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined) return { refusal: `${at}: ${id} groups by a word, and a date cut into buckets is a series` };
+  const r = read(decl as never);
+  if (r.refusals.length) return { refusal: r.refusals[0]! };
+  const unit = r.rows === 0 ? null : unitOfFormat(decl.format);
+  const limit = b.columns?.[1]?.field;
+  const other = unit === null || limit === undefined ? undefined : rows.map((e) => currencyOfValue(e.fields[limit])).find((c) => c !== null && c !== unit);
+  if (other) return { refusal: `A row here is in ${other} and ${id} is in ${unit}, and two currencies are never set against each other.` };
+  const groups = (r.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null }));
+  return { spentBy: { metric: id, unit, groups, ...(b.spent === undefined ? { toward: true } : {}) } };
+}
+
+const currencyOfValue = (v: unknown): string | null =>
+  typeof v === 'object' && v !== null && typeof (v as { currency?: unknown }).currency === 'string' ? (v as { currency: string }).currency : null;
 
 /** Exported for the test that holds this engine against the kernel's over the seed. */
 export function readBlock(b: PageBlock): BlockResult {
@@ -1991,6 +2018,9 @@ export function readBlock(b: PageBlock): BlockResult {
       });
     });
     if (register) markColumns(register, b.columns, entries, rows, (e) => provenanceOf(register, e));
+    /* A BUDGET OR A GOAL IS SET AGAINST THE PARTS OF ITS FIGURE, read here as the record reads them beside the rows. */
+    const figured = b.kind === 'progress' ? progressFigure(b, matched) : {};
+    if (figured.refusal) said.push(figured.refusal);
     /* A RUN HOLDS ITS PROJECT AS A SPOKEN ID, and the kernel's page layer names it, so this does too. */
     if (live)
       (b.columns ?? []).forEach((c, i) => {
@@ -2011,6 +2041,7 @@ export function readBlock(b: PageBlock): BlockResult {
       /* The kernel's own test of a run gone quiet, so the two hosts dim the same runs. */
       ...(live ? { quiet: entries.map((e) => isStale({ fields: e.fields as never, updated_at: e.created }, NOW)) } : {}),
       ...(own === undefined ? {} : { inherited: Math.max(0, entries.length - own) }),
+      ...(figured.spentBy === undefined ? {} : { spentBy: figured.spentBy }),
       /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
          `chips` and `gauge` iterate `matched` — every row — and apply `limit:` to their GROUPS; this
          counted `entries` for every kind alike, so the first author to write `limit: 5` on a bar

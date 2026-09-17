@@ -284,6 +284,17 @@ test('A PROGRESS BUDGET READS ITS ROWS AND THE FIGURE IT SPENT, which groups by 
   assert.equal(k.block({ ...budget, spent: 'nonesuch' }).refusals[0]?.code, 'METRIC_UNKNOWN');
   assert.equal(k.block({ ...budget, spent: 'by-month' }).refusals[0]?.code, 'DECLARATION_INVALID');
   assert.equal(k.block({ ...budget, spent: 3 as unknown as string }).refusals[0]?.at, 'spent');
+  /* A GOAL SETS ITS ROWS AGAINST WHAT WAS LOGGED TOWARD THEM, read the same way beside them. */
+  const goal = k.block({ ...budget, toward: 'by-bill' });
+  assert.deepEqual(goal.refusals, []);
+  assert.equal(goal.readings?.[0]?.metric, 'by-bill');
+  assert.equal(k.block({ ...budget, toward: 'by-month' }).refusals[0]?.at, 'toward');
+  /* A LIMIT IN ONE CURRENCY IS NEVER SET AGAINST A FIGURE IN ANOTHER. */
+  value(k.create('bills', { what: 'Ferry', amount: { amount: 9_000, currency: 'EUR' }, due: '2026-09-22' }, OWNER));
+  value(await k.install([{ id: 'metric.gbp-by-bill', kind: 'metric', body: { metric: 'gbp-by-bill', name: 'GBP by bill', source: 'register.bills', where: 'what is Rent', value: { sum: 'amount' }, group_by: 'what', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' } } as Declaration]));
+  const refused = k.block({ kind: 'progress', source: 'register.bills', where: 'what is Ferry', columns: [{ field: 'what' }, { field: 'amount' }], spent: 'gbp-by-bill', empty: 'None.' });
+  assert.equal(refused.refusals[0]?.code, 'MIXED_CURRENCY');
+  assert.equal(refused.readings, undefined);
 });
 
 test("A PAGE SAYS WHAT THE RECORD'S CLOCK READ, so a host draws today from the record", async () => {

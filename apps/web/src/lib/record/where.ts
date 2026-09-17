@@ -31,7 +31,7 @@
  *     due before 2026-10-01             a day
  *     due after today                   a temporal literal
  *     due before +30d                   a relative day: ± a number, then d, w or m
- *     renews before eom                 end of month. Also bom, boy, eoy, tomorrow, yesterday
+ *     renews before eom                 end of month. Also bow (this Monday), bom, boy, eoy, tomorrow, yesterday
  *     points at is empty                the field holds nothing: no value, '' or []
  *     points at is set                  and it holds something. `is not empty` is the second of
  *                                       those two and `is not set` is the first
@@ -135,6 +135,9 @@ export function resolveDay(word: string, now: number): string | null {
       return iso(now + DAY_MS);
     case 'yesterday':
       return iso(now - DAY_MS);
+    /* THE MONDAY OF THIS WEEK, so a weekly habit starts again on it. */
+    case 'bow':
+      return iso(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7), 12));
     case 'bom':
       return iso(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 12));
     case 'eom':

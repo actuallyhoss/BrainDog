@@ -140,7 +140,8 @@ function barRows(block: BlockResult): string[] {
 /**
  * A `progress` over a register: a track a row, in one of three readings of its columns.
  *
- * A BUDGET (`spent:`) sets each row's limit, its second column, against the part of the figure whose key is the row's
+ * A GOAL (`toward:`) sets each row's target, its second column, against what was logged toward that row, and its third
+ * column is the note. A BUDGET (`spent:`) sets each row's limit, its second column, against the part of the figure whose key is the row's
  * first column as stored, so Groceries is set against what the figure grouped as `groceries`, and a category nothing was
  * spent in is at zero. A COUNT, when the second column is a yes or no, groups the rows by the first and fills each group
  * by how many say yes: a project by its steps done. Otherwise each row is its own track, value against target, and a row
@@ -152,6 +153,20 @@ function progressRows(block: BlockResult): string[] {
   if (!label || !value) return [];
   const said = (field: string | undefined, v: unknown): string => (field ? (display(register, field, v, NOW, block.names) ?? '') : '');
   const cap = (rows: string[]) => (block.limit === undefined ? rows : rows.slice(0, Math.max(0, block.limit)));
+
+  /* A GOAL (`toward:`) sets each row's target, its second column, against what was logged toward that row. */
+  if (block.spentBy?.toward) {
+    const logged = block.spentBy;
+    return cap(
+      block.matched.map((e) => {
+        const aim = e.fields[value];
+        const currency = logged.unit ?? currencyOf(aim) ?? null;
+        const part = logged.groups.find((g) => g.key === String(e.seq))?.value ?? 0;
+        const figure = currency ? money(Math.round(part), currency) : String(Math.round(part * 100) / 100);
+        return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, aim))} | ${escapeCell(said(target, e.fields[target ?? '']))}`;
+      }),
+    );
+  }
 
   if (block.spentBy) {
     const spent = block.spentBy;

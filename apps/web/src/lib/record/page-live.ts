@@ -556,12 +556,17 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (reduces && got.length < matched) return cannot;
 
   /* A BUDGET IS DRAWN AGAINST WHAT ITS FIGURE SPENT, which the record read beside the rows; without it there is no budget to draw. */
-  const spent = (rest as { spent?: unknown }).spent;
+  const { spent, toward } = rest as { spent?: unknown; toward?: unknown };
+  const figure = spent ?? toward;
   let spentBy: LiveBlock['spentBy'];
-  if (kind === 'progress' && spent !== undefined) {
+  if (kind === 'progress' && figure !== undefined) {
     const reading = readings?.[0]?.reading;
-    if (typeof spent !== 'string' || !reading) return cannot;
-    spentBy = { metric: spent, unit: typeof reading.unit === 'string' ? reading.unit : null, groups: (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null })) };
+    if (typeof figure !== 'string' || !reading) return cannot;
+    /* A GOAL'S PARTS ARE KEYED BY THE ROW THEY WERE LOGGED AGAINST, which the record groups by its id; the rows here are
+       drawn by number, so each key is said as that row's number. */
+    const seqOf = new Map(got.map((r) => [String(r.id), String(r.seq)]));
+    const groups = (reading.groups ?? []).map((g) => ({ key: spent === undefined ? (seqOf.get(String(g.key)) ?? String(g.key)) : String(g.key), value: typeof g.value === 'number' ? g.value : null }));
+    spentBy = { metric: figure, unit: typeof reading.unit === 'string' ? reading.unit : null, groups, ...(spent === undefined ? { toward: true } : {}) };
   }
 
   const live = b.source === 'sessions.live';

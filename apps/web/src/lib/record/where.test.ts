@@ -230,7 +230,7 @@ test('a date operand that is not a date is refused, not compared as a string', (
 });
 
 test('the temporal literals resolve, and are not all the same day', () => {
-  const days = ['today', 'tomorrow', 'yesterday', 'bom', 'eom', 'boy', 'eoy', '+30d', '-7d', '+2w', '+1m'];
+  const days = ['today', 'tomorrow', 'yesterday', 'bow', 'bom', 'eom', 'boy', 'eoy', '+30d', '-7d', '+2w', '+1m'];
   const seen = new Set<string>();
   for (const d of days) {
     const out = resolveDay(d, NOW);

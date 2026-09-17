@@ -72,7 +72,7 @@ strong, em, code spans and links; a blockquote, a table, an image or raw HTML is
 | Group | Kinds |
 |---|---|
 | Prose and emphasis | `note` · `quote` |
-| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `lines`, a measure over time with the period before it dashed beside it · `progress` (with a `budget` form), one track a row filled toward a target, or spending against a limit with the overspend marked · `forecast`, a cash walk as a line, **page-only** |
+| Figures | `stat` (with a `lead` form) · `bar` · `gauge` · `chips` · `sparkline` · `split` · `bridge` · `series` (with a `net` form) · `lines`, a measure over time with the period before it dashed beside it · `progress` (with a `budget` form), one track a row filled toward a target (typed on the row, or `toward:` a figure of what was logged against it), or spending against a limit (`spent:`, in the limit's currency or refused `MIXED_CURRENCY`) with the overspend marked · `forecast`, a cash walk as a line, **page-only** |
 | Rows | `spec` · `params` |
 | Work | `todo` · `steps` · `timeline` · `board` |
 | Technical | `code` (annotated) · `tree` · `comparison` · `diff`, how a text changed from one version to the next, before and after |

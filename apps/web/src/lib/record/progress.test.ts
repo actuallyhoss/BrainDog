@@ -116,3 +116,44 @@ test('A BUDGET SETS EACH LIMIT AGAINST WHAT ITS FIGURE SPENT, zero where nothing
   const live = blockOf({ ...b, readings: undefined } as never, new Map(), NOW);
   assert.ok(live.cannot, 'a budget whose figure the record did not read says it cannot be drawn');
 });
+
+test('A GOAL IS SET AGAINST WHAT WAS LOGGED TOWARD IT, keyed by the row, in the goal form', () => {
+  REGISTERS.goals = register('goals', [
+    { id: 'what', type: 'text' },
+    { id: 'target', type: 'decimal' },
+    { id: 'unit', type: 'text' },
+  ]);
+  const reading = { value: 3, unit: null, rows: 3, met: null, refusals: [], groups: [{ key: 'r0', value: 2 }] };
+  const b = answered('register.goals', ['what', 'target', 'unit'], [
+    { what: 'Run three times a week', target: 3, unit: 'runs' },
+    { what: 'Cook at home', target: 5, unit: 'nights' },
+  ], { toward: 'logged-this-week-by-goal', readings: [{ metric: 'logged-this-week-by-goal', reading }] });
+  const block = drawn(b);
+  assert.equal(block.form, undefined, 'a goal is not a budget: reaching it is the aim');
+  assert.deepEqual(block.rows.map((r) => r.cells.slice(0, 4)), [['Run three times a week', '2', '3', 'runs'], ['Cook at home', '0', '5', 'nights']]);
+});
+
+test('A BUDGET IN ONE CURRENCY AND A FIGURE IN ANOTHER ARE NEVER SET AGAINST EACH OTHER in the sample', async () => {
+  const { readBlock, ROWS } = await import('./api.ts');
+  const { METRICS } = await import('./declared.ts');
+  REGISTERS.budgets_x = register('budgets_x', [
+    { id: 'category', type: 'enum', values: ['groceries'] },
+    { id: 'limit', type: 'money' },
+  ]);
+  REGISTERS.spend_x = register('spend_x', [
+    { id: 'category', type: 'enum', values: ['groceries'] },
+    { id: 'amount', type: 'money' },
+  ]);
+  const row = (fields: Record<string, unknown>, seq: number) => ({ seq, fields: fields as never, version: 1, created: '2026-09-01T09:00:00Z', by: 'p_owner' });
+  ROWS.spend_x = [row({ category: 'groceries', amount: gbp(4_500) }, 1)];
+  (METRICS as Record<string, unknown>)['spent-x'] = { metric: 'spent-x', name: 'Spent', source: 'register.spend_x', value: { sum: 'amount' }, group_by: 'category', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' };
+  const block = { kind: 'progress', source: 'register.budgets_x', columns: [{ field: 'category' }, { field: 'limit' }], spent: 'spent-x' };
+  ROWS.budgets_x = [row({ category: 'groceries', limit: gbp(5_000) }, 1)];
+  const same = readBlock(block as never);
+  assert.deepEqual(same.refusals, []);
+  assert.deepEqual(same.spentBy?.groups, [{ key: 'groceries', value: 4_500 }], 'the sample reads what was spent, not nothing');
+  ROWS.budgets_x = [row({ category: 'groceries', limit: { amount: 5_000, currency: 'EUR' } }, 1)];
+  const mixed = readBlock(block as never);
+  assert.equal(mixed.spentBy, undefined);
+  assert.match(mixed.refusals.join(' '), /EUR.*GBP.*two currencies/u);
+});

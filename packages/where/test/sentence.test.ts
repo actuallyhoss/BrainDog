@@ -123,6 +123,9 @@ test('THE TEMPORAL LITERALS ARE THE SET THE DATA MODEL SETTLED ON, and a month i
   assert.equal(resolveDay('bom', NOW), '2026-09-01');
   assert.equal(resolveDay('eom', NOW), '2026-09-30');
   assert.equal(resolveDay('boy', NOW), '2026-01-01');
+  assert.equal(resolveDay('bow', Date.parse('2026-09-17T09:00:00Z')), '2026-09-14', 'a Thursday counts from its Monday');
+  assert.equal(resolveDay('bow', Date.parse('2026-09-20T09:00:00Z')), '2026-09-14', 'a Sunday is the end of that week');
+  assert.equal(resolveDay('bow', Date.parse('2026-09-14T09:00:00Z')), '2026-09-14');
   assert.equal(resolveDay('eoy', NOW), '2026-12-31');
   assert.equal(resolveDay('2026-02-11', NOW), '2026-02-11');
   assert.equal(resolveDay('next tuesday', NOW), null);
