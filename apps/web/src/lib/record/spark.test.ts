@@ -72,3 +72,23 @@ test('the daily switch says what on and off mean and when Spark last looked, and
   const refused: SparkClient = { call: async () => ({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this in the app.' } }) as never };
   assert.deepEqual(await setDaily(refused, true), { ok: false, fix: 'Open this in the app.' });
 });
+
+test('a new record with nothing noticed and nothing suggested gets one friendly empty state, not two empty sections', async () => {
+  const { nothingYet } = await import('./spark.ts');
+  const fresh: Reading = { ...READING, noticed: [], drafts: [], waiting: [] };
+  assert.equal(nothingYet(fresh), true);
+  assert.equal(nothingYet(READING), false);
+  assert.equal(nothingYet({ ...fresh, noticed: READING.noticed }), false);
+  assert.ok(words.emptyTitle.length > 0 && words.emptyBody.length > 0);
+  for (const line of [words.emptyTitle, words.emptyBody]) assert.doesNotMatch(line, /—|–/u);
+
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('../../routes/spark/+page.svelte', import.meta.url), 'utf8');
+  assert.match(screen, /nothingYet\(reading\)/u);
+  assert.match(screen, /words\.emptyTitle/u);
+
+  /* The rail's star keeps its name and says what it is in plain words. */
+  const rail = readFileSync(new URL('../ui/Sidebar.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(rail, /\['\/spark', 'Spark', 'star', '\/spark'\]/u);
+  assert.match(rail, /sparkRail/u);
+});

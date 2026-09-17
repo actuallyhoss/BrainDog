@@ -1111,6 +1111,8 @@ export const copy = {
   catalogueAddon: 'Add-on',
   catalogueSigned: (keyId: string) => `Signed by key ${keyId}`,
   catalogueUnsigned: 'Unsigned',
+  /* THE RAIL'S STAR, said in plain words beside its name (`lib/ui/Sidebar.svelte`). */
+  sparkRail: 'Spark: suggestions to fit this BrainDog to how you use it',
   catalogueTrustUnsigned: 'Nobody signed this version, so nothing but the catalogue says who published it.',
   catalogueTrustStripped: (author: string, before: string[]) =>
     `Nobody signed this version, and ${author}'s earlier versions were signed by key ${before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this may not be from ${author}. It cannot be asked for.`,

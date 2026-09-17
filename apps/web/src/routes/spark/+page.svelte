@@ -14,7 +14,7 @@
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/record.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { askSpark, canAsk, draftedBy, readSpark, suggestionsOf, words, type Asked, type Reading, type SparkClient } from '$lib/record/spark.ts';
+  import { askSpark, canAsk, draftedBy, nothingYet, readSpark, suggestionsOf, words, type Asked, type Reading, type SparkClient } from '$lib/record/spark.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -89,6 +89,11 @@
       <p class="spark-by">{draftedBy(reading)}</p>
     </div>
 
+    {#if nothingYet(reading)}
+      <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Spark will do, and the reason it is
+           quiet when the record is young. -->
+      <Empty kind="no-data-yet" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
+    {:else}
     <Section title={words.noticed}>
       {#if reading.noticed.length === 0}
         <p class="spark-said">{words.noticedNone}</p>
@@ -126,6 +131,7 @@
         {/if}
       {/if}
     </Section>
+    {/if}
 
     {#if reading.daily}<SparkDaily daily={reading.daily} />{/if}
 

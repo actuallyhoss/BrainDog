@@ -37,6 +37,8 @@ export const words = {
   noticedNone: 'Nothing stands out yet. Spark keeps an eye on which lists grow, which pages you open and what agents do.',
   suggests: 'What Spark suggests',
   suggestsNone: 'No suggestions right now. This BrainDog fits the way you use it.',
+  emptyTitle: 'Nothing to suggest yet',
+  emptyBody: 'As you use this BrainDog, Spark notices which lists grow, which pages you open and what agents do, and suggests ways to fit it to how you work. Nothing changes until you say yes on Decide.',
   ask: 'Put these on Decide',
   asking: 'Putting them on Decide',
   waiting: 'Waiting on Decide',
@@ -62,6 +64,9 @@ export const words = {
 const decideHref = (id: string): string => `/decide/${encodeURIComponent(id)}`;
 
 /** Each draft with where it stands, new ones first. */
+/** Nothing noticed and nothing suggested, as on a new record: the screen says so once rather than under two headings. */
+export const nothingYet = (reading: Reading): boolean => reading.noticed.length === 0 && reading.drafts.length === 0;
+
 export function suggestionsOf(reading: Reading): Suggestion[] {
   const out = reading.drafts.map((d): Suggestion => {
     if (d.asked === null) return { question: d.question, state: 'new', href: null, said: words.fresh };

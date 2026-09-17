@@ -630,9 +630,10 @@
     </ul>
 
     <div class="utils">
-      <!-- SPARK SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs; its title is its name, as in the palette. -->
-      {#each [['/audit', copy.audit, 'clock', '/audit'], ['/spark', 'Spark', 'star', '/spark'], ['/packs', copy.packs, 'packs', '/packs'], ['/vault', copy.vault, 'vault', '/vault'], ['/settings/appearance', copy.settings, 'settings', '/settings']] as const as [href, label, glyph, at]}
-        <a class="util tap" {href} data-label={label} aria-label={label} title={label} aria-current={under(at) ? 'page' : undefined}>
+      <!-- SPARK SITS WITH THE TOOLS THAT SHAPE THE RECORD, beside Packs. Its label is its name, and its tooltip and spoken
+           name say what it is, since Spark is not a word a person uses about their business. -->
+      {#each [['/audit', copy.audit, 'clock', '/audit', copy.audit], ['/spark', 'Spark', 'star', '/spark', copy.sparkRail], ['/packs', copy.packs, 'packs', '/packs', copy.packs], ['/vault', copy.vault, 'vault', '/vault', copy.vault], ['/settings/appearance', copy.settings, 'settings', '/settings', copy.settings]] as const as [href, label, glyph, at, said]}
+        <a class="util tap" {href} data-label={label} aria-label={said} title={said} aria-current={under(at) ? 'page' : undefined}>
           <Icon name={glyph} size="m" />
         </a>
       {/each}
