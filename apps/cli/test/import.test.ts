@@ -82,8 +82,9 @@ test('projects keep their lane, mark, repos, plan and their own decisions, and t
   assert.equal(row(p, 'legacy:project:oldsite')!.fields.lane, 'retired');
 
   const mrr = row(p, 'legacy:datapoint:lanternly:Monthly revenue:2026-09-15')!;
-  assert.deepEqual(mrr.fields, { name: 'Monthly revenue', value: 1840, unit: 'USD', thing: { $ref: 'legacy:project:lanternly' }, at: '2026-09-15T03:20:00.000Z', source: 'typed' });
+  assert.deepEqual(mrr.fields, { name: 'Monthly revenue, Lanternly', value: 1840, unit: 'USD', thing: { $ref: 'legacy:project:lanternly' }, at: '2026-09-15T03:20:00.000Z', source: 'typed' });
   assert.equal(row(p, 'legacy:datapoint:quill:Monthly revenue:2026-09-15')!.fields.value, 2500, 'a revenue written "2,500" is read as a number');
+  assert.equal(row(p, 'legacy:datapoint:quill:Monthly revenue:2026-09-15')!.fields.name, 'Monthly revenue, Quill Consulting', 'two projects never share one tile on the Dashboard');
   assert.equal(row(p, 'legacy:datapoint:tidepool:Monthly revenue:2026-09-15')!.fields.value, 0);
   assert.equal(row(p, 'legacy:datapoint:lanternly:Revenue, next twelve months:2026-09-15')!.fields.value, 24000);
   assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.value, 312);
@@ -119,12 +120,11 @@ test('open questions are asked on Decide once, and decided, dismissed, put off a
   assert.equal(ask!.question, 'Which store should Tidepool launch on first?');
   assert.deepEqual(ask!.body, {
     options: [
-      { id: 'A', label: 'The desktop store', because: 'Where the beta players already are.' },
+      { id: 'A', label: 'The desktop store', because: 'Where the beta players already are.', recommended: true },
       { id: 'B', label: 'The console store', because: 'A bigger audience later.' },
     ],
     from: 'legacy:suggestion:SG7',
     context: 'The beta players are mostly on one store.',
-    recommend: 'A',
     project: 'tidepool',
   });
   assert.deepEqual(skippedItems(p, /^Already decided/u), ['SG4 as D3']);
