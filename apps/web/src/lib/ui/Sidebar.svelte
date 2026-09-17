@@ -32,7 +32,7 @@
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
-  import { arrange } from '../nav.ts';
+  import { arrange, orderLists } from '../nav.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import type { PageDecl, RegisterDecl } from '../record/schema.ts';
@@ -140,11 +140,15 @@
    * order, so a new page appears where the record put it rather than at the end.
    */
   const remember = (next: string[]) => {
-    arrangement = next;
-    pref.write({ nav: next });
+    /* THE LISTS' ORDER RIDES IN THE SAME PREFERENCE (`orderLists`), and a move here only knows the pages, so the list
+       addresses already held are kept rather than dropped by the next Move up. */
+    const kept = arrangement.filter((href) => href.startsWith('/r/') && !next.includes(href));
+    arrangement = [...next, ...kept];
+    pref.write({ nav: arrangement });
   };
 
   const sections = $derived(arrange(nav, arrangement));
+  const lists = $derived(orderLists(registers, arrangement));
 
   /* THE FLAT LIST IN RENDER ORDER, and it is derived FROM what renders rather than beside it. The
      two were computed separately and disagreed, which is how a move came to be calculated against a
@@ -528,7 +532,7 @@
       <!-- Every list this rail is given, and it is given only the ones that hold something: the
            filter is on `index.registers` in `api.ts`, because the phone's More sheet draws the same
            list and the two must not be able to disagree. -->
-      {#each registers as r}
+      {#each lists as r}
         <li>
           <a class="item tap" href="/r/{r.id}" data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
             <Icon name={r.icon} size="m" />

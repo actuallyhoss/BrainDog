@@ -59,7 +59,7 @@
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
-  import { arrange } from '$lib/nav.ts';
+  import { arrange, orderLists } from '$lib/nav.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { beforeNavigate, goto } from '$app/navigation';
@@ -93,6 +93,8 @@
   /** The same sectioned grouping AND THE SAME ORDER the rail draws — one nav, not two shapes. It
       was `group(data.nav)`, so the phone's More sheet ignored an arrangement the rail honoured. */
   const grouped = $derived(arrange(data.nav, pref.read().nav ?? []));
+  /* THE PHONE'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`). */
+  const moreLists = $derived(orderLists(data.index.registers, pref.read().nav ?? []));
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN. This indexed the raw list, so after a reorder the digit
      printed beside a rail row and the row the digit opened were different pages. */
@@ -496,7 +498,7 @@
     {#if data.index.registers.length > 0}
       <h2 class="more-section">{copy.lists}</h2>
     {/if}
-    {#each data.index.registers as r}
+    {#each moreLists as r}
       <a href="/r/{r.id}" onclick={() => (moreOpen = false)}>
         {r.name}<span class="more-tally num">{r.count}</span>
       </a>

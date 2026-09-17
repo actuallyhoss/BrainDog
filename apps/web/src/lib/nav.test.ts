@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrange } from './nav.ts';
+import { arrange, orderLists, withOrder } from './nav.ts';
 
 type Entry = { section: string; href: string; order: number };
 
@@ -71,4 +71,14 @@ test('and a section holds every entry it started with, whatever the arrangement 
   const out = of(held, ['/zz', '/b']);
   assert.equal(out.length, held.length);
   assert.deepEqual([...out].sort(), ['/a', '/b', '/w']);
+});
+
+test('THE LISTS FOLLOW THE ARRANGEMENT TOO, and a list it does not name keeps its place', () => {
+  const lists = [{ id: 'assignments' }, { id: 'books' }, { id: 'courses' }];
+  assert.deepEqual(orderLists(lists, ['/r/courses', '/p/studies', '/r/assignments']).map((l) => l.id), ['courses', 'books', 'assignments']);
+  assert.deepEqual(orderLists(lists, []).map((l) => l.id), ['assignments', 'books', 'courses']);
+});
+
+test("A SHARED ORDER GOES FIRST, AND WHAT THE READER HAD ARRANGED STAYS BEHIND IT", () => {
+  assert.deepEqual(withOrder(['/r/courses', '/r/assignments'], ['/p/money', '/r/assignments', '/r/people']), ['/r/courses', '/r/assignments', '/p/money', '/r/people']);
 });

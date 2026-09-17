@@ -91,3 +91,32 @@ export function arrange<T extends { section: string; href: string; order: number
       .map((x) => x.e),
   ]);
 }
+
+/**
+ * The lists in the order the reader's arrangement names them, `/r/<id>` by `/r/<id>`.
+ *
+ * THE LISTS ARE NOT A DECLARED SECTION, so `arrange` never saw them, and the record keeps no install order: a use case
+ * installed on a second record drew its lists in id order (Coursework before Modules). The arrangement a shared use case
+ * carries is written into the same preference the rail's Move up writes, and read here.
+ *
+ * ONLY THE NAMED ONES MOVE, AND ONLY AMONG THEMSELVES. A list the arrangement does not name keeps its place, so a list a
+ * later pack adds is not pushed to the end for somebody who once reordered.
+ */
+export function orderLists<T extends { id: string }>(lists: readonly T[], arrangement: readonly string[]): T[] {
+  const rank = new Map(arrangement.map((href, i) => [href, i]));
+  const slots = lists.flatMap((l, i) => (rank.has(`/r/${l.id}`) ? [i] : []));
+  const named = slots.map((i) => lists[i]!).sort((a, b) => rank.get(`/r/${a.id}`)! - rank.get(`/r/${b.id}`)!);
+  const out = [...lists];
+  slots.forEach((slot, i) => (out[slot] = named[i]!));
+  return out;
+}
+
+/**
+ * A shared use case's rail order laid over the reader's own: the file's addresses first, in its order, then every address
+ * the reader had arranged that the file does not name, in theirs. `arrange` and `orderLists` rank by position, so only
+ * the relative order of the file's own pages and lists changes; anything else keeps its place beside its neighbour.
+ */
+export function withOrder(carried: readonly string[], arrangement: readonly string[]): string[] {
+  const named = new Set(carried);
+  return [...carried, ...arrangement.filter((href) => !named.has(href))];
+}
