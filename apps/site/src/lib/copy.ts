@@ -35,8 +35,8 @@ export const site = {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'What your business is owed, what renews, who you work with and what you decided, in one ' +
-        'record that you and your AI agents keep up to date.',
+        'One record arranged around you: your own money, your studies, the companies you run, a ' +
+        "team's work or a new project. You and your AI agents keep it up to date.",
     },
     pricing: {
       title: 'Pricing · BrainDog',
@@ -69,12 +69,15 @@ export const site = {
 
   hero: {
     title: 'Give your business a memory',
+    /* THE SLOGAN STAYS UNTIL THE OWNER PICKS ANOTHER; the line under it speaks to every kind of person
+       the product is for (`loop/DIRECTION.md` §11), not to a business alone. */
     sub:
-      'What you are owed, what renews, who you work with and what you decided, in one record that ' +
-      'you and your AI agents keep up to date.',
+      'One record for what you keep track of, arranged around you: your own money, a term of ' +
+      "coursework, the companies you run, a team's work or a project you are starting. You and your " +
+      'AI agents keep it up to date.',
     /* `Open the demo` opens the demo, where nothing needs an account; `note` says so under it. */
     primary: 'Open the demo',
-    secondary: 'See how it works',
+    secondary: 'See who it is for',
     note:
       'The demo is a made-up business, not yours. There is no sign-up and no billing yet, and ' +
       'nothing you type into it is kept.',
@@ -92,12 +95,122 @@ export const site = {
     Tallow: { name: 'Tallow', mark: 'square', hue: 261 },
   },
 
+  /**
+   * WHO IT IS FOR: the five use cases, each with a photograph of its own first page.
+   *
+   * THE PICTURES ARE NOT THE DEMO. Each is a new self-hosted record set up through /start by
+   * `scripts/usecases.mjs`, so what it shows is what that person sees after Make my record, with the
+   * examples the use case ships. `shot: null` is a use case not yet built, drawn as text only and
+   * marked for a re-shoot: run `node scripts/usecases.mjs personal` once /start offers it, then set
+   * `shot: 'personal'` and write its alt text.
+   */
+  who: {
+    title: "Who it's for",
+    body:
+      'Say who you are and what the record is for, and it is arranged around that: its pages, its ' +
+      'lists and the words on them. Each picture is a new record, set up that way from the first screen.',
+    cases: [
+      {
+        id: 'personal',
+        title: 'Personal',
+        body: 'Your own money and bills, what renews, what you are saving for, and the passion projects you come back to.',
+        holds: 'Being built. Until it is ready, a personal record starts from the lists you pick on the first screen, such as Money, People and Work.',
+        shot: null,
+        alt: '',
+      },
+      {
+        id: 'student',
+        title: 'Student',
+        body: 'Your courses, what is due and when, and how each piece of work went.',
+        holds: 'Opens on Today, with Studies beside it. Lists: Courses, Assignments and Study sessions.',
+        shot: 'student',
+        alt: "A student's record on Today: an assignment due this week, a study session tomorrow, and what changed since the last look.",
+      },
+      {
+        id: 'founder',
+        title: 'Solo founder',
+        body: 'The organisations you run, the money across them, and the numbers your projects report.',
+        holds: 'Opens on Overview, with a Dashboard across organisations and a page for each. Lists: Organisations and Datapoints, beside Money, Projects, People and Tasks.',
+        shot: 'founder',
+        alt: "A solo founder's Overview: cash now, what comes in and goes out in 30 days, the numbers a project reported, and the organisations.",
+      },
+      {
+        id: 'team',
+        title: 'Team board',
+        body: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
+        holds: 'Opens on Team, with Board and Agent work. Lists: Teammates, Cycles and Tickets.',
+        shot: 'team',
+        alt: "A team's record: tickets in flight with the agent working on each, what is blocked, and what is due this week.",
+      },
+      {
+        id: 'guide',
+        title: 'New project guide',
+        body: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
+        holds: 'Opens on Your project, with a Guide page. Lists: Milestones, Steps, Choices and Resources.',
+        shot: 'guide',
+        alt: 'A new project on its first page: the milestone it is at, the next three steps with their dates, and a choice waiting.',
+      },
+    ],
+    pending: 'A picture follows when the personal setup ships.',
+    jump: 'The use cases',
+  },
+
+  /** THE FACADE, in plain words (`loop/DIRECTION.md` §11). */
+  facade: {
+    title: 'Arranged for you. Made of parts.',
+    body:
+      'Everything you see in a BrainDog is arranged for you. Underneath, it is modules that you or your ' +
+      'agents can change, and a setup that works can be handed to somebody else.',
+    items: [
+      {
+        title: 'What you see is arranged',
+        body: "The pages, the rail, the names of the lists and the voice of each screen follow what the record is for. A student's record talks about courses and due dates, not invoices.",
+      },
+      {
+        title: 'Underneath, it is modules',
+        body: 'Lists with typed fields, pages built from blocks, rules, polls and the tools agents use. Each can be turned on, turned off, renamed or changed, by you or by an agent you allow to.',
+      },
+      {
+        title: 'Spark suggests, you accept',
+        body: 'Spark, the manager of your BrainDog, suggests an arrangement from what you tell it on the first screen. Nothing is arranged or rearranged until you accept.',
+      },
+      {
+        title: 'Setups are shared',
+        body: 'An arrangement saves as a use case file. Another record installs it from the file or an address, and browses the ones on offer as cards. A shared setup is readable text and runs no code.',
+      },
+    ],
+  },
+
+  /** THE OWNER'S OWN CASE: numbers arriving from projects, drawn as dashboards. */
+  founder: {
+    title: 'Your projects report. Your dashboards draw.',
+    body:
+      'The case BrainDog was first built for: one person running several organisations, with the ' +
+      'numbers coming from the projects themselves rather than typed in.',
+    steps: [
+      {
+        title: 'A project reports',
+        body: 'Each project gets a report key that opens nothing else. It sends a measure, a value and a time, and the record keeps it as a row.',
+      },
+      {
+        title: 'Or BrainDog polls it',
+        body: 'Give it an address and an interval and it reads every number there, with no key when the address needs none. You approve the poll once.',
+      },
+      {
+        title: 'Dashboards draw them',
+        body: "Tiles, lines against the period before, and each organisation's balance from the accounts it names: across all of them, and one page for each.",
+      },
+    ],
+    alt: "A founder's Dashboard: cash across organisations, the balance of each, and active users, recurring revenue and signups drawn against the thirty days before.",
+    note: 'The numbers in this picture are sixty days of rows written the way a project reports them, into a new record.',
+  },
+
   /** SEVEN SMALL MOMENTS, each a real feature in miniature, drawn from the same demo record. */
   bento: {
-    title: 'The whole business, in one record.',
+    title: 'The same parts, whoever it is for.',
     body:
-      'Money, services, people, keys and decisions, each kept as rows with a type. Every picture ' +
-      'here is a small piece of the demo, a made-up studio called The Studio.',
+      'Every setup draws on the same modules: typed rows, questions, rules, keys, history and export. ' +
+      'The pictures here are small pieces of the demo, a made-up studio called The Studio.',
     money: {
       title: 'Money, owed and owing',
       caption: 'What you are owed, what is late, and the balance walked forward to the first day it would go under.',
@@ -236,8 +349,23 @@ export const site = {
   steps: {
     title: 'Agents propose. You decide.',
     body:
-      'Nothing an agent does to the record is quiet. It proposes, the record asks you, and your ' +
-      'answer is kept beside the rows it made.',
+      'Claude, Codex, Cursor or any MCP client reads and writes the record with a key you issue. ' +
+      'Nothing it does is quiet: every change carries its name, and what needs you arrives as a proposal.',
+    /* HOW AN AGENT CONNECTS, as a ledger under the chain. Each line is a thing the self-host does today. */
+    ways: [
+      {
+        title: 'Over MCP',
+        body: 'The record serves MCP over HTTP, and the braindog command serves it over stdio for tools that start one. Its tools read, search, write and propose.',
+      },
+      {
+        title: 'With a key you issue',
+        body: 'braindog login signs a machine in with a six-digit code you approve in Settings. A key can read, propose or write, and it expires.',
+      },
+      {
+        title: 'Proposals land with you',
+        body: 'A change the agent may not make itself is proposed. Decide draws what it would change, and one press applies it as you.',
+      },
+    ],
     items: [
       {
         title: 'An agent proposes',
@@ -278,9 +406,8 @@ export const site = {
     writer: 'Claude',
     age: '3h ago',
     note:
-      'Agents will reach a record over MCP. Sixteen typed tools are written and tested against it, ' +
-      'and the transport that carries them is not connected yet, so today this happens in the demo ' +
-      'rather than in a record of yours.',
+      'Agents reach a self-hosted record over MCP today. The chain above is drawn from the demo, and ' +
+      'on the hosted app it opens with sign-up.',
   },
 
   /** What a reader can hold the product to, and what it cannot do yet, side by side. */
@@ -309,10 +436,9 @@ export const site = {
     ],
     notYetTitle: 'Not built yet',
     notYet: [
-      'Agents cannot reach a record of yours yet. The sixteen MCP tools are written, and the transport is not connected.',
+      'The personal setup is being built. Student, Solo founder, Team board and New project guide are ready.',
+      'Spark suggests a setup by reading the words you type on the first screen. Arranging with a language model is not built yet.',
       'Mail does not arrive by itself yet. The inbox in the demo holds sample mail.',
-      'The self-hosted build boots, and its sign-in is not finished.',
-      'Revealing a secret is written and not yet routed, so nothing outside the record can decrypt one.',
       'Neither plan is open. There is no sign-up and no billing.',
     ],
   },
@@ -337,7 +463,7 @@ export const site = {
   },
 
   closing: {
-    body: 'The demo opens on The Studio, a made-up business with questions already waiting for you.',
+    body: 'The demo opens on The Studio, a made-up business with questions waiting. A record of your own starts with who you are and what it is for.',
     secondary: 'See the pricing',
   },
 

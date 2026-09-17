@@ -14,7 +14,13 @@
     - HONEST COPY. What it keeps, how agents work with it, and then what is not built and what it
       will not do, set as a plain ledger rather than a feature grid.
 
-  It gets more specific as it goes: a promise, the product, the mechanism, the limits.
+  THE FIFTH PASS, AND WHY (September 17th). The page read as a product for small businesses, and
+  BrainDog is for every kind of person (`loop/DIRECTION.md` §11). The slogan stays until the owner
+  picks another, and everything under it speaks to all of them: who it is for, with a photograph of
+  each use case from a fresh record; the facade and the modules under it; the founder story of
+  numbers arriving; the same parts for everyone; agents over MCP; then the limits.
+
+  It gets more specific as it goes: a promise, the people, the idea, the mechanism, the limits.
 -->
 <script lang="ts">
   import Fields from '$lib/Fields.svelte';
@@ -30,6 +36,8 @@
   import { APP, site } from '$lib/copy.ts';
 
   const b = site.bento;
+  const w = site.who;
+  const f = site.founder;
   const t = site.trust;
 </script>
 
@@ -57,7 +65,7 @@
         <!-- THE PAGE'S ONE FILLED PRIMARY. It opens the demo, and the note under it says what the
              demo is. -->
         <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
-        <a class="btn btn-lg" href="#how">{site.hero.secondary}</a>
+        <a class="btn btn-lg" href="#who">{site.hero.secondary}</a>
       </div>
       <p class="hero-note">{site.hero.note}</p>
     </div>
@@ -85,6 +93,91 @@
         />
       </picture>
     </div>
+  </div>
+</section>
+
+<section class="band" id="who" aria-labelledby="who-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 class="title" id="who-title">{w.title}</h2>
+      <p class="lead">{w.body}</p>
+      <!-- ALL FIVE NAMED AT ONCE, before the long run of pictures, so a reader finds themselves
+           without scrolling past four other people first. -->
+      <nav class="jump" aria-label={w.jump}>
+        {#each w.cases as c (c.id)}<a class="btn" href="#uc-{c.id}">{c.title}</a>{/each}
+      </nav>
+    </div>
+
+    <!-- FIVE USE CASES, each a row: what it is for and what it opens on, beside its own first page.
+         The picture is cropped to the rail and the main column, at a scale where the words in it
+         can be read, and a phone gets the phone's own capture. A use case with no picture yet is
+         text only and carries `data-reshoot`, so the next run of `scripts/usecases.mjs` finds it. -->
+    <div class="cases">
+      {#each w.cases as c (c.id)}
+        <article class="case" id="uc-{c.id}" class:case-text={!c.shot} data-reshoot={c.shot ? undefined : c.id} aria-labelledby="case-{c.id}">
+          <div class="case-copy">
+            <h3 class="case-title" id="case-{c.id}">{c.title}</h3>
+            <p class="case-body">{c.body}</p>
+            <p class="case-holds">{c.holds}</p>
+            {#if !c.shot}<div class="case-note"><Note text={w.pending} /></div>{/if}
+          </div>
+          {#if c.shot}
+            <div class="case-shot">
+              <picture>
+                <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="/shots/usecase-{c.shot}-phone-dark.webp" width="1170" height="2532" />
+                <source media="(max-width: 639px)" srcset="/shots/usecase-{c.shot}-phone-light.webp" width="1170" height="2532" />
+                <source media="(prefers-color-scheme: dark)" srcset="/shots/usecase-{c.shot}-dark.webp" width="2880" height="1800" />
+                <img src="/shots/usecase-{c.shot}-light.webp" width="2880" height="1800" alt={c.alt} loading="lazy" decoding="async" />
+              </picture>
+            </div>
+          {/if}
+        </article>
+      {/each}
+    </div>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="facade-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 class="title" id="facade-title">{site.facade.title}</h2>
+      <p class="lead">{site.facade.body}</p>
+    </div>
+    <ul class="items">
+      {#each site.facade.items as item}
+        <li class="item">
+          <h3 class="item-title">{item.title}</h3>
+          <p class="item-body">{item.body}</p>
+        </li>
+      {/each}
+    </ul>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="founder-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 class="title" id="founder-title">{f.title}</h2>
+      <p class="lead">{f.body}</p>
+    </div>
+    <ol class="items items-3 flow">
+      {#each f.steps as step, i}
+        <li class="item">
+          <span class="flow-n num" aria-hidden="true">{i + 1}</span>
+          <h3 class="item-title">{step.title}</h3>
+          <p class="item-body">{step.body}</p>
+        </li>
+      {/each}
+    </ol>
+    <div class="shot">
+      <picture>
+        <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="/shots/usecase-founder-dashboard-phone-dark.webp" width="1170" height="2532" />
+        <source media="(max-width: 639px)" srcset="/shots/usecase-founder-dashboard-phone-light.webp" width="1170" height="2532" />
+        <source media="(prefers-color-scheme: dark)" srcset="/shots/usecase-founder-dashboard-dark.webp" width="2880" height="1800" />
+        <img src="/shots/usecase-founder-dashboard-light.webp" width="2880" height="1800" alt={f.alt} loading="lazy" decoding="async" />
+      </picture>
+    </div>
+    <div class="note-at"><Note text={f.note} /></div>
   </div>
 </section>
 
@@ -171,6 +264,14 @@
     <Steps />
     <!-- THE LIMIT, under the steps and not in a footnote: the tools are written and the transport
          that carries them is not. -->
+    <ul class="items items-3 ways">
+      {#each site.steps.ways as way}
+        <li class="item">
+          <h3 class="item-title">{way.title}</h3>
+          <p class="item-body">{way.body}</p>
+        </li>
+      {/each}
+    </ul>
     <div class="note-at"><Note text={site.steps.note} /></div>
   </div>
 </section>
@@ -334,6 +435,110 @@
 
   .note-at {
     margin-block-start: var(--sp-7);
+  }
+
+  /* ── Who it's for ─────────────────────────────────────────────────── */
+
+  .cases {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* One row per use case: the words on the left, the record on the right, a hairline between rows. */
+  .case {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--sp-7);
+    align-items: start;
+    padding-block: var(--sp-7);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-5);
+  }
+
+  /* Clear of the sticky bar when a jump link lands here. */
+  .case {
+    scroll-margin-block-start: 72px;
+  }
+
+  .case:first-child {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  .case-text {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .case-copy {
+    max-inline-size: 44ch;
+  }
+
+  .case-title {
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .case-body {
+    margin-block-start: var(--sp-2);
+    font-size: var(--t-md);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  .case-holds {
+    margin-block-start: var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  .case-note {
+    margin-block-start: var(--sp-4);
+  }
+
+  /* THE CROP, and why it is a crop. The whole 1440px screen in a 780px box is text at half size;
+     the rail and the main column, the left 70 per cent of it, are text a reader can read. The
+     feed on the right is what is cut, and it is the same on every use case. */
+  .case-shot {
+    aspect-ratio: 16 / 11;
+    overflow: hidden;
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .case-shot img {
+    display: block;
+    inline-size: 142%;
+    max-inline-size: none;
+    block-size: auto;
+  }
+
+  /* ── The facade, the founder story and the agents' ways in ───────── */
+
+  .items.items-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .items.ways {
+    margin-block-start: var(--sp-7);
+    padding-block-start: var(--sp-6);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .flow-n {
+    display: block;
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   /* ── The bento ────────────────────────────────────────────────────── */
@@ -508,6 +713,17 @@
     }
   }
 
+  @media (width < 960px) {
+    .case {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-5);
+    }
+
+    .items.items-3 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   @media (width < 860px) {
     .group {
       grid-template-columns: minmax(0, 1fr);
@@ -554,6 +770,15 @@
       aspect-ratio: 390 / 560;
       object-fit: cover;
       object-position: top;
+    }
+
+    /* A phone shows the phone's own capture whole-width, cut where a thumb would start scrolling. */
+    .case-shot {
+      aspect-ratio: 390 / 520;
+    }
+
+    .case-shot img {
+      inline-size: 100%;
     }
 
     .stage {

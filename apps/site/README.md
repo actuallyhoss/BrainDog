@@ -45,6 +45,14 @@ asked for no motion, and the a11y gate, see the whole picture standing still. A 
 the pointer. A list that gains rows moves inside a box of fixed height, so nothing on the page
 shifts once per loop.
 
+**Who it's for is photographed from fresh records, not the demo.** `scripts/usecases.mjs` creates one
+self-hosted record per use case (a temporary data directory, a free port that is never 5189 or 5317,
+nothing secret), sets it up through `/start` the way a stranger would, and writes
+`static/shots/usecase-<id>[-phone]-<scheme>.webp` of the page it opens on, plus the founder's
+Dashboard after sixty days of reported numbers. It needs `apps/web/build`. A use case `/start` does not
+offer yet is skipped and said, and its row on the page is text only with `data-reshoot` until
+`node scripts/usecases.mjs <id>` is run and `copy.ts` gives it a `shot`. Personal is that row today.
+
 `scripts/product.mjs` writes `static/shots/` from the app's build, or from a running app with
 `--from=http://localhost:5317` while the build lags the source. The page serves the `home` WebPs;
 `home-light.png` is the `og:image` in `src/app.html`, because not every preview fetcher decodes WebP.

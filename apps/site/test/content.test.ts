@@ -297,3 +297,61 @@ test('every field the home page draws is one the money register declares', when(
     );
   }
 });
+
+/**
+ * EVERY KIND OF PERSON THE PRODUCT IS FOR IS NAMED ON THE HOME PAGE, and each has its own row.
+ *
+ * The owner's word, 2026-09-17 (`loop/DIRECTION.md` §11): the product is for everyone, and the site
+ * read as a product for small businesses. Five use cases are named, each with a row a jump link can
+ * land on, and each row either shows its own photograph, served from `static/shots/`, or says it is
+ * waiting for one with `data-reshoot`. A row that silently lost its picture is neither, and fails.
+ */
+const USE_CASES = [
+  ['personal', 'Personal'],
+  ['student', 'Student'],
+  ['founder', 'Solo founder'],
+  ['team', 'Team board'],
+  ['guide', 'New project guide'],
+] as const;
+
+test('the home page names all five use cases, each with its picture or marked for one', when(NO_BUILD), () => {
+  const html = uncommented(read('index.html'));
+  const words = readable(read('index.html'));
+  for (const [id, title] of USE_CASES) {
+    assert.match(words, new RegExp(`\\b${title}\\b`), `index.html no longer names the ${title} use case`);
+    const opens = html.search(new RegExp(`<article\\b[^>]*\\sid="uc-${id}"`));
+    assert.notEqual(opens, -1, `index.html has no row for the ${title} use case (id="uc-${id}")`);
+    const row = html.slice(opens, html.indexOf('</article>', opens));
+    const shot = new RegExp(`src="/shots/usecase-${id}-light\\.webp"`).test(row);
+    const waiting = /\sdata-reshoot="/.test(row);
+    assert.equal(shot || waiting, true, `the ${title} row shows no picture of its own and is not marked for a re-shoot`);
+  }
+});
+
+/**
+ * EVERY PICTURE A PAGE ASKS FOR IS ONE THE BUILD SERVES. `every href goes somewhere` walks links; a
+ * `src` or a `srcset` that names a screenshot nobody took is the same broken promise, drawn as an
+ * empty frame with a hairline round it.
+ */
+test('every image a page asks for is in the build', when(NO_BUILD), () => {
+  for (const page of PAGES) {
+    const html = uncommented(read(page));
+    for (const m of html.matchAll(/\s(?:src|srcset)="(\/[^"]+)"/g)) {
+      const path = (m[1] ?? '').split(/\s/)[0] ?? '';
+      assert.equal(existsSync(new URL(path.slice(1), BUILD)), true, `${page} asks for ${path}, and build/ does not have it`);
+    }
+  }
+});
+
+/**
+ * NO LICENCE NAME AND NO EM DASH IN THE COPY FILE'S MARKETING HALF EITHER. The served-bytes checks
+ * above only see what a page renders today, and a key added for a section not drawn yet slips past
+ * them. Everything in `copy.ts` above `legal:` is marketing copy.
+ */
+test('the marketing copy in copy.ts names no licence and holds no em dash', () => {
+  const source = readFileSync(new URL('../src/lib/copy.ts', import.meta.url), 'utf8');
+  const marketing = source.slice(source.indexOf('export const site'), source.indexOf('\n  legal: {'));
+  const strings = [...marketing.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').join('\n');
+  assert.equal(/\bApache\b|\bMIT\b/.test(strings), false, 'copy.ts names a licence above the legal section');
+  assert.equal(strings.includes('—'), false, 'copy.ts has an em dash in a marketing string');
+});
