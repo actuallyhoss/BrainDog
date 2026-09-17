@@ -101,8 +101,8 @@ export const site = {
    * THE PICTURES ARE NOT THE DEMO. Each is a new self-hosted record set up through /start by
    * `scripts/usecases.mjs`, so what it shows is what that person sees after Make my record, with the
    * examples the use case ships. `shot: null` is a use case not yet built, drawn as text only and
-   * marked for a re-shoot: run `node scripts/usecases.mjs personal` once /start offers it, then set
-   * `shot: 'personal'` and write its alt text.
+   * marked for a re-shoot: run `node scripts/usecases.mjs <id>` once /start offers it, then set
+   * `shot: '<id>'` and write its alt text.
    */
   who: {
     title: "Who it's for",
@@ -114,9 +114,10 @@ export const site = {
         id: 'personal',
         title: 'Personal',
         body: 'Your own money and bills, what renews, what you are saving for, and the passion projects you come back to.',
-        holds: 'Being built. Until it is ready, a personal record starts from the lists you pick on the first screen, such as Money, People and Work.',
-        shot: null,
-        alt: '',
+        holds: 'Opens on Day to day, with Spending under Money, Goals and a page for each project. Lists: Bills, Accounts, Spending, Budget, Savings goals, Goals, Log, Put by and Projects.',
+        /* A NAME, OR null FOR A USE CASE NOT YET PHOTOGRAPHED, which the page draws as text with a re-shoot mark. */
+        shot: 'personal' as string | null,
+        alt: "A person's record on Day to day: this month's spending, budget and bills, spending against each budget with one over, and the record's setup said in one line.",
       },
       {
         id: 'student',
@@ -151,7 +152,7 @@ export const site = {
         alt: 'A new project on its first page: the milestone it is at, the next three steps with their dates, and a choice waiting.',
       },
     ],
-    pending: 'A picture follows when the personal setup ships.',
+    pending: 'A picture follows when this setup ships.',
     jump: 'The use cases',
   },
 
@@ -436,7 +437,6 @@ export const site = {
     ],
     notYetTitle: 'Not built yet',
     notYet: [
-      'The personal setup is being built. Student, Solo founder, Team board and New project guide are ready.',
       'Spark suggests a setup by reading the words you type on the first screen. Arranging with a language model is not built yet.',
       'Mail does not arrive by itself yet. The inbox in the demo holds sample mail.',
       'Neither plan is open. There is no sign-up and no billing.',
