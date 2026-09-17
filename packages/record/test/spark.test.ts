@@ -193,6 +193,15 @@ test('SPARK FILES ITS PROPOSALS THROUGH THE SAME DOOR, and only the owner accept
   sql.close();
 });
 
+test('A RECORD MADE TODAY STARTED TODAY, not "0 days old"', async () => {
+  const { api, sql, install } = await record();
+  await install({ install: 'log' });
+  value(api.kernel.create('logbook', { what: 'First entry' }, { actor: 'p_owner' }));
+  const seen = value<Reading>(await api.spark({}, owner));
+  assert.equal(seen.quiet, 'This BrainDog started today. Spark waits for two weeks of use before it suggests changes.');
+  sql.close();
+});
+
 test('A YOUNG RECORD IS WATCHED, NOT ADVISED', async () => {
   const { api, sql, install, day } = await record();
   await install({ install: 'log' });

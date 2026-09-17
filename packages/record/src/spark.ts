@@ -582,7 +582,7 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
       quiet:
         usage.firstWrite === null
           ? 'Nothing has been added yet, so there is nothing to go on.'
-          : `This BrainDog is ${plural(usage.ageDays, 'day')} old. Spark waits for two weeks of use before it suggests changes.`,
+          : `${usage.ageDays < 1 ? 'This BrainDog started today' : usage.ageDays === 1 ? 'This BrainDog started yesterday' : `This BrainDog is ${plural(usage.ageDays, 'day')} old`}. Spark waits for two weeks of use before it suggests changes.`,
     };
   return { noticed, drafts: keyed(drafts), quiet: null };
 }
