@@ -60,7 +60,7 @@ function memoryRecord(registers: string[]) {
   return { door, rows, asked, writes };
 }
 
-const ALL = ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'organisations', 'session'];
+const ALL = ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'services', 'organisations', 'session'];
 
 test('an export is read only when it has a db with projects', () => {
   assert.equal(readLegacyTool('not json').ok, false);
@@ -236,15 +236,13 @@ test('agent runs keep their handoff, and what the founder use case has no place 
     tried: ['Mocked the receipt', 'Skipped the sandbox'],
     notes: ['Checkout is wired; the receipt check is not.'],
   });
-  assert.deepEqual(skippedItems(p, /Dates have no list/u), ['1 date']);
-  assert.deepEqual(skippedItems(p, /^Domains/u), ['1 domain']);
   assert.deepEqual(skippedItems(p, /^History/u), ['1 history line']);
   assert.ok(skippedItems(p, /no organisations/u).length === 1);
 });
 
 test('rows are written in an order where a row is there before a row that points at it', () => {
   const order = [...new Set(plan().rows.map((r) => r.register))];
-  assert.deepEqual(order, ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'session']);
+  assert.deepEqual(order, ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'services', 'session']);
 });
 
 test('applied to a record, refs become ids; applied again it adds nothing, asks nothing, and updates only what changed', async () => {
@@ -380,11 +378,11 @@ test('a dry run reads and reports, and writes nothing', async () => {
   const mem = memoryRecord(ALL);
   const report = await applyPlan(plan(), mem.door, { dryRun: true });
   assert.deepEqual(mem.writes, []);
-  assert.equal(report.tally.tasks!.added, 4);
+  assert.equal(report.tally.tasks!.added, 5, 'four tasks and one date');
   assert.equal(report.asked, 1);
   const lines = said(report, { dryRun: true, file: 'export.json' });
   assert.equal(lines[0], 'Read, and wrote nothing: export.json, exported 2026-09-15.');
-  assert.ok(lines.includes('Tasks: 4 would be added, 0 would be updated, 0 unchanged.'));
+  assert.ok(lines.includes('Tasks: 5 would be added, 0 would be updated, 0 unchanged.'));
 });
 
 test('a record without the founder and agents lists is told what to install, and nothing is written', async () => {
@@ -432,7 +430,7 @@ test('the command reads the file, talks to the host over the API, and exits 0; a
 
   assert.equal(await importCommand(['legacy', 'export.json'], io, TODAY), 0);
   assert.ok(seen.includes('schema') && seen.includes('create') && seen.includes('propose'));
-  assert.ok(out.some((l) => l.startsWith('Tasks: 4 added')));
+  assert.ok(out.some((l) => l.startsWith('Tasks: 5 added')));
 
   assert.equal(await importCommand(['legacy', 'nope.json'], io, TODAY), 1);
   assert.equal(say.at(-1), 'nope.json could not be read.');
@@ -450,4 +448,52 @@ test('example rows setting up planted, found beside the import, are said with wh
   const clean = await applyPlan(plan(), memoryRecord(ALL).door, { dryRun: true });
   assert.equal(clean.examples, 0);
   assert.ok(!said(clean, { dryRun: true, file: 'export.json' }).some((l) => l.includes('example rows')));
+});
+
+test('dates become tasks due that day on their project, domains and services go onto Estate with what is not known left blank, and readings are named with their service', () => {
+  const p = plan();
+  assert.deepEqual(row(p, 'legacy:date:EV1'), {
+    register: 'tasks',
+    key: 'legacy:date:EV1',
+    label: 'Store review window, 2026-09-30',
+    fields: { what: 'Store review window', state: 'open', by: '2026-09-30', note: 'Was EV1 in the old tool, a date (deadline).', thing: { $ref: 'legacy:project:lanternly' } },
+  });
+  assert.deepEqual(row(p, 'legacy:domain:lanternly.example')!.fields, { name: 'lanternly.example', kind: 'domain', cycle: 'yearly', state: 'live', renews: '2027-01-01', thing: { $ref: 'legacy:project:lanternly' } });
+  assert.deepEqual(row(p, 'legacy:service:vm-1')!.fields, { name: 'Game server', kind: 'hosting', cycle: 'monthly', state: 'live', provider: 'example', cost: { amount: 1200, currency: 'USD' } });
+  const reading = p.rows.find((r) => r.key.startsWith('legacy:servicereading:vm-1:disk:'))!;
+  assert.equal(reading.fields.name, 'Disk, Game server');
+  assert.equal(reading.fields.value, 12);
+  assert.equal(reading.fields.unit, 'GB');
+  for (const reason of [/Dates have no list/u, /^Domains/u, /^Services/u, /^Service readings/u]) assert.deepEqual(skippedItems(p, reason), []);
+
+  /* A DATE ALREADY PAST is done on its day. */
+  const past = planLegacyTool(syntheticExport(), '2026-10-01');
+  assert.equal(row(past, 'legacy:date:EV1')!.fields.state, 'done');
+  assert.equal(row(past, 'legacy:date:EV1')!.fields.done_on, '2026-09-30');
+});
+
+test('the dry run lists each date, domain and service; a re-run changes none; a record without Estate gets everything else and is told what installing it adds', async () => {
+  const mem = memoryRecord(ALL);
+  const dry = said(await applyPlan(plan(), mem.door, { dryRun: true }), { dryRun: true, file: 'export.json' });
+  const at = dry.indexOf('Dates, domains and services:');
+  assert.ok(at > 0);
+  assert.deepEqual(dry.slice(at + 1, at + 4), [
+    '- Date: Store review window, 2026-09-30, would be added (Tasks).',
+    '- Domain: lanternly.example, renews 2027-01-01, would be added (Services).',
+    '- Service: Game server, would be added (Services).',
+  ]);
+  await applyPlan(plan(), mem.door, { dryRun: false });
+  const count = mem.rows.length;
+  const again = said(await applyPlan(plan(), mem.door, { dryRun: false }), { dryRun: false, file: 'export.json' });
+  assert.equal(mem.rows.length, count, 'idempotent');
+  assert.ok(again.includes('- Service: Game server, unchanged (Services).'));
+
+  const founder = memoryRecord(ALL.filter((r) => r !== 'services'));
+  const report = await applyPlan(plan(), founder.door, { dryRun: false });
+  assert.deepEqual(report.missing, []);
+  assert.equal(founder.rows.filter((r) => r.register === 'services').length, 0);
+  assert.ok(founder.rows.some((r) => (r.fields.tags as string[] | undefined)?.includes('legacy:date:EV1')));
+  const lines = said(report, { dryRun: false, file: 'export.json' });
+  assert.ok(lines.includes('- This BrainDog has no Services list. Install Estate beside Solo founder, then run the import again to bring these in: lanternly.example, renews 2027-01-01, Game server.'));
+  assert.ok(!lines.join(' ').includes('—'));
 });

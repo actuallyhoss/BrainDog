@@ -57,7 +57,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.2.0',
   people: '1.0.0',
   'money-core': '1.1.0',
-  estate: '1.0.0',
+  estate: '1.1.0',
   work: '1.3.0',
 };
 

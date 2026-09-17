@@ -44,8 +44,12 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
       { id: 'name', type: 'text', required: true, search: true },
       { id: 'provider', type: 'text', index: true, search: true },
       { id: 'kind', label: 'Type', type: 'enum', values: ['domain', 'hosting', 'saas', 'certificate'], index: true, required: true },
-      { id: 'renews', type: 'day', index: true, deadline: true, required: true, remind: ['-30d', '-7d', '0d'] },
-      { id: 'cost', type: 'money', required: true },
+      /* NEITHER IS REQUIRED SINCE 1.1.0. A name somebody holds whose renewal day or price nobody has looked up yet is still
+         a name they hold, and a guessed day is worse than a blank one: a blank sends somebody to find out, a guess stops them.
+         the old tool's 23 domains carry no price at all, and most of its hosting no renewal day, so requiring both left the
+         whole estate out of the import. A blank day reminds nobody and a blank cost adds nothing to a sum. */
+      { id: 'renews', type: 'day', index: true, deadline: true, remind: ['-30d', '-7d', '0d'] },
+      { id: 'cost', type: 'money' },
       /* INDEXED, WHICH IS WHY IT IS ON THE SCREEN. Two reasons, and both were already true:
          `page.estate` declares a block filtering `state is live, cycle is monthly`, and filtering an
          unindexed field is the thing `query.scan` exists to notice — so the declaration was asking

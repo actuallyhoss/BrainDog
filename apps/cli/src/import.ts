@@ -28,7 +28,7 @@ import { refused, type Result } from '@braindog/ports';
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
-import { KEY_PREFIX, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
+import { KEY_PREFIX, OPTIONAL, ORDER, draftSetup, holdsKey, PROVIDED_BY, isRef, planLegacyTool, readLegacyTool, readSetup, type Plan, type PlannedRow, type Setup } from './legacy.ts';
 import type { AgentIo } from './skills.ts';
 
 import { createClient } from '@braindog/client';
@@ -64,6 +64,8 @@ export type Report = {
   refused: { label: string; register: string; fix: string }[];
   /** Example rows setting up planted, found in the lists the import writes to: the report suggests clearing them on Home. */
   examples: number;
+  /** What happened to each planned row, by its key: the report lists dates, domains and services one by one. */
+  outcomes: Record<string, 'added' | 'updated' | 'unchanged' | 'refused'>;
   plan: Plan;
 };
 
@@ -80,6 +82,7 @@ const NAMES: Readonly<Record<string, string>> = {
   credentials: 'Keys (the index only)',
   accounts: 'Accounts',
   obligations: 'Money in and out',
+  services: 'Services',
   organisations: 'Organisations',
   session: 'Agent runs',
 };
@@ -125,18 +128,38 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
  * Apply a plan through a door. Refs are resolved to the id of the row they name once it is written; a ref to a row in
  * the same list written later is set in a second pass.
  */
-export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
-  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], examples: 0, plan };
-  const registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
+export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
+  let plan = given;
+  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], examples: 0, outcomes: {}, plan };
+  let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
+  const absent: string[] = [];
   for (const register of registers) {
     const has = await door.schema(register);
     if (!has.ok) {
       if (unreachable(has)) throw new Unreachable();
-      report.missing.push(register);
+      if (OPTIONAL.has(register)) absent.push(register);
+      else report.missing.push(register);
     }
   }
   if (report.missing.length > 0) return report;
+  /* A LIST THIS RECORD DOES NOT HAVE AND DOES NOT NEED: its rows are left out, each named, with what installing adds them. */
+  if (absent.length > 0) {
+    const out = plan.rows.filter((r) => absent.includes(r.register));
+    plan = {
+      ...plan,
+      rows: plan.rows.filter((r) => !absent.includes(r.register)),
+      skipped: [
+        ...plan.skipped,
+        ...absent.map((register) => ({
+          reason: `This BrainDog has no ${NAMES[register] ?? register} list. Install ${PROVIDED_BY[register] ?? register} beside Solo founder, then run the import again to bring these in`,
+          items: out.filter((r) => r.register === register).map((r) => r.label),
+        })),
+      ],
+    };
+    report.plan = plan;
+    registers = registers.filter((r) => !absent.includes(r));
+  }
 
   const ids = new Map<string, string>();
   const existing = new Map<string, Row>();
@@ -180,6 +203,7 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
       const create = row.register === 'session' ? fields : { ...fields, tags: [row.key] };
       if (o.dryRun) {
         tally.added++;
+        report.outcomes[row.key] = 'added';
         ids.set(row.key, `(new ${row.key})`);
         continue;
       }
@@ -187,12 +211,14 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
       if (!made.ok) {
         if (unreachable(made)) throw new Unreachable();
         report.refused.push({ label: row.label, register: row.register, fix: fixOf(made) });
+        report.outcomes[row.key] = 'refused';
         continue;
       }
       const value = made.value as Row;
       ids.set(row.key, value.id);
       existing.set(row.key, value);
       tally.added++;
+      report.outcomes[row.key] = 'added';
       continue;
     }
 
@@ -200,9 +226,11 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
     for (const [field, value] of Object.entries(fields)) if (stable(found.fields[field]) !== stable(value)) patch[field] = value;
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
+      report.outcomes[row.key] = 'unchanged';
       continue;
     }
     report.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
+    report.outcomes[row.key] = 'updated';
     if (o.dryRun) {
       tally.updated++;
       continue;
@@ -211,6 +239,7 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
     if (!done.ok) {
       if (unreachable(done)) throw new Unreachable();
       report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
+      report.outcomes[row.key] = 'refused';
       continue;
     }
     existing.set(row.key, done.value as Row);
@@ -327,6 +356,19 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
   if (plan.polls.length > 0)
     lines.push(`Polls: ${String(report.polls.filed)} ${o.dryRun ? 'would be filed' : 'filed'} on Decide for you to approve, ${String(report.polls.before)} filed before.`);
+  const estate = plan.rows.filter((r) => /^legacy:(date|domain|service):/u.test(r.key));
+  if (estate.length > 0) {
+    lines.push('', 'Dates, domains and services:');
+    const kind = (r: PlannedRow) => (r.key.startsWith(`${KEY_PREFIX}date:`) ? 'Date' : r.key.startsWith(`${KEY_PREFIX}domain:`) ? 'Domain' : 'Service');
+    const outcome = (r: PlannedRow) => {
+      const was = report.outcomes[r.key];
+      if (was === 'added') return o.dryRun ? 'would be added' : 'added';
+      if (was === 'updated') return o.dryRun ? 'would be updated' : 'updated';
+      if (was === 'refused') return 'refused';
+      return 'unchanged';
+    };
+    for (const r of estate) lines.push(`- ${kind(r)}: ${r.label}, ${outcome(r)} (${NAMES[r.register] ?? r.register}).`);
+  }
   if (report.changes.length > 0) {
     lines.push('', o.dryRun ? 'What would change:' : 'What changed:');
     const most = 40;
