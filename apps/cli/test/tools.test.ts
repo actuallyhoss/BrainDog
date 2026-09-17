@@ -344,6 +344,26 @@ test('A GLOBAL SERVER FOUND FROM A PROJECT RUN is proposed with names only, once
   nowhere(h, [token]);
 });
 
+test('SEVERAL GLOBAL SERVERS FOUND FROM A PROJECT RUN are one question with a row each, asked once, and a new one later is asked alone', async (t) => {
+  const h = await setup(t, { project: true, grant: true });
+  const servers: Record<string, unknown> = {};
+  for (const name of ['fenwick', 'lantern', 'quill']) servers[name] = { command: `${name}-mcp` };
+  writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: servers }));
+
+  assert.deepEqual(await h.scan({ dryRun: true }), ['3 tools in ~/.claude.json (fenwick, lantern, quill) would be proposed together as tools everywhere, with their keys by name only.']);
+  assert.deepEqual(await h.scan(), ['3 tools in ~/.claude.json apply everywhere and this run is in a project, so recording them was proposed together as SG1, and their keys were not deposited.']);
+  assert.equal(h.of('propose').length, 1);
+  const asked = h.of('propose')[0]!.args as { question: string; body: { rows: { name: string }[] } };
+  assert.match(asked.question, /^Record 3 MCP servers from ~\/\.claude\.json on .+ as tools everywhere: fenwick, lantern, quill\? Accept them all, or pick which\.$/);
+  assert.deepEqual(asked.body.rows.map((r) => r.name), ['fenwick', 'lantern', 'quill']);
+  assert.deepEqual(await h.scan(), [], 'the set is not asked again');
+
+  servers.kestrel = { command: 'kestrel-mcp' };
+  writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: servers }));
+  assert.deepEqual(await h.scan(), ['Tool kestrel in ~/.claude.json applies everywhere and this run is in a project, so recording it was proposed as SG2, and its keys were not deposited.']);
+  assert.deepEqual(h.of('create'), []);
+});
+
 test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once per shape, and a mapped key is not deposited again', async (t) => {
   const h = await setup(t, { project: true, grant: true });
   const token = fakeValue();

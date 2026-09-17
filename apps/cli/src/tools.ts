@@ -321,6 +321,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   const keysSaid = (n: { deposited: number; would: number }) =>
     n.deposited > 0 ? `, with ${String(n.deposited)} key${n.deposited === 1 ? '' : 's'} deposited` : n.would > 0 ? `, and ${String(n.would)} key${n.would === 1 ? '' : 's'} would be deposited` : '';
 
+  const everywhere: { f: Found; key: string; shape: string; row: Record<string, unknown> }[] = [];
   try {
     const projectServers = [...found.values()].filter((f) => f.scope === 'project');
     if (project === null && projectServers.length > 0)
@@ -342,25 +343,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
           continue;
         }
         if (f.scope === 'global' && project !== null) {
-          /* A run in a project cannot create a row that applies everywhere, so it asks, with names only. */
+          /* A run in a project cannot create a row that applies everywhere, so it asks, with names only, and all of
+             them in one question once the loop is done: a first run on a machine with seven servers asked seven. */
           if (lock.asked[key] === shape) continue;
           const { needs } = await needsFor(f, [], false);
-          if (s.dryRun) {
-            lines.push(`Tool ${f.name} in ${f.source} would be proposed as a tool everywhere, with its keys by name only.`);
-            continue;
-          }
-          const out = await s.client.call<{ id: string }>('propose', {
-            question: `Record the ${f.name} MCP server from ${f.source} on ${machine} as a tool everywhere?`,
-            body_kind: 'rowset',
-            body: { register: 'tools', rows: [fieldsOf(f, needs, machine, now)] },
-          });
-          const made = valueOf(out);
-          if (made === null || typeof made.id !== 'string') {
-            lines.push(`Tool ${f.name} in ${f.source} was not proposed: ${fixOf(out)}`);
-            continue;
-          }
-          lock.asked[key] = shape;
-          lines.push(`Tool ${f.name} in ${f.source} applies everywhere and this run is in a project, so recording it was proposed as ${made.id}, and its keys were not deposited.`);
+          everywhere.push({ f, key, shape, row: fieldsOf(f, needs, machine, now) });
           continue;
         }
         const n = await needsFor(f, [], allow);
@@ -421,6 +408,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       lock.asked[key] = shape;
       lines.push(`Tool ${f.name} in ${f.source} differs from ${row.spoken}, so the row was left and the change was proposed as ${made.id}${keysSaid(n)}.`);
     }
+    if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
   } catch (e) {
     if (!(e instanceof Stopped)) throw e;
     lines.push('BrainDog stopped answering part way, so the rest of the tools wait for the next scan.');
@@ -450,6 +438,35 @@ function fieldsOf(f: Found, needs: string[], machine: string, now: number): Reco
     seen: new Date(now).toISOString(),
     origin: `${f.source} on ${machine}`.slice(0, 280),
   };
+}
+
+/**
+ * The one question for every server that applies everywhere and was found from a run in a project, and the line saying
+ * what became of it. One server keeps its own sentence; several are one rowset, accepted whole or row by row on Decide.
+ */
+async function askEverywhere(client: Client, asks: { f: Found; key: string; shape: string; row: Record<string, unknown> }[], lock: ToolsLock, machine: string, dryRun: boolean): Promise<string> {
+  const [first] = asks;
+  const one = asks.length === 1 && first !== undefined ? first.f : null;
+  const sources = [...new Set(asks.map((a) => a.f.source))].join(' and ');
+  const names = asks.map((a) => a.f.name).join(', ');
+  if (dryRun)
+    return one
+      ? `Tool ${one.name} in ${one.source} would be proposed as a tool everywhere, with its keys by name only.`
+      : `${String(asks.length)} tools in ${sources} (${names}) would be proposed together as tools everywhere, with their keys by name only.`;
+  const out = await client.call<{ id: string }>('propose', {
+    question: one
+      ? `Record the ${one.name} MCP server from ${one.source} on ${machine} as a tool everywhere?`
+      : `Record ${String(asks.length)} MCP servers from ${sources} on ${machine} as tools everywhere: ${names}? Accept them all, or pick which.`,
+    body_kind: 'rowset',
+    body: { register: 'tools', rows: asks.map((a) => a.row) },
+  });
+  const made = valueOf(out);
+  if (made === null || typeof made.id !== 'string')
+    return one ? `Tool ${one.name} in ${one.source} was not proposed: ${fixOf(out)}` : `${String(asks.length)} tools in ${sources} were not proposed: ${fixOf(out)}`;
+  for (const a of asks) lock.asked[a.key] = a.shape;
+  return one
+    ? `Tool ${one.name} in ${one.source} applies everywhere and this run is in a project, so recording it was proposed as ${made.id}, and its keys were not deposited.`
+    : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so recording them was proposed together as ${made.id}, and their keys were not deposited.`;
 }
 
 /* ── write ─────────────────────────────────────────────────────────────── */

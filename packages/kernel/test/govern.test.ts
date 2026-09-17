@@ -148,6 +148,30 @@ test('A DECISION IS A ROW, AND THE CHANGE IT AUTHORISED IS IN ITS TRANSACTION', 
   sql.close();
 });
 
+test('SOME ROWS OF A ROWSET: the rows picked are written, the rest declined by the same decision, and a bad pick is refused', async () => {
+  const { k, sql } = await record();
+  const three = rowset([{ what: 'Invoice 41', state: 'open' }, { what: 'Invoice 42', state: 'open' }, { what: 'Invoice 43', state: 'open' }]);
+  const made = value<{ id: string }>(k.propose(three, 'p_1'));
+  for (const rows of [[], [3], [-1], [0, 0], [1.5]])
+    assert.equal(refusal(k.decide(made.id, { decide: { option: 'accept', reason: 'some', rows } }, 'p_2')).at, 'rows', JSON.stringify(rows));
+  assert.equal(refusal(k.decide(made.id, { decide: { option: 'reject', reason: 'none', rows: [0] } }, 'p_2')).at, 'rows');
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
+
+  const out = value<{ decision: string; wrote: string[] }>(k.decide(made.id, { decide: { option: 'accept', reason: 'only these two', rows: [2, 0] } }, 'p_2'));
+  assert.equal(out.wrote.length, 2);
+  assert.deepEqual(
+    [1, 2].map((n) => k.get(`obligations#${n}`)?.fields.what),
+    ['Invoice 41', 'Invoice 43'],
+  );
+  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'resolved');
+  const said = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'decide'")!;
+  assert.deepEqual(JSON.parse(said.to_v).rows, [0, 2]);
+
+  const options_ = value<{ id: string }>(k.propose(options, 'p_1'));
+  assert.equal(refusal(k.decide(options_.id, { decide: { option: 'accept', reason: 'x', rows: [0] } }, 'p_2')).at, 'rows');
+  sql.close();
+});
+
 test('A DECISION CARRIES ITS REASON, and a gate without one is a gate nobody can revisit', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(k.propose(options, 'p_1'));

@@ -671,7 +671,11 @@ export type Decided = {
 };
 
 export type Verdict =
-  | { decide: { option: string; reason: string } }
+  /**
+   * `rows`, on accepting a `rowset` only: the rows to write, by their place in the body from 0. The rest are declined
+   * with the same decision, so a proposal of seven servers can take three. Leaving it out accepts every row.
+   */
+  | { decide: { option: string; reason: string; rows?: number[] } }
   | { defer: { until: string; why: string } }
   | { resolved_as: 'wont-fix' | 'incorrect'; reason?: string };
 
@@ -771,6 +775,18 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       allowed: ['accept', 'reject'],
     });
 
+  /* SOME OF A ROWSET, BY PLACE. Accepted rows are written and the rest are declined by this one decision. */
+  const picked = 'decide' in verdict ? verdict.decide.rows : undefined;
+  let only: Set<number> | null = null;
+  if (picked !== undefined) {
+    const count = Array.isArray(body.rows) ? body.rows.length : 0;
+    if (row.body_kind !== 'rowset' || option !== 'accept')
+      return no<Decided>('VALUE_MALFORMED', 'rows picks which rows of a rowset to accept, so it goes only with accept on a rowset.', { at: 'rows' });
+    if (!Array.isArray(picked) || picked.length === 0 || picked.some((n) => !Number.isInteger(n) || n < 0 || n >= count) || new Set(picked).size !== picked.length)
+      return no<Decided>('OUT_OF_BOUNDS', `rows names the rows to accept by place, each once, from 0 to ${String(count - 1)}. To accept none, reject it.`, { at: 'rows' });
+    only = new Set(picked);
+  }
+
   const wrote: string[] = [];
   let install: Record<string, unknown> | undefined;
   let apply: Decided['apply'];
@@ -780,7 +796,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       const batch = deps.mint();
       const register = String(body.register);
       const mechanism = typeof body.ingest === 'string' ? `ingest:${body.ingest}` : actor;
-      for (const r of (body.rows ?? []) as Record<string, unknown>[]) {
+      for (const [n, r] of ((body.rows ?? []) as Record<string, unknown>[]).entries()) {
+        if (only !== null && !only.has(n)) continue;
         /* AN UPDATE IS SIGNED BY THE PERSON DECIDING, whoever drew the proposal, because changing a
            row that exists is what their press authorised. A row a rowset creates keeps the ingest's
            name when an ingest produced it. */
@@ -837,7 +854,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   /* AND THE LINES THAT PRESS APPROVED, word for word, so "what did I agree to send" has an answer that does not depend
      on the declaration staying as it was. */
   const approved = option === 'accept' && row.body_kind === 'change' && Array.isArray(body.approve) ? { approved: body.approve } : {};
-  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved }));
+  event(deps, at, actor, 'decide', `decision:${decision}`, 'decision', JSON.stringify({ question, answer: option, ...approved, ...(only === null ? {} : { rows: [...only].sort((a, b) => a - b) }) }));
   event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason);
 
   return ok({

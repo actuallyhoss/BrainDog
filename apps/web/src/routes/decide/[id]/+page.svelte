@@ -47,6 +47,7 @@
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
   import { updatesOf, words as changeWords } from './changes.ts';
+  import { pickableOf, rowsToSend, words as pickWords } from './picked.ts';
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
@@ -81,6 +82,7 @@
     /* An answer for a question somebody has already navigated away from draws nothing. */
     if (String(page.params.id) !== id) return closed(true, at);
     live = out.from === 'live' ? out.value : null;
+    unticked = [];
     refusal = out.from === 'refused' ? out.fix : '';
     from = out.from;
     closed(out.from !== 'refused', at);
@@ -151,6 +153,12 @@
   /** Highlighted, not chosen. The two are different states and the interface says so. */
   let highlighted = $state<string | null>(null);
   let committing = $state<string | null>(null);
+
+  /* A PROPOSAL THAT ADDS SEVERAL ROWS, one tick each: Accept takes the ticked ones and declines the rest. */
+  const pickable = $derived(from === 'live' && live?.about ? pickableOf(live.about.kind, live.about.body) : []);
+  let unticked = $state<number[]>([]);
+  const picked = $derived(rowsToSend(pickable.length, unticked));
+  const noneTicked = $derived(committing === 'accept' && pickable.length > 0 && picked === null);
   /**
    * Deferring is a DECISION about when, and it takes a reason like every other one.
    *
@@ -303,7 +311,7 @@
     sending = true;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
-    const out = await answerQuestion(location.origin, a.question, a.option, reason);
+    const out = await answerQuestion(location.origin, a.question, a.option, reason, undefined, a.option === 'accept' && picked ? picked : undefined);
     sending = false;
     /* AN ARRANGEMENT THAT DID NOT ALL LAND. The record reopened the question, so the options come back under what was
        done and what was not, and the rail reads again for what did land. */
@@ -469,6 +477,32 @@
       </section>
     {/if}
 
+    {#if pickable.length && !settled && !live?.closed}
+      <section class="changed">
+        <div class="options-head">
+          <h2 class="options-title">{pickWords.heading}</h2>
+        </div>
+        <p class="pick-hint">{pickWords.hint}</p>
+        <ul class="picks">
+          {#each pickable as row (row.n)}
+            <li>
+              <label class="pick">
+                <input
+                  type="checkbox"
+                  checked={!unticked.includes(row.n)}
+                  aria-label={pickWords.keep(row.title)}
+                  onchange={(e) => (unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n])}
+                />
+                <span class="pick-title">{row.title}</span>
+                {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
+              </label>
+            </li>
+          {/each}
+        </ul>
+        {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+      </section>
+    {/if}
+
     {#if updates.length}
       <section class="changed">
         <div class="options-head">
@@ -611,7 +645,7 @@
           <div class="commit-actions">
             <Button
               weight="primary"
-              disabled={!reason.trim() || sending}
+              disabled={!reason.trim() || sending || noneTicked}
               aria-describedby={reason.trim() ? undefined : 'commit-why'}
               onclick={commit}
             >
@@ -625,6 +659,7 @@
                  next press is the irreversible one. -->
             {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
           </div>
+          {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
           {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
           <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
                gone: this panel is replaced by the settled block the moment the press lands, and the
@@ -692,6 +727,38 @@
     font-family: var(--font-ui);
     font-size: var(--t-ui);
     font-weight: 500;
+  }
+
+  .picks {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+  }
+
+  .pick-title {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .pick-detail,
+  .pick-hint {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .pick-hint {
+    margin: 0 0 var(--sp-2);
   }
 
   .calls-out {

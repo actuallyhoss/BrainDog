@@ -22,7 +22,8 @@ import { copy } from '../copy.ts';
 import { forget, type Fetch } from './boot-live.ts';
 import { noRecord } from './device.ts';
 
-export type Verdict = { decide: { option: string; reason: string } } | { defer: { until: string; why: string } };
+/** `rows`: on accepting a proposal that adds several rows, the places of the ones ticked; the rest are declined. */
+export type Verdict = { decide: { option: string; reason: string; rows?: number[] } } | { defer: { until: string; why: string } };
 
 export type Written =
   | { from: 'written'; decision: string | null; applied?: Record<string, string[]> }
@@ -38,7 +39,7 @@ function missing(verdict: Verdict): string | null {
 
 const trimmed = (verdict: Verdict): Verdict =>
   'decide' in verdict
-    ? { decide: { option: verdict.decide.option, reason: verdict.decide.reason.trim() } }
+    ? { decide: { option: verdict.decide.option, reason: verdict.decide.reason.trim(), ...(verdict.decide.rows ? { rows: verdict.decide.rows } : {}) } }
     : { defer: { until: verdict.defer.until, why: verdict.defer.why.trim() } };
 
 /** Send one verdict on suggestion `id`. */
@@ -59,9 +60,9 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
   return { from: 'refused', fix: out.refusal.fix };
 }
 
-/** Answer one with an option and the reason `decide` requires. */
-export const answerQuestion = (base: string, id: string, option: string, reason: string, io?: Fetch): Promise<Written> =>
-  writeDecision(base, id, { decide: { option, reason } }, io);
+/** Answer one with an option and the reason `decide` requires, and on accepting some rows of several, which. */
+export const answerQuestion = (base: string, id: string, option: string, reason: string, io?: Fetch, rows?: number[]): Promise<Written> =>
+  writeDecision(base, id, { decide: { option, reason, ...(rows ? { rows } : {}) } }, io);
 
 /** Park one until a day, with why it can wait. */
 export const parkQuestion = (base: string, id: string, until: string, why: string, io?: Fetch): Promise<Written> =>

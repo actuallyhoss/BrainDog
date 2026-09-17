@@ -80,3 +80,11 @@ test('no record behind the screen is gone, with a sentence: nothing answering, a
   const page = host(() => new Response('<h1>Not found</h1>', { status: 404, headers: { 'content-type': 'text/html' } }));
   assert.equal((await parkQuestion(BASE, 'SG2', '2026-10-01', 'Later.', page.io)).from, 'gone');
 });
+
+test('accepting some rows of several sends their places beside the option, and accepting all sends none', async () => {
+  const { io, sent } = host(() => json(200, { ok: true, value: { decision: 'D8', suggestion: 'SG6', status: 'resolved', wrote: ['e_1'] } }));
+  assert.deepEqual(await answerQuestion(BASE, 'SG6', 'accept', 'Only the two I use.', io, [0, 2]), { from: 'written', decision: 'D8' });
+  assert.deepEqual(sent[0]!.body, { id: 'SG6', decide: { option: 'accept', reason: 'Only the two I use.', rows: [0, 2] } });
+  await answerQuestion(BASE, 'SG7', 'accept', 'All of them.', io);
+  assert.deepEqual(sent[1]!.body, { id: 'SG7', decide: { option: 'accept', reason: 'All of them.' } });
+});
