@@ -35,6 +35,7 @@ export { RUNS, TASKS, TRACKS, UPDATES } from './modules/work.ts';
 
 import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import { ACCOUNTS, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
+export { MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
 import { PEOPLE, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';

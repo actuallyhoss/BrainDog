@@ -18,6 +18,8 @@ import {
   PAGES as SEED_PAGES,
   ROWS as SEED_ROWS,
   REGISTERS as SEED_REGISTERS,
+  METRICS as SEED_METRICS,
+  targetConfigOf,
   day,
   projectWithRunsOn,
   stamp,
@@ -662,19 +664,13 @@ export const PACKS: PackInfo[] = [
 ];
 
 /**
- * The settings the sample's Money add-on declares, one of each of the six types, so `/packs/money-core`
+ * The settings the sample's Money add-on declares, the ones the real pack does, so `/packs/money-core`
  * draws a whole form with no record behind it. Every other sample add-on declares none.
  */
-export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number'; values?: readonly string[]; default?: unknown; label?: string }>>> = {
-  'money-core': {
-    heading: { type: 'text', label: 'Page heading', default: 'Money' },
-    reminders: { type: 'enum', label: 'Reminders', values: ['weekly', 'monthly', 'never'], default: 'weekly' },
-    digest_day: { type: 'enum', label: 'Digest day', values: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], default: 'mon' },
-    chase_overdue: { type: 'bool', label: 'Chase overdue invoices', default: true },
-    late_fee: { type: 'money', label: 'Late fee', default: { amount: 4000, currency: 'GBP' } },
-    year_end: { type: 'day', label: 'Year end', default: '2027-04-05' },
-    lead_time: { type: 'duration', label: 'Remind before due', default: 604_800 },
-  },
+export const PACK_SETTINGS: Readonly<Record<string, Record<string, { type: 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number'; values?: readonly string[]; default?: unknown; label?: string; note?: string }>>> = {
+  /* THE SETTINGS MONEY SHIPS WITH, read from the metrics it declares as the record's pack reads them (`targetConfigOf`):
+     the six targets a person changes later, each starting at the figure's own target. */
+  'money-core': targetConfigOf(Object.values(SEED_METRICS) as unknown as Record<string, unknown>[]) as never,
 };
 
 /* ── scheduled actions ───────────────────────────────────────────────────── */

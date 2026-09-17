@@ -30,6 +30,7 @@ import {
   type PackState,
 } from './packs.ts';
 import { copy } from '../copy.ts';
+import { firstPartyDocument, MONEY_TARGET_SETTINGS } from '@braindog/seed';
 
 const AT = '2026-09-15T12:00:00.000Z';
 
@@ -184,23 +185,51 @@ const settingsOf = async (): Promise<PackConfig> => value(await sample(() => AT)
 const draftsOf = (s: PackConfig): Record<string, Draft> =>
   Object.fromEntries(Object.entries(s.config).map(([k, d]) => [k, draftOf(d, s.values[k])]));
 
-test('THE SAMPLE DECLARES ONE OF EACH TYPE ON ONE ADD-ON, AND NONE ON THE OTHERS', async () => {
+/* ONE SETTING OF EACH OTHER TYPE, for the controls a first-party pack does not use yet. */
+const EVERY_TYPE: PackConfig = {
+  id: 'ledger',
+  version: '1.0.0',
+  config: {
+    heading: { type: 'text', label: 'Page heading', default: 'Money' },
+    reminders: { type: 'enum', label: 'Reminders', values: ['weekly', 'monthly', 'never'], default: 'weekly' },
+    chase_overdue: { type: 'bool', label: 'Chase overdue invoices', default: true },
+    late_fee: { type: 'money', label: 'Late fee', default: { amount: 4000, currency: 'GBP' } },
+    year_end: { type: 'day', label: 'Year end', default: '2027-04-05' },
+    lead_time: { type: 'duration', label: 'Remind before due', default: 604_800 },
+  },
+  values: { heading: 'Money', reminders: 'monthly', chase_overdue: true, late_fee: { amount: 4000, currency: 'GBP' }, year_end: '2027-04-05', lead_time: 604_800 },
+};
+
+test("THE SAMPLE'S MONEY DECLARES THE SIX TARGETS THE REAL PACK DOES, AND THE OTHERS NONE", async () => {
   const s = sample(() => AT);
   const money = value(await s.config('money-core'));
-  assert.deepEqual(Object.values(money.config).map((d) => d.type).sort(), ['bool', 'day', 'duration', 'enum', 'enum', 'money', 'text']);
-  assert.deepEqual(money.values.late_fee, { amount: 4000, currency: 'GBP' });
+  const doc = firstPartyDocument('money-core') as { config: Record<string, unknown> };
+  assert.deepEqual(money.config, doc.config, 'the sample and the pack a record installs declare different settings');
+  assert.deepEqual(Object.keys(money.config).sort(), Object.values(MONEY_TARGET_SETTINGS).map((t) => t.setting).sort());
+  assert.deepEqual(money.values.most_out_30d, { amount: 5_000_000, currency: 'GBP' });
+  assert.equal(money.values.most_days_late, 14);
   assert.deepEqual(value(await s.config('people')).config, {});
   const none = await s.config('no-such-pack');
   assert.equal(none.ok ? '' : none.refusal.code, 'DECLARATION_UNKNOWN');
 });
 
 test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async () => {
-  const s = await settingsOf();
+  const money = await settingsOf();
+  const targets = draftsOf(money);
+  assert.equal(targets.most_out_30d?.text, '50000.00');
+  assert.equal(targets.most_days_late?.text, '14');
+  assert.deepEqual(changesOf(money, targets), { values: {}, wrong: {} });
+  assert.deepEqual(
+    changesOf(money, { ...targets, most_out_30d: { ...targets.most_out_30d!, text: '1000' }, most_days_late: { ...targets.most_days_late!, text: '7' } }).values,
+    { most_out_30d: { amount: 100_000, currency: 'GBP' }, most_days_late: 7 },
+  );
+
+  const s = EVERY_TYPE;
   const drafts = draftsOf(s);
   assert.equal(drafts.late_fee?.text, '40.00');
   assert.deepEqual([drafts.lead_time?.text, drafts.lead_time?.unit], ['7', 'days']);
   assert.equal(drafts.chase_overdue?.on, true);
-  assert.equal(drafts.digest_day?.text, 'mon');
+  assert.equal(drafts.reminders?.text, 'monthly');
   assert.deepEqual(changesOf(s, drafts), { values: {}, wrong: {} });
 
   const edited: Record<string, Draft> = {
@@ -218,25 +247,25 @@ test('EACH CONTROL STARTS FROM ITS VALUE, AND SAVE SENDS ONLY WHAT MOVED', async
 
 test('THE DEMO SAVES IN THE TAB AND SAYS NOTHING WAS SAVED; RESET PUTS THE DEFAULT BACK', async () => {
   const s = sample(() => AT);
-  const saved = value(await s.setConfig('money-core', { reminders: 'monthly', late_fee: { amount: 5000, currency: 'GBP' } }));
-  assert.deepEqual(saved.changed, ['reminders', 'late_fee']);
-  assert.equal(saved.said, copy.notWritten(words.changed(['Reminders', 'Late fee'])));
-  assert.equal(value(await s.config('money-core')).values.reminders, 'monthly');
-  assert.ok(!isDefault(saved.config.reminders!, saved.values.reminders));
+  const saved = value(await s.setConfig('money-core', { most_days_late: 7, most_out_30d: { amount: 100_000, currency: 'GBP' } }));
+  assert.deepEqual(saved.changed, ['most_out_30d', 'most_days_late']);
+  assert.equal(saved.said, copy.notWritten(words.changed(['Most going out in 30 days', 'Most days money in may be late'])));
+  assert.equal(value(await s.config('money-core')).values.most_days_late, 7);
+  assert.ok(!isDefault(saved.config.most_days_late!, saved.values.most_days_late));
 
-  const reset = value(await s.setConfig('money-core', { reminders: null }));
-  assert.deepEqual(reset.changed, ['reminders']);
-  assert.equal(reset.values.reminders, 'weekly');
-  assert.ok(isDefault(reset.config.reminders!, reset.values.reminders));
-  assert.deepEqual(reset.values.late_fee, { amount: 5000, currency: 'GBP' }, 'a reset of one setting moved another');
+  const reset = value(await s.setConfig('money-core', { most_days_late: null }));
+  assert.deepEqual(reset.changed, ['most_days_late']);
+  assert.equal(reset.values.most_days_late, 14);
+  assert.ok(isDefault(reset.config.most_days_late!, reset.values.most_days_late));
+  assert.deepEqual(reset.values.most_out_30d, { amount: 100_000, currency: 'GBP' }, 'a reset of one setting moved another');
 });
 
 test('A REFUSAL NAMES ITS SETTING, AND THE SESSION RULES ARE ANSWERED BY SIGNING IN AGAIN', async () => {
   const s = sample(() => AT);
-  const enumWrong = await s.setConfig('money-core', { reminders: 'hourly' });
-  assert.ok(!enumWrong.ok);
-  assert.equal(enumWrong.refusal.code, 'ENUM_VALUE_UNKNOWN');
-  assert.equal(fieldAt(enumWrong.refusal), 'reminders');
+  const unnamed = await s.setConfig('money-core', { reminders: 'hourly' });
+  assert.ok(!unnamed.ok);
+  assert.equal(unnamed.refusal.code, 'FIELD_UNKNOWN');
+  assert.equal(fieldAt(unnamed.refusal), 'reminders');
   const unknown = await s.setConfig('people', { colour: 'dark' });
   assert.ok(!unknown.ok);
   assert.deepEqual([unknown.refusal.code, unknown.refusal.fix], ['FIELD_UNKNOWN', 'people declares no settings.']);
@@ -261,7 +290,7 @@ test('WITH NO RECORD THE SETTINGS ARE THE SAMPLE’S, AND A LIVE SAVE SENDS setP
 
   const none = await openSettings(caller({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'x' } }), 'money-core', true);
   assert.equal(none.source.sample, true);
-  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 7);
+  assert.ok(none.first.ok && Object.keys(none.first.value.config).length === 6);
 
   const live: PackConfig = { id: 'ledger', version: '1.0.0', config: { cadence: { type: 'enum', values: ['weekly', 'monthly'] } }, values: { cadence: 'monthly' } };
   const yes = await openSettings(caller({ ok: true, value: live }), 'ledger', false);
