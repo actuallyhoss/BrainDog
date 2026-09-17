@@ -153,6 +153,8 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox' },
   { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
+  /* SPARK'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
+  { id: 'c-spark', title: 'Spark', href: '/spark', group: copy.destinations, icon: 'star' },
   { id: 'c-settings', title: copy.settings, href: '/settings/appearance', group: copy.destinations, icon: 'settings' },
   /* THE FRONT DOOR, WHICH NOTHING LINKED TO. A screen with no way in is the same as no screen,
      and the palette is `19 §4`'s primary way to reach one. */
