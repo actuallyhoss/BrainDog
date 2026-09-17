@@ -32,12 +32,21 @@
   import InstallShared from './InstallShared.svelte';
   import CatalogueUpdates from './CatalogueUpdates.svelte';
   import { catalogueTitles, readHostCatalogue } from './browse/catalogue.ts';
+  import { moduleName } from '@braindog/seed/usecases/names';
 
   /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
   const byId = new Map(PACKS.map((p) => [p.id, p]));
   /* AN ADD-ON FROM THIS BRAINDOG'S CATALOGUE is not in `PACKS`, so its catalogue title names it, and its id only when neither knows it. */
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
-  const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? id;
+  /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
+  const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
+  /* A LIST BY THE NAME THIS RECORD GIVES IT: a use case's own lists are not in the sample, and read `datapoints` without this. */
+  const listName = (r: string): string =>
+    REGISTERS[r]?.name ??
+    ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ??
+    r.charAt(0).toUpperCase() + r.slice(1).replaceAll('_', ' ');
+  /* The first-party author reads as the product's name. */
+  const authorName = (a: string): string => (a === 'braindog' ? copy.product : a);
 
   let states = $state<PackState[] | null>(null);
   let refused = $state<Refusal | null>(null);
@@ -392,7 +401,7 @@
                  of the product says Obligations and Overview, on the one screen whose whole job is
                  to tell somebody what they are about to install. A pack that is NOT installed names
                  things this record does not have yet, so the id is the honest fallback there. -->
-            {#each state.registers as r}<li><Icon name="rows" size="s" />{REGISTERS[r]?.name ?? r}</li>{/each}
+            {#each state.registers as r}<li><Icon name="rows" size="s" />{listName(r)}</li>{/each}
             {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
@@ -402,7 +411,7 @@
                 <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
                 <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => turn(block.id, false, block.also)}>{copy.packOffTogether(block.also.length)}</Button>
               {:else if block.kind === 'scopes'}
-                <span>{copy.packScopesInUse(block.registers.map((r) => REGISTERS[r]?.name ?? r))}</span>
+                <span>{copy.packScopesInUse(block.registers.map(listName))}</span>
               {:else if block.kind === 'off'}
                 <span>{copy.packIsOff(nameOf(block.pack))}</span>
                 <Button weight="quiet" disabled={busy !== null} onclick={() => turn(block.pack, true)}>{copy.packTurnOn(nameOf(block.pack))}</Button>
@@ -473,7 +482,7 @@
         {#each available as pack}
           <li>
             <div class="line">
-              <span class="seq">{pack.author}</span>
+              <span class="seq">{authorName(pack.author)}</span>
               <span class="line-main">
                 <span class="line-title">{pack.name}</span>
                 <span class="line-detail">{pack.blurb}</span>
@@ -516,7 +525,7 @@
                  default. One sentence, always, next to the control it disables. -->
             {#if !live && pack.conflicts?.length}
               <p class="pack-refused" id="conflict-{pack.id}">
-                {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
+                {copy.diffRefused(pack.conflicts.map(listName))}
               </p>
             {/if}
             {#if offer?.id === pack.id}{@render offered(pack)}

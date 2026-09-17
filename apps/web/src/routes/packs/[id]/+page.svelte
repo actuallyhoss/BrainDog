@@ -48,10 +48,12 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { moduleName } from '@braindog/seed/usecases/names';
 
   const id = $derived(String(page.params.id));
   const pack = $derived(PACKS.find((p) => p.id === id));
-  const name = $derived(pack?.name ?? id);
+  /* A use case's pack by its use case, never `usecase-founder`. */
+  const name = $derived(pack?.name ?? moduleName(id));
 
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
   let refusal = $state('');
@@ -364,7 +366,7 @@
             <li>
               <a class="line" href="/r/{r}">
                 <span class="seq"><Icon name="rows" size="s" /></span>
-                <span class="line-main"><span class="line-title">{REGISTERS[r]?.name ?? r}</span></span>
+                <span class="line-main"><span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? r}</span></span>
                 <span class="line-amount"></span>
                 <span class="line-when"></span>
               </a>
