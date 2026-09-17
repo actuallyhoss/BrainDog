@@ -1493,6 +1493,20 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A STEP ON A PHONE IS ONE COLUMN. The three tracks above come after the phone query, so the date and the milestone
+     landed in the middle track under a step, each at its own indent. Under 400px they go under the title, from its start. */
+  @media (width < 400px) {
+    .list[data-kind='steps'] > .item {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .list[data-kind='steps'] .item-detail,
+    .list[data-kind='steps'] .item-state {
+      grid-column: 1;
+      text-align: start;
+    }
+  }
+
   .item-title {
     display: flex;
     align-items: center;

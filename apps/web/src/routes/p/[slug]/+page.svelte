@@ -1219,10 +1219,12 @@
 
     .block-slot :global(.block[data-form='lead'] .grid:has(> .cell:nth-child(4)) > .cell:not(:first-child)) {
       grid-template-areas:
-        'label glyph figure'
-        'note note figure';
-      /* THE LABEL KEEPS A FLOOR, so a figure in several currencies, which is long, does not squeeze it to a word a line. */
-      grid-template-columns: minmax(min(14ch, 45%), max-content) minmax(0, 1fr) minmax(0, auto);
+        'label glyph . figure'
+        'note note note figure';
+      /* THE LABEL IS NEVER SQUEEZED, so a figure in several currencies, which is long, breaks between its amounts instead
+         of the label going to a word a line. THE MARK SITS AGAINST ITS LABEL: it had the track after a 14ch floor, so on the
+         Guide at 390 the dot after "Steps to take" floated a third of the way across. The space between is its own track. */
+      grid-template-columns: max-content auto minmax(0, 1fr) minmax(0, auto);
       column-gap: var(--sp-2);
     }
 
