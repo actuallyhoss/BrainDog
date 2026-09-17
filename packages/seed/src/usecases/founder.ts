@@ -17,18 +17,18 @@ const HOLDS = ['things', 'people', 'accounts', 'obligations', 'tasks', 'tracks',
  * out, and thirty days against the thirty before. The record works the series out (`measures.ts` in the kernel), so a
  * year of hourly polls draws as fast as a week of them.
  */
-const numbers = (where: string | null, empty: string) => {
+const numbers = (where: string | null, empty: string, line: string) => {
   const said = ['source is not example', ...(where ? [where] : [])].join(', ');
   const columns = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }];
   return [
     { kind: 'stat', heading: 'The numbers', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
-    { kind: 'lines', heading: 'Thirty days against the thirty before', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
+    { kind: 'lines', heading: 'Thirty days against the thirty before', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty: line },
   ];
 };
 
 export const FOUNDER = {
   usecase: 'founder',
-  version: '1.3.0',
+  version: '1.3.1',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -210,7 +210,9 @@ export const FOUNDER = {
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
           },
-          ...numbers(null, 'No project has reported a number yet.'),
+          /* WORDED FOR A FIRST DAY WITH AN EXAMPLE BESIDE THEM: the example number shows under Latest numbers and is left out
+             here, so "no project has reported a number" read as wrong beside it. */
+          ...numbers(null, 'When a project reports a number, it shows here. Examples are left out.', 'Each measure draws a line once a project reports it.'),
           {
             kind: 'table',
             heading: 'Latest numbers',
@@ -262,7 +264,7 @@ export const FOUNDER = {
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
           },
-          ...numbers('organisation is {{name}}', 'Nothing has been reported for {{name}} yet.'),
+          ...numbers('organisation is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
           {
             kind: 'table',
             heading: 'Latest numbers',
@@ -292,7 +294,7 @@ export const FOUNDER = {
         requires: [...(projectTemplate(HOLDS).requires as string[]), 'register.datapoints'],
         blocks: [
           ...(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
-          ...numbers('thing is {{name}}', 'Nothing has been reported for {{name}} yet.'),
+          ...numbers('thing is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
           { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12 },
         ],
       },
