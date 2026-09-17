@@ -5,7 +5,7 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { day, days, hours, stamp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
+import { TODAY, day, days, hours, stamp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
 
 /* ── tasks ────────────────────────────────────────────────────────────────── */
 
@@ -71,6 +71,27 @@ export const RUNS: Fields[] = [
   { doing: 'Drafting the chaser for invoice 2026-041', agent: 'cursor', state: 'done', project: 'things#2', host: 'studio-desktop', last_seen: hours(26) },
   { doing: 'Kerning pass, lowercase', agent: 'claude', state: 'done', project: 'things#1', repo: 'kiln-type', host: 'kiln-mbp', last_seen: hours(34) },
 ];
+
+/**
+ * Sixty days of `open-tasks`, one point a day, as the daily snapshot would have written them.
+ *
+ * WORKED BACK FROM THE ROWS, as `cashSeries` is: a task open now was open on each of those days, and a finished one was
+ * open until the day it was finished. A task finished with no day was finished today. A live record has no such history:
+ * its line starts on the day Work is installed.
+ */
+export function openTasksSeries(back = 60): { at: string; value: number }[] {
+  const out: { at: string; value: number }[] = [];
+  for (let offset = -back; offset <= -1; offset++) {
+    const at = day(offset);
+    const open = TASKS.filter((t) => {
+      if (t.state !== 'done' && t.state !== 'dropped') return true;
+      const finished = typeof t.done_on === 'string' ? t.done_on : TODAY;
+      return finished > at;
+    }).length;
+    out.push({ at, value: open });
+  }
+  return out;
+}
 
 /* Five tracks, and the shape of the set is the point.
    Two are open and healthy, one is at risk, one is HOLDING (so no update is expected of it, and it
@@ -246,6 +267,7 @@ const LIVE = 'state is not done or dropped';
  * NOTHING HERE IS ABOUT ONE KIND OF PERSON. A student's homework and a team's cycle are the same five questions.
  */
 export const WORK_METRICS: Record<string, SeedMetric> = {
+  /* REMEMBERED DAILY, so Open draws how much work was open over the weeks and not only today's count. */
   'open-tasks': {
     metric: 'open-tasks',
     name: 'Open',
@@ -256,6 +278,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
+    snapshot: { grain: 'day', into: 'series.open-tasks' },
   },
   'tasks-due-7d': {
     metric: 'tasks-due-7d',
@@ -377,7 +400,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         heading: 'Right now',
         span: 12,
         cells: [
-          { metric: 'open-tasks', label: 'Open', note: '{{tasks-with-agents}} with an agent' },
+          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent' },
           { metric: 'tasks-waiting', label: 'Waiting on you', note: 'to check, or blocked' },
           { metric: 'tasks-due-7d', label: 'Due in 7 days', note: '{{tasks-overdue}} past their date' },
           { metric: 'tasks-done-7d', label: 'Done in 7 days', note: '{{tasks-done-7d-agents}} of them by an agent' },

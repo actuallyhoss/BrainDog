@@ -51,10 +51,11 @@ export { LOOKUPS, NOW, TODAY } from '@braindog/seed';
 
 /**
  * The sample's daily series, as a record's snapshots would hold them: ninety days of `cash-now`,
- * worked back from the paid rows (`@braindog/seed`'s `cashSeries`).
+ * worked back from the paid rows (`@braindog/seed`'s `cashSeries`), and sixty of `open-tasks`, worked back from the days
+ * tasks were finished (`openTasksSeries`).
  */
-export const SERIES: Record<string, readonly { at: string; value: number }[]> = { 'cash-now': cashSeries() };
-import { cashSeries } from '@braindog/seed';
+export const SERIES: Record<string, readonly { at: string; value: number }[]> = { 'cash-now': cashSeries(), 'open-tasks': openTasksSeries() };
+import { cashSeries, openTasksSeries } from '@braindog/seed';
 
 /**
  * The pages the record ships with. They live in the seed, because a page is a document it holds.

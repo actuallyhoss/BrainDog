@@ -134,3 +134,12 @@ test('A TASK MADE DONE WITH NO DAY IS DATED TODAY BY BOTH ENGINES, and shows fir
   assert.equal(said(record.value.blocks.find((b) => b.heading === 'Done lately')!.rows)[0], title);
   assert.equal(said(page('work')!.blocks.find((b) => b.heading === 'Done lately')!.entries)[0], title);
 });
+
+test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were finished', () => {
+  const open = page('work')!.blocks.find((b) => b.kind === 'stat')!.metrics!.find((m) => m.label === 'Open')!;
+  assert.ok(open.trend && open.trend.length === 56, 'eight weeks, a point a day');
+  const live = TASKS.filter((t) => t.fields.state !== 'done' && t.fields.state !== 'dropped').length;
+  /* Yesterday the task finished today was still open. */
+  assert.equal(open.trend.at(-1), live + TASKS.filter((t) => t.fields.done_on === TODAY).length);
+  assert.ok(open.trend[0]! > open.trend.at(-1)!, 'more was open eight weeks ago, before the finished work was done');
+});

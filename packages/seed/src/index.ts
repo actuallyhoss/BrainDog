@@ -31,7 +31,7 @@ export { ACCOUNTS, OBLIGATIONS, cashSeries } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
-export { RUNS, TASKS, TRACKS, UPDATES } from './modules/work.ts';
+export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
 import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import { ACCOUNTS, MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';

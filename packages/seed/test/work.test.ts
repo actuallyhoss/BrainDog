@@ -184,3 +184,19 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
   assert.ok(block(overview, 'Due soon').rows.some((r) => r.fields.what === 'Problem set 3'));
   for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
 });
+
+test('OPEN IS REMEMBERED EACH DAY, so its figure draws a line once the record has run a night', async () => {
+  let now = NOW;
+  const k = await openRecord(openSqlite(), { now: () => now });
+  const out = await installSeed(k);
+  assert.ok(out.ok, sayOf(out));
+  const cell = () => (block(opened(k, 'work'), 'Right now').readings ?? []).find((r) => r.metric === 'open-tasks');
+  assert.equal(cell()?.trend, undefined, 'no line is drawn before a snapshot has run');
+
+  /* THE NEXT NIGHT: the snapshot armed at install runs, and yesterday's count is written. */
+  now = NOW + 86_400_000;
+  await k.drain();
+  const trend = cell()?.trend;
+  assert.ok(trend, 'Open has a line after the first night');
+  assert.equal(trend!.at(-1), TASKS.filter(live).length, 'the last point is the day before, counted as it stood');
+});
