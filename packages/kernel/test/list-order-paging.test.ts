@@ -116,3 +116,12 @@ test('A CURSOR THE RECORD DID NOT MINT IS REFUSED IN THE RECORD\'S OWN ORDER TOO
   assert.deepEqual([...seen].sort(), ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
   sql.close();
 });
+
+test('AN EMPTY VALUE SORTS LAST IN EITHER DIRECTION, as the sample sorts it, and pages the same way', async () => {
+  const { k, sql } = await record();
+  const names = (order: { field: string; dir?: 'asc' | 'desc' }[]) => page(k.list({ register: 'things', order, limit: 100 })).rows.map((r) => String(r.fields.name));
+  assert.deepEqual(names([{ field: 'rank', dir: 'asc' }]).slice(-2).sort(), ['c', 'g'], 'going up, the rows with no rank come last');
+  assert.deepEqual(names([{ field: 'rank', dir: 'desc' }]).slice(-2).sort(), ['c', 'g'], 'going down, the rows with no rank come last');
+  assert.deepEqual(names([{ field: 'rank', dir: 'asc' }]).slice(0, 2).sort(), ['b', 'f']);
+  sql.close();
+});

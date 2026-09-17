@@ -1396,7 +1396,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const expr = labels && Object.keys(labels).length
           ? `(CASE ${fieldSqlIn(schema, o.field)} ${Object.entries(labels).map(([v, l]) => `WHEN ${quote(v)} THEN ${quote(l)}`).join(' ')} ELSE ${fieldSqlIn(schema, o.field)} END)`
           : fieldSqlIn(schema, o.field);
-        parts.push(`${expr} ${dir}`);
+        /* AN EMPTY VALUE GOES LAST, IN EITHER DIRECTION. SQLite puts `NULL` first ascending, so a table sorted by an optional
+           day led with every row that has none; the sample put them last both ways, and last is the one a reader wants. */
+        parts.push(`${expr} IS NULL, ${expr} ${dir}`);
         keys.push({ expr, asc: dir === 'ASC' });
       }
       keys.push({ expr: 'id', asc: false });
@@ -1404,9 +1406,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /**
        * A SORTED LIST PAGES, AND IT DID NOT. It answered one page and no cursor, so past the limit a sorted list
        * simply stopped. The cursor is the last row's value under every sort key, its id last, and the next page is
-       * every row that sorts after it: equal on the keys before one, and past it on that one. SQLite puts `NULL`
-       * first ascending and last descending, and the comparison below is written to agree with that, so a field
-       * some rows leave empty neither loses them nor repeats them.
+       * every row that sorts after it: equal on the keys before one, and past it on that one. An empty value sorts
+       * last in either direction, and the comparison below is written to agree with that, so a field some rows leave
+       * empty neither loses them nor repeats them.
        */
       if (sortedCursor) {
         const said = readSortCursor(cursorText, orderKeyOf(q.order));
@@ -1415,7 +1417,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const ors: string[] = [];
         keys.forEach((key, i) => {
           const v = said[i]!;
-          const past = key.asc ? (v === null ? `${key.expr} IS NOT NULL` : `${key.expr} > ?`) : v === null ? null : `(${key.expr} < ? OR ${key.expr} IS NULL)`;
+          const past = v === null ? null : `(${key.expr} ${key.asc ? '>' : '<'} ? OR ${key.expr} IS NULL)`;
           if (past === null) return;
           const same = keys.slice(0, i).map((k) => `${k.expr} IS ?`);
           ors.push(`(${[...same, past].join(' AND ')})`);
