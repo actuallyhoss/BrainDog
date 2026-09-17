@@ -146,7 +146,9 @@ export const isMoney = (v: unknown): v is MoneyValue =>
   typeof (v as MoneyValue).amount === 'number' &&
   typeof (v as MoneyValue).currency === 'string';
 
-export type Fields = Record<string, string | number | boolean | MoneyValue | null>;
+/* A LIST FIELD CARRIES SEVERAL VALUES: tags, and a field that points at more than one row. It is
+   written back the way it was read, which is why the value here is a list as well as a single one. */
+export type Fields = Record<string, string | number | boolean | MoneyValue | readonly string[] | null>;
 
 export type Entry = {
   /** The number you can say out loud. Per-register, and it is why renaming a register is refused. */
