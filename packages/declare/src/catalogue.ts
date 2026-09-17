@@ -30,11 +30,41 @@ import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './crede
 import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackSource } from './index.ts';
 import { kindUnknownSentence, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULES } from './usecase.ts';
-import { isSignature, signVersion, verifySignature, type AuthorKey, type Signature } from './signing.ts';
+import {
+  isRevocation,
+  isRotation,
+  isSignature,
+  revocationOf,
+  rotatedFrom,
+  signVersion,
+  verifiedStatements,
+  verifyRevocation,
+  verifyRotation,
+  verifySignature,
+  type AuthorKey,
+  type KeyRevocation,
+  type KeyRotation,
+  type KeyStatements,
+  type Signature,
+} from './signing.ts';
 
 export {
   AUTHOR_KEY_FORMAT,
   keyIdOf,
+  keyToKeep,
+  noStatements,
+  REVOCATION_FORMAT,
+  revocationOf,
+  revokeKey,
+  ROTATION_FORMAT,
+  rotatedFrom,
+  rotateKey,
+  verifiedStatements,
+  verifyRevocation,
+  verifyRotation,
+  type KeyRevocation,
+  type KeyRotation,
+  type KeyStatements,
   newAuthorKey,
   readAuthorKey,
   readKnownKeys,
@@ -108,7 +138,13 @@ export type CatalogueEntry = {
   versions: CatalogueVersion[];
 };
 
-export type CatalogueIndex = { format: typeof CATALOGUE_FORMAT; name: string; entries: CatalogueEntry[] };
+export type CatalogueIndex = {
+  format: typeof CATALOGUE_FORMAT;
+  name: string;
+  entries: CatalogueEntry[];
+  /** Authors' rotation and revocation statements (`signing.ts`), each verified wherever it is read. */
+  keys?: KeyStatements;
+};
 
 export const emptyCatalogue = (name: string): CatalogueIndex => ({ format: CATALOGUE_FORMAT, name, entries: [] });
 
@@ -362,8 +398,40 @@ export function readCatalogue(doc: unknown): Result<CatalogueIndex> {
     versions.sort((a, b) => compareVersions(b.version, a.version));
     entries.push({ ...(e as unknown as CatalogueEntry), versions, latest: (versions[0] as CatalogueVersion).version });
   }
+  if (doc.keys !== undefined) {
+    const k = doc.keys;
+    if (!isMap(k) || !Array.isArray(k.rotations) || !Array.isArray(k.revocations) || !k.rotations.every(isRotation) || !k.revocations.every(isRevocation))
+      return bad('keys', 'The key statements in this catalogue are not rotations and revocations this version of BrainDog reads.');
+    return ok({ format: CATALOGUE_FORMAT, name: str(doc.name), entries, keys: { rotations: k.rotations, revocations: k.revocations } });
+  }
   return ok({ format: CATALOGUE_FORMAT, name: str(doc.name), entries });
 }
+
+/**
+ * A rotation or revocation added to a catalogue's index, verified first: a rotation signed by the key it leaves, a revocation
+ * by the key it revokes. The same statement twice is refused, and nothing else in the index changes.
+ */
+export async function addKeyStatement(index: CatalogueIndex, statement: KeyRotation | KeyRevocation): Promise<Result<CatalogueIndex>> {
+  const keys = index.keys ?? { rotations: [], revocations: [] };
+  if (isRotation(statement)) {
+    if (!(await verifyRotation(statement))) return no('SIGNATURE_INVALID', 'This rotation is not signed by the key it moves from, so it was not added.', { at: 'keys' });
+    if (keys.rotations.some((r) => r.from_key_id === statement.from_key_id && r.to_key_id === statement.to_key_id))
+      return no('ALREADY_KNOWN', `This catalogue already says key ${statement.from_key_id} moved to ${statement.to_key_id}.`, { at: 'keys' });
+    return ok({ ...index, keys: { ...keys, rotations: [...keys.rotations, statement] } });
+  }
+  if (isRevocation(statement)) {
+    if (!(await verifyRevocation(statement))) return no('SIGNATURE_INVALID', 'This revocation is not signed by the key it revokes, so it was not added.', { at: 'keys' });
+    if (keys.revocations.some((r) => r.key_id === statement.key_id)) return no('ALREADY_KNOWN', `Key ${statement.key_id} is already revoked in this catalogue.`, { at: 'keys' });
+    return ok({ ...index, keys: { ...keys, revocations: [...keys.revocations, statement] } });
+  }
+  return no('VALUE_MALFORMED', 'This is not a key rotation or revocation.', { at: 'keys' });
+}
+
+/** A version whose key its author revoked, said in the one sentence every reader shows, or `null` when it is not. */
+export const revokedNotice = (statements: KeyStatements, title: string, version: string, signature: Signature | null | undefined): string | null => {
+  const revoked = signature ? revocationOf(statements, signature.key_id) : null;
+  return revoked ? `${title} ${version} is signed by key ${revoked.key_id}, which its author revoked, so it is not trusted. Their reason: ${revoked.reason}` : null;
+};
 
 /** The entries a search matches, best first: by id, title, summary, author, and the lists and pages the latest adds. */
 export function searchCatalogue(index: CatalogueIndex, query: string, kind?: EntryKind): CatalogueEntry[] {
@@ -444,13 +512,17 @@ export async function publishTo(
   if (was && compareVersions(s.version, was.latest) < 0)
     return no('ALREADY_KNOWN', `${title} ${was.latest} is already in this catalogue, so this file needs a later version than ${s.version}.`, { at: 'version' });
 
-  /* ONE KEY PER ENTRY ONCE IT IS SIGNED, so a reader who trusted the first version's key is never handed a second one here. */
+  /* ONE KEY PER ENTRY ONCE IT IS SIGNED, or a key that one rotated to, so a reader who trusted the last version's key is
+     never handed another here without that key's word for it. A revoked key signs nothing more. */
+  const statements = await verifiedStatements(index.keys);
+  if (key && revocationOf(statements, key.key_id))
+    return no('SIGNATURE_INVALID', `Key ${key.key_id} is revoked in this catalogue, so it signs nothing more. Sign with the key it rotated to.`, { at: 'signature' });
   const pinned = was?.versions.find((v) => v.signature !== undefined)?.signature ?? null;
-  if (pinned && (!key || key.key_id !== pinned.key_id))
+  if (pinned && (!key || (key.key_id !== pinned.key_id && rotatedFrom(statements, [pinned.key_id], key.key_id) === null)))
     return no(
       'SIGNATURE_INVALID',
       key
-        ? `Earlier versions of ${title} are signed by key ${pinned.key_id}, and this key is ${key.key_id}. Sign it with the key the earlier versions used.`
+        ? `Earlier versions of ${title} are signed by key ${pinned.key_id}, and this key is ${key.key_id}. Sign it with that key, or publish a rotation from it to this one first.`
         : `Earlier versions of ${title} are signed by key ${pinned.key_id}. Sign this one with that key too.`,
       { at: 'signature' },
     );
@@ -526,6 +598,7 @@ export async function catalogueUpdates(
 ): Promise<{ updates: CatalogueUpdate[]; refused: { entry: CatalogueEntry; fix: string }[] }> {
   const updates: CatalogueUpdate[] = [];
   const refused: { entry: CatalogueEntry; fix: string }[] = [];
+  const statements = await verifiedStatements(index.keys);
   for (const entry of index.entries) {
     const installed = installedIdOf(entry);
     const state = held.find((h) => h.id === installed);
@@ -539,6 +612,12 @@ export async function catalogueUpdates(
     const verified = await verifyVersion(entry, latest, text);
     if (!verified.ok) {
       refused.push({ entry, fix: 'refusal' in verified ? verified.refusal.fix : 'It does not verify.' });
+      continue;
+    }
+    /* A VERSION SIGNED BY A REVOKED KEY IS NEVER OFFERED, and said plainly instead. */
+    const revoked = revokedNotice(statements, entry.title, latest.version, verified.value);
+    if (revoked !== null) {
+      refused.push({ entry, fix: revoked });
       continue;
     }
     const file = await readCatalogueFile(text, { kind: 'url' });

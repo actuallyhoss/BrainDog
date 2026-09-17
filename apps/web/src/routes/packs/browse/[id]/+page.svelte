@@ -29,7 +29,7 @@
   import Preview from '../Preview.svelte';
   import CatalogueDetail from './CatalogueDetail.svelte';
   import { readHostCatalogue } from '../catalogue.ts';
-  import type { CatalogueEntry } from '@braindog/declare/catalogue';
+  import type { CatalogueEntry, KeyStatements } from '@braindog/declare/catalogue';
 
   /* A CATALOGUE'S USE CASE IS ASKED FOR BY NAME (`?from=catalogue`), so one published under a built-in's id is still reachable. An add-on
      says its kind (`&kind=pack`), so one sharing an id with a use case is found as itself. */
@@ -37,6 +37,8 @@
   const kindAsked = $derived(page.url.searchParams.get('kind') === 'pack' ? 'pack' : 'usecase');
   const u = $derived(fromCatalogue ? null : (useCase(page.params.id ?? '') ?? null));
   let entry = $state.raw<CatalogueEntry | null>(null);
+  /* THE CATALOGUE'S KEY STATEMENTS, verified on the page before any counts. */
+  let keys = $state.raw<KeyStatements | undefined>(undefined);
   let looked = $state(false);
   const preview = $derived(u ? previewOf(u) : null);
   const installs = $derived(u ? installsOf(u) : null);
@@ -56,6 +58,7 @@
   onMount(() => {
     void readHostCatalogue(fetch).then((got) => {
       entry = got.ok ? (got.index?.entries.find((e) => e.id === page.params.id && e.kind === kindAsked) ?? null) : null;
+      keys = got.ok ? got.index?.keys : undefined;
       looked = true;
     });
     void read(async () => {
@@ -88,7 +91,7 @@
 
   {#if !u && entry}
     {#if refused}<Empty kind="error" title={refused} />{/if}
-    <CatalogueDetail {entry} {client} {live} {states} />
+    <CatalogueDetail {entry} {client} {live} {states} {keys} />
   {:else if !u || !preview || !installs}
     {#if looked || u}<Empty kind="no-results" title={copy.useCaseMissing} />{/if}
   {:else}

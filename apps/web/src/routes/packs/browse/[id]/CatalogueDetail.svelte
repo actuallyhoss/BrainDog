@@ -8,8 +8,9 @@
 
   THE LATEST FILE IS VERIFIED WHEN THE PAGE OPENS: its checksum, and its author's signature when it has one. One that does
   not verify is refused with its sentence and code, and nothing can be asked for. A signed one says whether this browser
-  has seen that key for its author before, and loudly when it is a different key; the key is kept on first use, when the
-  person asks for the version, and never written over.
+  has seen that key for its author before, and loudly when it is a different key; the key is kept on first use, or when a
+  key already seen named it in the catalogue's rotation statement, when the person asks for the version, and never written
+  over. A key its author revoked is said with their reason, and nothing it signed can be asked for.
 
   EITHER KIND IS ASKED FOR ON DECIDE, as an update is: the file is fetched and verified again, read, and filed as a
   proposal (a use case as its file, an add-on as its id and document) the owner accepts there, where the record's own plan
@@ -17,7 +18,7 @@
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
-  import type { CatalogueEntry, Changes, Trust } from '@braindog/declare/catalogue';
+  import type { CatalogueEntry, Changes, KeyStatements, Trust } from '@braindog/declare/catalogue';
   import { copy } from '$lib/copy.ts';
   import type { PackState } from '$lib/record/packs.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -30,7 +31,8 @@
     client,
     live,
     states,
-  }: { entry: CatalogueEntry; client: ReturnType<typeof createClient> | null; live: boolean; states: readonly PackState[] } = $props();
+    keys,
+  }: { entry: CatalogueEntry; client: ReturnType<typeof createClient> | null; live: boolean; states: readonly PackState[]; keys?: KeyStatements | undefined } = $props();
 
   const latest = $derived(entry.versions[0]);
   const reach = $derived(latest?.reach);
@@ -66,7 +68,7 @@
         checked = { ok: false };
         return;
       }
-      trust = await trustFor(browserStore(), entry.author, got.signature);
+      trust = await trustFor(browserStore(), entry.author, got.signature, keys);
       checked = { ok: true };
     });
   });
@@ -75,7 +77,7 @@
   const from = (): string | null => (standing?.kind === 'update' && standing.from !== '' ? standing.from : null);
 
   async function ask() {
-    if (!latest || busy) return;
+    if (!latest || busy || trust?.kind === 'revoked') return;
     refused = null;
     if (!live || !client) {
       would = copy.catalogueWouldAsk(entry.title, latest.version);
@@ -90,7 +92,7 @@
         return;
       }
       filed = out.id;
-      const now = await trustFor(browserStore(), entry.author, out.signature);
+      const now = await trustFor(browserStore(), entry.author, out.signature, keys);
       trust = now;
       await keepFirstKey(browserStore(), entry.author, now);
     } finally {
@@ -114,7 +116,7 @@
       <p class="said">{copy.catalogueAhead(standing.at)}</p>
     {:else if standing?.kind === 'off'}
       <p class="said">{copy.catalogueOff}</p>
-    {:else if standing && checked?.ok}
+    {:else if standing && checked?.ok && trust?.kind !== 'revoked'}
       {#if filed !== null}
         <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}</p>
       {:else}

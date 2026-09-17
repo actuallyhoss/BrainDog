@@ -1104,6 +1104,8 @@ export const copy = {
   catalogueTrustKnown: (author: string) => `This browser has seen this key for ${author} before.`,
   catalogueTrustChanged: (author: string, before: string[]) =>
     `This is not the key this browser has seen for ${author} before (${list(before)}). Somebody other than ${author} may have signed it. Check with ${author} before you ask for it.`,
+  catalogueTrustRotated: (author: string, from: string) => `This is a new key for ${author}. Key ${from}, the one this browser has seen for ${author}, signed a statement naming it as its successor.`,
+  catalogueTrustRevoked: (author: string, reason: string) => `${author} revoked the key that signed this version, so it is not trusted and cannot be asked for. Their reason: ${reason}`,
   catalogueAsk: 'Ask on Decide',
   catalogueAskUpdate: (version: string) => `Ask on Decide to update to ${version}`,
   catalogueQuestion: (title: string, to: string, from: string | null, keyId: string | null) =>

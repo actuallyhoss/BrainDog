@@ -7,14 +7,16 @@
  * either kind is a proposal on Decide: the record plans it and the owner approves it.
  *
  * TRUST ON FIRST USE IS KEPT PER BROWSER: the key ids seen for each author, in `localStorage` under `KNOWN_KEYS`. A page
- * that cannot reach storage still draws; it only cannot say a key was seen before.
+ * that cannot reach storage still draws; it only cannot say a key was seen before. The catalogue's own rotation and
+ * revocation statements are verified here too: a new key named by a key already seen is trusted and kept, and a revoked
+ * key is said as untrusted and nothing it signed is asked for.
  *
  * A HOST WITH NO CATALOGUE is not an error: browse draws the built-in use cases alone, as before.
  *
  * PURE, AND THEREFORE TESTABLE: the fetcher is handed in.
  */
 
-import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
+import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KeyStatements, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
 import { copy } from '../../../lib/copy.ts';
 import type { PackState } from '../../../lib/record/packs.ts';
@@ -136,10 +138,13 @@ export async function loadKnownKeys(store: KeyStore | null): Promise<KnownKeys> 
   }
 }
 
-/** Whether this browser has seen the key that signed a version for its author before. */
-export async function trustFor(store: KeyStore | null, author: string, signature: Signature | null | undefined): Promise<Trust> {
-  const { trustOf } = await import('@braindog/declare/catalogue');
-  return trustOf(await loadKnownKeys(store), author, signature);
+/**
+ * Whether this browser has seen the key that signed a version for its author before, read with the catalogue's key
+ * statements (`index.keys`), each verified here before it counts.
+ */
+export async function trustFor(store: KeyStore | null, author: string, signature: Signature | null | undefined, keys?: KeyStatements): Promise<Trust> {
+  const { trustOf, verifiedStatements } = await import('@braindog/declare/catalogue');
+  return trustOf(await loadKnownKeys(store), author, signature, await verifiedStatements(keys));
 }
 
 /** Trust said as a sentence, loud when the key is not the one seen before. */
@@ -153,18 +158,24 @@ export function trustWords(trust: Trust, author: string): { text: string; loud: 
       return { text: copy.catalogueTrustKnown(author), loud: false };
     case 'changed':
       return { text: copy.catalogueTrustChanged(author, trust.before), loud: true };
+    case 'rotated':
+      return { text: copy.catalogueTrustRotated(author, trust.from), loud: false };
+    case 'revoked':
+      return { text: copy.catalogueTrustRevoked(author, trust.reason), loud: true };
   }
 }
 
 /**
- * The key kept once a person asks for a version: only on first use. A known key needs nothing, and a changed key is never
- * written over the one seen before, so it is said loudly again next time. Answers whether anything was kept.
+ * The key kept once a person asks for a version: on first use, or a key one already seen named as its successor. A known
+ * key needs nothing, and a changed or revoked key is never written over the one seen before, so it is said loudly again
+ * next time. Answers whether anything was kept.
  */
 export async function keepFirstKey(store: KeyStore | null, author: string, trust: Trust): Promise<boolean> {
-  if (trust.kind !== 'first' || !store) return false;
-  const { rememberKey } = await import('@braindog/declare/catalogue');
+  const { keyToKeep, rememberKey } = await import('@braindog/declare/catalogue');
+  const keep = keyToKeep(trust);
+  if (keep === null || !store) return false;
   try {
-    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), author, trust.key_id)));
+    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), author, keep)));
     return true;
   } catch {
     return false;

@@ -18,7 +18,11 @@
  * INSTALL FROM A CATALOGUE ASKS, as every install from this command does: the file is held to the index's checksum and its
  * signature, read through its door, and filed as a `pack` proposal for the owner to accept on Decide, where the record's own
  * plan says what it adds, changes and takes away. Which key signed it is said, and whether this machine has seen that key
- * for its author before (trust on first use, kept beside the hosts file).
+ * for its author before (trust on first use, kept beside the hosts file), or that its old key named it in a rotation.
+ *
+ * `key rotate <old> <new> --to <folder>` writes a statement signed by the old key naming the new one into the catalogue's
+ * index; `key revoke <key> --to <folder> --reason <why> [--successor <key id>]` writes one signed by the key itself. Only
+ * the public halves and the signature are written. A version signed by a revoked key is said as untrusted and never asked for.
  *
  * PREVIEW STARTS A SCRATCH SELF-HOST on this machine, loopback only, with an empty record and the file published to a
  * scratch catalogue, and prints the page to install it from. Nothing on any other record is touched, and the scratch
@@ -34,8 +38,14 @@ import { parseArgs } from 'node:util';
 
 import { exportUseCase, sharedFileName } from '@braindog/declare';
 import {
+  addKeyStatement,
   CATALOGUE_INDEX,
   catalogueFile,
+  keyToKeep,
+  revokeKey,
+  revokedNotice,
+  rotateKey,
+  verifiedStatements,
   changesBetween,
   emptyCatalogue,
   newAuthorKey,
@@ -57,7 +67,6 @@ import {
   type EntryKind,
   type KnownKeys,
   type Reach,
-  type Signature,
   type Trust,
 } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
@@ -249,6 +258,10 @@ export function trustLine(trust: Trust, author: string): string {
       return `Signed by key ${trust.key_id}, the key this machine has seen for ${author} before.`;
     case 'changed':
       return `Signed by key ${trust.key_id}, which is not the key this machine has seen for ${author} before (${trust.before.join(', ')}). Somebody else may have published it.`;
+    case 'rotated':
+      return `Signed by key ${trust.key_id}, which key ${trust.from}, the one this machine has seen for ${author}, named as its successor. This machine now remembers it too.`;
+    case 'revoked':
+      return `Signed by key ${trust.key_id}, which its author revoked, so it is not trusted. Their reason: ${trust.reason}`;
   }
 }
 
@@ -265,10 +278,10 @@ function knownKeys(io: AgentIo): KnownKeys {
   }
 }
 
-function remember(io: AgentIo, author: string, signature: Signature): void {
+function remember(io: AgentIo, author: string, keyId: string): void {
   const file = knownKeysPath(io);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), author, signature.key_id), null, 2)}\n`);
+  writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), author, keyId), null, 2)}\n`);
 }
 
 /** The git working tree a path is inside, or `null`. */
@@ -283,6 +296,7 @@ function gitTreeOf(path: string): string | null {
 }
 
 async function key(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  if (args[0] === 'rotate' || args[0] === 'revoke') return keyStatement(args[0], args.slice(1), io, kind);
   const cmd = `braindog ${kind} key`;
   let values: { author?: string | undefined };
   let positionals: string[];
@@ -324,6 +338,65 @@ async function readKeyFile(given: string, io: AgentIo): Promise<AuthorKey | stri
   }
   const read = await readAuthorKey(doc);
   return read.ok ? read.value : saidWithCode(read);
+}
+
+/**
+ * `key rotate <old key file> <new key file> --to <folder>` and `key revoke <key file> --to <folder> --reason <why> [--successor <key id>]`:
+ * a statement signed by the key it speaks for, added to the catalogue's index. Only public halves and the signature are written.
+ */
+async function keyStatement(verb: 'rotate' | 'revoke', args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} key ${verb}`;
+  const usage =
+    verb === 'rotate'
+      ? `${cmd} takes the old key file, the new key file and --to <folder>, as in ${cmd} ~/old.key.json ~/new.key.json --to ./catalogue.`
+      : `${cmd} takes one key file, --to <folder> and --reason <why>, and --successor <key id> when a rotation from it should still count.`;
+  let values: { to?: string | undefined; reason?: string | undefined; successor?: string | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { to: { type: 'string' }, reason: { type: 'string' }, successor: { type: 'string' } } }));
+  } catch {
+    io.say(usage);
+    return 1;
+  }
+  const want = verb === 'rotate' ? 2 : 1;
+  if (positionals.length !== want || values.to === undefined || (verb === 'revoke' && values.reason === undefined) || (verb === 'rotate' && (values.reason !== undefined || values.successor !== undefined))) {
+    io.say(usage);
+    return 1;
+  }
+  const keys: AuthorKey[] = [];
+  for (const given of positionals) {
+    const got = await readKeyFile(given, io);
+    if (typeof got === 'string') {
+      io.say(got);
+      return 1;
+    }
+    keys.push(got);
+  }
+  const at = await catalogueAt(values.to, io, true);
+  if (typeof at === 'string') {
+    io.say(at);
+    return 1;
+  }
+  const [first, second] = keys as [AuthorKey, AuthorKey | undefined];
+  const statement = verb === 'rotate' ? await rotateKey(first, second as AuthorKey) : await revokeKey(first, values.reason ?? '', values.successor ?? null);
+  if (!statement.ok) {
+    io.say(saidWithCode(statement));
+    return 1;
+  }
+  const added = await addKeyStatement(at.index, statement.value);
+  if (!added.ok) {
+    io.say(saidWithCode(added));
+    return 1;
+  }
+  mkdirSync(at.where, { recursive: true });
+  writeFileSync(join(at.where, CATALOGUE_INDEX), `${JSON.stringify(added.value, null, 2)}\n`);
+  if (verb === 'rotate')
+    io.out(`Key ${first.key_id} now names key ${(second as AuthorKey).key_id} as its successor in ${at.where}. Readers who trusted the old key trust versions the new one signs. Sign from now on with the new key file.`);
+  else
+    io.out(
+      `Key ${first.key_id} is revoked in ${at.where}. Every version it signed is said as untrusted and is not offered${values.successor ? `, and only a rotation to ${values.successor} still counts` : ''}.`,
+    );
+  return 0;
 }
 
 /* ── a catalogue, as a folder or an address ─────────────────────────────── */
@@ -450,11 +523,12 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     return 0;
   }
   const known = knownKeys(io);
+  const statements = await verifiedStatements(at.index.keys);
   for (const e of found) {
     const v = e.versions[0];
     io.out(`${e.id}  ${e.title} ${e.latest} by ${e.author}. ${e.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);
-    io.out(`  ${trustLine(trustOf(known, e.author, v?.signature), e.author)}`);
+    io.out(`  ${trustLine(trustOf(known, e.author, v?.signature, statements), e.author)}`);
   }
   io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${values.from}.`);
   return 0;
@@ -551,11 +625,19 @@ export async function installFromCatalogue(id: string, from: string, version: st
     io.say(`${path} is not ${NOUN[kind].a}, so this catalogue lists it wrongly. Nothing was sent.`);
     return 1;
   }
-  const trust = trustOf(knownKeys(io), entry.author, held.value);
+  const statements = await verifiedStatements(at.index.keys);
+  /* A REVOKED KEY IS SAID AND NOTHING IS ASKED. */
+  const revoked = revokedNotice(statements, entry.title, chosen.version, held.value);
+  if (revoked !== null) {
+    io.say(`${revoked} Nothing was sent.`);
+    return 1;
+  }
+  const trust = trustOf(knownKeys(io), entry.author, held.value, statements);
   const said = trustLine(trust, entry.author);
   io.out(said);
-  /* THE KEY IS REMEMBERED ON FIRST USE ONLY. A different key is said on Decide and never replaces the one seen before. */
-  if (trust.kind === 'first' && held.value) remember(io, entry.author, held.value);
+  /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT. A different key is said on Decide and never replaces the one seen before. */
+  const keep = keyToKeep(trust);
+  if (keep !== null) remember(io, entry.author, keep);
   const question = `Install ${entry.title} ${chosen.version} from a catalogue? ${said}`;
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
   return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);
@@ -662,7 +744,7 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id> --from <catalogue> [--version <x.y.z>] [--host <host>].';
+  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id> --from <catalogue> [--version <x.y.z>] [--host <host>].';
 
 /** `braindog pack …`: the add-on half of the SDK. */
 export async function pack(args: string[], io: AgentIo): Promise<number> {

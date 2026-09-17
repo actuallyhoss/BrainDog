@@ -246,3 +246,55 @@ test('a use case on its catalogue page is asked for on Decide, as an add-on is, 
   assert.doesNotMatch(detail, /entry\.kind === 'pack'\}/u);
   assert.match(detail, /askForVersion\(/u);
 });
+
+test('a browser that kept an old key trusts and keeps the key it rotated to, and a revoked key is said plainly and never offered', async () => {
+  const { addKeyStatement, revokeKey, rotateKey } = await import('@braindog/declare/catalogue');
+  const old = await newAuthorKey('Halden');
+  const next = await newAuthorKey('Halden');
+  const { index, entry, fetcher } = await servedAddon(next);
+  const signature = entry.versions[0]!.signature!;
+  const store = memoryStore();
+  store.setItem(KNOWN_KEYS, JSON.stringify({ Halden: [old.key_id] }));
+
+  assert.equal((await trustFor(store, 'Halden', signature, index.keys)).kind, 'changed');
+  const rotation = await rotateKey(old, next);
+  assert.ok(rotation.ok);
+  const rotated = await addKeyStatement(index, rotation.value);
+  assert.ok(rotated.ok);
+  const trust = await trustFor(store, 'Halden', signature, rotated.value.keys);
+  assert.deepEqual(trust, { kind: 'rotated', key_id: next.key_id, from: old.key_id });
+  const said = trustWords(trust, 'Halden');
+  assert.ok(!said.loud && said.text.includes(old.key_id));
+  assert.equal(await keepFirstKey(store, 'Halden', trust), true);
+  assert.deepEqual(await loadKnownKeys(store), { Halden: [old.key_id, next.key_id] });
+
+  /* A rotation someone else signed, planted in the index, counts for nothing. */
+  const mallory = await newAuthorKey('Halden');
+  const forged = await rotateKey(mallory, next);
+  assert.ok(forged.ok);
+  const planted = { rotations: [{ ...forged.value, from_key_id: old.key_id, from_public_key: old.public_key }], revocations: [] };
+  assert.equal((await trustFor(memoryStore(), 'Halden', signature, planted)).kind, 'first');
+  const fresh = memoryStore();
+  fresh.setItem(KNOWN_KEYS, JSON.stringify({ Halden: [old.key_id] }));
+  assert.equal((await trustFor(fresh, 'Halden', signature, planted)).kind, 'changed');
+
+  const revocation = await revokeKey(next, 'The key was copied off a shared machine.');
+  assert.ok(revocation.ok);
+  const revoked = await addKeyStatement(rotated.value, revocation.value);
+  assert.ok(revoked.ok);
+  const untrusted = await trustFor(store, 'Halden', signature, revoked.value.keys);
+  assert.equal(untrusted.kind, 'revoked');
+  const notice = trustWords(untrusted, 'Halden');
+  assert.ok(notice.loud);
+  assert.equal(notice.text, 'Halden revoked the key that signed this version, so it is not trusted and cannot be asked for. Their reason: The key was copied off a shared machine.');
+  assert.equal(await keepFirstKey(store, 'Halden', untrusted), false);
+
+  const held = [{ id: 'bookshelf', version: '1.0.0', disabled_at: null, registers: [] }];
+  const offered = await updatesFor(fetcher, revoked.value, held);
+  assert.equal(offered.updates.length, 0);
+  assert.match(offered.refused[0] ?? '', /which its author revoked, so it is not trusted/u);
+
+  const { readFileSync } = await import('node:fs');
+  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
+  assert.match(detail, /trust\?\.kind !== 'revoked'/u);
+});

@@ -108,3 +108,41 @@ test('install --from holds the file to its checksum, then only asks the owner', 
   assert.match(h.said.at(-1) ?? '', /It has: club\./u);
   assert.equal(await usecase(['install', 'club', '--version', '1.0.0'], h.io), 1);
 });
+
+test('key rotate lets a reader who trusted the old key trust the new one, and key revoke stops a version being asked for', async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const h = await setup(t);
+  const keys = join(h.dir, 'keys');
+  assert.equal(await pack(['key', join(keys, 'old.json'), '--author', 'Halden'], h.io), 0, h.said.join('\n'));
+  assert.equal(await pack(['key', join(keys, 'new.json'), '--author', 'Halden'], h.io), 0, h.said.join('\n'));
+  const oldId = (JSON.parse(readFileSync(join(keys, 'old.json'), 'utf8')) as { key_id: string }).key_id;
+  const newId = (JSON.parse(readFileSync(join(keys, 'new.json'), 'utf8')) as { key_id: string }).key_id;
+
+  assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join('\n'));
+  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'old.json')], h.io), 0, h.said.join('\n'));
+  assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.match(h.out.join('\n'), /has not seen a key for Halden before/u);
+
+  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  writeFileSync(join(h.dir, 'bookshelf-1.0.1.pack.json'), JSON.stringify({ ...later, version: '1.0.1', summary: `${String(later.summary)} Kept tidy.` }));
+  assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'new.json')], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /rotation/u);
+
+  assert.equal(await pack(['key', 'rotate', join(keys, 'old.json'), join(keys, 'new.json'), '--to', 'catalogue'], h.io), 0, h.said.join('\n'));
+  const index = readFileSync(join(h.dir, 'catalogue', 'index.json'), 'utf8');
+  assert.match(index, /braindog-key-rotation-1/u);
+  assert.doesNotMatch(index, /private_key/u);
+  assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'new.json')], h.io), 0, h.said.join('\n'));
+  assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
+  assert.match(h.out.join('\n'), new RegExp(`Signed by key ${newId}, which key ${oldId}, the one this machine has seen for Halden, named as its successor`, 'u'));
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, 'config', 'braindog', 'known-keys.json'), 'utf8')), { Halden: [oldId, newId] });
+
+  assert.equal(await pack(['key', 'revoke', join(keys, 'new.json'), '--to', 'catalogue'], h.io), 1);
+  assert.equal(await pack(['key', 'revoke', join(keys, 'new.json'), '--to', 'catalogue', '--reason', 'Copied off a shared machine.'], h.io), 0, h.said.join('\n'));
+  const asked = h.seen.filter((s) => s.method === 'propose').length;
+  assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 1);
+  assert.equal(h.said.at(-1), `Bookshelf 1.0.1 is signed by key ${newId}, which its author revoked, so it is not trusted. Their reason: Copied off a shared machine. Nothing was sent.`);
+  assert.equal(h.seen.filter((s) => s.method === 'propose').length, asked);
+  assert.equal(await pack(['search', '--from', 'catalogue'], h.io), 0);
+  assert.match(h.out.at(-2) ?? '', /which its author revoked/u);
+});

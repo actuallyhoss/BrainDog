@@ -38,7 +38,7 @@
       if (!got.ok || !got.index) return;
       const out = await updatesFor(fetch, got.index, held);
       const store = browserStore();
-      offered = await Promise.all(out.updates.map(async (update) => ({ update, trust: await trustFor(store, update.entry.author, update.signature), filed: null, fix: null })));
+      offered = await Promise.all(out.updates.map(async (update) => ({ update, trust: await trustFor(store, update.entry.author, update.signature, got.index?.keys), filed: null, fix: null })));
       refused = out.refused;
     })();
   });
