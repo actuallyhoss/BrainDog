@@ -8,7 +8,7 @@
 
 export const STUDENT = {
   usecase: 'student',
-  version: '1.0.0',
+  version: '1.1.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -29,6 +29,16 @@ export const STUDENT = {
     nothing_needs_you: 'Nothing is due.',
     since_away: 'Since you last looked',
     lists: 'Notebooks',
+  },
+  /* THE LISTS' OWN WORDS, SO A STUDENT CAN CALL THEM WHAT THEIR SCHOOL DOES: Modules, Coursework, Revision. Kept as the
+     pack's settings (S8), so they are renamed at /packs/usecase-student and travel with a shared copy. */
+  labels: {
+    courses: 'Courses',
+    'courses:one': 'course',
+    assignments: 'Assignments',
+    'assignments:one': 'assignment',
+    study_sessions: 'Study sessions',
+    'study_sessions:one': 'study session',
   },
   skills: [{ name: 'study-planner', trigger: 'when an assignment is added or its due date moves, to plan the days before it' }],
   pack: {
