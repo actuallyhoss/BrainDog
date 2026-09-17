@@ -30,6 +30,7 @@ import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
 import { skills } from './skills.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
+import { pack } from './catalogue.ts';
 import { tools } from './tools.ts';
 import { usecase } from './usecase.ts';
 
@@ -77,12 +78,18 @@ const usage = () =>
     '  Write a starting use-case file, one list and a page over it, that already reads the way a record will read it.',
     'braindog usecase diff <earlier file> <later file>',
     '  Say what moved between two versions of a use case, and the least version bump that needs. Nothing is sent.',
-    'braindog usecase publish <file> --to <folder>',
+    'braindog usecase publish <file> --to <folder> [--sign <key file>]',
     '  Add a version to a catalogue folder: never one already there, never an earlier one, and a major when it takes something away.',
     'braindog usecase search [words] --from <folder|address>',
     '  List what a catalogue holds, with what each can reach and call out to. Nothing is sent to a record.',
     'braindog usecase preview <file> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the file in its catalogue, to install and look at. Removed when it stops.',
+    'braindog pack new|check|diff|search|install <...>',
+    '  The same for an add-on (a .pack.json file): new <id>, check <file>, diff <a> <b>, search [words] --from <catalogue>, install <id> --from <catalogue>.',
+    'braindog pack publish <file> --to <folder> [--sign <key file>]',
+    '  Add an add-on version to a catalogue folder, by the same rules, signed with an author key when one is named.',
+    'braindog pack key <file> --author <name>',
+    '  Make an author key in a file you choose, outside any repository. Keep it private: it signs what you publish.',
     'braindog import legacy <export.json> [--host <host>] [--dry-run]',
     '  Move a the old tool export into this BrainDog. Running it again updates what it added, and no key value is ever read.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
@@ -188,7 +195,7 @@ async function keysCommand(args: string[]): Promise<void> {
 }
 
 /** `braindog skills|tools|page|usecase|import`, over the real terminal, and the exit code the command decides. */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'import', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -204,7 +211,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'im
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : await pageCommand(args, io);
+    which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : await pageCommand(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -277,7 +284,7 @@ try {
   if (command === 'mcp') await mcp(rest);
   else if (command === 'login') await signIn(rest);
   else if (command === 'keys') await keysCommand(rest);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'import') await agentCommand(command, rest);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import') await agentCommand(command, rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);

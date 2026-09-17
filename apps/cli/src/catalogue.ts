@@ -1,20 +1,24 @@
 /**
- * The use-case SDK on this machine: `braindog usecase new|publish|search|diff|preview`, and `install <id> --from`
- * (`loop/research-marketplace.md` §3, over `@braindog/declare/catalogue`).
+ * The use-case and add-on SDK on this machine: `braindog usecase|pack new|check|diff|publish|search|key`, `usecase preview`,
+ * and `install <id> --from` (`loop/research-marketplace.md` §3, over `@braindog/declare/catalogue`).
  *
- * NEW writes a starting file that already reads through `readShared`, so the first `check` passes and every edit after
- * it is checked the way a record will check it.
+ * NEW writes a starting file that already reads through its door (`readShared` for a use case, `readPackFile` for an
+ * add-on), so the first `check` passes and every edit after it is checked the way a record will check it.
  *
- * PUBLISH WRITES INTO A CATALOGUE FOLDER, never to a service. The file is read through `readShared`, its version must be
- * later than the latest there and never one already published, and a version that takes a list, page, module or field
- * away must be a major. The file is written byte for byte and `index.json` beside it. A self-host serves that folder
- * with `BRAINDOG_CATALOGUE`, and a copy of it on any https host is read the same way.
+ * PUBLISH WRITES INTO A CATALOGUE FOLDER, never to a service. The file is read through its door, its version must be later
+ * than the latest there and never one already published, and a version that takes a list, page, module or field away must
+ * be a major. The file is written byte for byte and `index.json` beside it. With `--sign <key file>` the version carries
+ * the author's signature, and once an entry is signed every later version must be signed with the same key.
+ *
+ * KEY MAKES AN AUTHOR KEY in a file the person names, never over a file already there and never inside a git working tree,
+ * so a private key is not committed by accident. Nothing else in this command writes or reads a private key.
  *
  * SEARCH AND DIFF SEND NOTHING to a record. `diff` says what moved between two versions and the bump that needs.
  *
- * INSTALL FROM A CATALOGUE ASKS, as every install from this command does: the file is held to the index's checksum, read
- * through `readShared`, and filed as a `pack` proposal for the owner to accept on Decide, where the record's own plan says
- * what it adds, changes and takes away.
+ * INSTALL FROM A CATALOGUE ASKS, as every install from this command does: the file is held to the index's checksum and its
+ * signature, read through its door, and filed as a `pack` proposal for the owner to accept on Decide, where the record's own
+ * plan says what it adds, changes and takes away. Which key signed it is said, and whether this machine has seen that key
+ * for its author before (trust on first use, kept beside the hosts file).
  *
  * PREVIEW STARTS A SCRATCH SELF-HOST on this machine, loopback only, with an empty record and the file published to a
  * scratch catalogue, and prints the page to install it from. Nothing on any other record is touched, and the scratch
@@ -28,23 +32,37 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { exportUseCase, readShared, sharedFileName, type Shared } from '@braindog/declare';
+import { exportUseCase, sharedFileName } from '@braindog/declare';
 import {
   CATALOGUE_INDEX,
   catalogueFile,
   changesBetween,
   emptyCatalogue,
+  newAuthorKey,
   publishTo,
+  reachOf,
+  readAuthorKey,
   readCatalogue,
+  readCatalogueFile,
+  readKnownKeys,
+  rememberKey,
   searchCatalogue,
+  trustOf,
   unchanged,
-  verifyFile,
+  verifyVersion,
+  type AuthorKey,
+  type CatalogueFile,
   type CatalogueIndex,
   type Changes,
+  type EntryKind,
+  type KnownKeys,
   type Reach,
+  type Signature,
+  type Trust,
 } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
+import { hostsPath } from './http.ts';
 import type { AgentIo } from './skills.ts';
 import { proposeFile, readSource } from './usecase.ts';
 
@@ -52,7 +70,47 @@ const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.
 const ID = /^[a-z][a-z0-9-]{0,62}$/u;
 const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/u;
 
+const NOUN: Record<EntryKind, { a: string; the: string; suffix: string }> = {
+  usecase: { a: 'a use case', the: 'use case', suffix: '.usecase.json' },
+  pack: { a: 'an add-on', the: 'add-on', suffix: '.pack.json' },
+};
+
 /* ── new ────────────────────────────────────────────────────────────────── */
+
+const ITEMS = {
+  register: 'items',
+  name: 'Items',
+  title: 'name',
+  fields: [
+    { id: 'name', type: 'text', required: true },
+    { id: 'state', type: 'enum', values: ['open', 'done'], default: 'open' },
+    { id: 'due', type: 'day' },
+  ],
+};
+
+const itemsPage = (id: string, title: string) => ({
+  page: id,
+  title,
+  nav: { section: title, order: 10 },
+  icon: 'board',
+  requires: ['register.items'],
+  blocks: [
+    {
+      kind: 'table',
+      heading: 'Open',
+      span: 12,
+      source: 'register.items',
+      where: 'state is open',
+      columns: [
+        { field: 'name', label: 'Item', width: 'minmax(20ch,1fr)' },
+        { field: 'due', label: 'Due', width: '14ch', align: 'end' },
+      ],
+      order: [{ field: 'due', dir: 'asc' }],
+      limit: 20,
+      empty: 'Nothing is open.',
+    },
+  ],
+});
 
 /** A starting use case: one list, a page over it, and a Home heading, already through `readShared`. */
 export function starter(id: string, title: string, author: string): Result<Record<string, unknown>> {
@@ -68,73 +126,85 @@ export function starter(id: string, title: string, author: string): Result<Recor
     modules: [],
     voice: { home: title },
     labels: {},
-    declarations: [
-      {
-        register: 'items',
-        name: 'Items',
-        title: 'name',
-        fields: [
-          { id: 'name', type: 'text', required: true },
-          { id: 'state', type: 'enum', values: ['open', 'done'], default: 'open' },
-          { id: 'due', type: 'day' },
-        ],
-      },
-      {
-        page: id,
-        title,
-        nav: { section: title, order: 10 },
-        icon: 'board',
-        requires: ['register.items'],
-        blocks: [
-          {
-            kind: 'table',
-            heading: 'Open',
-            span: 12,
-            source: 'register.items',
-            where: 'state is open',
-            columns: [
-              { field: 'name', label: 'Item', width: 'minmax(20ch,1fr)' },
-              { field: 'due', label: 'Due', width: '14ch', align: 'end' },
-            ],
-            order: [{ field: 'due', dir: 'asc' }],
-            limit: 20,
-            empty: 'Nothing is open.',
-          },
-        ],
-      },
-    ],
+    declarations: [ITEMS, itemsPage(id, title)],
     examples: [],
   });
 }
 
-async function create(args: string[], io: AgentIo): Promise<number> {
+/** A starting add-on: the same list and page, as a pack file that reads through `readPackFile`. */
+export function packStarter(id: string, title: string, author: string): Record<string, unknown> {
+  return {
+    pack: id,
+    version: '1.0.0',
+    title,
+    summary: `What ${title} adds, in one sentence.`,
+    author,
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [ITEMS, itemsPage(id, title)],
+  };
+}
+
+async function create(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} new`;
   let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' } } }));
   } catch {
-    io.say('braindog usecase new takes an id, and --title, --author and --out.');
+    io.say(`${cmd} takes an id, and --title, --author and --out.`);
     return 1;
   }
   const [id, ...more] = positionals;
-  if (!id || more.length > 0 || !ID.test(id)) {
-    io.say('braindog usecase new takes one id of lower-case letters, digits and dashes, as in braindog usecase new reading-club.');
+  if (!id || more.length > 0 || !ID.test(id) || (kind === 'pack' && id.length < 2)) {
+    io.say(`${cmd} takes one id of lower-case letters, digits and dashes, as in ${cmd} reading-club.`);
     return 1;
   }
   const words = id.replace(/-/gu, ' ');
   const title = values.title ?? words.charAt(0).toUpperCase() + words.slice(1);
-  const built = starter(id, title, values.author ?? 'Your name');
-  if (!built.ok) {
-    io.say(saidWithCode(built));
-    return 1;
-  }
-  const file = resolve(io.cwd, values.out ?? sharedFileName(id, '1.0.0'));
+  let doc: Record<string, unknown>;
+  if (kind === 'usecase') {
+    const built = starter(id, title, values.author ?? 'Your name');
+    if (!built.ok) {
+      io.say(saidWithCode(built));
+      return 1;
+    }
+    doc = built.value;
+  } else doc = packStarter(id, title, values.author ?? 'Your name');
+  const file = resolve(io.cwd, values.out ?? (kind === 'usecase' ? sharedFileName(id, '1.0.0') : `${id}-1.0.0${NOUN.pack.suffix}`));
   if (existsSync(file)) {
     io.say(`${file} is already there, and new never writes over a file.`);
     return 1;
   }
-  writeFileSync(file, `${JSON.stringify(built.value, null, 2)}\n`);
-  io.out(`${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog usecase check, and see it with braindog usecase preview.`);
+  const text = `${JSON.stringify(doc, null, 2)}\n`;
+  const read = await readCatalogueFile(text);
+  if (!read.ok) {
+    io.say(saidWithCode(read));
+    return 1;
+  }
+  writeFileSync(file, text);
+  io.out(
+    `${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog ${kind} check${kind === 'usecase' ? ', and see it with braindog usecase preview' : ''}.`,
+  );
+  return 0;
+}
+
+/* ── check, for an add-on ───────────────────────────────────────────────── */
+
+async function checkPack(args: string[], io: AgentIo): Promise<number> {
+  const [file, ...more] = args;
+  if (!file || more.length > 0 || file.startsWith('-')) {
+    io.say('braindog pack check takes one file, as in braindog pack check bookshelf-1.0.0.pack.json.');
+    return 1;
+  }
+  const read = await readFileAs(file, io, 'pack');
+  if (typeof read === 'number') return read;
+  if (read.file.kind !== 'pack') return 1;
+  const { pack, title } = read.file.file;
+  const count = (k: string) => pack.declarations.filter((d) => d.kind === k).length;
+  io.out(`${title} ${pack.manifest.version} reads as an add-on: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
+  io.out(`  By ${pack.manifest.author}, ${pack.manifest.license}.`);
+  for (const line of reachLines(reachOf(read.file))) io.out(line);
   return 0;
 }
 
@@ -166,6 +236,94 @@ export function changeLines(c: Changes): string[] {
   if (c.words) lines.push('  Its words, voice, labels or skills differ.');
   if (unchanged(c)) lines.push('  Nothing else differs.');
   return lines;
+}
+
+/** How a signature is said, with what this machine knows of the key. */
+export function trustLine(trust: Trust, author: string): string {
+  switch (trust.kind) {
+    case 'unsigned':
+      return 'Unsigned: nothing says who published it beyond the catalogue it came from.';
+    case 'first':
+      return `Signed by key ${trust.key_id}. This machine has not seen a key for ${author} before, so it now remembers this one.`;
+    case 'known':
+      return `Signed by key ${trust.key_id}, the key this machine has seen for ${author} before.`;
+    case 'changed':
+      return `Signed by key ${trust.key_id}, which is not the key this machine has seen for ${author} before (${trust.before.join(', ')}). Somebody else may have published it.`;
+  }
+}
+
+/* ── keys ───────────────────────────────────────────────────────────────── */
+
+/** The keys this machine has seen per author, beside the hosts file. */
+export const knownKeysPath = (io: AgentIo): string => join(dirname(hostsPath(io.env)), 'known-keys.json');
+
+function knownKeys(io: AgentIo): KnownKeys {
+  try {
+    return readKnownKeys(JSON.parse(readFileSync(knownKeysPath(io), 'utf8')));
+  } catch {
+    return {};
+  }
+}
+
+function remember(io: AgentIo, author: string, signature: Signature): void {
+  const file = knownKeysPath(io);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), author, signature.key_id), null, 2)}\n`);
+}
+
+/** The git working tree a path is inside, or `null`. */
+function gitTreeOf(path: string): string | null {
+  let dir = dirname(path);
+  for (;;) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return null;
+    dir = up;
+  }
+}
+
+async function key(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} key`;
+  let values: { author?: string | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { author: { type: 'string' } } }));
+  } catch {
+    io.say(`${cmd} takes one file to write the key to, and --author <name>.`);
+    return 1;
+  }
+  const [given, ...more] = positionals;
+  if (!given || more.length > 0 || values.author === undefined || values.author.trim() === '') {
+    io.say(`${cmd} takes one file and --author <name>, as in ${cmd} ~/braindog-author.key.json --author "Halden". Keep the file private and out of any repository.`);
+    return 1;
+  }
+  const file = resolve(io.cwd, given);
+  if (existsSync(file)) {
+    io.say(`${file} is already there, and a key is never written over a file.`);
+    return 1;
+  }
+  const tree = gitTreeOf(file);
+  if (tree !== null) {
+    io.say(`${file} is inside the git working tree at ${tree}, where a private key could be committed. Choose a path outside any repository.`);
+    return 1;
+  }
+  const made = await newAuthorKey(values.author.trim());
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(made, null, 2)}\n`, { mode: 0o600 });
+  io.out(`An author key for ${made.author} is written to ${file}. Its key id is ${made.key_id}; readers see that id beside what you sign.`);
+  io.out(`Sign with braindog ${kind} publish <file> --to <folder> --sign ${given}. Keep the file private: anybody holding it can publish as you.`);
+  return 0;
+}
+
+async function readKeyFile(given: string, io: AgentIo): Promise<AuthorKey | string> {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(resolve(io.cwd, given), 'utf8'));
+  } catch {
+    return `${given} could not be read as an author key file.`;
+  }
+  const read = await readAuthorKey(doc);
+  return read.ok ? read.value : saidWithCode(read);
 }
 
 /* ── a catalogue, as a folder or an address ─────────────────────────────── */
@@ -212,18 +370,19 @@ function parsed(text: string, read: Catalogue['read'], where: string): Catalogue
 
 /* ── publish, search, diff ──────────────────────────────────────────────── */
 
-async function publish(args: string[], io: AgentIo): Promise<number> {
-  let values: { to?: string | undefined };
+async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} publish`;
+  let values: { to?: string | undefined; sign?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { to: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { to: { type: 'string' }, sign: { type: 'string' } } }));
   } catch {
-    io.say('braindog usecase publish takes one file and --to <folder>.');
+    io.say(`${cmd} takes one file, --to <folder> and --sign <key file>.`);
     return 1;
   }
   const [file, ...more] = positionals;
   if (!file || more.length > 0 || values.to === undefined) {
-    io.say('braindog usecase publish takes one file and --to <folder>, as in braindog usecase publish study-1.0.0.usecase.json --to ./catalogue.');
+    io.say(`${cmd} takes one file and --to <folder>, as in ${cmd} ${kind === 'usecase' ? 'study-1.0.0.usecase.json' : 'bookshelf-1.0.0.pack.json'} --to ./catalogue.`);
     return 1;
   }
   const source = await readSource(file, io);
@@ -231,12 +390,26 @@ async function publish(args: string[], io: AgentIo): Promise<number> {
     io.say(source.fix);
     return 1;
   }
+  const shape = await readCatalogueFile(source.text);
+  if (shape.ok && shape.value.kind !== kind) {
+    io.say(`${file} is ${NOUN[shape.value.kind].a}, not ${NOUN[kind].a}. Publish it with braindog ${shape.value.kind} publish.`);
+    return 1;
+  }
+  let signer: AuthorKey | undefined;
+  if (values.sign !== undefined) {
+    const got = await readKeyFile(values.sign, io);
+    if (typeof got === 'string') {
+      io.say(got);
+      return 1;
+    }
+    signer = got;
+  }
   const at = await catalogueAt(values.to, io, true);
   if (typeof at === 'string') {
     io.say(at);
     return 1;
   }
-  const out = await publishTo(at.index, source.text, at.read);
+  const out = await publishTo(at.index, source.text, at.read, new Date(), signer);
   if (!out.ok) {
     io.say(saidWithCode(out));
     return 1;
@@ -246,23 +419,24 @@ async function publish(args: string[], io: AgentIo): Promise<number> {
   writeFileSync(target, source.text);
   writeFileSync(join(at.where, CATALOGUE_INDEX), `${JSON.stringify(out.value.index, null, 2)}\n`);
   const { entry, version, changes } = out.value;
-  io.out(`${entry.title} ${version.version} published to ${at.where}.`);
+  io.out(`${entry.title} ${version.version} published to ${at.where}${version.signature ? `, signed by key ${version.signature.key_id}` : ', unsigned'}.`);
   if (changes.from !== null) for (const line of changeLines(changes)) io.out(line);
   for (const line of reachLines(version.reach)) io.out(line);
   return 0;
 }
 
-async function search(args: string[], io: AgentIo): Promise<number> {
+async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} search`;
   let values: { from?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { from: { type: 'string' } } }));
   } catch {
-    io.say('braindog usecase search takes words and --from <folder or address>.');
+    io.say(`${cmd} takes words and --from <folder or address>.`);
     return 1;
   }
   if (values.from === undefined) {
-    io.say('braindog usecase search needs --from <folder or address>, the catalogue to read.');
+    io.say(`${cmd} needs --from <folder or address>, the catalogue to read.`);
     return 1;
   }
   const at = await catalogueAt(values.from, io);
@@ -270,73 +444,82 @@ async function search(args: string[], io: AgentIo): Promise<number> {
     io.say(at);
     return 1;
   }
-  const found = searchCatalogue(at.index, positionals.join(' '));
+  const found = searchCatalogue(at.index, positionals.join(' '), kind);
   if (found.length === 0) {
-    io.out(positionals.length === 0 ? 'This catalogue has nothing published yet.' : `Nothing in this catalogue matches ${positionals.join(' ')}.`);
+    io.out(positionals.length === 0 ? `This catalogue has no ${NOUN[kind].the} published yet.` : `No ${NOUN[kind].the} in this catalogue matches ${positionals.join(' ')}.`);
     return 0;
   }
+  const known = knownKeys(io);
   for (const e of found) {
     const v = e.versions[0];
     io.out(`${e.id}  ${e.title} ${e.latest} by ${e.author}. ${e.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);
+    io.out(`  ${trustLine(trustOf(known, e.author, v?.signature), e.author)}`);
   }
-  io.out(`Not from the add-on index, and unsigned. Install one with braindog usecase install <id> --from ${values.from}.`);
+  io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${values.from}.`);
   return 0;
 }
 
-async function readFileShared(given: string, io: AgentIo): Promise<{ text: string; shared: Shared } | number> {
+async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<{ text: string; file: CatalogueFile } | number> {
   const source = await readSource(given, io);
   if (!source.ok) {
     io.say(source.fix);
     return 1;
   }
-  const shared = await readShared(source.text);
-  if (!shared.ok) {
-    io.say(`${given}: ${saidWithCode(shared)}`);
+  const read = await readCatalogueFile(source.text);
+  if (!read.ok) {
+    io.say(`${given}: ${saidWithCode(read)}`);
     return 1;
   }
-  return { text: source.text, shared: shared.value };
+  if (read.value.kind !== kind) {
+    io.say(`${given} is ${NOUN[read.value.kind].a}, not ${NOUN[kind].a}. Use braindog ${read.value.kind} for it.`);
+    return 1;
+  }
+  return { text: source.text, file: read.value };
 }
 
-async function diff(args: string[], io: AgentIo): Promise<number> {
+const idOf = (f: CatalogueFile): string => (f.kind === 'usecase' ? f.shared.usecase.usecase : f.file.pack.manifest.pack);
+
+async function diff(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
+  const cmd = `braindog ${kind} diff`;
   let positionals: string[];
   try {
     ({ positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {} }));
   } catch {
-    io.say('braindog usecase diff takes two files, the earlier first.');
+    io.say(`${cmd} takes two files, the earlier first.`);
     return 1;
   }
   const [a, b, ...more] = positionals;
   if (!a || !b || more.length > 0) {
-    io.say('braindog usecase diff takes two files, the earlier first, as in braindog usecase diff study-1.0.0.usecase.json study-1.1.0.usecase.json.');
+    io.say(`${cmd} takes two files, the earlier first, as in ${cmd} ${kind === 'usecase' ? 'study-1.0.0.usecase.json study-1.1.0.usecase.json' : 'bookshelf-1.0.0.pack.json bookshelf-1.1.0.pack.json'}.`);
     return 1;
   }
-  const from = await readFileShared(a, io);
+  const from = await readFileAs(a, io, kind);
   if (typeof from === 'number') return from;
-  const to = await readFileShared(b, io);
+  const to = await readFileAs(b, io, kind);
   if (typeof to === 'number') return to;
-  if (from.shared.usecase.usecase !== to.shared.usecase.usecase) {
-    io.say(`${a} is ${from.shared.usecase.usecase} and ${b} is ${to.shared.usecase.usecase}; diff compares two versions of one use case.`);
+  if (idOf(from.file) !== idOf(to.file)) {
+    io.say(`${a} is ${idOf(from.file)} and ${b} is ${idOf(to.file)}; diff compares two versions of one ${NOUN[kind].the}.`);
     return 1;
   }
-  for (const line of changeLines(changesBetween(from.shared, to.shared))) io.out(line);
+  for (const line of changeLines(changesBetween(from.file, to.file))) io.out(line);
   return 0;
 }
 
 /* ── install from a catalogue ───────────────────────────────────────────── */
 
-/** `install <id> --from <catalogue> [--version x.y.z]`: the file held to its checksum, then asked for on Decide. */
-export async function installFromCatalogue(id: string, from: string, version: string | undefined, host: string | undefined, io: AgentIo): Promise<number> {
+/** `install <id> --from <catalogue> [--version x.y.z]`: the file held to its checksum and signature, then asked for on Decide. */
+export async function installFromCatalogue(id: string, from: string, version: string | undefined, host: string | undefined, io: AgentIo, kind: EntryKind = 'usecase'): Promise<number> {
   const at = await catalogueAt(from, io);
   if (typeof at === 'string') {
     io.say(at);
     return 1;
   }
-  const bare = id.replace(/^usecase-/u, '');
-  const entry = at.index.entries.find((e) => e.id === bare);
+  const bare = kind === 'usecase' ? id.replace(/^usecase-/u, '') : id;
+  const entry = at.index.entries.find((e) => e.id === bare && e.kind === kind);
   if (!entry) {
-    const ids = at.index.entries.map((e) => e.id);
-    io.say(`There is no use case called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`);
+    const ids = at.index.entries.filter((e) => e.kind === kind).map((e) => e.id);
+    io.say(`There is no ${NOUN[kind].the} called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`);
     return 1;
   }
   if (version !== undefined && !VERSION.test(version)) {
@@ -348,22 +531,52 @@ export async function installFromCatalogue(id: string, from: string, version: st
     io.say(`${entry.title} has no version ${version} in this catalogue. It has ${entry.versions.map((v) => v.version).join(', ')}.`);
     return 1;
   }
-  const text = await at.read(catalogueFile(entry.id, chosen.version));
+  const path = catalogueFile(entry.id, chosen.version, kind);
+  const text = await at.read(path);
   if (text === null) {
-    io.say(`${catalogueFile(entry.id, chosen.version)} is listed in this catalogue and missing from it.`);
+    io.say(`${path} is listed in this catalogue and missing from it.`);
     return 1;
   }
-  const held = await verifyFile(chosen, text);
+  const held = await verifyVersion(entry, chosen, text);
   if (!held.ok) {
     io.say(saidWithCode(held));
     return 1;
   }
-  const shared = await readShared(text, { kind: 'url', ref: at.where });
-  if (!shared.ok) {
-    io.say(saidWithCode(shared));
+  const read = await readCatalogueFile(text, { kind: 'url', ref: at.where });
+  if (!read.ok) {
+    io.say(saidWithCode(read));
     return 1;
   }
-  return proposeFile(text, shared.value.usecase, host, io);
+  if (read.value.kind !== kind) {
+    io.say(`${path} is not ${NOUN[kind].a}, so this catalogue lists it wrongly. Nothing was sent.`);
+    return 1;
+  }
+  const trust = trustOf(knownKeys(io), entry.author, held.value);
+  const said = trustLine(trust, entry.author);
+  io.out(said);
+  /* THE KEY IS REMEMBERED ON FIRST USE ONLY. A different key is said on Decide and never replaces the one seen before. */
+  if (trust.kind === 'first' && held.value) remember(io, entry.author, held.value);
+  const question = `Install ${entry.title} ${chosen.version} from a catalogue? ${said}`;
+  if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
+  return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);
+}
+
+async function proposePack(id: string, doc: Record<string, unknown>, question: string, host: string | undefined, io: AgentIo): Promise<number> {
+  const { connect } = await import('./skills.ts');
+  const at = await connect(host, io);
+  if (typeof at === 'number') return at;
+  const answer = await at.client.call<{ id: string }>('propose', { question, body_kind: 'pack', body: { install: id, doc } });
+  if (!answer.ok) {
+    io.say(saidWithCode(answer));
+    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+  }
+  const filed = (answer.value as { id?: unknown }).id;
+  if (typeof filed !== 'string') {
+    io.say('The record took the question and did not say which one it is. Open Decide in the app.');
+    return 1;
+  }
+  io.out(`Asked the owner: ${question} Nothing is installed until they accept it: ${new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href}`);
+  return 0;
 }
 
 /* ── preview ────────────────────────────────────────────────────────────── */
@@ -383,8 +596,10 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
     io.say('braindog usecase preview takes one file and --port <n> above 1023, as in braindog usecase preview study-1.0.0.usecase.json --port 5870.');
     return 1;
   }
-  const read = await readFileShared(file, io);
-  if (typeof read === 'number') return read;
+  const got = await readFileAs(file, io, 'usecase');
+  if (typeof got === 'number') return got;
+  if (got.file.kind !== 'usecase') return 1;
+  const read = { text: got.text, shared: got.file.shared };
 
   const scratch = mkdtempSync(join(tmpdir(), 'braindog-preview-'));
   const catalogue = join(scratch, 'catalogue');
@@ -434,8 +649,43 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
   return code;
 }
 
-/** The SDK verbs `usecase` hands here, or `null` for a verb that is not one of them. */
-export function sdkVerb(verb: string | undefined): ((args: string[], io: AgentIo) => Promise<number>) | null {
-  return verb === 'new' ? create : verb === 'publish' ? publish : verb === 'search' ? search : verb === 'diff' ? diff : verb === 'preview' ? preview : null;
+
+/** The SDK verbs `usecase` and `pack` hand here, or `null` for a verb that is not one of them. */
+export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): ((args: string[], io: AgentIo) => Promise<number>) | null {
+  if (verb === 'new') return (a, io) => create(a, io, kind);
+  if (verb === 'publish') return (a, io) => publish(a, io, kind);
+  if (verb === 'search') return (a, io) => search(a, io, kind);
+  if (verb === 'diff') return (a, io) => diff(a, io, kind);
+  if (verb === 'key') return (a, io) => key(a, io, kind);
+  if (verb === 'preview' && kind === 'usecase') return preview;
+  return null;
 }
 
+const PACK_USAGE =
+  'braindog pack takes new <id>, check <file>, diff <a> <b>, key <file> --author <name>, publish <file> --to <folder> [--sign <key file>], search [words] --from <catalogue>, or install <id> --from <catalogue> [--version <x.y.z>] [--host <host>].';
+
+/** `braindog pack …`: the add-on half of the SDK. */
+export async function pack(args: string[], io: AgentIo): Promise<number> {
+  const [verb, ...rest] = args;
+  if (verb === 'check') return checkPack(rest, io);
+  if (verb === 'install') {
+    let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined };
+    let positionals: string[];
+    try {
+      ({ values, positionals } = parseArgs({ args: rest, allowPositionals: true, strict: true, options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' } } }));
+    } catch {
+      io.say(PACK_USAGE);
+      return 1;
+    }
+    const [id, ...more] = positionals;
+    if (!id || more.length > 0 || !ID.test(id) || values.from === undefined) {
+      io.say('braindog pack install takes one id and --from <catalogue>, as in braindog pack install bookshelf --from ./catalogue.');
+      return 1;
+    }
+    return installFromCatalogue(id, values.from, values.version, values.host, io, 'pack');
+  }
+  const sdk = verb === 'preview' ? null : sdkVerb(verb, 'pack');
+  if (sdk) return sdk(rest, io);
+  io.say(PACK_USAGE);
+  return 1;
+}

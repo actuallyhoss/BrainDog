@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -80,7 +80,7 @@ test('publish fills a catalogue, refuses the same version and a bump too small, 
   h.out.length = 0;
   assert.equal(await usecase(['search', 'club', '--from', 'catalogue'], h.io), 0);
   assert.match(h.out[0] ?? '', /^club {2}Club 2\.0\.0 by Halden/u);
-  assert.ok(h.out.some((l) => /Not from the add-on index, and unsigned/u.test(l)));
+  assert.ok(h.out.some((l) => /Unsigned: nothing says who published it/u.test(l)));
   h.out.length = 0;
   assert.equal(await usecase(['diff', 'club-1.0.0.usecase.json', 'club-2.0.0.usecase.json'], h.io), 0);
   assert.equal(h.out[0], '1.0.0 to 2.0.0 needs at least a major version.');
@@ -95,7 +95,7 @@ test('install --from holds the file to its checksum, then only asks the owner', 
   const asked = h.seen.filter((s) => s.method !== 'context');
   assert.deepEqual(asked.map((s) => s.method), ['propose']);
   assert.equal(asked[0]?.args.body_kind, 'pack');
-  assert.match(h.out.at(-1) ?? '', /Asked the owner to install Club 1\.0\.0\. Nothing is installed until they accept it: .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /Asked the owner: Install Club 1\.0\.0 from a catalogue\? Unsigned.* Nothing is installed until they accept it: .*\/decide\/SG7$/u);
 
   /* A file changed after it was published is refused, and nothing more is sent. */
   const path = join(h.dir, 'catalogue', 'usecases', 'club', '1.0.0.usecase.json');

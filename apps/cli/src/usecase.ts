@@ -37,7 +37,7 @@ import { installFromCatalogue, reachLines, sdkVerb } from './catalogue.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
-  'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
+  'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder> [--sign <key file>], key <file> --author <name>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
 
 /** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
 const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
