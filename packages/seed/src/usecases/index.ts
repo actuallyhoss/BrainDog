@@ -30,8 +30,12 @@ function checked(doc: unknown): UseCase {
   return out.value;
 }
 
-/** In the order a tie is broken: the most specific first, and the business setup last. */
-export const USE_CASES: readonly UseCase[] = [checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(PERSONAL), checked(BUSINESS)];
+/**
+ * In the order a tie is broken: one person's own life first, then the most specific, and the business setup last. Personal
+ * leads because a sentence that is as much about a person's budget as their coursework is a person's record with their
+ * studies beside it (`alongside`), and the record speaks in the voice of the use-case pack whose id sorts first.
+ */
+export const USE_CASES: readonly UseCase[] = [checked(PERSONAL), checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
 
 export const useCase = (id: string): UseCase | undefined => USE_CASES.find((u) => u.usecase === id);
 
@@ -85,17 +89,19 @@ export function arrange(said: string, catalogue: readonly UseCase[] = USE_CASES)
  * THE OTHER USE CASES A PERSON'S RECORD TAKES BESIDE THE ONE PROPOSED, for one person who said more than one thing about
  * their own life: "my budget, my running and my coursework" is Personal with Student's lists beside it. Only between use
  * cases for an individual that carry a pack, only when the sentence was heard saying so, and never two that declare the
- * same list or page, so neither install can refuse the other. The proposed one speaks: its voice is installed first.
+ * same list or page, so neither install can refuse the other.
  */
 export function alongside(arranged: Arrangement, proposed: UseCase | null): UseCase[] {
   if (!proposed || proposed.audience !== 'individual' || proposed.pack === null) return [];
+  /* A RECORD SPEAKS IN THE VOICE OF ITS FIRST USE-CASE PACK BY ID (`voice.ts` `speaking`), so only a use case whose id
+     sorts after the proposal's goes beside it: the voice the proposal promised is the one the record has. */
   const ids = (u: UseCase): Set<string> =>
     new Set(((u.pack?.declarations ?? []) as Record<string, unknown>[]).flatMap((d) => [d.register, d.page, d.metric].filter((x): x is string => typeof x === 'string')));
   const taken = ids(proposed);
   const out: UseCase[] = [];
   for (const r of arranged.ranked) {
     const u = r.usecase;
-    if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null) continue;
+    if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null || u.usecase < proposed.usecase) continue;
     const mine = ids(u);
     if ([...mine].some((id) => taken.has(id))) continue;
     for (const id of mine) taken.add(id);
