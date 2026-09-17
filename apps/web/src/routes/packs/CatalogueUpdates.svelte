@@ -179,7 +179,6 @@
 
   .key {
     color: var(--ink2);
-    font-family: var(--font-id);
     font-size: var(--t-xs);
   }
 

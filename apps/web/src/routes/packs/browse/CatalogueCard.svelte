@@ -109,7 +109,6 @@
   }
 
   .facts .key {
-    font-family: var(--font-id);
     font-size: var(--t-xs);
   }
 
