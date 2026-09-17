@@ -549,6 +549,7 @@ test('WHAT GOOD LOOKS LIKE IS A SENTENCE, not an inequality', () => {
   assert.equal(under, 'no more than GBP 20,000.00');
   assert.equal(targetLine({ format: 'money.GBP', target: { lte: 0 } } as MetricDecl), 'should be nothing');
   assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'at least 3');
+  assert.equal(targetLine({ format: 'money.GBP', target: { gte: 0 } } as MetricDecl), 'never below zero');
   for (const said of [under, targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl)])
     assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
 });

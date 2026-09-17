@@ -1025,6 +1025,8 @@ export const targetLine = (decl: MetricDecl): string => {
   const under = 'lte' in decl.target;
   const bound = 'lte' in decl.target ? decl.target.lte : decl.target.gte;
   if (under && bound === 0) return 'should be nothing';
+  /* "AT LEAST £0.00" SAYS A NUMBER TO SAY A SIDE OF ZERO. Home's cash and money coming in both read it under the figure. */
+  if (!under && bound === 0) return 'never below zero';
   /**
    * "WATCH OVER" IS NOT A SENTENCE ANYBODY SAYS, and at the boundary it argued with itself.
    *
