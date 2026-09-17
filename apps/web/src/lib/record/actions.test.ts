@@ -24,6 +24,7 @@ import {
   monthRange,
   often,
   openActions,
+  countsOf,
   readUsage,
   sample,
   stateOf,
@@ -374,4 +375,8 @@ test('A 401 CANCELS ITS BODY rather than leaving the request pending', async () 
   const first = await live(io).actions();
   assert.equal(first.ok === false && first.refusal.code, 'UNAUTHORIZED');
   assert.equal(cancelled, true);
+});
+
+test('one run and one request are said in the singular', () => {
+  assert.equal(countsOf({ runs: 1, requests: 1, bytes: 11, failures: 0 }).startsWith('1 run · 1 request · '), true);
 });

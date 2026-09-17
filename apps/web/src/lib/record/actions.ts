@@ -452,7 +452,7 @@ async function nobodySignedIn(io: Fetch, base: string): Promise<boolean> {
 export const countsOf = (t: Totals): string =>
   [
     t.runs === 1 ? '1 run' : `${t.runs.toLocaleString('en-GB')} runs`,
-    `${t.requests.toLocaleString('en-GB')} ${words.requests}`,
+    t.requests === 1 ? '1 request' : `${t.requests.toLocaleString('en-GB')} ${words.requests}`,
     fmtBytes(t.bytes),
     t.failures > 0 ? words.failures(t.failures) : '',
   ]
