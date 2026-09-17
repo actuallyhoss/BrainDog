@@ -237,6 +237,19 @@ test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOA
   sql.close();
 });
 
+test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and its agents, with nothing over money or services', async () => {
+  const { k, sql } = await made('team');
+  const product = value<{ seq: number }>(k.create('things', { name: 'Mobile app', lane: 'building', health: 'at_risk', next: 'Cut the release branch' }, { actor: 'p_owner' }));
+  value(k.create('tasks', { what: 'Review the store listing', state: 'review', thing: `things#${product.seq}` }, { actor: 'agent:claude' }));
+  const page = value<{ blocks: (Drawn & { kind: string; rows?: Row[] })[] }>(k.page('mobile-app'));
+  for (const b of page.blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  const headings = page.blocks.map((b) => b.heading);
+  assert.ok(headings.includes('Where it stands') && headings.includes('Waiting on you') && headings.includes('Agents'), headings.join(', '));
+  assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
+  assert.deepEqual(page.blocks.find((b) => b.heading === 'Waiting on you')!.rows?.map((r) => r.fields.what), ['Review the store listing']);
+  sql.close();
+});
+
 test('A RUN OR A SAVING IS A ROW THAT MOVES ITS GOAL, and a habit counts only this week', async () => {
   const { k, sql } = await made('personal');
   const io: LinkIo = {

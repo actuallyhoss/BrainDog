@@ -459,7 +459,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: 'thing is {{name}}, state is review or blocked',
         columns: [
-          { field: 'what', label: 'Task', width: 'minmax(16ch,1fr)' },
+          /* NO LABEL: headed by what one task is called, so a team whose tasks are Tickets reads Ticket. */
+          { field: 'what', width: 'minmax(16ch,1fr)' },
           { field: 'state', label: 'Status', width: '11ch' },
           { field: 'changed', label: 'Changed by', width: '15ch' },
         ],
@@ -576,9 +577,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
 /**
  * THE LISTS THE PROJECT TEMPLATE ONLY LINKS TO. What a project runs on, and what that costs a year, come from Estate's
  * services, and a record that keeps no services still has projects worth a page: a founder's apps, a student's passion
- * project. So services are a link and not a dependency, the way People's "Met in" is (`first-party.ts` `LINKS`).
+ * project. So services are a link and not a dependency, the way People's "Met in" is (`first-party.ts` `LINKS`). Money
+ * owed on a project is the same: a team's products have work and agents on them and no invoices in the record.
  */
-export const PROJECT_LINKS: readonly string[] = ['services'];
+export const PROJECT_LINKS: readonly string[] = ['services', 'obligations'];
 
 /**
  * The project template for a record that holds these lists: every block and figure over a linked list it does not hold

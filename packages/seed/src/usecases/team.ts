@@ -16,14 +16,20 @@
  * A record that took 2.0.0 had its backlog tickets made To do, and the update puts them back (`backlogAgain`).
  */
 
+import { projectTemplate } from '../modules/portfolio.ts';
+
 type Body = Record<string, unknown>;
+
+/** The lists a team's record holds, so the project page leaves out what reads money and services. */
+const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan'];
 
 /* NO LABEL: the column over a ticket's title is headed by what one ticket is called, so a team that calls them Issues reads Issue. */
 const TICKET = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
 export const TEAM = {
   usecase: 'team',
-  version: '2.1.0',
+  /* 2.2.0: a page for each product or project in play, from Projects' template. */
+  version: '2.2.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -213,6 +219,12 @@ export const TEAM = {
             empty: 'Nobody is blocked.',
           },
         ],
+      },
+      {
+        /* A PAGE FOR EACH PROJECT IN PLAY: where it stands, the tickets on it waiting on a call, what is open, and the agents
+           on it. Projects' template, without what reads money and services, which a team's record does not hold. Same id as
+           the template, so a record never has two pages at one project's address. */
+        ...projectTemplate(HOLDS),
       },
       {
         page: 'agent-work',
