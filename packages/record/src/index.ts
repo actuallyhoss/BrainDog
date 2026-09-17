@@ -463,6 +463,11 @@ export type Boot = {
   /** What changed since the caller last read, exactly as `whatsNew` answers with no cursor. */
   whatsNew: WhatsNew;
   /**
+   * Each person on the record by name, by id, for saying who did what, and only for a caller who may read the membership
+   * list (the owner) or the People list. Names only: no address, no level. Absent for anybody else.
+   */
+  names?: Record<string, string>;
+  /**
    * Whether anybody signs in on this host.
    *
    * THE HOST KNOWS AND THE APP COULD NOT TELL. A self-host started without a key, or a Worker with no
@@ -1279,7 +1284,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * What the shell draws around every screen, held to the caller as `boot`'s registers are: the record's name, who is
    * asking, the pages they may open, and the two counts on the rail.
    */
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'whatsNew'> => {
+  /**
+   * WHO DID WHAT, BY NAME, FOR A CALLER WHO MAY ALREADY KNOW WHO IS HERE. A member other than the owner read every colleague
+   * as "Someone on this record", because the one read with names in it, `members`, is ADMIN: it carries every address.
+   * The owner reads the membership list, and a member who may read People reads the people the record knows, so each of
+   * them is told the names and nothing else. Anybody else still reads Someone (`20 §1`, the ceiling; `members`, the addresses).
+   */
+  const namesFor = (ctx: CallContext): Record<string, string> | null => {
+    const mayKnow = allows(ctx, 'owner') === null || (kernel.register(PEOPLE) !== undefined && readable(ctx, PEOPLE) === null);
+    if (!mayKnow) return null;
+    return Object.fromEntries(kernel.members().flatMap((m) => (typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()]] : [])));
+  };
+
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -1303,6 +1320,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         inbox: allows(ctx, 'owner') === null ? kernel.inboxWaiting() : null,
       },
       whatsNew: newsFor(ctx),
+      ...((names) => (names === null ? {} : { names }))(namesFor(ctx)),
     };
   };
 

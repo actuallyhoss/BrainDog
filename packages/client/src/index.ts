@@ -59,6 +59,8 @@ export type Boot = {
   record?: { slug: string; name: string; locale: string } | null;
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
   me?: { kind: 'person' | 'token' | 'system'; person: string | null; name: string | null; level: string | null };
+  /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
+  names?: Record<string, string>;
   /** The pages the caller may open, each with its place in the rail when it has one. */
   pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null }[];
   /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */

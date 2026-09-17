@@ -154,6 +154,16 @@ test('a use case added beside another says so, and "speaks" is said only when th
   assert.deepEqual(texts([voice('personal', null, false), voice('student', null, true)]), ['Personal added beside Student']);
 });
 
+test('ANOTHER PERSON IN THE FEED IS NAMED WHEN boot SAID THE NAME, and is Someone on this record when it did not, never an id', () => {
+  const ada = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+  const cy = 'p_01M2PB0000000000000000000C';
+  const events = [line({ actor: ada, kind: 'decide', title: 'Renew' }), line({ actor: cy, kind: 'decide', title: 'Renew' }), line({ actor: 'p_1', kind: 'decide', title: 'Renew' })];
+  assert.deepEqual(newsOf(events as never, 'p_1', new Map([[ada, 'Ada Lovelace']])).map((i) => i.by), ['Ada Lovelace', 'Someone on this record', 'you']);
+  const shell = layoutOf({ ...BOOT, names: { [ada]: 'Ada Lovelace' }, whatsNew: { events: [line({ actor: ada, kind: 'decide', title: 'Renew' })], upTo: 1, sinceCapped: false } } as never);
+  assert.deepEqual(shell.names, { [ada]: 'Ada Lovelace' });
+  assert.equal(shell.whatsNew[0]?.by, 'Ada Lovelace');
+});
+
 test('what was applied, kept on a decision, is not a line of its own in the feed', () => {
   const items = newsOf([line({ kind: 'note', target: 'decision:D7', target_kind: 'decision', note: 'Applied what was accepted.' }), line({ kind: 'decide', title: 'Add Personal?' })] as never, null);
   assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal?']);

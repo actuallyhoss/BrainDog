@@ -11,6 +11,7 @@ import { createClient, type ClientOptions } from '@braindog/client';
 
 import { AUDIT, display, labelOf, NOW, REGISTERS } from './api.ts';
 import { noRecord } from './device.ts';
+import { readBoot } from './boot-live.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -64,10 +65,14 @@ export const linesOf = (register: string, events: readonly Event[]): Line[] =>
   events.map((e) => ({ by: actor(e.actor), note: noteOf(register, e), at: e.ts })).reverse();
 
 /**
- * The names of the people on this record, by id, for saying who did what. `members` is the owner's to read, so anybody
- * else, a refusal and the sample all get an empty map, and each person is said as You or Someone on this record.
+ * The names of the people on this record, by id, for saying who did what. `boot` sends them to the owner and to a member
+ * who may read People, and the shell keeps that answer, so this costs no call. A host older than `names` is asked
+ * `members`, which is the owner's. Anybody else, a refusal and the sample get an empty map, and each person is said as
+ * You or Someone on this record.
  */
 export async function readNames(base: string, io?: Fetch): Promise<ReadonlyMap<string, string>> {
+  const booted = await readBoot(base, io).catch(() => null);
+  if (booted?.from === 'live' && booted.boot.names !== undefined) return new Map(Object.entries(booted.boot.names));
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.members().catch(() => null);
   if (!out?.ok || !Array.isArray(out.value)) return new Map();

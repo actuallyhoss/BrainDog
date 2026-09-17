@@ -117,3 +117,18 @@ test('THE NAMES ARE THE MEMBERS THE RECORD ANSWERS, and a refusal is no names ra
   const refused = await readNames('https://x.example', (async () => new Response(JSON.stringify({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Owners only.' } }), { status: 403, headers: { 'content-type': 'application/json' } })) as never);
   assert.equal(refused.size, 0);
 });
+
+test('A MEMBER WHO MAY READ PEOPLE IS TOLD THE NAMES BY boot, and members, which is the owner’s, is not asked', async () => {
+  const { forget } = await import('./boot-live.ts');
+  forget();
+  const asked: string[] = [];
+  const io = (async (url: string | URL | Request) => {
+    asked.push(new URL(String(url)).pathname);
+    const value = { registers: [], now: '2026-09-17T12:00:00.000Z', me: { kind: 'person', person: 'p_2', name: 'Bo', level: 'read' }, names: { p_01M2PAZ28BN3FTKQB266DVT4HX: 'Ada Lovelace' } };
+    return new Response(JSON.stringify({ ok: true, value }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as never;
+  const names = await readNames('https://x.example', io);
+  assert.deepEqual([...names], [['p_01M2PAZ28BN3FTKQB266DVT4HX', 'Ada Lovelace']]);
+  assert.deepEqual(asked, ['/api/boot']);
+  forget();
+});

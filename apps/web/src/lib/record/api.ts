@@ -2410,10 +2410,10 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
  * below the rows newer than the reader's read mark, which the renderer draws as new, and says when that
  * was. A reader with no mark yet gets it at the end with no time, which is the renderer's "not looked yet".
  */
-export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null): Pick<BlockResult, 'rows' | 'shown'> {
+export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : feedWho(r.who, me), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
+    cells: [r.by, r.who === null ? '' : feedWho(r.who, me, names), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

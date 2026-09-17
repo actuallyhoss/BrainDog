@@ -402,7 +402,7 @@ function isSeries(v: unknown): v is MeasureSeries {
 }
 
 /** One answered block as the page draws it. */
-export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number, me: string | null = null): LiveBlock {
+export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): LiveBlock {
   const {
     kind: _kind,
     where: _where,
@@ -540,7 +540,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     if (kind === 'agents') return { ...shell, feed, ...agentsTable(feed, now), total: feed.length };
     const seen = typeof mark === 'string' ? mark : null;
     const marks = b.since === 'seen' || mark !== undefined;
-    return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now, me), total: matched };
+    return { ...shell, feed, ...(marks ? { seen } : {}), ...feedTable(feed, marks, seen, now, me, names), total: matched };
   }
   if (kind === 'diff') {
     const history = historyOf(versions);
@@ -705,6 +705,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       /* WHO IS READING, for a feed that names the reader as You: the shell's own `boot`, kept, so it costs no call. */
       const booted = blocks.some((b) => b.source === 'activity') ? await readBoot(base, io) : null;
       const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
+      const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
       const refs = new Map<string, RefMap>();
       for (const target of wanted) {
         const map = await mapOf(target);
@@ -732,7 +733,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         page: {
           page: identity ? { ...page, identity } : page,
           blocks: blocks.map((b, i) => {
-            const drawn = blockOf(b, refs, now, me);
+            const drawn = blockOf(b, refs, now, me, names);
             const held = linked.get(i);
             return held && !drawn.cannot ? { ...drawn, linked: held } : drawn;
           }),

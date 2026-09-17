@@ -534,3 +534,28 @@ test('A PAGE OF GOVERNANCE IS FILLED FROM WHAT THE CALLER MAY SEE, not trimmed f
   assert.equal(value<Record<string, unknown>[]>(await api.governance({}, owner)).length, 50);
   sql.close();
 });
+
+test('BOOT NAMES WHO IS ON THE RECORD to the owner and to a member who may read People, and never an address', async () => {
+  const { api, sql } = await record();
+  const PEOPLE_LIST = { id: 'register.people', kind: 'register' as const, body: { id: 'people', name: 'People', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never };
+  const namesOf = async (ctx: CallContext) => (value<Boot>(await api.boot(ctx)) as Boot & { names?: Record<string, string> }).names;
+  value(await api.invite({ person: 'p_2', name: 'Bo', email: 'bo@example.com', level: 'read' } as never, owner));
+  value(await api.invite({ person: 'p_3', name: 'Cy', registers: { obligations: 'read' } } as never, owner));
+  const held = (id: string): CallContext => {
+    const a = api.kernel.access(id)!;
+    return { principal: { kind: 'person', id, level: a.level }, registers: a.registers ?? '*', levels: a.levels };
+  };
+
+  /* NO PEOPLE LIST: only the owner, who reads the membership list, is told. */
+  assert.deepEqual(await namesOf(owner), { p_2: 'Bo', p_3: 'Cy' });
+  assert.equal(await namesOf(held('p_2')), undefined, 'a reader was named the members on a record with no People list');
+
+  assert.ok((await api.kernel.install([PEOPLE_LIST])).ok);
+  value(await api.invite({ person: 'p_4', name: 'Di', registers: { people: 'read' } } as never, owner));
+  assert.deepEqual(await namesOf(held('p_2')), { p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member who reads the whole record, People with it');
+  assert.deepEqual(await namesOf(held('p_4')), { p_2: 'Bo', p_3: 'Cy', p_4: 'Di' }, 'a member invited to People');
+  assert.equal(await namesOf(held('p_3')), undefined, 'a member held to Obligations was named everybody');
+  assert.equal(await namesOf(project), undefined, 'a token held to one project was named everybody');
+  assert.doesNotMatch(JSON.stringify(value<Boot>(await api.boot(held('p_2')))), /example\.com/u);
+  sql.close();
+});

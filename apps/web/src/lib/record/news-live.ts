@@ -14,7 +14,7 @@ import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { Metric } from './api.ts';
-import { actorFor, forget, newsOf, type Fetch } from './boot-live.ts';
+import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
@@ -81,8 +81,14 @@ export async function readHome(base: string, me: string | null, io?: Fetch, aske
   return {
     from: 'live',
     tiles: figures.flatMap((out, i) => (out.ok ? [tileOf(asked[i]!, out.value as Reading)] : [])),
-    news: { items: newsOf(news.value.events, me), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
+    news: { items: newsOf(news.value.events, me, news.value.events.some((e) => e.actor.startsWith('p_') && e.actor !== me) ? await namesFor(base, io) : new Map()), upTo: news.value.upTo, sinceCapped: news.value.sinceCapped },
   };
+}
+
+/** The names `boot` told this reader, from the shell's kept answer, so it costs no call once the shell has drawn. Asked only when somebody else is in the feed. */
+async function namesFor(base: string, io?: Fetch): Promise<ReadonlyMap<string, string>> {
+  const booted = await readBoot(base, io).catch(() => null);
+  return new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
 }
 
 /** Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. */

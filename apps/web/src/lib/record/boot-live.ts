@@ -16,7 +16,7 @@
 import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
-import { iconFor, NOW, PACKS, REGISTERS, setupSaid, type boot, type NavEntry } from './api.ts';
+import { iconFor, NOW, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
 import { copy } from '../copy.ts';
 import { noRecord } from './device.ts';
 import { noteOf } from './history-live.ts';
@@ -58,6 +58,11 @@ export type Shell = Omit<Sample, 'me'> & {
    * the record holds it, so a use case with no Home page is not asked for one on every load. Empty for the sample.
    */
   pages: string[];
+  /**
+   * EACH PERSON ON THE RECORD BY NAME, by id, when `boot` sent them: to the owner and to a member who may read People. Empty
+   * for anybody else and for the sample, and a person it does not name is Someone on this record.
+   */
+  names: Record<string, string>;
   inbox: number;
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
@@ -99,6 +104,13 @@ export function forget(): void {
    lines are "you", as the sample's are. */
 export const actorFor = (actor: string, me: string | null): string =>
   me !== null && actor === me ? 'you' : actor.replace(/^rule:/u, 'rule.');
+
+/* ANOTHER PERSON IN THE FEED BY THE NAME THE RECORD TOLD THIS READER, else as Someone on this record, never as their id. */
+const feedActor = (actor: string, me: string | null, names: ReadonlyMap<string, string>): string => {
+  if (me !== null && actor === me) return 'you';
+  const said = whoDid(actor, me, names);
+  return said.person && actor !== 'you' ? said.name : actorFor(actor, me);
+};
 
 const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -265,7 +277,7 @@ function reasonsOf(events: readonly EventLine[]): { byDecision: Map<number, stri
 }
 
 /** The record's lines as the feed's items, newest first as they came. */
-export function newsOf(events: readonly EventLine[], me: string | null): NewsItem[] {
+export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
   const reasons = reasonsOf(events);
   return events.flatMap((e, i) => {
@@ -274,7 +286,7 @@ export function newsOf(events: readonly EventLine[], me: string | null): NewsIte
     if (reasons.folded.has(e.rowid)) return [];
     const reason = reasons.byDecision.get(e.rowid);
     const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
-    return text == null ? [] : [{ at: e.ts, by: actorFor(e.actor, me), text, href: hrefOf(e) }];
+    return text == null ? [] : [{ at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e) }];
   });
 }
 
@@ -308,13 +320,14 @@ export function layoutOf(b: Boot): Shell {
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
     pages: (b.pages ?? []).map((p) => p.slug),
+    names: { ...b.names },
     nav,
     pen: [],
     me: { person: person ?? '', level, owner: level === 'owner', records: record ? [{ slug: record.slug, name: record.name, level }] : [] },
     people: [],
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */
     questions: (b.waiting ?? []).map((w, i) => ({ id: w.id, title: w.question || w.id, cost: '', rank: i + 1, opened: w.opened_at, options: [] })),
-    whatsNew: newsOf(b.whatsNew?.events ?? [], person),
+    whatsNew: newsOf(b.whatsNew?.events ?? [], person, new Map(Object.entries(b.names ?? {}))),
     sinceCapped: b.whatsNew?.sinceCapped ?? false,
     /* THE NEWEST LINE THIS CALLER MAY SEE, which is as near the record's version as `boot` says. */
     version: b.whatsNew?.upTo ?? 0,
@@ -335,6 +348,7 @@ export const sampleShell = (sample: Sample, inbox: number): Shell => ({
   ...sample,
   lists: Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name })),
   pages: [],
+  names: {},
   inbox,
   open: sample.questions.length,
   now: NOW,

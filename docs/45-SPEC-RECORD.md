@@ -581,7 +581,7 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 
 As built, `boot` answers `registers`, `now`, `sessions` and `waiting` (20 open suggestions), and what the web shell
 draws: `record`, `me` (with the member's name), `pages` filtered as `pages` filters them, `counts { decide, inbox }`
-(`inbox` is `null` below owner), `whatsNew` with the default cursor, each held to what the caller may read, and
+(`inbox` is `null` below owner), `whatsNew` with the default cursor, each held to what the caller may read, `names`, each person on the record by name and by id, sent only to a caller who may read the membership list (the owner) or the People list, with no address and no level, so who did what is said by name to them and as Someone on this record to anybody else *(added September 17th 2026)*, and
 `signIn: boolean`, whether anybody signs in on this host. `signIn` is read off the host's `invitations` hook: an
 invitation is spent by signing in, so a host that cannot take one has no sign-in, and a host that never said is `false`.
 A self-host started without a key, or a Worker with no `SESSION_SECRET`, answers `/account/records` 401 on every load,

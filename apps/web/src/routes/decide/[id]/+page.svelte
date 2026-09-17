@@ -494,7 +494,7 @@
         <p class="settled-head">
           <Icon name="check" size="m" />
           {copy.decidedBy}
-          {whoDid(settled.by, String(page.data.me?.person ?? '') || null).name}, {since(settled.at, now)}
+          {whoDid(settled.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))).name}, {since(settled.at, now)}
         </p>
         <p class="settled-choice">{settled.title}</p>
         <p class="settled-reason">“{settled.reason}”</p>
