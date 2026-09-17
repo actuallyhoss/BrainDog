@@ -16,7 +16,7 @@
   import type { PackState } from '$lib/record/packs.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { browserStore, fileProposal, keepFirstKey, readHostCatalogue, signedWords, trustFor, trustWords, updateProposal, updatesFor } from './browse/catalogue.ts';
+  import { browserStore, fileProposal, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords, updateProposal, updatesFor } from './browse/catalogue.ts';
   import { moduleTitle } from './sharing.ts';
 
   let { states, live, client }: { states: readonly PackState[] | null; live: boolean; client: ReturnType<typeof createClient> | null } = $props();
@@ -38,7 +38,7 @@
       if (!got.ok || !got.index) return;
       const out = await updatesFor(fetch, got.index, held);
       const store = browserStore();
-      offered = await Promise.all(out.updates.map(async (update) => ({ update, trust: await trustFor(store, update.entry.author, update.signature, got.index?.keys), filed: null, fix: null })));
+      offered = await Promise.all(out.updates.map(async (update) => ({ update, trust: await trustForEntry(store, update.entry, update.to.version, update.signature, got.index?.keys), filed: null, fix: null })));
       refused = out.refused;
     })();
   });
@@ -55,7 +55,7 @@
       }
       o.fix = null;
       o.filed = out.id;
-      await keepFirstKey(browserStore(), o.update.entry.author, o.trust);
+      await keepFirstKey(browserStore(), keyOf(o.update), o.trust);
     } finally {
       busy = null;
     }

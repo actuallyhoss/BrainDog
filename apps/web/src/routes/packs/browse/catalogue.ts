@@ -109,7 +109,7 @@ export async function catalogueTitles(index: CatalogueIndex | null): Promise<Map
 
 /* ── signatures and trust on first use ──────────────────────────────────── */
 
-/** Where this browser keeps the key ids it has seen for each author. */
+/** Where this browser keeps the key ids it has seen for each entry, by `trustSubject` (kind and id, never the author name). */
 export const KNOWN_KEYS = 'braindog.catalogue.keys';
 
 /** The part of `Storage` read here, so a test hands in a map and a page hands in `localStorage`. */
@@ -139,12 +139,19 @@ export async function loadKnownKeys(store: KeyStore | null): Promise<KnownKeys> 
 }
 
 /**
- * Whether this browser has seen the key that signed a version for its author before, read with the catalogue's key
- * statements (`index.keys`), each verified here before it counts.
+ * Whether this browser has seen the key that signed a version for its entry before (`subject`, from `trustSubject`), read
+ * with the catalogue's key statements (`index.keys`), each verified here before it counts, and the keys that signed the
+ * entry's earlier versions (`keysSignedBefore`), so a version that lost its signature is said loudly.
  */
-export async function trustFor(store: KeyStore | null, author: string, signature: Signature | null | undefined, keys?: KeyStatements): Promise<Trust> {
+export async function trustFor(store: KeyStore | null, subject: string, signature: Signature | null | undefined, keys?: KeyStatements, signedBefore: readonly string[] = []): Promise<Trust> {
   const { trustOf, verifiedStatements } = await import('@braindog/declare/catalogue');
-  return trustOf(await loadKnownKeys(store), author, signature, await verifiedStatements(keys));
+  return trustOf(await loadKnownKeys(store), subject, signature, await verifiedStatements(keys), signedBefore);
+}
+
+/** Trust for an entry's version, with its subject and earlier signatures read from the entry itself. */
+export async function trustForEntry(store: KeyStore | null, entry: CatalogueEntry, version: string, signature: Signature | null | undefined, keys?: KeyStatements): Promise<Trust> {
+  const { keysSignedBefore, trustSubject } = await import('@braindog/declare/catalogue');
+  return trustFor(store, trustSubject(entry), signature, keys, await keysSignedBefore(entry, version));
 }
 
 /** Trust said as a sentence, loud when the key is not the one seen before. */
@@ -152,6 +159,8 @@ export function trustWords(trust: Trust, author: string): { text: string; loud: 
   switch (trust.kind) {
     case 'unsigned':
       return { text: copy.catalogueTrustUnsigned, loud: false };
+    case 'stripped':
+      return { text: copy.catalogueTrustStripped(author, trust.before), loud: true };
     case 'first':
       return { text: copy.catalogueTrustFirst(author), loud: false };
     case 'known':
@@ -170,12 +179,12 @@ export function trustWords(trust: Trust, author: string): { text: string; loud: 
  * key needs nothing, and a changed or revoked key is never written over the one seen before, so it is said loudly again
  * next time. Answers whether anything was kept.
  */
-export async function keepFirstKey(store: KeyStore | null, author: string, trust: Trust): Promise<boolean> {
+export async function keepFirstKey(store: KeyStore | null, subject: string, trust: Trust): Promise<boolean> {
   const { keyToKeep, rememberKey } = await import('@braindog/declare/catalogue');
   const keep = keyToKeep(trust);
   if (keep === null || !store) return false;
   try {
-    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), author, keep)));
+    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), subject, keep)));
     return true;
   } catch {
     return false;
@@ -224,7 +233,12 @@ export async function askForVersion(
 ): Promise<{ ok: true; id: string; signature: Signature | null } | { ok: false; fix: string; code: string | null }> {
   const got = await catalogueText(fetcher, entry, version);
   if (!got.ok) return got;
-  const { readCatalogueFile } = await import('@braindog/declare/catalogue');
+  const { keysSignedBefore, readCatalogueFile, strippedNotice } = await import('@braindog/declare/catalogue');
+  /* AN UNSIGNED VERSION AFTER SIGNED ONES IS NEVER ASKED FOR. */
+  if (got.signature === null) {
+    const before = await keysSignedBefore(entry, version.version);
+    if (before.length > 0) return { ok: false, fix: strippedNotice(entry.title, version.version, before), code: 'SIGNATURE_INVALID' };
+  }
   const file = await readCatalogueFile(got.text, { kind: 'url' });
   if (!file.ok || file.value.kind !== entry.kind)
     return { ok: false, fix: !file.ok && 'refusal' in file ? file.refusal.fix : `${entry.title} ${version.version} does not read.`, code: !file.ok && 'refusal' in file ? file.refusal.code : null };

@@ -135,7 +135,7 @@ test('key rotate lets a reader who trusted the old key trust the new one, and ke
   assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'new.json')], h.io), 0, h.said.join('\n'));
   assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 0, h.said.join('\n'));
   assert.match(h.out.join('\n'), new RegExp(`Signed by key ${newId}, which key ${oldId}, the one this machine has seen for Halden, named as its successor`, 'u'));
-  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, 'config', 'braindog', 'known-keys.json'), 'utf8')), { Halden: [oldId, newId] });
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, 'config', 'braindog', 'known-keys.json'), 'utf8')), { 'pack:bookshelf': [oldId, newId] });
 
   assert.equal(await pack(['key', 'revoke', join(keys, 'new.json'), '--to', 'catalogue'], h.io), 1);
   assert.equal(await pack(['key', 'revoke', join(keys, 'new.json'), '--to', 'catalogue', '--reason', 'Copied off a shared machine.'], h.io), 0, h.said.join('\n'));
@@ -145,4 +145,30 @@ test('key rotate lets a reader who trusted the old key trust the new one, and ke
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, asked);
   assert.equal(await pack(['search', '--from', 'catalogue'], h.io), 0);
   assert.match(h.out.at(-2) ?? '', /which its author revoked/u);
+});
+
+test('install refuses a version that arrives unsigned after signed ones, and search says it loudly', async (t) => {
+  const { pack } = await import('../src/catalogue.ts');
+  const h = await setup(t);
+  const keys = join(h.dir, 'keys');
+  assert.equal(await pack(['key', join(keys, 'k.json'), '--author', 'Halden'], h.io), 0, h.said.join(' '));
+  const keyId = (JSON.parse(readFileSync(join(keys, 'k.json'), 'utf8')) as { key_id: string }).key_id;
+  assert.equal(await pack(['new', 'bookshelf', '--author', 'Halden'], h.io), 0, h.said.join(' '));
+  assert.equal(await pack(['publish', 'bookshelf-1.0.0.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], h.io), 0, h.said.join(' '));
+  const later = JSON.parse(readFileSync(join(h.dir, 'bookshelf-1.0.0.pack.json'), 'utf8')) as Record<string, unknown>;
+  writeFileSync(join(h.dir, 'bookshelf-1.0.1.pack.json'), JSON.stringify({ ...later, version: '1.0.1', summary: `${String(later.summary)} Kept tidy.` }));
+  assert.equal(await pack(['publish', 'bookshelf-1.0.1.pack.json', '--to', 'catalogue', '--sign', join(keys, 'k.json')], h.io), 0, h.said.join(' '));
+
+  /* Somebody edits the index: the latest version loses its signature, and the author is renamed. */
+  const path = join(h.dir, 'catalogue', 'index.json');
+  const index = JSON.parse(readFileSync(path, 'utf8')) as { entries: { author: string; versions: Record<string, unknown>[] }[] };
+  delete index.entries[0]!.versions[0]!.signature;
+  index.entries[0]!.author = 'Someone Else';
+  writeFileSync(path, JSON.stringify(index));
+
+  assert.equal(await pack(['install', 'bookshelf', '--from', 'catalogue'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', new RegExp(`Bookshelf 1\.0\.1 is unsigned, and earlier versions were signed by key ${keyId}.*Nothing was sent\.$`, 'u'));
+  assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0);
+  assert.equal(await pack(['search', '--from', 'catalogue'], h.io), 0);
+  assert.ok(h.out.some((l) => /Unsigned, and earlier versions were signed by key/u.test(l)));
 });

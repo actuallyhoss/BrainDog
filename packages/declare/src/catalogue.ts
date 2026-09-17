@@ -72,6 +72,7 @@ export {
   signedText,
   signVersion,
   trustOf,
+  trustSubject,
   verifySignature,
   type AuthorKey,
   type KnownKeys,
@@ -433,6 +434,23 @@ export const revokedNotice = (statements: KeyStatements, title: string, version:
   return revoked ? `${title} ${version} is signed by key ${revoked.key_id}, which its author revoked, so it is not trusted. Their reason: ${revoked.reason}` : null;
 };
 
+/**
+ * The keys that verifiably signed an entry's versions earlier than `version`, as the index lists them. A signature covers
+ * the kind, id, version and checksum, so it is checked from the index alone; one that does not verify counts for nothing.
+ */
+export async function keysSignedBefore(entry: Pick<CatalogueEntry, 'kind' | 'id' | 'versions'>, version: string): Promise<string[]> {
+  const keys: string[] = [];
+  for (const v of entry.versions) {
+    if (!v.signature || compareVersions(v.version, version) >= 0 || keys.includes(v.signature.key_id)) continue;
+    if ((await verifySignature(v.signature, entry.kind, entry.id, v.version, v.checksum)).ok) keys.push(v.signature.key_id);
+  }
+  return keys;
+}
+
+/** A version with no signature after signed ones, said in the one sentence every reader shows. */
+export const strippedNotice = (title: string, version: string, before: readonly string[]): string =>
+  `${title} ${version} is unsigned, and earlier versions were signed by key ${before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this one may not be from its author. It is not offered.`;
+
 /** The entries a search matches, best first: by id, title, summary, author, and the lists and pages the latest adds. */
 export function searchCatalogue(index: CatalogueIndex, query: string, kind?: EntryKind): CatalogueEntry[] {
   const pool = kind === undefined ? index.entries : index.entries.filter((e) => e.kind === kind);
@@ -619,6 +637,14 @@ export async function catalogueUpdates(
     if (revoked !== null) {
       refused.push({ entry, fix: revoked });
       continue;
+    }
+    /* NOR IS ONE THAT LOST ITS SIGNATURE: an unsigned version after signed ones was not published by the author's hand. */
+    if (verified.value === null) {
+      const before = await keysSignedBefore(entry, latest.version);
+      if (before.length > 0) {
+        refused.push({ entry, fix: strippedNotice(entry.title, latest.version, before) });
+        continue;
+      }
     }
     const file = await readCatalogueFile(text, { kind: 'url' });
     if (!file.ok || file.value.kind !== entry.kind) {

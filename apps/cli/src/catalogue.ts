@@ -41,6 +41,7 @@ import {
   addKeyStatement,
   CATALOGUE_INDEX,
   catalogueFile,
+  keysSignedBefore,
   keyToKeep,
   revokeKey,
   revokedNotice,
@@ -57,7 +58,9 @@ import {
   readKnownKeys,
   rememberKey,
   searchCatalogue,
+  strippedNotice,
   trustOf,
+  trustSubject,
   unchanged,
   verifyVersion,
   type AuthorKey,
@@ -252,6 +255,8 @@ export function trustLine(trust: Trust, author: string): string {
   switch (trust.kind) {
     case 'unsigned':
       return 'Unsigned: nothing says who published it beyond the catalogue it came from.';
+    case 'stripped':
+      return `Unsigned, and earlier versions were signed by key ${trust.before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this may not be from ${author}. It is not asked for.`;
     case 'first':
       return `Signed by key ${trust.key_id}. This machine has not seen a key for ${author} before, so it now remembers this one.`;
     case 'known':
@@ -267,7 +272,7 @@ export function trustLine(trust: Trust, author: string): string {
 
 /* ── keys ───────────────────────────────────────────────────────────────── */
 
-/** The keys this machine has seen per author, beside the hosts file. */
+/** The keys this machine has seen per entry (`trustSubject`: kind and id, never the author name), beside the hosts file. */
 export const knownKeysPath = (io: AgentIo): string => join(dirname(hostsPath(io.env)), 'known-keys.json');
 
 function knownKeys(io: AgentIo): KnownKeys {
@@ -278,10 +283,10 @@ function knownKeys(io: AgentIo): KnownKeys {
   }
 }
 
-function remember(io: AgentIo, author: string, keyId: string): void {
+function remember(io: AgentIo, subject: string, keyId: string): void {
   const file = knownKeysPath(io);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), author, keyId), null, 2)}\n`);
+  writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), subject, keyId), null, 2)}\n`);
 }
 
 /** The git working tree a path is inside, or `null`. */
@@ -528,7 +533,7 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     const v = e.versions[0];
     io.out(`${e.id}  ${e.title} ${e.latest} by ${e.author}. ${e.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);
-    io.out(`  ${trustLine(trustOf(known, e.author, v?.signature, statements), e.author)}`);
+    io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author)}`);
   }
   io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${values.from}.`);
   return 0;
@@ -632,12 +637,22 @@ export async function installFromCatalogue(id: string, from: string, version: st
     io.say(`${revoked} Nothing was sent.`);
     return 1;
   }
-  const trust = trustOf(knownKeys(io), entry.author, held.value, statements);
+  const before = await keysSignedBefore(entry, chosen.version);
+  /* NOR IS ONE THAT LOST ITS SIGNATURE AFTER SIGNED VERSIONS. */
+  if (held.value === null && before.length > 0) {
+    io.say(`${strippedNotice(entry.title, chosen.version, before)} Nothing was sent.`);
+    return 1;
+  }
+  const trust = trustOf(knownKeys(io), trustSubject(entry), held.value, statements, before);
+  if (trust.kind === 'stripped') {
+    io.say(`${entry.title} ${chosen.version}: ${trustLine(trust, entry.author)} Nothing was sent.`);
+    return 1;
+  }
   const said = trustLine(trust, entry.author);
   io.out(said);
   /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT. A different key is said on Decide and never replaces the one seen before. */
   const keep = keyToKeep(trust);
-  if (keep !== null) remember(io, entry.author, keep);
+  if (keep !== null) remember(io, trustSubject(entry), keep);
   const question = `Install ${entry.title} ${chosen.version} from a catalogue? ${said}`;
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
   return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io);

@@ -7,7 +7,7 @@
  *
  * THE PRIVATE KEY LIVES IN A FILE THE AUTHOR CREATES ON THEIR OWN MACHINE (`braindog pack key`), and nothing here writes one.
  * A signature carries the public key, so anybody can verify it without a key server; whether that key is the author's is a
- * matter of trust on first use: the first key seen for an author is remembered where the reader keeps such things, and a
+ * matter of trust on first use: the first key seen for an entry is remembered where the reader keeps such things, and a
  * later version signed by a different one is said plainly.
  *
  * A KEY MOVES ON ONLY BY ITS OWN WORD. An author who makes a new key publishes a rotation statement signed by the old key
@@ -290,11 +290,21 @@ export function rotatedFrom(statements: KeyStatements, trusted: readonly string[
 
 /* ── trust on first use ─────────────────────────────────────────────────── */
 
-/** The key ids a reader has seen for each author, first seen first. */
+/**
+ * The key ids a reader has seen for each entry, first seen first, by `trustSubject`.
+ *
+ * KEPT BY WHAT A SIGNATURE COVERS, THE ENTRY'S KIND AND ID, never by the author name an index carries: that name is not
+ * signed, so an edited index could rename the author and be heard as a first use.
+ */
 export type KnownKeys = Record<string, string[]>;
+
+/** What a reader keeps a key under: the entry's kind and id, which the signature covers. */
+export const trustSubject = (entry: { kind: string; id: string }): string => `${entry.kind}:${entry.id}`;
 
 export type Trust =
   | { kind: 'unsigned' }
+  /** Unsigned, where a key was seen for this entry or its earlier versions were signed: untrusted, and never offered. */
+  | { kind: 'stripped'; before: string[] }
   /** Signed, and no key was seen for this author on this reader before. */
   | { kind: 'first'; key_id: string }
   /** Signed by a key this reader already holds for this author. */
@@ -307,15 +317,26 @@ export type Trust =
   | { kind: 'revoked'; key_id: string; reason: string };
 
 /**
- * How far a reader trusts a signature. `statements` are the verified rotations and revocations the catalogue carries
- * (`verifiedStatements`). A revoked key is untrusted before anything else is asked.
+ * How far a reader trusts a signature. `subject` is `trustSubject` of the entry. `statements` are the verified rotations
+ * and revocations the catalogue carries (`verifiedStatements`). `signedBefore` are the keys that verifiably signed the
+ * entry's earlier versions in the index (`keysSignedBefore`). A revoked key is untrusted before anything else is asked.
+ *
+ * A MISSING SIGNATURE IS LOUD WHEN A KEY IS KNOWN: a catalogue refuses to publish an unsigned version after a signed one,
+ * so one that arrives that way was not published by the author's hand.
  */
-export function trustOf(known: KnownKeys, author: string, signature: Signature | null | undefined, statements: KeyStatements = noStatements()): Trust {
-  if (!signature) return { kind: 'unsigned' };
+export function trustOf(known: KnownKeys, subject: string, signature: Signature | null | undefined, statements: KeyStatements = noStatements(), signedBefore: readonly string[] = []): Trust {
+  const seen = Object.hasOwn(known, subject) && Array.isArray(known[subject]) ? known[subject] : [];
+  if (!signature) {
+    const before = [...new Set([...seen, ...signedBefore])];
+    return before.length > 0 ? { kind: 'stripped', before } : { kind: 'unsigned' };
+  }
   const revoked = revocationOf(statements, signature.key_id);
   if (revoked) return { kind: 'revoked', key_id: signature.key_id, reason: revoked.reason };
-  const seen = Object.hasOwn(known, author) && Array.isArray(known[author]) ? known[author] : [];
-  if (seen.length === 0) return { kind: 'first', key_id: signature.key_id };
+  if (seen.length === 0) {
+    const listed = [...new Set(signedBefore)];
+    if (listed.length > 0 && !listed.includes(signature.key_id) && rotatedFrom(statements, listed, signature.key_id) === null) return { kind: 'changed', key_id: signature.key_id, before: listed };
+    return { kind: 'first', key_id: signature.key_id };
+  }
   if (seen.includes(signature.key_id)) return { kind: 'known', key_id: signature.key_id };
   const from = rotatedFrom(statements, seen, signature.key_id);
   return from !== null ? { kind: 'rotated', key_id: signature.key_id, from } : { kind: 'changed', key_id: signature.key_id, before: [...seen] };
@@ -325,15 +346,15 @@ export function trustOf(known: KnownKeys, author: string, signature: Signature |
 export const keyToKeep = (trust: Trust): string | null => (trust.kind === 'first' || trust.kind === 'rotated' ? trust.key_id : null);
 
 /** The keys known after trusting one, and nothing changed for a key already held. */
-export function rememberKey(known: KnownKeys, author: string, keyId: string): KnownKeys {
-  const seen = Object.hasOwn(known, author) && Array.isArray(known[author]) ? known[author] : [];
-  return seen.includes(keyId) ? known : { ...known, [author]: [...seen, keyId] };
+export function rememberKey(known: KnownKeys, subject: string, keyId: string): KnownKeys {
+  const seen = Object.hasOwn(known, subject) && Array.isArray(known[subject]) ? known[subject] : [];
+  return seen.includes(keyId) ? known : { ...known, [subject]: [...seen, keyId] };
 }
 
 /** Known keys read from anywhere, keeping only well-formed ids. */
 export function readKnownKeys(doc: unknown): KnownKeys {
   if (!isMap(doc)) return {};
   const out: KnownKeys = {};
-  for (const [author, ids] of Object.entries(doc)) if (Array.isArray(ids)) out[author] = ids.filter((x): x is string => typeof x === 'string' && KEY_ID.test(x));
+  for (const [subject, ids] of Object.entries(doc)) if (Array.isArray(ids)) out[subject] = ids.filter((x): x is string => typeof x === 'string' && KEY_ID.test(x));
   return out;
 }

@@ -24,7 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { moduleTitle } from '../../sharing.ts';
-  import { askForVersion, browserStore, catalogueText, changesSince, keepFirstKey, signedWords, standingOf, trustFor, trustWords, type Standing } from '../catalogue.ts';
+  import { askForVersion, browserStore, catalogueText, changesSince, keepFirstKey, signedWords, standingOf, trustForEntry, trustWords, type Standing } from '../catalogue.ts';
 
   let {
     entry,
@@ -68,7 +68,7 @@
         checked = { ok: false };
         return;
       }
-      trust = await trustFor(browserStore(), entry.author, got.signature, keys);
+      trust = await trustForEntry(browserStore(), entry, version.version, got.signature, keys);
       checked = { ok: true };
     });
   });
@@ -77,7 +77,7 @@
   const from = (): string | null => (standing?.kind === 'update' && standing.from !== '' ? standing.from : null);
 
   async function ask() {
-    if (!latest || busy || trust?.kind === 'revoked') return;
+    if (!latest || busy || trust?.kind === 'revoked' || trust?.kind === 'stripped') return;
     refused = null;
     if (!live || !client) {
       would = copy.catalogueWouldAsk(entry.title, latest.version);
@@ -92,9 +92,9 @@
         return;
       }
       filed = out.id;
-      const now = await trustFor(browserStore(), entry.author, out.signature, keys);
+      const now = await trustForEntry(browserStore(), entry, latest.version, out.signature, keys);
       trust = now;
-      await keepFirstKey(browserStore(), entry.author, now);
+      await keepFirstKey(browserStore(), `${entry.kind}:${entry.id}`, now);
     } finally {
       busy = false;
     }
@@ -116,7 +116,7 @@
       <p class="said">{copy.catalogueAhead(standing.at)}</p>
     {:else if standing?.kind === 'off'}
       <p class="said">{copy.catalogueOff}</p>
-    {:else if standing && checked?.ok && trust?.kind !== 'revoked'}
+    {:else if standing && checked?.ok && trust?.kind !== 'revoked' && trust?.kind !== 'stripped'}
       {#if filed !== null}
         <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}</p>
       {:else}

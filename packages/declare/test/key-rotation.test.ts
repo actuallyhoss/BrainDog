@@ -169,3 +169,44 @@ test('an update signed by a revoked key is not offered, and the reason is said p
   const planted = { ...out.value.index, keys: { rotations: [], revocations: [{ ...fake.value, key_id: old.key_id, public_key: old.public_key }] } };
   assert.equal((await catalogueUpdates(planted, held, read)).updates.length, 1);
 });
+
+test('a version arriving unsigned after signed ones is said loudly and never offered, and trust is kept by entry, not by the author the index names', async () => {
+  const { keysSignedBefore, trustSubject } = await import('../src/catalogue.ts');
+  const { old, files, index } = await signedCatalogue();
+  const read = (p: string) => files.get(p) ?? null;
+  const entry = index.entries[0]!;
+  const subject = trustSubject(entry);
+  assert.equal(subject, 'pack:bookshelf');
+
+  /* An edited index lists 1.1.0 with no signature: the file is served, the checksum holds, and nothing signed it. */
+  const text = addon('1.1.0');
+  const signedOut = await publishTo(index, text, read, new Date(), old);
+  assert.ok(signedOut.ok);
+  files.set(signedOut.value.path, text);
+  const { signature: _s, ...bare } = signedOut.value.version;
+  const stripped: CatalogueIndex = { ...signedOut.value.index, entries: [{ ...signedOut.value.entry, versions: [bare, ...signedOut.value.entry.versions.slice(1)] }] };
+  const before = await keysSignedBefore(stripped.entries[0]!, '1.1.0');
+  assert.deepEqual(before, [old.key_id]);
+
+  /* A reader who never saw a key still hears it loudly, from the index's own earlier signatures. */
+  const fresh = trustOf({}, subject, null, undefined, before);
+  assert.deepEqual(fresh, { kind: 'stripped', before: [old.key_id] });
+  /* A reader who kept the key hears it even when the index strips every signature. */
+  assert.equal(trustOf(rememberKey({}, subject, old.key_id), subject, null).kind, 'stripped');
+  assert.equal(trustOf({}, subject, null).kind, 'unsigned');
+  assert.equal(keyToKeep(fresh), null);
+
+  const offered = await catalogueUpdates(stripped, [{ id: 'bookshelf', version: '1.0.0' }], read);
+  assert.equal(offered.updates.length, 0);
+  assert.match(offered.refused[0]?.fix ?? '', /unsigned, and earlier versions were signed by key/u);
+
+  /* A signature from another key on a fresh reader, where the index shows earlier versions signed by the author's key, is changed, not first. */
+  const mallory = await newAuthorKey('Halden');
+  const sigOf = signedOut.value.version.signature!;
+  assert.equal(trustOf({}, subject, { ...sigOf, key_id: mallory.key_id, public_key: mallory.public_key }, undefined, before).kind, 'changed');
+
+  /* Renaming the author in an edited index does not make a kept key a first use: trust is keyed by kind and id. */
+  const known = rememberKey({}, subject, old.key_id);
+  const renamed = { ...entry, author: 'Someone Else' };
+  assert.equal(trustOf(known, trustSubject(renamed), { ...sigOf, key_id: mallory.key_id }).kind, 'changed');
+});

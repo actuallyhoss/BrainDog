@@ -153,7 +153,9 @@ test('trust on first use: kept when asked for, said loudly for a different key, 
   assert.equal(await keepFirstKey(store, 'Halden', changed), false);
   assert.deepEqual(await loadKnownKeys(store), { Halden: [key.key_id] });
 
-  assert.equal((await trustFor(store, 'Halden', null)).kind, 'unsigned');
+  /* A version with no signature where a key is kept is said as stripped, and one where none is kept as unsigned. */
+  assert.equal((await trustFor(store, 'Halden', null)).kind, 'stripped');
+  assert.equal((await trustFor(memoryStore(), 'Halden', null)).kind, 'unsigned');
   store.held.set(KNOWN_KEYS, 'not json');
   assert.deepEqual(await loadKnownKeys(store), {});
   const blocked = (): never => {
@@ -297,4 +299,35 @@ test('a browser that kept an old key trusts and keeps the key it rotated to, and
   const { readFileSync } = await import('node:fs');
   const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
   assert.match(detail, /trust\?\.kind !== 'revoked'/u);
+});
+
+test('a version arriving unsigned after signed ones is said loudly, cannot be asked for, and is not offered on /packs', async () => {
+  const { keysSignedBefore, trustSubject } = await import('@braindog/declare/catalogue');
+  const key = await newAuthorKey('Halden');
+  const { index, entry, fetcher } = await servedAddon(key);
+  const { signature: _s, ...bare } = entry.versions[0]!;
+  const strippedEntry = { ...entry, versions: [bare, ...entry.versions.slice(1)] };
+  const stripped = { ...index, entries: [strippedEntry] };
+  const subject = trustSubject(entry);
+
+  const trust = await trustFor(memoryStore(), subject, null, stripped.keys, await keysSignedBefore(strippedEntry, '1.1.0'));
+  assert.equal(trust.kind, 'stripped');
+  const said = trustWords(trust, 'Halden');
+  assert.ok(said.loud && said.text.includes(key.key_id));
+
+  const calls: string[] = [];
+  const asked = await askForVersion(fetcher, async (name) => (calls.push(name), { ok: true, value: { id: '1' } }), strippedEntry, bare, '1.0.0');
+  assert.equal(asked.ok, false);
+  assert.deepEqual(calls, []);
+
+  const offered = await updatesFor(fetcher, stripped, [{ id: 'bookshelf', version: '1.0.0', disabled_at: null, registers: [] }]);
+  assert.equal(offered.updates.length, 0);
+  assert.match(offered.refused[0] ?? '', /is unsigned, and earlier versions were signed/u);
+
+  const { readFileSync } = await import('node:fs');
+  const detail = readFileSync(new URL('./[id]/CatalogueDetail.svelte', import.meta.url), 'utf8');
+  assert.match(detail, /trust\?\.kind !== 'stripped'|trust\?\.kind === 'stripped'/u);
+  assert.doesNotMatch(detail, /trustFor\(browserStore\(\), entry\.author/u);
+  const updates = readFileSync(new URL('../CatalogueUpdates.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(updates, /entry\.author, /u);
 });
