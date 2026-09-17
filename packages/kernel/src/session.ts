@@ -104,6 +104,9 @@ export type Found = {
  *      idle and heard from in the last 45 minutes, the newest first: adopted. A caller whose
  *      `client_id` matched nothing is a different run, and adopting it would merge two agents working
  *      side by side in one checkout.
+ *   4b. With no `client_id`, no `host`, no `repo` and no `cwd`, as a remote MCP client over HTTP sends, the
+ *      newest run of the same token that says none of them either, on the same terms: adopted. Without it
+ *      every write opened a run of its own, and a handoff landed on a run that had done nothing.
  *
  * A RUN BELONGS TO THE TOKEN THAT OPENED IT (`token_id`). Rungs 1 and 3 name a run outright, so a run
  * of another token found there comes back `foreign`, and the caller refuses it: a person's other key,
@@ -143,6 +146,17 @@ export function findSession(sql: Sql, hints: SessionHints, nowMs: number, token?
       hints.repo,
       new Date(nowMs - STALE_MS).toISOString(),
       ...(token === undefined ? [] : [token ?? null]),
+    );
+
+  if (typeof token === 'string' && !hints.host && !hints.repo && !hints.cwd)
+    return pick(
+      'adopted',
+      `json_extract(fields, '$.host') IS NULL AND json_extract(fields, '$.repo') IS NULL AND json_extract(fields, '$.cwd') IS NULL
+       AND json_extract(fields, '$.client_id') IS NULL AND state IN ('active', 'idle')
+       AND json_extract(fields, '$.last_seen') > ? AND json_extract(fields, '$.token_id') = ?
+       ORDER BY json_extract(fields, '$.last_seen') DESC LIMIT 1`,
+      new Date(nowMs - STALE_MS).toISOString(),
+      token,
     );
 
   return null;

@@ -176,6 +176,25 @@ test('A LIVE RUN ON THE SAME HOST AND REPO IS ADOPTED, but not by a caller with 
   sql.close();
 });
 
+test('A REMOTE CLIENT THAT SAYS NOTHING OF WHERE IT IS keeps one run per token: its create and its handoff are one run', async () => {
+  const { k, sql, clock } = await record();
+  value(k.create('tasks', { what: 'a' }, agent({ agent: 'other' })));
+  clock.advance(10 * MIN);
+  value(k.create('tasks', { what: 'b' }, agent({ agent: 'other' })));
+  assert.deepEqual(runs(sql), [1], 'a second write with no whereabouts opened a second run');
+
+  /* Another token is another run, and a caller that says where it is never takes a run that did not. */
+  value(k.create('tasks', { what: 'c' }, { ...agent({ agent: 'other' }), principal: { kind: 'token', token: 't_2' } }));
+  value(k.create('tasks', { what: 'd' }, agent({ host: 'dev-pc', repo: 'braindog' })));
+  value(k.create('tasks', { what: 'e' }, agent({ client_id: 'cc-9' })));
+  assert.deepEqual(runs(sql), [1, 2, 3, 4]);
+
+  clock.advance(46 * MIN);
+  value(k.create('tasks', { what: 'f' }, agent({ agent: 'other' })));
+  assert.deepEqual(runs(sql), [1, 2, 3, 4, 5], 'a run quiet for 46 minutes was adopted');
+  sql.close();
+});
+
 test('A PERSON IS NEVER A RUN, whatever the request says about one', async () => {
   const { k, sql } = await record();
   const task = value<Entry>(
