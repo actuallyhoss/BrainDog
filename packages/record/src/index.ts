@@ -77,10 +77,12 @@ import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, type CatalogueEntry } from './arrange.ts';
+import { useCases, type ExportArgs } from './usecase.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
+export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
@@ -989,6 +991,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
   });
 
+  /* A USE CASE SHARED AS A FILE, and one planned here (`usecase.ts`). */
+  const sharing = useCases({ kernel, catalogue: deps.catalogue ?? [], installed: () => installedState() });
+
   /** The pages a caller may open, as `pages` lists them: one is visible when any register it draws from is readable. */
   const visiblePages = (ctx: CallContext) =>
     kernel
@@ -1792,6 +1797,54 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return arrangement.declaration(args.page, visiblePages(ctx));
       }
       return ok(arrangement.overview(visiblePages(ctx)));
+    },
+
+    /**
+     * This BrainDog's arrangement as a use-case file somebody else can install (`loop/research-spark.md` S14).
+     *
+     * A READ, like `arrangement`, and for the same callers, so the CLI can save one with its token. It carries the
+     * modules, the use case's lists and pages, the pages placed by hand, the voice and the labels, and no row unless
+     * `examples` names it; naming rows asks to read the whole record and each list they come from.
+     */
+    async exportUseCase(args: ExportArgs | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['usecase', 'title', 'summary', 'version', 'audience', 'author', 'examples']);
+      if (extra) return { ok: false as const, refusal: extra };
+      for (const key of ['usecase', 'title', 'summary', 'version', 'audience', 'author'])
+        if (said[key] !== undefined && (typeof said[key] !== 'string' || !(said[key] as string).trim()))
+          return no('VALUE_MALFORMED', `${key} is a line of text.`, { at: key });
+      const examples = said.examples;
+      if (examples !== undefined && (typeof examples !== 'object' || examples === null || Array.isArray(examples)))
+        return no('VALUE_MALFORMED', 'examples names row numbers by list, such as {"courses":[1,2]}.', { at: 'examples' });
+      if (examples !== undefined && Object.keys(examples).length > 0 && !wholeRecord(ctx))
+        return no('FORBIDDEN', 'Example rows are shared by somebody who can read the whole BrainDog.', { at: 'examples' });
+      return sharing.exportFile(said as ExportArgs, (register) => {
+        const denied = readable(ctx, register);
+        if (denied) return { ok: false, refusal: denied };
+        const read = kernel.list({ register, limit: 500 });
+        return read.ok ? ok(read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : read;
+      });
+    },
+
+    /**
+     * What installing a shared use case would do to this record, pack by pack. It writes nothing.
+     *
+     * ADMIN, AS `planPack` IS, because what it answers is the plan an install approves. The file goes through
+     * `declare`'s `readShared` first, so an oversized file, a credential and a block kind nothing draws are refused
+     * before anything is planned. Installing is `installPack`, one document at a time, with no door of its own.
+     */
+    async planUseCase(args: { doc?: unknown; text?: string; source?: PackSource; modules?: Record<string, unknown> } | undefined, ctx: CallContext) {
+      const stop = admin(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(said, ['doc', 'text', 'source', 'modules']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (said.text !== undefined && typeof said.text !== 'string') return no('VALUE_MALFORMED', 'text is the file as it was read.', { at: 'text' });
+      if (said.modules !== undefined && (typeof said.modules !== 'object' || said.modules === null || Array.isArray(said.modules)))
+        return no('VALUE_MALFORMED', 'modules is a pack document by module id.', { at: 'modules' });
+      return sharing.planFile(said as never);
     },
 
     /**

@@ -1,0 +1,268 @@
+/**
+ * A BrainDog's arrangement shared as a use case, and a shared one planned for this record (`loop/research-spark.md` S14).
+ *
+ * WHAT GOES OUT IS WHAT MAKES THE ARRANGEMENT, AND NONE OF THE RECORD'S ROWS BY DEFAULT. The first-party modules that
+ * are on; the enabled use case's own lists and pages; the pages the person placed themselves; the voice and labels as
+ * they are set now; and the example rows the caller named by number, never one they did not.
+ *
+ * WHAT COMES IN IS PLANNED, NEVER INSTALLED, HERE. `plan` reads the file through `declare`'s `readShared`, works out
+ * the modules it needs first and plans each pack in order against the record as the ones before it would leave it.
+ * Installing is the ordinary `installPack`, one document at a time, with the plan hash and the calls-out lines the
+ * owner read: this file adds no second way in.
+ *
+ * THE CORE NAMES NO USE CASE: the only convention read is `declare`'s, that a use case's pack is `usecase-<id>`.
+ */
+
+import type { Refusal, Result } from '@braindog/ports';
+import { ok } from '@braindog/ports';
+import {
+  MODULES,
+  SEEDS_PER_REGISTER,
+  exampleFields,
+  exportUseCase,
+  labelsOf,
+  nextVersion,
+  packIdOf,
+  plan,
+  readShared,
+  sharedFileName,
+  unfilled,
+  voiceOf,
+  AUDIENCES,
+  type Audience,
+  type Installed,
+  type Pack,
+  type PackSource,
+} from '@braindog/declare';
+import { normalise } from '@braindog/declare';
+import type { Kernel } from '@braindog/kernel';
+
+import type { CatalogueEntry } from './arrange.ts';
+
+type Body = Record<string, unknown>;
+
+const USE_CASE = packIdOf('');
+const ID = /^[a-z][a-z0-9-]{1,40}$/u;
+const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
+const isMap = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
+const refuse = <T>(code: Refusal['code'], fix: string, at?: string): Result<T> => ({ ok: false, refusal: { code, fix, ...(at === undefined ? {} : { at }) } });
+
+/**
+ * A stored declaration body in a pack document's own shape: its kind as the first key, naming it.
+ *
+ * THE RECORD STORES A BODY CANONICALLY, keys sorted, and a register's name as `id`, so `{ fields, id: 'courses' }` is
+ * written back as `{ register: 'courses', fields }`, which is the only form `normalise` reads.
+ */
+function asWritten(kind: string, body: Body): Body {
+  const { [kind]: named, ...rest } = body;
+  if (typeof named === 'string') return { [kind]: named, ...rest };
+  const { id, ...others } = rest;
+  return { [kind]: id, ...others };
+}
+
+export type UseCaseDeps = {
+  kernel: Kernel;
+  catalogue: readonly CatalogueEntry[];
+  installed: () => Installed;
+};
+
+export type ExportArgs = {
+  usecase?: string;
+  title?: string;
+  summary?: string;
+  version?: string;
+  audience?: string;
+  author?: string;
+  /** Example rows to share, by list and row number. Nothing is shared that is not named here. */
+  examples?: Record<string, number[]>;
+};
+
+/** One pack as `planUseCase` answers: the document to install and what installing it would do. */
+export type PlannedPack = {
+  id: string;
+  /** `module` for a first-party pack the use case builds on, `usecase` for the pack the file carries. */
+  role: 'module' | 'usecase';
+  version: string;
+  installed_version: string | null;
+  direction: 'install' | 'upgrade' | 'downgrade' | 'reinstall';
+  adds: string[];
+  changes: string[];
+  retires: string[];
+  conflicts: { id: string; pack: string }[];
+  unresolved: string[];
+  examples: number;
+  calls_out: string[];
+  approve: string[];
+  doc: Body;
+};
+
+export function useCases(d: UseCaseDeps) {
+  const { kernel } = d;
+
+  /* ── going out ────────────────────────────────────────────────────────── */
+
+  /** The arrangement as a use-case file, and the name to save it under. `rows` reads one list for the examples. */
+  async function exportFile(args: ExportArgs, rows: (register: string) => Result<{ seq: number | null; fields: Body }[]>): Promise<Result<Body>> {
+    const states = kernel.packStates();
+    const on = states.filter((s) => s.disabled_at === null);
+    const speaking = on.find((s) => s.id.startsWith(USE_CASE)) ?? null;
+    const id = args.usecase ?? speaking?.id.slice(USE_CASE.length) ?? 'my-setup';
+    if (!ID.test(id)) return refuse('VALUE_MALFORMED', `${id} is not a use case id: lower-case letters, digits and hyphens.`, 'usecase');
+    const version = args.version ?? nextVersion(speaking?.version);
+    if (!SEMVER.test(version)) return refuse('VALUE_MALFORMED', `${version} is not a version. Write 1.0.1.`, 'version');
+    if (args.audience !== undefined && !(AUDIENCES as readonly string[]).includes(args.audience))
+      return refuse('ENUM_VALUE_UNKNOWN', `${args.audience} is not an audience. It is one of ${AUDIENCES.join(', ')}.`, 'audience');
+
+    const all = kernel.declarations();
+    const settings = speaking ? kernel.packConfig(speaking.id) : null;
+    const values = settings?.ok ? (settings.value.values as Body) : {};
+    const config = settings?.ok ? (settings.value.config as Record<string, { default?: unknown }>) : {};
+    /* A HEADING THE VOICE FILLED goes out as its placeholder, from the value now or the default it was installed with. */
+    const filled = new Map<string, string>();
+    for (const key of Object.keys(config))
+      if (key.startsWith('voice_'))
+        for (const v of [config[key]?.default, values[key]]) if (typeof v === 'string' && v.trim() !== '') filled.set(v, key);
+
+    const own = all.filter((r) => speaking !== null && r.pack_id === speaking.id);
+    /* THE PAGES A PERSON PLACED belong to no pack; a page the seed owns by its body names its pack in it. */
+    const placed = all.filter((r) => r.pack_id === null && r.kind === 'page' && !('pack' in (JSON.parse(r.body) as Body)));
+    const declarations = [...own, ...placed].map((r) => {
+      const body = asWritten(r.kind, JSON.parse(r.body) as Body);
+      /* A USE CASE'S HOME IS THE PAGE NAMED FOR IT, so it is renamed with the use case. */
+      if (speaking && r.kind === 'page' && body.page === `home-${speaking.id.slice(USE_CASE.length)}`) body.page = `home-${id}`;
+      return (r.kind === 'page' ? unfilled(body, filled) : body) as Body;
+    });
+
+    const registers = new Map(declarations.filter((b) => typeof b.register === 'string').map((b) => [String(b.register), b]));
+    const examples: { register: string; fields: Body }[] = [];
+    for (const [register, seqs] of Object.entries(args.examples ?? {})) {
+      const decl = registers.get(register);
+      if (!decl)
+        return refuse('VALUE_MALFORMED', `${register} is not a list this use case carries, so its rows cannot be shared as examples. It carries ${[...registers.keys()].join(', ') || 'no lists'}.`, `examples.${register}`);
+      if (!Array.isArray(seqs) || seqs.some((n) => !Number.isInteger(n)))
+        return refuse('VALUE_MALFORMED', `examples.${register} is a list of row numbers.`, `examples.${register}`);
+      if (seqs.length > SEEDS_PER_REGISTER)
+        return refuse('OUT_OF_BOUNDS', `A use case shares at most ${SEEDS_PER_REGISTER} example rows a list.`, `examples.${register}`);
+      const read = rows(register);
+      if (!read.ok) return read as Result<Body>;
+      for (const seq of seqs) {
+        const row = read.value.find((r) => r.seq === seq);
+        if (!row) return refuse('OUT_OF_BOUNDS', `${register} has no row ${seq}.`, `examples.${register}`);
+        examples.push({ register, fields: exampleFields(decl, row.fields) });
+      }
+    }
+
+    const modules = (MODULES as readonly string[]).filter((m) => on.some((s) => s.id === m));
+    const title = args.title ?? id.charAt(0).toUpperCase() + id.slice(1).replaceAll('-', ' ');
+    const built = exportUseCase({
+      usecase: id,
+      version,
+      title,
+      summary: args.summary ?? `${title}, as one BrainDog is arranged.`,
+      author: args.author ?? 'Shared from a BrainDog',
+      license: 'MIT',
+      audience: (args.audience ?? 'other') as Audience,
+      tone: 'as its owner arranged it',
+      modules,
+      voice: voiceOf(values),
+      labels: labelsOf(values),
+      declarations,
+      examples,
+    });
+    if (!built.ok) return built;
+    /* THE FILE IS READ BACK THROUGH THE DOOR IT WILL COME IN BY, so a picked row holding a credential is refused here,
+       before it is downloaded, rather than on somebody else's record. */
+    const text = JSON.stringify(built.value, null, 2);
+    const back = await readShared(text);
+    if (!back.ok) return back as Result<Body>;
+    return ok({ file: sharedFileName(id, version), doc: built.value, bytes: back.value.bytes });
+  }
+
+  /* ── coming in ────────────────────────────────────────────────────────── */
+
+  /**
+   * What installing a shared use case would do here: the modules it needs first, then its own pack, each planned
+   * against the record as the ones before it would leave it. Nothing is written.
+   *
+   * `modules` MAY CARRY THE DOCUMENTS for first-party modules this host has no catalogue for, as the app builds them for
+   * this record; a module neither offers is refused by name.
+   */
+  async function planFile(args: { doc?: unknown; text?: string; source?: PackSource; modules?: Record<string, unknown> }): Promise<Result<Body>> {
+    const given = args.text ?? args.doc;
+    if (given === undefined) return refuse('REQUIRED_MISSING', 'Send the use-case file as text, or its document as doc.', 'text');
+    const shared = await readShared(given, args.source ?? { kind: 'paste' });
+    if (!shared.ok) return shared as Result<Body>;
+    const u = shared.value.usecase;
+
+    const states = kernel.packStates();
+    const base = d.installed();
+    let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
+    const enable: string[] = [];
+    const packs: PlannedPack[] = [];
+    const holds = (s: Installed) => s.declarations.filter((x) => x.kind === 'register').map((x) => x.id.slice('register.'.length));
+
+    const step = async (id: string, role: PlannedPack['role'], pack: Pack, doc: Body) => {
+      const diff = await plan(pack, state);
+      packs.push({
+        id,
+        role,
+        version: pack.manifest.version,
+        installed_version: diff.installed_version,
+        direction: diff.direction,
+        adds: diff.adds.map((a) => a.id),
+        changes: diff.changes.map((c) => c.id),
+        retires: diff.retires.map((r) => r.id),
+        conflicts: diff.conflicts,
+        unresolved: diff.unresolved.map((x) => x.register),
+        examples: diff.seeds.count,
+        calls_out: diff.calls_out.map((c) => c.line),
+        approve: diff.approve,
+        doc,
+      });
+      const kept = state.declarations.filter((x) => x.pack_id !== id);
+      state = {
+        ...state,
+        packs: [...state.packs.filter((p) => p.id !== id), { id, version: pack.manifest.version }],
+        declarations: [...kept, ...pack.declarations.map((decl) => ({ id: decl.id, version: 1, kind: decl.kind, pack_id: id, body: decl.canonical, checksum: '' }))],
+      };
+    };
+
+    for (const m of u.modules) {
+      const s = states.find((p) => p.id === m);
+      if (s) {
+        if (s.disabled_at !== null) enable.push(m);
+        continue;
+      }
+      const offered = args.modules?.[m] ?? d.catalogue.find((e) => e.id === m)?.doc({ holds: holds(state), usecase: null }) ?? null;
+      if (!isMap(offered))
+        return refuse('DECLARATION_UNKNOWN', `${u.title} builds on ${m}, which this host cannot offer by name. Install ${m} from Add-ons first, then plan this again.`, `modules`);
+      const pack = await normalise(offered, { kind: 'local' });
+      if (!pack.ok) return pack as Result<Body>;
+      if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);
+      await step(m, 'module', pack.value, offered);
+    }
+    if (shared.value.pack && shared.value.doc) await step(shared.value.pack.manifest.pack, 'usecase', shared.value.pack, shared.value.doc);
+
+    return ok({
+      usecase: {
+        usecase: u.usecase,
+        version: u.version,
+        title: u.title,
+        summary: u.summary,
+        author: u.author,
+        license: u.license,
+        audience: u.audience,
+        modules: u.modules,
+        voice: u.voice,
+        labels: u.labels,
+        skills: u.skills,
+      },
+      bytes: shared.value.bytes,
+      ...(enable.length === 0 ? {} : { enable }),
+      packs,
+      approve: [...new Set(packs.flatMap((p) => p.approve))],
+    });
+  }
+
+  return { exportFile, planFile };
+}

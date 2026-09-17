@@ -566,6 +566,12 @@ export function createClient(options: ClientOptions) {
     whoami: () => call<unknown>('whoami'),
     planPack: (args: { doc: unknown; source?: { kind: string; ref?: string } }) =>
       call<unknown>('planPack', args as Record<string, unknown>),
+    /** What installing a shared use case would do, pack by pack, with the documents to install. A POST, as a file is long. */
+    planUseCase: (args: { doc?: unknown; text?: string; source?: { kind: string; ref?: string }; modules?: Record<string, unknown> }) =>
+      call<unknown>('planUseCase', args as Record<string, unknown>),
+    /** This BrainDog's arrangement as a use-case file, with only the example rows named by list and number. */
+    exportUseCase: (args: { usecase?: string; title?: string; summary?: string; version?: string; audience?: string; author?: string; examples?: Record<string, number[]> } = {}) =>
+      call<unknown>('exportUseCase', args as Record<string, unknown>),
 
     /* THE ADMIN WRITES A SETTINGS SCREEN MAKES, SO A BROWSER SESSION FOR EACH. They were reachable through
        `call` and had no name, which left the argument names unchecked on the screens that change who may
