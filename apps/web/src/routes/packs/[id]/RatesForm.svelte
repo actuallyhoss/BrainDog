@@ -193,7 +193,8 @@
     display: grid;
     gap: var(--sp-2);
     min-inline-size: 0;
-    margin: 0;
+    /* A LEGEND TAKES NO MARGIN OF ITS OWN, so the gap above "Currencies to fetch" is the fieldset's: it sat on the note above. */
+    margin: var(--sp-2) 0 0;
     padding: 0;
     border: 0;
   }
