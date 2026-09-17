@@ -9,7 +9,8 @@
     "./usecases/founder-poll": "./src/usecases/founder-poll.ts",
     "./usecases/install": "./src/usecases/install.ts",
     "./usecases/links": "./src/usecases/links.ts",
-    "./usecases/names": "./src/usecases/names.ts"
+    "./usecases/names": "./src/usecases/names.ts",
+    "./usecases/share": "./src/usecases/share.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",
