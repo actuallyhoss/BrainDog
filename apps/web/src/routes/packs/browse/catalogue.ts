@@ -1,18 +1,23 @@
 /**
- * A catalogue on browse: the use cases this BrainDog's host serves from a folder (`/catalogue/index.json`,
+ * A catalogue on browse: the use cases and add-ons this BrainDog's host serves from a folder (`/catalogue/index.json`,
  * `@braindog/declare/catalogue`, `loop/research-marketplace.md` §1 and §2).
  *
- * NOTHING HERE INSTALLS. It reads the index, fetches a version's file and holds it to the checksum the index gives, says
- * whether a use case here is at that version, and what changed from the version installed. Installing is the shared
- * file's path (`InstallShared.svelte`): the record plans it and the owner approves it.
+ * NOTHING HERE INSTALLS. It reads the index, fetches a version's file and holds it to the checksum and signature the index
+ * gives, says whether this record holds that entry at that version, and what changed from the version installed. Installing
+ * is a proposal on Decide (or, for a use case on browse, the shared file's path in `InstallShared.svelte`): the record plans
+ * it and the owner approves it.
+ *
+ * TRUST ON FIRST USE IS KEPT PER BROWSER: the key ids seen for each author, in `localStorage` under `KNOWN_KEYS`. A page
+ * that cannot reach storage still draws; it only cannot say a key was seen before.
  *
  * A HOST WITH NO CATALOGUE is not an error: browse draws the built-in use cases alone, as before.
  *
  * PURE, AND THEREFORE TESTABLE: the fetcher is handed in.
  */
 
-import type { CatalogueEntry, CatalogueIndex, CatalogueVersion, Changes } from '@braindog/declare/catalogue';
+import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
+import { copy } from '../../../lib/copy.ts';
 import type { PackState } from '../../../lib/record/packs.ts';
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -40,31 +45,38 @@ export async function readHostCatalogue(fetcher: Fetcher): Promise<{ ok: true; i
   return read.ok ? { ok: true, index: read.value } : { ok: false, fix: 'refusal' in read ? read.refusal.fix : 'This catalogue does not read.' };
 }
 
-/** A version's file, fetched and held to the checksum the index gives, or the sentence and code to say instead. */
-export async function catalogueText(fetcher: Fetcher, entry: CatalogueEntry, version: CatalogueVersion): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
-  const { catalogueFile, verifyFile } = await import('@braindog/declare/catalogue');
+/**
+ * A version's file, fetched by its kind and held to the checksum and signature the index gives, with the signature it
+ * verified (`null` when unsigned), or the sentence and code to say instead.
+ */
+export async function catalogueText(
+  fetcher: Fetcher,
+  entry: CatalogueEntry,
+  version: CatalogueVersion,
+): Promise<{ ok: true; text: string; signature: Signature | null } | { ok: false; fix: string; code: string | null }> {
+  const { catalogueFile, verifyVersion } = await import('@braindog/declare/catalogue');
   let text: string;
   try {
-    const res = await fetcher(`${CATALOGUE_BASE}${catalogueFile(entry.id, version.version)}`, { credentials: 'same-origin' });
+    const res = await fetcher(`${CATALOGUE_BASE}${catalogueFile(entry.id, version.version, entry.kind)}`, { credentials: 'same-origin' });
     if (!res.ok) return { ok: false, fix: `${entry.title} ${version.version} is listed in this catalogue and its file is missing.`, code: null };
     text = await res.text();
   } catch {
     return { ok: false, fix: `${entry.title} ${version.version} could not be fetched from this catalogue.`, code: null };
   }
-  const held = await verifyFile(version, text);
+  const held = await verifyVersion(entry, version, text);
   if (!held.ok) return { ok: false, fix: 'refusal' in held ? held.refusal.fix : 'This file does not read.', code: 'refusal' in held ? held.refusal.code : null };
-  return { ok: true, text };
+  return { ok: true, text, signature: held.value };
 }
 
 export type Standing = { kind: 'install' } | { kind: 'update'; from: string } | { kind: 'current' } | { kind: 'ahead'; at: string } | { kind: 'off'; at: string | null };
 
 /** Where this record stands against an entry's latest version: not here, older, the same, newer, or turned off. */
 export async function standingOf(entry: CatalogueEntry, states: readonly PackState[]): Promise<Standing> {
-  const held = states.find((s) => s.id === `usecase-${entry.id}`);
+  const { compareVersions, installedIdOf } = await import('@braindog/declare/catalogue');
+  const held = states.find((s) => s.id === installedIdOf(entry));
   if (!held) return { kind: 'install' };
   if (held.disabled_at !== null) return { kind: 'off', at: held.version };
   if (held.version === null) return { kind: 'update', from: '' };
-  const { compareVersions } = await import('@braindog/declare/catalogue');
   const d = compareVersions(held.version, entry.latest);
   return d < 0 ? { kind: 'update', from: held.version } : d === 0 ? { kind: 'current' } : { kind: 'ahead', at: held.version };
 }
@@ -79,8 +91,148 @@ export async function changesSince(fetcher: Fetcher, entry: CatalogueEntry, from
   if (!was || !now || was === now) return null;
   const [a, b] = await Promise.all([catalogueText(fetcher, entry, was), catalogueText(fetcher, entry, now)]);
   if (!a.ok || !b.ok) return null;
-  const { readShared } = await import('@braindog/declare');
-  const { changesBetween } = await import('@braindog/declare/catalogue');
-  const [x, y] = await Promise.all([readShared(a.text), readShared(b.text)]);
+  const { changesBetween, readCatalogueFile } = await import('@braindog/declare/catalogue');
+  const [x, y] = await Promise.all([readCatalogueFile(a.text), readCatalogueFile(b.text)]);
   return x.ok && y.ok ? changesBetween(x.value, y.value) : null;
 }
+
+/* ── signatures and trust on first use ──────────────────────────────────── */
+
+/** Where this browser keeps the key ids it has seen for each author. */
+export const KNOWN_KEYS = 'braindog.catalogue.keys';
+
+/** The part of `Storage` read here, so a test hands in a map and a page hands in `localStorage`. */
+export type KeyStore = { getItem(key: string): string | null; setItem(key: string, value: string): void };
+
+/** This browser's storage, or `null` when it cannot be reached (a private window, blocked site data, the server). */
+export function browserStore(): KeyStore | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** A version's signature said plainly: the key that signed it, or that nothing did. */
+export const signedWords = (signature: Signature | null | undefined): string => (signature ? copy.catalogueSigned(signature.key_id) : copy.catalogueUnsigned);
+
+/** The keys this browser has seen, or none when storage is out of reach or holds something else. */
+export async function loadKnownKeys(store: KeyStore | null): Promise<KnownKeys> {
+  const { readKnownKeys } = await import('@braindog/declare/catalogue');
+  try {
+    const raw = store?.getItem(KNOWN_KEYS) ?? null;
+    return raw === null ? {} : readKnownKeys(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+/** Whether this browser has seen the key that signed a version for its author before. */
+export async function trustFor(store: KeyStore | null, author: string, signature: Signature | null | undefined): Promise<Trust> {
+  const { trustOf } = await import('@braindog/declare/catalogue');
+  return trustOf(await loadKnownKeys(store), author, signature);
+}
+
+/** Trust said as a sentence, loud when the key is not the one seen before. */
+export function trustWords(trust: Trust, author: string): { text: string; loud: boolean } {
+  switch (trust.kind) {
+    case 'unsigned':
+      return { text: copy.catalogueTrustUnsigned, loud: false };
+    case 'first':
+      return { text: copy.catalogueTrustFirst(author), loud: false };
+    case 'known':
+      return { text: copy.catalogueTrustKnown(author), loud: false };
+    case 'changed':
+      return { text: copy.catalogueTrustChanged(author, trust.before), loud: true };
+  }
+}
+
+/**
+ * The key kept once a person asks for a version: only on first use. A known key needs nothing, and a changed key is never
+ * written over the one seen before, so it is said loudly again next time. Answers whether anything was kept.
+ */
+export async function keepFirstKey(store: KeyStore | null, author: string, trust: Trust): Promise<boolean> {
+  if (trust.kind !== 'first' || !store) return false;
+  const { rememberKey } = await import('@braindog/declare/catalogue');
+  try {
+    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), author, trust.key_id)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ── asking on Decide ───────────────────────────────────────────────────── */
+
+export type CatalogueProposal = { question: string; body_kind: 'pack'; body: { file: string } | { install: string; doc: Record<string, unknown> } };
+
+/**
+ * The proposal that asks for a version on Decide: a use case carries its file\'s text, an add-on the id the record holds it
+ * under and its document. `from` is the version installed, for an update.
+ */
+export async function proposalFor(entry: CatalogueEntry, version: string, from: string | null, text: string, file: CatalogueFile, signature: Signature | null): Promise<CatalogueProposal> {
+  const { installedIdOf } = await import('@braindog/declare/catalogue');
+  const question = copy.catalogueQuestion(entry.title, version, from, signature?.key_id ?? null);
+  return file.kind === 'usecase' ? { question, body_kind: 'pack', body: { file: text } } : { question, body_kind: 'pack', body: { install: installedIdOf(entry), doc: file.file.doc } };
+}
+
+type Call = (name: string, args: Record<string, unknown>) => Promise<{ ok: true; value: unknown } | { ok: false; refusal?: { fix: string; code?: string } }>;
+
+/** A proposal filed, answering the id Decide opens it at (empty when the record names none), or the record\'s sentence. */
+export async function fileProposal(call: Call, proposal: CatalogueProposal): Promise<{ ok: true; id: string } | { ok: false; fix: string; code: string | null }> {
+  let out: Awaited<ReturnType<Call>>;
+  try {
+    out = await call('propose', proposal as unknown as Record<string, unknown>);
+  } catch {
+    return { ok: false, fix: copy.recordNotReached, code: null };
+  }
+  if (!out.ok) return { ok: false, fix: out.refusal?.fix ?? copy.recordNotReached, code: out.refusal?.code ?? null };
+  const id = (out.value as { id?: unknown } | null)?.id;
+  return { ok: true, id: typeof id === 'string' ? id : typeof id === 'number' ? String(id) : '' };
+}
+
+/**
+ * A version fetched, verified and read, then asked for on Decide. Nothing is filed for a file that does not verify or read.
+ * Answers the proposal id and the signature it verified.
+ */
+export async function askForVersion(
+  fetcher: Fetcher,
+  call: Call,
+  entry: CatalogueEntry,
+  version: CatalogueVersion,
+  from: string | null,
+): Promise<{ ok: true; id: string; signature: Signature | null } | { ok: false; fix: string; code: string | null }> {
+  const got = await catalogueText(fetcher, entry, version);
+  if (!got.ok) return got;
+  const { readCatalogueFile } = await import('@braindog/declare/catalogue');
+  const file = await readCatalogueFile(got.text, { kind: 'url' });
+  if (!file.ok || file.value.kind !== entry.kind)
+    return { ok: false, fix: !file.ok && 'refusal' in file ? file.refusal.fix : `${entry.title} ${version.version} does not read.`, code: !file.ok && 'refusal' in file ? file.refusal.code : null };
+  const filed = await fileProposal(call, await proposalFor(entry, version.version, from, got.text, file.value, got.signature));
+  return filed.ok ? { ...filed, signature: got.signature } : filed;
+}
+
+/* ── updates on /packs ──────────────────────────────────────────────────── */
+
+/** A catalogue path read through the host, `null` when it is not there. */
+export const fetchReader =
+  (fetcher: Fetcher) =>
+  async (path: string): Promise<string | null> => {
+    try {
+      const res = await fetcher(`${CATALOGUE_BASE}${path}`, { credentials: 'same-origin' });
+      return res.ok ? await res.text() : null;
+    } catch {
+      return null;
+    }
+  };
+
+/** Every later version of what this record holds, verified and read, and the sentences for any that were not. */
+export async function updatesFor(fetcher: Fetcher, index: CatalogueIndex, states: readonly PackState[]): Promise<{ updates: CatalogueUpdate[]; refused: string[] }> {
+  const { catalogueUpdates } = await import('@braindog/declare/catalogue');
+  const out = await catalogueUpdates(index, states, fetchReader(fetcher));
+  return { updates: out.updates, refused: out.refused.map((r) => r.fix) };
+}
+
+/** The proposal for an update already fetched and verified by `updatesFor`. */
+export const updateProposal = (u: CatalogueUpdate): Promise<CatalogueProposal> => proposalFor(u.entry, u.to.version, u.from, u.text, u.file, u.signature);
+

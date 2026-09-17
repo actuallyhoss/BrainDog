@@ -1,23 +1,30 @@
 <!--
-  One use case from this BrainDog's catalogue, on its own page: `/packs/browse/<id>?from=catalogue` (`../catalogue.ts`).
+  One use case or add-on from this BrainDog's catalogue, on its own page: `/packs/browse/<id>?from=catalogue`, with
+  `&kind=pack` for an add-on (`../catalogue.ts`).
 
   WHAT IT CAN REACH, WHAT CHANGED, AND EVERY VERSION, each read from the files as the catalogue published them: the
   modules it installs first, its lists, pages and rules, example rows and skills, and every line it would call out with.
   An update says what moved from the version installed here, when the catalogue still holds that version.
 
-  INSTALL AND UPDATE ARE THE SHARED FILE'S PATH. The file is fetched and held to the checksum the index lists, then handed
-  to `InstallShared`, where the record plans it and the owner approves it. Nothing is installed from this page otherwise.
+  THE LATEST FILE IS VERIFIED WHEN THE PAGE OPENS: its checksum, and its author's signature when it has one. One that does
+  not verify is refused with its sentence and code, and nothing can be asked for. A signed one says whether this browser
+  has seen that key for its author before, and loudly when it is a different key; the key is kept on first use, when the
+  person asks for the version, and never written over.
+
+  A USE CASE INSTALLS THROUGH THE SHARED FILE'S PATH: the file is handed to `InstallShared`, where the record plans it and
+  the owner approves it. AN ADD-ON IS ASKED FOR ON DECIDE: the file is fetched and verified again, read, and filed as a
+  proposal the owner accepts there. The sample says what it would ask and files nothing.
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
-  import type { CatalogueEntry, Changes } from '@braindog/declare/catalogue';
+  import type { CatalogueEntry, Changes, Trust } from '@braindog/declare/catalogue';
   import { copy } from '$lib/copy.ts';
   import type { PackState } from '$lib/record/packs.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import InstallShared from '../../InstallShared.svelte';
   import { moduleTitle } from '../../sharing.ts';
-  import { catalogueText, changesSince, standingOf, type Standing } from '../catalogue.ts';
+  import { askForVersion, browserStore, catalogueText, changesSince, keepFirstKey, signedWords, standingOf, trustFor, trustWords, type Standing } from '../catalogue.ts';
 
   let {
     entry,
@@ -29,7 +36,7 @@
 
   const latest = $derived(entry.versions[0]);
   const reach = $derived(latest?.reach);
-  const audience = $derived((copy.shareAudiences as Record<string, string>)[entry.audience] ?? copy.shareAudiences.other);
+  const audience = $derived(entry.kind === 'pack' ? copy.catalogueAddon : ((copy.shareAudiences as Record<string, string>)[entry.audience] ?? copy.shareAudiences.other));
   const kindWord = (kind: string) => copy.proposalKind(kind).toLowerCase();
 
   let standing = $state<Standing | null>(null);
@@ -38,6 +45,13 @@
   let refused = $state<{ fix: string; code: string | null } | null>(null);
   let busy = $state(false);
   let opened = $state(0);
+  /** The latest file checked when the page opens: `null` until then. */
+  let checked = $state<{ ok: boolean } | null>(null);
+  let trust = $state<Trust | null>(null);
+  const said = $derived(trust ? trustWords(trust, entry.author) : null);
+  /** An add-on asked for: the proposal id, empty when the record named none. */
+  let filed = $state<string | null>(null);
+  let would = $state<string | null>(null);
 
   $effect(() => {
     const held = states;
@@ -46,6 +60,47 @@
       changes = s.kind === 'update' && s.from !== '' ? await changesSince(fetch, entry, s.from) : null;
     });
   });
+
+  $effect(() => {
+    const version = latest;
+    if (!version) return;
+    void catalogueText(fetch, entry, version).then(async (got) => {
+      if (!got.ok) {
+        refused = { fix: got.fix, code: got.code };
+        checked = { ok: false };
+        return;
+      }
+      trust = await trustFor(browserStore(), entry.author, got.signature);
+      checked = { ok: true };
+    });
+  });
+
+  /** The version installed here, for an update's question. */
+  const from = (): string | null => (standing?.kind === 'update' && standing.from !== '' ? standing.from : null);
+
+  async function ask() {
+    if (!latest || busy) return;
+    refused = null;
+    if (!live || !client) {
+      would = copy.catalogueWouldAsk(entry.title, latest.version);
+      return;
+    }
+    const c = client;
+    busy = true;
+    try {
+      const out = await askForVersion(fetch, (name, args) => c.call(name, args), entry, latest, from());
+      if (!out.ok) {
+        refused = { fix: out.fix, code: out.code };
+        return;
+      }
+      filed = out.id;
+      const now = await trustFor(browserStore(), entry.author, out.signature);
+      trust = now;
+      await keepFirstKey(browserStore(), entry.author, now);
+    } finally {
+      busy = false;
+    }
+  }
 
   async function review() {
     if (!latest || busy) return;
@@ -64,6 +119,7 @@
 
   async function installed() {
     given = null;
+    if (trust) await keepFirstKey(browserStore(), entry.author, trust);
     await onchanged();
   }
 </script>
@@ -72,6 +128,8 @@
   <p class="for">{audience} · {copy.catalogueHeading}</p>
   <p class="summary">{entry.summary}</p>
   <p class="meta">{copy.useCaseVersion(entry.latest, entry.author, entry.license)}</p>
+  <p class="meta key"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</p>
+  {#if said}<p class="trust" data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>{#if said.loud}<Icon name="alert" size="s" />{/if}{said.text}</p>{/if}
   <p class="meta">{copy.catalogueBlurb}</p>
   <div class="offer">
     {#if standing?.kind === 'current'}
@@ -80,7 +138,16 @@
       <p class="said">{copy.catalogueAhead(standing.at)}</p>
     {:else if standing?.kind === 'off'}
       <p class="said">{copy.catalogueOff}</p>
-    {:else if standing}
+    {:else if standing && checked?.ok && entry.kind === 'pack'}
+      {#if filed !== null}
+        <p class="said" role="status">{copy.catalogueAsked}{#if filed}{' '}<a class="tap" href="/decide/{filed}">{copy.pollOpenDecide}</a>{/if}</p>
+      {:else}
+        <Button weight="primary" disabled={busy} onclick={() => void ask()}>
+          {standing.kind === 'update' ? copy.catalogueAskUpdate(entry.latest) : copy.catalogueAsk}
+        </Button>
+      {/if}
+      {#if would}<p class="said" role="status">{would}</p>{/if}
+    {:else if standing && checked?.ok}
       <Button weight="primary" disabled={busy} onclick={() => void review()}>
         {standing.kind === 'update' ? copy.updateTo(entry.latest) : copy.catalogueReview}
       </Button>
@@ -141,6 +208,7 @@
           <span class="v">{v.version}</span>
           <span class="quiet">{v.bump ? copy.catalogueBump[v.bump] : copy.catalogueFirst}</span>
           <span class="quiet small">{copy.cataloguePublished(v.published_at.slice(0, 10), v.checksum)}</span>
+          <span class="quiet small key">{signedWords(v.signature)}</span>
         </li>
       {/each}
     </ol>
@@ -171,6 +239,33 @@
     align-items: center;
     gap: 6px;
     color: var(--ink2);
+  }
+
+  .key {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .trust {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .trust[data-loud] {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--warn);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font-weight: 600;
   }
 
   .code {

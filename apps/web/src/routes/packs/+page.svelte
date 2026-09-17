@@ -30,6 +30,7 @@
   import type { PackInfo } from '$lib/record/schema.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import InstallShared from './InstallShared.svelte';
+  import CatalogueUpdates from './CatalogueUpdates.svelte';
 
   /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
   const byId = new Map(PACKS.map((p) => [p.id, p]));
@@ -297,6 +298,7 @@
        nowhere, so this screen listed things by name and version with nothing saying what installing
        one would do to the record. -->
   <p class="blurb">{copy.packBlurb}</p>
+  <CatalogueUpdates {states} {live} {client} />
   <!-- A RECORD WITH NOTHING INSTALLED IS THE ORDINARY FIRST STATE OF THIS SCREEN, and it drew an
        empty `Section` under a `0`. `19 §6` again — and here the sentence has somewhere obvious to
        point, because the list of packs that are NOT installed is directly below it. -->

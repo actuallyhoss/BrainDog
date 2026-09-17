@@ -31,8 +31,10 @@
   import { readHostCatalogue } from '../catalogue.ts';
   import type { CatalogueEntry } from '@braindog/declare/catalogue';
 
-  /* A CATALOGUE'S USE CASE IS ASKED FOR BY NAME (`?from=catalogue`), so one published under a built-in's id is still reachable. */
+  /* A CATALOGUE'S USE CASE IS ASKED FOR BY NAME (`?from=catalogue`), so one published under a built-in's id is still reachable. An add-on
+     says its kind (`&kind=pack`), so one sharing an id with a use case is found as itself. */
   const fromCatalogue = $derived(page.url.searchParams.get('from') === 'catalogue');
+  const kindAsked = $derived(page.url.searchParams.get('kind') === 'pack' ? 'pack' : 'usecase');
   const u = $derived(fromCatalogue ? null : (useCase(page.params.id ?? '') ?? null));
   let entry = $state.raw<CatalogueEntry | null>(null);
   let looked = $state(false);
@@ -53,7 +55,7 @@
 
   onMount(() => {
     void readHostCatalogue(fetch).then((got) => {
-      entry = got.ok ? (got.index?.entries.find((e) => e.id === page.params.id) ?? null) : null;
+      entry = got.ok ? (got.index?.entries.find((e) => e.id === page.params.id && e.kind === kindAsked) ?? null) : null;
       looked = true;
     });
     void read(async () => {

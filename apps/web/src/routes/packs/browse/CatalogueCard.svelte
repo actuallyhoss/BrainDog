@@ -1,8 +1,9 @@
 <!--
-  One use case from this BrainDog's catalogue, as a card on browse (`catalogue.ts`).
+  One use case or add-on from this BrainDog's catalogue, as a card on browse (`catalogue.ts`).
 
   THE TRUST FACTS ARE THE FILE'S OWN, read from its latest version as the catalogue computed them when it was published:
-  the version and author, how many lists and pages it adds, and every host it would call out to. Nothing on the card is
+  the version and author, the key that signed it or that nothing did, how many lists and pages it adds, and every host it
+  would call out to. The signature is the index's claim here; the detail page verifies it before anything is asked for. Nothing on the card is
   written by its author about itself apart from the title and summary, which the card says as theirs.
 -->
 <script lang="ts">
@@ -10,13 +11,15 @@
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { signedWords } from './catalogue.ts';
 
   let { entry }: { entry: CatalogueEntry } = $props();
 
   const latest = $derived(entry.versions[0]);
   const hosts = $derived([...new Set((latest?.reach.calls_out ?? []).map((c) => c.host ?? '').filter((h) => h !== ''))]);
-  const href = $derived(`/packs/browse/${entry.id}?from=catalogue`);
-  const audience = $derived((copy.shareAudiences as Record<string, string>)[entry.audience] ?? copy.shareAudiences.other);
+  /* A USE CASE KEEPS ITS LINK; an add-on says its kind, so one sharing an id with a use case is still reachable. */
+  const href = $derived(`/packs/browse/${entry.id}?from=catalogue${entry.kind === 'pack' ? '&kind=pack' : ''}`);
+  const audience = $derived(entry.kind === 'pack' ? copy.catalogueAddon : ((copy.shareAudiences as Record<string, string>)[entry.audience] ?? copy.shareAudiences.other));
 </script>
 
 <li class="card">
@@ -29,6 +32,7 @@
   {#if latest}
     <ul class="facts">
       <li><Icon name="rows" size="s" />{copy.catalogueAdds(latest.reach.lists.length, latest.reach.pages.length)}</li>
+      <li class="key"><Icon name={latest.signature ? 'key' : 'info'} size="s" />{signedWords(latest.signature)}</li>
       <li data-calls={hosts.length > 0 ? '' : undefined}><Icon name={hosts.length > 0 ? 'globe' : 'check'} size="s" />{hosts.length > 0 ? copy.catalogueCallsOut(hosts) : copy.catalogueCallsNothing}</li>
     </ul>
   {/if}
@@ -102,6 +106,11 @@
     align-items: flex-start;
     gap: 6px;
     overflow-wrap: anywhere;
+  }
+
+  .facts .key {
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
   }
 
   .facts li[data-calls] {

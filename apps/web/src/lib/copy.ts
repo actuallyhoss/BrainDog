@@ -1093,7 +1093,24 @@ export const copy = {
   /* A CATALOGUE THIS BRAINDOG SERVES (`routes/packs/browse/catalogue.ts`): said as what it is, never as the add-on index. */
   catalogueHeading: "From this BrainDog's catalogue",
   catalogueBlurb:
-    'Use cases published to a folder this BrainDog serves. They are not from the add-on index and carry no signature. Each file is held to the checksum the catalogue lists, then planned for you to approve, like any shared file.',
+    "Use cases and add-ons published to a folder this BrainDog serves. They are not from the add-on index. Each file is held to the checksum the catalogue lists and to its author's signature when it has one, then planned for you to approve on Decide.",
+  catalogueAddon: 'Add-on',
+  catalogueSigned: (keyId: string) => `Signed by key ${keyId}`,
+  catalogueUnsigned: 'Unsigned',
+  catalogueTrustUnsigned: 'Nobody signed this version, so nothing but the catalogue says who published it.',
+  catalogueTrustFirst: (author: string) => `This browser has not seen a key for ${author} before. It keeps this one when you ask on Decide, and will say so if a later version is signed by a different key.`,
+  catalogueTrustKnown: (author: string) => `This browser has seen this key for ${author} before.`,
+  catalogueTrustChanged: (author: string, before: string[]) =>
+    `This is not the key this browser has seen for ${author} before (${list(before)}). Somebody other than ${author} may have signed it. Check with ${author} before you ask for it.`,
+  catalogueAsk: 'Ask on Decide',
+  catalogueAskUpdate: (version: string) => `Ask on Decide to update to ${version}`,
+  catalogueQuestion: (title: string, to: string, from: string | null, keyId: string | null) =>
+    `${from ? `Update ${title} from ${from} to ${to}` : `Install ${title} ${to}`} from this BrainDog's catalogue? ${keyId ? `It is signed by key ${keyId}.` : 'Nobody signed it.'}`,
+  catalogueAsked: 'Asked. It installs only when you approve it on Decide.',
+  catalogueWouldAsk: (title: string, version: string) => `On a record this would ask on Decide for ${title} ${version}. This sample files nothing.`,
+  catalogueUpdatesHeading: "Updates from this BrainDog's catalogue",
+  catalogueFromTo: (from: string, to: string) => `${from} to ${to}`,
+  catalogueChangedGone: 'The catalogue no longer holds the version installed here, so only the plan on Decide can say what changes.',
   catalogueAdds: (lists: number, pages: number) => `Adds ${lists} ${lists === 1 ? 'list' : 'lists'} and ${pages} ${pages === 1 ? 'page' : 'pages'}`,
   catalogueCallsNothing: 'Calls out to nothing. It reads and writes only this record.',
   catalogueCallsOut: (hosts: string[]) => `Calls out to ${list(hosts)}`,

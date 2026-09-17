@@ -103,7 +103,7 @@
       <h2 class="catalogue-h" id="catalogue-h">{copy.catalogueHeading}</h2>
       <p class="blurb">{copy.catalogueBlurb}</p>
       <ul class="cards fill">
-        {#each catalogue.entries as entry (entry.id)}<CatalogueCard {entry} />{/each}
+        {#each catalogue.entries as entry (`${entry.kind}:${entry.id}`)}<CatalogueCard {entry} />{/each}
       </ul>
     </section>
   {/if}

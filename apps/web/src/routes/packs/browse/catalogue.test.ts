@@ -7,9 +7,24 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { exportUseCase } from '@braindog/declare';
-import { emptyCatalogue, publishTo, type CatalogueIndex } from '@braindog/declare/catalogue';
+import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type CatalogueIndex } from '@braindog/declare/catalogue';
 
-import { catalogueText, changesSince, readHostCatalogue, standingOf } from './catalogue.ts';
+import {
+  askForVersion,
+  catalogueText,
+  changesSince,
+  keepFirstKey,
+  KNOWN_KEYS,
+  loadKnownKeys,
+  readHostCatalogue,
+  signedWords,
+  standingOf,
+  trustFor,
+  trustWords,
+  updateProposal,
+  updatesFor,
+  type KeyStore,
+} from './catalogue.ts';
 
 const COURSES = { register: 'courses', name: 'Courses', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
 const READING = { register: 'reading', name: 'Reading list', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
@@ -69,4 +84,134 @@ test('standing against the latest, and what changed from the version installed',
   assert.deepEqual(changes?.added.map((a) => a.title), ['Reading list']);
   assert.equal(changes?.bump, 'minor');
   assert.equal(await changesSince(fetcher, entry, '0.9.0'), null);
+});
+
+const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
+const SHELF = { page: 'shelf', title: 'Shelf', requires: ['register.books'], blocks: [{ kind: 'table', source: 'register.books', span: 12 }] };
+const addon = (version: string, declarations: Record<string, unknown>[]) =>
+  JSON.stringify({ pack: 'bookshelf', version, title: 'Bookshelf', summary: 'Books you own.', author: 'Halden', license: 'MIT', declarations });
+
+/** An add-on at two versions, each signed by `key`, served as the self-host serves a catalogue folder. */
+async function servedAddon(key: AuthorKey) {
+  let index = emptyCatalogue('Signed');
+  const files = new Map<string, string>();
+  for (const text of [addon('1.0.0', [BOOKS]), addon('1.1.0', [BOOKS, SHELF])]) {
+    const out = await publishTo(index, text, (p) => files.get(p) ?? null, new Date(), key);
+    assert.ok(out.ok, JSON.stringify(out));
+    index = out.value.index;
+    files.set(out.value.path, text);
+  }
+  const fetcher = async (input: string) => {
+    const text = files.get(input.replace(/^\/catalogue\//u, ''));
+    return text === undefined ? new Response('', { status: 404 }) : new Response(text, { headers: { 'content-type': 'application/json' } });
+  };
+  return { index, fetcher, entry: index.entries[0]! };
+}
+
+const memoryStore = (): KeyStore & { held: Map<string, string> } => {
+  const held = new Map<string, string>();
+  return { held, getItem: (k) => held.get(k) ?? null, setItem: (k, v) => void held.set(k, v) };
+};
+
+test('an add-on is fetched by its kind, verified with its signature, and stands by its own id', async () => {
+  const key = await newAuthorKey('Halden');
+  const { entry, fetcher } = await servedAddon(key);
+  assert.equal(entry.kind, 'pack');
+  const got = await catalogueText(fetcher, entry, entry.versions[0]!);
+  assert.ok(got.ok && got.signature?.key_id === key.key_id);
+  assert.equal(signedWords(got.ok ? got.signature : null), `Signed by key ${key.key_id}`);
+  assert.equal(signedWords(null), 'Unsigned');
+
+  const forged = { ...entry.versions[0]!, signature: { ...entry.versions[0]!.signature!, sig: entry.versions[1]!.signature!.sig } };
+  const bad = await catalogueText(fetcher, entry, forged);
+  assert.equal(!bad.ok && bad.code, 'SIGNATURE_INVALID');
+
+  assert.deepEqual(await standingOf(entry, [{ id: 'bookshelf', version: '1.0.0', disabled_at: null, registers: [] }]), { kind: 'update', from: '1.0.0' });
+  assert.deepEqual(await standingOf(entry, [{ id: 'usecase-bookshelf', version: '1.0.0', disabled_at: null, registers: [] }]), { kind: 'install' });
+  const changes = await changesSince(fetcher, entry, '1.0.0');
+  assert.deepEqual(changes?.added.map((a) => a.title), ['Shelf']);
+});
+
+test('trust on first use: kept when asked for, said loudly for a different key, never written over, and fine without storage', async () => {
+  const key = await newAuthorKey('Halden');
+  const { entry } = await servedAddon(key);
+  const signature = entry.versions[0]!.signature!;
+  const store = memoryStore();
+
+  const first = await trustFor(store, 'Halden', signature);
+  assert.equal(first.kind, 'first');
+  assert.equal(trustWords(first, 'Halden').loud, false);
+  assert.equal(await keepFirstKey(store, 'Halden', first), true);
+  assert.equal((await trustFor(store, 'Halden', signature)).kind, 'known');
+
+  const other = await newAuthorKey('Mallory');
+  const changed = await trustFor(store, 'Halden', { ...signature, key_id: other.key_id });
+  assert.equal(changed.kind, 'changed');
+  const said = trustWords(changed, 'Halden');
+  assert.ok(said.loud && said.text.includes(key.key_id));
+  assert.equal(await keepFirstKey(store, 'Halden', changed), false);
+  assert.deepEqual(await loadKnownKeys(store), { Halden: [key.key_id] });
+
+  assert.equal((await trustFor(store, 'Halden', null)).kind, 'unsigned');
+  store.held.set(KNOWN_KEYS, 'not json');
+  assert.deepEqual(await loadKnownKeys(store), {});
+  const blocked = (): never => {
+    throw new Error('blocked');
+  };
+  const broken: KeyStore = { getItem: blocked, setItem: blocked };
+  assert.equal((await trustFor(broken, 'Halden', signature)).kind, 'first');
+  assert.equal(await keepFirstKey(broken, 'Halden', first), false);
+  assert.equal(await keepFirstKey(null, 'Halden', first), false);
+});
+
+test('asking on Decide files an add-on as its id and document, a use case as its text, and nothing for a file that does not verify', async () => {
+  const key = await newAuthorKey('Halden');
+  const { entry, fetcher } = await servedAddon(key);
+  const filed: Record<string, unknown>[] = [];
+  const call = async (_name: string, args: Record<string, unknown>) => {
+    filed.push(args);
+    return { ok: true as const, value: { id: 'P7' } };
+  };
+
+  const asked = await askForVersion(fetcher, call, entry, entry.versions[0]!, '1.0.0');
+  assert.ok(asked.ok && asked.id === 'P7' && asked.signature?.key_id === key.key_id);
+  const body = filed[0]!.body as { install: string; doc: { pack: string } };
+  assert.equal(filed[0]!.body_kind, 'pack');
+  assert.equal(body.install, 'bookshelf');
+  assert.equal(body.doc.pack, 'bookshelf');
+  assert.ok(String(filed[0]!.question).includes('Update Bookshelf from 1.0.0 to 1.1.0') && String(filed[0]!.question).includes(key.key_id));
+
+  const tampered = async (input: string) => (input.endsWith('1.1.0.pack.json') ? new Response(addon('1.1.0', [BOOKS])) : fetcher(input));
+  const refused = await askForVersion(tampered, call, entry, entry.versions[0]!, null);
+  assert.equal(!refused.ok && refused.code, 'CHECKSUM_MISMATCH');
+  assert.equal(filed.length, 1);
+
+  const study = await served();
+  const uc = study.index.entries[0]!;
+  const ucAsked = await askForVersion(study.fetcher, call, uc, uc.versions[0]!, null);
+  assert.ok(ucAsked.ok && ucAsked.signature === null);
+  assert.equal(typeof (filed[1]!.body as { file: unknown }).file, 'string');
+  assert.ok(String(filed[1]!.question).includes('Nobody signed it'));
+
+  const no = await askForVersion(study.fetcher, async () => ({ ok: false as const, refusal: { fix: 'Only the owner can ask.', code: 'FORBIDDEN' } }), uc, uc.versions[0]!, null);
+  assert.deepEqual(no, { ok: false, fix: 'Only the owner can ask.', code: 'FORBIDDEN' });
+});
+
+test('updates on offer for what a record holds, with what changed, and a proposal for each', async () => {
+  const key = await newAuthorKey('Halden');
+  const { index, fetcher } = await servedAddon(key);
+  const held = [{ id: 'bookshelf', version: '1.0.0', disabled_at: null, registers: [] }];
+  const { updates, refused } = await updatesFor(fetcher, index, held);
+  assert.equal(refused.length, 0);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0]!.changes?.added.map((a) => a.title), ['Shelf']);
+  const proposal = await updateProposal(updates[0]!);
+  assert.equal((proposal.body as { install: string }).install, 'bookshelf');
+
+  const gone = await updatesFor(fetcher, index, [{ ...held[0]!, version: '0.9.0' }]);
+  assert.equal(gone.updates[0]!.changes, null);
+  assert.equal((await updatesFor(fetcher, index, [{ ...held[0]!, version: '1.1.0' }])).updates.length, 0);
+  const missing = await updatesFor(async () => new Response('', { status: 404 }), index, held);
+  assert.equal(missing.updates.length, 0);
+  assert.equal(missing.refused.length, 1);
 });
