@@ -30,6 +30,7 @@ import {
   voiceOf,
   AUDIENCES,
   type Audience,
+  type Diff,
   type Installed,
   type Pack,
   type PackSource,
@@ -91,7 +92,8 @@ export type PlannedPack = {
   conflicts: { id: string; pack: string }[];
   unresolved: string[];
   examples: number;
-  calls_out: string[];
+  /** What it calls out, as `plan` answers each action; `approve` is the lines the owner arms at install. */
+  calls_out: Diff['calls_out'];
   approve: string[];
   doc: Body;
 };
@@ -215,7 +217,7 @@ export function useCases(d: UseCaseDeps) {
         conflicts: diff.conflicts,
         unresolved: diff.unresolved.map((x) => x.register),
         examples: diff.seeds.count,
-        calls_out: diff.calls_out.map((c) => c.line),
+        calls_out: diff.calls_out,
         approve: diff.approve,
         doc,
       });

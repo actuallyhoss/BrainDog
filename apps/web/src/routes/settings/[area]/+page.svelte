@@ -2468,6 +2468,8 @@
             aria-busy={exporting === 'rows'}
             onclick={() => takeCopy('rows', 'The rows would be written without where each one came from, which is a clean handover')}
           >{copy.exportRows}</Button>
+          <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
+          <Button weight="bare" href="/packs/share">{copy.shareSetup}</Button>
         </div>
       </Section>
       <!--

@@ -29,6 +29,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { PackInfo } from '$lib/record/schema.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
+  import InstallShared from './InstallShared.svelte';
 
   /* THE CATALOGUE CARRIES NAMES AND BLURBS; the record carries which packs there are and whether each is on. */
   const byId = new Map(PACKS.map((p) => [p.id, p]));
@@ -39,7 +40,7 @@
   let blocks = $state<Record<string, Blocked>>({});
   let busy = $state<string | null>(null);
   let source: Source | null = null;
-  let client: ReturnType<typeof createClient> | null = null;
+  let client = $state.raw<ReturnType<typeof createClient> | null>(null);
   /** True once the record answered, so Install plans and installs instead of saying what it would do. */
   let live = $state(false);
 
@@ -356,6 +357,26 @@
     </div>
   </Section>
 
+  <!-- USE CASES: a whole arrangement as one file, browsed, shared and installed through the same plan as an add-on
+       (`loop/research-spark.md` S14). -->
+  <Section title={copy.useCases}>
+    <p class="blurb">{copy.useCasesBlurb}</p>
+    <div class="usecase-links">
+      <Button weight="quiet" href="/packs/browse">{copy.browseUseCases}</Button>
+      <Button weight="bare" href="/packs/share">{copy.shareSetup}</Button>
+    </div>
+    <h3 class="usecase-sub">{copy.installFromFile}</h3>
+    <InstallShared
+      {client}
+      {live}
+      {installed}
+      oninstalled={async () => {
+        const again = await source?.packs();
+        if (again?.ok) states = again.value;
+      }}
+    />
+  </Section>
+
   <!-- AND THIS HALF HAD NONE, eleven lines under the half that does it right. A record that has
        installed everything got the heading, a `0` and a hole where the list had been, which is the
        failure `19 §6` names and the fix was one branch away in the same file. It is `cleared` and
@@ -477,6 +498,21 @@
     .ledger :global(.line) {
       grid-template-columns: 12ch minmax(0, 1fr) auto auto;
     }
+  }
+
+  .usecase-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-4);
+  }
+
+  .usecase-sub {
+    margin-block-end: var(--sp-2);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    color: var(--ink2);
   }
 
   /* One sentence saying what the things on this screen are, in the person's words. */
