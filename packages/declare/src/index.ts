@@ -38,7 +38,7 @@ export type { Egress };
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
-export { AUDIENCES, LABEL_KEY, MODULES, SHARED_VERSION, VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type UseCase, type VoiceKey } from './usecase.ts';
+export { AUDIENCES, LABEL_KEY, MODULES, SHARED_VERSION, VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 

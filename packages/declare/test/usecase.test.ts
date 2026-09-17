@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
+import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
 
 const DOC = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   usecase: 'reading',
@@ -144,4 +144,14 @@ test("A LIST'S SINGULAR AND ITS DESCRIPTION LINE ARE LABELS TOO, as one_<list> a
   assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:one': long } }))).at, 'labels.books:one', 'a singular is a word');
   assert.ok(normaliseUseCase(DOC({ labels: { 'books:holds': long.slice(0, 180) } })).ok, 'a description is a line');
   assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:many': 'x' } }))).code, 'VALUE_MALFORMED');
+});
+
+test('THE VOICE RULE: a use case added goes beside the one speaking, or takes the voice when its id sorts first', () => {
+  const on = (...ids: string[]) => ids.map((id) => ({ id, disabled_at: null }));
+  assert.equal(voiceWhenAdding([], 'student'), 'speaks', 'nothing speaks yet');
+  assert.equal(voiceWhenAdding(on('usecase-personal', 'work'), 'student'), 'beside');
+  assert.equal(voiceWhenAdding(on('usecase-student'), 'personal'), 'speaks');
+  assert.equal(voiceWhenAdding(on('usecase-student'), 'usecase-student'), 'speaks', 'the one speaking still speaks');
+  assert.equal(voiceWhenAdding([{ id: 'usecase-founder', disabled_at: '2026-09-17' }, ...on('usecase-team')], 'guide'), 'speaks', 'a pack switched off does not speak');
+  assert.equal(speakingPack([...on('usecase-team', 'usecase-personal')]), 'usecase-personal');
 });

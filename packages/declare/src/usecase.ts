@@ -94,6 +94,25 @@ const text = (v: unknown, most: number): v is string => typeof v === 'string' &&
 /** The pack id a use case carries. */
 export const packIdOf = (usecase: string): string => `usecase-${usecase}`;
 
+/**
+ * THE VOICE RULE, ONE PLACE FOR EVERY DOOR A SECOND USE CASE COMES IN BY (onboarding, browse, a shared file, an agent's
+ * arrangement). A record speaks in the voice of its first use-case pack switched on, by id, so installing another use case
+ * either goes beside the one speaking, which keeps its voice and its Home, or takes the voice over. `beside` when the
+ * one speaking keeps it; `speaks` when the use case added would, or when none speaks yet.
+ */
+export function voiceWhenAdding(packs: readonly { id: string; disabled_at: string | null }[], adding: string): 'speaks' | 'beside' {
+  const speaking = speakingPack(packs);
+  const pack = adding.startsWith(packIdOf('')) ? adding : packIdOf(adding);
+  return speaking === null || speaking === pack || pack < speaking ? 'speaks' : 'beside';
+}
+
+/** The use-case pack a record speaks in: the first switched on, by id, or `null` for the house voice. */
+export const speakingPack = (packs: readonly { id: string; disabled_at: string | null }[]): string | null =>
+  packs
+    .filter((p) => p.id.startsWith(packIdOf('')) && p.disabled_at === null)
+    .map((p) => p.id)
+    .sort()[0] ?? null;
+
 /** The setting a voice line is stored under. */
 export const voiceSetting = (key: VoiceKey): string => `voice_${key}`;
 

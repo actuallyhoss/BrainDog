@@ -7,11 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack } from '@braindog/seed/usecases';
-import { labelSetting as labelSettingOfPack, useCasePack } from '@braindog/declare';
+import { labelSetting as labelSettingOfPack, useCasePack, voiceWhenAdding as voiceWhenAddingPack } from '@braindog/declare';
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
-import { VOICE_LINES, homePageOf, labelSetting, labelsOf, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
+import { VOICE_LINES, homePageOf, labelSetting, labelsOf, voiceWhenAdding, lineOf, listNamed, relabel, relabelAll, speaking, voiceOf } from './voice.ts';
 
 test('THE DISPLAY READS EVERY KEY THE FORMAT ALLOWS, and no other', () => {
   assert.deepEqual(Object.keys(VOICE_LINES).sort(), [...VOICE_KEYS].sort());
@@ -112,4 +112,16 @@ test("THE BUILD'S OWN LISTS ARE RELABELLED IN PLACE, and a label taken away puts
 test("A USE CASE'S HOME IS THE PAGE THE SEED DECLARES FOR IT, by its pack's id", () => {
   for (const u of USE_CASES) assert.equal(homePageOf(`usecase-${u.usecase}`), homeOfPack(u.usecase));
   assert.equal(homePageOf('usecase-student'), 'home-student');
+});
+
+test('WHAT ADDING A USE CASE DOES TO THE VOICE is the rule the format keeps', () => {
+  const cases: [{ id: string; disabled_at: string | null }[], string][] = [
+    [[], 'student'],
+    [[{ id: 'usecase-personal', disabled_at: null }], 'student'],
+    [[{ id: 'usecase-student', disabled_at: null }], 'personal'],
+    [[{ id: 'usecase-team', disabled_at: '2026-09-17' }, { id: 'usecase-guide', disabled_at: null }], 'founder'],
+    [[{ id: 'usecase-student', disabled_at: null }], 'usecase-team'],
+  ];
+  for (const [packs, id] of cases) assert.equal(voiceWhenAdding(packs, id), voiceWhenAddingPack(packs, id), `${id} over ${JSON.stringify(packs)}`);
+  assert.equal(voiceWhenAdding([{ id: 'usecase-personal', disabled_at: null }], 'student'), 'beside');
 });

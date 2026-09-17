@@ -52,6 +52,18 @@ export const speaking = (packs: readonly { id: string; disabled_at: string | nul
   packs.find((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null)?.id ?? null;
 
 /**
+ * WHAT INSTALLING ANOTHER USE CASE DOES TO THE VOICE, by the rule `@braindog/declare` `voiceWhenAdding` keeps: `beside`
+ * when the use case speaking now keeps its voice and Home, `speaks` when the one added would take them, or none speaks.
+ * Browse and a shared file say which before Install, as onboarding says "Adds Student as well".
+ */
+export function voiceWhenAdding(packs: readonly { id: string; disabled_at: string | null }[], adding: string): 'speaks' | 'beside' {
+  const on = packs.filter((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null).map((p) => p.id).sort();
+  const pack = USE_CASE_PACK.test(adding) ? adding : `usecase-${adding}`;
+  const now = on[0];
+  return now === undefined || now === pack || pack < now ? 'speaks' : 'beside';
+}
+
+/**
  * THE WORDS A RECORD GIVES ITS LISTS, FIELDS AND STATES (`loop/research-spark.md` S8), by label key: `tickets`,
  * `people.role`, `people.role.collaborator`. Held as the use-case pack's `label_*` settings, where a person can
  * change them, and read in place of the declaration's own word. A key left out reads the declaration's word.

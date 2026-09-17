@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { normalise, packIdOf, plan, install, unresolvedFault, VOICE_KEYS, voiceSetting, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { normalise, packIdOf, plan, install, unresolvedFault, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -189,7 +189,7 @@ export function arranger(d: ArrangeDeps) {
     let state: Installed = { ...base, packs: [...base.packs], declarations: [...base.declarations] };
     const out: Planned = { plan: [], approve: [], batch: [], config: new Map() };
     for (const id of ids) {
-      const read = await packOf(id, docs, heldBy(state), useCaseFor(ids));
+      const read = await packOf(id, docs, heldBy(state), useCaseFor(ids, id));
       if (!read.ok) return read;
       const pack = read.value;
       const diff = await plan(pack, state);
@@ -228,8 +228,13 @@ export function arranger(d: ArrangeDeps) {
    * THE USE CASE A MODULE IS INSTALLED FOR: the one this proposal installs, else the one already on. A module added by a
    * proposal carried no examples where onboarding gives it the use case's, so the two paths made different records.
    */
-  const useCaseFor = (installing: readonly string[]): string | null =>
-    ([...installing].reverse().find((id) => id.startsWith(USE_CASE)) ?? useCaseOn())?.slice(USE_CASE.length) ?? null;
+  const useCaseFor = (installing: readonly string[], id?: string): string | null => {
+    /* A MODULE GOES IN FOR THE USE CASE AFTER IT IN THE ORDER, so with Student beside Personal, Money carries Personal's
+       examples and not Student's. */
+    const from = id === undefined ? -1 : installing.indexOf(id);
+    const next = from < 0 ? undefined : installing.slice(from).find((x) => x.startsWith(USE_CASE));
+    return (next ?? [...installing].reverse().find((x) => x.startsWith(USE_CASE)) ?? useCaseOn())?.slice(USE_CASE.length) ?? null;
+  };
 
   async function packOf(id: string, docs: ReadonlyMap<string, Body>, holds: readonly string[], usecase: string | null): Promise<Result<Pack>> {
     const doc = docs.get(id) ?? entryOf(id)?.doc({ holds, usecase }) ?? null;
@@ -342,10 +347,30 @@ export function arranger(d: ArrangeDeps) {
 
     /* AN ARRANGEMENT: packs, then pages, then settings, each checked against what the ones before would leave. */
     const packs = isMap(body.packs) ? body.packs : {};
-    const asked = [
-      ...(typeof body.usecase === 'string' ? [packIdOf(body.usecase.replace(new RegExp(`^${USE_CASE}`), ''))] : []),
-      ...(Array.isArray(packs.install) ? packs.install.map(String) : []),
-    ];
+    const lead = typeof body.usecase === 'string' ? packIdOf(body.usecase.replace(new RegExp(`^${USE_CASE}`), '')) : null;
+    /* A USE CASE BESIDE THE ONE SPEAKING, by the voice rule every other door keeps (`declare` `voiceWhenAdding`): it
+       installs after the lead, and one that would take the voice over is refused rather than quietly changing it. */
+    const beside: string[] = [];
+    if (body.alongside !== undefined) {
+      if (!Array.isArray(body.alongside) || body.alongside.some((x) => typeof x !== 'string'))
+        return refuse('VALUE_MALFORMED', 'alongside is a list of use case ids from offer, such as ["student"].', 'body.alongside');
+      const speaking = [...states(), ...(lead === null ? [] : [{ id: lead, disabled_at: null }])];
+      if (!speaking.some((p) => p.id.startsWith(USE_CASE) && p.disabled_at === null))
+        return refuse('REQUIRED_MISSING', 'A use case goes beside the one this BrainDog speaks in, and none is on. Name one as usecase, and the others beside it.', 'body.alongside');
+      for (const [i, raw] of (body.alongside as string[]).entries()) {
+        const id = packIdOf(raw.replace(new RegExp(`^${USE_CASE}`), ''));
+        const entry = entryOf(id);
+        if (!entry || entry.kind !== 'usecase') return notOffered(raw, `body.alongside[${i}]`);
+        if (voiceWhenAdding(speaking, id) === 'speaks')
+          return refuse(
+            'TRANSITION_ILLEGAL',
+            `${entry.title} would speak in place of the use case this BrainDog speaks in now, and beside it keeps that voice. Propose ${entry.title} as usecase, or leave it out.`,
+            `body.alongside[${i}]`,
+          );
+        beside.push(id);
+      }
+    }
+    const asked = [...(lead === null ? [] : [lead]), ...beside, ...(Array.isArray(packs.install) ? packs.install.map(String) : [])];
     const order = expand([...new Set(asked)], 'body.packs.install', new Map());
     if (!order.ok) return order;
     const enable = [...order.value.enable];
@@ -391,6 +416,7 @@ export function arranger(d: ArrangeDeps) {
 
     return ok({
       ...(typeof body.usecase === 'string' ? { usecase: body.usecase } : {}),
+      ...(beside.length === 0 ? {} : { alongside: beside.map((id) => id.slice(USE_CASE.length)) }),
       why: body.why,
       packs: {
         ...(order.value.install.length === 0 ? {} : { install: order.value.install }),
@@ -455,7 +481,7 @@ export function arranger(d: ArrangeDeps) {
         continue;
       }
       const state = d.installed();
-      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? []));
+      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
       if (!pack.ok) return stopped(pack);
       const diff = await plan(pack.value, state);
       const unshown = diff.approve.filter((line) => !approved.includes(line));

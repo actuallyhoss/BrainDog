@@ -202,6 +202,8 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
   /* A PACK THAT INSTALLS ONE THING IS SAID BY ITS LEAD, Adds Work, and is not said twice. */
   const saidByLead = install.length === 1 && (kind === 'pack' || install[0] === `usecase-${text(body.usecase)}`);
   if (install.length > 0 && !saidByLead) packLines.push(copy.arrangeInstalls(install.map(name)));
+  const beside = strings(body.alongside);
+  if (beside.length && kind === 'arrange') packLines.push(copy.arrangeBeside(beside.map((id) => words(id))));
   if (enable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOn(enable.map(name)));
   if (disable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOff(disable.map(name)));
   const registers = strings(body.registers).map((r) => listName(r, ctx));

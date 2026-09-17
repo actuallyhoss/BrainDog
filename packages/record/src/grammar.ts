@@ -73,9 +73,10 @@ const PROPOSALS = {
   pack: '{"install":"<id from offer>"}, {"enable":"<id>"} or {"disable":"<id>"}; install may carry "doc", a pack document the catalogue lacks',
   settings: '{"pack":"<id>","values":{"<setting>":<value or null for its default>}}, or {"voice":{"<key>":"<line>"}} for the use case on',
   arrange: {
-    shape: '{"why":[...],"usecase"?,"packs"?:{"install"?,"enable"?,"disable"?},"pages"?:[<page>],"settings"?:[<settings>],"voice"?:{...}}',
+    shape: '{"why":[...],"usecase"?,"alongside"?:[<usecase>],"packs"?:{"install"?,"enable"?,"disable"?},"pages"?:[<page>],"settings"?:[<settings>],"voice"?:{...}}',
     why: 'one to 12 reasons, each a sentence or {"text","at":"tasks#4"} citing a row',
     usecase: 'a use case id from offer, installed with the modules it builds on',
+    alongside: 'use case ids from offer installed beside the one speaking, which keeps its voice and Home; one whose id sorts before it would take the voice over and is refused',
     limits: 'at most 12 of each; at most 3 arrangements wait at once',
   },
   voice_keys: VOICE_KEYS,

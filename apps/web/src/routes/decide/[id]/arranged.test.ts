@@ -126,3 +126,10 @@ test('a partial apply says what was done, what was not, and why it stopped', () 
   });
   assert.equal(partialOf('arrange', STUDENT, 'Nothing landed.'), null);
 });
+
+test('A USE CASE BESIDE THE ONE SPEAKING IS SAID, and in the same voice', () => {
+  const out = arrangedOf('arrange', { usecase: 'personal', alongside: ['student'], why: ['Money and coursework.'], packs: { install: ['money-core', 'usecase-personal', 'usecase-student'] } });
+  const packs = out?.parts.find((p) => p.part === 'packs');
+  assert.ok(packs?.part === 'packs');
+  assert.ok(packs.lines.includes('Adds Student beside it, in the same voice'), JSON.stringify(packs.lines));
+});

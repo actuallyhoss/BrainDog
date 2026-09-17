@@ -1992,6 +1992,8 @@ export const copy = {
   arrangeCallSends: (fields: string) => `sends ${fields}`,
   arrangePacks: 'Packs',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
+  /** Use cases an arrangement installs beside the one the record speaks in, which keeps its voice. */
+  arrangeBeside: (names: string[]) => `Adds ${list(names)} beside it, in the same voice`,
   arrangeTurnsOn: (names: readonly string[]) => `Turns on ${list([...names])}`,
   arrangeTurnsOff: (names: readonly string[]) => `Turns off ${list([...names])}`,
   arrangeListsLeave: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'leaves' : 'leave'} the sidebar. The rows are kept.`,

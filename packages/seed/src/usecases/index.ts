@@ -10,7 +10,7 @@
  * loaded only when `SPARK_ENDPOINT` is set. Tiers B and C file the same proposal this answers.
  */
 
-import { normaliseUseCase, useCasePack, type UseCase } from '@braindog/declare';
+import { normaliseUseCase, packIdOf, useCasePack, voiceWhenAdding, type UseCase } from '@braindog/declare';
 
 import { BUSINESS } from './business.ts';
 import { dated, dayOf } from './dates.ts';
@@ -101,7 +101,8 @@ export function alongside(arranged: Arrangement, proposed: UseCase | null): UseC
   const out: UseCase[] = [];
   for (const r of arranged.ranked) {
     const u = r.usecase;
-    if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null || u.usecase < proposed.usecase) continue;
+    if (u === proposed || r.score === 0 || u.audience !== 'individual' || u.pack === null) continue;
+    if (voiceWhenAdding([{ id: packIdOf(proposed.usecase), disabled_at: null }], u.usecase) !== 'beside') continue;
     const mine = ids(u);
     if ([...mine].some((id) => taken.has(id))) continue;
     for (const id of mine) taken.add(id);
