@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { exportUseCase } from '@braindog/declare';
 
-import { examplesOf, usecase } from '../src/usecase.ts';
+import { USECASE_READ_MOST_BYTES, USECASE_READ_TIMEOUT_MS, examplesOf, readSource, usecase } from '../src/usecase.ts';
 import type { AgentIo } from '../src/skills.ts';
 
 /* Obviously fake. */
@@ -139,4 +139,43 @@ test('usecase install: files a pack proposal carrying the file, prints its Decid
   assert.match(h.said.at(-1) ?? '', /is not an https address/);
   assert.equal(await usecase(['install'], h.io), 1);
   assert.equal(h.seen.length, before, 'a refused file was sent');
+});
+
+test('usecase install: an address is read to 300 KB and ten seconds at most, as the hosts read one, and a file on disk to the same weight', async (t) => {
+  const big = 'x'.repeat(400 * 1024);
+  const server: Server = createServer((req, res) => {
+    if (req.url === '/said') {
+      res.writeHead(200, { 'content-type': 'application/json', 'content-length': String(big.length) });
+      return res.end(big);
+    }
+    if (req.url === '/streamed') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      /* No length said: the cap has to be counted as it arrives. */
+      for (let i = 0; i < 8; i++) res.write('x'.repeat(64 * 1024));
+      return res.end();
+    }
+    /* `/silent` answers headers and never a body. */
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.write('{');
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  t.after(() => new Promise<void>((done) => (server.closeAllConnections(), server.close(() => done()))));
+  const at = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-usecase-cap-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const io = { env: {}, cwd: dir, home: dir, out: () => undefined, say: () => undefined, headers: async () => ({}) } satisfies AgentIo;
+
+  assert.equal(USECASE_READ_MOST_BYTES, 300 * 1024);
+  assert.equal(USECASE_READ_TIMEOUT_MS, 10_000);
+  for (const path of ['/said', '/streamed']) {
+    const read = await readSource(`${at}${path}`, io);
+    assert.equal(read.ok, false, path);
+    assert.match(read.ok ? '' : read.fix, /larger than a shared use case may be/, path);
+  }
+  const slow = await readSource(`${at}/silent`, io, 50);
+  assert.match(slow.ok ? '' : slow.fix, /took longer than/);
+
+  writeFileSync(join(dir, 'big.usecase.json'), big);
+  const onDisk = await readSource('big.usecase.json', io);
+  assert.match(onDisk.ok ? '' : onDisk.fix, /larger than a shared use case may be/);
 });

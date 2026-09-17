@@ -20,7 +20,7 @@
  * build would refuse is refused here first, and nothing is sent.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -174,23 +174,56 @@ function addressOf(given: string): URL | null {
   return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? url : null;
 }
 
+/** The most a use-case file is read to, from a path or an address: what the hosts read one to (`PUBLIC_MOST_BYTES`), a little over what one may weigh, so `readShared`'s refusal is the one said for a file just over. */
+export const USECASE_READ_MOST_BYTES = 300 * 1024;
+/** How long reading one from an address may take, the body included, as on the hosts (`PUBLIC_TIMEOUT_MS`). */
+export const USECASE_READ_TIMEOUT_MS = 10_000;
+
+const TOO_LARGE = (where: string) => `The file at ${where} is larger than a shared use case may be, so it was not read.`;
+
 /** The text of a use-case file, from a path or an address, or the sentence saying why it could not be read. */
-async function readSource(given: string, io: AgentIo): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
+export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE_READ_TIMEOUT_MS): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
   if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
     try {
-      return { ok: true, text: readFileSync(resolve(io.cwd, given), 'utf8') };
+      const path = resolve(io.cwd, given);
+      if (statSync(path).size > USECASE_READ_MOST_BYTES) return { ok: false, fix: TOO_LARGE(given) };
+      return { ok: true, text: readFileSync(path, 'utf8') };
     } catch {
       return { ok: false, fix: `${given} could not be read.` };
     }
   }
   const url = addressOf(given);
   if (url === null) return { ok: false, fix: `${given} is not an https address. A use case is read from https, or from http on this machine.` };
+  const signal = AbortSignal.timeout(timeoutMs);
   try {
-    const got = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15_000) });
-    if (!got.ok) return { ok: false, fix: `${url.host} answered ${String(got.status)} for that file.` };
-    return { ok: true, text: await got.text() };
+    const got = await fetch(url, { redirect: 'error', signal });
+    if (!got.ok) {
+      await got.body?.cancel().catch(() => undefined);
+      return { ok: false, fix: `${url.host} answered ${String(got.status)} for that file.` };
+    }
+    /* COUNTED AS IT ARRIVES, so a length that lies, or none, reads no further than the cap. */
+    if (Number(got.headers.get('content-length') ?? '0') > USECASE_READ_MOST_BYTES) {
+      await got.body?.cancel().catch(() => undefined);
+      return { ok: false, fix: TOO_LARGE(url.host) };
+    }
+    const parts: Uint8Array[] = [];
+    let total = 0;
+    if (got.body) {
+      const reader = got.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > USECASE_READ_MOST_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          return { ok: false, fix: TOO_LARGE(url.host) };
+        }
+        parts.push(value);
+      }
+    }
+    return { ok: true, text: Buffer.concat(parts).toString('utf8') };
   } catch {
-    return { ok: false, fix: `${url.host} did not answer with the file.` };
+    return { ok: false, fix: signal.aborted ? `${url.host} took longer than ${String(Math.round(timeoutMs / 1000) || timeoutMs / 1000)} seconds, so nothing was read.` : `${url.host} did not answer with the file.` };
   }
 }
 
