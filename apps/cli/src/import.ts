@@ -62,6 +62,8 @@ export type Report = {
   /** Each row that changes, with the fields that change. */
   changes: { register: string; label: string; fields: string[] }[];
   refused: { label: string; register: string; fix: string }[];
+  /** Example rows setting up planted, found in the lists the import writes to: the report suggests clearing them on Home. */
+  examples: number;
   plan: Plan;
 };
 
@@ -124,7 +126,7 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
  * the same list written later is set in a second pass.
  */
 export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
-  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], plan };
+  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], examples: 0, plan };
   const registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
   for (const register of registers) {
@@ -140,6 +142,7 @@ export async function applyPlan(plan: Plan, door: Door, o: { dryRun: boolean }):
   const existing = new Map<string, Row>();
   for (const register of registers)
     for (const row of await readAll(door, register)) {
+      if (Array.isArray(row.fields.tags) && row.fields.tags.includes('example')) report.examples++;
       const key = keyOf(register, row.fields);
       if (key) {
         existing.set(key, row);
@@ -342,6 +345,11 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     lines.push('', 'Left out, and why:');
     for (const s of plan.skipped) lines.push(`- ${s.reason}: ${few(s.items)}.`);
   }
+  if (report.examples > 0)
+    lines.push(
+      '',
+      `This BrainDog still holds ${report.examples === 1 ? 'one example row' : `${String(report.examples)} example rows`} from setting up, beside your own. Open Home and press Clear the examples: it deletes only the examples nobody has changed.`,
+    );
   lines.push('', 'No key value was read or sent. Keys are indexed by what they open; move a value with braindog keys put.');
   return lines;
 }

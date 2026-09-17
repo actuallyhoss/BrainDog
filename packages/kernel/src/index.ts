@@ -770,6 +770,55 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     return typeof said === 'string' && said.trim() !== '' ? said.trim() : null;
   }
 
+  /**
+   * THE EXAMPLES NOBODY HAS TOUCHED, read from the log rather than from a flag a write could forget to clear.
+   *
+   * A row is an untouched example when it is live, carries `example` in its tags, ARRIVED with that tag (its `create`
+   * event says so, so a real row somebody tagged later is never one), and every later event on it is an edit that only
+   * pointed it at another example, which is what setting up a use case does when it links its examples to each other.
+   * Any other event (an edited value, a move, a note, a tag, a restore) makes it touched, and so does a live row that is
+   * not an example naming it: deleting a project a real task belongs to would take the task's project away.
+   */
+  function untouchedExamples(): { untouched: Entry[]; touched: number } {
+    const tagged = sql.all<{ id: string; deleted_at: string | null }>(
+      "SELECT DISTINCT e.id, e.deleted_at FROM entry e, json_each(e.fields, '$.tags') t WHERE json_type(e.fields, '$.tags') = 'array' AND t.value = 'example'",
+    );
+    const examples = new Set(tagged.map((r) => r.id));
+    const idOf = (raw: string | null): string | null => {
+      if (raw === null) return null;
+      let v: unknown;
+      try {
+        v = JSON.parse(raw);
+      } catch {
+        v = raw;
+      }
+      return typeof v === 'string' ? v.replace(/^[a-z][a-z0-9_]*#(?=[0-9A-HJKMNP-TV-Z]{26}$)/u, '') : null;
+    };
+    const untouched: Entry[] = [];
+    let touched = 0;
+    for (const { id, deleted_at } of tagged) {
+      if (deleted_at !== null) continue;
+      const events = sql.all<{ kind: string; to_v: string | null }>('SELECT kind, to_v FROM event WHERE target = ? ORDER BY rowid', `entry:${id}`);
+      const created = events[0];
+      let arrived = false;
+      if (created?.kind === 'create' && created.to_v !== null)
+        try {
+          const tags = (JSON.parse(created.to_v) as { tags?: unknown }).tags;
+          arrived = Array.isArray(tags) && tags.includes('example');
+        } catch {
+          arrived = false;
+        }
+      const onlyLinked = events.slice(1).every((e) => (e.kind === 'edit' || e.kind === 'link') && examples.has(idOf(e.to_v) ?? ''));
+      const named = sql
+        .all<{ id: string }>('SELECT id FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', id, id)
+        .some((r) => !examples.has(r.id));
+      const row = arrived && onlyLinked && !named ? byId(id) : null;
+      if (row) untouched.push(row);
+      else touched++;
+    }
+    return { untouched, touched };
+  }
+
   /** A row as a person says it, `S42` or `things#3`, or its id when the row is gone. */
   function nameOf(id: string): string {
     const row = byId(id, true);
@@ -3521,6 +3570,44 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /** A row by its title, for a row id or spoken id: how a plan names the project an action runs for. */
     titleOfRow: (ref: string): string | null => titleOfRow(ref),
+
+    /** The example rows a use case planted that nobody has touched, and how many examples somebody has (`untouchedExamples`). */
+    examples: (): { untouched: number; touched: number; registers: Record<string, number>; others: number } => {
+      const { untouched, touched } = untouchedExamples();
+      const registers: Record<string, number> = {};
+      for (const row of untouched) registers[row.register] = (registers[row.register] ?? 0) + 1;
+      /* THE ROWS OF THEIR OWN BESIDE THEM, in the same lists: above zero once somebody has imported or typed their own, which is
+         when the examples stop explaining and start getting in the way. */
+      const others = Object.keys(registers).reduce(
+        (n, register) =>
+          n +
+          (sql.one<{ n: number }>(
+            "SELECT count(*) AS n FROM entry e WHERE register = ? AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM json_each(CASE json_type(e.fields, '$.tags') WHEN 'array' THEN json_extract(e.fields, '$.tags') ELSE '[]' END) WHERE value = 'example')",
+            register,
+          )?.n ?? 0),
+        0,
+      );
+      return { untouched: untouched.length, touched, registers, others };
+    },
+
+    /**
+     * Delete every untouched example row, in one transaction and one batch, through the write path, so each is a `delete`
+     * the log keeps and a restore can undo. A row somebody edited, noted, tagged, restored or pointed a row of their own
+     * at is kept. Answers how many went and how many examples were kept.
+     */
+    clearExamples: (w: WriteContext): Result<{ cleared: number; kept: number }> =>
+      transaction(() => {
+        const { untouched, touched } = untouchedExamples();
+        const batch = w.batch ?? mint();
+        let cleared = 0;
+        let kept = touched;
+        for (const row of untouched) {
+          const out = write(row.register, row.id, { deleted_at: true }, { ...w, batch, note: w.note ?? 'Cleared the examples' });
+          if (out.ok) cleared++;
+          else kept++;
+        }
+        return ok({ cleared, kept });
+      }),
 
     /** Every https origin an active `pull`, `call` or `poll` names. A host's executor sends to these and nothing else. */
     /**

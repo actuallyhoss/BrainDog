@@ -1,0 +1,109 @@
+/**
+ * Clearing a founder's example rows (`kernel` `examples`, `clearExamples`): only rows that arrived as examples and that
+ * nobody has touched since go, each as a `delete` the log keeps. An example somebody edited, or one a row of their own
+ * points at, stays.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+import { NOW, firstPartyManifest } from '../src/index.ts';
+import { modulesFor, useCase } from '../src/usecases/index.ts';
+import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+
+const TODAY = dayOf(NOW);
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const hostFor = (k: Kernel): Host => ({
+  count: (register) => k.count(register),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
+  retire: (ids) => k.retire(ids),
+  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_1', cascade: false }) as never,
+  remember: (row) => k.rememberPack(row),
+  forget: (id) => k.forgetPack(id),
+  claimed: (pack) => k.packClaims(pack),
+});
+
+const stateOf = (k: Kernel): Installed => ({
+  format: 1,
+  primitives: 1,
+  record_version: k.version(),
+  packs: k.packs(),
+  declarations: k.declarations() as Installed['declarations'],
+  rows: k.census(),
+  config: k.packSettings(),
+});
+
+const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice('register.'.length));
+
+async function founder(): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'northwind', name: 'Northwind', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'founder@example.test', name: 'Ada' } }).ok);
+  const u = useCase('founder')!;
+  for (const m of modulesFor(u, ['people'])) {
+    if (m === 'agents') continue;
+    const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
+    const pack = value<Pack>(await normalise(moduleDocument(u, m, { today: TODAY, holds }), { kind: 'local' }));
+    const diff = await plan(pack, stateOf(k));
+    value(await install(pack, diff, hostFor(k), diff.planHash));
+  }
+  const pack = value<Pack>(await normalise(carriedDocument(u, TODAY), { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  value(await install(pack, diff, hostFor(k), diff.planHash));
+  return k;
+}
+
+const exampleIn = (k: Kernel, register: string) =>
+  value<{ rows: { id: string; seq: number | null; fields: Record<string, unknown> }[] }>(k.list({ register, limit: 50 })).rows.find((r) => Array.isArray(r.fields.tags) && r.fields.tags.includes('example'));
+
+test('ONLY UNTOUCHED EXAMPLES ARE CLEARED: one linked to another example goes, one edited or pointed at by a real row stays', async () => {
+  const k = await founder();
+  const w = { actor: 'p_1' };
+  const before = k.examples();
+  assert.ok(before.untouched >= 5, `a founder record plants examples, got ${before.untouched}`);
+  assert.equal(before.touched, 0);
+  const othersBefore = before.others;
+
+  /* Linking one example to another, as setting up does, leaves both untouched. */
+  const project = exampleIn(k, 'things')!;
+  const task = exampleIn(k, 'tasks')!;
+  const decl = k.register('tasks') as { fields: { id: string; type: string; to?: string }[] };
+  const link = decl.fields.find((f) => f.type === 'ref' && f.to === 'things');
+  assert.ok(link, 'a task can name its project');
+  value(k.update('tasks', task.id, { [link.id]: project.id }, w));
+  assert.equal(k.examples().untouched, before.untouched);
+
+  /* A real row naming the example project keeps it; an edited example is kept. */
+  const mine = value<{ id: string }>(k.create('tasks', { what: 'My own task', state: 'open', [link.id]: project.id }, w));
+  const track = exampleIn(k, 'tracks')!;
+  value(k.update('tracks', track.id, { name: 'Launch the yearly plan' }, w));
+  /* A real row somebody tagged example later is not an example. */
+  const real = value<{ id: string }>(k.create('tracks', { name: 'Hire a designer', state: 'open' }, w));
+  value(k.update('tracks', real.id, { tags: ['example'] }, w));
+
+  const now = k.examples();
+  assert.ok(now.others >= othersBefore + 1, 'a row of their own beside the examples is counted');
+  assert.equal(now.touched, 3, 'the project a real task names, the edited track, and the real track tagged later');
+  const out = value<{ cleared: number; kept: number }>(k.clearExamples(w));
+  assert.equal(out.cleared, now.untouched);
+  assert.equal(out.kept, 3);
+  assert.equal(k.get(task.id), null, 'the untouched example task is gone');
+  assert.ok(k.get(project.id), 'the example project a real task names stays');
+  assert.ok(k.get(track.id), 'the edited example stays');
+  assert.ok(k.get(real.id) && k.get(mine.id), 'real rows stay');
+  assert.ok(k.get(task.id, { includeDeleted: true })?.deleted_at, 'deleted, not purged, so it can be restored');
+  assert.deepEqual(k.examples(), { untouched: 0, touched: 3, registers: {}, others: 0 });
+  /* Twice is the same answer. */
+  assert.deepEqual(value(k.clearExamples(w)), { cleared: 0, kept: 3 });
+});

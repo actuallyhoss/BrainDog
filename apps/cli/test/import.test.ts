@@ -439,3 +439,15 @@ test('the command reads the file, talks to the host over the API, and exits 0; a
   assert.equal(await importCommand(['notion', 'export.json'], io, TODAY), 1);
   assert.equal(say.at(-1), 'braindog import takes legacy <export.json> [--setup <setup.json>] [--host <host>] [--dry-run], or legacy <export.json> --draft-setup.');
 });
+
+test('example rows setting up planted, found beside the import, are said with where to clear them; none, and nothing is said', async () => {
+  const mem = memoryRecord(ALL);
+  await mem.door.create({ register: 'things', fields: { name: 'Northwind app', tags: ['example'] } });
+  await mem.door.create({ register: 'tasks', fields: { what: 'Write the pricing page copy', tags: ['example'] } });
+  const report = await applyPlan(plan(), mem.door, { dryRun: true });
+  assert.equal(report.examples, 2);
+  assert.ok(said(report, { dryRun: true, file: 'export.json' }).includes('This BrainDog still holds 2 example rows from setting up, beside your own. Open Home and press Clear the examples: it deletes only the examples nobody has changed.'));
+  const clean = await applyPlan(plan(), memoryRecord(ALL).door, { dryRun: true });
+  assert.equal(clean.examples, 0);
+  assert.ok(!said(clean, { dryRun: true, file: 'export.json' }).some((l) => l.includes('example rows')));
+});

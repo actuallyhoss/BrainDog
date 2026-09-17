@@ -649,6 +649,10 @@ export function createClient(options: ClientOptions) {
     restore: (args: { bookmark: string; at?: string }) => call<Restored>('restore', args as Record<string, unknown>),
     /** Erase a person: every value naming them, in one transaction. There is no undo. */
     erase: (args: { subjects: string[]; personId?: string; basis: string }) => call<EraseReport>('erase', args as Record<string, unknown>),
+    /** The example rows nobody has touched, counted by list, and how many examples somebody has. */
+    examples: () => call<{ untouched: number; touched: number; registers: Record<string, number>; others: number }>('examples'),
+    /** Delete every untouched example row. A row somebody edited, or one a row of theirs points at, stays. */
+    clearExamples: () => call<{ cleared: number; kept: number }>('clearExamples'),
     /** Delete this record. `slug` is its name, typed to confirm. */
     deleteRecord: (args: { slug: string }) => call<{ slug: string; deleted: true }>('deleteRecord', args as Record<string, unknown>),
 

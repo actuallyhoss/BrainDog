@@ -3122,6 +3122,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * and counted, because somebody put it there and the write path says a mechanism does not
      * overwrite what a person set.
      */
+    /**
+     * The example rows setting up planted that nobody has touched, counted by list, and how many examples somebody has.
+     * `admin`, because clearing them is the owner's, and what this counts is what Clear the examples would delete.
+     */
+    async examples(_args: Record<string, never> | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'clear the examples');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(kernel.examples());
+    },
+
+    /** Delete every untouched example row, each as a delete the log keeps. A row somebody edited or pointed at stays. */
+    async clearExamples(_args: Record<string, never> | undefined, ctx: CallContext) {
+      const stop = admin(ctx, 'clear the examples');
+      if (stop) return { ok: false as const, refusal: stop };
+      return tail(kernel.clearExamples({ ...writerOf(ctx), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) }));
+    },
+
     async ruleApply(args: { id: string; dry?: boolean; limit?: number }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };

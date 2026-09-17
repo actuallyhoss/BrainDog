@@ -30,6 +30,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import DeclaredHome from '$lib/ui/DeclaredHome.svelte';
+  import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../lib/ui/screen.svelte.ts';
@@ -202,6 +203,8 @@
 
 <div class="page">
   <div class="primary">
+    <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain, and loudly once rows of the owner's own sit beside them. -->
+    {#if data.live}<ClearExamples />{/if}
     <!--
       THE FIGURES LEAD. A person opens this to find out where the money is. All of them are one size:
       no figure is louder than another, and state lives in the qualifier line under each.
