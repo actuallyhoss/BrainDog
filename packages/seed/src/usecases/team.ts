@@ -29,7 +29,7 @@ const TICKET = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 export const TEAM = {
   usecase: 'team',
   /* 2.2.0: a page for each product or project in play, from Projects' template. */
-  version: '2.2.0',
+  version: '2.3.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

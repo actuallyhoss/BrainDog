@@ -119,7 +119,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE without Estate: what is open, its money, 
     'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal((blocks[0] as unknown as { cells: unknown[] }).cells.length, 2, 'what it costs a year needs Estate, so that figure is left out');
+  assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Due soon', 'In review'], 'what it costs a year needs Estate, so its place goes to a figure from the tasks');
   assert.equal((blocks[5] as unknown as { span: number }).span, 12, 'the money table takes the width the services list had');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
   assert.equal((blocks[6] as unknown as { document?: boolean }).document, true);

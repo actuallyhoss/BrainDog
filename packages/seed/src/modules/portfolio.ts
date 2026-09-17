@@ -224,6 +224,43 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT IS MOVING ON A PROJECT, from its tasks alone: a record that keeps no money still has these to say (`projectTemplate`). */
+  'project-due-soon': {
+    metric: 'project-due-soon',
+    name: 'Due soon',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is not backlog or done or dropped, by after yesterday, by before +8d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'project-in-review': {
+    metric: 'project-in-review',
+    name: 'In review',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is review',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'project-done-7d': {
+    metric: 'project-done-7d',
+    name: 'Done this week',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is done, done_on after -8d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'project-owed': {
     metric: 'project-owed',
     name: 'Owed to you',
@@ -594,6 +631,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
  */
 export const PROJECT_LINKS: readonly string[] = ['services', 'obligations'];
 
+/** What a project's stat row says from its tasks when a figure over money is left out, and how many figures the row holds. */
+const PROJECT_WORK_CELLS: readonly { metric: string; label: string }[] = [
+  { metric: 'project-due-soon:{{name}}', label: 'Due soon' },
+  { metric: 'project-in-review:{{name}}', label: 'In review' },
+  { metric: 'project-done-7d:{{name}}', label: 'Done this week' },
+];
+const PROJECT_CELLS = 4;
+
 /**
  * The project template for a record that holds these lists: every block and figure over a linked list it does not hold
  * left out, and the width a block took given to the block before it, so a row that paired two still fills the width.
@@ -615,7 +660,14 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
       continue;
     }
     const cells = block.cells as { metric: string }[] | undefined;
-    blocks.push(cells ? { ...block, cells: cells.filter((c) => !gone(PROJECT_METRICS[c.metric.split(':')[0] ?? '']?.source)) } : block);
+    if (!cells) {
+      blocks.push(block);
+      continue;
+    }
+    const kept = cells.filter((c) => !gone(PROJECT_METRICS[c.metric.split(':')[0] ?? '']?.source));
+    /* A ROW THAT LOST A FIGURE IS MADE UP FROM THE PROJECT'S TASKS, so a team's page does not lead with Open alone. */
+    const made = kept.length < cells.length ? [...kept, ...PROJECT_WORK_CELLS].slice(0, PROJECT_CELLS) : kept;
+    blocks.push({ ...block, cells: made });
   }
   return { ...page, requires: (page.requires as string[]).filter((r) => !gone(r)), blocks };
 }

@@ -28,7 +28,7 @@ const numbers = (where: string | null, empty: string) => {
 
 export const FOUNDER = {
   usecase: 'founder',
-  version: '1.2.0',
+  version: '1.3.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
