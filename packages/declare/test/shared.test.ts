@@ -10,7 +10,9 @@ import {
   SHARED_MOST_BYTES,
   exampleFields,
   exportUseCase,
+  laterVersion,
   looksLikeCredential,
+  useCasePack,
   nextVersion,
   normalise,
   readShared,
@@ -71,7 +73,7 @@ test('AN EXPORTED ARRANGEMENT READS BACK AS THE SAME USE CASE, WITH ITS PACK REA
   assert.equal(shared.usecase.version, '1.0.1');
   assert.equal(shared.pack?.manifest.pack, 'usecase-my-studies');
   assert.equal(shared.pack?.manifest.version, '1.0.1');
-  assert.deepEqual(Object.keys(shared.pack?.manifest.config ?? {}).sort(), ['label_courses', 'voice_home']);
+  assert.deepEqual(Object.keys(shared.pack?.manifest.config ?? {}).sort(), ['label_courses', 'shared_version', 'voice_home']);
   assert.equal(shared.pack?.seeds.length, 1);
 });
 
@@ -98,6 +100,11 @@ test('AN EXAMPLE ROW KEEPS NO LINK, NO TAGS AND NOTHING EMPTY', () => {
 test('THE NEXT VERSION IS THE NEXT PATCH, AND A FILE IS NAMED FOR IT', () => {
   assert.equal(nextVersion('1.2.3'), '1.2.4');
   assert.equal(nextVersion(null), '1.0.0');
+  assert.equal(nextVersion('1.2.3', 'minor'), '1.3.0');
+  assert.equal(laterVersion('1.1.1', '1.1.2'), '1.1.2');
+  assert.equal(laterVersion('1.10.0', '1.9.9'), '1.10.0');
+  assert.equal(laterVersion(null, '2.0.0'), '2.0.0');
+  assert.equal(laterVersion(undefined, ''), null);
   assert.equal(sharedFileName('student', '1.0.1'), 'student-1.0.1.usecase.json');
 });
 
@@ -163,6 +170,39 @@ test('A BLOCK KIND THIS BUILD DOES NOT DRAW IS REFUSED BEFORE A PLAN', async () 
   const r = refused(await readShared(doc));
   assert.equal(r.code, 'KIND_UNKNOWN');
   assert.match(r.at ?? '', /^page\.studies/);
+  /* SAID TO SOMEBODY INSTALLING, not to somebody writing a pack: the kind by name, and no path or count of kinds. */
+  assert.equal(r.fix.startsWith('This setup uses a block this version of BrainDog does not have: hologram.'), true, r.fix);
+  assert.doesNotMatch(r.fix, /twenty|blocks\[/u);
+});
+
+test('THE RAIL ORDER GOES OUT AND COMES BACK, and an address that is not a page or a list is refused', async () => {
+  const doc = value<Record<string, unknown>>(exportUseCase({ ...PARTS, nav: ['/p/studies', '/r/courses'] }));
+  assert.deepEqual(doc.nav, ['/p/studies', '/r/courses']);
+  const back = await readShared(JSON.stringify(doc));
+  assert.ok(back.ok);
+  assert.deepEqual((back as { value: Shared }).value.usecase.nav, ['/p/studies', '/r/courses']);
+  assert.equal(refused(await readShared({ ...doc, nav: ['javascript:alert(1)'] })).code, 'VALUE_MALFORMED');
+  assert.equal(refused(await readShared({ ...doc, nav: ['/r/courses', '/r/courses'] })).code, 'VALUE_MALFORMED');
+});
+
+test('SIGNALS AND SKILLS GO OUT WHEN GIVEN, and a skill holding a credential is refused like any other value', async () => {
+  const doc = value<Record<string, unknown>>(exportUseCase({ ...PARTS, signals: ['homework', 'my courses'], skills: [{ name: 'study-planner', trigger: 'when an assignment is added' }] }));
+  const back = await readShared(doc);
+  assert.ok(back.ok);
+  assert.deepEqual((back as { value: Shared }).value.usecase.signals, ['homework', 'my courses']);
+  assert.deepEqual((back as { value: Shared }).value.usecase.skills, [{ name: 'study-planner', trigger: 'when an assignment is added' }]);
+  const leaky = value<Record<string, unknown>>(exportUseCase({ ...PARTS, skills: [{ name: 'deploy', trigger: `run with ${fake.stripe()}` }] }));
+  const r = refused(await readShared(leaky));
+  assert.equal(r.code, 'SECRET_IN_PACK');
+  assert.match(r.at ?? '', /skills/u);
+});
+
+test('THE CARRIED PACK KEEPS THE VERSION IT WAS LAST SHARED AS, as a setting beside its voice', async () => {
+  const doc = value<Record<string, unknown>>(exportUseCase(PARTS));
+  const back = await readShared(doc);
+  assert.ok(back.ok);
+  const pack = useCasePack((back as { value: Shared }).value.usecase) as { config: Record<string, { type: string; default?: unknown }> };
+  assert.deepEqual(pack.config.shared_version, { type: 'text', label: 'Last shared as' });
 });
 
 test('AN UNKNOWN KEY AT THE TOP IS REFUSED BY THE FORMAT', async () => {

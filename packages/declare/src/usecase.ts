@@ -62,14 +62,22 @@ export type UseCase = {
   pack: Record<string, unknown> | null;
   /** What an agent should know here. Offered to the agents pack as proposals, never installed directly. */
   skills: { name: string; trigger: string }[];
+  /**
+   * The rail's order as the person who shared it arranged it: addresses of the pages and lists this use case carries,
+   * `/p/<page>` and `/r/<list>`, in the order they were drawn. A record keeps no install order, so without this a
+   * second record draws the lists in id order. Applied as the reader's own nav order, which they can change.
+   */
+  nav: string[];
 };
 
-const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills'];
+const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills', 'nav'];
 const ID = /^[a-z][a-z0-9-]{1,40}$/;
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 const SIGNAL = /^[a-z0-9][a-z0-9 '-]{0,39}$/;
 const SKILL = /^[a-z][a-z0-9-]{1,63}$/;
 const VOICE_BYTES = 80;
+const NAV_ADDRESS = /^\/(p|r)\/[a-z0-9][a-z0-9_-]{0,63}$/;
+const NAV_CEILING = 64;
 const SIGNALS_CEILING = 64;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -94,8 +102,14 @@ export const LABEL_KEY = new RegExp(`^${SEGMENT}(?:\\.${SEGMENT}){0,2}$`);
 const LABEL_PREFIX = 'label_';
 /** Settings are named in lower case with underscores, at most 32; the dots of a label key are written `__`. */
 const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
-/** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share. */
+/** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share with `shared_version`. */
 const SETTINGS_CEILING = 32;
+
+/**
+ * THE VERSION THIS ARRANGEMENT WAS LAST SHARED AS, kept as a setting of the pack a use case carries, so a second share
+ * from the same record offers the version after it rather than the one after the installed version again.
+ */
+export const SHARED_VERSION = 'shared_version';
 
 /**
  * A LIST'S OWN WORDS BESIDE ITS NAME: `tickets:one` is what one ticket is called ("New issue"), `tickets:holds` the line
@@ -165,8 +179,13 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
       labels[key] = word;
     }
   }
-  if (Object.keys(voice).length + Object.keys(labels).length > SETTINGS_CEILING)
+  if (Object.keys(voice).length + Object.keys(labels).length > SETTINGS_CEILING - 1)
     return no('VALUE_MALFORMED', `A use case's voice and labels are its pack's settings, and a pack has at most ${SETTINGS_CEILING}.`, { at: 'labels' });
+
+  const nav = doc.nav ?? [];
+  if (!Array.isArray(nav) || nav.length > NAV_CEILING || nav.some((a) => typeof a !== 'string' || !NAV_ADDRESS.test(a)))
+    return no('VALUE_MALFORMED', `nav is up to ${NAV_CEILING} addresses of pages and lists, such as /p/studies and /r/courses.`, { at: 'nav' });
+  if (new Set(nav).size !== nav.length) return no('VALUE_MALFORMED', 'An address is listed twice in nav.', { at: 'nav' });
 
   let pack: Record<string, unknown> | null = null;
   if (doc.pack !== undefined && doc.pack !== null) {
@@ -199,6 +218,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     labels,
     pack,
     skills: (skills as { name: string; trigger: string }[]).map((s) => ({ name: s.name, trigger: s.trigger })),
+    nav: [...(nav as string[])],
   });
 }
 
@@ -215,6 +235,7 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
   }
   for (const [key, word] of Object.entries(u.labels))
     config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
+  const settings: Record<string, { type: 'text'; label: string; default?: string }> = { ...config, [SHARED_VERSION]: { type: 'text', label: 'Last shared as' } };
   return {
     ...u.pack,
     pack: packIdOf(u.usecase),
@@ -222,7 +243,7 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     ...(u.pack.summary === undefined ? { summary: u.summary } : {}),
     ...(u.pack.author === undefined ? { author: u.author } : {}),
     ...(u.pack.license === undefined ? { license: u.license } : {}),
-    ...(Object.keys(config).length > 0 ? { config } : {}),
+    config: settings,
   };
 }
 

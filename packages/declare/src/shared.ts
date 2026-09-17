@@ -91,9 +91,22 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
   if (!pack.ok) return pack as Result<Shared>;
   for (const decl of pack.value.declarations) {
     const fault = validateDeclaration({ id: decl.id, kind: decl.kind, body: decl.body });
-    if (fault?.code === 'KIND_UNKNOWN') return { ok: false, refusal: { ...fault, at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
+    if (fault?.code === 'KIND_UNKNOWN')
+      return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
   }
   return ok({ usecase: u.value, pack: pack.value, doc: carried, bytes });
+}
+
+/**
+ * THE KERNEL'S SENTENCE IS FOR SOMEBODY WRITING A PACK (`page.evil.blocks[0]: kind "iframe" is not one of the twenty`),
+ * and a shared file is read by somebody installing one. The same refusal, the same code and the same `at`, said as what
+ * it means to them. A block with no kind at all is said as a block this version cannot read.
+ */
+export function kindUnknownSentence(authorFix: string): string {
+  const named = /kind "([^"]{1,40})"/u.exec(authorFix)?.[1];
+  return named
+    ? `This setup uses a block this version of BrainDog does not have: ${named}. It cannot be installed here until BrainDog draws that block.`
+    : 'This setup has a block that names no kind, so this version of BrainDog cannot draw it. Ask whoever shared it for a new file.';
 }
 
 /* ── going out ──────────────────────────────────────────────────────────── */
@@ -116,6 +129,8 @@ export type ExportParts = {
   /** Example rows the person picked, each already cut to what a seed may hold (`exampleFields`). */
   examples: readonly { register: string; fields: Record<string, unknown> }[];
   skills?: readonly { name: string; trigger: string }[];
+  /** The rail's order, as addresses of the pages and lists this file carries (`UseCase.nav`). */
+  nav?: readonly string[];
 };
 
 /**
@@ -159,16 +174,38 @@ export function exportUseCase(parts: ExportParts): Result<Record<string, unknown
         }
       : null,
     skills: (parts.skills ?? []).map((s) => ({ name: s.name, trigger: s.trigger })),
+    ...(parts.nav !== undefined && parts.nav.length > 0 ? { nav: [...parts.nav] } : {}),
   };
   const checked = normaliseUseCase(doc);
   if (!checked.ok) return checked as Result<Record<string, unknown>>;
   return ok(doc);
 }
 
-/** The next version to share an arrangement as: the patch after `was`, or 1.0.0 for one that has none. */
-export function nextVersion(was: string | null | undefined): string {
+/** How far a share moves the version: a patch for a changed word or row, a minor for a list or page added. */
+export type VersionStep = 'patch' | 'minor';
+
+/** The next version to share an arrangement as: the patch or minor after `was`, or 1.0.0 for one that has none. */
+export function nextVersion(was: string | null | undefined, step: VersionStep = 'patch'): string {
   const m = /^(\d+)\.(\d+)\.(\d+)/u.exec(was ?? '');
-  return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : '1.0.0';
+  if (!m) return '1.0.0';
+  return step === 'minor' ? `${m[1]}.${Number(m[2]) + 1}.0` : `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
+}
+
+/**
+ * The later of two versions, by number, ignoring a pre-release tail; `null` when neither is one. A share counts on from
+ * whichever is later: the version installed, or the one this record last shared as.
+ */
+export function laterVersion(a: string | null | undefined, b: string | null | undefined): string | null {
+  const parse = (v: string | null | undefined) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)/u.exec(v ?? '');
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const x = parse(a);
+  const y = parse(b);
+  if (!x) return y ? (b as string) : null;
+  if (!y) return a as string;
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return (x[i] as number) > (y[i] as number) ? (a as string) : (b as string);
+  return a as string;
 }
 
 /** Field types a shared example row never carries: a link is to a row the other record does not hold. */
