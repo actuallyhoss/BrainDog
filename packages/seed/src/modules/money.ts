@@ -315,6 +315,21 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT COMES IN EVERY MONTH, the other side of `every-month-out`: a pay day, a retainer, each at its monthly share.
+     The series counts it in every month ahead, as it counts what goes out. */
+  'every-month-in': {
+    metric: 'every-month-in',
+    name: 'Every month, in',
+    source: 'register.obligations',
+    where: 'state is not written off, direction is owed to me, repeats is monthly or quarterly or yearly',
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
+    lookups: { per_month: LOOKUPS.per_month! },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* MONEY YOU ARE OWED THAT IS PAST ITS DATE, the other side of `overdue`. */
   'late-in': {
     metric: 'late-in',
@@ -393,7 +408,9 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     metric: 'in-due-by-month',
     name: 'Due to come in, by month',
     source: 'register.obligations',
-    where: `${OPEN}, direction is owed to me, due after yesterday, due before +4m`,
+    /* ONE-OFF ROWS ONLY: a repeating row is counted in every month ahead at its monthly share (`every-month-in`), not
+       only in the month its next due day falls in. */
+    where: `${OPEN}, direction is owed to me, repeats is not monthly or quarterly or yearly, due after yesterday, due before +4m`,
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
@@ -407,7 +424,7 @@ export const MONEY_METRICS: Record<string, SeedMetric> = {
     metric: 'out-due-by-month',
     name: 'Due to go out, by month',
     source: 'register.obligations',
-    where: `${OPEN}, direction is owed by me, due after yesterday, due before +4m`,
+    where: `${OPEN}, direction is owed by me, repeats is not monthly or quarterly or yearly, due after yesterday, due before +4m`,
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
@@ -645,13 +662,13 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       {
         /* MONTH BY MONTH: what was paid in and out in the six months to now, and what is due in the three
            after, with what was left each month as a line. The current month is so far, and the months
-           ahead are what is due, not a guess. */
+           ahead are what is due once plus what repeats at its monthly share, in every one of them. */
         kind: 'series',
         heading: 'In and out, by month',
         span: 12,
         series: [
-          { metric: 'in-by-month', then: 'in-due-by-month', label: 'Money in' },
-          { metric: 'out-by-month', then: 'out-due-by-month', label: 'Money out', dir: 'out' },
+          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
+          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
         ],
         back: 6,
         ahead: 3,

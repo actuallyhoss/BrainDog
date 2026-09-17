@@ -132,7 +132,7 @@ A7), and the install-time check refuses a key that is not in it, by name.
 | `limit` | int | 50, at most 500 | no |
 | `empty` | text, interpolatable | — | **yes, on every block with a `source`** |
 | `cells` | `[{ metric, label, trend?, note? }]`. `note` is the line under the figure in place of its target, and may name other figures as `{{id}}`; `N thing(s)` after a figure is said `1 thing` or `2 things` | — | `stat` |
-| `series` | 1–4 of `{ metric, then?, label?, dir?: in \| out }`. On a `series`, each line is a metric grouped by a date and a bucket, every line the same bucket and one currency; `then` names the metric that answers the buckets after the current one (money due, where `metric` is money paid). `in` stands on the zero rule, `out` hangs under it | — | `series` |
+| `series` | 1–4 of `{ metric, then?, each?, label?, dir?: in \| out }`. On a `series`, each line is a metric grouped by a date and a bucket, every line the same bucket and one currency; `then` names the metric that answers the buckets after the current one (money due, where `metric` is money paid); `each`, on a series by month, names an ungrouped monthly figure added to every month after the current one (what repeats, at its monthly share), so a repeating bill is in every month ahead rather than only the one its next due day falls in. `in` stands on the zero rule, `out` hangs under it | — | `series` |
 | `back` | int, 1–24. On a `series`, how many buckets it draws up to and including the current one; leading buckets no line has a value in are trimmed | `6` | no |
 | `ahead` | int, 0–12. On a `series`, how many buckets after the current one it draws | `0` | no |
 | `net` | bool. On a `series`, draw in minus out per bucket as a line | `false` | no |

@@ -150,6 +150,15 @@ test('A PERSONAL RECORD HOLDS ROWS OF A PERSON: accounts, bills, spending, a bud
   sql.close();
 });
 
+test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder's keeps Money's own", () => {
+  const targetOf = (u: ReturnType<typeof useCase> | null, metric: string): unknown =>
+    ((moduleDocument(u ?? null, 'money-core', { today: TODAY }) as { declarations: { metric?: string; target?: unknown }[] }).declarations.find((d) => d.metric === metric) ?? {}).target;
+  assert.deepEqual(targetOf(useCase('personal'), 'out-30d'), { lte: 250_000 });
+  assert.deepEqual(targetOf(useCase('personal'), 'every-month-out'), { lte: 150_000 });
+  assert.deepEqual(targetOf(useCase('founder'), 'out-30d'), { lte: 5_000_000 });
+  assert.deepEqual(targetOf(null, 'out-30d'), { lte: 5_000_000 });
+});
+
 type Drawn = { heading?: string; kind: string; rows?: Row[]; refusals?: unknown[]; readings?: { metric: string; reading: { value: number | null } | null; refusal?: unknown }[] };
 
 test("A USE CASE'S HOME OPENS, every block readable, with its headings in the record's voice", async () => {

@@ -1657,7 +1657,7 @@ function seriesBlock(b: PageBlock): BlockResult {
       const r = read(decl as never);
       return r.refusals.length
         ? { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: r.refusals[0]! } }
-        : { ok: true, value: { groups: r.groups ?? [], current: r.current ?? '', unit: r.rows === 0 ? null : unitOfFormat((decl as { format?: string }).format) } };
+        : { ok: true, value: { groups: r.groups ?? [], current: r.current ?? '', value: r.value ?? null, unit: r.rows === 0 ? null : unitOfFormat((decl as { format?: string }).format) } };
     },
   );
   const refusals = 'refusal' in got ? [got.refusal.fix] : [];

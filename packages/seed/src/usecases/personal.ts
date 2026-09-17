@@ -579,6 +579,20 @@ export const PERSONAL_STEP_PROJECTS: readonly (readonly [string, string])[] = [
 const gbp = (pence: number) => ({ amount: pence, currency: 'GBP' });
 
 /**
+ * WHAT GOOD LOOKS LIKE ON MONEY'S FIGURES FOR ONE PERSON, in place of a studio's. Money's own targets are a business's
+ * ("no more than £50,000.00" going out in 30 days), which on a person's Overview read as though the record were somebody
+ * else's. The use case installs Money with these, by metric, in pence; a figure left out keeps Money's.
+ */
+export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: number }>> = {
+  'out-30d': { lte: 250_000 },
+  'every-month-out': { lte: 150_000 },
+  'every-month-by-category': { lte: 150_000 },
+  'due-30d': { lte: 250_000 },
+  'owed-to-you': { lte: 500_000 },
+  'days-late-in': { lte: 3 },
+};
+
+/**
  * THE EXAMPLE ROWS MONEY AND PROJECTS GET IN A PERSON'S RECORD, in place of the sample studio's: a current account, a
  * savings account and a card; rent, a phone, a streaming subscription and the rest of a month's bills, and a pay day;
  * two projects on the go and one on hold. People gets none: onboarding writes the person's own row there.

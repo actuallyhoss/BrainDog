@@ -312,4 +312,7 @@ test('THE MONEY PAGE’S BARS BY MONTH are the same buckets and the same figures
   assert.deepEqual(w.bars, k.bars);
   assert.deepEqual(k.bars.states.slice(-4), ['partial', 'ahead', 'ahead', 'ahead'], 'this month so far, then three months due');
   assert.ok(k.bars.values.every((line) => line.some((v) => v !== null)), 'a line with nothing in it');
+  /* WHAT REPEATS IS IN EVERY MONTH AHEAD: the sample repeats costs, so no month ahead is left blank beside one that is not. */
+  const ahead = k.bars.states.flatMap((s, i) => (s === 'ahead' ? [i] : []));
+  for (const line of k.bars.values) assert.ok(ahead.every((i) => line[i] !== null), `a month ahead without what repeats: ${JSON.stringify(line)}`);
 });

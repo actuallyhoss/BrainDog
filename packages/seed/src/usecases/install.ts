@@ -11,6 +11,8 @@
  *
  * A DAY IN AN EXAMPLE IS COUNTED FROM TODAY (`dates.ts`), so Home's week has something in it on any day.
  *
+ * A FIGURE'S TARGET IS THE USE CASE'S TOO, so a person's Money does not hold them to a studio's sums (`MODULE_TARGETS`).
+ *
  * HOME IS A PAGE THE USE CASE DECLARES, called `home-<use case>`, with no place on the rail. The display draws
  * it on Home in place of the house figures (`homePageOf`).
  */
@@ -19,13 +21,16 @@ import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
-import { PERSONAL_EXAMPLES } from './personal.ts';
+import { PERSONAL_EXAMPLES, PERSONAL_TARGETS } from './personal.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
 
 type Body = Record<string, unknown>;
 
 /** The example rows each use case gives the first-party modules it names. A use case not listed gives none. */
 const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { founder: FOUNDER_EXAMPLES, personal: PERSONAL_EXAMPLES };
+
+/** The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. */
+const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };
 
 /** The page a use case's Home is, by the id of the pack it carries or the use case's own id. */
 export const homePageOf = (id: string): string => `home-${id.replace(/^usecase-/u, '')}`;
@@ -53,6 +58,9 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   const seeds = u === null ? undefined : (MODULE_EXAMPLES[u.usecase] ?? []).filter((s) => mine.has(String(s.register)));
   const doc = firstPartyDocument(id, { ...(options.holds === undefined ? {} : { holds: options.holds }), ...(seeds === undefined ? {} : { seeds }) });
   if (!doc) return null;
+  const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
+  if (Array.isArray(doc.declarations))
+    doc.declarations = (doc.declarations as Body[]).map((d) => (typeof d.metric === 'string' && targets[d.metric] !== undefined ? { ...d, target: targets[d.metric] } : d));
   const out = dated(doc, options.today);
   if (Array.isArray(out.seeds) && out.seeds.length === 0) delete out.seeds;
   return out;

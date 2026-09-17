@@ -17,6 +17,12 @@ export type SeriesLine = {
   metric: string;
   /** The figure that answers the buckets after the current one: money due, where `metric` is money paid. */
   then?: string;
+  /**
+   * A monthly figure counted in every bucket after the current one: what repeats, at its share of a month, where `then`
+   * leaves repeating rows out. A repeating bill has one due day, so without this it drew in the one month ahead that
+   * day falls in and in none after it. Only on a series bucketed by month.
+   */
+  each?: string;
   label?: string;
   /** Money in stands on the zero rule and money out hangs under it. `in` when absent. */
   dir?: 'in' | 'out';
@@ -40,7 +46,7 @@ export const SERIES_BACK = { least: 1, most: 24, fallback: 6 } as const;
 export const SERIES_AHEAD = { least: 0, most: 12, fallback: 0 } as const;
 export const SERIES_LINES = 4;
 
-type Read = (decl: MetricDecl) => { ok: true; value: Pick<Reading, 'groups' | 'current' | 'unit'> } | { ok: false; refusal?: Refusal };
+type Read = (decl: MetricDecl) => { ok: true; value: Pick<Reading, 'groups' | 'current' | 'unit'> & { value?: number | null } } | { ok: false; refusal?: Refusal };
 
 /**
  * The bars, or the one refusal that stops them.
@@ -69,7 +75,7 @@ export function barsOf(
 
   /* HELD ON AN OBJECT, because each line's reading sets them and a narrowed `let` would not see that. */
   const seen: { bucket: Bucket | null; current: string | null; unit: string | null } = { bucket: null, current: null, unit: null };
-  const parts: { past: Group[]; then: Group[] | null }[] = [];
+  const parts: { past: Group[]; then: Group[] | null; each: number | null }[] = [];
 
   const one = (id: string): { groups: Group[]; current: string | undefined; unit: string | null } | { refusal: Refusal } => {
     const decl = typeof id === 'string' ? metric(id) : null;
@@ -99,17 +105,34 @@ export function barsOf(
         seen.unit = got.unit;
       }
     }
-    parts.push({ past: past.groups, then: then ? then.groups : null });
+    let each: number | null = null;
+    if (line.each !== undefined) {
+      const decl = typeof line.each === 'string' ? metric(line.each) : null;
+      if (!decl) return bad('METRIC_UNKNOWN', `There is no metric called ${String(line.each)} for a series to count in every month ahead.`);
+      if (decl.group_by !== undefined || decl.bucket !== undefined)
+        return bad('DECLARATION_INVALID', `each: counts one figure in every month ahead, and ${line.each} is grouped.`);
+      if (seen.bucket !== 'month') return bad('DECLARATION_INVALID', `each: counts a monthly figure, so the series is bucketed by month.`);
+      const got = read(decl);
+      if (!got.ok) return { refusal: got.refusal ?? { code: 'NOT_IN_THIS_BUILD', fix: `${line.each} could not be read.`, at: 'series' } };
+      if (got.value.unit !== null && seen.unit !== null && got.value.unit !== seen.unit)
+        return bad('MIXED_CURRENCY', `${line.each} is in ${got.value.unit} and the series in ${seen.unit}, and two currencies are never drawn on one scale.`);
+      if (got.value.unit !== null) seen.unit ??= got.value.unit;
+      each = got.value.value ?? null;
+    }
+    parts.push({ past: past.groups, then: then ? then.groups : null, each });
   }
   if (seen.bucket === null || seen.current === null) return bad('DECLARATION_INVALID', 'A series needs figures grouped by a date.');
 
   const b: Bucket = seen.bucket;
   const now: string = seen.current;
   const keys = Array.from({ length: backs + aheads }, (_, i) => shiftBucket(now, b, i - (backs - 1)));
-  const values = parts.map(({ past, then }) =>
+  const values = parts.map(({ past, then, each }) =>
     keys.map((key) => {
       const from = key > now && then ? then : past;
-      return from.find((g) => g.key === key)?.value ?? null;
+      const found = from.find((g) => g.key === key)?.value ?? null;
+      /* WHAT REPEATS IS IN EVERY MONTH AHEAD, or in none: never only the month its next due day falls in. */
+      if (key > now && each !== null && each !== 0) return (found ?? 0) + each;
+      return found;
     }),
   );
   const first = keys.findIndex((_, i) => values.some((line) => line[i] !== null));
