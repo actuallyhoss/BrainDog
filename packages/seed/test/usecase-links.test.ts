@@ -13,7 +13,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument, moduleExamples } from '../src/usecases/install.ts';
-import { exampleLinks, linkExamples, titleFieldOf, type LinkIo, type LinkRow } from '../src/usecases/links.ts';
+import { carryForward, exampleLinks, linkExamples, titleFieldOf, type CarryIo, type LinkIo, type LinkRow } from '../src/usecases/links.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -152,4 +152,64 @@ test('A FILE UNDER ITS OWN ID LINKS ITS EXAMPLES BY THE LINKS IT DECLARES, readi
     ['meetings', 1, 'book', 'books#3'],
     ['dues', 2, 'account', 'accounts#7'],
   ]);
+});
+
+test('A PERSONAL RECORD FROM BEFORE THE LOG KEEPS ITS PROGRESS: each typed amount becomes one row toward its goal on update', async () => {
+  const u = useCase('personal')!;
+  const sql = openSqlite();
+  const k: Kernel = await openRecord(sql, fixedClock(NOW));
+  const host: Host = {
+    count: (register) => k.count(register),
+    stage: (batch) => k.stageInstall(batch as never),
+    transaction: (fn) => k.transaction(fn),
+    reload: () => k.reload(),
+    retire: (ids) => k.retire(ids),
+    seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+    remember: (row) => k.rememberPack(row),
+    forget: (x) => k.forgetPack(x),
+    claimed: (pack) => k.packClaims(pack),
+  };
+  const held = () => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice(9));
+  const put = async (doc: unknown) => {
+    const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
+    const state: Installed = { format: 1, primitives: 1, record_version: k.version(), packs: k.packs(), declarations: k.declarations() as Installed['declarations'], rows: k.census(), config: k.packSettings() };
+    const diff = await plan(pack, state);
+    value(await install(pack, diff, host, diff.planHash));
+  };
+  for (const m of modulesFor(u, ['people'])) {
+    if (m === 'agents') continue;
+    const holds = new Set([...held(), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
+    await put(moduleDocument(u, m, { today: TODAY, holds }));
+  }
+  await put(carriedDocument(u, TODAY));
+  /* WHAT 1.0.0 LEFT: a goal and a savings goal with their progress typed on them, and one with none. */
+  const actor = { actor: 'p_owner', cascade: false };
+  value(k.create('goals', { what: 'Swim 20 lengths', kind: 'goal', target: 20, done: 12, state: 'active' }, actor));
+  value(k.create('goals', { what: 'Learn to juggle', kind: 'goal', target: 1, state: 'active' }, actor));
+  value(k.create('savings_goals', { name: 'New bike', target: { amount: 60_000, currency: 'GBP' }, saved: { amount: 21_500, currency: 'GBP' }, state: 'saving' }, actor));
+
+  const io: CarryIo = {
+    rows: async (register) => {
+      const read = k.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async () => false,
+    create: async (register, fields) => k.create(register, fields, actor).ok,
+    clear: async (register, seq, field) => k.update(register, `${register}#${seq}`, { [field]: null }, actor).ok,
+  };
+  assert.equal(await carryForward(io, 'personal', '1.2.0', TODAY), 0, 'a record already on the log moves nothing');
+  assert.equal(await carryForward(io, 'student', '1.0.0', TODAY), 0, 'a use case with nothing to carry moves nothing');
+  assert.equal(await carryForward(io, 'personal', '1.0.0', TODAY), 2);
+  const rows = (register: string) => value<{ rows: LinkRow[] }>(k.list({ register, limit: 200 })).rows;
+  const swim = rows('goals').find((r) => r.fields.what === 'Swim 20 lengths')!;
+  const logged = rows('goal_log').filter((r) => !((r.fields.tags as string[] | undefined) ?? []).includes('example'));
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0]?.fields.amount, 12);
+  assert.equal(logged[0]?.fields.on, TODAY);
+  assert.equal(k.get(String(logged[0]?.fields.goal))?.fields.what, 'Swim 20 lengths', 'the row counts toward its goal');
+  assert.equal(swim.fields.done ?? null, null, 'the typed number is emptied, so it is never counted twice');
+  const put_by = rows('put_by').filter((r) => !((r.fields.tags as string[] | undefined) ?? []).includes('example'));
+  assert.deepEqual(put_by.map((r) => r.fields.amount), [{ amount: 21_500, currency: 'GBP' }]);
+  assert.equal(await carryForward(io, 'personal', '1.0.0', TODAY), 0, 'a second update moves nothing again');
+  sql.close();
 });

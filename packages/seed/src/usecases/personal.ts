@@ -727,6 +727,20 @@ export const PERSONAL = {
 const OLD_BIKE = 'Restore the old road bike';
 const STORIES = 'A collection of short stories';
 
+/**
+ * WHAT A RECORD MADE BEFORE THE LOG HAD TYPED, CARRIED INTO IT. Personal 1.0.0 kept a goal's "so far" and a savings goal's
+ * "saved" as numbers typed on the goal; from 1.2.0 progress is only what is logged toward it, so those numbers read as
+ * nothing. Updating from before 1.2.0 writes each one as a single row toward its goal, dated the day of the update, and
+ * empties the typed number so it is never counted twice (`links.ts` `carryForward`).
+ */
+export const PERSONAL_CARRIED = {
+  before: '1.2.0',
+  moves: [
+    { from: 'goals', field: 'done', to: 'goal_log', link: 'goal', amount: 'amount', what: 'So far, before the log' },
+    { from: 'savings_goals', field: 'saved', to: 'put_by', link: 'saving', amount: 'amount', what: 'Saved before the log' },
+  ],
+} as const;
+
 /** Which goal each example log row and each saving counts toward, for the linker (`links.ts`). */
 export const PERSONAL_LOG_LINKS: readonly { register: string; title: string; field: string; to: string; target: string }[] = [
   ...LOGGED.map(([title, goal]) => ({ register: 'goal_log', title, field: 'goal', to: 'goals', target: goal })),

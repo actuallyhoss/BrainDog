@@ -13,7 +13,7 @@
 
 import { FIRST_PARTY, firstPartyDocument } from '../packs/first-party.ts';
 import { useCase } from './index.ts';
-import { PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
+import { PERSONAL_CARRIED, PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
 
 /** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
@@ -112,4 +112,53 @@ export async function linkExamples(io: LinkIo, usecase: string, declared?: Decla
     if (await io.link(l.register, row.seq, l.field, `${l.to}#${target.seq}`).catch(() => false)) made += 1;
   }
   return made;
+}
+
+/* ── carrying typed progress forward on an update ──────────────────────── */
+
+/** One typed number moved into a list of rows: `from`'s `field` becomes a row of `to` pointing back through `link`. */
+export type CarriedMove = { from: string; field: string; to: string; link: string; amount: string; what: string };
+
+/** What a use case moves when a record updates to it from before `before`, by its id. None for most. */
+const CARRIED: Readonly<Record<string, { before: string; moves: readonly CarriedMove[] }>> = { personal: PERSONAL_CARRIED };
+
+/** What carrying forward needs: the rows of a list, a row written, and a field emptied. */
+export type CarryIo = LinkIo & {
+  create: (register: string, fields: Record<string, unknown>) => Promise<boolean>;
+  clear: (register: string, seq: number, field: string) => Promise<boolean>;
+};
+
+const olderThan = (a: string, b: string): boolean => {
+  const parse = (v: string) => /^(\d+)\.(\d+)\.(\d+)/u.exec(v)?.slice(1).map(Number) ?? null;
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return false;
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return (x[i] as number) < (y[i] as number);
+  return false;
+};
+
+/** A typed amount worth carrying: a number above zero, or money whose amount is. */
+const carried = (v: unknown): boolean =>
+  (typeof v === 'number' && v > 0) || (typeof v === 'object' && v !== null && typeof (v as { amount?: unknown }).amount === 'number' && (v as { amount: number }).amount > 0);
+
+/**
+ * On an update from `fromVersion`, move what the use case's older version kept typed into the rows its newer one reads,
+ * one row a goal, dated `today`, then empty the typed number. Answers how many were moved; a refused write is skipped, and
+ * a number is only emptied once its row is written.
+ */
+export async function carryForward(io: CarryIo, usecase: string, fromVersion: string | null, today: string): Promise<number> {
+  const plan = CARRIED[usecase.replace(/^usecase-/u, '')];
+  if (!plan || fromVersion === null || !olderThan(fromVersion, plan.before)) return 0;
+  let moved = 0;
+  for (const m of plan.moves) {
+    for (const row of (await io.rows(m.from).catch(() => null)) ?? []) {
+      const value = row.fields[m.field];
+      if (row.seq === null || !carried(value)) continue;
+      const made = await io.create(m.to, { what: m.what, [m.link]: `${m.from}#${row.seq}`, [m.amount]: value, on: today }).catch(() => false);
+      if (!made) continue;
+      await io.clear(m.from, row.seq, m.field).catch(() => false);
+      moved += 1;
+    }
+  }
+  return moved;
 }

@@ -12,7 +12,7 @@
  * PURE, AND THEREFORE TESTABLE, for the reason `packs.ts` gives: the screen only assigns.
  */
 
-import { linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
+import { carryForward, linkExamples, type ExampleLink } from '@braindog/seed/usecases/links';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
@@ -286,25 +286,47 @@ export async function installShared(client: SharingClient, plan: SharedPlan): Pr
  * arrangement to keep, for the screen to write where the rail reads it; a link that is refused is skipped.
  */
 export async function afterInstall(
-  client: { list(args: { register: string; limit?: number }): Promise<Wire<unknown>>; update(args: { register: string; seq: number; patch: Record<string, unknown> }): Promise<Wire<unknown>> },
+  client: {
+    list(args: { register: string; limit?: number }): Promise<Wire<unknown>>;
+    update(args: { register: string; seq: number; patch: Record<string, unknown> }): Promise<Wire<unknown>>;
+    create?(args: { register: string; fields: Record<string, unknown> }): Promise<Wire<unknown>>;
+  },
   plan: SharedPlan,
   arrangement: readonly string[],
-): Promise<{ links: number; nav: string[] | null }> {
-  const links = await linkExamples(
-    {
-      rows: async (register) => {
-        const read = await client.list({ register, limit: 200 });
-        return read.ok && isMap(read.value) && Array.isArray(read.value.rows) ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
-      },
-      link: async (register, seq, field, spoken) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+  today: string = new Date().toISOString().slice(0, 10),
+): Promise<{ links: number; carried: number; nav: string[] | null }> {
+  const io = {
+    rows: async (register: string) => {
+      const read = await client.list({ register, limit: 200 });
+      return read.ok && isMap(read.value) && Array.isArray(read.value.rows) ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
     },
+    link: async (register: string, seq: number, field: string, spoken: string) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+  };
+  /* AN UPDATE FROM AN OLDER VERSION MOVES WHAT THAT VERSION KEPT TYPED into the rows the new one reads (`carryForward`). */
+  const from = plan.packs.find((p) => p.role === 'usecase')?.installedVersion ?? null;
+  const create = client.create?.bind(client);
+  const carried =
+    from === null || !create
+      ? 0
+      : await carryForward(
+          {
+            ...io,
+            create: async (register, fields) => (await create({ register, fields })).ok,
+            clear: async (register, seq, field) => (await client.update({ register, seq, patch: { [field]: null } })).ok,
+          },
+          plan.usecase.id,
+          from,
+          today,
+        );
+  const links = await linkExamples(
+    io,
     plan.usecase.id,
     {
       links: plan.links,
       declarations: plan.packs.flatMap((p) => (Array.isArray(p.doc.declarations) ? (p.doc.declarations as Body[]) : [])),
     },
   );
-  return { links, nav: plan.nav.length === 0 ? null : withOrder(plan.nav, arrangement) };
+  return { links, carried, nav: plan.nav.length === 0 ? null : withOrder(plan.nav, arrangement) };
 }
 
 /* ── switching between use cases ───────────────────────────────────────── */
