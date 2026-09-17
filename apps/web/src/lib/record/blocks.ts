@@ -1064,7 +1064,10 @@ export function draw(
     block.kind === 'cards'
       ? block.entries.length === 0
       : block.kind === 'section'
-        ? Boolean(block.register) && block.matched.length === 0
+        /* AND A SECTION THAT WROTE NO SENTENCE SAYS NOTHING when its list matched nothing: it is a heading over the
+           blocks below it, which say their own nothing, and "Nothing matched." above "Nothing is parked or finished."
+           is the same fact twice on a record that has neither. */
+        ? Boolean(block.register) && block.matched.length === 0 && Boolean(block.empty)
         : segments.every((s) => s.type === 'block' && s.rows.length === 0);
   return {
     segments,

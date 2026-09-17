@@ -412,3 +412,14 @@ test('A LINK IN A LIST BLOCK READS AS THE ROW IT POINTS AT, as the table beside 
   assert.doesNotMatch(text, /people#999/u);
   assert.match(text, /Say what it is and who it is for/u);
 });
+
+test('A SECTION THAT WROTE NO SENTENCE SAYS NOTHING when its list matched nothing, and one that wrote one still says it', () => {
+  const shell = { heading: 'Parked and finished', register: 'things', rows: [], entries: [], matched: [], refusals: [], authored: [], columns: [], total: 0 };
+  const quiet = draw({ ...shell, kind: 'section' } as never);
+  assert.equal(quiet.refusal, null, 'a heading over blocks that say their own nothing says nothing itself');
+  const said = draw({ ...shell, kind: 'section', empty: 'Nothing is parked yet.' } as never);
+  assert.equal(said.refusal?.title, 'Nothing is parked yet.');
+  /* A LIST BLOCK STILL SAYS ITS OWN. */
+  const table = draw({ ...shell, kind: 'table', empty: 'Nothing is parked or finished.' } as never);
+  assert.equal(table.refusal?.title, 'Nothing is parked or finished.');
+});
