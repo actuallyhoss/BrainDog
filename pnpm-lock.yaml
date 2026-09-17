@@ -30,6 +30,9 @@ importers:
       '@braindog/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@braindog/declare':
+        specifier: workspace:*
+        version: link:../../packages/declare
       '@braindog/dog':
         specifier: workspace:*
         version: link:../../packages/dog

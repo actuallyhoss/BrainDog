@@ -30,6 +30,7 @@ import { skills } from './skills.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { tools } from './tools.ts';
+import { usecase } from './usecase.ts';
 
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
    `process.exit` does not wait for it. */
@@ -63,6 +64,10 @@ const usage = () =>
     '  Read a .dog file and set it as the page. An owner in the app only — a token is refused, this CLI included.',
     'braindog page check <file>',
     '  Validate a .dog file against the authoring grammar, locally. Nothing is sent.',
+    'braindog usecase export [--out <file>] [--title <title>] [--version <x.y.z>] [--example <list>:<n>,<n>] [--host <host>]',
+    "  Save this BrainDog's arrangement as a use-case file: its modules, lists, pages, voice and labels, and only the rows named.",
+    'braindog usecase check <file>',
+    '  Read a use-case file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
     'braindog mcp [--agent claude|codex|cursor|other] [--host <host>]',
     '  Serve BrainDog to an agent over standard input and output. The agent starts it.',
     'braindog hook start|end',
@@ -165,8 +170,8 @@ async function keysCommand(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog skills|tools|page`, over the real terminal, and the exit code the command decides. */
-async function agentCommand(which: 'skills' | 'tools' | 'page', args: string[]): Promise<void> {
+/** `braindog skills|tools|page|usecase`, over the real terminal, and the exit code the command decides. */
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -181,7 +186,8 @@ async function agentCommand(which: 'skills' | 'tools' | 'page', args: string[]):
     },
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
-  const code = which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : await pageCommand(args, io);
+  const code =
+    which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : await pageCommand(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -254,7 +260,7 @@ try {
   if (command === 'mcp') await mcp(rest);
   else if (command === 'login') await signIn(rest);
   else if (command === 'keys') await keysCommand(rest);
-  else if (command === 'skills' || command === 'tools' || command === 'page') await agentCommand(command, rest);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase') await agentCommand(command, rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
