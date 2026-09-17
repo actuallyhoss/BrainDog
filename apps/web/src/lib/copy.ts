@@ -695,7 +695,7 @@ export const copy = {
   /** A decision in the feed, with the reason it was given when there is one. */
   feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
   /** Many writes by one writer in a few seconds, such as an import, as one line of the feed: "Added 52 rows and asked 8 questions". */
-  feedBulk: (n: { added: number; changed: number; asked: number; removed: number }, more: boolean) => {
+  feedBulk: (n: { added: number; changed: number; asked: number; removed: number }, more: boolean, why: string | null = null) => {
     const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
     const parts = [
       n.added ? `added ${plural(n.added, 'row', 'rows')}` : '',
@@ -704,7 +704,8 @@ export const copy = {
       n.asked ? `asked ${plural(n.asked, 'question', 'questions')}` : '',
     ].filter(Boolean);
     const joined = parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-    return `${joined.charAt(0).toUpperCase()}${joined.slice(1)} at once${more ? ', and more before these' : ''}`;
+    const tail = more ? ', and more before these' : '';
+    return why ? `${why}: ${joined}${tail}` : `${joined.charAt(0).toUpperCase()}${joined.slice(1)} at once${tail}`;
   },
   feedYou: 'You',
   feedSomeone: 'Someone on this record',

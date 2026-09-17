@@ -301,3 +301,14 @@ test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day i
   const two = bulk.slice(0, 20).map((l, i) => (i === 10 ? { ...l, actor: 'agent:claude' } : l));
   assert.equal(newsOf(two as never, 'p_1').length, 2 + 9);
 });
+
+test("ONE WRITE'S LINES ARE ONE LINE from three, led by the note they share: clearing the examples", () => {
+  const cleared = ['Northwind app', 'Northwind current account', 'Write the pricing page copy'].map((title, i) =>
+    line({ rowid: 20 - i, kind: 'delete', batch: 'b1', note: 'Cleared the examples', register: 'tasks', seq: i + 1, title }),
+  );
+  const items = newsOf([...cleared, line({ rowid: 5, ts: '2026-09-15T08:00:00.000Z', title: 'Older' , register: 'tasks', seq: 9 })] as never, 'p_1');
+  assert.deepEqual(items.map((i) => i.text), ['Cleared the examples: removed 3 rows', 'Added Older']);
+  assert.equal(items[0]!.href, '/audit?by=you&on=2026-09-15');
+  /* Two lines of one write keep their own lines. */
+  assert.equal(newsOf(cleared.slice(0, 2) as never, 'p_1').length, 2);
+});

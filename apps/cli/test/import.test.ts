@@ -455,7 +455,7 @@ test('dates become tasks due that day on their project, domains and services go 
   assert.deepEqual(row(p, 'legacy:date:EV1'), {
     register: 'tasks',
     key: 'legacy:date:EV1',
-    label: 'Store review window, 2026-09-30',
+    label: 'Store review window on 2026-09-30',
     fields: { what: 'Store review window', state: 'open', by: '2026-09-30', note: 'Was EV1 in the old tool, a date (deadline).', thing: { $ref: 'legacy:project:lanternly' } },
   });
   assert.deepEqual(row(p, 'legacy:domain:lanternly.example')!.fields, { name: 'lanternly.example', kind: 'domain', cycle: 'yearly', state: 'live', renews: '2027-01-01', thing: { $ref: 'legacy:project:lanternly' } });
@@ -478,8 +478,8 @@ test('the dry run lists each date, domain and service; a re-run changes none; a 
   const at = dry.indexOf('Dates, domains and services:');
   assert.ok(at > 0);
   assert.deepEqual(dry.slice(at + 1, at + 4), [
-    '- Date: Store review window, 2026-09-30, would be added (Tasks).',
-    '- Domain: lanternly.example, renews 2027-01-01, would be added (Services).',
+    '- Date: Store review window on 2026-09-30, would be added (Tasks).',
+    '- Domain: lanternly.example renewing 2027-01-01, would be added (Services).',
     '- Service: Game server, would be added (Services).',
   ]);
   await applyPlan(plan(), mem.door, { dryRun: false });
@@ -494,6 +494,6 @@ test('the dry run lists each date, domain and service; a re-run changes none; a 
   assert.equal(founder.rows.filter((r) => r.register === 'services').length, 0);
   assert.ok(founder.rows.some((r) => (r.fields.tags as string[] | undefined)?.includes('legacy:date:EV1')));
   const lines = said(report, { dryRun: false, file: 'export.json' });
-  assert.ok(lines.includes('- This BrainDog has no Services list. Install Estate beside Solo founder, then run the import again to bring these in: lanternly.example, renews 2027-01-01, Game server.'));
+  assert.ok(lines.includes('- This BrainDog has no Services list. Install Estate beside Solo founder, then run the import again to bring these in: lanternly.example renewing 2027-01-01, Game server.'));
   assert.ok(!lines.join(' ').includes('—'));
 });

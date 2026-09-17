@@ -295,6 +295,8 @@ function reasonsOf(events: readonly EventLine[]): { byDecision: Map<number, stri
  */
 export const BULK_MIN = 10;
 export const BULK_GAP_MS = 5_000;
+/** Lines one write made together (one `batch`), such as clearing the examples, are one line from this many. */
+export const BULK_BATCH_MIN = 3;
 /** `whatsNew` sends at most sixty lines, so a run that reaches the oldest of sixty may go on before them. */
 const WHATS_NEW_CAP = 60;
 type BulkPart = 'added' | 'changed' | 'asked' | 'removed';
@@ -338,19 +340,29 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
         Math.abs(Date.parse(said[j]!.e.ts) - Date.parse(said[j + 1]!.e.ts)) <= BULK_GAP_MS
       )
         j++;
-    if (j + 1 - i < BULK_MIN) {
+    /* ONE WRITE'S LINES, whatever their number: clearing seven examples is one thing somebody did. */
+    let k = i;
+    const batch = first.e.batch ?? null;
+    if (batch !== null && BULK_KIND[first.e.kind])
+      while (k + 1 < said.length && said[k + 1]!.e.batch === batch && said[k + 1]!.e.actor === first.e.actor && BULK_KIND[said[k + 1]!.e.kind]) k++;
+    const bySize = j + 1 - i >= BULK_MIN;
+    if (!bySize && k + 1 - i < BULK_BATCH_MIN) {
       out.push(first.item);
       i++;
       continue;
     }
+    if (!bySize) j = k;
     const run = said.slice(i, j + 1);
     const counts = { added: 0, changed: 0, asked: 0, removed: 0 };
     for (const r of run) counts[BULK_KIND[r.e.kind]!]++;
     const on = first.e.ts.slice(0, 10);
+    /* THE NOTE THEY ALL CARRY SAYS WHY, "Cleared the examples", and leads the line when there is one. */
+    const notes = new Set(run.map((r) => r.e.note?.trim().replace(/\.$/u, '') || null));
+    const why = notes.size === 1 ? [...notes][0]! : null;
     out.push({
       at: first.item.at,
       by: first.item.by,
-      text: copy.feedBulk(counts, run.some((r) => r.last)),
+      text: copy.feedBulk(counts, run.some((r) => r.last), why),
       href: `/audit?${new URLSearchParams({ by: actorFor(first.e.actor, me), on })}`,
     });
     i = j + 1;
