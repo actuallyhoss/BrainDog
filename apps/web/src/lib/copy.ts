@@ -1992,6 +1992,8 @@ export const copy = {
   arrangeLeadUseCase: (name: string) => `Sets this BrainDog up for ${name}`,
   arrangeLeadArrange: 'Rearranges this BrainDog',
   arrangeLeadInstall: (name: string) => `Adds ${name}`,
+  /** A pack on at an older version, updated to the one on offer. */
+  arrangeLeadUpdate: (name: string, from: string, to: string) => `Updates ${name} from ${from} to ${to}`,
   arrangeLeadEnable: (name: string) => `Turns ${name} back on`,
   arrangeLeadDisable: (name: string) => `Turns ${name} off`,
   arrangeLeadSettings: (name: string) => `Changes the words and settings of ${name}`,
@@ -2004,6 +2006,7 @@ export const copy = {
   arrangeCallSends: (fields: string) => `sends ${fields}`,
   arrangePacks: 'Packs',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
+  arrangeUpdates: (name: string, from: string, to: string) => `Updates ${name} from ${from} to ${to}`,
   /** Use cases an arrangement installs beside the one the record speaks in, which keeps its voice. */
   arrangeBeside: (names: string[]) => `Adds ${list(names)} beside it, in the same voice`,
   arrangeTurnsOn: (names: readonly string[]) => `Turns on ${list([...names])}`,
@@ -2041,6 +2044,7 @@ export const copy = {
   arrangeCountSettings: (n: number) => `${n} ${n === 1 ? 'setting' : 'settings'}`,
   arrangeApplied: 'What was applied',
   arrangeDidInstall: (names: readonly string[]) => `Installed ${list([...names])}`,
+  arrangeDidUpdate: (name: string, from: string, to: string) => `Updated ${name} from ${from} to ${to}`,
   arrangeDidEnable: (names: readonly string[]) => `Turned on ${list([...names])}`,
   arrangeDidDisable: (names: readonly string[]) => `Turned off ${list([...names])}`,
   arrangeDidPages: (names: readonly string[]) => `Put in place ${names.length === 1 ? 'the page' : 'the pages'} ${list([...names])}`,

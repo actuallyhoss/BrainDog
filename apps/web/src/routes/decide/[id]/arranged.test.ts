@@ -147,3 +147,30 @@ test('a long label is said by the title filed with it, and never by its hashed s
     [['In Bills, “Client work” will be called “Pay”'], ['Personal: A label will be Old']],
   );
 });
+
+test('AN UPDATE IS SAID AS ONE, with the versions it goes from and to, before and after it is accepted', () => {
+  const body = {
+    install: 'usecase-personal',
+    kind: 'usecase',
+    title: 'Personal',
+    packs: { install: ['usecase-personal'] },
+    plan: [{ pack: 'usecase-personal', from: '1.0.0', version: '1.2.0', adds: ['register.goal_log'], changes: ['register.goals'] }],
+    approve: [],
+  };
+  const out = arrangedOf('pack', body);
+  assert.equal(out?.lead, 'Updates Personal from 1.0.0 to 1.2.0');
+  assert.equal(out?.parts.some((p) => p.part === 'packs'), false, 'the update was said twice');
+  assert.deepEqual(appliedLines({ installed: ['usecase-personal'] }, body), ['Updated Personal from 1.0.0 to 1.2.0']);
+
+  const arranged = arrangedOf('arrange', {
+    usecase: 'student',
+    why: ['A newer Personal.'],
+    packs: { install: ['usecase-student', 'usecase-personal'] },
+    plan: [
+      { pack: 'usecase-student', version: '1.1.0', adds: ['register.courses'] },
+      { pack: 'usecase-personal', from: '1.0.0', version: '1.2.0', adds: ['register.goal_log'] },
+    ],
+  });
+  const packs = arranged?.parts.find((p) => p.part === 'packs');
+  assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Student', 'Updates Personal from 1.0.0 to 1.2.0']);
+});

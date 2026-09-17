@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { laterVersion, normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -36,6 +36,11 @@ export type CatalogueEntry = {
   summary: string;
   /** The packs installed before it, in order. */
   modules: readonly string[];
+  /**
+   * The version `doc` builds, when the host knows it without building one, so a pack on at an older version is offered as
+   * an update. Absent, the document is built to read it, and only for a pack a proposal names.
+   */
+  version?: string | undefined;
   /**
    * The document to install, for a record that holds `holds` once the packs before it are in, so a link to a list
    * the record will not hold can be left out, and whose use case is `usecase` (its id, `team`), so a module carries
@@ -118,6 +123,26 @@ export function arranger(d: ArrangeDeps) {
   const on = (id: string) => stateOf(id)?.disabled_at === null;
   const entryOf = (id: string): CatalogueEntry | undefined =>
     catalogue.find((e) => e.id === id) ?? catalogue.find((e) => e.kind === 'usecase' && e.id === packIdOf(id));
+  /** The version on offer for a pack, from the catalogue or the document sent with the proposal. */
+  const offeredVersion = (id: string, docs: ReadonlyMap<string, Body>): string | null => {
+    const sent = docs.get(id)?.version;
+    if (typeof sent === 'string') return sent;
+    const entry = entryOf(id);
+    if (!entry) return null;
+    if (entry.version !== undefined) return entry.version;
+    const built = entry.doc({ holds: heldBy(d.installed()), usecase: null })?.version;
+    return typeof built === 'string' ? built : null;
+  };
+  /**
+   * AN UPDATE: a pack on at a version older than the one on offer. It is planned and installed like any other, over the one
+   * there, and the catalogue's carry step moves what the older version kept typed (`carryUpdate`).
+   */
+  const updateOf = (id: string, docs: ReadonlyMap<string, Body>): { from: string; to: string } | null => {
+    const held = stateOf(id);
+    if (!held || held.disabled_at !== null || held.version === null) return null;
+    const offered = offeredVersion(id, docs);
+    return offered !== null && offered !== held.version && laterVersion(offered, held.version) === offered ? { from: held.version, to: offered } : null;
+  };
   const useCaseOn = (): string | null => states().find((s) => s.id.startsWith(USE_CASE) && s.disabled_at === null)?.id ?? null;
   const waiting = (): string[] => {
     const open = kernel.openSuggestions();
@@ -171,6 +196,14 @@ export function arranger(d: ArrangeDeps) {
           summary: e.summary,
           ...(e.modules.length === 0 ? {} : { modules: e.modules }),
         })),
+      /* A PACK ON AT AN OLDER VERSION THAN THE ONE OFFERED, which a `pack` install proposal updates. */
+      ...(() => {
+        const updates = packs.flatMap((p) => {
+          const version = p.disabled_at === null && p.version !== null ? entryOf(p.id)?.version : undefined;
+          return version !== undefined && version !== p.version && laterVersion(version, p.version) === version ? [{ id: p.id, from: p.version, to: version }] : [];
+        });
+        return updates.length === 0 ? {} : { updates };
+      })(),
       /* THE KEYS ARE IN braindog:grammar/proposals, read once; here is only what this record says. */
       voice: { pack: voicePack, said },
       ...(Object.keys(settings).length === 0 ? {} : { settings }),
@@ -196,7 +229,7 @@ export function arranger(d: ArrangeDeps) {
 
   /* ── filing ──────────────────────────────────────────────────────────── */
 
-  /** The packs to install and to turn on, dependencies first, for what was asked. Already on is skipped. */
+  /** The packs to install and to turn on, dependencies first, for what was asked. Already on is skipped, unless it is what was asked and a newer version is offered. */
   function expand(ids: readonly string[], at: string, docs: ReadonlyMap<string, Body>): Result<{ install: string[]; enable: string[] }> {
     const install: string[] = [];
     const enable: string[] = [];
@@ -209,7 +242,10 @@ export function arranger(d: ArrangeDeps) {
         if (seen.has(id)) continue;
         seen.add(id);
         const state = stateOf(id);
-        if (state && state.disabled_at === null) continue;
+        if (state && state.disabled_at === null) {
+          if (id === target && updateOf(id, docs)) install.push(id);
+          continue;
+        }
         if (state) enable.push(id);
         else if (entryOf(id) || docs.has(id)) install.push(id);
         else return notOffered(id, `${at}[${i}]`);
@@ -235,8 +271,10 @@ export function arranger(d: ArrangeDeps) {
       const clash = diff.conflicts[0];
       if (clash)
         return refuse('PROVIDES_CONFLICT', `${id} would take over ${clash.id}, which ${clash.pack} holds. Leave ${id} out, or retire ${clash.id} first.`, 'body.packs');
+      const from = state.packs.find((p) => p.id === id)?.version ?? null;
       out.plan.push({
         pack: id,
+        ...(from === null ? {} : { from }),
         version: pack.manifest.version,
         adds: diff.adds.map((a) => a.id),
         ...(diff.changes.length === 0 ? {} : { changes: diff.changes.map((c) => c.id) }),
@@ -247,9 +285,9 @@ export function arranger(d: ArrangeDeps) {
       for (const decl of pack.declarations) out.batch.push({ id: decl.id, kind: decl.kind, body: decl.body, pack: id });
       state = {
         ...state,
-        packs: [...state.packs, { id, version: pack.manifest.version }],
+        packs: [...state.packs.filter((p) => p.id !== id), { id, version: pack.manifest.version }],
         declarations: [
-          ...state.declarations,
+          ...state.declarations.filter((decl) => decl.pack_id !== id),
           ...pack.declarations.map((decl) => ({ id: decl.id, version: 1, kind: decl.kind, pack_id: id, body: decl.canonical, checksum: '' })),
         ],
       };
@@ -367,9 +405,13 @@ export function arranger(d: ArrangeDeps) {
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;
       const target = entryOf(asked)?.id ?? asked;
-      if (on(target))
-        return refuse('TRANSITION_ILLEGAL', `${target} is already installed and on. To change what it says, propose body_kind settings.`, 'body.install');
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
+      if (on(target) && !updateOf(target, docs))
+        return refuse(
+          'TRANSITION_ILLEGAL',
+          `${target} is already installed and on, at ${stateOf(target)?.version ?? 'its version'}, and no newer version is offered. To change what it says, propose body_kind settings.`,
+          'body.install',
+        );
       const order = expand([asked], 'body.install', docs);
       if (!order.ok) return order;
       const planned = await planAll(order.value.install, docs);
@@ -510,9 +552,14 @@ export function arranger(d: ArrangeDeps) {
     const approved = Array.isArray(body.approve) ? (body.approve as string[]) : [];
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
 
+    const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
     for (const id of packs.install ?? []) {
-      if (on(id)) continue;
-      if (stateOf(id)) {
+      /* AN UPDATE THE OWNER ACCEPTED goes in over the pack that is on, unless that pack is already at the planned version. */
+      const step = steps.find((s) => s.pack === id);
+      const held = stateOf(id)?.version ?? null;
+      const updating = on(id) && typeof step?.from === 'string' && typeof step.version === 'string' && held !== step.version && laterVersion(step.version, held) === step.version;
+      if (on(id) && !updating) continue;
+      if (stateOf(id) && !updating) {
         const back = await kernel.enablePack(id, { actor });
         if (!back.ok) return stopped(back);
         done.enabled.push(id);

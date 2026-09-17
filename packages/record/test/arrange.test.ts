@@ -315,3 +315,63 @@ test('A LONG LABEL IS FILED WITH ITS TITLE, so Decide never says its hashed sett
   const filed = value<{ body: { settings: { titles?: Record<string, string> }[] } }>(await api.governance({ id: arranged.id }, owner));
   assert.deepEqual(filed.body.settings[0]?.titles, { [hashed]: 'Label: courses, submission state, handed in after deadline' });
 });
+
+test('A PROPOSAL UPDATES A USE CASE THAT IS ON TO THE NEWER VERSION OFFERED, through the same plan, with the carry step', async () => {
+  let offered = '1.0.0';
+  const carried: string[] = [];
+  const doc = () => ({ ...smallUseCase('diary', 'entries'), version: offered });
+  const { api, sql } = await record([
+    ...CATALOGUE,
+    {
+      id: 'usecase-diary',
+      kind: 'usecase',
+      title: 'Diary',
+      summary: 'Entries.',
+      modules: [],
+      doc,
+      carry: async (_io, from) => {
+        carried.push(from);
+        return 0;
+      },
+    },
+  ]);
+  value(await api.decide(accept(value<{ id: string }>(await api.propose({ question: 'Diary?', body_kind: 'pack', body: { install: 'diary' } } as never, agent)).id), owner));
+  assert.deepEqual(carried, [], 'a first install ran the carry step');
+
+  /* THE SAME VERSION IS STILL REFUSED, and says so. */
+  const same = refusal(await api.propose({ question: 'Again?', body_kind: 'pack', body: { install: 'diary' } } as never, agent));
+  assert.equal(same.code, 'TRANSITION_ILLEGAL');
+  assert.match(same.fix, /at 1\.0\.0, and no newer version is offered/u);
+
+  offered = '1.2.0';
+  const seen = value<{ updates?: { id: string; from: string; to: string }[] }>(await api.arrangement({}, agent));
+  assert.equal(seen.updates, undefined, 'an entry with no version said is not built on every read');
+  const filed = value<{ id: string }>(await api.propose({ question: 'Update Diary?', body_kind: 'pack', body: { install: 'diary' } } as never, agent));
+  const row = value<{ body: { packs: { install: string[] }; plan: { pack: string; from?: string; version: string }[] } }>(await api.governance({ id: filed.id }, owner));
+  assert.deepEqual(row.body.packs.install, ['usecase-diary']);
+  assert.deepEqual(row.body.plan.map((p) => [p.pack, p.from, p.version]), [['usecase-diary', '1.0.0', '1.2.0']]);
+  value(await api.decide(accept(filed.id), owner));
+  const packs = value<{ packs: { id: string; version?: string }[] }>(await api.arrangement({}, agent)).packs;
+  assert.equal(packs.find((p) => p.id === 'usecase-diary')?.version, '1.2.0');
+  assert.deepEqual(carried, ['1.0.0'], 'the update did not run the carry step from the version it replaced');
+
+  /* AN ARRANGEMENT NAMING IT UPDATES IT TOO, and one accepted after the pack is already there changes nothing. */
+  offered = '1.3.0';
+  const first = value<{ id: string }>(await api.propose({ question: 'Arrange?', body_kind: 'arrange', body: { why: ['Newer.'], usecase: 'diary' } } as never, agent));
+  const second = value<{ id: string }>(await api.propose({ question: 'Update?', body_kind: 'pack', body: { install: 'diary' } } as never, agent));
+  value(await api.decide(accept(first.id), owner));
+  value(await api.decide(accept(second.id), owner));
+  assert.deepEqual(carried, ['1.0.0', '1.2.0']);
+  sql.close();
+});
+
+test('A CATALOGUE THAT SAYS ITS VERSIONS LISTS THE UPDATES ON OFFER in the arrangement', async () => {
+  const { api, sql } = await record([...CATALOGUE.map((e) => (e.id === 'work' ? { ...e, version: '1.0.0' } : e))]);
+  value(await api.decide(accept(value<{ id: string }>(await api.propose({ question: 'Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent)).id), owner));
+  assert.equal(value<{ updates?: unknown }>(await api.arrangement({}, agent)).updates, undefined);
+  sql.close();
+  const later = await record([{ ...CATALOGUE[0]!, version: '1.1.0', doc: () => ({ ...WORK, version: '1.1.0' }) }]);
+  value(await later.api.decide(accept(value<{ id: string }>(await later.api.propose({ question: 'Work?', body_kind: 'pack', body: { install: 'work', doc: WORK } } as never, agent)).id), owner));
+  assert.deepEqual(value<{ updates?: unknown }>(await later.api.arrangement({}, agent)).updates, [{ id: 'work', from: '1.0.0', to: '1.1.0' }]);
+  later.sql.close();
+});

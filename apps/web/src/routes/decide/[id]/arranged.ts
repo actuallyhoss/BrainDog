@@ -44,6 +44,15 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === '
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : []);
 const words = (id: string): string => copy.valueWord(id.replace(/^[a-z]+\./u, '').replace(/^usecase-/u, '').replace(/[_-]+/gu, ' '));
 
+/** The packs a body's plan updates over the version on now, by id, with the version each goes from and to. */
+export function updatesOf(body: Row): Map<string, { from: string; to: string }> {
+  const out = new Map<string, { from: string; to: string }>();
+  for (const step of Array.isArray(body.plan) ? body.plan.filter(isRow) : []) {
+    if (text(step.pack) && text(step.from) && text(step.version)) out.set(text(step.pack), { from: text(step.from), to: text(step.version) });
+  }
+  return out;
+}
+
 /** A pack by the name a person knows it by: the body's title for the one it installs, its id in words otherwise. */
 export function packName(id: string, body: Row): string {
   if (id === text(body.install) && text(body.title) !== '') return copy.valueWord(text(body.title));
@@ -208,9 +217,14 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
   if (calls.length) parts.push({ part: 'calls', calls });
 
   const packLines: string[] = [];
+  /* AN UPDATE IS SAID AS ONE, with the versions, and never as an install. */
+  const updates = updatesOf(body);
+  const fresh = install.filter((id) => !updates.has(id));
+  const update = kind === 'pack' ? updates.get(text(body.install)) : undefined;
   /* A PACK THAT INSTALLS ONE THING IS SAID BY ITS LEAD, Adds Work, and is not said twice. */
   const saidByLead = install.length === 1 && (kind === 'pack' || install[0] === `usecase-${text(body.usecase)}`);
-  if (install.length > 0 && !saidByLead) packLines.push(copy.arrangeInstalls(install.map(name)));
+  if (fresh.length > 0 && !saidByLead) packLines.push(copy.arrangeInstalls(fresh.map(name)));
+  for (const [id, u] of updates) if (install.includes(id) && !(saidByLead && kind === 'pack')) packLines.push(copy.arrangeUpdates(name(id), u.from, u.to));
   const beside = strings(body.alongside);
   if (beside.length && kind === 'arrange') packLines.push(copy.arrangeBeside(beside.map((id) => words(id))));
   if (enable.length && kind !== 'pack') packLines.push(copy.arrangeTurnsOn(enable.map(name)));
@@ -237,9 +251,11 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
       ? copy.arrangeLeadSettings(name(text(body.pack)))
       : kind === 'pack'
         ? text(body.install)
-          ? useCase
-            ? copy.arrangeLeadUseCase(copy.valueWord(useCase))
-            : copy.arrangeLeadInstall(name(text(body.install)))
+          ? update
+            ? copy.arrangeLeadUpdate(name(text(body.install)), update.from, update.to)
+            : useCase
+              ? copy.arrangeLeadUseCase(copy.valueWord(useCase))
+              : copy.arrangeLeadInstall(name(text(body.install)))
           : enable.length
             ? copy.arrangeLeadEnable(name(enable[0]!))
             : copy.arrangeLeadDisable(name(disable[0] ?? ''))
@@ -275,7 +291,11 @@ export type Applied = { installed?: string[]; enabled?: string[]; disabled?: str
 export function appliedLines(applied: Applied, body: Row, sidebar: readonly string[] = []): string[] {
   const name = (id: string) => packName(id, body);
   const out: string[] = [];
-  if (applied.installed?.length) out.push(copy.arrangeDidInstall(applied.installed.map(name)));
+  const updates = updatesOf(body);
+  const installed = (applied.installed ?? []).filter((id) => !updates.has(id));
+  const updated = (applied.installed ?? []).filter((id) => updates.has(id));
+  if (installed.length) out.push(copy.arrangeDidInstall(installed.map(name)));
+  for (const id of updated) out.push(copy.arrangeDidUpdate(name(id), updates.get(id)!.from, updates.get(id)!.to));
   if (applied.enabled?.length) out.push(copy.arrangeDidEnable(applied.enabled.map(name)));
   if (applied.disabled?.length) out.push(copy.arrangeDidDisable(applied.disabled.map(name)));
   if (applied.pages?.length) out.push(copy.arrangeDidPages(applied.pages.map((id) => pageTitle(id, body))));

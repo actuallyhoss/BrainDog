@@ -29,6 +29,8 @@ export type SeedCatalogueEntry = {
   title: string;
   summary: string;
   modules: readonly string[];
+  /** The version `doc` builds, so a pack on at an older one is offered as an update without building a document. */
+  version?: string;
   doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
   afterInstall?: (io: LinkIo) => Promise<unknown>;
   carry?: (io: CarryIo, from: string) => Promise<number>;
@@ -59,6 +61,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
       title: id,
       summary: typeof bare?.summary === 'string' ? bare.summary : '',
       modules: before(firstPartyManifest(id).requires).filter((m) => m !== id),
+      version: firstPartyManifest(id).version,
       doc: ({ holds, usecase }) => {
         const u = usecase ? useCase(usecase) : undefined;
         const doc = u ? moduleDocument(u, id, { today: today(), holds }) : firstPartyDocument(id, { holds, seeds: [] });
@@ -68,12 +71,16 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     };
   });
   const agents = agentsPackDocument();
-  const useCases: SeedCatalogueEntry[] = USE_CASES.filter((u) => useCaseDocument(u.usecase) !== null).map((u) => ({
+  const useCases: SeedCatalogueEntry[] = USE_CASES.flatMap((u) => {
+    const version = useCaseDocument(u.usecase)?.version;
+    return typeof version === 'string' ? [{ u, version }] : [];
+  }).map(({ u, version }) => ({
     id: packIdOf(u.usecase),
     kind: 'usecase',
     title: u.title,
     summary: u.summary,
     modules: modulesFor(u),
+    version,
     doc: () => useCaseDocument(u.usecase, today()),
     /* A SEED CARRIES NO LINK (42 §5.2), so the use case's examples are pointed at each other once they are in (`links.ts`). */
     afterInstall: (io) => linkExamples(io, u.usecase),
@@ -82,7 +89,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
   }));
   return [
     ...modules,
-    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), doc: () => agentsPackDocument() },
+    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, doc: () => agentsPackDocument() },
     ...useCases,
   ];
 }
