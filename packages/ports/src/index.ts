@@ -159,8 +159,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-two, counted, in nine
- * families — 52 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-three, counted, in nine
+ * families — 53 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
  * lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -175,7 +175,7 @@ export type Conflict = {
  * into the list of everything that can appear in a `code`.
  */
 
-/** Pack and declaration — 52. */
+/** Pack and declaration — 53. */
 const PACK = [
   'KIND_UNKNOWN', 'FIELD_TYPE_UNKNOWN', 'FIELDS_OVER_CAP', 'INDEXES_OVER_CAP', 'PATTERN_OVER_CAP',
   'METRIC_NEEDS_TARGET_OR_WINDOW', 'MIXED_CURRENCY', 'CONTRAST_FLOOR', 'REQUIRED_ON_POPULATED', 'ID_RENAMED',
@@ -202,6 +202,8 @@ const PACK = [
   /* A pack's settings and what it points at, 2026-09-15: a setting of a type a setting does not take,
      and a pack leaning on a list the record does not hold and the pack does not declare. */
   'CONFIG_TYPE_UNSUPPORTED', 'REGISTER_UNRESOLVED',
+  /* A shared use case, 2026-09-17: a file past the size a shared use case may be, refused before it is parsed. */
+  'PACK_OVER_CAP',
 ] as const;
 
 /** Grammar — 14. */

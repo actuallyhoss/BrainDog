@@ -25,6 +25,7 @@
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
+import { credentialKey as credential, credentialValue } from './credentials.ts';
 import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
@@ -35,6 +36,8 @@ export const egressOf = (decl: { kind: string; body: unknown }): Egress | null =
 export type { Egress };
 
 /* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
+export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared } from './shared.ts';
+export { looksLikeCredential } from './credentials.ts';
 export { AUDIENCES, LABEL_KEY, MODULES, VOICE_KEYS, labelSetting, labelsOf, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
@@ -268,8 +271,6 @@ const listOf = (body: unknown, key: string): readonly unknown[] => {
 const malformed = <T>(fix: string, at?: string): Result<T> =>
   no<T>('PACK_MALFORMED', fix, at === undefined ? {} : { at });
 
-/** Keys whose value is a credential by any reading. A pack is a file people share. */
-const SECRETS = new Set(['secret', 'token', 'password', 'api_key', 'apikey', 'ciphertext', 'private_key', 'bearer']);
 
 /** Keys that name an appearance, which only a theme may. `42 §5.3·11`. */
 const PAINTS = new Set(['colour', 'color']);
@@ -382,6 +383,12 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (wrong)
       return no<Pack>('SECRET_IN_PACK', `${kind}.${name} carries a ${wrong}, and a pack is a file people share.`, {
         at: wrong,
+      });
+    /* AND A VALUE THAT IS ONE, whatever key it sits under (`credentials.ts`). */
+    const shaped = credentialValue(body);
+    if (shaped)
+      return no<Pack>('SECRET_IN_PACK', `${kind}.${name} holds what looks like a credential at ${shaped}, and a pack is a file people share.`, {
+        at: `${kind}.${name}.${shaped}`,
       });
 
     /**
@@ -508,6 +515,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       return no<Pack>('SECRET_IN_PACK', `${seed.register}'s example row carries a ${leaked}, and a pack is a file people share.`, {
         at: leaked,
       });
+    const shapedSeed = credentialValue(seed.fields);
+    if (shapedSeed)
+      return no<Pack>('SECRET_IN_PACK', `${seed.register}'s example row holds what looks like a credential in ${shapedSeed}, and a pack is a file people share.`, {
+        at: `seeds.${seed.register}.${shapedSeed}`,
+      });
 
     seeds.push({
       register: seed.register,
@@ -559,31 +571,6 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   const canonical = canonicalise({ manifest: hashed, declarations: declarations.map((d) => d.body), seeds });
   if (canonical === null) return malformed('This pack holds something the record cannot write down.');
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });
-}
-
-/** The first credential-shaped key anywhere in a declaration, or `null`. */
-function credential(body: Json, seen: WeakSet<object> = new WeakSet()): string | null {
-  /* A SEEN-SET, because `normalise` takes an `unknown` and a caller in this process can hand it a
-     body that points at itself. A stack overflow out of a function that returns a `Result` is the
-     one thing this package promises does not happen. */
-  if (typeof body === 'object' && body !== null) {
-    if (seen.has(body)) return null;
-    seen.add(body);
-  }
-  if (Array.isArray(body)) {
-    for (const item of body) {
-      const found = credential(item, seen);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!isObject(body)) return null;
-  for (const [key, value] of Object.entries(body)) {
-    if (SECRETS.has(key.toLowerCase()) && typeof value === 'string' && value.trim()) return key;
-    const found = credential(value, seen);
-    if (found) return found;
-  }
-  return null;
 }
 
 /**

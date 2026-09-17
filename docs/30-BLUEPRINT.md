@@ -623,7 +623,7 @@ the caller's bug; refusing names it.
 
 ### The codes
 
-One hundred and twenty-three, counted, in nine families — 53 pack and declaration · 14 grammar · 18 write path · 7 auth and
+One hundred and twenty-four, counted, in nine families — 54 pack and declaration · 14 grammar · 18 write path · 7 auth and
 vault · 8 format and lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
@@ -756,6 +756,7 @@ any row is written".*
 | `SCOPES_IN_USE` | disabling the pack whose register declares `scopes:` while a field left on still has `scope:` pointing at its projects, 02 §5 (41 §5.6) | `scopes-in-use` |
 | `CONFIG_TYPE_UNSUPPORTED` | a manifest's `config:` setting whose type is not text, enum, bool, money, day or duration; a ref, a secret and a file are refused on purpose, 04 §2 (41 §5.7) | `config-type-unsupported` |
 | `REGISTER_UNRESOLVED` | planning or installing a pack whose field `to:`, page `requires` or block source, or metric `source` names a list the record does not hold and the pack does not declare; the sentence names the first-party pack that declares it when there is one, 04 §5 (42 §6) | `register-unresolved` |
+| `PACK_OVER_CAP` | a shared use-case file larger than a shared use case may be (256 KB), refused before it is parsed, `loop/research-spark.md` S14 | `pack-over-cap` |
 | `VIEW_UNKNOWN` | `view` or `retireView` naming a saved view the register has not got, §5 — `allowed` carries the names it does have, so the answer ends the search rather than starting one, as `PAGE_UNKNOWN` does with its slugs. A seventh of the same kind as the six above it, and here for the same reason: the family is named for what its codes are about, and a saved view is a thing the record was told to hold (2026-09-16) | `view-unknown` |
 
 **Grammar** — refused when a `where:`, an `extract:` form or a connector path is compiled or validated

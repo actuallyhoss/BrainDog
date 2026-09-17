@@ -1,0 +1,5 @@
+code:   PACK_OVER_CAP
+via:    lint
+raises: packages/declare/src/shared.ts
+at:     file
+fix:    Share fewer example rows, or split the use case.
