@@ -80,7 +80,8 @@
   /* FRESH EYES, APPENDIX C1: THE WASH WENT TOO. A green, amber or blue capsule beside a page's primary
      was the loudest thing on Decide, a thread and a run, and rule 1.2 allows a status capsule only on
      `--hold-wash`. The shape stays neutral and the glyph alone is the colour. */
-  .chip[data-intent] .glyph {
-    color: var(--tone);
-  }
+  /* AND THE GLYPH IS THE DOT. `blocks.css` draws every `.glyph` as a 6px mark in `--tone-fill`, with its character
+     indented out of sight and `transparent`, and the name kept for a screen reader. This rule used to paint that
+     hidden character in `--tone`, so axe measured amber on the amber dot at 1.7:1 on Decide, a job and a track. Nothing
+     a person could see changed when it went. */
 </style>
