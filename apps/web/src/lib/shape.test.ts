@@ -11,7 +11,7 @@ import { arrange } from '@braindog/seed/usecases';
 
 import { firstRun } from './first-run.ts';
 import { PACKS } from './record/data.ts';
-import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, writable, type PackId, type Shape } from './shape.ts';
+import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, writable, type PackId, type Shape } from './shape.ts';
 
 const TODAY = '2026-09-15';
 const read = (s: string): Shape => shape(s, TODAY);
@@ -213,4 +213,36 @@ test('WHAT EACH LIST LEANS ON is what the seed says its pack requires, and comes
   assert.deepEqual([...LEANS_ON.agents].sort(), leans(AGENTS_PACK.manifest.requires));
   for (const id of INSTALL_ORDER)
     for (const needs of LEANS_ON[id]) assert.ok(INSTALL_ORDER.indexOf(needs) < INSTALL_ORDER.indexOf(id), `${id} is before ${needs}`);
+});
+
+test('A PROJECT THE GUIDE IS FOR ASKS FOR NO MODULE: "an Etsy shop" said to the New project guide installs no Projects', async () => {
+  const { claimedBy } = await import('@braindog/seed/usecases/install');
+  const { useCase } = await import('@braindog/seed/usecases');
+  const guide = useCase('guide')!;
+  /* Each sentence said to the guide, whether the arranger suggests it or the person picked it, and the modules onboarding turns on. */
+  const table: [string, PackId[]][] = [
+    ['I want to open an Etsy shop', []],
+    ['I want to start a shop selling handmade candles', []],
+    ["I'm starting an online store and don't know where to begin", []],
+    ['I want to build an app and have no idea where to start', []],
+    ['starting a new project from scratch', []],
+    ['I want to start a podcast, step by step, with milestones', []],
+    ['I want to make a game as a side project, from scratch', []],
+    ['I want to start a YouTube channel and a website for it', []],
+    /* A phrase the guide does not claim still asks for its module, and Projects comes with what leans on it. */
+    ['I want to start a shop and send invoices to my first customers', ['portfolio', 'people', 'money-core']],
+    ['I want to start a podcast and my agents in Claude will help', ['portfolio', 'agents']],
+  ];
+  for (const [sentence, packs] of table) {
+    /* Before, every one of these turned Projects on. */
+    assert.ok(toTurnOn(read(sentence), false).includes('portfolio'), `${sentence} heard nothing for Projects`);
+    assert.deepEqual(toTurnOn(heardFor(read(sentence), claimedBy(guide, sentence)), false), packs, sentence);
+  }
+  /* THE ARRANGER'S OWN PICK for a sentence that starts something, so the path onboarding takes is the one tested. */
+  for (const sentence of ['I want to start an Etsy shop and have no idea where to begin', 'I want to start a podcast, step by step, with milestones'])
+    assert.equal(arrange(sentence).pick?.usecase, 'guide', sentence);
+  /* ANOTHER USE CASE KEEPS WHAT IT HEARD: a founder's projects are Projects. */
+  const founder = 'I run two startups and track our projects and invoices';
+  const f = arrange(founder).pick!;
+  assert.ok(toTurnOn(heardFor(read(founder), claimedBy(f, founder)), false).includes('money-core'), founder);
 });

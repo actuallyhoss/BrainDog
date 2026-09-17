@@ -305,6 +305,19 @@ export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
   agents: ['portfolio'],
 };
 
+/**
+ * The shape with the packs a use case already holds taken out: a pack every phrase of which the use case claims
+ * (`@braindog/seed/usecases/install` `claimedBy`). "An Etsy shop" said to the New project guide is the project it guides,
+ * so it asks for no Projects. A pack still heard for a phrase of its own stays, and Projects comes back only when a pack
+ * left leans on it.
+ */
+export function heardFor(s: Shape, claimed: (span: Span) => boolean): Shape {
+  if (s.declined !== null) return s;
+  const kept = s.packs.filter((p) => p.why.length > 0 && !p.why.every(claimed));
+  if (kept.length > 0 && !kept.some((p) => p.id === 'portfolio')) kept.push({ id: 'portfolio', why: [] });
+  return { ...s, packs: kept };
+}
+
 /** The packs to turn on, dependencies first, with People added when turn 1 heard a name. */
 export function toTurnOn(s: Shape, person: boolean): PackId[] {
   const wanted = new Set<PackId>(s.packs.map((p) => p.id));

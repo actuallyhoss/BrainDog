@@ -30,9 +30,9 @@
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
-  import { INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
+  import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
-  import { carriedDocument, dayOf, formedFor, forms, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
+  import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
@@ -240,7 +240,9 @@
 
   /** The first-party packs to turn on: the use case's own, what the sentence named, and what each leans on, in order. */
   function modulesToTurnOn(now: Shape | null, person: boolean, u: UseCase | null): PackId[] {
-    const heardPacks: string[] = now && now.declined === null ? toTurnOn(now, person) : person ? ['people'] : [];
+    /* A PHRASE THE USE CASE CLAIMS ASKS FOR NO MODULE: "an Etsy shop" said to the guide is its project, not Projects. */
+    const kept = now && u ? heardFor(now, claimedBy(u, about)) : now;
+    const heardPacks: string[] = kept && kept.declined === null ? toTurnOn(kept, person) : person ? ['people'] : [];
     const wanted = new Set<PackId>((u ? [...modulesFor(u, heardPacks), ...beside.flatMap((b) => b.modules)] : heardPacks) as PackId[]);
     for (let grew = true; grew; ) {
       grew = false;

@@ -21,7 +21,7 @@ import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
-import { formGuide, type FormedPlan } from './guide-kinds.ts';
+import { formGuide, GUIDE_KINDS, type FormedPlan } from './guide-kinds.ts';
 import { PERSONAL_EXAMPLES, PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
 import { TEAM_EXAMPLES } from './team.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
@@ -110,6 +110,25 @@ export const formedFor = (u: UseCase, said: string | null | undefined): FormedPl
   said && said.trim() ? (FORMS[u.usecase]?.(said) ?? null) : null;
 
 export type { FormedPlan };
+
+/** The words a use case that forms around a sentence hears as the kind of thing being made, beside its own signals. */
+const FORM_WORDS: Readonly<Record<string, readonly string[]>> = { guide: GUIDE_KINDS.flatMap((k) => k.signals) };
+
+const escapeWord = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * WHAT A USE CASE ALREADY HOLDS OF A SENTENCE: whether a phrase heard at `at` lies inside one of its own signals, or one of
+ * the words it forms a plan from. "An Etsy shop" said to the guide is the project the guide is for, not a request for
+ * Projects, so onboarding does not install a module for a phrase the use case claims (`apps/web/src/lib/shape.ts` `heardFor`).
+ */
+export function claimedBy(u: UseCase, said: string): (span: { at: number; text: string }) => boolean {
+  const lower = said.toLowerCase();
+  const taken: [number, number][] = [];
+  for (const signal of [...u.signals, ...(FORM_WORDS[u.usecase] ?? [])])
+    for (const m of lower.matchAll(new RegExp(`(?<![\\p{L}\\p{N}])${escapeWord(signal.toLowerCase())}(?![\\p{L}\\p{N}])`, 'gu')))
+      taken.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  return (span) => taken.some(([a, b]) => span.at < b && a < span.at + span.text.length);
+}
 
 /** Whether a use case forms its examples around what the person says, so onboarding can ask what the project is. */
 export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
