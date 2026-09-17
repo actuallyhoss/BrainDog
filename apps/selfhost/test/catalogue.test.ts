@@ -1,55 +1,57 @@
 /**
- * What this self-host offers to install by proposal (`catalogue.ts`, `loop/research-spark.md` S12).
- *
- * EVERY ENTRY IS A PROPOSAL THAT CAN BE FILED ON A FRESH RECORD. A pack whose plan refuses on an empty record is
- * on offer and cannot be asked for, and an agent would learn that one refusal at a time.
+ * A catalogue folder served read-only under `/catalogue/`: the index and each version's file, and nothing else in the
+ * folder, whatever the path says.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { createRecordApi, type CallContext } from '@braindog/record';
+import { start } from '../src/server.ts';
 
-import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
-import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
+test('the index and a version are answered, and any other path in the folder is not', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bd-catalogue-'));
+  const folder = join(dir, 'catalogue');
+  mkdirSync(join(folder, 'usecases', 'study'), { recursive: true });
+  writeFileSync(join(folder, 'index.json'), '{"format":1,"name":"Test","entries":[]}');
+  writeFileSync(join(folder, 'usecases', 'study', '1.0.0.usecase.json'), '{"usecase":"study"}');
+  writeFileSync(join(dir, 'outside.json'), '{"not":"yours"}');
+  writeFileSync(join(folder, 'notes.txt'), 'private');
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0, catalogue: folder });
+  t.after(async () => {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
+  const get = (path: string, init?: RequestInit) => fetch(`${base}${path}`, init);
 
-const agent: CallContext = { principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' } };
+  const index = await get('/catalogue/index.json');
+  assert.equal(index.status, 200);
+  assert.deepEqual(await index.json(), { format: 1, name: 'Test', entries: [] });
+  const file = await get('/catalogue/usecases/study/1.0.0.usecase.json');
+  assert.equal(file.status, 200);
+  assert.equal(await file.text(), '{"usecase":"study"}');
 
-test('EVERY PACK AND USE CASE ON OFFER FILES AS A PROPOSAL ON A FRESH RECORD, modules first', async () => {
-  const catalogue = seedCatalogue();
-  assert.ok(catalogue.some((e) => e.kind === 'usecase'));
-  for (const entry of catalogue) {
-    const sql = openSqlite();
-    const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17)), catalogue });
-    const filed = await api.propose({ question: `Install ${entry.id}?`, body_kind: 'pack', body: { install: entry.id } } as never, agent);
-    assert.ok(filed.ok, `${entry.id}: ${JSON.stringify(filed)}`);
-    const row = await api.governance({ id: (filed as { value: { id: string } }).value.id }, agent);
-    const body = (row as unknown as { value: { body: { packs: { install: string[] } } } }).value.body;
-    assert.equal(body.packs.install.at(-1), entry.id);
-    sql.close();
+  for (const path of ['/catalogue/notes.txt', '/catalogue/usecases/study/1.0.1.usecase.json', '/catalogue/%2e%2e/outside.json', '/catalogue/usecases/..%2f..%2foutside/1.0.0.usecase.json', '/catalogue/']) {
+    const res = await get(path);
+    assert.equal(res.status, 404, path);
+    assert.doesNotMatch(await res.text(), /yours|private/u, path);
   }
+  assert.equal((await get('/catalogue/index.json', { method: 'POST', body: '{}' })).status, 405);
 });
 
-test('A MODULE A PROPOSAL INSTALLS FOR A USE CASE CARRIES THAT USE CASE\'S EXAMPLES, as onboarding gives them', async () => {
-  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
-  const catalogue = seedCatalogue();
-  const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 17)), catalogue });
-  const said = <T>(r: unknown): T => {
-    assert.ok((r as { ok: boolean }).ok, JSON.stringify(r));
-    return (r as { value: T }).value;
-  };
-  const accept = async (body_kind: string, body: Record<string, unknown>) => {
-    const filed = said<{ id: string }>(await api.propose({ question: 'Arrange?', body_kind, body } as never, agent));
-    said(await api.decide({ id: filed.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
-  };
-
-  /* A FOUNDER'S RECORD MADE BY PROPOSAL: Money and Work arrive with the founder's rows, and nothing of the studio's. */
-  await accept('arrange', { usecase: 'founder', why: ['I run two companies'] });
-  for (const list of ['things', 'accounts', 'obligations', 'tasks', 'datapoints']) assert.equal(api.kernel.count(list), 1, list);
-
-  /* AND A MODULE ADDED LATER TO A RECORD WITH A USE CASE ON is that use case's too: none, for estate. */
-  await accept('pack', { install: 'estate' });
-  assert.equal(api.kernel.count('services'), 0, 'a bare module brought the sample studio\'s services');
-  sql.close();
+test('a host with no catalogue says so under /catalogue/, and answers everything else as before', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bd-catalogue-'));
+  const running = await start({ file: join(dir, 'record.sqlite'), port: 0, pollMs: 0 });
+  t.after(async () => {
+    await running.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const base = `http://127.0.0.1:${(running.server.address() as { port: number }).port}`;
+  const res = await fetch(`${base}/catalogue/index.json`);
+  assert.equal(res.status, 404);
+  assert.match(await res.text(), /BRAINDOG_CATALOGUE/u);
+  assert.equal((await fetch(`${base}/.well-known/braindog-build`)).status, 200);
 });

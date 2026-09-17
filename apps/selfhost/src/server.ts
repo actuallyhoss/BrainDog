@@ -40,6 +40,7 @@ import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
+import { catalogueAnswer } from './catalogue.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
@@ -450,6 +451,8 @@ export async function start(options: {
   origin?: string | undefined;
   /** The built app to serve for every path that is not `/api`, `/auth` or `/mcp`. Absent: those paths are 404. */
   shell?: string | undefined;
+  /** A folder of published use cases served read-only under `/catalogue/` (`catalogue.ts`), or none. */
+  catalogue?: string | undefined;
   /** 32 bytes for the Directory's MACs, derived from the KEK or `BRAINDOG_SESSION_SECRET`. Absent: no sessions. */
   sessionKey?: Uint8Array | undefined;
   /** `BRAINDOG_TRUST_PROXY=1`: count the lockout against the address the proxy saw, not the proxy's own. */
@@ -781,6 +784,13 @@ export async function start(options: {
     if (/^\/+\.well-known\/+braindog-build\/*$/.test(new URL(req.url ?? '/', 'http://localhost').pathname)) {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ app: buildApp || null }));
+      return;
+    }
+    /* A CATALOGUE IS FILES, answered before any door, and never a record's: a deleted record does not change it. */
+    const listed = catalogueAnswer(options.catalogue, req.method ?? 'GET', new URL(req.url ?? '/', 'http://localhost').pathname);
+    if (listed) {
+      res.writeHead(listed.status, listed.headers);
+      res.end(req.method === 'HEAD' ? undefined : listed.body);
       return;
     }
     /* A DELETED RECORD ANSWERS NOTHING BUT THAT, and never reads a file that is no longer there. */

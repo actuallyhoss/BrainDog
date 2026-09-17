@@ -448,6 +448,7 @@ async function serve(): Promise<void> {
     ...(existsSync(dirFile) ? { directory: dirFile } : {}),
     ...(env.BRAINDOG_ORIGIN === undefined ? {} : { origin: env.BRAINDOG_ORIGIN }),
     ...(shell === undefined ? {} : { shell }),
+    ...(env.BRAINDOG_CATALOGUE === undefined ? {} : { catalogue: env.BRAINDOG_CATALOGUE }),
     sessionKey,
     trustProxy: env.BRAINDOG_TRUST_PROXY === '1',
     /* THE SCHEDULED ACTIONS RUN ON THIS PROCESS'S TIMER, sending only to the origins their declarations name. */
