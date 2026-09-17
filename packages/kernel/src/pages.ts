@@ -484,7 +484,10 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const values = valuesOf(deps, block);
   if (values) base.values = values;
 
-  if (block.kind === 'stat' || block.cells) {
+  /* A STAT OVER A REGISTER AND NO FIGURES reads that register's rows, as a table does, and the host draws one tile a
+     measure from them: the numbers a project reported are rows, and a figure per measure would be a declaration per
+     measure nobody can write ahead of the project sending it. */
+  if (block.cells || (block.kind === 'stat' && !block.source?.startsWith('register.'))) {
     return {
       ...base,
       readings: (block.cells ?? []).map(({ trend: window, ...cell }) => {
