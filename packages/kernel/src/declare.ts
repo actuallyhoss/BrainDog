@@ -3836,7 +3836,7 @@ export function homeCurrency(sql: Sql): string | null {
  * NOT THE DEFAULTS. A default belongs to the version being installed, so a plan reads it from that
  * version's manifest; only a value a person set outlives the version it was set on.
  */
-export function packSettings(sql: Sql): Record<string, Record<string, Json>> {
+export function packSettings(sql: Sql, removedSince?: string): Record<string, Record<string, Json>> {
   const out: Record<string, Record<string, Json>> = {};
   for (const row of sql.all<{ id: string }>('SELECT id FROM pack ORDER BY id')) {
     const m = manifestOf(sql, row.id);
@@ -3844,7 +3844,29 @@ export function packSettings(sql: Sql): Record<string, Record<string, Json>> {
     const { set } = settingsOf(m.manifest);
     if (Object.keys(set).length > 0) out[row.id] = set;
   }
+  /* AND WHAT AN UNINSTALL TOOK, INSIDE THE WINDOW, for a pack that is not back yet. A plan reads these as the settings
+     somebody chose, so installing it again fills its declarations with them rather than with the defaults. */
+  if (removedSince !== undefined)
+    for (const row of sql.all<{ pack: string; settings: string }>(
+      'SELECT pack, settings FROM pack_removed WHERE removed_at >= ? AND pack NOT IN (SELECT id FROM pack) ORDER BY pack',
+      removedSince,
+    )) {
+      const set = JSON.parse(row.settings) as Record<string, Json>;
+      if (Object.keys(set).length > 0) out[row.pack] = set;
+    }
   return out;
+}
+
+/**
+ * How long an uninstalled pack's settings and pending schedules are kept for a reinstall to put back (`pack_removed`).
+ * Past it, installing the pack again starts from its defaults, as a first install does.
+ */
+export const REMOVED_WINDOW_DAYS = 30;
+
+/** The settings a pack row holds, for the stash an uninstall keeps. */
+export function chosenSettings(sql: Sql, id: string): Record<string, Json> {
+  const m = manifestOf(sql, id);
+  return m ? settingsOf(m.manifest).set : {};
 }
 
 /**

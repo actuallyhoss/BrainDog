@@ -89,13 +89,10 @@ test('SIGN-IN NAMES ANOTHER WAY IN ONLY WHEN ONE IS DRAWN', () => {
   for (const s of [copy.passkeyUnusable(true), copy.passkeyUnusable(false), copy.rejectedNext(true)]) assert.doesNotMatch(s, /—/u);
 });
 
-test('UNINSTALL ASKS IN WHAT LEAVES, named and counted, and says what is kept', () => {
-  /* The September 16th QA pass retired an add-on and its lists in one press. The question is the guard,
-     so it has to name this add-on and what goes with it rather than ask "Are you sure?". */
-  assert.equal(copy.uninstallLeaves('Money', 1, 1), 'Money, its list and its page leave the sidebar. Their rows are kept; its settings and schedules are not.');
-  assert.match(copy.uninstallLeaves('Estate', 3, 2), /^Estate, its 3 lists and its 2 pages leave the sidebar\. Their rows are kept;/u);
-  assert.equal(copy.uninstallLeaves('Rates', 0, 0), 'Rates leaves the sidebar. Its settings and schedules go with it.');
-  assert.equal(copy.uninstallNamed('Money'), 'Uninstall Money');
-  for (const s of [copy.uninstallLeaves('Money', 2, 0), copy.uninstallLeaves('Money', 0, 1), copy.uninstalled('Money'), copy.uninstallKeep])
-    assert.doesNotMatch(s, /—|Are you sure/u);
+test('UNINSTALL IS UNDONE RATHER THAN ASKED, and says what installing it again brings back', () => {
+  /* The kernel keeps an uninstalled add-on's settings and schedules for thirty days (`pack_removed`), so the toast's Undo
+     is a real way back and the question it replaced is gone. */
+  assert.equal(copy.uninstalled('Money'), 'Money is uninstalled. Its rows stay, and installing it again within 30 days brings back its settings and schedules.');
+  assert.equal(copy.reinstalled('Money'), 'Money is back, with its settings and schedules.');
+  for (const s of [copy.uninstalled('Money'), copy.reinstalled('Money'), copy.reinstallApprove('Money')]) assert.doesNotMatch(s, /—|Are you sure/u);
 });

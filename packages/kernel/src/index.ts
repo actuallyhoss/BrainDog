@@ -34,6 +34,8 @@ import {
   liveTarget,
   homeCurrency,
   packSettings as declaredPackSettings,
+  chosenSettings,
+  REMOVED_WINDOW_DAYS,
   readPackConfig,
   retireDeclarations,
   writePackConfig,
@@ -788,6 +790,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   const lastActor = (id: string): string | null =>
     sql.one<{ actor: string }>('SELECT actor FROM event WHERE target = ? ORDER BY rowid DESC LIMIT 1', `entry:${id}`)
       ?.actor ?? null;
+
+  /** The oldest removal a reinstall still puts back (`REMOVED_WINDOW_DAYS`). */
+  const removedSince = (): string => instant(clock.now() - REMOVED_WINDOW_DAYS * 86_400_000);
 
   const count = (register: string): number =>
     Number(
@@ -4370,7 +4375,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
 
     /** Every pack's setting values, by pack id, as a plan fills `{{config:}}` from them. */
-    packSettings: () => declaredPackSettings(sql),
+    packSettings: () => declaredPackSettings(sql, removedSince()),
 
     registers: () => registers,
     register: (id: string) => registers.get(id),
@@ -4633,11 +4638,54 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           row.version,
           approved ? row.approved!.join('\n') : null,
         );
+        /* WHAT AN UNINSTALL TOOK, PUT BACK. The settings came in through the plan (`packSettings`); the schedules come back
+           here, each as it was when the pack went, over the row the install just armed, and only for a declaration the
+           pack has live again. The stash is spent either way, so a later uninstall keeps its own. */
+        const stash = sql.one<{ schedules: string }>('SELECT schedules FROM pack_removed WHERE pack = ? AND removed_at >= ?', row.id, removedSince());
+        if (stash) {
+          const live = new Set(
+            sql
+              .all<{ id: string }>('SELECT id FROM declaration WHERE pack_id = ? AND superseded_at IS NULL AND retired = 0', row.id)
+              .map((d) => d.id.slice(d.id.indexOf('.') + 1)),
+          );
+          for (const k of JSON.parse(stash.schedules) as { kind: string; key: string; due_at: string; payload: string; state: string; attempts: number }[]) {
+            if (!live.has(k.key)) continue;
+            sql.exec(
+              `INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT (kind, key) DO UPDATE SET due_at = excluded.due_at, payload = excluded.payload, state = excluded.state, attempts = excluded.attempts`,
+              mint(),
+              k.due_at,
+              k.kind,
+              k.key,
+              k.payload,
+              k.state,
+              k.attempts,
+            );
+          }
+        }
+        sql.exec('DELETE FROM pack_removed WHERE pack = ?', row.id);
       }),
 
     /** And the row goes when the pack does. The declarations are retired; the rows are not. */
     forgetPack: (id: string) =>
       transaction(() => {
+        /* KEPT FOR A REINSTALL: the settings chosen for it and its pending schedules, as they are now (`pack_removed`). */
+        const version = sql.one<{ version: string }>('SELECT version FROM pack WHERE id = ?', id)?.version;
+        const pending = sql.all<{ kind: string; key: string; due_at: string; payload: string; state: string; attempts: number }>(
+          `SELECT kind, key, due_at, payload, state, attempts FROM schedule WHERE state IN ('pending', 'paused') AND kind IN ('digest', 'pull', 'call', 'poll', 'snapshot')
+           AND key IN (SELECT substr(id, instr(id, '.') + 1) FROM declaration WHERE pack_id = ?) ORDER BY kind, key`,
+          id,
+        );
+        if (version !== undefined)
+          sql.exec(
+            `INSERT INTO pack_removed (pack, version, removed_at, settings, schedules) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (pack) DO UPDATE SET version = excluded.version, removed_at = excluded.removed_at, settings = excluded.settings, schedules = excluded.schedules`,
+            id,
+            version,
+            instant(clock.now()),
+            JSON.stringify(chosenSettings(sql, id)),
+            JSON.stringify(pending),
+          );
         sql.exec('DELETE FROM pack WHERE id = ?', id);
         sql.exec(
           "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, 'system', 'uninstall', ?, 'pack', NULL)",

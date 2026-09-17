@@ -1440,6 +1440,9 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      wrong answer this module can give. */
   const { provides: _provides, ...manifest } = pack.manifest;
   const kept = diff.config.filter((c) => c.from === 'kept').map((c) => [c.key, c.value] as const);
+  /* A LIST THAT ALREADY HOLDS ROWS HAS HAD ITS EXAMPLES. An uninstall keeps the rows, so installing the pack again used
+     to plant the examples a second time beside the first ones; counted before anything is written. */
+  const planted = seedsFor(pack, diff.adds).filter((seed) => host.count(seed.register) === 0);
   try {
     return host.transaction((): Result<Applied> => {
       const put = staged.value();
@@ -1455,7 +1458,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
       /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed the register would refuse is refused here
          rather than becoming a row nothing else in the product could have made. */
-      for (const seed of seedsFor(pack, diff.adds)) {
+      for (const seed of planted) {
         const made = host.seed(seed.register, seed.fields, seed.note);
         if (!made.ok) throw new Rolled(made);
       }
@@ -1475,7 +1478,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         pack: pack.manifest.pack,
         version: pack.manifest.version,
         declarations: pack.declarations.length,
-        seeds: seedsFor(pack, diff.adds).length,
+        seeds: planted.length,
         retired: diff.retires.length,
       });
     });

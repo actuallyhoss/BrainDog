@@ -947,22 +947,10 @@ export const copy = {
      second press, never as a side effect of the first. */
   packTurnedOff: 'Turned off',
   packSwitch: (name: string) => `${name}, on or off`,
-  /* UNINSTALL IS ASKED, NOT UNDONE, and it is the one place on this screen that is. The kernel
-     retires the declarations, forgets the pack row with its chosen settings and deletes its pending
-     schedules, and a second install plants the examples again, so there is no state before to give
-     back. The question names what leaves, in counts a person can check against the row above it. */
-  uninstallLeaves: (pack: string, lists: number, pages: number): string => {
-    const parts = [
-      ...(lists > 0 ? [lists === 1 ? 'its list' : `its ${lists} lists`] : []),
-      ...(pages > 0 ? [pages === 1 ? 'its page' : `its ${pages} pages`] : []),
-    ];
-    const leave = `${list([pack, ...parts])} ${parts.length > 0 ? 'leave' : 'leaves'} the sidebar.`;
-    return lists > 0
-      ? `${leave} Their rows are kept; its settings and schedules are not.`
-      : `${leave} Its settings and schedules go with it.`;
-  },
-  uninstallNamed: (pack: string) => `Uninstall ${pack}`,
-  uninstallKeep: 'Keep it',
+  /* UNINSTALL IS UNDONE, NOT ASKED. The kernel keeps what the pack row and its schedules held for thirty days, and an
+     install inside that window puts them back and plants no second set of examples, so Undo is installing it again. */
+  reinstalled: (pack: string) => `${pack} is back, with its settings and schedules.`,
+  reinstallApprove: (pack: string) => `${pack} calls other services. Approve what it calls out below to install it again.`,
   /* TURNING OFF IS UNDONE, because turning back on is the same kernel call over the same rows. */
   packTurnedOffNamed: (names: string[]) =>
     `${list(names)} ${names.length === 1 ? 'is' : 'are'} turned off and out of the sidebar. The rows are kept.`,
@@ -1891,7 +1879,7 @@ export const copy = {
   exceptionCancel: 'Cancel',
   peopleUnrouted: 'This record does not list its people yet.',
   exported: (file: string) => `${file} is in your downloads.`,
-  uninstalled: (pack: string) => `${pack} is uninstalled. The rows it created are still here.`,
+  uninstalled: (pack: string) => `${pack} is uninstalled. Its rows stay, and installing it again within 30 days brings back its settings and schedules.`,
   /* Lane E: archive and restore, installing an add-on, and saved views */
   writeArchived: (what: string) => `Archived ${what}.`,
   writeArchivedSome: (landed: number, total: number) => `${landed} of ${total} rows archived.`,

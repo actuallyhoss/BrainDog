@@ -85,6 +85,39 @@
   }
 
   /** Install, second press: the plan that is on screen. A plan the record has moved past is planned and drawn again. */
+  /**
+   * Undo for Uninstall: plan the add-on again and install that plan, which puts back its settings and schedules and
+   * plants no second set of examples. A pack that calls other services is shown with its plan instead, because what it
+   * calls out is approved by a press, never by an undo.
+   */
+  async function reinstall(pack: PackInfo) {
+    if (!client || !source || busy !== null) return;
+    busy = pack.id;
+    try {
+      const again = await source.packs();
+      if (again.ok) states = again.value;
+      const doc = await packDocument(pack.id, installed);
+      if (!doc) return void toasts.push(copy.packNotInstallable(pack.name), { intent: 'warn' });
+      const planned = await planInstall(client, pack.id, doc, planName(pack));
+      if (!planned.ok) return void toasts.push(planned.refusal.fix, { intent: 'warn' });
+      if (planned.value.approve.length > 0) {
+        offer = planned.value;
+        return void toasts.push(copy.reinstallApprove(pack.name), { intent: 'warn' });
+      }
+      const out = await installPlanned(client, planned.value, planName(pack));
+      if (!out.ok) {
+        toasts.push(out.fix, { intent: 'warn' });
+        if (out.again) offer = out.again;
+        return;
+      }
+      toasts.push(copy.reinstalled(pack.name), { intent: 'good' });
+      const now = await source.packs();
+      if (now.ok) states = now.value;
+    } finally {
+      busy = null;
+    }
+  }
+
   async function installOffer(pack: PackInfo) {
     if (!client || !source || !offer || busy !== null) return;
     busy = pack.id;
@@ -178,26 +211,23 @@
     }
   }
 
-  /** The row whose Uninstall was pressed once, asking before the second press does it. */
-  let asking = $state<string | null>(null);
-  /** Focus moves to the safe answer, so a second Enter keeps the add-on rather than removing it. */
-  const focusOn = (node: HTMLElement) => node.focus();
 
   /**
    * Uninstall one. The sample keeps the sentence it always toasted; a record takes it out, and the list is read
    * again, so what is drawn is what the record now holds. A refusal is the record's sentence, and a race reads again.
    */
-  async function uninstall(id: string, name: string) {
+  async function uninstall(pack: PackInfo) {
+    const { id, name } = pack;
     if (!source || busy !== null) return;
     busy = id;
-    asking = null;
     try {
       const out = await source.uninstall(id);
       if (source.sample) {
         toasts.push(out.ok ? (out.value.said ?? copy.notWritten(copy.uninstallWould(name))) : out.refusal.fix, { intent: 'warn' });
         return;
       }
-      if (out.ok) toasts.push(copy.uninstalled(name), { intent: 'good' });
+      /* NOT ASKED FIRST: the record keeps its settings and schedules for thirty days, so Undo installs it again. */
+      if (out.ok) toasts.push(copy.uninstalled(name), { intent: 'good', undo: () => void reinstall(pack) });
       else toasts.push(out.refusal.code === 'VERSION_STALE' ? copy.writeRaced : out.refusal.fix, { intent: 'warn' });
       if (out.ok || out.refusal.code === 'VERSION_STALE') {
         const again = await source.packs();
@@ -310,15 +340,7 @@
             {#each pack?.pages ?? [] as p}<li><Icon name="doc" size="s" />{pages()[p]?.title ?? PAGES[p]?.title ?? p}</li>{/each}
           </ul>
           <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
-          {#if pack && asking === state.id}
-            <!-- ASKED, BECAUSE IT CANNOT BE UNDONE (copy.uninstallLeaves says why), and named, so the answer is
-                 about this add-on and its counts rather than "Are you sure?". -->
-            <p class="pack-said" role="status">
-              <span>{copy.uninstallLeaves(pack.name, state.registers.length, pack.pages?.length ?? 0)}</span>
-              <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => uninstall(pack.id, pack.name)}>{copy.uninstallNamed(pack.name)}</Button>
-              <Button weight="bare" {@attach focusOn} onclick={() => (asking = null)}>{copy.uninstallKeep}</Button>
-            </p>
-          {:else if block}
+          {#if block}
             <p class="pack-said" role="status">
               {#if block.kind === 'required'}
                 <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
@@ -347,7 +369,7 @@
               weight="bare"
               tone="bad"
               disabled={busy !== null}
-              onclick={() => (asking = pack.id)}
+              onclick={() => uninstall(pack)}
             >{copy.uninstall}</Button>
           {/if}
           </footer>
