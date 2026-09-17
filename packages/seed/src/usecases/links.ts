@@ -16,8 +16,11 @@ import { useCase } from './index.ts';
 import { PERSONAL_CARRIED, PERSONAL_LOG_LINKS, PERSONAL_STEP_PROJECTS } from './personal.ts';
 import { BACKLOG_KEPT_IN, TEAM_PLAN_LINKS, TICKETS_MOVED_IN, backlogAgain, moveTickets } from './team.ts';
 
-/** One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. */
-export type ExampleLink = { register: string; title: string; field: string; to: string; target: string };
+/**
+ * One link: the example row titled `title` in `register` points its `field` at the example titled `target` in `to`. `list`
+ * when the field is a list of refs, which is written as a list holding that one row.
+ */
+export type ExampleLink = { register: string; title: string; field: string; to: string; target: string; list?: true };
 
 /**
  * WHAT A FILE SAYS OF ITS OWN LINKS (`UseCase.links`), and the declarations it installs, so a use case shared under an id
@@ -32,8 +35,8 @@ export type LinkRow = { seq: number | null; fields: Record<string, unknown> };
 export type LinkIo = {
   /** Every row of a list, or `null` when it cannot be read. A few dozen at most on a new record. */
   rows: (register: string) => Promise<readonly LinkRow[] | null>;
-  /** Point one row's field at a row, spoken as `courses#3`. `false` when the write was refused. */
-  link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean>;
+  /** Point one row's field at a row, spoken as `courses#3`, or a list field at `[accounts#2]`. `false` when the write was refused. */
+  link: (register: string, seq: number, field: string, spoken: string | readonly string[]) => Promise<boolean>;
 };
 
 const COURSE = 'Introduction to statistics';
@@ -59,6 +62,14 @@ const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   ],
   /* A TEAM'S PLANNED TICKETS POINT AT THE TICKET, one of Work's tasks, and at the example cycle. */
   team: TEAM_PLAN_LINKS,
+  /* A FOUNDER'S ORGANISATION HOLDS THE EXAMPLE ACCOUNT AND RUNS THE EXAMPLE PROJECT, and the example number is that
+     project's, so the Dashboard's balance by organisation and an organisation's own page agree with the rows beside them. */
+  founder: [
+    { register: 'organisations', title: 'Northwind Labs Ltd', field: 'accounts', to: 'accounts', target: 'Northwind current account', list: true },
+    { register: 'organisations', title: 'Northwind Labs Ltd', field: 'projects', to: 'things', target: 'Northwind app', list: true },
+    { register: 'datapoints', title: 'Monthly recurring revenue', field: 'thing', to: 'things', target: 'Northwind app' },
+    { register: 'datapoints', title: 'Monthly recurring revenue', field: 'organisation', to: 'organisations', target: 'Northwind Labs Ltd' },
+  ],
 };
 
 /** The links a use case makes between its examples, by its id (`student`, or `usecase-student`). None for most. */
@@ -79,7 +90,7 @@ export function titleFieldOf(usecase: string, register: string, carried: readonl
 }
 
 const isExample = (row: LinkRow): boolean => Array.isArray(row.fields.tags) && (row.fields.tags as unknown[]).includes('example');
-const empty = (v: unknown): boolean => v === undefined || v === null || v === '';
+const empty = (v: unknown): boolean => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
 
 /**
  * Link a use case's example rows to each other: by the links its file declares, or else the built-in ones for its id.
@@ -104,7 +115,8 @@ export async function linkExamples(io: LinkIo, usecase: string, declared?: Decla
     if (!row || row.seq === null || !empty(row.fields[l.field])) continue;
     const target = await find(l.to, l.target);
     if (!target || target.seq === null) continue;
-    if (await io.link(l.register, row.seq, l.field, `${l.to}#${target.seq}`).catch(() => false)) made += 1;
+    const spoken = `${l.to}#${target.seq}`;
+    if (await io.link(l.register, row.seq, l.field, l.list ? [spoken] : spoken).catch(() => false)) made += 1;
   }
   return made;
 }

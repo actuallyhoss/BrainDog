@@ -84,7 +84,7 @@ export type Grows = { when: readonly FigureTest[]; install: readonly string[]; q
 /** The rows of a list, and one link set on one row, as the owner who accepted. */
 export type RowIo = {
   rows: (register: string) => Promise<readonly { seq: number | null; fields: Record<string, unknown> }[] | null>;
-  link: (register: string, seq: number, field: string, spoken: string) => Promise<boolean>;
+  link: (register: string, seq: number, field: string, spoken: string | readonly string[]) => Promise<boolean>;
 };
 
 /** A `RowIo` that also writes a row and empties one field, as the owner who pressed. */

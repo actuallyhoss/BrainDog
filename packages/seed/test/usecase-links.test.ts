@@ -34,7 +34,8 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
       counted += 1;
       const decl = pack.declarations?.find((d) => d.register === l.register);
       const field = (decl?.fields as Body[] | undefined)?.find((f) => f.id === l.field);
-      assert.equal(field?.type, 'ref', `${u.usecase}: ${l.register}.${l.field}`);
+      if (l.list) assert.equal(`${String(field?.type)} of ${String(field?.of)}`, 'list of ref', `${u.usecase}: ${l.register}.${l.field}`);
+      else assert.equal(field?.type, 'ref', `${u.usecase}: ${l.register}.${l.field}`);
       assert.equal(field?.to, l.to, `${u.usecase}: ${l.register}.${l.field} points at ${String(field?.to)}`);
       const seeded = (register: string, title: string) =>
         /* A MODULE'S EXAMPLES COUNT TOO, so a person's step can point at a project Projects was given for this use case. */
@@ -134,7 +135,7 @@ test('A FILE UNDER ITS OWN ID LINKS ITS EXAMPLES BY THE LINKS IT DECLARES, readi
     accounts: [{ seq: 7, fields: { name: 'Club kitty', tags: ['example'] } }],
     dues: [{ seq: 2, fields: { what: 'Autumn dues', tags: ['example'] } }],
   };
-  const made: [string, number, string, string][] = [];
+  const made: [string, number, string, string | readonly string[]][] = [];
   const io: LinkIo = { rows: async (r) => rows[r] ?? null, link: async (r, seq, field, spoken) => (made.push([r, seq, field, spoken]), true) };
   const declarations = [
     { register: 'books', title: 'name' },

@@ -816,7 +816,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         } catch {
           arrived = false;
         }
-      const onlyLinked = events.slice(1).every((e) => (e.kind === 'edit' || e.kind === 'link') && examples.has(idOf(e.to_v) ?? ''));
+      /* A LIST OF REFS IS LINKED TOO, when every row it names is an example: a founder's organisation holding its account. */
+      const linkedTo = (raw: string | null): boolean => {
+        let v: unknown = null;
+        try {
+          v = raw === null ? null : JSON.parse(raw);
+        } catch {
+          v = null;
+        }
+        if (Array.isArray(v)) return v.length > 0 && v.every((one) => typeof one === 'string' && examples.has(idOf(JSON.stringify(one)) ?? ''));
+        return examples.has(idOf(raw) ?? '');
+      };
+      const onlyLinked = events.slice(1).every((e) => (e.kind === 'edit' || e.kind === 'link') && linkedTo(e.to_v));
       const named = sql
         .all<{ id: string }>('SELECT id FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', id, id)
         .some((r) => !examples.has(r.id));

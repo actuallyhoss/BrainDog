@@ -140,3 +140,28 @@ test("A GUIDE'S PLAN FORMED FROM WHAT THE PERSON SAID IS NEVER OFFERED FOR CLEAR
   assert.ok(demo.untouched > 0, "a guide set up without a sentence has the use case's own examples to clear");
   assert.equal(value<{ cleared: number }>(plain.clearExamples({ actor: 'p_1' })).cleared, demo.untouched);
 });
+
+test("A FOUNDER'S EXAMPLES ARE LINKED INTO ONE PICTURE, and still clear together", async () => {
+  const { linkExamples } = await import('../src/usecases/links.ts');
+  const k = await founder();
+  const before = k.examples();
+  /* The ordinary write path, as `packages/record` `rowIo` hands it to an install. */
+  const io = {
+    rows: async (register: string) => {
+      const read = k.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async (register: string, seq: number, field: string, spoken: string | readonly string[]) =>
+      k.update(register, `${register}#${seq}`, { [field]: spoken as never }, { actor: 'p_1', cascade: false }).ok,
+  };
+  const made = await linkExamples(io, 'founder');
+  assert.equal(made, 4, 'the organisation names its account and project, and the number its project and organisation');
+  const org = exampleIn(k, 'organisations')!;
+  const point = exampleIn(k, 'datapoints')!;
+  assert.equal((org.fields.accounts as unknown[]).length, 1);
+  assert.equal((org.fields.projects as unknown[]).length, 1);
+  assert.ok(point.fields.thing && point.fields.organisation);
+  assert.deepEqual(k.examples(), before, 'linking one example to another leaves every one untouched');
+  assert.equal(value<{ cleared: number; kept: number }>(k.clearExamples({ actor: 'p_1' })).cleared, before.untouched);
+  assert.deepEqual(k.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 });
+});

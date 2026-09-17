@@ -354,7 +354,7 @@ export async function afterInstall(
       const read = await client.list({ register, limit: 200 });
       return read.ok && isMap(read.value) && Array.isArray(read.value.rows) ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
     },
-    link: async (register: string, seq: number, field: string, spoken: string) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+    link: async (register: string, seq: number, field: string, spoken: string | readonly string[]) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
   };
   /* WHAT AN OLDER VERSION KEPT TYPED IS MOVED BY THE RECORD as it installs the update (`@braindog/record` `carryUpdate`),
      so an agent's proposal and any other caller carry it too; this only links the examples. */
