@@ -82,12 +82,12 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { fromModel, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
+import { catalogueDrafts, fromModel, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
-export { fromModel, noticeUsage, readUsage, SPARK_OPEN_CAP, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
+export { fromModel, noticeUsage, readUsage, SPARK_OPEN_CAP, type CatalogueOffer, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
@@ -690,6 +690,11 @@ export type RecordDeps = {
    * validation, and only an owner's press applies it.
    */
   sparkModel?: SparkModel | undefined;
+  /**
+   * Newer versions of what this record holds, found in the host's catalogue, verified and read there (`spark.ts`
+   * `catalogueDrafts`). Spark asks about each on Decide through the same `prepare`; absent, it asks about none.
+   */
+  catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -705,7 +710,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel'>) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'sparkModel' | 'catalogueOffers'>) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * After every write: re-arm the alarm, then ring the doorbell.
@@ -1120,6 +1125,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         } else dropped.push("The model proposed nothing Spark could use, so Spark's own rules drafted these.");
       } catch {
         dropped.push("The model did not answer, so Spark's own rules drafted these.");
+      }
+    }
+    if (deps.catalogueOffers) {
+      try {
+        const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
+        drafts = [...drafts, ...catalogueDrafts(await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true }))))];
+      } catch {
+        dropped.push('The catalogue could not be read, so no update from it was asked about.');
       }
     }
     const filed: { id: string; question: string; by: string }[] = [];

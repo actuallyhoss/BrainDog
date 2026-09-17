@@ -647,6 +647,9 @@ export function fromModel(raw: unknown, name: string, most = SPARK_OPEN_CAP): { 
 
 /** What a body is about, for recognising it once asked: the pack it names, the use case, or the pages it adds. */
 export function stableKey(body: Record<string, unknown>): string {
+  /* AN INSTALL CARRYING ITS OWN DOCUMENT is that version, so a newer version from a catalogue is a new question. */
+  const carried = body.doc !== null && typeof body.doc === 'object' ? (body.doc as { version?: unknown }).version : undefined;
+  if (typeof body.install === 'string' && typeof carried === 'string') return `install:${body.install}@${carried}`;
   for (const k of ['install', 'enable', 'disable', 'usecase'] as const) if (typeof body[k] === 'string') return `${k}:${body[k]}`;
   /* A SETTINGS CHANGE IS WHAT IT SETS, so turning a line one way and back again are two questions, and each is asked once. */
   if (typeof body.pack === 'string')
@@ -660,4 +663,43 @@ export function stableKey(body: Record<string, unknown>): string {
   if (body.voice && typeof body.voice === 'object') return `voice:${Object.keys(body.voice).sort().join(',')}`;
   if (Array.isArray(body.pages)) return `pages:${body.pages.map((p) => String((p as { id?: unknown })?.id)).sort().join(',')}`;
   return JSON.stringify(body).slice(0, 120);
+}
+
+/* ── a newer version in a catalogue ─────────────────────────────────────── */
+
+/** A later version of something installed, as the host found it in its catalogue, checked and read (`@braindog/declare/catalogue`). */
+export type CatalogueOffer = {
+  /** The pack id the record holds it under. */
+  id: string;
+  title: string;
+  from: string;
+  to: string;
+  /** What `propose` takes: `{ file }` for a use case, `{ install, doc }` for an add-on. */
+  body: Record<string, unknown>;
+  /** The key id that signed it, or `null` when nothing did. */
+  signedBy: string | null;
+  /** Hosts it would newly call out to, and what it takes away, when the catalogue still holds the version installed. */
+  hostsAdded: readonly string[];
+  removed: readonly string[];
+};
+
+/**
+ * Spark's question for each newer version: filed like any other draft, through `prepare`, so the plan on Decide is the
+ * record's own and nothing is installed until the owner accepts it.
+ */
+export function catalogueDrafts(offers: readonly CatalogueOffer[]): SparkDraft[] {
+  return offers.map((o) => {
+    const notes = [
+      o.signedBy === null ? 'It is unsigned.' : `It is signed by key ${o.signedBy}.`,
+      o.hostsAdded.length > 0 ? `It would newly call out to ${joinNames(o.hostsAdded)}.` : '',
+      o.removed.length > 0 ? `It takes away ${joinNames(o.removed)}.` : '',
+    ].filter((n) => n !== '');
+    return {
+      key: `catalogue:${o.id}@${o.to}`,
+      question: `Update ${o.title} from ${o.from} to ${o.to}? This BrainDog's catalogue has it. ${notes.join(' ')}`.slice(0, 280),
+      body_kind: 'pack',
+      body: o.body,
+      by: 'rules',
+    };
+  });
 }

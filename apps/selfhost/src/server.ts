@@ -40,7 +40,7 @@ import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
-import { catalogueAnswer } from './catalogue.ts';
+import { catalogueAnswer, catalogueOffersFrom } from './catalogue.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
@@ -714,6 +714,8 @@ export async function start(options: {
     readAddress: sharedReader(options.shared),
     /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     sparkModel,
+    /* NEWER VERSIONS IN THIS HOST'S CATALOGUE, for Spark to ask about on Decide. */
+    ...(options.catalogue === undefined ? {} : { catalogueOffers: catalogueOffersFrom(options.catalogue) }),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.
