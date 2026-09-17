@@ -37,7 +37,7 @@
     {@const drawn = draw(
       block,
       held
-        ? { rows: block.total, name: held.name, ...(held.holds ? { holds: held.holds } : {}), add: { href: `/r/${block.register}?new=1`, label: copy.addOne } }
+        ? { rows: block.total, name: held.name, ...(held.holds ? { holds: held.holds } : {}), ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: copy.addOne } }) }
         : undefined,
     )}
     {@const to = openHref(block)}

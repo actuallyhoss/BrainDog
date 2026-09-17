@@ -657,7 +657,9 @@
 
                      The block's own filter is deliberately NOT carried: the list is empty, and
                      narrowing an empty list is the last thing anybody needs. */
-                  add: { href: `/r/${block.register}?new=1`, label: copy.addOne },
+                  /* NOT ON AN AGENT'S RUNS, which an agent starts and a person does not type in: Agent work offered "Add the
+                     first row" under "No agent has started a run here yet". */
+                  ...(block.register === 'session' ? {} : { add: { href: `/r/${block.register}?new=1`, label: copy.addOne } }),
                 }
               : undefined,
           )}
