@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { inQuietHours, localParts, nextOccurrence, openRecord, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
+import { inQuietHours, jcs, localParts, nextOccurrence, openRecord, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -213,6 +213,27 @@ test('A COLUMN WITH NO LABEL OVER THE LIST’S TITLE IS HEADED BY WHAT ONE ROW I
   const text = (JSON.parse(outbox(sql)[0]!.payload) as { text: string }).text;
   assert.ok(text.includes('seq | Obligation | amount | due'), text);
   assert.ok(!text.includes('| what |'), 'the title column is headed by its field id');
+  sql.close();
+});
+
+test('AND BY THE WORD THE RECORD SPEAKS, when a use case calls one row of the list something else', async () => {
+  const { k, sql, clock } = await record();
+  const words = (id: string, one: string, speaks?: boolean) =>
+    k.rememberPack({
+      id,
+      version: '1.0.0',
+      source: 'local',
+      ref: null,
+      manifest: jcs({ pack: id, version: '1.0.0', config: { one_obligations: { type: 'text', default: one }, ...(speaks === undefined ? {} : { speaks: { type: 'bool', default: speaks } }) } }),
+      checksum: 'not-a-real-checksum',
+    });
+  words('usecase-aaa', 'Receipt', false);
+  words('usecase-bbb', 'Bill');
+  arm(sql, NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+  const text = (JSON.parse(outbox(sql)[0]!.payload) as { text: string }).text;
+  assert.ok(text.includes('seq | Bill | amount | due'), text);
   sql.close();
 });
 

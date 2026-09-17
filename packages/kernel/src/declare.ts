@@ -3845,6 +3845,24 @@ export function homeCurrency(sql: Sql): string | null {
 }
 
 /**
+ * The settings of the use case a record speaks in, or an empty map when it speaks the house voice.
+ *
+ * THE SAME RULE `@braindog/declare` `speakingPack` AND THE WEB'S `voice.ts` `speaking` KEEP: of the use-case packs switched on,
+ * by id, the first set to speak, else the first not set against it, else the first. Read here so what the record sends on its
+ * own, a digest, says a list in the words its pages do: Ticket on a team's record, not Task.
+ */
+export function speakingSettings(sql: Sql): Record<string, Json> {
+  const on = sql
+    .all<{ id: string }>("SELECT id FROM pack WHERE disabled_at IS NULL AND id LIKE 'usecase-%' ORDER BY id")
+    .flatMap((row) => {
+      const m = manifestOf(sql, row.id);
+      return m ? [{ id: row.id, values: settingsOf(m.manifest).values }] : [];
+    });
+  const speaks = (p: { values: Record<string, Json> }) => p.values.speaks;
+  return (on.find((p) => speaks(p) === true) ?? on.find((p) => speaks(p) !== false) ?? on[0])?.values ?? {};
+}
+
+/**
  * The settings somebody chose, by pack id. What a plan carries into the next install of a pack.
  *
  * NOT THE DEFAULTS. A default belongs to the version being installed, so a plan reads it from that

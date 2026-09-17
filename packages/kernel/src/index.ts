@@ -33,6 +33,7 @@ import {
   lintBatch,
   liveTarget,
   homeCurrency,
+  speakingSettings,
   packSettings as declaredPackSettings,
   chosenSettings,
   REMOVED_WINDOW_DAYS,
@@ -2637,7 +2638,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       schemaOf: deps.schemaOf,
       listOf: (register) => {
         const decl = registers.get(register) as (RegisterDecl & { one?: unknown }) | undefined;
-        return decl ? { title: decl.title, ...(typeof decl.one === 'string' ? { one: decl.one } : {}) } : null;
+        if (!decl) return null;
+        /* WHAT ONE ROW IS CALLED AS THE RECORD SPEAKS IT: the use case's `one_<list>`, else the list's own word. */
+        const said = speakingSettings(sql)[`one_${register}`];
+        const one = typeof said === 'string' && said.trim() !== '' ? said : decl.one;
+        return { title: decl.title, ...(typeof one === 'string' ? { one } : {}) };
       },
       ctx: deps.ctx,
       /* THE OWNERS, BY ADDRESS. A digest with nowhere to go is not sent rather than sent to the
