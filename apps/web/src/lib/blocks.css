@@ -394,13 +394,23 @@
   .cell-figure[data-fit] {
     /* The renderer says the length on the figure itself; this is only what a figure marked without one would use. */
     --chars: 16;
-    font-size: min(var(--t-xl), calc(100cqi / (var(--chars) * 0.62)));
+    /* NEVER BELOW A READABLE SIZE. Six figures in one row at 1024 stepped down to 11px; the floor is the body's reading size,
+       and a figure that still does not fit wraps between its amounts (` · `) instead of shrinking further. The row itself
+       goes three by two before that point (below). */
+    font-size: max(var(--t-md), min(var(--t-xl), calc(100cqi / (var(--chars) * 0.62))));
   }
 
-  /* FOUR FIGURES OR MORE GO TWO BY TWO IN A NARROW BLOCK. The block is its own container, so a stat
-     in a narrow column of a wide page answers its own width, not the viewport's. */
+  /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, so a stat in a narrow column of a wide
+     page answers its own width, not the viewport's. Five figures or more go three across below 60rem (a Dashboard at 1024
+     beside the rail), and four or more go two by two below 30rem (a phone). */
   .block[data-kind='stat'] {
     container-type: inline-size;
+  }
+
+  @container (inline-size < 60rem) {
+    .grid:has(> .cell:nth-child(5)) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   @container (inline-size < 30rem) {
