@@ -22,6 +22,7 @@ import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId 
 import { dated, dayOf } from './dates.ts';
 import { FOUNDER_EXAMPLES } from './founder.ts';
 import { formGuide, GUIDE_KINDS, type FormedPlan } from './guide-kinds.ts';
+import type { ExampleLink } from './links.ts';
 import { PERSONAL_EXAMPLES, PERSONAL_NAMES, PERSONAL_TARGETS } from './personal.ts';
 import { TEAM_EXAMPLES } from './team.ts';
 import { useCaseDocument, type UseCase } from './index.ts';
@@ -144,6 +145,30 @@ export function carriedDocument(u: UseCase, today: string, said?: string | null)
   if (!doc) return null;
   return dated({ ...doc, seeds: formedSeeds(formed.seeds) }, today);
 }
+
+/**
+ * THE SAME PLAN, WRITTEN AFTER THE PACK IS IN. Where a model is configured, onboarding installs the use case's lists with no
+ * rows and asks the model for a plan (`sparkForm`). When it forms nothing, these are the rows the pack's seeds would have
+ * been, tagged as the install tags them, with the links to make once they are in, so the templates stand exactly as before.
+ */
+export function plantedRows(u: UseCase, today: string, said?: string | null): { rows: { register: string; fields: Body }[]; links: ExampleLink[] | undefined } {
+  const doc = carriedDocument(u, today, said);
+  const rows = ((doc?.seeds ?? []) as Body[]).map((s) => {
+    const fields = (s.fields ?? {}) as Body;
+    const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : [];
+    return { register: String(s.register), fields: { ...fields, tags: tags.includes(EXAMPLE_TAG) ? tags : [...tags, EXAMPLE_TAG] } };
+  });
+  return { rows, links: formedFor(u, said)?.links };
+}
+
+/** A use case's pack with no rows of its own, for a record that asks a model for its plan first. */
+export function withoutRows(doc: Body): Body {
+  const { seeds: _seeds, ...rest } = doc;
+  return rest;
+}
+
+/** The tag the install path puts on every row a pack seeds. */
+const EXAMPLE_TAG = 'example';
 
 /** The tag a row formed around what the person said carries beside `example`, so Clear the examples never offers their plan. */
 export const FORMED_TAG = 'formed';

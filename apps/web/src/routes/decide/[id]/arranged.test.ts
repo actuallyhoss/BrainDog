@@ -292,3 +292,28 @@ test('WHAT AN UPDATE TAKES AWAY is said on its own, with the rows each list keep
   assert.match(said, /Meetings, whose 3 rows stay/u);
   assert.doesNotMatch(said, /"Adds"/u);
 });
+
+test('A PLAN OF ROWS reads list by list, each row with the row it belongs with, counted on the queue and said once accepted', () => {
+  const body = {
+    why: ['Drafted by Spark from what you said the project is.'],
+    packs: {},
+    rows: [
+      { register: 'milestones', fields: { what: 'Say what the show is about', stage: 'idea', state: 'underway', order: 1 } },
+      { register: 'milestones', fields: { what: 'Record a pilot', stage: 'build', state: 'not_started', order: 2 } },
+      { register: 'steps', fields: { what: 'Write one sentence', state: 'to_do', order: 1 }, links: { milestone: 0 } },
+      { register: 'choices', fields: { question: 'Alone or with a co-host?', state: 'open' } },
+    ],
+  };
+  const out = arrangedOf('arrange', body, { lists: new Map([['milestones', 'Milestones'], ['steps', 'Steps'], ['choices', 'Choices']]) });
+  assert.ok(out);
+  assert.equal(out.lead, 'Rearranges this BrainDog');
+  assert.deepEqual(out.parts.map((p) => p.part), ['why', 'rows']);
+  const rows = out.parts[1] as Extract<(typeof out.parts)[number], { part: 'rows' }>;
+  assert.deepEqual(rows.lists, [
+    { name: 'Milestones', lines: ['Say what the show is about', 'Record a pilot'] },
+    { name: 'Steps', lines: ['Write one sentence, for “Say what the show is about”'] },
+    { name: 'Choices', lines: ['Alone or with a co-host?'] },
+  ]);
+  assert.equal(out.summary, '4 new rows');
+  assert.deepEqual(appliedLines({ rows: ['milestones#1', 'milestones#2', 'steps#1', 'choices#1'] }, body), ['Added 4 rows']);
+});

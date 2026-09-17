@@ -57,6 +57,11 @@ export const firstRun = {
   /* A USE CASE THAT FORMS AROUND WHAT WAS SAID (the guide): what it made from the sentence, or the one thing to add. */
   useFormed: (name: string) => `Its milestones, first steps and choices are for ${name}, from what you said.`,
   useFormHint: 'Say what the project is, such as a podcast, a shop or an app, and its milestones and first steps are made for it.',
+  /** Where a model drafted the plan instead: it waits on Decide, and nothing in it is added until it is accepted. */
+  usePlanWaiting: 'Spark drafted a first plan for what you said. It is waiting on Decide, and nothing in it is added until you accept it.',
+  usePlanSee: 'See the plan',
+  /** The note on the rows of a plan written after its lists went in, when no model formed one. */
+  usePlanPlanted: 'The first plan for this project.',
   useQuoted: (line: string) => `“${line}”`,
   shapeHeard: 'What I heard',
   shapeRecord: 'Your record',

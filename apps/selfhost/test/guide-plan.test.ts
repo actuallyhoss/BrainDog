@@ -200,3 +200,46 @@ test('A MILESTONE REACHED ASKS ONCE WHETHER TO START THE NEXT ONE, and the guide
   const by = sql.one<{ actor: string; note: string | null }>("SELECT actor, note FROM event WHERE target = (SELECT 'entry:' || id FROM entry WHERE register = 'milestones' AND seq = ?) ORDER BY rowid DESC LIMIT 1", fourth!.seq)!;
   assert.equal(by.actor, 'p_owner');
 });
+
+test('WHEN NO MODEL FORMS A PLAN, THE TEMPLATES WRITTEN AFTER THE LISTS ARE THE ROWS THE PACK WOULD HAVE SEEDED, linked the same way', async () => {
+  const { plantedRows, carriedDocument } = await import('@braindog/seed/usecases/install');
+  const { linkExamples } = await import('@braindog/seed/usecases/links');
+  const { useCase } = await import('@braindog/seed/usecases');
+  const guide = useCase('guide')!;
+  const shape = (sql: ReturnType<typeof openSqlite>) =>
+    sql
+      .all<{ register: string; fields: string; target: string | null }>(
+        "SELECT e.register, e.fields, json_extract(m.fields, '$.what') AS target FROM entry e LEFT JOIN entry m ON m.id = json_extract(e.fields, '$.milestone') WHERE e.deleted_at IS NULL AND e.register IN ('milestones', 'steps', 'choices', 'resources')",
+      )
+      .map((r) => {
+        const { milestone: _m, ...fields } = JSON.parse(r.fields) as Record<string, unknown>;
+        return JSON.stringify([r.register, fields, r.target]);
+      })
+      .sort();
+  const io = (api: Awaited<ReturnType<typeof guideRecord>>['api']) => ({
+    rows: async (register: string) => {
+      const read = (await api.list({ register, limit: 200 }, owner)) as { ok: boolean; value?: { rows: Row[] } };
+      return read.ok ? read.value!.rows : null;
+    },
+    link: async (register: string, seq: number, field: string, spoken: string) => ((await api.update({ register, seq, patch: { [field]: spoken } }, owner)) as { ok: boolean }).ok,
+  });
+
+  for (const said of [SAID, 'I want to start something new']) {
+    /* AS BEFORE: the pack with its seeds, then its links. */
+    const seeded = openSqlite();
+    const before = await createRecordApi({ sql: seeded, clock: fixedClock(Date.UTC(2026, 8, 17, 12)), catalogue: seedCatalogue() });
+    const doc = carriedDocument(guide, '2026-09-17', said)!;
+    const planned = value<{ diff: { planHash: string } }>(await before.planPack({ doc }, owner));
+    value(await before.installPack({ doc, planHash: planned.diff.planHash }, owner));
+    const plan = plantedRows(guide, '2026-09-17', said);
+    await linkExamples(io(before), 'guide', plan.links ? { links: plan.links } : undefined);
+
+    /* WITH A MODEL THAT FORMED NOTHING: the lists empty, then the same rows written, then the same links. */
+    const { sql, api } = await guideRecord(fake(() => 'nothing'));
+    assert.equal(value<{ formed: boolean }>(await api.sparkForm({ usecase: 'guide', said }, owner)).formed, false);
+    for (const row of plan.rows) value(await api.create({ register: row.register, fields: row.fields as never }, owner));
+    await linkExamples(io(api), 'guide', plan.links ? { links: plan.links } : undefined);
+
+    assert.deepEqual(shape(sql), shape(seeded), said);
+  }
+});

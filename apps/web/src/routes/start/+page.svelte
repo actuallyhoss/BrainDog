@@ -32,7 +32,7 @@
   import { firstRun } from '$lib/first-run.ts';
   import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
-  import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest } from '@braindog/seed/usecases/install';
+  import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
   import { linkExamples } from '@braindog/seed/usecases/links';
   import { PACKS } from '$lib/record/data.ts';
   import { REGISTERS } from '$lib/record/api.ts';
@@ -318,7 +318,7 @@
     }))];
   });
 
-  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean };
+  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
   let kept = $state<HTMLDivElement | undefined>(undefined);
@@ -345,7 +345,9 @@
       const client = createClient({ base: location.origin });
       const chosen = await recordOrSample(client, sampled);
       const installed = chosen.first.ok ? chosen.first.value : [];
-      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample };
+      const out: Outcome = { made: [], onward: null, on: [], added: [], absent: [], refused: [], waiting: chosen.source.sample, plan: null };
+      /* WHETHER A MODEL IS BEHIND SPARK HERE, so a use case that forms a plan asks it before planting its own (`sparkForm`). */
+      const modelHere = !chosen.source.sample && (await client.version().then((v) => v.ok && v.value.spark).catch(() => false));
 
       /* The lists this record holds with their pack on, so a pack is added only after what it points at. */
       const held = new Set(installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers));
@@ -387,7 +389,10 @@
         /* THE PROPOSED USE CASE IS MADE FOR WHAT WAS SAID, when it forms around it (`formedFor`); one beside it keeps its examples. */
         const said = one === u ? (arranged?.from ?? about) : null;
         const plan = formedFor(one, said);
-        const doc = carriedDocument(one, dayOf(Date.now()), said);
+        /* A MODEL DRAFTS THE PLAN WHERE ONE IS CONFIGURED: the lists go in empty, and the templates are planted only if it forms nothing. */
+        const asksModel = modelHere && one === u && forms(one) && Boolean(said?.trim());
+        const carried = carriedDocument(one, dayOf(Date.now()), said);
+        const doc = carried && asksModel ? withoutRows(carried) : carried;
         if (!doc) continue;
         const id = String(doc.pack);
         const state = installed.find((p) => p.id === id);
@@ -406,6 +411,15 @@
           if (!done.ok) out.refused.push(firstRun.shapeNotAdded(one.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
           else {
             out.added.push(...names);
+            if (asksModel) {
+              const asked = await client.call<{ formed: boolean; id?: string }>('sparkForm', { usecase: one.usecase, said: String(said).slice(0, 600) });
+              if (asked.ok && asked.value.formed && asked.value.id) {
+                out.plan = asked.value.id;
+                continue;
+              }
+              /* NOTHING FORMED: the rows the pack would have seeded, written now, then linked as below. */
+              for (const row of plantedRows(one, dayOf(Date.now()), said).rows) await client.create({ register: row.register, fields: row.fields, note: firstRun.usePlanPlanted }).catch(() => null);
+            }
             /* A SEED CARRIES NO LINK (42 §5.2), so the examples are pointed at each other now they are in: a student's
                assignment at its course, a guide's step at its milestone (`links.ts`). A refused link is skipped. */
             await linkExamples(
@@ -992,6 +1006,12 @@
             {#if outcome.added.length > 0}<p class="kept-why">{firstRun.shapeAdded(firstRun.shapeAnd(outcome.added))}</p>{/if}
             {#if outcome.absent.length > 0}<p class="kept-why">{firstRun.shapeAbsent(firstRun.shapeAnd(outcome.absent))}</p>{/if}
             {#each outcome.refused as r}<p class="kept-why">{r}</p>{/each}
+            {#if outcome.plan}
+              <p class="kept-why">{firstRun.usePlanWaiting}</p>
+              <div class="actions">
+                <Button weight="quiet" href={`/decide/${outcome.plan}`}>{firstRun.usePlanSee}</Button>
+              </div>
+            {/if}
             {#if outcome.waiting}<p class="kept-why">{firstRun.keptNothing} {firstRun.keptNothingWhy}</p>{/if}
             {#if outcome.onward}
               <div class="actions">

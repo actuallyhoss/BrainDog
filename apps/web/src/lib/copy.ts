@@ -2143,6 +2143,12 @@ export const copy = {
   arrangeShowsNow: 'Shows now',
   arrangeWillShow: 'Will show',
   arrangeExamples: (n: number) => `With ${n} example ${n === 1 ? 'row' : 'rows'} to start from`,
+  /** The rows a plan adds, list by list, each under the row it belongs with when it names one. */
+  arrangeRows: 'Adds these rows',
+  arrangeRowUnder: (row: string, under: string) => `${row}, for “${under}”`,
+  arrangeRowsNote: 'Nothing is added until you accept. Each row can be changed or deleted afterwards like any other.',
+  arrangeCountRows: (n: number) => `${n} new ${n === 1 ? 'row' : 'rows'}`,
+  arrangeDidRows: (n: number) => `Added ${n} ${n === 1 ? 'row' : 'rows'}`,
   arrangeWords: 'Words',
   arrangeCalled: (now: string, next: string) => `${now} will be called “${next}”`,
   arrangeReads: (now: string, next: string) => `“${now}” will read “${next}”`,

@@ -34,6 +34,7 @@ export type Part =
   | { part: 'packs'; lines: string[] }
   | { part: 'appears'; appears: Appears[]; examples: number }
   | { part: 'words'; lines: string[] }
+  | { part: 'rows'; lists: { name: string; lines: string[] }[]; count: number }
   | { part: 'settings'; lines: string[] };
 
 export type Arranged = { lead: string; parts: Part[]; summary: string };
@@ -302,6 +303,9 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   if (wordLines.length) parts.push({ part: 'words', lines: wordLines });
   if (otherLines.length) parts.push({ part: 'settings', lines: otherLines });
 
+  const rows = kind === 'arrange' ? rowsOf(body.rows, ctx) : null;
+  if (rows) parts.push(rows);
+
   const useCase = text(body.usecase) || (kind === 'pack' && body.kind === 'usecase' ? text(body.title) : '');
   const lead =
     kind === 'settings'
@@ -329,8 +333,36 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
     more ? copy.arrangeCountOther(more) : '',
     wordLines.length ? copy.arrangeCountWords(wordLines.length) : '',
     otherLines.length ? copy.arrangeCountSettings(otherLines.length) : '',
+    rows ? copy.arrangeCountRows(rows.count) : '',
   ].filter((b) => b !== '');
   return { lead, parts, summary: bits.join(', ') };
+}
+
+/** A row's title as a plan carries it: the first line of text among its fields. */
+const rowTitle = (fields: Row): string => {
+  for (const key of ['what', 'question', 'name', 'title']) if (text(fields[key])) return text(fields[key]);
+  return Object.values(fields).map(text).find((v) => v !== '') ?? '';
+};
+
+/**
+ * THE ROWS A PLAN ADDS (`record` `arrange.ts` `rowsOf`), list by list in the order they are written, each said with the title
+ * of the earlier row it points at. `null` when the body carries none.
+ */
+function rowsOf(raw: unknown, ctx: Context): Extract<Part, { part: 'rows' }> | null {
+  const rows = Array.isArray(raw) ? raw.filter(isRow) : [];
+  if (rows.length === 0) return null;
+  const lists: { register: string; name: string; lines: string[] }[] = [];
+  for (const r of rows) {
+    const register = text(r.register);
+    const fields = isRow(r.fields) ? r.fields : {};
+    const under = Object.values(isRow(r.links) ? r.links : {})
+      .map((to) => (typeof to === 'number' && isRow(rows[to]) && isRow(rows[to]!.fields) ? rowTitle(rows[to]!.fields as Row) : ''))
+      .find((t) => t !== '');
+    const line = under ? copy.arrangeRowUnder(rowTitle(fields), under) : rowTitle(fields);
+    const list = lists.find((l) => l.register === register) ?? (lists.push({ register, name: listName(register, ctx), lines: [] }), lists[lists.length - 1]!);
+    list.lines.push(line);
+  }
+  return { part: 'rows', lists: lists.map(({ name, lines }) => ({ name, lines })), count: rows.length };
 }
 
 /** A page an arrangement puts in place, by the title its body gives, or its id in words. */
@@ -342,7 +374,7 @@ const pageTitle = (id: string, body: Row): string => {
 /* ── what an accepted one did ───────────────────────────────────────────── */
 
 /** `applied` as `decide` answers it: what was installed, turned on and off, and which pages and settings were set. */
-export type Applied = { installed?: string[]; enabled?: string[]; disabled?: string[]; pages?: string[]; settings?: string[] };
+export type Applied = { installed?: string[]; enabled?: string[]; disabled?: string[]; pages?: string[]; settings?: string[]; rows?: string[] };
 
 /** What was applied, as sentences, with what is new in the sidebar when the screen could tell. */
 export function appliedLines(applied: Applied, body: Row, sidebar: readonly string[] = []): string[] {
@@ -357,6 +389,7 @@ export function appliedLines(applied: Applied, body: Row, sidebar: readonly stri
   if (applied.disabled?.length) out.push(copy.arrangeDidDisable(applied.disabled.map(name)));
   if (applied.pages?.length) out.push(copy.arrangeDidPages(applied.pages.map((id) => pageTitle(id, body))));
   if (applied.settings?.length) out.push(copy.arrangeDidSettings([...new Set(applied.settings)].map(name)));
+  if (applied.rows?.length) out.push(copy.arrangeDidRows(applied.rows.length));
   if (sidebar.length) out.push(copy.arrangeDidSidebar(sidebar));
   if (out.length === 0) out.push(copy.arrangeDidNothing);
   return out;

@@ -14,7 +14,7 @@
 
   let { arranged, compact = false }: { arranged: Arranged; compact?: boolean } = $props();
 
-  const folded = new Set(['appears', 'words', 'settings']);
+  const folded = new Set(['appears', 'words', 'settings', 'rows']);
 </script>
 
 <div class="arr" data-compact={compact ? '' : undefined}>
@@ -67,6 +67,17 @@
           <ul class="arr-lines">
             {#each p.lines as line, i (i)}<li>{line}</li>{/each}
           </ul>
+        </section>
+      {:else if p.part === 'rows'}
+        <section class="arr-part" aria-label={copy.arrangeRows}>
+          <h3 class="arr-h">{copy.arrangeRows}</h3>
+          {#each p.lists as l (l.name)}
+            <h4 class="arr-h">{l.name}</h4>
+            <ul class="arr-lines">
+              {#each l.lines as line, i (i)}<li>{line}</li>{/each}
+            </ul>
+          {/each}
+          <p class="arr-note">{copy.arrangeRowsNote}</p>
         </section>
       {:else if p.part === 'settings'}
         <section class="arr-part" aria-label={copy.arrangeSettings}>
