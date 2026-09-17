@@ -46,6 +46,7 @@ import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type Resolve, type Send } from './actions.ts';
+import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -466,6 +467,12 @@ export async function start(options: {
    * system's name service; a test passes a web of its own so nothing leaves the machine.
    */
   shared?: { send?: Send | undefined; resolve?: Resolve | undefined } | undefined;
+  /**
+   * A model for Spark to draft with (`@braindog/host/spark`): `SPARK_ENDPOINT`, `SPARK_MODEL` and `SPARK_KEY` in the environment
+   * when not given. Absent, Spark's own rules draft. The key is the environment's, else the person's own key in the vault
+   * labelled `spark`; it is opened on each call and never kept (`spark.ts`). `send` is for tests.
+   */
+  spark?: SparkConfig | undefined;
 } & (
     | {
         /**
@@ -693,6 +700,8 @@ export async function start(options: {
     catalogue: seedCatalogue(),
     /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
     readAddress: sharedReader(options.shared),
+    /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
+    sparkModel: sparkModelFor(options.spark ?? sparkFromEnv(env), () => api, options.keys),
     /* WHAT THIS HOST IS, for `/api/version` (`33 §4`). `BRAINDOG_BUILD` is the same variable name
        the Worker's deploy sets, so the answer has the same shape on both hosts; a self-host started
        from a checkout has none, and the record then says `app: null` rather than inventing one.

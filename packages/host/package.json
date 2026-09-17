@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./auth": "./src/auth.ts",
-    "./actions": "./src/actions.ts"
+    "./actions": "./src/actions.ts",
+    "./spark": "./src/spark.ts"
   },
   "dependencies": {
     "@braindog/ports": "workspace:*",
