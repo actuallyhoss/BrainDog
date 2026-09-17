@@ -11,7 +11,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { draftSetup, planLegacyTool, readLegacyTool, readSetup, type Plan, type Setup } from '../src/legacy.ts';
+import { draftSetup, planLegacyTool, readLegacyTool, readSetup, spoken, type Plan, type Setup } from '../src/legacy.ts';
 import { applyPlan, importCommand, said, type Door } from '../src/import.ts';
 import type { AgentIo } from '../src/skills.ts';
 import { syntheticExport, syntheticSetup } from './legacy-export.ts';
@@ -89,6 +89,11 @@ test('projects keep their lane, mark, repos, plan and their own decisions, and t
   assert.equal(row(p, 'legacy:datapoint:tidepool:Monthly revenue:2026-09-15')!.fields.value, 0);
   assert.equal(row(p, 'legacy:datapoint:lanternly:Revenue, next twelve months:2026-09-15')!.fields.value, 24000);
   assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.value, 312);
+  /* A METRIC'S KEY IS SAID IN WORDS, and a percentage keeps its unit. */
+  assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.name, 'Subscribers, Lanternly');
+  assert.deepEqual({ name: row(p, 'legacy:datapoint:lanternly:churn_pct:2026-09-15')!.fields.name, unit: row(p, 'legacy:datapoint:lanternly:churn_pct:2026-09-15')!.fields.unit }, { name: 'Churn, Lanternly', unit: '%' });
+  assert.deepEqual(spoken('activeUsers'), { name: 'Active users', unit: '' });
+  assert.deepEqual(spoken('pct'), { name: 'Pct', unit: '' });
   assert.equal(row(p, 'legacy:datapoint:lanternly:subscribers:2026-09-15')!.fields.unit, undefined, 'no unit is left out, not sent empty, so a second import reads it unchanged');
   assert.deepEqual(skippedItems(p, /not a single number/u), ['lanternly: plans']);
 });
