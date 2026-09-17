@@ -87,7 +87,7 @@ test('THE VOICE IS KEPT AS THE PACK\'S SETTINGS, AND READ BACK FROM THEM', async
   const pack = value<{ manifest: { pack: string; version: string; summary: string; config?: Record<string, { type: string; default?: unknown }> } }>(await normalise(doc));
   assert.equal(pack.manifest.pack, 'usecase-reading');
   assert.equal(pack.manifest.summary, u.summary);
-  assert.deepEqual(Object.keys(pack.manifest.config ?? {}).sort(), ['shared_version', 'voice_home', 'voice_needs_you']);
+  assert.deepEqual(Object.keys(pack.manifest.config ?? {}).sort(), ['shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
   const defaults = Object.fromEntries(Object.entries(pack.manifest.config ?? {}).map(([k, c]) => [k, c.default]));
   assert.deepEqual(voiceOf(defaults), u.voice);
   assert.deepEqual(voiceOf({ voice_home: '  ', voice_lists: 3, other: 'x' }), {});
@@ -104,7 +104,7 @@ test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY K
   const doc = useCasePack(u)!;
   const pack = value<{ manifest: { config?: Record<string, { type: string; default?: unknown; label?: string }> } }>(await normalise(doc));
   const config = pack.manifest.config ?? {};
-  assert.deepEqual(Object.keys(config).sort(), ['label_books', 'label_books__state', 'label_books__state__to_read', 'label_people', 'shared_version', 'voice_home', 'voice_needs_you']);
+  assert.deepEqual(Object.keys(config).sort(), ['label_books', 'label_books__state', 'label_books__state__to_read', 'label_people', 'shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
   assert.equal(config.label_books__state__to_read?.label, 'Label: books, state, to read');
   const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
   assert.deepEqual(labelsOf(defaults), labels);
@@ -154,4 +154,10 @@ test('THE VOICE RULE: a use case added goes beside the one speaking, or takes th
   assert.equal(voiceWhenAdding(on('usecase-student'), 'usecase-student'), 'speaks', 'the one speaking still speaks');
   assert.equal(voiceWhenAdding([{ id: 'usecase-founder', disabled_at: '2026-09-17' }, ...on('usecase-team')], 'guide'), 'speaks', 'a pack switched off does not speak');
   assert.equal(speakingPack([...on('usecase-team', 'usecase-personal')]), 'usecase-personal');
+  /* A PERSON'S CHOICE LEADS THE RULE: set to speak, or set not to. */
+  assert.equal(speakingPack([{ id: 'usecase-personal', disabled_at: null, speaks: false }, ...on('usecase-student')]), 'usecase-student');
+  assert.equal(speakingPack([...on('usecase-personal'), { id: 'usecase-student', disabled_at: null, speaks: true }]), 'usecase-student');
+  assert.equal(voiceWhenAdding([...on('usecase-student'), { id: 'usecase-personal', disabled_at: null, speaks: false }], 'team'), 'beside');
+  const carried = useCasePack({ ...(normaliseUseCase(DOC({})) as { value: UseCase }).value });
+  assert.deepEqual((carried?.config as Record<string, unknown>)?.speaks, { type: 'bool', label: 'Speaks for this BrainDog' });
 });

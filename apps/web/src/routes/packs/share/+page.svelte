@@ -29,7 +29,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import { drawnOrder, exportShared, listWords, offeredVersion, rowTitle, speakingOf } from '../sharing.ts';
+  import { drawnOrder, exportShared, listWords, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
 
   const AUDIENCES = ['individual', 'founder', 'team', 'starter', 'other'] as const;
   const EXAMPLES_MOST = 8;
@@ -76,7 +76,8 @@
         refused = chosen.first.refusal.fix;
         return false;
       }
-      states = chosen.first.value;
+      /* WHO SPEAKS IS WHO WAS CHOSEN TO, when two use cases are on, so the file is made from that one. */
+      states = live ? await speakingStates(client, chosen.first.value) : chosen.first.value;
       const id = speakingOf(states);
       if (id !== null) title = useCaseName(id);
       if (live && states.some((s) => s.registers.includes('skills') && s.disabled_at === null)) {

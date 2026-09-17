@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { normalise, packIdOf, plan, install, unresolvedFault, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { normalise, packIdOf, plan, install, unresolvedFault, SPEAKS, VOICE_KEYS, voiceSetting, voiceWhenAdding, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { configValue, type ConfigDecl, type Declaration, type Kernel } from '@braindog/kernel';
 
 /**
@@ -357,7 +357,13 @@ export function arranger(d: ArrangeDeps) {
     if (body.alongside !== undefined) {
       if (!Array.isArray(body.alongside) || body.alongside.some((x) => typeof x !== 'string'))
         return refuse('VALUE_MALFORMED', 'alongside is a list of use case ids from offer, such as ["student"].', 'body.alongside');
-      const speaking = [...states(), ...(lead === null ? [] : [{ id: lead, disabled_at: null }])];
+      /* WITH THE `speaks` SETTING A PERSON CHOSE, so the one kept speaking is the one asked about. */
+      const speaks = (id: string): boolean | null => {
+        const v = id.startsWith(USE_CASE) ? kernel.packConfig(id) : null;
+        const said = v?.ok ? v.value.values[SPEAKS] : null;
+        return typeof said === 'boolean' ? said : null;
+      };
+      const speaking = [...states().map((p) => ({ ...p, speaks: speaks(p.id) })), ...(lead === null ? [] : [{ id: lead, disabled_at: null }])];
       if (!speaking.some((p) => p.id.startsWith(USE_CASE) && p.disabled_at === null))
         return refuse('REQUIRED_MISSING', 'A use case goes beside the one this BrainDog speaks in, and none is on. Name one as usecase, and the others beside it.', 'body.alongside');
       for (const [i, raw] of (body.alongside as string[]).entries()) {

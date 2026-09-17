@@ -15,7 +15,22 @@
   import { words as vaultWords } from '$lib/record/vault.ts';
   import { installable, type SharedPlan } from './sharing.ts';
 
-  let { plan, busy, oninstall, oncancel }: { plan: SharedPlan; busy: boolean; oninstall: () => void; oncancel: () => void } = $props();
+  let {
+    plan,
+    busy,
+    oninstall,
+    oncancel,
+    voice = null,
+    choice = $bindable('beside'),
+  }: {
+    plan: SharedPlan;
+    busy: boolean;
+    oninstall: () => void;
+    oncancel: () => void;
+    /** Whose voice the record keeps, asked when another use case speaks now: that use case's title. */
+    voice?: { now: string } | null;
+    choice?: 'speaks' | 'beside';
+  } = $props();
 
   const own = $derived(plan.packs.find((p) => p.role === 'usecase') ?? null);
   const modules = $derived(plan.packs.filter((p) => p.role === 'module'));
@@ -76,6 +91,19 @@
       {/if}
     {/each}
     <CallsOut calls={plan.packs.flatMap((p) => p.calls)} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+    {#if voice}
+      <dt>{copy.voiceAsk}</dt>
+      <dd>
+        <fieldset class="voice" aria-label={copy.voiceAsk}>
+          {#each [['beside', copy.voiceKeep(voice.now, plan.usecase.title)], ['speaks', copy.voiceTake(voice.now, plan.usecase.title)]] as [value, words] (value)}
+            <label class="voice-pick">
+              <input type="radio" name="voice-{plan.usecase.id}" {value} bind:group={choice} disabled={busy} />
+              <span>{words}</span>
+            </label>
+          {/each}
+        </fieldset>
+      </dd>
+    {/if}
     {#if plan.packs.some((p) => p.examples > 0)}
       <dt>{copy.diffSeeds}</dt>
       <dd>{plan.packs.reduce((n, p) => n + p.examples, 0)}</dd>
@@ -166,6 +194,23 @@
   .diff-detail {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  .voice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .voice-pick {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    color: var(--ink);
+    cursor: pointer;
   }
 
   .plan-actions {

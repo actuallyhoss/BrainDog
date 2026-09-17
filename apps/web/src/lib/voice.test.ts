@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { USE_CASES, VOICE_KEYS, labelsOf as labelsOfPack, voiceOf as voiceOfPack } from '@braindog/seed/usecases';
-import { labelSetting as labelSettingOfPack, useCasePack, voiceWhenAdding as voiceWhenAddingPack } from '@braindog/declare';
+import { labelSetting as labelSettingOfPack, speakingPack as speakingPackOf, useCasePack, voiceWhenAdding as voiceWhenAddingPack } from '@braindog/declare';
 import { homePageOf as homeOfPack } from '@braindog/seed/usecases/install';
 
 import { copy } from './copy.ts';
@@ -124,4 +124,17 @@ test('WHAT ADDING A USE CASE DOES TO THE VOICE is the rule the format keeps', ()
   ];
   for (const [packs, id] of cases) assert.equal(voiceWhenAdding(packs, id), voiceWhenAddingPack(packs, id), `${id} over ${JSON.stringify(packs)}`);
   assert.equal(voiceWhenAdding([{ id: 'usecase-personal', disabled_at: null }], 'student'), 'beside');
+});
+
+test('A USE CASE CHOSEN TO SPEAK SPEAKS, and one chosen not to is passed over, by the rule the format keeps', () => {
+  const cases: { id: string; disabled_at: string | null; speaks?: boolean | null }[][] = [
+    [{ id: 'usecase-personal', disabled_at: null, speaks: false }, { id: 'usecase-student', disabled_at: null }],
+    [{ id: 'usecase-personal', disabled_at: null }, { id: 'usecase-student', disabled_at: null, speaks: true }],
+    [{ id: 'usecase-personal', disabled_at: null, speaks: false }, { id: 'usecase-student', disabled_at: null, speaks: false }],
+    [{ id: 'usecase-personal', disabled_at: null, speaks: true }, { id: 'usecase-student', disabled_at: null, speaks: true }],
+    [{ id: 'usecase-personal', disabled_at: '2026-09-17', speaks: true }, { id: 'usecase-student', disabled_at: null }],
+  ];
+  for (const packs of cases) assert.equal(speaking(packs), speakingPackOf(packs), JSON.stringify(packs));
+  assert.deepEqual(cases.map((c) => speaking(c)), ['usecase-student', 'usecase-student', 'usecase-personal', 'usecase-personal', 'usecase-student']);
+  assert.equal(voiceWhenAdding(cases[0]!, 'guide'), voiceWhenAddingPack(cases[0]!, 'guide'));
 });

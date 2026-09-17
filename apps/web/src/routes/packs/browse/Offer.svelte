@@ -8,7 +8,7 @@
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
-  import type { UseCase } from '@braindog/seed/usecases';
+  import { USE_CASES, type UseCase } from '@braindog/seed/usecases';
   import { builtInFile, modulesToInstall } from '@braindog/seed/usecases/share';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
@@ -17,7 +17,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import SharedPlan from '../SharedPlan.svelte';
-  import { afterInstall, installShared, offerFor, planShared, switchTo, type SharedPlan as Plan } from '../sharing.ts';
+  import { afterInstall, installShared, keepVoice, offerFor, planShared, speakingStates, switchTo, useCaseTitle, voiceQuestion, type SharedPlan as Plan } from '../sharing.ts';
 
   let {
     u,
@@ -28,10 +28,21 @@
   }: { u: UseCase; client: ReturnType<typeof createClient> | null; live: boolean; states: readonly PackState[]; onchanged: () => Promise<void> } = $props();
 
   const carries = $derived(u.pack !== null);
-  const offer = $derived(offerFor(u.usecase, states, carries, modulesToInstall(u)));
+  /* THE STATES WITH WHO WAS CHOSEN TO SPEAK, so a use case put in beside another offers Switch to, not In use. */
+  let spoken = $state.raw<Awaited<ReturnType<typeof speakingStates>>>([]);
+  $effect(() => {
+    const held = states;
+    spoken = [...held];
+    if (live && client) void speakingStates(client, held).then((read) => (states === held ? (spoken = read) : null));
+  });
+  const offer = $derived(offerFor(u.usecase, spoken, carries, modulesToInstall(u)));
   let busy = $state(false);
   let plan = $state<Plan | null>(null);
   let refused = $state<{ fix: string; code: string | null } | null>(null);
+  /* WHOSE VOICE THE RECORD KEEPS, asked when another use case speaks now, with the rule's answer picked to begin with. */
+  let asked = $state<{ now: string } | null>(null);
+  let choice = $state<'speaks' | 'beside'>('beside');
+  let heard: Awaited<ReturnType<typeof speakingStates>> = [];
 
   async function offerInstall() {
     if (busy) return;
@@ -45,8 +56,13 @@
       const file = builtInFile(u.usecase);
       if (!file) return;
       const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held) => packDocument(m, held));
-      if (out.ok) plan = out.plan;
-      else refused = { fix: out.fix, code: out.code };
+      if (out.ok) {
+        heard = await speakingStates(client, states);
+        const q = voiceQuestion(heard, u.usecase);
+        asked = q === null ? null : { now: useCaseTitle(q.now, USE_CASES) };
+        choice = q?.rule ?? 'speaks';
+        plan = out.plan;
+      } else refused = { fix: out.fix, code: out.code };
     } finally {
       busy = false;
     }
@@ -59,6 +75,7 @@
     try {
       const out = await installShared(client, p);
       if (out.ok) {
+        if (asked) await keepVoice(client, heard, p.usecase.id, choice);
         const after = await afterInstall(client, p, pref.read().nav ?? []);
         if (after.nav) pref.write({ nav: after.nav });
         toasts.push(copy.shareInstalled(p.usecase.title), { intent: 'good' });
@@ -103,7 +120,7 @@
     <p class="refused" role="status">{refused.fix}{#if refused.code}<span class="code">{copy.refusalCode(refused.code)}</span>{/if}</p>
   {/if}
   {#if plan}
-    <SharedPlan {plan} {busy} oninstall={() => void install()} oncancel={() => (plan = null)} />
+    <SharedPlan {plan} {busy} voice={asked} bind:choice oninstall={() => void install()} oncancel={() => (plan = null)} />
   {/if}
 </div>
 

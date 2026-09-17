@@ -997,6 +997,11 @@ export const copy = {
   switchTo: (title: string) => `Switch to ${title}`,
   switchedTo: (title: string) => `This BrainDog is now set up as ${title}.`,
   inUse: 'In use',
+  /* A SECOND USE CASE ASKS WHOSE VOICE THE RECORD KEEPS, as onboarding and an arrangement say it, and the person picks. */
+  voiceAsk: 'Voice and Home',
+  voiceKeep: (now: string, adding: string) => `Keep ${now}'s voice and Home, and add ${adding} beside it`,
+  voiceTake: (now: string, adding: string) => `Speak as ${adding}, with its own Home. ${now}'s lists stay`,
+  updateTo: (version: string) => `Update to ${version}`,
   browseRail: 'Rail',
   browseHome: 'Home',
   browseLists: 'Lists',
@@ -2016,13 +2021,13 @@ export const copy = {
   arrangeFieldCalled: (list: string, field: string, next: string) => `In ${list}, ${field} will be called “${next}”`,
   arrangeValueCalled: (list: string, value: string, next: string) => `In ${list}, “${value}” will be called “${next}”`,
   arrangeDefault: 'its usual word',
+  /** A long label filed before its title was, so only its hashed setting name is known. */
+  arrangeLongLabel: 'A label',
   arrangeSettings: 'Settings',
   arrangeSettingTo: (pack: string, setting: string, value: string, was: string | null) =>
     was === null ? `${pack}: ${setting} will be ${value}` : `${pack}: ${setting} will be ${value}, where it is ${was} now`,
   arrangeCountPages: (n: number) => `${n} new ${n === 1 ? 'page' : 'pages'}`,
   arrangeCountLists: (n: number) => `${n} new ${n === 1 ? 'list' : 'lists'}`,
-  /** A long label filed before its title was, so only its hashed setting name is known. */
-  arrangeLongLabel: 'A label',
   arrangeCountOther: (n: number) => `${n} more ${n === 1 ? 'change' : 'changes'}`,
   arrangeCountWords: (n: number) => `${n} ${n === 1 ? 'word changes' : 'words change'}`,
   arrangeLeadSummary: (lead: string, summary: string) => `${lead}: ${summary}`,

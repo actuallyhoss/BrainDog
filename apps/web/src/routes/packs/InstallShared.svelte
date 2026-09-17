@@ -12,6 +12,7 @@
 -->
 <script lang="ts">
   import type { createClient } from '@braindog/client';
+  import { USE_CASES } from '@braindog/seed/usecases';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -19,7 +20,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { packDocument, type PackState } from '$lib/record/packs.ts';
   import SharedPlan from './SharedPlan.svelte';
-  import { afterInstall, installShared, planShared, readAddress, readOnHost, type SharedPlan as Plan } from './sharing.ts';
+  import { afterInstall, installShared, keepVoice, planShared, readAddress, readOnHost, speakingStates, useCaseTitle, voiceQuestion, type SharedPlan as Plan } from './sharing.ts';
 
   let {
     client,
@@ -35,6 +36,10 @@
   let code = $state<string | null>(null);
   let plan = $state<Plan | null>(null);
   let last: { text: string; source: 'local' | 'url'; ref?: string } | null = null;
+  /* WHOSE VOICE THE RECORD KEEPS, asked when another use case speaks now (`sharing.ts` `voiceQuestion`). */
+  let asked = $state<{ now: string } | null>(null);
+  let choice = $state<'speaks' | 'beside'>('beside');
+  let heard: Awaited<ReturnType<typeof speakingStates>> = [];
 
   async function planText(text: string, source: 'local' | 'url', ref?: string) {
     said = null;
@@ -49,8 +54,13 @@
       return;
     }
     const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held) => packDocument(id, held));
-    if (out.ok) plan = out.plan;
-    else {
+    if (out.ok) {
+      heard = await speakingStates(client, installed);
+      const q = voiceQuestion(heard, out.plan.usecase.id);
+      asked = q === null ? null : { now: useCaseTitle(q.now, USE_CASES) };
+      choice = q?.rule ?? 'speaks';
+      plan = out.plan;
+    } else {
       said = out.fix;
       code = out.code;
     }
@@ -90,6 +100,7 @@
     try {
       const out = await installShared(client, plan);
       if (out.ok) {
+        if (asked) await keepVoice(client, heard, plan.usecase.id, choice);
         const after = await afterInstall(client, plan, pref.read().nav ?? []);
         if (after.nav) pref.write({ nav: after.nav });
         toasts.push(copy.shareInstalled(plan.usecase.title), { intent: 'good' });
@@ -124,7 +135,7 @@
     </form>
   </div>
   {#if said}<p class="shared-said" role="status">{said}{#if code}<span class="shared-code">{copy.refusalCode(code)}</span>{/if}</p>{/if}
-  {#if plan}<SharedPlan {plan} {busy} oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
+  {#if plan}<SharedPlan {plan} {busy} voice={asked} bind:choice oninstall={() => void install()} oncancel={() => (plan = null)} />{/if}
 </div>
 
 <style>

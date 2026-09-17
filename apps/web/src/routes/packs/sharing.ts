@@ -16,6 +16,7 @@ import { linkExamples } from '@braindog/seed/usecases/links';
 
 import { copy } from '../../lib/copy.ts';
 import { withOrder } from '../../lib/nav.ts';
+import { SPEAKS, speaking, voiceWhenAdding, withSpeaks, type SpeakingState } from '../../lib/voice.ts';
 import { callsOutOf, type CallOut } from '../../lib/record/actions.ts';
 import type { PackState, Refusal } from '../../lib/record/packs.ts';
 
@@ -42,6 +43,8 @@ export type SharingClient = {
   installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[] }): Promise<Wire<unknown>>;
   enablePack(args: { id: string }): Promise<Wire<unknown>>;
   disablePack(args: { id: string; alsoDisable?: string[] }): Promise<Wire<unknown>>;
+  packConfig(args: { id: string }): Promise<Wire<unknown>>;
+  setPackConfig(args: { id: string; values: Record<string, unknown> }): Promise<Wire<unknown>>;
 };
 
 const refusalOf = (r: Wire<unknown>): Refusal =>
@@ -299,14 +302,47 @@ export async function afterInstall(
 
 /* ── switching between use cases ───────────────────────────────────────── */
 
-/** The use case this record speaks as: the enabled `usecase-*` pack's id without its prefix, or `null`. */
-export const speakingOf = (states: readonly PackState[]): string | null =>
-  states.find((s) => s.id.startsWith('usecase-') && s.disabled_at === null)?.id.slice('usecase-'.length) ?? null;
+/**
+ * The use case this record speaks as, without its prefix, or `null`, by the voice rule (`voice.ts` `speaking`). The states
+ * may carry each pack's `speaks` setting (`speakingStates`); without it the rule's default is said.
+ */
+export const speakingOf = (states: readonly SpeakingState[]): string | null => speaking(states)?.slice('usecase-'.length) ?? null;
+
+/** The record's packs with each use-case pack's `speaks` setting read, when two or more are on. */
+export const speakingStates = (client: Pick<SharingClient, 'packConfig'>, states: readonly PackState[]): Promise<(PackState & SpeakingState)[]> =>
+  withSpeaks(states, async (id) => {
+    const read = await client.packConfig({ id });
+    return read.ok && isMap(read.value) && isMap(read.value.values) ? read.value.values : null;
+  }) as Promise<(PackState & SpeakingState)[]>;
+
+/**
+ * WHAT A PERSON IS ASKED BEFORE A SECOND USE CASE GOES IN, as onboarding and an agent's arrangement say it: the use case
+ * speaking now, and what the rule would do if nobody chose (`beside`, or `speaks` to take the voice and Home over).
+ * `null` when there is nothing to ask: no use case speaks, or the one speaking is the one being installed.
+ */
+export function voiceQuestion(states: readonly SpeakingState[], adding: string): { now: string; rule: 'speaks' | 'beside' } | null {
+  const now = speaking(states);
+  if (now === null || now === `usecase-${adding}`) return null;
+  return { now: now.slice('usecase-'.length), rule: voiceWhenAdding(states, adding) };
+}
+
+/**
+ * Keep the person's answer once the use case is in, as each pack's `speaks` setting: the one chosen to speak is set to, and
+ * every other use case switched on is set not to, so the rule reads the choice whatever the ids. A pack that has no such
+ * setting (one installed before it existed) is passed over; the rule's order by id still stands for it.
+ */
+export async function keepVoice(client: Pick<SharingClient, 'setPackConfig'>, states: readonly SpeakingState[], adding: string, choice: 'speaks' | 'beside'): Promise<void> {
+  const added = `usecase-${adding}`;
+  const now = speaking(states);
+  const lead = choice === 'speaks' ? added : now;
+  const others = new Set([added, ...states.filter((p) => p.id.startsWith('usecase-') && p.disabled_at === null).map((p) => p.id)]);
+  for (const id of others) await client.setPackConfig({ id, values: { [SPEAKS]: id === lead } }).catch(() => null);
+}
 
 /** What a browse card offers for a use case on this record. */
 export type Offer = 'in-use' | 'switch' | 'install';
 
-export function offerFor(id: string, states: readonly PackState[], carriesPack: boolean, modules: readonly string[] = []): Offer {
+export function offerFor(id: string, states: readonly (PackState & SpeakingState)[], carriesPack: boolean, modules: readonly string[] = []): Offer {
   const speaking = speakingOf(states);
   /* A USE CASE THAT CARRIES NO PACK IS ITS MODULES AND THE HOUSE VOICE: installed once every module is here and on. */
   if (!carriesPack) {
@@ -325,6 +361,12 @@ export async function switchTo(client: SharingClient, id: string, states: readon
   if (carriesPack) {
     const on = await client.enablePack({ id: `usecase-${id}` });
     if (!on.ok) return { ok: false, fix: refusalOf(on).fix };
+    /* A USE CASE THAT CAN BE SET TO SPEAK IS, and the others stay on beside it with their lists. */
+    const set = await client.setPackConfig({ id: `usecase-${id}`, values: { [SPEAKS]: true } }).catch(() => null);
+    if (set?.ok) {
+      await keepVoice(client, states, id, 'speaks');
+      return { ok: true };
+    }
   }
   for (const s of states)
     if (s.id.startsWith('usecase-') && s.id !== `usecase-${id}` && s.disabled_at === null) {
@@ -333,6 +375,10 @@ export async function switchTo(client: SharingClient, id: string, states: readon
     }
   return { ok: true };
 }
+
+/** A use case's name for the voice question: the built-in's title, or its id in words for one somebody shared. */
+export const useCaseTitle = (id: string, builtIn: readonly { usecase: string; title: string }[]): string =>
+  builtIn.find((u) => u.usecase === id)?.title ?? listWords(id.replaceAll('-', '_'));
 
 /* ── going out ─────────────────────────────────────────────────────────── */
 

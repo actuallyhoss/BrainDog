@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import type { PackState } from '../../lib/record/packs.ts';
-import { afterInstall, drawnOrder, installShared, offerFor, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, switchTo, type SharingClient } from './sharing.ts';
+import { afterInstall, drawnOrder, installShared, keepVoice, offerFor, offeredVersion, planShared, readAddress, readOnHost, rowTitle, sharedPlanOf, speakingStates, switchTo, voiceQuestion, type SharingClient } from './sharing.ts';
 
 const COURSES_DOC = {
   pack: 'usecase-study',
@@ -59,6 +59,8 @@ function stub(over: Partial<SharingClient> = {}): { client: SharingClient; calls
     enablePack: log('enablePack'),
     disablePack: log('disablePack'),
     fetchUseCase: log('fetchUseCase'),
+    packConfig: log('packConfig'),
+    setPackConfig: log('setPackConfig'),
     ...over,
   } as SharingClient;
   return { client, calls };
@@ -118,8 +120,8 @@ test('A CARD OFFERS INSTALL, SWITCH, OR SAYS IT IS IN USE', () => {
   assert.equal(offerFor('business', [state('portfolio'), state('people')], false, ['portfolio', 'people']), 'in-use');
 });
 
-test('SWITCHING TURNS THE CHOSEN ONE ON AND THE ONE SPEAKING OFF', async () => {
-  const { client, calls } = stub();
+test('SWITCHING TURNS THE CHOSEN ONE ON AND THE ONE SPEAKING OFF, when the pack has no speaks setting', async () => {
+  const { client, calls } = stub({ setPackConfig: async () => ({ ok: false as const, refusal: { code: 'FIELD_UNKNOWN', fix: 'no' } }) });
   assert.deepEqual(await switchTo(client, 'team', [state('usecase-student'), state('usecase-team', true)], true), { ok: true });
   assert.deepEqual(calls, [
     ['enablePack', { id: 'usecase-team' }],
@@ -213,4 +215,40 @@ test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READ
   assert.ok(out.links >= 1, 'no example was linked');
   assert.deepEqual(updates[0], { register: 'assignments', seq: 1, patch: { course: 'courses#4' } });
   assert.equal((await afterInstall(client, { ...plan, nav: [] }, [])).nav, null);
+});
+
+test('SWITCHING TO A USE CASE THAT CAN SPEAK SETS IT TO, and keeps the others on beside it', async () => {
+  const { client, calls } = stub();
+  assert.deepEqual(await switchTo(client, 'team', [state('usecase-student'), state('usecase-team')], true), { ok: true });
+  assert.deepEqual(calls, [
+    ['enablePack', { id: 'usecase-team' }],
+    ['setPackConfig', { id: 'usecase-team', values: { speaks: true } }],
+    ['setPackConfig', { id: 'usecase-team', values: { speaks: true } }],
+    ['setPackConfig', { id: 'usecase-student', values: { speaks: false } }],
+  ]);
+});
+
+test('A SECOND USE CASE ASKS WHOSE VOICE IS KEPT, and the answer is kept whichever id sorts first', async () => {
+  const student = [state('usecase-student')];
+  assert.equal(voiceQuestion([], 'personal'), null, 'nothing speaks yet, so nothing to ask');
+  assert.equal(voiceQuestion(student, 'student'), null, 'the one speaking is the one installed');
+  assert.deepEqual(voiceQuestion(student, 'personal'), { now: 'student', rule: 'speaks' });
+  assert.deepEqual(voiceQuestion(student, 'team'), { now: 'student', rule: 'beside' });
+
+  /* BESIDE, THOUGH PERSONAL SORTS FIRST: Student is set to speak and Personal set not to. */
+  const beside = stub();
+  await keepVoice(beside.client, student, 'personal', 'beside');
+  assert.deepEqual(new Map(beside.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks])), new Map([['usecase-personal', false], ['usecase-student', true]]));
+  /* TAKING IT OVER. */
+  const take = stub();
+  await keepVoice(take.client, student, 'personal', 'speaks');
+  assert.deepEqual(new Map(take.calls.map(([, a]) => [a.id, (a.values as Record<string, unknown>).speaks])), new Map([['usecase-personal', true], ['usecase-student', false]]));
+
+  /* READ BACK, THE RULE SPEAKS AS CHOSEN, and a card offers Switch to the one put beside. */
+  const held: Record<string, boolean> = { 'usecase-personal': false, 'usecase-student': true };
+  const reading = stub({ packConfig: async ({ id }) => ok({ values: { speaks: held[id] } }) });
+  const both = await speakingStates(reading.client, [state('usecase-personal'), state('usecase-student')]);
+  assert.equal(offerFor('student', both, true), 'in-use');
+  assert.equal(offerFor('personal', both, true), 'switch');
+  assert.equal(offerFor('personal', [state('usecase-personal'), state('usecase-student')], true), 'in-use', 'unread, the rule by id');
 });

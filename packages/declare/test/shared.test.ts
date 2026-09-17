@@ -73,7 +73,7 @@ test('AN EXPORTED ARRANGEMENT READS BACK AS THE SAME USE CASE, WITH ITS PACK REA
   assert.equal(shared.usecase.version, '1.0.1');
   assert.equal(shared.pack?.manifest.pack, 'usecase-my-studies');
   assert.equal(shared.pack?.manifest.version, '1.0.1');
-  assert.deepEqual(Object.keys(shared.pack?.manifest.config ?? {}).sort(), ['label_courses', 'shared_version', 'voice_home']);
+  assert.deepEqual(Object.keys(shared.pack?.manifest.config ?? {}).sort(), ['label_courses', 'shared_version', 'speaks', 'voice_home']);
   assert.equal(shared.pack?.seeds.length, 1);
 });
 

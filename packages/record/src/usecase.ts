@@ -24,6 +24,8 @@ import {
   laterVersion,
   nextVersion,
   SHARED_VERSION,
+  SPEAKS,
+  speakingPack,
   packIdOf,
   plan,
   readShared,
@@ -120,7 +122,14 @@ export function useCases(d: UseCaseDeps) {
   async function exportFile(args: ExportArgs, rows: (register: string) => Result<{ seq: number | null; fields: Body }[]>): Promise<Result<Body>> {
     const states = kernel.packStates();
     const on = states.filter((s) => s.disabled_at === null);
-    const speaking = on.find((s) => s.id.startsWith(USE_CASE)) ?? null;
+    /* THE USE CASE SPEAKING, by the voice rule and the `speaks` setting a person chose, when two are on. */
+    const speaks = (id: string): boolean | null => {
+      const read = kernel.packConfig(id);
+      const v = read.ok ? read.value.values[SPEAKS] : null;
+      return typeof v === 'boolean' ? v : null;
+    };
+    const lead = speakingPack(on.filter((s) => s.id.startsWith(USE_CASE)).map((s) => ({ id: s.id, disabled_at: s.disabled_at, speaks: speaks(s.id) })));
+    const speaking = on.find((s) => s.id === lead) ?? null;
     const id = args.usecase ?? speaking?.id.slice(USE_CASE.length) ?? 'my-setup';
     if (!ID.test(id)) return refuse('VALUE_MALFORMED', `${id} is not a use case id: lower-case letters, digits and hyphens.`, 'usecase');
     const all = kernel.declarations();

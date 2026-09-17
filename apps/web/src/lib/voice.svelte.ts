@@ -8,7 +8,7 @@
  * house voice.
  */
 
-import { heardLabels, homePageOf, labelsOf, lineOf, relabelAll, speaking, voiceOf, type Labels, type Voice, type VoiceKey } from './voice.ts';
+import { heardLabels, homePageOf, labelsOf, lineOf, relabelAll, speaking, voiceOf, withSpeaks, type Labels, type SpeakingState, type Voice, type VoiceKey } from './voice.ts';
 
 export { labels, listNamed } from './voice.ts';
 
@@ -48,7 +48,14 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   const { createClient } = await import('@braindog/client');
   const client = createClient({ base });
   const packs = await client.packs();
-  const id = packs.ok ? speaking(packs.value as { id: string; disabled_at: string | null }[]) : null;
+  const id = packs.ok
+    ? speaking(
+        await withSpeaks(packs.value as SpeakingState[], async (pack) => {
+          const read = await client.packConfig({ id: pack });
+          return read.ok ? ((read.value as { values?: Record<string, unknown> }).values ?? null) : null;
+        }),
+      )
+    : null;
   if (id === null) {
     state.voice = {};
     state.pack = null;

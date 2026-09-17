@@ -47,19 +47,45 @@ export const lineOf = (voice: Voice, key: VoiceKey): string => voice[key] ?? VOI
 /** The page a use case declares as its Home: `usecase-student` answers `home-student`. The seed's `homePageOf` agrees. */
 export const homePageOf = (pack: string): string => `home-${pack.replace(/^usecase-/u, '')}`;
 
-/** The use-case pack whose voice a record speaks in: the first one switched on, in the order the record lists them. */
-export const speaking = (packs: readonly { id: string; disabled_at: string | null }[]): string | null =>
-  packs.find((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null)?.id ?? null;
+/** A use-case pack as the voice rule reads it, with its `speaks` setting when that was read (`@braindog/declare` `SpeakingState`). */
+export type SpeakingState = { id: string; disabled_at: string | null; speaks?: boolean | null };
+
+/** The setting a person chooses which use case speaks with. */
+export const SPEAKS = 'speaks';
+
+/**
+ * The use-case pack whose voice a record speaks in, by the rule `@braindog/declare` `speakingPack` keeps: of those switched
+ * on, by id, the first set to speak, else the first not set against it, else the first.
+ */
+export const speaking = (packs: readonly SpeakingState[]): string | null => {
+  const on = packs.filter((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return (on.find((p) => p.speaks === true) ?? on.find((p) => p.speaks !== false) ?? on[0])?.id ?? null;
+};
+
+/**
+ * The use-case packs with each one's `speaks` setting read, so the rule sees what the person chose. Only asked for when two
+ * or more are on, because one alone speaks whatever it holds. A setting that cannot be read counts as not chosen.
+ */
+export async function withSpeaks(packs: readonly SpeakingState[], valuesOf: (id: string) => Promise<Readonly<Record<string, unknown>> | null>): Promise<SpeakingState[]> {
+  const on = packs.filter((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null);
+  if (on.length < 2) return [...packs];
+  return Promise.all(
+    packs.map(async (p) => {
+      if (!on.includes(p)) return p;
+      const said = (await valuesOf(p.id).catch(() => null))?.[SPEAKS];
+      return { ...p, speaks: typeof said === 'boolean' ? said : null };
+    }),
+  );
+}
 
 /**
  * WHAT INSTALLING ANOTHER USE CASE DOES TO THE VOICE, by the rule `@braindog/declare` `voiceWhenAdding` keeps: `beside`
  * when the use case speaking now keeps its voice and Home, `speaks` when the one added would take them, or none speaks.
  * Browse and a shared file say which before Install, as onboarding says "Adds Student as well".
  */
-export function voiceWhenAdding(packs: readonly { id: string; disabled_at: string | null }[], adding: string): 'speaks' | 'beside' {
-  const on = packs.filter((p) => USE_CASE_PACK.test(p.id) && p.disabled_at === null).map((p) => p.id).sort();
+export function voiceWhenAdding(packs: readonly SpeakingState[], adding: string): 'speaks' | 'beside' {
   const pack = USE_CASE_PACK.test(adding) ? adding : `usecase-${adding}`;
-  const now = on[0];
+  const now = speaking(packs) ?? undefined;
   return now === undefined || now === pack || pack < now ? 'speaks' : 'beside';
 }
 

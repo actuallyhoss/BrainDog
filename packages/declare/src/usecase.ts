@@ -100,18 +100,32 @@ export const packIdOf = (usecase: string): string => `usecase-${usecase}`;
  * either goes beside the one speaking, which keeps its voice and its Home, or takes the voice over. `beside` when the
  * one speaking keeps it; `speaks` when the use case added would, or when none speaks yet.
  */
-export function voiceWhenAdding(packs: readonly { id: string; disabled_at: string | null }[], adding: string): 'speaks' | 'beside' {
+export function voiceWhenAdding(packs: readonly SpeakingState[], adding: string): 'speaks' | 'beside' {
   const speaking = speakingPack(packs);
   const pack = adding.startsWith(packIdOf('')) ? adding : packIdOf(adding);
   return speaking === null || speaking === pack || pack < speaking ? 'speaks' : 'beside';
 }
 
-/** The use-case pack a record speaks in: the first switched on, by id, or `null` for the house voice. */
-export const speakingPack = (packs: readonly { id: string; disabled_at: string | null }[]): string | null =>
-  packs
-    .filter((p) => p.id.startsWith(packIdOf('')) && p.disabled_at === null)
-    .map((p) => p.id)
-    .sort()[0] ?? null;
+/**
+ * A use-case pack as the voice rule reads it: on or off, and its `speaks` setting when it was read. `true` when the person
+ * chose this one to speak, `false` when they chose to keep another's voice, and absent or `null` when nobody chose.
+ */
+export type SpeakingState = { id: string; disabled_at: string | null; speaks?: boolean | null };
+
+/**
+ * THE SETTING A PERSON CHOOSES THE VOICE WITH, when a second use case comes in. The rule by id is only the default: a pack
+ * set to speak speaks, and one set not to is passed over, so either use case can keep the voice whichever id sorts first.
+ */
+export const SPEAKS = 'speaks';
+
+/**
+ * The use-case pack a record speaks in, or `null` for the house voice: of those switched on, by id, the first set to speak,
+ * else the first not set against it, else the first.
+ */
+export const speakingPack = (packs: readonly SpeakingState[]): string | null => {
+  const on = packs.filter((p) => p.id.startsWith(packIdOf('')) && p.disabled_at === null).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return (on.find((p) => p.speaks === true) ?? on.find((p) => p.speaks !== false) ?? on[0])?.id ?? null;
+};
 
 /** The setting a voice line is stored under. */
 export const voiceSetting = (key: VoiceKey): string => `voice_${key}`;
@@ -127,8 +141,9 @@ export const LABEL_KEY = new RegExp(`^${SEGMENT}(?:\\.${SEGMENT}){0,2}$`);
 const LABEL_PREFIX = 'label_';
 /** Settings are named in lower case with underscores, at most 32; the dots of a label key are written `__`. */
 const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
-/** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share with `shared_version`. */
+/** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share with `shared_version` and `speaks`. */
 const SETTINGS_CEILING = 64;
+const HELD_SETTINGS = 2;
 
 /**
  * THE VERSION THIS ARRANGEMENT WAS LAST SHARED AS, kept as a setting of the pack a use case carries, so a second share
@@ -235,7 +250,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
       labels[key] = word;
     }
   }
-  if (Object.keys(voice).length + Object.keys(labels).length > SETTINGS_CEILING - 1)
+  if (Object.keys(voice).length + Object.keys(labels).length > SETTINGS_CEILING - HELD_SETTINGS)
     return no('VALUE_MALFORMED', `A use case's voice and labels are its pack's settings, and a pack has at most ${SETTINGS_CEILING}.`, { at: 'labels' });
 
   const nav = doc.nav ?? [];
@@ -291,7 +306,11 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
   }
   for (const [key, word] of Object.entries(u.labels))
     config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
-  const settings: Record<string, { type: 'text'; label: string; default?: string }> = { ...config, [SHARED_VERSION]: { type: 'text', label: 'Last shared as' } };
+  const settings: Record<string, { type: 'text' | 'bool'; label: string; default?: string }> = {
+    ...config,
+    [SHARED_VERSION]: { type: 'text', label: 'Last shared as' },
+    [SPEAKS]: { type: 'bool', label: 'Speaks for this BrainDog' },
+  };
   return {
     ...u.pack,
     pack: packIdOf(u.usecase),
