@@ -106,7 +106,19 @@ export function callOf(line: string): Call {
 function declared(doc: unknown): Map<string, { id: string; kind: string; body: Row }> {
   const out = new Map<string, { id: string; kind: string; body: Row }>();
   if (!isRow(doc) || !Array.isArray(doc.declarations)) return out;
-  for (const d of doc.declarations.filter(isRow)) {
+  /* A USE CASE'S WORDS ARE ITS SETTINGS, and a block reads one as `{{config:voice_needs_you}}`, which reached Decide as
+     written. Each is said as the setting's default, the line the use case ships, and one with none says nothing. */
+  const config = isRow(doc.config) ? doc.config : {};
+  const filled = (v: unknown): unknown => {
+    if (typeof v === 'string')
+      return v.replace(/\{\{config:([a-z0-9_]+)\}\}/gu, (_, key: string) => {
+        const decl = config[key];
+        return isRow(decl) && typeof decl.default === 'string' ? decl.default : '';
+      });
+    if (Array.isArray(v)) return v.map(filled);
+    return isRow(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, filled(x)])) : v;
+  };
+  for (const d of (doc.declarations.filter(isRow).map(filled) as Row[])) {
     const kind = Object.keys(d)[0] ?? '';
     const id = `${kind}.${text(d[kind])}`;
     out.set(id, { id, kind, body: d });

@@ -255,3 +255,23 @@ test('A CHANGED PAGE READS FROM ITS LISTS BY THE RAIL’S NAMES, and a module wh
   const appears = out?.parts.find((p) => p.part === 'appears');
   assert.deepEqual(appears?.part === 'appears' && appears.appears[0]?.lines.find((l) => l.label === 'Reads from'), { label: 'Reads from', value: 'Bills, Accounts' });
 });
+
+test('A BLOCK THAT READS A USE CASE’S WORDS FROM ITS SETTINGS SAYS THE WORDS, never {{config:…}}', () => {
+  const out = arrangedOf('pack', {
+    install: 'usecase-study',
+    kind: 'usecase',
+    title: 'Term time',
+    packs: { install: ['usecase-study'] },
+    plan: [{ pack: 'usecase-study', version: '1.2.1', adds: ['page.home-study'] }],
+    doc: {
+      pack: 'usecase-study',
+      config: { voice_needs_you: { type: 'text', label: 'Voice: needs you', default: 'Coming up' } },
+      declarations: [{ page: 'home-study', title: 'Today', blocks: [{ kind: 'table', heading: '{{config:voice_needs_you}}' }, { kind: 'table', heading: '{{config:voice_gone}}' }, { kind: 'table', heading: 'Sessions' }] }],
+    },
+  });
+  assert.equal(out?.lead, 'Sets this BrainDog up for Term time');
+  const said = JSON.stringify(out);
+  assert.doesNotMatch(said, /\{\{config:/u);
+  const appears = out?.parts.find((p) => p.part === 'appears');
+  assert.deepEqual(appears?.part === 'appears' && appears.appears[0]?.lines.find((l) => l.label === 'Shows'), { label: 'Shows', value: 'Coming up, Table, Sessions' });
+});

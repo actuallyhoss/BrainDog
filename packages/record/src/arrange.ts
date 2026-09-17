@@ -513,7 +513,8 @@ export function arranger(d: ArrangeDeps) {
       const names = namesFor(planned.value, keeps ?? (target.startsWith(USE_CASE) && !on(target) ? target : speaker));
       return ok({
         install: target,
-        ...(entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : fromFile ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary } : {}),
+        /* A FILE IS SAID BY ITS OWN TITLE, even over a catalogue use case with the same id: it is what the owner was asked about. */
+        ...(fromFile ? { kind: 'usecase', title: fromFile.title, summary: fromFile.summary } : entry ? { kind: entry.kind, title: entry.title, summary: entry.summary } : {}),
         ...(keeps === null ? {} : { keeps }),
         packs: { install: order.value.install, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
