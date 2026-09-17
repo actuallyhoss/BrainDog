@@ -610,7 +610,9 @@
     const asked = introduce(now, signed.ok ? (signed.value.me?.email ?? null) : null, packs);
     if (!asked || met === asked.name) return;
     const out = await client.meet(asked);
-    if (!out.ok) return;
+    /* A PEOPLE LIST WITH NO PROJECTS TO LINK, a student's or a guide's, is one `meet` refuses (it writes the agents pack's
+       fields), so the person is written as a plain row instead, and is in People like anybody else's. */
+    if (!out.ok && !(await client.create({ register: 'people', fields: personRow(asked, now.bio) }).catch(() => null))?.ok) return;
     met = asked.name;
     known = { name: asked.name, waiting: false };
   }
