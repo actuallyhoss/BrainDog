@@ -297,10 +297,10 @@ const isEntry = (x: unknown): x is Entry =>
  * bytes of what no tool takes back, and the address every tool does take had to be put together by the
  * model. `register#number` is accepted by every tool, for every register, prefixed or not.
  */
-export function compact(row: Entry): Record<string, unknown> {
+export function compact(row: Entry, prefix = ''): Record<string, unknown> {
   const extra = row as Entry & { updated_at?: unknown; deleted_at?: unknown };
   return {
-    spoken: row.seq === null ? row.id : `${row.register}#${String(row.seq)}`,
+    spoken: row.seq === null ? row.id : prefix ? `${prefix}${String(row.seq)}` : `${row.register}#${String(row.seq)}`,
     version: row.version,
     ...(row.state === null || row.state === undefined ? {} : { state: row.state }),
     ...(typeof extra.updated_at === 'string' ? { updated_at: extra.updated_at } : {}),
@@ -309,17 +309,32 @@ export function compact(row: Entry): Record<string, unknown> {
   };
 }
 
+/** A register's own prefix for its rows, such as `LN` or `S`, or `''` where it has none. */
+type PrefixOf = (register: string) => string;
+const unprefixed: PrefixOf = () => '';
+
 /** A row, or a page of rows, made compact; anything else as it came. */
-const compacted = (value: unknown): unknown => {
-  if (isEntry(value)) return compact(value);
-  if (isObject(value) && Array.isArray(value.rows)) return { ...value, rows: value.rows.map((r) => (isEntry(r) ? compact(r) : r)) };
+const compacted = (value: unknown, prefixOf: PrefixOf = unprefixed): unknown => {
+  if (isEntry(value)) return compact(value, prefixOf(value.register));
+  if (isObject(value) && Array.isArray(value.rows))
+    return { ...value, rows: value.rows.map((r) => (isEntry(r) ? compact(r, prefixOf(r.register)) : r)) };
   return value;
 };
 
-const shaped = (r: Result<unknown>): Result<unknown> => {
-  if (r.ok) return { ok: true, value: compacted(r.value) };
+const shaped = (r: Result<unknown>, prefixOf: PrefixOf = unprefixed): Result<unknown> => {
+  if (r.ok) return { ok: true, value: compacted(r.value, prefixOf) };
   const conflict = (r as { conflict?: { current?: unknown } }).conflict;
-  return conflict && isEntry(conflict.current) ? ({ ...r, conflict: { ...conflict, current: compact(conflict.current) } } as Result<unknown>) : r;
+  return conflict && isEntry(conflict.current)
+    ? ({ ...r, conflict: { ...conflict, current: compact(conflict.current, prefixOf(conflict.current.register)) } } as Result<unknown>)
+    : r;
+};
+
+/** The registers a tool's answer holds rows of: one row, a page, or the row a conflict carries. */
+const registersIn = (r: Result<unknown>): string[] => {
+  const value = r.ok ? r.value : (r as { conflict?: { current?: unknown } }).conflict?.current;
+  if (isEntry(value)) return [value.register];
+  if (isObject(value) && Array.isArray(value.rows)) return [...new Set(value.rows.filter(isEntry).map((row) => row.register))];
+  return [];
 };
 const badSpoken = (fix: string): Result<never> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'spoken' } });
 
@@ -417,6 +432,15 @@ export const TEMPLATES = [
  * to keep in step, and the one that drifted would be the one an agent reads.
  */
 export function tools<C>(surface: McpSurface<C>) {
+  /* KEPT FOR THE LIFE OF THE SERVER, because a register's prefix is part of its declaration and does not move. A schema
+     the caller may not read is not kept, and that register's rows are named `register#number`. */
+  const prefixes = new Map<string, string>();
+  const learnPrefix = async (register: string, ctx: C): Promise<void> => {
+    const schema = await surface.schema({ register }, ctx);
+    if (!schema.ok) return;
+    const said = isObject(schema.value) ? schema.value.seq_prefix : undefined;
+    prefixes.set(register, typeof said === 'string' && /^[A-Z]{1,4}$/.test(said) ? said : '');
+  };
   /**
    * Where a row is, from any way an agent says it: `register#number` as it is, and a prefixed id such as
    * `LN7` asked of the record, which alone knows which register owns a prefix.
@@ -776,7 +800,12 @@ export function tools<C>(surface: McpSurface<C>) {
           refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no tool called ${name}.`, allowed: TOOLS.map((t) => t.name) },
         };
       /* The rows a tool answers with, and the row a conflict carries, as an agent reads them. */
-      return SHAPED.has(name) ? shaped(await tool(args, ctx)) : tool(args, ctx);
+      if (!SHAPED.has(name)) return tool(args, ctx);
+      /* A ROW IS NAMED AS CONTEXT NAMES IT: `LN1` and `S3`, not `learnings#1` and `session#1`. An agent handed two
+         names for one row wrote the second into its notes, and the person reads the first. Both are still taken. */
+      const answer = await tool(args, ctx);
+      for (const register of registersIn(answer)) if (!prefixes.has(register)) await learnPrefix(register, ctx);
+      return shaped(answer, (register) => prefixes.get(register) ?? '');
     },
   };
 }

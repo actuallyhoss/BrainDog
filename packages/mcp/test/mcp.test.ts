@@ -262,7 +262,11 @@ test('A PREFIXED ID IS WRITTEN TO, as context names it: update, log and history 
   value(await mcp.call('log', { spoken: 'S1', note: 'Looked at from the app.' }, owner));
   assert.ok(value<unknown[]>(await mcp.call('history', { spoken: 'S1' }, owner)).length >= 2);
   const moved = await mcp.call('update', { spoken: 'S1', patch: { doing: 'Checking the gates' }, version: run.version + 1 }, token);
-  assert.equal(value<{ spoken: string }>(moved).spoken, 'session#1');
+  /* Answered as context names it, and the other spelling is still taken. */
+  const said = value<{ spoken: string; version: number }>(moved);
+  assert.equal(said.spoken, 'S1');
+  assert.equal(value<{ spoken: string }>(await mcp.call('get', { spoken: 'session#1' }, owner)).spoken, 'S1');
+  assert.equal(value<{ rows: { spoken: string }[] }>(await mcp.call('list', { register: 'session' }, owner)).rows[0]?.spoken, 'S1');
   sql.close();
 });
 
