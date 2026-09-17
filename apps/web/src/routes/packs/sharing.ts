@@ -224,7 +224,7 @@ export async function planShared(
   client: SharingClient,
   file: { text: string; source: 'paste' | 'url' | 'local'; ref?: string },
   installed: readonly PackState[],
-  moduleDoc: (id: string, installed: readonly PackState[]) => Promise<Body | null>,
+  moduleDoc: (id: string, installed: readonly PackState[], usecase: string) => Promise<Body | null>,
 ): Promise<{ ok: true; plan: SharedPlan } | { ok: false; fix: string; code: string | null }> {
   const { readShared } = await import('@braindog/declare');
   const read = await readShared(file.text, { kind: file.source });
@@ -232,7 +232,7 @@ export async function planShared(
   const modules: Record<string, unknown> = {};
   for (const m of read.value.usecase.modules) {
     if (installed.some((p) => p.id === m)) continue;
-    const doc = await moduleDoc(m, installed);
+    const doc = await moduleDoc(m, installed, read.value.usecase.usecase);
     if (doc) modules[m] = doc;
   }
   const out = await client.planUseCase({

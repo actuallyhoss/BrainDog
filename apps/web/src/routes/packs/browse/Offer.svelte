@@ -55,7 +55,7 @@
     try {
       const file = builtInFile(u.usecase);
       if (!file) return;
-      const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held) => packDocument(m, held));
+      const out = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, held, id) => packDocument(m, held, id));
       if (out.ok) {
         heard = await speakingStates(client, states);
         /* AN UPDATE ASKS NOTHING: the use case is already here, speaking or beside, and stays as it was. */

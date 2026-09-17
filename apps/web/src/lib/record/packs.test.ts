@@ -310,3 +310,14 @@ test('PEOPLE ALONE, FROM THE ADD-ONS SCREEN: no "Met in" without Projects, and n
   assert.ok(withProjects.declarations.find((d) => d.register === 'people')?.fields?.some((f) => f.to === 'things'), 'a record with Projects gets the link');
   assert.ok((await packDocument('people'))?.seeds, 'with no record to go into, the document is as it always was');
 });
+
+test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet: Personal gives Money a person\'s sums and words', async () => {
+  type Doc = { declarations: { metric?: string; name?: string; target?: { lte?: number } }[] };
+  const figure = (doc: unknown, metric: string) => (doc as Doc).declarations.find((d) => d.metric === metric);
+  const personal = await packDocument('money-core', [], 'personal');
+  assert.equal(figure(personal, 'out-30d')?.target?.lte, 250_000);
+  assert.equal(figure(personal, 'days-late-in')?.name, 'Pay comes in late by');
+  const bare = await packDocument('money-core', []);
+  assert.equal(figure(bare, 'out-30d')?.target?.lte, 5_000_000, 'with no use case, Money keeps its own');
+  assert.equal(figure(await packDocument('money-core', [], 'reading-club'), 'out-30d')?.target?.lte, 5_000_000, 'a use case this build does not know changes nothing');
+});

@@ -140,7 +140,7 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And the examples are the record's
  * use case's, or none: a module added here never brings the sample studio's rows into somebody's record.
  */
-export async function packDocument(id: string, installed?: readonly PackState[]): Promise<Record<string, unknown> | null> {
+export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed');
   if (id === seed.AGENTS_PACK.manifest.id) return seed.agentsPackDocument();
   if (installed === undefined) return seed.firstPartyDocument(id);
@@ -150,7 +150,9 @@ export async function packDocument(id: string, installed?: readonly PackState[])
   const own = seed.FIRST_PARTY.includes(id as never) ? seed.firstPartyManifest(id as never).provides : [];
   const holds = [...on.flatMap((p) => p.registers), ...own.flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []))];
   const speaking = on.find((p) => p.id.startsWith('usecase-'))?.id.slice('usecase-'.length);
-  const u = speaking === undefined ? undefined : useCase(speaking);
+  /* THE USE CASE BEING INSTALLED, WHEN ONE IS, so a module it brings carries its examples, targets and words: Personal
+     installed from browse on an empty record was given Money with a business's sums and "Money in arrives late by". */
+  const u = (usecase === undefined ? undefined : useCase(usecase)) ?? (speaking === undefined ? undefined : useCase(speaking));
   const doc = u ? moduleDocument(u, id, { today: dayOf(Date.now()), holds }) : seed.firstPartyDocument(id, { holds, seeds: [] });
   if (doc && Array.isArray(doc.seeds) && doc.seeds.length === 0) delete doc.seeds;
   return doc;

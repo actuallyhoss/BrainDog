@@ -53,7 +53,7 @@
       code = !read.ok && 'refusal' in read ? read.refusal.code : null;
       return;
     }
-    const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held) => packDocument(id, held));
+    const out = await planShared(client, { text, source, ...(ref === undefined ? {} : { ref }) }, installed, (id, held, usecase) => packDocument(id, held, usecase));
     if (out.ok) {
       heard = await speakingStates(client, installed);
       const q = out.plan.packs.some((p) => p.role === 'usecase' && p.installedVersion !== null) ? null : voiceQuestion(heard, out.plan.usecase.id);
