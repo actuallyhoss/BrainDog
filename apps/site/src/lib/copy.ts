@@ -44,6 +44,10 @@ export const site = {
         'Two ways to run BrainDog: hosted at $12 a month per record, or self-hosted for free on your ' +
         'own machine. Neither plan is open yet.',
     },
+    notFound: {
+      title: 'Page not found · BrainDog',
+      description: 'There is no page at this address on brain.dog.',
+    },
     legal: {
       title: 'Legal · BrainDog',
       description:
@@ -512,6 +516,21 @@ export const site = {
       'No free hosted tier, on purpose. A free tier on a per-customer database is a per-customer ' +
       'cost with no revenue against it, and the way that ends is a product that quietly gets worse ' +
       'for the people paying for it.',
+  },
+
+  /**
+   * THE PAGE A MISTYPED ADDRESS LANDS ON. Cloudflare serves it with a 404 for any path the build has
+   * no file for (`not_found_handling` in `wrangler.jsonc`), in place of a blank white page.
+   */
+  notFound: {
+    title: 'There is no page here',
+    lede: 'The address may be mistyped, or the page may have moved. These are the pages brain.dog has.',
+    links: [
+      { label: 'Home', href: '/' },
+      { label: 'Pricing', href: '/pricing' },
+      { label: 'Changelog', href: '/changelog' },
+      { label: 'Legal', href: '/legal' },
+    ],
   },
 
   /**

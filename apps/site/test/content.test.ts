@@ -355,3 +355,20 @@ test('the marketing copy in copy.ts names no licence and holds no em dash', () =
   assert.equal(/\bApache\b|\bMIT\b/.test(strings), false, 'copy.ts names a licence above the legal section');
   assert.equal(strings.includes('—'), false, 'copy.ts has an em dash in a marketing string');
 });
+
+/**
+ * A MISTYPED ADDRESS GETS THE SITE'S OWN 404 PAGE, not a blank one: the Worker's assets answer a
+ * path with no file with `404.html`, and the build writes it. Both environments say so.
+ */
+test('the Worker serves a prerendered 404 page for a path with no file', () => {
+  const config = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  assert.equal(config.match(/"not_found_handling": "404-page"/g)?.length, 2, 'production and alpha both name the 404 page');
+  assert.ok(existsSync(new URL('../src/routes/404/+page.svelte', import.meta.url)), 'there is no 404 route to prerender');
+});
+
+test('the build writes 404.html, in the site shell and not indexed', when(existsSync(new URL('404.html', BUILD)) ? null : NO_BUILD ?? 'apps/site/build has no 404.html'), () => {
+  const html = read('404.html');
+  assert.match(html, /There is no page here/);
+  assert.match(html, /name="robots" content="noindex"/);
+  assert.match(html, /href="\/pricing"/);
+});

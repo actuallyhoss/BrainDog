@@ -38,14 +38,15 @@
 
   /* `directory` is relative to this file, so it is the build output beside it, unprefixed.
 
-     `not_found_handling` IS ABSENT, WHICH MEANS "none" — a plain 404. `"single-page-application"`
-     would be wrong twice over: there is no client router here by default (`apps/site` prerenders
-     every route and is readable with scripting off) and answering `index.html` with a 200 for
-     every typo is the behaviour that makes a site look alive to a crawler and dead to a reader.
-     `"404-page"` is the right answer the day `apps/site` prerenders a `404.html`; today's build
-     does not have one, and pointing at a file that is not there is how a setting becomes a lie. */
+     `not_found_handling` IS "404-page": a path with no file answers a 404 status with `404.html`,
+     which `src/routes/404` prerenders in the site's own shell. It was absent, which is "none", and
+     a mistyped address got a blank white page. `"single-page-application"` would be wrong twice
+     over: there is no client router here by default, and answering `index.html` with a 200 for every
+     typo makes a site look alive to a crawler and dead to a reader. `test/content.test.ts` holds the
+     setting and the file to each other. */
   "assets": {
-    "directory": "build"
+    "directory": "build",
+    "not_found_handling": "404-page"
   },
 
   /* Two environments for symmetry with `apps/worker/wrangler.jsonc`, and because the alternative
@@ -83,7 +84,7 @@
 
     "alpha": {
       "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
-      "assets": { "directory": "build-alpha" }
+      "assets": { "directory": "build-alpha", "not_found_handling": "404-page" }
     }
   }
 }
