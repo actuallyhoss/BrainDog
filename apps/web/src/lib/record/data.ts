@@ -658,7 +658,7 @@ export const PACKS: PackInfo[] = [
   { id: 'people', name: 'People', blurb: 'Collaborators, contractors, accountants.', version: '1.0.3', installed: true, registers: ['people'], pages: [], author: 'braindog' },
   { id: 'work', name: 'Work', blurb: 'Tasks, tracks, dates.', version: '1.1.0', installed: true, registers: ['tasks'], pages: ['work'], author: 'braindog' },
   { id: 'portfolio', name: 'Portfolio', blurb: 'The things you run, and the plan for each.', version: '1.0.0', installed: true, registers: ['things'], pages: [], author: 'braindog' },
-  { id: 'agents', name: 'Agents', blurb: 'What your agents learn, the skills they use, the keys they are handed and the tools they run, each for one project or for all.', version: '1.0.0', installed: true, registers: ['learnings', 'skills', 'credentials', 'tools'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Keys', tools: 'Tools', agents: 'Agents' } },
+  { id: 'agents', name: 'Agents', blurb: 'What your agents learn, the skills they use, the keys they are handed and the tools they run, each for one project or for all.', version: '1.1.0', installed: true, registers: ['learnings', 'skills', 'credentials', 'tools'], pages: ['agents'], author: 'braindog', titles: { learnings: 'Learnings', skills: 'Skills', credentials: 'Keys', tools: 'Tools', agents: 'Agents' } },
   /* IT WANTS TO SIT ABOVE YOUR MONEY PAGE, AND IT DOES NOT GET TO. `04 §4`'s worked example is this
      pack, and the record had no way to hold the fact — so the diff's `CHANGES` section was behind a
      condition that could never be true and the three sentences about it rendered nowhere. A trust

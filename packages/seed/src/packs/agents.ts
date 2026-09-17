@@ -157,13 +157,16 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
     title: 'Agents',
     nav: { section: 'Agents', order: 10 },
     icon: 'session',
-    requires: ['register.session', 'register.learnings', 'register.skills'],
+    requires: ['register.session', 'register.learnings', 'register.skills', 'register.tools', 'register.credentials'],
     blocks: [
+      /* ONLY THE RUNS STILL WORKING. The end hook leaves a run idle and a handoff waits for a pickup, and both were
+         listed here as working, the run that closed a minute ago beside the one typing now. */
       {
         kind: 'cards',
         heading: 'Working now',
         span: 12,
         source: 'sessions.live',
+        where: 'state is active',
         columns: [
           { field: 'doing', as: 'title' },
           { field: 'agent', as: 'who' },
@@ -173,6 +176,24 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         ],
         limit: 12,
         empty: 'No agent is working right now.',
+      },
+      /* WHERE THE STOPPED RUNS LEFT OFF, led by the next step, because that is what the next session starts from. A
+         run that stopped without one has nothing to hand on, and is left out. */
+      {
+        kind: 'cards',
+        heading: 'Where they left off',
+        span: 12,
+        source: 'sessions.live',
+        where: 'state is idle or handoff, next is set',
+        columns: [
+          { field: 'next', as: 'title' },
+          { field: 'agent', as: 'who' },
+          { field: 'doing', label: 'Was doing', as: 'fact' },
+          { field: 'project', label: 'Project', as: 'fact' },
+          { field: 'last_seen', as: 'when' },
+        ],
+        limit: 6,
+        empty: 'No run has left a next step.',
       },
       {
         kind: 'cards',
@@ -205,6 +226,41 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         order: [{ field: 'seq', dir: 'desc' }],
         limit: 8,
         empty: 'No skills yet.',
+      },
+      /* WHAT THE AGENTS RUN ON: the servers and tools they recorded, and the keys by name. A key is its label and what
+         it opens, never its value, which no page can read. */
+      {
+        kind: 'cards',
+        heading: 'Tools and servers',
+        span: 6,
+        source: 'register.tools',
+        where: 'state is active',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'trigger', label: 'When to use it', as: 'fact' },
+          { field: 'transport', label: 'Transport', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'seen', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 8,
+        empty: 'No tools recorded yet.',
+      },
+      {
+        kind: 'cards',
+        heading: 'Keys',
+        span: 6,
+        source: 'register.credentials',
+        where: 'state is not retired',
+        columns: [
+          { field: 'label', as: 'title' },
+          { field: 'opens', label: 'What it opens', as: 'fact' },
+          { field: 'project', label: 'Where it applies', as: 'fact' },
+          { field: 'verified', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'desc' }],
+        limit: 8,
+        empty: 'No keys kept yet.',
       },
     ],
   },
@@ -288,7 +344,7 @@ export const RUNS_ON: { requires: readonly string[]; blocks: readonly Record<str
 };
 
 export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES } = {
-  manifest: { id: 'agents', version: '1.0.0', requires: ['register.things'] },
+  manifest: { id: 'agents', version: '1.1.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
 };

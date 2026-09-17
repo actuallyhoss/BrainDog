@@ -44,10 +44,10 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.0.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.1.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.0.0');
+  assert.equal(pack.manifest.version, '1.1.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
@@ -55,7 +55,7 @@ const PROVIDES = ['page.agents', 'page.skill', 'register.credentials', 'register
 
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.0.0' });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.1.0' });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -200,8 +200,16 @@ test('/p/agents: the runs working now, the newest seen first, then what was lear
   const blocks = opened(k, 'agents');
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
 
-  const live = RUNS.filter((r) => r.state === 'active' || r.state === 'idle').sort((a, z) => String(z.last_seen).localeCompare(String(a.last_seen)));
-  assert.deepEqual(headed(blocks, 'Working now').rows.map((r) => r.fields.doing), live.map((r) => r.doing), 'a finished run is listed, or the order is not by last seen');
+  const seen = (a: (typeof RUNS)[number], z: (typeof RUNS)[number]) => String(z.last_seen).localeCompare(String(a.last_seen));
+  const working = RUNS.filter((r) => r.state === 'active').sort(seen);
+  assert.deepEqual(headed(blocks, 'Working now').rows.map((r) => r.fields.doing), working.map((r) => r.doing), 'a stopped run is listed as working, or the order is not by last seen');
+  const left = RUNS.filter((r) => (r.state === 'idle' || r.state === 'handoff') && r.next).sort(seen);
+  assert.ok(left.length > 0, 'the seed has no run that left a next step');
+  assert.deepEqual(headed(blocks, 'Where they left off').rows.map((r) => r.fields.next), left.map((r) => r.next), 'a run that left no next step is listed, or a working one is');
+
+  assert.ok(headed(blocks, 'Tools and servers').rows.length > 0 && !headed(blocks, 'Tools and servers').rows.some((r) => r.fields.state !== 'active'));
+  const keys = headed(blocks, 'Keys');
+  assert.ok(keys.rows.length > 0 && !keys.rows.some((r) => r.fields.state === 'retired'), 'a retired key is listed');
 
   const learnings = headed(blocks, 'Learnings');
   assert.equal(learnings.matched, ROWS.learnings!.filter((r) => (r.state ?? 'active') === 'active').length, 'a superseded learning is counted');

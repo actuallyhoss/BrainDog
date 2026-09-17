@@ -225,13 +225,14 @@ test('/p/AGENTS, AS THE PACK DECLARES IT, draws the same runs, learnings and ski
 
     const project = block.columns!.findIndex((c) => c.field === 'project');
     assert.deepEqual(web.rows.map((r) => r.cells[project]), kernel.scopes, `${at}: each run's project, by its name`);
-    assert.deepEqual(kernel.scopes, ['Kiln', 'Kiln', 'Portage']);
+    const working = at === 'Working now';
+    assert.deepEqual(kernel.scopes, working ? ['Kiln', 'Kiln'] : ['Portage'], at);
     assert.deepEqual(
       web.quiet,
       kernel.rows.map((r) => isStale({ fields: r.fields, updated_at: r.updated_at }, NOW)),
       `${at}: the runs dimmed are the ones the kernel calls stale`,
     );
-    assert.deepEqual(web.quiet, [false, false, true], 'the run seen two hours ago has gone quiet');
+    assert.deepEqual(web.quiet, working ? [false, false] : [true], `${at}: the run seen two hours ago has gone quiet`);
   }
 });
 
