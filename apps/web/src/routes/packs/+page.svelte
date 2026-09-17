@@ -19,7 +19,7 @@
   import { DEPLOYMENT, PAGES, REGISTERS, PACKS, packDiff, pages } from '$lib/record/api.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { installWords } from '$lib/record/actions.ts';
-  import { blocked, choose, installPlanned, packDocument, planInstall, words, type Blocked, type Offer, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { blocked, choose, installPlanned, moduleUpdates, packDocument, planInstall, words, type Blocked, type Offer, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { words as vaultWords } from '$lib/record/vault.ts';
   import { read } from '$lib/data/record.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -53,6 +53,17 @@
   const available = $derived(PACKS.filter((p) => (live || !p.installed) && !installed.some((s) => s.id === p.id)));
 
   let diff = $state<string | null>(null);
+
+  /* A MODULE ON AT AN OLDER VERSION THAN THIS BUILD SHIPS, offered here through the same plan an install gets, so a module
+     turned on by itself, with no use case to update it through browse, still reaches its newer version. */
+  let updates = $state.raw<Map<string, { from: string; to: string }>>(new Map());
+  $effect(() => {
+    const held = states;
+    if (!live || !held) return;
+    void moduleUpdates(held).then((found) => {
+      if (states === held) updates = new Map(found.map((u) => [u.id, u]));
+    });
+  });
 
   /** The record's plan for one add-on, drawn under it until Install or Not now. */
   let offer = $state<Offer | null>(null);
@@ -295,6 +306,43 @@
   </dl>
 {/snippet}
 
+<!-- THE RECORD'S PLAN FOR ONE ADD-ON, under its row to install it or under its card to update it. -->
+{#snippet offered(pack: PackInfo)}
+  {#if offer}
+    <!-- THE RECORD'S OWN PLAN, the lines Install approves and nothing else. -->
+    <dl class="diff">
+      <dt>{copy.diffAdds}</dt>
+      <dd>
+        {#if offer.plan.summary}<p>{offer.plan.summary}</p>{/if}
+        <ul class="diff-adds">
+          {#each offer.plan.adds as add (add.kind + add.name)}
+            <li>
+              <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
+              <span class="diff-name">{add.name}</span>
+              {#if add.detail}<span class="diff-detail">{add.detail}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </dd>
+      {#if offer.plan.conflicts.length}
+        <dt>{copy.diffConflicts}</dt>
+        <dd>{#each offer.plan.conflicts as c (c)}<p>{c}</p>{/each}</dd>
+      {/if}
+      <CallsOut calls={offer.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
+      {#if offer.plan.seeds}
+        <dt>{copy.diffSeeds}</dt>
+        <dd>{offer.plan.seeds}</dd>
+      {/if}
+      <dt>{copy.diffTouches}</dt>
+      <dd>{offer.plan.touches}</dd>
+    </dl>
+    <div class="offer-actions">
+      <Button weight="primary" disabled={busy !== null || offer.plan.conflicts.length > 0} onclick={() => void installOffer(pack)}>{copy.install}</Button>
+      <Button weight="bare" disabled={busy !== null} onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
+    </div>
+  {/if}
+{/snippet}
+
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
 <PageHead icon="packs" title={copy.packs} />
@@ -366,6 +414,11 @@
           <footer class="pack-foot">
             <!-- EVERY INSTALLED ADD-ON HAS THIS, catalogued or not: whether it declares settings is the page's to say. -->
             <Button weight="bare" href="/packs/{state.id}">{words.settings}</Button>
+          {#if pack && updates.has(state.id)}
+            <Button weight="quiet" disabled={busy !== null || offer?.id === pack.id} onclick={() => void offerInstall(pack)}>
+              {busy === pack.id && offer?.id !== pack.id ? copy.packPlanning : copy.updateTo(updates.get(state.id)?.to ?? '')}
+            </Button>
+          {/if}
           {#if pack}
             <Button weight="bare" onclick={() => (diff = diff === pack.id ? null : pack.id)}>
               {copy.installDiff}
@@ -381,7 +434,7 @@
             >{copy.uninstall}</Button>
           {/if}
           </footer>
-          {#if pack && diff === pack.id}{@render plan(pack)}{/if}
+          {#if pack && offer?.id === pack.id}{@render offered(pack)}{:else if pack && diff === pack.id}{@render plan(pack)}{/if}
         </article>
       {/each}
     </div>
@@ -466,38 +519,7 @@
                 {copy.diffRefused(pack.conflicts.map((id) => REGISTERS[id]?.name ?? id))}
               </p>
             {/if}
-            {#if offer?.id === pack.id}
-              <!-- THE RECORD'S OWN PLAN, the lines Install approves and nothing else. -->
-              <dl class="diff">
-                <dt>{copy.diffAdds}</dt>
-                <dd>
-                  {#if offer.plan.summary}<p>{offer.plan.summary}</p>{/if}
-                  <ul class="diff-adds">
-                    {#each offer.plan.adds as add (add.kind + add.name)}
-                      <li>
-                        <Icon name={add.kind === 'list' ? 'rows' : 'doc'} size="s" />
-                        <span class="diff-name">{add.name}</span>
-                        {#if add.detail}<span class="diff-detail">{add.detail}</span>{/if}
-                      </li>
-                    {/each}
-                  </ul>
-                </dd>
-                {#if offer.plan.conflicts.length}
-                  <dt>{copy.diffConflicts}</dt>
-                  <dd>{#each offer.plan.conflicts as c (c)}<p>{c}</p>{/each}</dd>
-                {/if}
-                <CallsOut calls={offer.calls} hosted={DEPLOYMENT.kind !== 'self-host'} note={installWords.asksOnce} />
-                {#if offer.plan.seeds}
-                  <dt>{copy.diffSeeds}</dt>
-                  <dd>{offer.plan.seeds}</dd>
-                {/if}
-                <dt>{copy.diffTouches}</dt>
-                <dd>{offer.plan.touches}</dd>
-              </dl>
-              <div class="offer-actions">
-                <Button weight="primary" disabled={busy !== null || offer.plan.conflicts.length > 0} onclick={() => void installOffer(pack)}>{copy.install}</Button>
-                <Button weight="bare" disabled={busy !== null} onclick={() => (offer = null)}>{vaultWords.notNow}</Button>
-              </div>
+            {#if offer?.id === pack.id}{@render offered(pack)}
             {:else if diff === pack.id}{@render plan(pack)}{/if}
           </li>
         {/each}

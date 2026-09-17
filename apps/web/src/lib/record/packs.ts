@@ -159,6 +159,23 @@ export async function packDocument(id: string, installed?: readonly PackState[],
 }
 
 /**
+ * The modules this build ships at a later version than the record holds, each on: `{ id, from, to }`.
+ *
+ * A MODULE TURNED ON BY ITSELF WAS NEVER OFFERED ITS NEWER VERSION. /packs hid an installed pack from Install and had no
+ * Update, browse offers updates only through a use case, and Spark reads only a shared catalogue, so a record that took
+ * Work alone stayed on the version it started with. /packs offers these through the same plan an install gets.
+ */
+export async function moduleUpdates(states: readonly PackState[]): Promise<{ id: string; from: string; to: string }[]> {
+  const seed = await import('@braindog/seed');
+  const { compareVersions } = await import('@braindog/declare/catalogue');
+  const shipped = new Map<string, string>([...seed.FIRST_PARTY.map((id) => [id, seed.FIRST_PARTY_VERSIONS[id]] as const), [seed.AGENTS_PACK.manifest.id, seed.AGENTS_PACK.manifest.version]]);
+  return states.flatMap((s) => {
+    const to = shipped.get(s.id);
+    return to !== undefined && s.version !== null && s.disabled_at === null && compareVersions(s.version, to) < 0 ? [{ id: s.id, from: s.version, to }] : [];
+  });
+}
+
+/**
  * A module already on this record as the use case being added would install it, with no example rows, or `null` when that
  * use case gives the module no words or targets of its own (`install.ts` `relabels`). A module installed before a use case
  * keeps the words it went in with, and this is the update the plan offers for it.

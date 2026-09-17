@@ -382,3 +382,16 @@ test("MONEY'S SUMS ARE TYPED IN THE HOME CURRENCY once one is chosen, and one st
   assert.deepEqual(changesOf(money, draftsOf(money)), { values: {}, wrong: {} }, 'nor a box still drawn in sterling before the home was chosen');
   assert.deepEqual(changesOf(money, { ...drafts, most_out_30d: { ...drafts.most_out_30d!, text: '2,500,000' } }).values, { most_out_30d: { amount: 250_000_000, currency: 'EGP' } });
 });
+
+test('a module turned on by itself is offered its newer version on /packs, as a use case is on browse', async () => {
+  const { moduleUpdates } = await import('./packs.ts');
+  const { FIRST_PARTY_VERSIONS } = await import('@braindog/seed');
+  const held = (id: string, version: string | null, off = false) => ({ id, version, disabled_at: off ? '2026-09-17' : null, registers: [] });
+  const out = await moduleUpdates([held('work', '1.0.0'), held('people', FIRST_PARTY_VERSIONS.people), held('estate', '1.0.0', true), held('bookshelf', '0.1.0'), held('portfolio', null)]);
+  assert.deepEqual(out, [{ id: 'work', from: '1.0.0', to: FIRST_PARTY_VERSIONS.work }]);
+
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('../../routes/packs/+page.svelte', import.meta.url), 'utf8');
+  assert.match(screen, /moduleUpdates\(/u);
+  assert.match(screen, /copy\.updateTo\(/u);
+});
