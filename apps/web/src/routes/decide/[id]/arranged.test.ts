@@ -188,3 +188,10 @@ test('a first-party module and rule are named as a person knows them, never from
   assert.doesNotMatch(said, /invoice|Invoice late|cash-stale/u);
   assert.equal(arrangedOf('arrange', { usecase: 'founder', alongside: ['usecase-student'] })?.lead, 'Sets this BrainDog up for Solo founder');
 });
+
+test('an update of a module under a use case already at its version is said as that update', () => {
+  const body = { install: 'usecase-study', kind: 'usecase', title: 'Study', packs: { install: ['money-core'] }, plan: [{ pack: 'money-core', from: '1.0.0', version: '1.1.0', adds: [] }] };
+  const out = arrangedOf('pack', body);
+  assert.equal(out?.lead, 'Updates Money from 1.0.0 to 1.1.0');
+  assert.deepEqual(appliedLines({ installed: ['money-core'] }, body), ['Updated Money from 1.0.0 to 1.1.0']);
+});

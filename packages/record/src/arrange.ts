@@ -251,7 +251,10 @@ export function arranger(d: ArrangeDeps) {
 
   /* ── filing ──────────────────────────────────────────────────────────── */
 
-  /** The packs to install and to turn on, dependencies first, for what was asked. Already on is skipped, unless it is what was asked and a newer version is offered. */
+  /**
+   * The packs to install and to turn on, dependencies first, for what was asked. Already on is skipped, unless a newer
+   * version is offered: of what was asked, or of a module under it, which the shared-file install already plans.
+   */
   function expand(ids: readonly string[], at: string, docs: ReadonlyMap<string, Body>): Result<{ install: string[]; enable: string[] }> {
     const install: string[] = [];
     const enable: string[] = [];
@@ -265,7 +268,7 @@ export function arranger(d: ArrangeDeps) {
         seen.add(id);
         const state = stateOf(id);
         if (state && state.disabled_at === null) {
-          if (id === target && updateOf(id, docs)) install.push(id);
+          if (updateOf(id, docs)) install.push(id);
           continue;
         }
         if (state) enable.push(id);
@@ -428,7 +431,8 @@ export function arranger(d: ArrangeDeps) {
       const asked = body.install;
       const target = entryOf(asked)?.id ?? asked;
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
-      if (on(target) && !updateOf(target, docs))
+      /* AN UPDATE OF A MODULE UNDER IT is an update too: Personal at its version with Money behind is planned for Money. */
+      if (on(target) && ![...(entryOf(asked)?.modules ?? []), target].some((id) => on(id) && updateOf(id, docs)))
         return refuse(
           'TRANSITION_ILLEGAL',
           `${target} is already installed and on, at ${stateOf(target)?.version ?? 'its version'}, and no newer version is offered. To change what it says, propose body_kind settings.`,

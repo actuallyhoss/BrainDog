@@ -399,6 +399,26 @@ test('A PROPOSAL UPDATES A USE CASE THAT IS ON TO THE NEWER VERSION OFFERED, thr
   sql.close();
 });
 
+test('A PROPOSAL NAMING A USE CASE ALSO UPDATES AN OLDER MODULE UNDER IT, as installing a shared file does', async () => {
+  let work = '1.0.0';
+  const catalogue: CatalogueEntry[] = [{ ...CATALOGUE[0]!, doc: () => ({ ...WORK, version: work }) }, CATALOGUE[1]!];
+  const { api, sql } = await record(catalogue);
+  value(await api.decide(accept(value<{ id: string }>(await api.propose({ question: 'Study?', body_kind: 'pack', body: { install: 'study' } } as never, agent)).id), owner));
+  assert.equal(refusal(await api.propose({ question: 'Again?', body_kind: 'pack', body: { install: 'study' } } as never, agent)).code, 'TRANSITION_ILLEGAL');
+
+  work = '1.1.0';
+  const filed = value<{ id: string }>(await api.propose({ question: 'Update Study?', body_kind: 'pack', body: { install: 'study' } } as never, agent));
+  const row = value<{ body: { packs: { install: string[] }; plan: { pack: string; from?: string; version: string }[] } }>(await api.governance({ id: filed.id }, owner));
+  assert.deepEqual(row.body.packs.install, ['work']);
+  assert.deepEqual(row.body.plan.map((p) => [p.pack, p.from, p.version]), [['work', '1.0.0', '1.1.0']]);
+  const done = value<{ applied: { installed: string[] } }>(await api.decide(accept(filed.id), owner));
+  assert.deepEqual(done.applied.installed, ['work']);
+  const packs = value<{ packs: { id: string; version?: string }[] }>(await api.arrangement({}, agent)).packs;
+  assert.equal(packs.find((p) => p.id === 'work')?.version, '1.1.0');
+  assert.equal(packs.find((p) => p.id === 'usecase-study')?.version, STUDY.version);
+  sql.close();
+});
+
 test('A CATALOGUE THAT SAYS ITS VERSIONS LISTS THE UPDATES ON OFFER in the arrangement', async () => {
   const { api, sql } = await record([...CATALOGUE.map((e) => (e.id === 'work' ? { ...e, version: '1.0.0' } : e))]);
   value(await api.decide(accept(value<{ id: string }>(await api.propose({ question: 'Work?', body_kind: 'pack', body: { install: 'work' } } as never, agent)).id), owner));

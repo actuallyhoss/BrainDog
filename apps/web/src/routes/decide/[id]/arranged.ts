@@ -228,7 +228,9 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
   /* AN UPDATE IS SAID AS ONE, with the versions, and never as an install. */
   const updates = updatesOf(body);
   const fresh = install.filter((id) => !updates.has(id));
-  const update = kind === 'pack' ? updates.get(text(body.install)) : undefined;
+  /* AN UPDATE OF A MODULE UNDER A USE CASE ALREADY AT ITS VERSION leads as that update, never as setting the use case up. */
+  const updating = kind === 'pack' ? (updates.has(text(body.install)) ? text(body.install) : fresh.length === 0 ? [...updates.keys()][0] : undefined) : undefined;
+  const update = updating === undefined ? undefined : updates.get(updating);
   /* A PACK THAT INSTALLS ONE THING IS SAID BY ITS LEAD, Adds Work, and is not said twice. */
   const saidByLead = install.length === 1 && (kind === 'pack' || install[0] === `usecase-${text(body.usecase)}`);
   if (fresh.length > 0 && !saidByLead) packLines.push(copy.arrangeInstalls(fresh.map(name)));
@@ -261,7 +263,7 @@ export function arrangedOf(kind: string, body: Row, ctx: Context = {}): Arranged
       : kind === 'pack'
         ? text(body.install)
           ? update
-            ? copy.arrangeLeadUpdate(name(text(body.install)), update.from, update.to)
+            ? copy.arrangeLeadUpdate(name(updating ?? ''), update.from, update.to)
             : useCase
               ? copy.arrangeLeadUseCase(copy.valueWord(useCase))
               : copy.arrangeLeadInstall(name(text(body.install)))
