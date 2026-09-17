@@ -539,5 +539,6 @@ export const GUIDE_GROWS = {
     { metric: 'guide-idea-reached', gt: 0 },
   ],
   install: ['portfolio', 'work'],
+  why: 'Every milestone of the idea stage is reached.',
   question: 'Your idea stage is done. Add Projects and Work, so the project can be run as well as guided? Your milestones, steps and choices stay as they are.',
 } as const;

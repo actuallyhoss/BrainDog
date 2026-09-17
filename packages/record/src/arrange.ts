@@ -60,7 +60,18 @@ export type CatalogueEntry = {
   carry?: (io: CarryIo, from: string) => Promise<number>;
   /** The skills a use case names for agents working in it, which Spark offers once it is on (`loop/research-spark.md` S9). */
   skills?: readonly { name: string; trigger: string }[] | undefined;
+  /**
+   * WHAT A USE CASE GROWS INTO, and when: once every figure test holds, Spark asks on Decide to install these packs beside it
+   * (`spark.ts` `growsDrafts`). A guide whose idea stage is over grows into Projects and Work. Nothing is taken away.
+   */
+  grows?: Grows | undefined;
 };
+
+/** One test of a figure the use case declares, as a page block's `when:` is written. */
+export type FigureTest = { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number };
+
+/** What a use case grows into: the tests that say it is time, the packs to add, the question Decide asks and the short reason it gives. */
+export type Grows = { when: readonly FigureTest[]; install: readonly string[]; question: string; why: string };
 
 /** The rows of a list, and one link set on one row, as the owner who accepted. */
 export type RowIo = {

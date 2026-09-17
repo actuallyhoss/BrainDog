@@ -15,6 +15,7 @@ import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
+import { GUIDE_GROWS } from './guide.ts';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
 import { moduleDocument } from './install.ts';
 import { carryForward, linkExamples, type CarryIo, type LinkIo } from './links.ts';
@@ -36,7 +37,12 @@ export type SeedCatalogueEntry = {
   carry?: (io: CarryIo, from: string) => Promise<number>;
   /** The skills a use case names for agents, which Spark offers once it is on. */
   skills?: readonly { name: string; trigger: string }[];
+  /** What a use case grows into once the figures it names say so, which Spark asks about on Decide (`@braindog/record` `Grows`). */
+  grows?: { when: readonly { metric: string; gt?: number; gte?: number; lt?: number; lte?: number; is?: number }[]; install: readonly string[]; question: string; why: string };
 };
+
+/** What each use case grows into, by its id. The guide, once its idea stage is over, into Projects and Work. */
+const GROWS: Readonly<Record<string, NonNullable<SeedCatalogueEntry['grows']>>> = { guide: GUIDE_GROWS };
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -90,6 +96,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     /* AN UPDATE FROM BEFORE A VERSION THAT READS WHAT IS LOGGED moves what was typed into the log (`links.ts`). */
     carry: (io, from) => carryForward(io, u.usecase, from, today()),
     skills: u.skills,
+    ...(GROWS[u.usecase] ? { grows: GROWS[u.usecase] } : {}),
   }));
   return [
     ...modules,

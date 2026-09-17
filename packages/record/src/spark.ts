@@ -18,6 +18,7 @@
  * evidence where presence is being recorded (a page nobody opens counts only on a record where other pages are opened).
  */
 
+import type { FigureTest, Grows } from './arrange.ts';
 import type { Sql } from '@braindog/ports';
 import type { Kernel } from '@braindog/kernel';
 import { labelSetting, voiceSetting } from '@braindog/declare';
@@ -667,7 +668,49 @@ export function stableKey(body: Record<string, unknown>): string {
     return `rows:${body.register}:${body.rows.map((r) => String((r as { name?: unknown; what?: unknown })?.name ?? (r as { what?: unknown })?.what ?? '')).sort().join(',')}`;
   if (body.voice && typeof body.voice === 'object') return `voice:${Object.keys(body.voice).sort().join(',')}`;
   if (Array.isArray(body.pages)) return `pages:${body.pages.map((p) => String((p as { id?: unknown })?.id)).sort().join(',')}`;
+  /* PACKS ADDED BY AN ARRANGEMENT are what it is about, so a guide asked once to add Projects and Work is not asked again. */
+  const packs = body.packs as { install?: unknown } | undefined;
+  if (packs && typeof packs === 'object' && Array.isArray(packs.install) && packs.install.length > 0 && Object.keys(body).every((k) => k === 'packs' || k === 'why' || k === 'plan' || k === 'approve' || k === 'names'))
+    return `packs:install:${packs.install.map(String).sort().join(',')}`;
   return JSON.stringify(body).slice(0, 120);
+}
+
+/* ── what a use case grows into ─────────────────────────────────────────── */
+
+/** Whether one figure passes its test. A figure that cannot be read passes none. */
+function passes(test: FigureTest, value: number | null): boolean {
+  if (value === null || !Number.isFinite(value)) return false;
+  if (test.gt !== undefined) return value > test.gt;
+  if (test.gte !== undefined) return value >= test.gte;
+  if (test.lt !== undefined) return value < test.lt;
+  if (test.lte !== undefined) return value <= test.lte;
+  if (test.is !== undefined) return value === test.is;
+  return false;
+}
+
+/**
+ * Spark's question for each use case that is on and has reached what it grows into (`CatalogueEntry.grows`): every figure
+ * test holds and a pack it names is not on yet. Filed like any draft, through `prepare`, as an arrangement that installs
+ * only those packs, so accepting adds them and keeps every row.
+ *
+ * NOT HELD BACK ON A YOUNG RECORD. Spark waits a fortnight before reading habits into how a record is used; this is the
+ * person reaching a point their use case names, which can happen on the second day.
+ */
+export function growsDrafts(
+  entries: readonly { id: string; kind: string; grows?: Grows | undefined }[],
+  on: (pack: string) => boolean,
+  read: (metric: string) => number | null,
+): SparkDraft[] {
+  const out: SparkDraft[] = [];
+  for (const e of entries) {
+    const grows = e.grows;
+    if (e.kind !== 'usecase' || !grows || !on(e.id)) continue;
+    const missing = grows.install.filter((id) => !on(id));
+    if (missing.length === 0 || grows.when.length === 0 || !grows.when.every((t) => passes(t, read(t.metric)))) continue;
+    const body = { packs: { install: [...missing] }, why: [grows.why] };
+    out.push({ key: stableKey(body), question: grows.question.slice(0, QUESTION_MAX), body_kind: 'arrange', body, by: 'rules' });
+  }
+  return out;
 }
 
 /* ── a newer version in a catalogue ─────────────────────────────────────── */

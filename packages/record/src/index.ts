@@ -83,12 +83,12 @@ import type { Json as JsonValue } from '@braindog/kernel';
 
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, fromModel, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
+import { catalogueDrafts, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SPARK_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SparkDraft, type SparkModel } from './spark.ts';
 import { grammarOf } from './grammar.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
-export type { CatalogueEntry, RowIo } from './arrange.ts';
-export { fromModel, noticeUsage, readUsage, SPARK_OPEN_CAP, type CatalogueOffer, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
+export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
+export { fromModel, growsDrafts, noticeUsage, readUsage, SPARK_OPEN_CAP, type CatalogueOffer, type Noticed, type SparkDraft, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
@@ -1148,6 +1148,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push('The catalogue could not be read, so no update from it was asked about.');
       }
     }
+    /* WHAT A USE CASE GROWS INTO, once the figures it names say so: asked whatever the record's age (`growsDrafts`). */
+    const usedOn = new Map(r.usage.packs.map((p) => [p.id, p.on]));
+    const packsOn = new Set(kernel.packs().filter((p) => usedOn.get(p.id) ?? true).map((p) => p.id));
+    drafts = [
+      ...drafts,
+      ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
+        const decl = kernel.metricDecl(metric);
+        const read = decl ? kernel.metric(decl) : null;
+        return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
+      }),
+    ];
     const filed: { id: string; question: string; by: string }[] = [];
     const skipped: { question: string; why: string }[] = [];
     for (const d of drafts) {
