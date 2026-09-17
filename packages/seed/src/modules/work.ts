@@ -41,7 +41,9 @@ export const TASKS: Fields[] = [
   { what: 'Illustrations for the specimen page', state: 'doing', thing: 1, track: 3, parent: 10, owner: 3, by: day(10), effort: days(3), note: '' },
   { what: 'Type tester for the specimen page', state: 'open', thing: 1, track: 3, parent: 10, by: day(14), effort: days(1), note: '' },
   { what: 'Reconcile the Fenwick invoice against services', state: 'review', thing: 3, track: 2, agent: 'claude', by: day(2), effort: days(0.5), note: 'Two services share one monthly total. Claude matched them by renewal date; check the match.' },
-  { what: 'Check the September bank statement', state: 'open', thing: null, by: day(5), effort: days(0.2), note: '' },
+  /* DUE THE SAME DAY AS `tasks#4`, on purpose: two tasks on one day are listed in the same order by the record and the
+     sample, newest first, and a sample with no tie could not show that. */
+  { what: 'Check the September bank statement', state: 'open', thing: null, by: day(4), effort: days(0.2), note: '' },
   { what: 'Mastering pass, all instances', state: 'done', thing: 1, track: 1, agent: 'claude', by: day(-3), done_on: day(-4), effort: days(2), note: '' },
   { what: 'Outline check on instances 1 to 3', state: 'done', thing: 1, track: 1, agent: 'claude', by: day(-19), done_on: day(-20), effort: days(0.5), note: '' },
   { what: 'Sign off instances 1 to 3', state: 'done', thing: 1, track: 1, by: day(-18), done_on: day(-19), effort: days(0.5), note: '' },

@@ -781,58 +781,64 @@ export function applyFilters(register: string, entries: Entry[], filters: Filter
 /** `names` is a live record's, as `display` takes it: a ref column on a record sorts by the record's names. */
 export function sortRows(register: string, entries: Entry[], field: string, dir: 'asc' | 'desc', names?: Names): Entry[] {
   const sign = dir === 'asc' ? 1 : -1;
-  return [...entries].sort((a, b) => {
-    if (field === 'seq') return (a.seq - b.seq) * sign;
-    const x = a.fields[field];
-    const y = b.fields[field];
-    if (x === y) return a.seq - b.seq;
-    if (x === null || x === undefined) return 1;
-    if (y === null || y === undefined) return -1;
+  /* TWO ROWS WITH ONE VALUE GO NEWEST FIRST, in either direction, because that is the record's own tie-break: its sorted
+     list orders by the field and then `id DESC`, and an id is minted in the order rows are made, as a number is. Oldest
+     first here put two tasks due on one day in one order on the sample and the other on a real record. */
+  const tie = (a: Entry, b: Entry): number => b.seq - a.seq;
+  return [...entries].sort((a, b) => compareRows(register, a, b, field, sign, names) || tie(a, b));
+}
 
-    /**
-     * A REF SORTS BY THE NAME ON SCREEN, not by the row number behind it.
-     *
-     * A `ref` is stored as a seq — a number — so it missed the string branch below and fell into
-     * `amountOf`, which coerces any scalar, and the column was ordered by the hidden id while the
-     * cell rendered the title of the row it points at. `/r/obligations?sort=party:asc` gave Halden
-     * ×9, Ravensworth ×8, J. Okonkwo ×4, Pell & Vine ×5 — the `people` register's own seq order, in
-     * no visible order at all, under a `columnheader` announcing `aria-sort="ascending"`.
-     *
-     * The Project column has the same shape and was saved by luck: Kiln, Marlow & Co, Portage and
-     * Tallow happen to be alphabetical in seq order, so renaming one project would have silently
-     * stopped that column sorting too.
-     *
-     * `display()` IS WHAT THE CELL SHOWS, so it is what the sort has to read. Same locale collation
-     * as any other text, for the same reason.
-     */
-    const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
-    /* AND AN ENUM WITH LABELS SORTS BY THEM, for the same reason: `owed_by_me` is Money out on screen. */
-    if (decl?.type === 'ref' || (decl?.type === 'enum' && decl.labels)) {
-      const sx = display(register, field, x, NOW, names) ?? '';
-      const sy = display(register, field, y, NOW, names) ?? '';
-      return sx.localeCompare(sy, LOCALE) * sign;
-    }
+function compareRows(register: string, a: Entry, b: Entry, field: string, sign: number, names?: Names): number {
+  if (field === 'seq') return (a.seq - b.seq) * sign;
+  const x = a.fields[field];
+  const y = b.fields[field];
+  if (x === y) return 0;
+  if (x === null || x === undefined) return 1;
+  if (y === null || y === undefined) return -1;
 
-    /* TEXT COLLATES, everything else compares. `<` on strings compares UTF-16 code units, so every
-       capital sorts above every lowercase — "Zebra" before "apple" — and anything accented lands
-       after "z", which puts "Ökonkwo" at the bottom of a column of party names. Numbers and ISO
-       days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
-       chronological already precisely because it is written to sort as text. */
-    if (typeof x === 'string' && typeof y === 'string') return x.localeCompare(y, LOCALE) * sign;
-    /* MONEY IS AN OBJECT, and `{} < {}` is false both ways round — so a column of money sorted into
-       whatever order the rows arrived in, which looks exactly like a sort that worked. Within one
-       currency it compares by magnitude; across two it groups by code first, because there is no
-       order between them and pretending otherwise is the same lie as adding them. */
-    const mx = amountOf(x);
-    const my = amountOf(y);
-    if (mx !== null && my !== null) {
-      const cx = currencyOf(x) ?? '';
-      const cy = currencyOf(y) ?? '';
-      if (cx !== cy) return cx.localeCompare(cy) * sign;
-      return (mx - my) * sign;
-    }
-    return (x < y ? -1 : 1) * sign;
-  });
+  /**
+   * A REF SORTS BY THE NAME ON SCREEN, not by the row number behind it.
+   *
+   * A `ref` is stored as a seq — a number — so it missed the string branch below and fell into
+   * `amountOf`, which coerces any scalar, and the column was ordered by the hidden id while the
+   * cell rendered the title of the row it points at. `/r/obligations?sort=party:asc` gave Halden
+   * ×9, Ravensworth ×8, J. Okonkwo ×4, Pell & Vine ×5 — the `people` register's own seq order, in
+   * no visible order at all, under a `columnheader` announcing `aria-sort="ascending"`.
+   *
+   * The Project column has the same shape and was saved by luck: Kiln, Marlow & Co, Portage and
+   * Tallow happen to be alphabetical in seq order, so renaming one project would have silently
+   * stopped that column sorting too.
+   *
+   * `display()` IS WHAT THE CELL SHOWS, so it is what the sort has to read. Same locale collation
+   * as any other text, for the same reason.
+   */
+  const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+  /* AND AN ENUM WITH LABELS SORTS BY THEM, for the same reason: `owed_by_me` is Money out on screen. */
+  if (decl?.type === 'ref' || (decl?.type === 'enum' && decl.labels)) {
+    const sx = display(register, field, x, NOW, names) ?? '';
+    const sy = display(register, field, y, NOW, names) ?? '';
+    return sx.localeCompare(sy, LOCALE) * sign;
+  }
+
+  /* TEXT COLLATES, everything else compares. `<` on strings compares UTF-16 code units, so every
+     capital sorts above every lowercase — "Zebra" before "apple" — and anything accented lands
+     after "z", which puts "Ökonkwo" at the bottom of a column of party names. Numbers and ISO
+     days are left alone: money is an integer and must compare by magnitude, and `2026-07-27` is
+     chronological already precisely because it is written to sort as text. */
+  if (typeof x === 'string' && typeof y === 'string') return x.localeCompare(y, LOCALE) * sign;
+  /* MONEY IS AN OBJECT, and `{} < {}` is false both ways round — so a column of money sorted into
+     whatever order the rows arrived in, which looks exactly like a sort that worked. Within one
+     currency it compares by magnitude; across two it groups by code first, because there is no
+     order between them and pretending otherwise is the same lie as adding them. */
+  const mx = amountOf(x);
+  const my = amountOf(y);
+  if (mx !== null && my !== null) {
+    const cx = currencyOf(x) ?? '';
+    const cy = currencyOf(y) ?? '';
+    if (cx !== cy) return cx.localeCompare(cy) * sign;
+    return (mx - my) * sign;
+  }
+  return (x < y ? -1 : 1) * sign;
 }
 
 /* ── tracks ──────────────────────────────────────────────────────────────── */

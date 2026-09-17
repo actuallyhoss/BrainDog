@@ -300,7 +300,8 @@ export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = {
   people: [],
   'money-core': ['portfolio', 'people'],
   estate: ['portfolio'],
-  work: ['portfolio'],
+  /* Work only links to Projects and People too: a task's project and owner are left out of a record without them. */
+  work: [],
   agents: ['portfolio'],
 };
 

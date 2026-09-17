@@ -49,9 +49,10 @@ test('a missing value sorts last in BOTH directions', () => {
   }
 });
 
-test('ties break by seq, so the order is stable and the same every time', () => {
+test('ties break newest first, as the record breaks them, so the order is stable and the same every time', () => {
   const out = sortRows('obligations', rows({ amount: 100 }, { amount: 100 }, { amount: 100 }), 'amount', 'asc');
-  assert.deepEqual(seqs(out), [1, 2, 3]);
+  assert.deepEqual(seqs(out), [3, 2, 1]);
+  assert.deepEqual(seqs(sortRows('obligations', rows({ amount: 100 }, { amount: 100 }), 'amount', 'desc')), [2, 1], 'in either direction');
 });
 
 test('sorting does not mutate what it was given', () => {
