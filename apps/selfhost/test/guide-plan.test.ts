@@ -221,7 +221,8 @@ test('WHEN NO MODEL FORMS A PLAN, THE TEMPLATES WRITTEN AFTER THE LISTS ARE THE 
       const read = (await api.list({ register, limit: 200 }, owner)) as { ok: boolean; value?: { rows: Row[] } };
       return read.ok ? read.value!.rows : null;
     },
-    link: async (register: string, seq: number, field: string, spoken: string) => ((await api.update({ register, seq, patch: { [field]: spoken } }, owner)) as { ok: boolean }).ok,
+    link: async (register: string, seq: number, field: string, spoken: string | readonly string[]) =>
+      ((await api.update({ register, seq, patch: { [field]: spoken as never } }, owner)) as { ok: boolean }).ok,
   });
 
   for (const said of [SAID, 'I want to start something new']) {

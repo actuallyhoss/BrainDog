@@ -51,7 +51,8 @@ const io = (client: Client) => ({
     const read = await client.list({ register, limit: 200 });
     return read.ok ? (read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : null;
   },
-  link: async (register: string, seq: number, field: string, spoken: string) => (await client.update({ register, seq, patch: { [field]: spoken } })).ok,
+  link: async (register: string, seq: number, field: string, spoken: string | readonly string[]) =>
+    (await client.update({ register, seq, patch: { [field]: spoken as never } })).ok,
 });
 
 test('A USE CASE SHARED ON ONE HOST INSTALLS ON ANOTHER FROM AN ADDRESS, IN THE ORDER IT WAS DRAWN, WITH ITS EXAMPLES LINKED', async (t) => {
