@@ -387,6 +387,8 @@ export type RecordSurface = {
   archiveArrival(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
   arrangement(args: never, ctx: never): Promise<Result<unknown>>;
+  spark(args: never, ctx: never): Promise<Result<unknown>>;
+  sparkPropose(args: never, ctx: never): Promise<Result<unknown>>;
   actions(ctx: never): Promise<Result<unknown>>;
   setPackConfig(args: never, ctx: never): Promise<Result<unknown>>;
   setDeclaration(args: never, ctx: never): Promise<Result<unknown>>;
@@ -466,6 +468,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     archiveArrival: (a, ctx) => api.archiveArrival(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
     arrangement: (a, ctx) => api.arrangement(a as never, ctx as never),
+    spark: (a, ctx) => api.spark(a as never, ctx as never),
+    sparkPropose: (a, ctx) => api.sparkPropose(a as never, ctx as never),
     actions: (_a, ctx) => api.actions(ctx as never),
     setPackConfig: (a, ctx) => api.setPackConfig(a as never, ctx as never),
     setDeclaration: (a, ctx) => api.setDeclaration(a as never, ctx as never),
