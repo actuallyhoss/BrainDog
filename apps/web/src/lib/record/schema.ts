@@ -117,6 +117,8 @@ export type RegisterDecl = {
   done?: readonly string[];
   /** A day field the record fills when a row enters a `done` state and empties when it leaves one. */
   finished?: string;
+  /** Its rows are steps of the row a `ref` field points at, done when a `bool` field is true (the kernel's `steps.ts`). */
+  steps?: { of: string; done: string };
   fields: readonly FieldDecl[];
   /** Rows of this register HAVE an identity: a mark and a frozen accent hue (13 §2.1b). */
   identity?: { mark: string; accent: string };

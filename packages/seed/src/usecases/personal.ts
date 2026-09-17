@@ -129,7 +129,7 @@ const budgetProgress = (heading: string) => ({
 export const PERSONAL = {
   usecase: 'personal',
   /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home. */
-  version: '1.3.0',
+  version: '1.4.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -347,6 +347,8 @@ export const PERSONAL = {
         icon: 'task',
         holds: 'the steps each project takes, and which are done',
         title: 'what',
+        /* HOW FAR ALONG A PROJECT IS, when nobody typed it: the share of its steps done, drawn on Projects' rings. */
+        steps: { of: 'thing', done: 'done' },
         mobile: ['what', 'thing', 'done'],
         fields: [
           { id: 'what', label: 'Step', type: 'text', required: true, search: true },

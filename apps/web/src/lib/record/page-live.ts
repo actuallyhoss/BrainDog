@@ -122,6 +122,7 @@ type Answered = {
   matched?: number;
   readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said; trend?: unknown; note?: unknown }[];
   scopes?: (string | null)[];
+  rings?: (number | null)[];
   inherited?: number;
   refusals?: Said[];
   drawn?: boolean;
@@ -454,6 +455,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     matched = 0,
     readings,
     scopes,
+    rings,
     inherited,
     refusals = [],
     values,
@@ -619,7 +621,11 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
 
   const live = b.source === 'sessions.live';
   const entries = got.map((r) => entryOf(register, r, refs));
-  const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
+  /* HOW FAR ALONG A CARD IS FROM ITS STEPS, worked out by the record where the ring's own field is empty. Drawn through the
+     field, so the ring reads as a typed one does; the row itself is not changed. */
+  const ring = kind === 'cards' ? b.columns?.find((c) => c.as === 'ring')?.field : undefined;
+  const drawnEntries = ring && Array.isArray(rings) ? entries.map((e, n) => (typeof rings[n] === 'number' ? { ...e, fields: { ...e.fields, [ring]: rings[n] } } : e)) : entries;
+  const rows = toRows(register, drawnEntries, shell.columns, now, namesOf(refs));
   /* WHO CHANGED EACH ROW LAST, named by the kernel on `changes`, and each money column's sign. */
   markColumns(register, b.columns, entries, rows, (_e, n) => changeOf(changed, n));
   /* WHERE A ROW APPLIES, and which project a run is in, are named by the kernel on `scopes`. */

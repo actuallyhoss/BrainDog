@@ -2113,11 +2113,36 @@ test('THE CLOSED LISTS ARE `42 §4.4`’s OWN, and this is the test that stops t
    *   `id` · `to`        the code's spellings of `register:` on a body and on a `ref`.
    *   `state` · `done`   which field is mirrored, and which of its values mean finished.
    *   `finished`         the day field the write path fills when a row enters one of those values (`finished.ts`).
+   *   `steps`            which row a row is a step of, and whether it is done, for a card's ring (`steps.ts`).
    *   `icon` · `holds` · `label` · `deadline` · `qualifies` · `unit`  drawn by `apps/web`.
    *   `search`           on a FIELD, which is what `fts.ts` actually reads.
    *   `derived`          the kernel's own flag, which refuses a write and skips validation.
    */
   const undocumented = (mine: readonly string[], theirs: readonly string[]) => mine.filter((k) => !theirs.includes(k)).sort();
-  assert.deepEqual(undocumented(register, REG), ['done', 'finished', 'holds', 'icon', 'id', 'state']);
+  assert.deepEqual(undocumented(register, REG), ['done', 'finished', 'holds', 'icon', 'id', 'state', 'steps']);
   assert.deepEqual(undocumented(field, FLD), ['deadline', 'derived', 'label', 'qualifies', 'search', 'to', 'unit']);
+});
+
+test('STEPS NAME A REF AND A BOOL OF THEIR OWN LIST, or the list is refused', () => {
+  const body = (steps: unknown) => ({
+    id: 'register.milestones',
+    kind: 'register',
+    body: {
+      id: 'milestones',
+      name: 'Milestones',
+      title: 'what',
+      steps,
+      fields: [
+        { id: 'what', type: 'text' },
+        { id: 'thing', type: 'ref', to: 'things' },
+        { id: 'done', type: 'bool' },
+      ],
+    },
+  }) as never;
+  assert.equal(validateDeclaration(body({ of: 'thing', done: 'done' })), null);
+  for (const wrong of [{ of: 'what', done: 'done' }, { of: 'thing', done: 'what' }, { of: 'thing' }, 'thing', { of: 'thing', done: 'done', by: 'x' }]) {
+    const said = validateDeclaration(body(wrong));
+    assert.equal(said?.code, 'DECLARATION_INVALID', JSON.stringify(wrong));
+    assert.equal(said?.at, 'steps');
+  }
 });

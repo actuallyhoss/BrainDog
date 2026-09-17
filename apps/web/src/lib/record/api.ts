@@ -55,7 +55,7 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, barsOf, findingsFrom, isStale, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
+import { STALE_MS, barsOf, findingsFrom, isStale, stepsPercent, tallySteps, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
 import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
@@ -2183,7 +2183,7 @@ export function readBlock(b: PageBlock): BlockResult {
           ...(c.as === undefined || c.as === 'scope' ? {} : { as: c.as }),
         }))
       : [];
-    const rows = toRows(register ?? '', entries, columns);
+    const rows = toRows(register ?? '', ringed(register, b, entries), columns);
     (b.columns ?? []).forEach((c, i) => {
       if (c.as !== 'scope') return;
       entries.forEach((e, n) => {
@@ -2232,6 +2232,25 @@ export function readBlock(b: PageBlock): BlockResult {
       }),
     };
   }
+}
+
+/**
+ * HOW FAR ALONG EACH CARD IS FROM THE STEPS UNDER IT, where its ring's field is empty, as the record works it out
+ * (`@braindog/kernel` `steps.ts`). Only what the cells are drawn from carries it; the rows themselves are not changed.
+ */
+function ringed(register: string | undefined, b: { kind: string; columns?: readonly { field: string; as?: string }[] }, entries: Entry[]): Entry[] {
+  const ring = b.kind === 'cards' ? b.columns?.find((c) => c.as === 'ring')?.field : undefined;
+  if (!register || !ring) return entries;
+  const tally = new Map<string, { done: number; total: number }>();
+  for (const [id, list] of Object.entries(REGISTERS)) {
+    const of = list.steps ? list.fields.find((f) => f.id === list.steps!.of) : undefined;
+    if (list.steps && of?.to === register) tallySteps(ROWS[id] ?? [], list.steps, tally);
+  }
+  if (tally.size === 0) return entries;
+  return entries.map((e) => {
+    const share = typeof e.fields[ring] === 'number' ? null : stepsPercent(tally.get(String(e.seq)));
+    return share === null ? e : { ...e, fields: { ...e.fields, [ring]: share } };
+  });
 }
 
 /**

@@ -105,6 +105,7 @@ import {
 } from './govern.ts';
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
+import type { StepsDecl } from './steps.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -216,6 +217,7 @@ export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket,
 export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
+export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -422,6 +424,8 @@ export type RegisterDecl = {
   seq_prefix?: string;
   /** On the one register whose rows are projects: the fields listing each one's repositories and folders. */
   scopes?: ScopesDecl;
+  /** Its rows are steps of the row a `ref` field points at, done when a `bool` field is true (`steps.ts`). */
+  steps?: StepsDecl;
 };
 
 export type Entry = {
@@ -2536,6 +2540,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return f && 'to' in f && typeof f.to === 'string' ? { field: f.id, to: f.to } : null;
     },
     inScope: (register, project, opts) => inScope(register, project, opts),
+    stepsOf: (register) =>
+      [...registers.values()].flatMap((r) => {
+        const to = r.steps ? r.fields.find((f) => f.id === r.steps!.of) : undefined;
+        return r.steps && to && 'to' in to && to.to === register ? [{ register: r.id, ...r.steps }] : [];
+      }),
     /* A ROW NAMED THE WAY A PAGE NAMES IT, `skills#3`, and only in the register the block reads. */
     history: (register, row) => {
       const m = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(row);

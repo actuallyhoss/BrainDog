@@ -237,6 +237,33 @@ test('A PERSONAL HOME OPENS ON THE MONTH, THE BUDGET, THE BILLS OF THE WEEK, GOA
   sql.close();
 });
 
+test('A PERSONAL PROJECT IS AS FAR ALONG AS ITS STEPS ARE DONE, on the Overview, and a typed number still wins', async () => {
+  const { k, sql } = await made('personal');
+  const io: LinkIo = {
+    rows: async (register) => {
+      const read = k.list({ register, limit: 200 });
+      return read.ok ? read.value.rows : null;
+    },
+    link: async (register, seq, field, spoken) => k.update(register, `${register}#${seq}`, { [field]: spoken }, { actor: 'p_owner', cascade: false }).ok,
+  };
+  await linkExamples(io, 'personal');
+  type Carded = Drawn & { heading: string; rows?: Row[]; rings?: (number | null)[] };
+  const ringBy = (b: Carded) => Object.fromEntries((b.rows ?? []).map((r, i) => [String(r.fields.name ?? r.fields.next), b.rings?.[i] ?? null]));
+  const inPlay = value<{ blocks: Carded[] }>(k.page('portfolio')).blocks.find((b) => b.heading === 'In play')!;
+  assert.deepEqual(inPlay.refusals ?? [], []);
+  const rings = ringBy(inPlay);
+  assert.equal(rings['Restore the old road bike'], 50, JSON.stringify(rings));
+  assert.equal(rings['A collection of short stories'], 33, JSON.stringify(rings));
+
+  /* A NUMBER SOMEBODY TYPED IS WHAT THEY SAID, so the steps do not overrule it. */
+  const bike = (k.list({ register: 'things', where: 'name is Restore the old road bike', limit: 1 }) as { value: { rows: { seq: number }[] } }).value.rows[0]!;
+  value(k.update('things', `things#${bike.seq}`, { progress: 80 }, { actor: 'p_owner' }));
+  const typed = ringBy(value<{ blocks: Carded[] }>(k.page('portfolio')).blocks.find((b) => b.heading === 'In play')!);
+  assert.equal(typed['Restore the old road bike'], null, 'the typed 80 is drawn from the field');
+  assert.equal(typed['A collection of short stories'], 33);
+  sql.close();
+});
+
 test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and its agents, with nothing over money or services', async () => {
   const { k, sql } = await made('team');
   const product = value<{ seq: number }>(k.create('things', { name: 'Mobile app', lane: 'building', health: 'at_risk', next: 'Cut the release branch' }, { actor: 'p_owner' }));

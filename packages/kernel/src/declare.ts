@@ -1952,6 +1952,8 @@ function createFault(
  *   `icon` · `holds`  the rail's glyph and the register's one line, both drawn by `apps/web`.
  *   `seq_prefix`  the letters a row's spoken id starts with, `S` for `S42`; `get` resolves it, and
  *             `validate` refuses one another register already speaks.
+ *   `steps`   `{ of, done }`: its rows are steps of the row the `ref` field `of` points at, done when the `bool` field
+ *             `done` is true; a card's ring over an empty field draws the share done (`steps.ts`).
  *   `scopes`  on the one register whose rows are projects, the fields listing their repositories
  *             and folders; `resolveProject` places a run by them.
  *
@@ -1963,7 +1965,7 @@ function createFault(
  */
 const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
-  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes',
+  'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps',
 ] as const;
 
 /**
@@ -2849,6 +2851,22 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
         `${id} names ${String(finished)} as the day a row was finished. That is a day field of a register that declares a state.`,
         'finished',
         (decl.body.fields as readonly Record<string, unknown>[]).filter((x) => x.type === 'day').map((x) => String(x.id)),
+      );
+  }
+
+  /* STEPS NAME A REF AND A BOOL OF THIS LIST, or there is no row they belong to and no way to tell one done. */
+  const steps = decl.body.steps;
+  if (steps !== undefined) {
+    const own = decl.body.fields as readonly Record<string, unknown>[];
+    const said = steps !== null && typeof steps === 'object' && !Array.isArray(steps) ? (steps as Record<string, unknown>) : {};
+    const of = own.find((x) => x.id === said.of);
+    const done = own.find((x) => x.id === said.done);
+    if (Object.keys(said).some((k) => k !== 'of' && k !== 'done') || of?.type !== 'ref' || done?.type !== 'bool')
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} says its rows are steps. Say which ref field names the row each belongs to and which bool field says it is done, as { of: thing, done: done }.`,
+        'steps',
+        own.filter((x) => x.type === 'ref' || x.type === 'bool').map((x) => String(x.id)),
       );
   }
 

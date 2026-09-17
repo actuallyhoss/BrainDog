@@ -29,6 +29,7 @@ import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
+import { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
 
 export type PageBlock = {
@@ -202,6 +203,8 @@ export type BlockResult = PageBlock & {
    * `sessions.live`, the name of the project each run was placed in.
    */
   scopes?: (string | null)[];
+  /** A `cards` block's: how far along each row is from the steps under it, where its ring's own field is empty (`steps.ts`). */
+  rings?: (number | null)[];
   /** A `feed` block's rows, newest first, a burst being one row. */
   feed?: FeedRow[];
   /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
@@ -285,6 +288,8 @@ export type PageDeps = {
    */
   /** The field that says where a register's rows apply, and the register of projects it points at. */
   scopeOf?: (register: string) => { field: string; to: string } | null;
+  /** The lists whose rows are steps of this list's rows, and how each says which row and whether it is done. */
+  stepsOf?: (register: string) => ({ register: string } & StepsDecl)[];
   /** The kernel's `inScope`, which is where nearer-wins is decided. */
   inScope?: (register: string, project: string, opts: { limit?: number; open?: boolean }) => Result<{ rows: Entry[]; inherited: Entry[] }>;
   /** Every event about one row of `register`, oldest first. `row` is a spoken id or a row id. */
@@ -898,6 +903,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     matched: listed.value.matched,
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
+    ...ringsOf(deps, block, register, rows),
   };
 }
 
@@ -1100,6 +1106,24 @@ function changesOf(deps: PageDeps, register: string, rows: readonly Entry[]): ({
     const last = events?.ok ? events.value.at(-1) : undefined;
     return last ? { by: byOf(last.actor), who: last.actor, at: last.ts } : null;
   });
+}
+
+/**
+ * HOW FAR ALONG EACH CARD IS, when its ring's field is empty and a list declares steps of this one: the share of its steps
+ * done. Absent when no ring would take one, so a page with nothing to derive answers as it did.
+ */
+function ringsOf(deps: PageDeps, block: PageBlock, register: string, rows: readonly Entry[]): { rings?: (number | null)[] } {
+  const ring = block.kind === 'cards' ? block.columns?.find((c) => c.as === 'ring') : undefined;
+  if (!ring || !deps.stepsOf || rows.every((r) => typeof r.fields[ring.field] === 'number')) return {};
+  const lists = deps.stepsOf(register);
+  if (lists.length === 0) return {};
+  const tally = new Map<string, { done: number; total: number }>();
+  for (const list of lists) {
+    const read = everyRow(deps, list.register, undefined);
+    if (read.ok) tallySteps(read.value.rows, list, tally);
+  }
+  const rings = rows.map((r) => (typeof r.fields[ring.field] === 'number' ? null : stepsPercent(tally.get(r.id))));
+  return rings.some((v) => v !== null) ? { rings } : {};
 }
 
 function scopesOf(deps: PageDeps, rows: readonly Entry[], scope: { field: string; to: string }): (string | null)[] {
