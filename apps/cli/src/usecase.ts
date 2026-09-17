@@ -3,7 +3,13 @@
  * (`loop/research-spark.md` S14).
  *
  * EXPORT IS A READ, so a signed-in machine may save one: `exportUseCase` answers the modules, the use case's lists and
- * pages, the pages placed by hand, the voice and the labels, and no row unless `--example list:1,2` names it.
+ * pages, the pages placed by hand, the voice and the labels, and no row unless `--example list:1,2` names it. `--minor`
+ * counts a minor on from the later of the installed version and the one last shared, where a patch is the default;
+ * `--signal` puts in a word that suggests the use case, and `--skill 3` a skill's name and trigger. The version shared is
+ * kept only from the app's share form, because keeping it is a settings write, which is an owner's in a browser.
+ *
+ * A REFUSAL IS SAID AS THE RECORD SAYS IT, with its code after it, so a file refused for a block kind this build does not
+ * draw reads as that, and the code is there for whoever wrote the file.
  *
  * CHECK SENDS NOTHING. It runs the file through `readShared`, the door the record and the app read a shared file
  * through, so a file that would be refused (too large, a credential in it, a block kind nothing draws) is found out here.
@@ -17,11 +23,15 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { readShared, SHARED_SUFFIX } from '@braindog/declare';
-import { refused } from '@braindog/ports';
+import { refused, type Result } from '@braindog/ports';
 
 import { connect, fixOf, type AgentIo } from './skills.ts';
 
-const USAGE = 'braindog usecase takes export [--out <file>] [--title <title>] [--version <x.y.z>] [--example <list>:<n>,<n>], or check <file>.';
+const USAGE =
+  'braindog usecase takes export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or check <file>.';
+
+/** A refusal's sentence with its code after it, or the plain sentence for an answer that carries none. */
+const saidWithCode = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : fixOf(r));
 
 export async function usecase(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
@@ -47,7 +57,17 @@ export function examplesOf(given: readonly string[]): { ok: true; value: Record<
 }
 
 async function exportFile(args: string[], io: AgentIo): Promise<number> {
-  let values: { host?: string | undefined; out?: string | undefined; title?: string | undefined; version?: string | undefined; usecase?: string | undefined; example?: string[] | undefined };
+  let values: {
+    host?: string | undefined;
+    out?: string | undefined;
+    title?: string | undefined;
+    version?: string | undefined;
+    usecase?: string | undefined;
+    example?: string[] | undefined;
+    minor?: boolean | undefined;
+    signal?: string[] | undefined;
+    skill?: string[] | undefined;
+  };
   try {
     ({ values } = parseArgs({
       args,
@@ -59,6 +79,9 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
         version: { type: 'string' },
         usecase: { type: 'string' },
         example: { type: 'string', multiple: true },
+        minor: { type: 'boolean' },
+        signal: { type: 'string', multiple: true },
+        skill: { type: 'string', multiple: true },
       },
     }));
   } catch {
@@ -70,6 +93,15 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
     io.say(examples.fix);
     return 1;
   }
+  const skills = (values.skill ?? []).map(Number);
+  if (skills.some((n) => !Number.isInteger(n) || n < 1)) {
+    io.say('--skill is a row number from Skills, as in --skill 3.');
+    return 1;
+  }
+  if (values.minor && values.version !== undefined) {
+    io.say('--minor counts the version on for you, so give it or --version, not both.');
+    return 1;
+  }
 
   const at = await connect(values.host, io);
   if (typeof at === 'number') return at;
@@ -78,9 +110,12 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
     ...(values.version === undefined ? {} : { version: values.version }),
     ...(values.usecase === undefined ? {} : { usecase: values.usecase }),
     ...(Object.keys(examples.value).length === 0 ? {} : { examples: examples.value }),
+    ...(values.minor ? { step: 'minor' as const } : {}),
+    ...(values.signal === undefined ? {} : { signals: values.signal }),
+    ...(skills.length === 0 ? {} : { skills }),
   });
   if (!answer.ok) {
-    io.say(fixOf(answer));
+    io.say(saidWithCode(answer));
     return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
   }
   const got = answer.value as { file?: unknown; doc?: unknown };
@@ -117,7 +152,7 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   }
   const shared = await readShared(text);
   if (!shared.ok) {
-    io.say(fixOf(shared));
+    io.say(saidWithCode(shared));
     return 1;
   }
   const u = shared.value.usecase;

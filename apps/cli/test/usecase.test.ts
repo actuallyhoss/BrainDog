@@ -38,6 +38,15 @@ const built = exportUseCase({
 assert.ok(built.ok);
 const DOC = built.value;
 
+/** A query value as the host reads it: JSON where it is JSON, and a line of text where it is not (`takes: 'text'`). */
+const parsed = (v: string): unknown => {
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+};
+
 async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
   const seen: { method: string; args: Record<string, unknown> }[] = [];
   const server: Server = createServer((req, res) => {
@@ -47,7 +56,7 @@ async function setup(t: { after: (fn: () => void | Promise<void>) => void }) {
       const url = new URL(req.url ?? '/', 'http://stub');
       const method = url.pathname.replace(/^\/api\//, '');
       const raw = Buffer.concat(chunks).toString('utf8');
-      const args = (raw ? JSON.parse(raw) : Object.fromEntries([...url.searchParams].map(([k, v]) => [k, JSON.parse(v)]))) as Record<string, unknown>;
+      const args = (raw ? JSON.parse(raw) : Object.fromEntries([...url.searchParams].map(([k, v]) => [k, parsed(v)]))) as Record<string, unknown>;
       seen.push({ method, args });
       res.writeHead(200, { 'content-type': 'application/json' });
       if (method === 'context') return res.end(JSON.stringify({ ok: true, value: CONTEXT }));
@@ -80,6 +89,10 @@ test('usecase export: --example sends the rows named, and a malformed one is ref
   assert.equal(await usecase(['export', '--example', 'courses:1,2', '--out', 'mine.json'], h.io), 0);
   assert.deepEqual(h.seen.find((s) => s.method === 'exportUseCase')?.args, { examples: { courses: [1, 2] } });
   assert.equal(await usecase(['export', '--example', 'courses'], h.io), 1);
+  assert.equal(await usecase(['export', '--minor', '--signal', 'homework', '--skill', '2', '--out', 'next.json'], h.io), 0);
+  assert.deepEqual(h.seen.filter((s) => s.method === 'exportUseCase').at(-1)?.args, { step: 'minor', signals: ['homework'], skills: [2] });
+  assert.equal(await usecase(['export', '--skill', 'two'], h.io), 1);
+  assert.equal(await usecase(['export', '--minor', '--version', '2.0.0'], h.io), 1);
   assert.deepEqual(examplesOf(['a:1', 'a:2']), { ok: true, value: { a: [1, 2] } });
 });
 
@@ -91,6 +104,11 @@ test('usecase check: reads a good file, and refuses a credential in one, sending
   writeFileSync(join(h.dir, 'bad.usecase.json'), JSON.stringify({ ...DOC, summary: `Uses ${['xoxb', '1234567890', 'abcdefghij'].join('-')}` }));
   assert.equal(await usecase(['check', 'bad.usecase.json'], h.io), 1);
   assert.match(h.said.at(-1) ?? '', /looks like a credential/);
+  assert.match(h.said.at(-1) ?? '', /\(SECRET_IN_PACK\)$/);
+  const pack = { pack: 'usecase-study', requires: { format: 1, primitives: 1, packs: {} }, declarations: [{ page: 'evil', title: 'Evil', blocks: [{ kind: 'iframe', span: 12 }] }] };
+  writeFileSync(join(h.dir, 'frame.usecase.json'), JSON.stringify({ ...DOC, pack }));
+  assert.equal(await usecase(['check', 'frame.usecase.json'], h.io), 1);
+  assert.match(h.said.at(-1) ?? '', /^This setup uses a block this version of BrainDog does not have: iframe\..*\(KIND_UNKNOWN\)$/);
   assert.equal(h.seen.length, 0, 'check sent something');
   assert.equal(await usecase(['install', 'x'], h.io), 1);
 });
