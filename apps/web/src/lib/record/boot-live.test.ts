@@ -276,3 +276,28 @@ test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail, at its page, and
     'the palette still reads every view as a page',
   );
 });
+
+test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day in the log, and a few writes by hand keep their own lines', () => {
+  const at = (s: number) => new Date(Date.parse('2026-09-15T09:00:00.000Z') - s * 1000).toISOString();
+  /* Newest first: eight questions, then fifty-two rows, a second apart, by the reader on an open self-host. */
+  const bulk = [
+    ...Array.from({ length: 8 }, (_, i) => line({ rowid: 100 - i, ts: at(i), kind: 'suggest', target: `SG${i + 1}`, target_kind: 'suggestion', title: `Question ${i}` })),
+    ...Array.from({ length: 52 }, (_, i) => line({ rowid: 92 - i, ts: at(8 + i), kind: 'create', register: 'tasks', seq: i + 1, title: `Task ${i}` })),
+  ];
+  const items = newsOf(bulk as never, 'p_1');
+  assert.equal(items.length, 1);
+  assert.deepEqual(items[0], { at: at(0), by: 'you', text: 'Added 52 rows and asked 8 questions at once, and more before these', href: '/audit?by=you&on=2026-09-15' });
+
+  /* The same run with an hour-old line of its own after it: grouped, not "more before these", and the old line kept. */
+  const older = line({ rowid: 1, ts: '2026-09-15T07:00:00.000Z', kind: 'create', register: 'tasks', seq: 99, title: 'By hand' });
+  const mixed = newsOf([...bulk.slice(0, 20), older] as never, 'p_1');
+  assert.deepEqual(mixed.map((m) => m.text), ['Added 12 rows and asked 8 questions at once', 'Added By hand']);
+
+  /* Nine writes a second apart are not bulk; nor are ten a minute apart. */
+  assert.equal(newsOf(bulk.slice(0, 9) as never, 'p_1').length, 9);
+  const slow = Array.from({ length: 12 }, (_, i) => line({ rowid: 50 - i, ts: at(i * 60), kind: 'create', register: 'tasks', seq: i + 1, title: `T${i}` }));
+  assert.equal(newsOf(slow as never, 'p_1').length, 12);
+  /* Another writer breaks the run. */
+  const two = bulk.slice(0, 20).map((l, i) => (i === 10 ? { ...l, actor: 'agent:claude' } : l));
+  assert.equal(newsOf(two as never, 'p_1').length, 2 + 9);
+});

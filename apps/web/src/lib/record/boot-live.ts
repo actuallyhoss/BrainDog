@@ -287,18 +287,75 @@ function reasonsOf(events: readonly EventLine[]): { byDecision: Map<number, stri
   return out;
 }
 
+/**
+ * BULK WRITES ARE ONE LINE. An import on an open self-host wrote every row and every question as "you", and Home's feed was
+ * sixty lines of "You asked". A run of at least `BULK_MIN` row writes and questions by one writer, each within `BULK_GAP_MS`
+ * of the one before, is said once with its counts and a link to that writer's day in the log. A person working by hand does
+ * not write ten things a few seconds apart, so what they did keeps its own lines.
+ */
+export const BULK_MIN = 10;
+export const BULK_GAP_MS = 5_000;
+/** `whatsNew` sends at most sixty lines, so a run that reaches the oldest of sixty may go on before them. */
+const WHATS_NEW_CAP = 60;
+type BulkPart = 'added' | 'changed' | 'asked' | 'removed';
+const BULK_KIND: Record<string, BulkPart> = {
+  create: 'added',
+  edit: 'changed',
+  state: 'changed',
+  link: 'changed',
+  tag: 'changed',
+  untag: 'changed',
+  note: 'changed',
+  restore: 'changed',
+  delete: 'removed',
+  suggest: 'asked',
+  propose: 'asked',
+};
+
 /** The record's lines as the feed's items, newest first as they came. */
 export function newsOf(events: readonly EventLine[], me: string | null, names: ReadonlyMap<string, string> = new Map()): NewsItem[] {
   const voice = voiceTexts(events);
   const reasons = reasonsOf(events);
-  return events.flatMap((e, i) => {
+  const said = events.flatMap((e, i): { e: EventLine; last: boolean; item: NewsItem }[] => {
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
     if (reasons.folded.has(e.rowid)) return [];
     const reason = reasons.byDecision.get(e.rowid);
     const text = voice.has(i) ? voice.get(i) : reason !== undefined && e.title ? copy.feedDecided(e.title, reason) : textOf(e);
-    return text == null ? [] : [{ at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e) }];
+    const last = i === events.length - 1 && events.length >= WHATS_NEW_CAP;
+    return text == null ? [] : [{ e, last, item: { at: e.ts, by: feedActor(e.actor, me, names), text, href: hrefOf(e) } }];
   });
+
+  const out: NewsItem[] = [];
+  for (let i = 0; i < said.length; ) {
+    let j = i;
+    const first = said[i]!;
+    if (BULK_KIND[first.e.kind] && !voice.has(events.indexOf(first.e)))
+      while (
+        j + 1 < said.length &&
+        BULK_KIND[said[j + 1]!.e.kind] &&
+        said[j + 1]!.e.actor === first.e.actor &&
+        Math.abs(Date.parse(said[j]!.e.ts) - Date.parse(said[j + 1]!.e.ts)) <= BULK_GAP_MS
+      )
+        j++;
+    if (j + 1 - i < BULK_MIN) {
+      out.push(first.item);
+      i++;
+      continue;
+    }
+    const run = said.slice(i, j + 1);
+    const counts = { added: 0, changed: 0, asked: 0, removed: 0 };
+    for (const r of run) counts[BULK_KIND[r.e.kind]!]++;
+    const on = first.e.ts.slice(0, 10);
+    out.push({
+      at: first.item.at,
+      by: first.item.by,
+      text: copy.feedBulk(counts, run.some((r) => r.last)),
+      href: `/audit?${new URLSearchParams({ by: actorFor(first.e.actor, me), on })}`,
+    });
+    i = j + 1;
+  }
+  return out;
 }
 
 /**
