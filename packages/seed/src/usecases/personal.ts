@@ -43,6 +43,7 @@ const savingsProgress = (span: number) => ({
   source: 'register.savings_goals',
   where: 'state is not paused',
   columns: [{ field: 'name' }, { field: 'saved' }, { field: 'target' }, { field: 'by' }],
+  order: [{ field: 'seq', dir: 'asc' }],
   limit: 6,
   empty: 'No savings goal yet. Add one and how close you are shows here.',
 });
@@ -54,6 +55,7 @@ const goalsProgress = (span: number) => ({
   source: 'register.goals',
   where: 'state is active',
   columns: [{ field: 'what' }, { field: 'done' }, { field: 'target' }, { field: 'unit' }],
+  order: [{ field: 'seq', dir: 'asc' }],
   limit: 8,
   empty: 'No goals yet. Add one, like running three times a week.',
 });
@@ -495,7 +497,7 @@ export const PERSONAL = {
           {
             kind: 'todo',
             heading: 'Still to do',
-            span: 7,
+            span: 12,
             source: 'register.project_steps',
             where: 'thing is {{name}}, done is false',
             columns: [{ field: 'what' }, { field: 'by' }],
@@ -506,7 +508,7 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Done',
-            span: 5,
+            span: 12,
             source: 'register.project_steps',
             where: 'thing is {{name}}, done is true',
             columns: [{ field: 'what', label: 'Step', width: 'minmax(16ch,1fr)' }],
