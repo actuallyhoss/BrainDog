@@ -349,12 +349,6 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
     }
   }
 
-  /* PAGES NOBODY OPENS, only where opening pages is recorded at all. */
-  if (usage.listening.pages)
-    for (const p of usage.pages)
-      if (p.opens90 === 0 && olderThan(p.declaredAt, QUIET_DAYS, nowMs))
-        noticed.push({ kind: 'unopened', subject: p.slug, text: `Nobody has opened ${p.title} in ninety days.` });
-
   /* A PACK NOTHING HAS TOUCHED: its lists unwritten and unread, its pages unopened, for a quarter. Not the one speaking, and
      not one an on use case is built on. */
   const needed = new Set(offered.filter((o) => usage.packs.some((p) => p.id === o.id && p.on)).flatMap((o) => o.modules));
@@ -375,6 +369,13 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
         by: 'rules',
       });
     }
+
+  /* PAGES NOBODY OPENS, only where opening pages is recorded at all, and not a page of a pack already said to be untouched. */
+  const untouched = new Set(noticed.filter((n) => n.kind === 'untouched').map((n) => n.subject));
+  if (usage.listening.pages)
+    for (const p of usage.pages)
+      if (p.opens90 === 0 && olderThan(p.declaredAt, QUIET_DAYS, nowMs) && !(p.pack !== null && untouched.has(p.pack)))
+        noticed.push({ kind: 'unopened', subject: p.slug, text: `Nobody has opened ${p.title} in ninety days.` });
 
   /* THE VOICE: another use case on takes most of what is added, so it may be the one to speak. */
   if (usage.speaking !== null) {

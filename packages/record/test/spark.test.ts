@@ -130,7 +130,7 @@ test('SPARK READS HOW A RECORD IS USED and says what it noticed in plain sentenc
   assert.equal(said['grows:tasks'], 'Tasks gained 12 rows in the last thirty days, on 3 separate days.');
   assert.equal(said['grows:logbook'], 'Logbook gained 6 rows in the last thirty days, on 3 separate days.');
   assert.equal(said['agents:agent:claude'], 'An agent made 12 changes in the last thirty days, mostly in Tasks.');
-  assert.equal(said['unopened:notes'], 'Nobody has opened Notes in ninety days.');
+  assert.equal(said['unopened:notes'], undefined, 'a page of a pack already said to be untouched was said again');
   assert.equal(said['untouched:notes'], 'Nothing in Notes has been opened or changed in ninety days.');
   assert.equal(said['unopened:work'], undefined, 'a page opened this quarter was called unopened');
   for (const n of seen.noticed) assert.ok(!n.text.includes('—'), `an em dash in: ${n.text}`);
