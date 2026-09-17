@@ -28,6 +28,17 @@ export const REPORT_ROWS_MOST = 100;
  */
 export const REPORT_BYTES_MOST = 256 * 1024;
 
+/**
+ * The rows one report key may send in a minute, counted in a window its first report opens. `tools/gates/budgets.json`'s
+ * `report.rowsPerMinute` holds the same number, and `guards` fails when the two differ.
+ *
+ * A LEAKED KEY WAS EVERY ROW THE RECORD COULD HOLD: a hundred a call, as often as it liked. Six hundred is a reading every
+ * tenth of a second, far past a project that reports its own numbers, and a limit on one that is misused.
+ */
+export const REPORT_ROWS_PER_MINUTE = 600;
+/** The window `REPORT_ROWS_PER_MINUTE` is counted over. */
+export const REPORT_WINDOW_MS = 60_000;
+
 /** The most fields a key fixes. Each is a value the project cannot change. */
 export const REPORT_FIXED_MOST = 8;
 

@@ -63,6 +63,10 @@
     "//": "13 §2. How much of an offending line is quoted — a colour literal is not a secret, but a whole minified line is not a finding either.",
     "excerptChars": 100
   },
+  "report": {
+    "//": "packages/record/src/report.ts, REPORT_ROWS_PER_MINUTE: the rows one report key may send in a minute, refused past it as RATE_LIMITED with retry_after (30 §6). A report key is kept in a project's environment, where a credential is most likely to leak, and a hundred rows a call as often as it liked was every row a record could hold. Six hundred is a reading every tenth of a second. The record enforces the constant, because the Worker cannot read this file; guards holds the two equal. Added September 17th 2026.",
+    "rowsPerMinute": 600
+  },
   "flags": {
     "//": "A flag guards finished code whose release is undecided; unfinished code is an unmerged branch, never a flag. Both numbers exist to stop a flag becoming permanent branching, which is the failure that turns a release switch into a second codebase.",
     "//maxDays": "Ninety days from `since` to `until`. A quarter is long enough to hold a release back for a reason and short enough that the reason is still remembered; past it the flag is not waiting for a decision, it IS the decision, and the branch it guards should be deleted or shipped.",

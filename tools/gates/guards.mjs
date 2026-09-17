@@ -53,6 +53,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { budget } from './lib.mjs';
+
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
 
@@ -165,6 +167,25 @@ for (const route of routes) {
         .join(' or ')}`,
     );
   }
+}
+
+/**
+ * AND THE ONE ROUTE A KEY KEPT OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES IS BUDGETED, as `budgets.json` says.
+ *
+ * A report key lives in a project's environment, where a credential is most likely to leak, and `report` wrote a hundred
+ * rows a call with no limit on the calls. `REPORT_ROWS_PER_MINUTE` in `packages/record/src/report.ts` is what the record
+ * enforces, the Worker cannot read a file under `tools`, so the number lives in both places and this holds them equal,
+ * and holds `report`'s body to spending it. Read only when `report` is routed, so a tree without one has nothing to hold.
+ */
+if (routes.some((r) => r.name === 'report')) {
+  const R = budget('report');
+  const code = read('packages', 'record', 'src', 'report.ts');
+  const said = /export const REPORT_ROWS_PER_MINUTE = ([\d_]+);/.exec(code)?.[1];
+  const enforced = said === undefined ? null : Number(said.split('_').join(''));
+  if (enforced !== R.rowsPerMinute)
+    findings.push(`packages/record/src/report.ts holds REPORT_ROWS_PER_MINUTE at ${enforced ?? 'nothing'}, and budgets.json's report.rowsPerMinute is ${R.rowsPerMinute}`);
+  const body = (bodies.get('report') ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+  if (!/\breportBudget\(/.test(body)) findings.push('report is routed and its body spends no reportBudget(), so a report key has no limit');
 }
 
 if (findings.length === 0) {

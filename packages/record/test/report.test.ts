@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, REPORT_BYTES_MOST, reportBindingOf, reportLabel, reportedFields, type CallContext } from '../src/index.ts';
+import { createRecordApi, REPORT_BYTES_MOST, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, reportBindingOf, reportLabel, reportedFields, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 9);
@@ -38,7 +38,7 @@ const TASKS = {
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
 
-type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
+type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string; retry_after?: number } };
 const value = <T>(r: Out): T => {
   assert.ok(r.ok, r.ok ? '' : `${r.refusal?.code}: ${r.refusal?.fix}`);
   return r.value as T;
@@ -50,7 +50,8 @@ const refusal = (r: Out) => {
 
 async function record() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   assert.ok((await api.kernel.install([POINTS, TASKS])).ok);
   /* A key, and the context a host builds from it: the principal `verifyToken` answers, and nothing else. */
@@ -61,7 +62,7 @@ async function record() {
     const ctx: CallContext = { principal: { kind: 'token', id: seen.value.id, scope: seen.value.scope, person: seen.value.person_id, level: 'owner' } };
     return { minted, ctx };
   };
-  return { api, sql, key };
+  return { api, sql, key, clock };
 }
 
 test('A REPORT KEY WRITES ONE ROW, with its fixed fields over what was sent and its stamp filled', async () => {
@@ -189,4 +190,31 @@ test('the binding reads back as it was written, and a broken one binds nothing',
   assert.deepEqual(reportBindingOf('report:{not json'), { register: '' });
   assert.deepEqual(reportBindingOf('report:{"register":"Bad Name"}'), { register: '' });
   assert.deepEqual(reportedFields({ register: 'points', stamp: 'day' }, { name: 'x' }, '2026-09-17T09:00:00.000Z', 'day'), { name: 'x', day: '2026-09-17' });
+});
+
+test('A REPORT KEY HAS A BUDGET OF ROWS A MINUTE, refused with how long to wait, and one key spending it leaves another alone', async () => {
+  /* A key kept in a project's environment is the credential most likely to leak, and a hundred rows a call as often as
+     it liked was every row the record could hold. The budget counts rows, in a window a key's first report opens. */
+  const { api, sql, key, clock } = await record();
+  const { ctx } = await key();
+  const { ctx: other } = await key();
+  const batch = Array.from({ length: REPORT_ROWS_MOST }, (_, i) => ({ name: 'Sign-ups', value: i }));
+  const full = Math.floor(REPORT_ROWS_PER_MINUTE / REPORT_ROWS_MOST);
+  for (let i = 0; i < full; i++) value(await api.report({ rows: batch }, ctx));
+  const written = REPORT_ROWS_MOST * full;
+  const left = REPORT_ROWS_PER_MINUTE - written;
+  if (left > 0) value(await api.report({ rows: batch.slice(0, left) }, ctx));
+
+  clock.advance(20_000);
+  const limited = refusal(await api.report({ name: 'One more', value: 1 }, ctx));
+  assert.equal(`${limited.code} at ${limited.at}`, 'RATE_LIMITED at rows');
+  assert.equal(limited.retry_after, 40);
+  assert.match(limited.fix, /40 seconds/);
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'points'")?.n, REPORT_ROWS_PER_MINUTE, 'a limited report was written');
+
+  /* ANOTHER KEY HAS ITS OWN, and the window ends when it says. */
+  value(await api.report({ name: 'Elsewhere', value: 1 }, other));
+  clock.advance(40_000);
+  value(await api.report({ rows: batch }, ctx));
+  sql.close();
 });

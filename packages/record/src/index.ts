@@ -82,11 +82,11 @@ import type { Json as JsonValue } from '@braindog/kernel';
 import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry } from './arrange.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { grammarOf } from './grammar.ts';
-import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 export type { CatalogueEntry, RowIo } from './arrange.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
-export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
@@ -894,6 +894,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     if (!row) return Math.ceil(WINDOW / 1000);
     return row.n > STARTS ? Math.max(1, Math.ceil((Date.parse(row.until) - now) / 1000)) : null;
+  };
+
+  /**
+   * Spend `rows` of a report key's budget: the seconds to wait, or `null` when they fit and are now spent.
+   *
+   * IN `auth_fail`, THE RECORD'S OWN LOCAL TABLE, so it holds on either host and across a restart, and never travels
+   * in an export. A window opens with a key's first report and ends a minute later; a report that does not fit is not
+   * counted, so it can be sent again whole. FAIL CLOSED, as `counted` is.
+   */
+  const reportBudget = (token: string, rows: number): number | null => {
+    const now = clock.now();
+    const key = `report:${token}`;
+    try {
+      sql.exec("DELETE FROM auth_fail WHERE key LIKE 'report:%' AND until <= ?", new Date(now).toISOString());
+      const row = sql.one<{ n: number; until: string }>('SELECT n, until FROM auth_fail WHERE key = ?', key);
+      if (row && row.n + rows > REPORT_ROWS_PER_MINUTE) return Math.max(1, Math.ceil((Date.parse(row.until) - now) / 1000));
+      if (row) sql.exec('UPDATE auth_fail SET n = n + ? WHERE key = ?', rows, key);
+      else sql.exec('INSERT INTO auth_fail (key, n, until) VALUES (?, ?, ?)', key, rows, new Date(now + REPORT_WINDOW_MS).toISOString());
+      return null;
+    } catch {
+      return Math.ceil(REPORT_WINDOW_MS / 1000);
+    }
   };
 
   /* ── the vault doors' half ── */
@@ -1741,6 +1763,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const weight = new TextEncoder().encode(JSON.stringify(rows)).length;
       if (weight > REPORT_BYTES_MOST)
         return no('OUT_OF_BOUNDS', `One report is at most ${REPORT_BYTES_MOST / 1024} KB, and this one is ${Math.ceil(weight / 1024)} KB. Send shorter rows, or fewer at a time.`, { at: 'rows' });
+      const wait = reportBudget(ctx.principal.kind === 'token' ? ctx.principal.id : 'key', rows.length);
+      if (wait !== null)
+        return {
+          ok: false as const,
+          refusal: {
+            code: 'RATE_LIMITED',
+            fix: `This key has sent its ${REPORT_ROWS_PER_MINUTE} rows for this minute. Send these again in ${wait} second${wait === 1 ? '' : 's'}.`,
+            at: 'rows',
+            retry_after: wait,
+          },
+        };
       const decl = kernel.register(binding.register);
       if (!decl) return no('REGISTER_UNKNOWN', `This key sends rows to ${binding.register}, and this record has no such list now.`, { at: 'register' });
       const stampType = binding.stamp === undefined ? undefined : decl.fields.find((f) => f.id === binding.stamp)?.type;

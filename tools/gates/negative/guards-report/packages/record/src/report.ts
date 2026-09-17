@@ -1,0 +1,1 @@
+export const REPORT_ROWS_PER_MINUTE = 600;

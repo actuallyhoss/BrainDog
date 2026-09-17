@@ -603,7 +603,7 @@ separate list because it names what the *driver* refused, not what the *format* 
 | Surface | Becomes |
 |---|---|
 | CLI | `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
-| HTTP | the `Result` envelope, unchanged, and a status that is one function of it — `httpStatus(result)`, shared by both hosts: `422` for any refusal the exceptions below do not name (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — refusals, never 409); `409` for a `conflict` (`VERSION_STALE`; `WRONG_KEY` per [12-SECURITY](12-SECURITY.md) §6.1); `401` with an empty body for `UNAUTHORIZED`; `403` with the envelope for `FORBIDDEN` and `NEEDS_BROWSER_SESSION`; `404` for `ROUTE_UNKNOWN` and `400` for `BODY_MALFORMED`, which are the router's own and no method returns; `501` for `NOT_IN_THIS_BUILD`; `503` for `SCHEMA_MISMATCH`, `SCHEMA_NEWER` and `RECORD_UNAVAILABLE`. `X-Request-Id` is echoed |
+| HTTP | the `Result` envelope, unchanged, and a status that is one function of it — `httpStatus(result)`, shared by both hosts: `422` for any refusal the exceptions below do not name (`PLAN_STALE` and `IMPORT_NOT_EMPTY` included — refusals, never 409); `409` for a `conflict` (`VERSION_STALE`; `WRONG_KEY` per [12-SECURITY](12-SECURITY.md) §6.1); `401` with an empty body for `UNAUTHORIZED`; `403` with the envelope for `FORBIDDEN` and `NEEDS_BROWSER_SESSION`; `429` with `Retry-After` for `RATE_LIMITED`; `404` for `ROUTE_UNKNOWN` and `400` for `BODY_MALFORMED`, which are the router's own and no method returns; `501` for `NOT_IN_THIS_BUILD`; `503` for `SCHEMA_MISMATCH`, `SCHEMA_NEWER` and `RECORD_UNAVAILABLE`. `X-Request-Id` is echoed |
 | MCP | an error result carrying `code` and `fix`, so **the refusal teaches the agent** — [10-MCP](10-MCP.md) §7 rule 4. A call outside its published schema is the protocol's own `-32602`, `message` the fix and `data` `{ at, found, wanted, fix }` — a vocabulary, not a code (below) |
 | UI | the sentence, next to the field, plus in the summary — [06-PAGES](06-PAGES.md) §8 |
 
@@ -623,7 +623,7 @@ the caller's bug; refusing names it.
 
 ### The codes
 
-One hundred and twenty-four, counted, in nine families — 54 pack and declaration · 14 grammar · 18 write path · 7 auth and
+One hundred and twenty-five, counted, in nine families — 54 pack and declaration · 14 grammar · 18 write path · 8 auth and
 vault · 8 format and lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
@@ -814,6 +814,7 @@ any row is written".*
 | `GRANT_REVOKED` | `openGrant` on a row with `revoked_at` | `grant-revoked` |
 | `DEVICE_CODE_EXPIRED` | a poll past the ten-minute life, 12 §6.1 | `device-code-expired` |
 | `DEVICE_CODE_TRIES` | the fifth wrong code — every pending row goes `denied` | `device-code-tries` |
+| `RATE_LIMITED` | a credential past its budget for now: a report key's rows a minute (`REPORT_ROWS_PER_MINUTE`, `budgets.json` `report.rowsPerMinute`). 429, and the refusal carries `retry_after`, the whole seconds to wait, which the host also sends as `Retry-After`. Added September 17th 2026 | `rate-limited` |
 
 **Format and lifecycle** ([03-DOG-FORMAT](03-DOG-FORMAT.md); [33-CONTRACTS](33-CONTRACTS.md) §9):
 

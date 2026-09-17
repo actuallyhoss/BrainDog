@@ -312,3 +312,11 @@ test('A REFUSAL CODE OFF `Object.prototype` IS A 422, not a RangeError out of th
   assert.equal(httpStatus(no('FORBIDDEN', 'x')), 403);
   assert.equal(httpStatus(no('SCHEMA_NEWER', 'x')), 503);
 });
+
+test('A REFUSAL THAT SAYS WHEN TO ASK AGAIN IS A 429 WITH Retry-After, on the one door both hosts serve through', async () => {
+  const limited: Handler = async () => ({ ok: false, refusal: { code: 'RATE_LIMITED', fix: 'Wait 42 seconds.', at: 'rows', retry_after: 42 } });
+  const res = await serveApi(new Request('https://x/api/report', { method: 'POST', body: '{}' }), { report: limited } as never, owner);
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get('retry-after'), '42');
+  assert.equal(httpStatus({ ok: false, refusal: { code: 'RATE_LIMITED', fix: 'x' } }), 429);
+});

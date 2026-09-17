@@ -1,0 +1,5 @@
+code:   RATE_LIMITED
+via:    rpc
+raises: packages/record/src/index.ts
+at:     rows
+fix:    Send these again in 40 seconds.

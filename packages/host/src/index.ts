@@ -272,6 +272,9 @@ for (const name of UNROUTED)
  */
 const NOT_422: Readonly<Record<string, number>> = {
   UNAUTHORIZED: 401,
+  /* A CREDENTIAL PAST ITS BUDGET FOR NOW. Not 422, because nothing about the request is wrong: the same call succeeds
+     after `retry_after` seconds, which `serveApi` also sends as `Retry-After`. */
+  RATE_LIMITED: 429,
   FORBIDDEN: 403,
   /* A BROWSER SESSION IS NOT A SCOPE PROBLEM. 403 with the envelope, because the sentence is the
      part that tells somebody what to do about it — 30 §6's own row. */
@@ -670,12 +673,16 @@ const notText = (key: string, seen: unknown): Refusal => ({
   at: key,
 });
 
-const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict }): Response =>
-  new Response(JSON.stringify(body), {
+const json = (status: number, body: { ok: boolean; value?: unknown; refusal?: Refusal; conflict?: Conflict }): Response => {
+  const wait = body.refusal?.retry_after;
+  return new Response(JSON.stringify(body), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       /* A record is never a shared cache's business: one customer's answer must never be another's. */
       'cache-control': 'no-store',
+      /* A 429 SAYS WHEN, in the header a client already reads, as well as in the envelope. */
+      ...(status === 429 && typeof wait === 'number' && Number.isSafeInteger(wait) && wait > 0 ? { 'retry-after': String(wait) } : {}),
     },
   });
+};

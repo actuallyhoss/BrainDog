@@ -74,6 +74,20 @@ test('A PROJECT REPORTS WITH ITS KEY OVER HTTP, AND THE KEY OPENS NOTHING ELSE',
       assert.equal(said.status, route.name === 'log' ? 422 : 403, `${route.name} answered ${said.status}`);
     }
 
+    /* A BUDGET OF ROWS A MINUTE, over the socket: a 429 that says how long to wait. */
+    let limited = { status: 200, retry: null as string | null };
+    for (let i = 0; i < 1000 && limited.status === 200; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/report`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ rows: Array.from({ length: 100 }, (_, n) => ({ name: 'Sign-ups', value: n })) }),
+      });
+      limited = { status: res.status, retry: res.headers.get('retry-after') };
+      await res.body?.cancel();
+    }
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.retry) > 0 && Number(limited.retry) <= 60, `Retry-After was ${limited.retry}`);
+
     /* And what the owner sees afterwards: one key, bound to points. */
     const keys = await post('reportKeys', {}, SERVER_KEY);
     assert.equal(keys.status, 200);

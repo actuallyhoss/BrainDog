@@ -146,6 +146,10 @@ const CASES = [
      `scoped`, so one finding is an assertion that those two groups share one list rather than an
      assertion that the gate went red about something. */
   { gate: 'guards-data', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
+  /* AND THE ONE ROUTE A KEY OUTSIDE ANY BROWSER CALLS AS OFTEN AS IT LIKES: `report` spending no budget, and the number
+     the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved. */
+  { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
+  { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only

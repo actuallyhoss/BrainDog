@@ -159,8 +159,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-three, counted, in nine
- * families — 53 pack and declaration · 14 grammar · 18 write path · 7 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-five, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 18 write path · 8 auth and vault · 8 format and
  * lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -227,10 +227,13 @@ const WRITE = [
   'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
 ] as const;
 
-/** Auth and vault — 7. */
+/** Auth and vault — 8. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',
+  /* A credential past its budget for now, 2026-09-17: a report key's rows a minute. The one code that carries
+     `retry_after`, and HTTP 429 with `Retry-After`. */
+  'RATE_LIMITED',
 ] as const;
 
 /** Format and lifecycle — 8. */
@@ -279,7 +282,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and twenty-two, in `30 §6`'s order. */
+/** The hundred and twenty-five, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SPARK, ...CONNECTOR, ...HOST,
 ] as const;
@@ -292,7 +295,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and twenty-two. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and twenty-five. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was
@@ -328,6 +331,8 @@ export type Refusal = {
   at?: string;
   /** What the caller may send instead: an enum's values, a register's fields. */
   allowed?: readonly string[];
+  /** For `RATE_LIMITED`: the whole seconds until asking again may be answered. A host sends it as `Retry-After`. */
+  retry_after?: number;
 };
 
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
