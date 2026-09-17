@@ -106,6 +106,8 @@ export type PageBlock = {
   under?: number;
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
+  /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
+  tones?: Record<string, 'good' | 'warn' | 'bad' | 'info'>;
   /** A `note`'s: its body is a whole document, drawn with the blocks written in it, such as a project's `{{note}}`. */
   document?: boolean;
   /** A `cards` block's: a row whose day in `field` is older than `after` is drawn as out of date. */
@@ -152,7 +154,7 @@ const READS = new Set([
   /* A `forecast`'s remembered figure and knobs, and the points it answers with. */
   'recorded', 'knobs', 'past',
   /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
-  'changes', 'unset',
+  'changes', 'unset', 'tones',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
   'late', 'under', 'lateness', 'late_name',
   /* A card grid's out-of-date rule. */

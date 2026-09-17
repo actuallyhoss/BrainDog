@@ -308,6 +308,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 4,
         source: 'metric.projects-by-health',
         unset: 'Not said yet',
+        /* EACH PART IN ITS INTENT, so off track reads as trouble at a glance, in the theme's colour and not only in words. */
+        tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
         empty: 'No project is in play.',
       },
       {

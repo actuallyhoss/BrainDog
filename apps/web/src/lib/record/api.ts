@@ -2024,8 +2024,8 @@ const READS = new Set([
   'bucket',
   /* A forecast's remembered figure and its knobs, its late mark and its warning reach. */
   'recorded', 'knobs', 'late', 'under',
-  /* A bar's or a split's row for what no part holds. */
-  'unset',
+  /* A bar's or a split's row for what no part holds, and the intent each part is drawn in. */
+  'unset', 'tones',
   /* A card grid's out-of-date rule. */
   'stale',
   /* A progress budget's figure of what was spent, and a goal's of what was logged toward it. */

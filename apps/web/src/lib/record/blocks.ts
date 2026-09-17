@@ -212,6 +212,12 @@ const joined = (where: string | undefined, clause: string): string => (where?.tr
 /** The row for what no part holds: its label, linked to those rows, and its figure. */
 const unsetRow = (label: string, href: string, shown: string): string => `[${escapeCell(label)}](${href}) | ${escapeCell(shown)} | `;
 
+/** The intent a block names for one part, as the dialect's trailing word, or nothing. */
+const toneOf = (tones: Readonly<Record<string, string>> | undefined, key: string): string => {
+  const tone = tones && Object.hasOwn(tones, key) ? tones[key] : undefined;
+  return tone === 'good' || tone === 'warn' || tone === 'bad' || tone === 'info' ? ` | ${tone}` : '';
+};
+
 /**
  * A bar or a split over a grouped figure: each part, labelled as its field labels it, largest first, and what no part
  * holds as the block's `unset:` row.
@@ -230,7 +236,9 @@ function partsRows(block: BlockResult): string[] {
   const rows = parts.groups
     .filter((g): g is { key: string; value: number } => g.value !== null)
     .slice(0, limit)
-    .map((g) => `${escapeCell(display(register, field, g.key) ?? g.key)} | ${escapeCell(said(g.value))} | `);
+    /* A PART THE BLOCK GIVES AN INTENT IS DRAWN IN IT, by the value it groups, so "Off track" reads as trouble in the theme's
+       own colour and a part not named stays neutral. Only the four intents: anything else is left off. */
+    .map((g) => `${escapeCell(display(register, field, g.key) ?? g.key)} | ${escapeCell(said(g.value))} | ${toneOf(block.tones, g.key)}`);
   const rest = parts.value === null || parts.more > 0 ? 0 : parts.value - parts.groups.reduce((n, g) => n + (g.value ?? 0), 0);
   if (!block.unset || !register || Math.round(rest) < 1) return rows;
   return [...rows, unsetRow(block.unset, registerHref(register, joined(decl?.where, `${field} is empty`)), said(rest))];

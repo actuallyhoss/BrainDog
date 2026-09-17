@@ -316,6 +316,8 @@ export type PageBlock = {
   knobs?: readonly ('horizon' | 'late' | 'spend' | 'leave')[];
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
+  /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
+  tones?: Readonly<Record<string, 'good' | 'warn' | 'bad' | 'info'>>;
   /** A `progress` budget's: the figure, grouped by a word, of what was spent against each row's limit. */
   spent?: string;
   /** A `progress` goal's: the figure, grouped by a link to the block's rows, of what was logged toward each row's target. */

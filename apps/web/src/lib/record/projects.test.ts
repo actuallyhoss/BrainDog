@@ -96,3 +96,9 @@ test('THE OVERVIEW’S QUEUE IS THE PROJECTS SOMEBODY SAID ARE NOT GOING WELL, a
   const cards = overview.blocks.find((b) => b.heading === 'In play')!;
   assert.match(JSON.stringify(toSegments(cards)), /60 %/u, 'how far along is a proportion a ring can draw');
 });
+
+test('HOW THEY ARE GOING DRAWS EACH PART IN ITS INTENT, and a part nobody has said about stays neutral', () => {
+  const split = page('portfolio')!.blocks.find((b) => b.heading === 'How they are going')!;
+  const said = JSON.stringify(toSegments(split));
+  for (const tone of ['good', 'warn', 'bad']) assert.ok(said.includes(`"tone":"${tone}"`), `no part is drawn ${tone}: ${said}`);
+});

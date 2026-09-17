@@ -47,13 +47,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *
  * - portfolio 1.1.0: a project says how it is going, what is next, how far along it is and which agent holds it, with
  *   the Overview and the rule over them.
+ * - portfolio 1.2.0: How they are going draws each part in its intent.
  * - money-core 1.1.0: the home currency is chosen from a list.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.1.0',
+  portfolio: '1.2.0',
   people: '1.0.0',
   'money-core': '1.1.0',
   estate: '1.0.0',
