@@ -159,3 +159,28 @@ test('DONE READS THE STORED BODY, SETS IT WHOLE, and hands back the one before f
     String(url).includes('/api/page') ? json(200, { ok: true, value: BODY }) : json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an admin sets a declaration.' } });
   assert.deepEqual(await saveArrangement(BASE, 'money', 3, [{ i: 0, span: 12 }], [], refused), { from: 'refused', fix: 'Only an owner or an admin sets a declaration.' });
 });
+
+test('DONE WRITES AGAINST THE VERSION THE SCREEN DREW, and a page arranged by somebody else meanwhile is not written over', async () => {
+  const sent: { url: string; body: unknown }[] = [];
+  let answer: unknown = { ok: true, value: [{ id: 'page.money', version: 5, changed: true }] };
+  const io: ClientFetch = async (input, init) => {
+    const url = String(input);
+    sent.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (url.includes('/api/page')) return json(200, { ok: true, value: { ...BODY, read_at: '2026-09-17T12:00:00.000Z', declared_version: 4 } });
+    return json((answer as { ok: boolean }).ok ? 200 : 409, answer);
+  };
+  const out = await saveArrangement(BASE, 'money', 3, [{ i: 1, span: 12 }, { i: 0, span: 12 }, { i: 2, span: 6 }], [], io, 4);
+  assert.deepEqual(out.from === 'written' && out.version, 5, 'the undo was not handed the version the write made');
+  const set = sent.find((s) => s.url.endsWith('/api/setDeclaration'))?.body as { version?: number; body: object };
+  assert.equal(set.version, 4);
+  assert.ok(!('read_at' in set.body) && !('declared_version' in set.body), 'what the answer carried was written back as the declaration');
+
+  /* Drawn at 3 and now at 4: somebody arranged it in between. Nothing is sent. */
+  sent.length = 0;
+  assert.deepEqual(await saveArrangement(BASE, 'money', 3, [{ i: 0, span: 12 }], [], io, 3), { from: 'refused', fix: copy.arrangeMoved });
+  assert.equal(sent.filter((s) => s.url.endsWith('/api/setDeclaration')).length, 0);
+
+  /* Moved between the read and the write: the record's conflict says the same. */
+  answer = { ok: false, conflict: { version: 5, current: null, actor: 'in-app' } };
+  assert.deepEqual(await saveArrangement(BASE, 'money', 3, [{ i: 0, span: 12 }], [], io, 4), { from: 'refused', fix: copy.arrangeMoved });
+});

@@ -39,6 +39,7 @@ import {
   writePackConfig,
   stageDeclarations,
   type Declaration,
+  type Expected,
   type PackConfig,
   type PackToggle,
 } from './declare.ts';
@@ -265,7 +266,7 @@ export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Read
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
-export type { ConfigDecl, ConfigType, Declaration, DeclKind, Installed, PackConfig, PackToggle } from './declare.ts';
+export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, PackConfig, PackToggle } from './declare.ts';
 export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from './declare.ts';
 
 /**
@@ -4228,7 +4229,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * reloaded is a register the write path still refuses — a failure that looks like the install
      * silently not working.
      */
-    async install(given: readonly (Declaration | DeclarationBundle)[]) {
+    async install(given: readonly (Declaration | DeclarationBundle)[], expect?: Expected) {
       /* A BUNDLE IS ITS DECLARATIONS, so an accepted change carrying several installs and arms them in one go. */
       const batch: Declaration[] = given.flatMap((d) =>
         Array.isArray((d as DeclarationBundle).declarations) ? (d as DeclarationBundle).declarations : [d as Declaration],
@@ -4237,7 +4238,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       const cannot = unreadable(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
-      const out = await installDeclarations(sql, clock.now(), batch, transaction);
+      const out = await installDeclarations(sql, clock.now(), batch, transaction, expect);
       if (out.ok) {
         reload();
         /* AND THE ROWS THE DECLARATIONS EARN. `digest`, `snapshot` and `analyse` have complete

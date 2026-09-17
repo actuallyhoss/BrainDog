@@ -155,7 +155,10 @@ export function arrangedBody(body: PageBody, placed: readonly Placed[], added: r
   return { ...body, blocks };
 }
 
-export type Arranged = { from: 'written'; before: PageBody } | { from: 'refused'; fix: string } | { from: 'unreachable'; fix: string };
+export type Arranged =
+  | { from: 'written'; before: PageBody; version: number | null }
+  | { from: 'refused'; fix: string }
+  | { from: 'unreachable'; fix: string };
 
 /**
  * Done, on a live page: read the body the record stores, lay it out as arranged, and set it whole.
@@ -165,6 +168,9 @@ export type Arranged = { from: 'written'; before: PageBody } | { from: 'refused'
  *
  * A TEMPLATE IS REFUSED. Its answer is one row's expansion, and setting that would turn one declaration for every row into
  * a page about one row.
+ *
+ * `seen` IS THE VERSION THE SCREEN DREW, and the write carries it: a page somebody else arranged after it was drawn is
+ * refused here or by the record, never written over. `version` in the answer is what the undo carries.
  */
 export async function saveArrangement(
   base: string,
@@ -173,23 +179,39 @@ export async function saveArrangement(
   placed: readonly Placed[],
   added: readonly Added[],
   io?: ClientFetch,
+  seen?: number | null,
 ): Promise<Arranged> {
   const read = await pagesReader(base, io).readOne(slug);
   if (read.from === 'absent') return { from: 'refused', fix: copy.recordNotReached };
   if (read.from === 'refused') return read;
   if (read.from === 'expanded') return { from: 'refused', fix: copy.arrangeTemplate };
   if (read.page.body.blocks.length !== drawn) return { from: 'refused', fix: copy.arrangeMoved };
+  if (typeof seen === 'number' && read.page.version !== null && read.page.version !== seen) return { from: 'refused', fix: copy.arrangeMoved };
   const body = arrangedBody(read.page.body, placed, added);
   if (!body) return { from: 'refused', fix: copy.arrangeMoved };
-  const out = await setBody(base, body, io);
-  return out.from === 'written' ? { from: 'written', before: read.page.body } : out;
+  const out = await setBody(base, body, io, read.page.version);
+  return out.from === 'written' ? { from: 'written', before: read.page.body, version: out.version } : out;
 }
 
-/** One page body, set whole through `setDeclaration`. Undo is this with the body read before. */
-export async function setBody(base: string, body: PageBody, io?: ClientFetch): Promise<{ from: 'written' } | { from: 'refused' | 'unreachable'; fix: string }> {
+/**
+ * One page body, set whole through `setDeclaration`. Undo is this with the body read before and the version the write made.
+ *
+ * `version` IS THE ONE THE BODY WAS READ AT; `null` sends none, for a record that does not say. A page moved meanwhile is a
+ * conflict, and it is said as the page having changed.
+ */
+export async function setBody(
+  base: string,
+  body: PageBody,
+  io?: ClientFetch,
+  version: number | null = null,
+): Promise<{ from: 'written'; version: number | null } | { from: 'refused' | 'unreachable'; fix: string }> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.call('setDeclaration', { body });
-  if (out.ok) return { from: 'written' };
+  const out = await client.call('setDeclaration', version === null ? { body } : { body, version });
+  if (out.ok) {
+    const made = Array.isArray(out.value) ? (out.value as { version?: unknown }[]).find((d) => Number.isInteger(d?.version)) : undefined;
+    return { from: 'written', version: made ? (made.version as number) : null };
+  }
+  if ('conflict' in out) return { from: 'refused', fix: copy.arrangeMoved };
   if (!('refusal' in out)) return { from: 'unreachable', fix: copy.recordNotReached };
   if (out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
   if (out.refusal.code === 'UNAUTHORIZED') return { from: 'refused', fix: copy.signInAgain };

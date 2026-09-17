@@ -142,7 +142,8 @@ type Answered = {
  * The cast is what let it through, and a cast that bridges two types silences every other difference
  * between them at the same time.
  */
-export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[] };
+/** `declared_version` is the version the record holds the page at, which arranging it writes against. */
+export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number };
 
 type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown };
 

@@ -17,11 +17,10 @@
  *   2. Escape has to mean escape. A mode that has already written cannot be cancelled, only
  *      compensated, and a compensating write is a second thing in the log that says the opposite of
  *      the first.
- *   3. A page declaration is written WHOLE (`setDeclaration({ body })`, 33 §2) — there is no patch
- *      form and, unlike `installPack`'s `planHash`, no compare-and-set token for it. So the client
- *      must hold one coherent body and send it once. `ponytail:` that gap is real and unresolved in
- *      the contract; a second person arranging the same page concurrently would silently win, and
- *      the fix is a `version` on `setDeclaration`, not anything this file can do.
+ *   3. A page declaration is written WHOLE (`setDeclaration({ body, version })`, 33 §2) — there is no
+ *      patch form. So the client must hold one coherent body and send it once, against the version
+ *      the page was drawn at (`page-write.ts`): a second person who arranged it meanwhile makes this
+ *      write a conflict, said as the page having changed, rather than a silent overwrite.
  *
  * ── WHY ORDER IS A LIST OPERATION ───────────────────────────────────────────
  *

@@ -271,7 +271,7 @@
       const title = result?.page.title ?? slug;
       const m = await import('$lib/record/page-write.ts');
       const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span }));
-      const out = await m.saveArrangement(location.origin, slug, result?.blocks.length ?? 0, placed, extra);
+      const out = await m.saveArrangement(location.origin, slug, result?.blocks.length ?? 0, placed, extra, undefined, result?.page.declared_version);
       saving = false;
       if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
       arrangement.commit();
@@ -281,7 +281,7 @@
       const before = out.before;
       toasts.push(copy.arranged(title), {
         undo: () =>
-          void m.setBody(location.origin, before).then(async (back) => {
+          void m.setBody(location.origin, before, undefined, out.version).then(async (back) => {
             if (back.from !== 'written') toasts.push(back.fix, { intent: 'warn' });
             await reread();
           }),

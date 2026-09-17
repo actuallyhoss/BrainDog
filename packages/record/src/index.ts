@@ -1996,8 +1996,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          diluting the count that does. */
       if (out.ok) kernel.observe([{ kind: 'page.render', subject: args.slug }]);
       if (!out.ok) return out;
+      /* THE VERSION A WRITE OVER THIS PAGE CARRIES (`setDeclaration`). A page declared `for:` rows has none of its own slug. */
+      const declared = sql.one<{ version: number }>(
+        "SELECT version FROM declaration WHERE id = ? AND kind = 'page' AND superseded_at IS NULL AND retired = 0",
+        `page.${args.slug}`,
+      );
       return ok({
         ...out.value,
+        ...(declared ? { declared_version: declared.version } : {}),
         blocks: out.value.blocks.map((b) => {
           /**
            * EVERY REGISTER THE BLOCK DRAWS FROM, AND IT USED TO BE `b.source` ALONE.
@@ -2817,10 +2823,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * IT BELONGS TO NO PACK. `pack_id` is null, so a later `uninstall` of anything cannot take it,
      * and a pack that claims the same id is a `PROVIDES_CONFLICT` rather than a silent overwrite.
+     *
+     * `version` IS THE ONE THE CALLER READ, and `page` answers it as `declared_version`. Given, the write lands only if the
+     * declaration is still at it, and otherwise answers a conflict carrying the body as it now stands, so two people
+     * arranging one page no longer each overwrite the other. `0` says there was no such declaration to read.
      */
-    async setDeclaration(args: { body: unknown }, ctx: CallContext) {
+    async setDeclaration(args: { body: unknown; version?: number }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
+      if (args?.version !== undefined && !(Number.isInteger(args.version) && args.version >= 0))
+        return no('VALUE_MALFORMED', 'version is the whole number the declaration was read at, or 0 when there was none.', { at: 'version' });
 
       /* WRAPPED AS A ONE-DECLARATION PACK, because that is where the reading of a document lives.
          A second parser for the in-app form would be a second grammar. */
@@ -2838,7 +2850,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!one.ok) return one;
 
       const decl = one.value.declarations[0]!;
-      return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }]));
+      const expect = args.version === undefined ? undefined : { id: decl.id, version: args.version };
+      return tail(await kernel.install([{ id: decl.id, kind: decl.kind, body: decl.body as never }], expect));
     },
 
     /** Retire one. Its rows stay; a declaration is a shape, not the things under it. */

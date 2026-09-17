@@ -70,8 +70,8 @@ export type PageBody = {
   [key: string]: unknown;
 };
 
-/** One page the record declares, with the body it holds for it. */
-export type DeclaredPage = { slug: string; title: string; body: PageBody };
+/** One page the record declares, with the body it holds for it and the version it holds it at (`null` when not said). */
+export type DeclaredPage = { slug: string; title: string; body: PageBody; version: number | null };
 
 /** A page whose answer is an expansion rather than a stored body, and why it is being withheld. */
 export type Expanded = { slug: string; title: string; why: string };
@@ -126,12 +126,18 @@ export function bodyOfBlock(answered: Record<string, unknown>): BlockBody {
  * thinks was typed.
  */
 function bodyOf(slug: string, answered: Record<string, unknown>): PageBody {
-  const { blocks, ...rest } = answered;
+  /* `read_at` AND `declared_version` ARE THE ANSWER'S, the clock it was read by and the version it was read at, and a body
+     carrying them back would declare one moment's reading. */
+  const { blocks, read_at: _clock, declared_version: _version, ...rest } = answered;
   /* `page` IS THE FIRST KEY, because the record reads a declaration's kind from its first key and the answer does not keep
      the order a page was declared in: a body read back with `nav` first was refused as a declaration that begins with nav. */
   const named = { page: typeof rest.page === 'string' ? rest.page : slug, title: typeof rest.title === 'string' ? rest.title : '' };
   return { ...named, ...rest, ...named, blocks: Array.isArray(blocks) ? blocks.filter(isObject).map(bodyOfBlock) : [] };
 }
+
+/** The version `page` says the declaration is at, which a write over it carries. */
+const versionOf = (answered: Record<string, unknown>): number | null =>
+  Number.isInteger(answered.declared_version) ? (answered.declared_version as number) : null;
 
 /**
  * Whether this answer is a template's expansion rather than a stored body.
@@ -208,7 +214,7 @@ export function pagesReader(base: string, io?: Fetch): PagesReader {
           expanded.push({ slug, title, why: declWords.expanded });
           continue;
         }
-        pages.push({ slug, title, body: bodyOf(slug, got.value) });
+        pages.push({ slug, title, body: bodyOf(slug, got.value), version: versionOf(got.value) });
       }
       return { from: 'live', pages, expanded };
     },
@@ -218,7 +224,7 @@ export function pagesReader(base: string, io?: Fetch): PagesReader {
       if (!got.ok) return got.miss;
       const title = typeof got.value.title === 'string' ? got.value.title : '';
       if (isExpanded(got.value)) return { from: 'expanded', expanded: { slug, title, why: declWords.expanded } };
-      return { from: 'live', page: { slug, title, body: bodyOf(slug, got.value) } };
+      return { from: 'live', page: { slug, title, body: bodyOf(slug, got.value), version: versionOf(got.value) } };
     },
   };
 }

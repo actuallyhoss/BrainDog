@@ -18,7 +18,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { no, ok } from '@braindog/ports';
+import { clash, no, ok } from '@braindog/ports';
 import { jsonPath } from '@braindog/where';
 
 import { FIELD_TYPES, coerce, measure, range, type FieldDecl, type Json } from './coerce.ts';
@@ -2939,11 +2939,20 @@ export type Installed = { id: string; version: number; changed: boolean };
  * A BATCH, because a page that names a register and the register itself must arrive together or the
  * record is briefly inconsistent — and "briefly" is however long the second call takes to fail.
  */
+/**
+ * The version a caller read a declaration at, so a write over it lands only if nobody moved it first.
+ *
+ * A PAGE IS SET WHOLE, so without this two people arranging one page each wrote their own reading over the other's. `0`
+ * says the caller read no live declaration by that id.
+ */
+export type Expected = { id: string; version: number };
+
 export async function installDeclarations(
   sql: Sql,
   now: number,
   batch: readonly Declaration[],
   transaction: <T>(fn: () => T) => T,
+  expect?: Expected,
 ): Promise<Result<Installed[]>> {
   const off = disabledPackFault(sql, batch);
   if (off) return { ok: false, refusal: off };
@@ -2951,7 +2960,7 @@ export async function installDeclarations(
   /* PASSED THROUGH WHOLE. Rebuilding the envelope by hand dropped whichever arm the rebuild did
      not know about, and there are three of them now. */
   if (!staged.ok) return staged;
-  return staged.value(sql, now, transaction);
+  return staged.value(sql, now, transaction, expect);
 }
 
 /**
@@ -3027,13 +3036,13 @@ export async function stageDeclarations(
   batch: readonly Declaration[],
   known?: Known,
   owners?: Owners,
-): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T) => Result<Installed[]>>> {
+): Promise<Result<(sql: Sql, now: number, transaction: <T>(fn: () => T) => T, expect?: Expected) => Result<Installed[]>>> {
   for (const decl of batch) {
     const wrong = validate(decl, known, owners);
     if (wrong) return { ok: false, refusal: wrong };
   }
   const sums = await Promise.all(batch.map((d) => digest(jcs(d.body))));
-  return ok((sql, now, transaction) => applyDeclarations(sql, now, batch, sums, transaction));
+  return ok((sql, now, transaction, expect) => applyDeclarations(sql, now, batch, sums, transaction, expect));
 }
 
 function applyDeclarations(
@@ -3042,6 +3051,7 @@ function applyDeclarations(
   batch: readonly Declaration[],
   sums: readonly string[],
   transaction: <T>(fn: () => T) => T,
+  expect?: Expected,
 ): Result<Installed[]> {
   const at = instant(now);
 
@@ -3056,6 +3066,17 @@ function applyDeclarations(
   function install(): Result<Installed[]> {
   return transaction(() => {
     const out: Installed[] = [];
+
+    /* ASKED INSIDE THE TRANSACTION THAT WRITES, so a second write read at the same version cannot pass the check while
+       the first is still hashing. A retired declaration is not live, so it reads as 0. */
+    if (expect) {
+      const held = sql.one<{ version: number; body: string; pack_id: string | null }>(
+        'SELECT version, body, pack_id FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+        expect.id,
+      );
+      if ((held?.version ?? 0) !== expect.version)
+        return clash<Installed[]>(held?.version ?? 0, held ? { id: expect.id, body: JSON.parse(held.body) } : null, held?.pack_id ?? 'in-app');
+    }
 
     for (const [i, decl] of batch.entries()) {
       const checksum = sums[i]!;
