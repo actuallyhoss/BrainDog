@@ -29,6 +29,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
 import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
+import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
 import { alarmScheduler } from './alarm.ts';
@@ -133,6 +134,9 @@ function storageSql(storage: DurableObjectStorage): Sql {
 const serveMcp = (request: Request, api: RecordApi, ctx: CallContext): Promise<Response> =>
   answerMcp(request, api, ctx, { session: (c, said) => withSession(c, hintsOf(said)) });
 
+/** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
+const CATALOGUE = seedCatalogue();
+
 /** One customer's record. The class name is `Record$` because `Record` is a TypeScript builtin. */
 export class Record$ extends DurableObject<Env> {
   #api: Promise<RecordApi> | null = null;
@@ -194,6 +198,10 @@ export class Record$ extends DurableObject<Env> {
         delivers: DELIVERS,
         /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
         readAddress: sharedReader(),
+        /* WHAT AN AGENT MAY PROPOSE INSTALLING, and the carry step an update from an older use case runs. The same list the
+           self-host hands in (`@braindog/seed/usecases/catalogue`): without it a hosted Personal 1.0.0 record updated and
+           left what it kept typed where nothing reads it. */
+        catalogue: CATALOGUE,
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         /* DELETION, `51 §5.13`. The record has checked the owner, the sign-in and the typed name; this is the alarm,

@@ -82,7 +82,7 @@ devDependency is an edge — a build-time import is an import.
 | 7 | `kernel` | 2, 3 |
 | 8 | `declare` | 2, 7 — and `yaml` behind `./yaml` ([ADR-063](16-DECISIONS.md)). **7 is the edge the boundary table below says must not exist**; see the note under it |
 | 9 | `extract` | 2, 3 *(unbuilt)* |
-| 10 | `seed` | 2, 3, 7, 8 — the demonstration record, as declarations. A devDependency of `web` and of nothing that ships |
+| 10 | `seed` | 2, 3, 7, 8 — the demonstration record, as declarations, and the packs and use cases a host offers to install (`./usecases/catalogue`). A devDependency of `web`, and a dependency of `worker` and `selfhost` for that catalogue |
 | 11 | `record` | 1, 2, 3, 7, 8 — `./directory` is a subpath, not a package. **1 is the other edge the boundary table forbids** |
 | 12 | `mcp` | 2, 11 (types) — the wrapper sits above what it wraps |
 | 13 | `spark` | 2, 3, 11 *(unbuilt)* — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
@@ -93,8 +93,8 @@ devDependency is an edge — a build-time import is an import.
 | 18 | `web` | 1, 4, 5, 7, 10 — `render` and `skin` at build time, `seed` for the demonstration record |
 | 19 | `site` | 5 — the marketing site is the same design system with fewer screens, and imports nothing else |
 | 20 | `cli` | 1, 2, 3, 7, 8, 12, 13, 16. The manifest holds 2, 12 and 16 today: `braindog mcp` runs the MCP core (`12`) over stdio and reaches the record through the typed client (`16`). The others arrive with the commands that need them, and `13` is for `@braindog/spark/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
-| 21 | `worker` | 2, 7, 11, 12, 15. `12` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
-| 22 | `selfhost` | 2, 7, 11, 12, 15, 16. `12` serves `POST /mcp`, as on the Worker. `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
+| 21 | `worker` | 2, 7, 10, 11, 12, 15. `10` is the catalogue, so an update carries progress forward as it does on the self-host. `12` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
+| 22 | `selfhost` | 2, 7, 8, 10, 11, 12, 15, 16. `12` serves `POST /mcp`, as on the Worker. `16` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
 
 **Eighteen workspaces in the tree today, twenty-two at platform.** The
 order is also the build order, so `pnpm -r run build` reproduces it for free. *(An earlier draft had

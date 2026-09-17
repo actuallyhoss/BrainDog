@@ -171,6 +171,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../../packages/record
+      '@braindog/seed':
+        specifier: workspace:*
+        version: link:../../packages/seed
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260907.1

@@ -1,9 +1,10 @@
 /**
- * What this self-host offers to install by proposal: the first-party packs and the starter use cases
+ * What a host offers to install by proposal: the first-party packs and the starter use cases
  * (`loop/research-spark.md` S12).
  *
  * THE HOST'S, BECAUSE THE RECORD NAMES NO USE CASE. The record reads this list to tell an agent what is on offer
  * and to plan what a `pack` or `arrange` proposal would install; it never installs from it until the owner accepts.
+ * The self-host and the Worker hand in this one list, so an update carries progress forward on both.
  *
  * NO EXAMPLE ROWS FROM A BARE MODULE. A first-party pack asked for by itself carries none, because its own
  * examples are the sample studio's and would land in somebody else's record. A use case carries its own, and a module
@@ -11,11 +12,27 @@
  */
 
 import { FIRST_PARTY_LISTS, packIdOf } from '@braindog/declare';
-import type { CatalogueEntry } from '@braindog/record';
-import { AGENTS_PACK, FIRST_PARTY, agentsPackDocument, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '@braindog/seed';
-import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from '@braindog/seed/usecases';
-import { moduleDocument } from '@braindog/seed/usecases/install';
-import { carryForward, linkExamples } from '@braindog/seed/usecases/links';
+
+import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
+import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
+import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
+import { moduleDocument } from './install.ts';
+import { carryForward, linkExamples, type CarryIo, type LinkIo } from './links.ts';
+
+/**
+ * One thing on offer, in the shape `@braindog/record`'s `CatalogueEntry` takes. SPELT HERE AND NOT IMPORTED, because the
+ * record sits above the seed in the stack (`docs/31-STACK.md` §2); a host that hands this list to the record checks the two agree.
+ */
+export type SeedCatalogueEntry = {
+  id: string;
+  kind: 'pack' | 'usecase';
+  title: string;
+  summary: string;
+  modules: readonly string[];
+  doc: (options: { holds: readonly string[]; usecase?: string | null }) => Record<string, unknown> | null;
+  afterInstall?: (io: LinkIo) => Promise<unknown>;
+  carry?: (io: CarryIo, from: string) => Promise<number>;
+};
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -33,8 +50,8 @@ function before(requires: readonly string[]): string[] {
 }
 
 /** The first-party packs, each with no example rows, and the use cases that carry a pack of their own. */
-export function seedCatalogue(): CatalogueEntry[] {
-  const modules: CatalogueEntry[] = FIRST_PARTY.map((id) => {
+export function seedCatalogue(): SeedCatalogueEntry[] {
+  const modules: SeedCatalogueEntry[] = FIRST_PARTY.map((id) => {
     const bare = firstPartyDocument(id, { seeds: [] });
     return {
       id,
@@ -51,7 +68,7 @@ export function seedCatalogue(): CatalogueEntry[] {
     };
   });
   const agents = agentsPackDocument();
-  const useCases: CatalogueEntry[] = USE_CASES.filter((u) => useCaseDocument(u.usecase) !== null).map((u) => ({
+  const useCases: SeedCatalogueEntry[] = USE_CASES.filter((u) => useCaseDocument(u.usecase) !== null).map((u) => ({
     id: packIdOf(u.usecase),
     kind: 'usecase',
     title: u.title,

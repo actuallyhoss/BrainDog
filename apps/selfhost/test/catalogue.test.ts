@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { seedCatalogue } from '../src/catalogue.ts';
+import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 
 const agent: CallContext = { principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' } };
