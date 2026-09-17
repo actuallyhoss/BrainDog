@@ -156,6 +156,7 @@ function accessText(e: EventLine): string | null {
 
 /** One line of the log in the words the feed draws. */
 function textOf(e: EventLine): string {
+  if (e.kind === 'setup') return setupText(e);
   if (e.register !== null) {
     if (e.kind === 'create' && e.title) return `Added ${e.title}`;
     const what = noteOf(e.register, e);
@@ -166,6 +167,20 @@ function textOf(e: EventLine): string {
   const pack = packText(e) ?? exportText(e) ?? accessText(e);
   if (pack) return pack;
   return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
+}
+
+/**
+ * A RECORD SETTING ITSELF UP IS ONE LINE (`kernel/src/feed.ts`): the use case it installed, or the add-on, and how many
+ * example rows it added, rather than a line a row.
+ */
+function setupText(e: EventLine): string {
+  const rows = typeof e.to === 'number' ? e.to : 0;
+  if (rows === 0) return copy.setUpLinked;
+  const id = (e.target ?? '').replace(/^pack:/u, '');
+  const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(id)?.[1];
+  if (usecase) return copy.setUpWith(useCaseName(usecase), rows);
+  const names = (PACKS.find((p) => p.id === id)?.registers ?? []).map((r) => REGISTERS[r]?.name ?? r);
+  return names.length > 0 ? copy.setUpWith(names.join(', '), rows) : copy.setUpRows(rows);
 }
 
 /** Where a line goes: the row, the question, or the log for anything that is neither. */

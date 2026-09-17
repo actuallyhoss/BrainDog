@@ -644,6 +644,10 @@ export const copy = {
   recordEmpty: 'Nothing in the record yet.',
   /** A use case's pack going in or out, in the feed: "Added the Student use case". */
   useCaseEvent: (verb: string, name: string) => `${verb} the ${name} use case`,
+  /** A record setting itself up, said as one line of the feed: "Set up Personal with 40 example rows". */
+  setUpWith: (name: string, rows: number) => `Set up ${name} with ${rows} example ${rows === 1 ? 'row' : 'rows'}`,
+  setUpRows: (rows: number) => `Added ${rows} example ${rows === 1 ? 'row' : 'rows'}`,
+  setUpLinked: 'Linked the example rows to each other',
   /** Who did it and what to, in a `feed` block on a live record: "You", "Someone", "installed the Team board use case". */
   feedYou: 'You',
   feedSomeone: 'Someone on this record',

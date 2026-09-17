@@ -222,6 +222,7 @@ export {
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
+export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS } from './govern.ts';
 export { MET_CAP, PEOPLE } from './people.ts';

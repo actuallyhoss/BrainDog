@@ -169,3 +169,10 @@ test('a live boot is kept for the tab until it is forgotten', async () => {
   assert.equal(sent.length, 2);
   forget();
 });
+
+test('A RECORD SETTING ITSELF UP IS ONE LINE: the use case and how many example rows', () => {
+  const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'setup', note: null, field: null, from: null, register: null, seq: null, title: null, ...over })] as never, null)[0]?.text;
+  assert.equal(at({ target: 'pack:usecase-personal', target_kind: 'pack', to: 40 }), 'Set up Personal with 40 example rows');
+  assert.equal(at({ target: null, target_kind: null, to: 1 }), 'Added 1 example row');
+  assert.equal(at({ target: null, target_kind: null, to: 0 }), 'Linked the example rows to each other');
+});

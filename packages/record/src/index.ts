@@ -72,6 +72,7 @@ import {
   type EventLine as LogLine,
   type InboxLine,
   type ArrivalSettled,
+  setupCollapser,
 } from '@braindog/kernel';
 import type { Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
@@ -1227,30 +1228,45 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
    * `next` is where a further walk would start, and `null` once nothing is left above the floor.
    */
-  const walk = (ctx: CallContext, before: number | null, floor: number, want: number): { lines: EventLine[]; next: number | null } => {
+  const walk = (ctx: CallContext, before: number | null, floor: number, want: number, setups = false): { lines: EventLine[]; next: number | null } => {
     const lines: EventLine[] = [];
+    /* THE FEED SAYS A RECORD SETTING ITSELF UP AS ONE LINE (`kernel/src/feed.ts`); the log keeps every write. */
+    const setup = setups
+      ? setupCollapser<EventLine>((line) => {
+          const id = (line.target ?? '').replace(/^entry:/u, '');
+          const tags = kernel.get(id, { includeDeleted: true })?.fields.tags;
+          return Array.isArray(tags) && tags.includes('example');
+        })
+      : null;
+    const keep = (line: EventLine): void => {
+      for (const out of setup ? setup.push(line) : [line]) lines.push(out);
+    };
+    const done = (next: number | null): { lines: EventLine[]; next: number | null } => {
+      if (setup) lines.push(...setup.flush());
+      return { lines, next };
+    };
     let at = before;
     let walked = 0;
     while (walked < WALK) {
       const batch = kernel.eventsBefore(at, BATCH);
       for (const e of batch) {
-        if (e.rowid < floor) return { lines, next: null };
+        if (e.rowid < floor) return done(null);
         walked += 1;
         at = e.rowid;
         const line = lineOf(ctx, e);
-        if (line) lines.push(line);
-        if (lines.length === want) return { lines, next: at };
+        if (line) keep(line);
+        if (lines.length >= want) return done(at);
       }
-      if (batch.length < BATCH) return { lines, next: null };
+      if (batch.length < BATCH) return done(null);
     }
-    return { lines, next: at };
+    return done(at);
   };
 
   /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
-    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(person), NEWS + 1);
+    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(person), NEWS + 1, true);
     const events = lines.slice(0, NEWS);
     return { events, upTo: events[0]?.rowid ?? null, sinceCapped: next !== null };
   };
