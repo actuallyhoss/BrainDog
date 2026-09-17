@@ -32,7 +32,7 @@ import { extname, join, normalize } from 'node:path';
 import { chromium } from '@playwright/test';
 
 import { budget, readiness } from './lib.mjs';
-import { answers, forward, forwards, startRecord } from './record.mjs';
+import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
@@ -125,7 +125,13 @@ const STATES = [
      in the toolbar, as checkboxes, behind a scrim, over the identical controls still visible
      underneath — so this scenario audited a second copy of the row above it. What is worth auditing
      is that the chips themselves carry their state to somebody who cannot see the raised segment. */
-  { name: 'grid: filter chips', route: '/r/obligations', keys: [], expect: '.segmented [aria-pressed]' },
+  /* AND THE CHIPS BECAME MENUS. A list with three or more choice fields draws each as a menu of its values, where a
+     value is a `menuitemcheckbox` carrying `aria-checked`, and a phone draws one Filter button and a sheet of
+     `aria-pressed` values. `.segmented` is left only for a list with one or two fields, and Obligations has more, so
+     this scenario waited on a control the screen no longer draws. Each width now opens the control it has, and the
+     state is audited with the values in view, which is where somebody who cannot see a tick needs it said. */
+  { name: 'grid: filter menu', route: '/r/obligations', click: '.menu-trigger:has(.sift)', expect: '[role="menu"] [role="menuitemcheckbox"][aria-checked]', wide: true },
+  { name: 'grid: filter sheet', route: '/r/obligations', click: '.sift-sheet', expect: 'dialog[open] .filter-value[aria-pressed]', narrow: true },
   { name: 'grid: create sheet', route: '/r/obligations', keys: ['n'], expect: 'dialog[open]' },
   { name: 'grid: display options', route: '/r/obligations', keys: ['v'], expect: 'dialog[open]' },
   { name: 'grid: peek drawer', route: '/r/obligations', keys: ['p'], expect: 'dialog[open]' },
@@ -273,6 +279,7 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
 
     /** Loads a route, waits for it to be real, injects axe, and RETURNS what the screen settled into. */
     const open = async (route) => {
+      await recordFor(page, route);
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle' });
       /* The one readiness site in this gate, because every load goes through here. The `5000` that
          used to be written on this line was a bare literal in a directory whose shared file opens by
@@ -406,6 +413,8 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
     process.stdout.write(' ');
     for (const st of STATES) {
       if (st.desktop && width < 900) continue;
+      /* A LIST IS CARDS BELOW 640 (`packages/render/svelte/cards.svelte.ts`), and the filter control changes with it. */
+      if ((st.wide && width < 640) || (st.narrow && width >= 640)) continue;
       const unmeasured = ready.check(`${app.name} ${st.name} ${scheme}@${width}`, st.route, await open(st.route));
       /* THE ROUTE BEFORE THE KEYSTROKE. A scenario whose page never settled has no grid for the key
          to act on, and reporting that as `no dialog[open]` is the gate accusing the app of its own

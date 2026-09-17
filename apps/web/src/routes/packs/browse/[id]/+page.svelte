@@ -58,7 +58,12 @@
       return true;
     });
   });
-  $effect(() => drew(u ? 'ready' : 'empty'));
+  /* ONLY A USE CASE THAT EXISTS SAYS READY. The missing one is `Empty`'s to report, and it does. This effect called
+     `drew('empty')` itself, whose `s.empties++` reads what it writes, so the effect depended on itself and threw
+     `effect_update_depth_exceeded`: an unknown id drew its sentence and never settled. */
+  $effect(() => {
+    if (u) drew('ready');
+  });
 </script>
 
 <svelte:head><title>{titleOf(u?.title ?? copy.useCases)}</title></svelte:head>

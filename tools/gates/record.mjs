@@ -92,6 +92,25 @@ export async function startRecord(port = 0, { open = false, origin } = {}) {
 /** The paths a gate's server hands to the record: the record's and sign-in's. Everything else is the build's. */
 export const forwards = (pathname) => /^\/+(?:api|auth)(?:\/|$)/.test(pathname);
 
+/**
+ * THE ROUTES ONLY THE SAMPLE DRAWS, opened with the record taken away.
+ *
+ * `/v/<key>` is the sample's saved view. On a live record a view is a page (`apps/web/src/lib/record/views.ts`), so
+ * the route sends the reader to `/p/<key>`, and the seeded record saves no view: every gate that opened
+ * `/v/obligations.overdue` over it measured the refusal of a page that does not exist, while the view screen itself
+ * went unmeasured. A record that cannot be reached is what `readBoot` answers with the sample, so aborting the
+ * record's paths for these routes is the product's own sample path, not a stand-in for it.
+ */
+const SAMPLE_ONLY = [/^\/v\//];
+const RECORD_PATHS = (url) => forwards(url.pathname);
+const ABORT = (r) => r.abort();
+
+/** Call before opening `route` on `page`: the record is there for every route but the sample's own. */
+export async function recordFor(page, route) {
+  await page.unroute(RECORD_PATHS, ABORT);
+  if (SAMPLE_ONLY.some((r) => r.test(route))) await page.route(RECORD_PATHS, ABORT);
+}
+
 /** Headers that describe one hop and not the message, so they are not copied across this one. */
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'host', 'content-length', 'content-encoding']);
 
