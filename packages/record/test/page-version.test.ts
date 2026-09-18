@@ -11,10 +11,15 @@ import assert from 'node:assert/strict';
 
 import { conflicted } from '@braindog/ports';
 
-import { createRecordApi, type CallContext } from '../src/index.ts';
+import { createRecordApi, type Boot, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+
+const value = <T>(r: unknown): T => {
+  assert.ok((r as { ok?: unknown }).ok, JSON.stringify(r));
+  return (r as { value: T }).value;
+};
 
 const body = (...notes: string[]) => ({ page: 'plans', title: 'Plans', blocks: notes.map((n) => ({ kind: 'note', body: n })) });
 
@@ -103,5 +108,37 @@ test('A PAGE WHOSE NAME IS NOT ITS SLUG (an underscore) answers its version at i
   const now = await api.page({ slug: 'my-plans' }, owner);
   assert.ok(now.ok);
   assert.deepEqual((now.value as { blocks: { body: string }[] }).blocks.map((b) => b.body), ['b', 'a']);
+  sql.close();
+});
+
+/**
+ * THE HOLDING PEN IS THE DECLARATION'S OWN `placed`, and nothing else. A page that emerged from the data declares
+ * `placed: false` and no nav (29 §3), and the rail and the pen both read that one key, so placing a page is a write of
+ * the whole declaration with `placed: true` and a nav on it. Movement is forward-only and needs a person to ask (29 §2),
+ * so the write carries the version the page was read at and a page somebody else placed first is a conflict.
+ */
+test('A PAGE IN THE HOLDING PEN LEAVES IT once it is placed, and is in the nav from then on', async () => {
+  const { api, sql } = await record();
+  const penned = { page: 'people', title: 'People', origin: 'derived', placed: false, blocks: [{ kind: 'note', body: 'Everyone.' }] };
+  assert.ok((await api.setDeclaration({ body: penned }, owner)).ok);
+
+  const inPen = await api.page({ slug: 'people' }, owner);
+  assert.ok(inPen.ok, JSON.stringify(inPen));
+  const held = inPen.value as { placed?: unknown; nav?: unknown; declared_version: number };
+  assert.equal(held.placed, false, 'the page the record answered was not in the pen');
+  assert.equal(held.nav, undefined, 'a page in the pen has no place in the nav yet');
+  assert.deepEqual(value<Boot>(await api.boot(owner)).pages.find((p) => p.slug === 'people')?.nav, null);
+
+  /* What the control writes: the body as it stands, placed, at the end of its section, at the version it was read at. */
+  const placed = { ...penned, placed: true, nav: { section: 'People', order: 10 } };
+  assert.ok((await api.setDeclaration({ body: placed, version: held.declared_version }, owner)).ok);
+
+  const out = await api.page({ slug: 'people' }, owner);
+  assert.ok(out.ok);
+  assert.equal((out.value as { placed?: unknown }).placed, true, 'the page was still in the pen after it was placed');
+  assert.deepEqual(value<Boot>(await api.boot(owner)).pages.find((p) => p.slug === 'people')?.nav, { section: 'People', order: 10 });
+
+  /* And a second press over somebody else's placing is a conflict, not a silent second write. */
+  assert.ok(conflicted(await api.setDeclaration({ body: placed, version: held.declared_version }, owner)));
   sql.close();
 });

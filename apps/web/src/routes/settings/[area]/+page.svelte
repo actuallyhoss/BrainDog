@@ -15,6 +15,7 @@
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
+  import { invalidateAll } from '$app/navigation';
   import * as pref from '$lib/pref.ts';
   import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
@@ -523,25 +524,13 @@
     pref.apply('scheme', v === 'system' ? null : v);
   }
 
-  const pen = $derived(Object.values(pages()).filter((p) => p.placed === false));
+  /* PLACED IN THIS VISIT. The pen is derived from the declarations this screen was drawn with, so a page just written
+     into the nav would sit here until the next full read without somewhere to remember it. */
+  let placedHere = $state(new Set<string>());
+  let placing = $state<string | null>(null);
 
-  /**
-   * Put a suggested page in the rail.
-   *
-   * 29 §2's three tiers are derived → proposed → placed, and *"Movement is forward-only and needs a
-   * user action."* This is the user action, and two rules from §4 govern what it would write: the
-   * page appends AT THE END OF ITS SECTION rather than being inserted mid-list — Microsoft's
-   * Personalized Menus put items at different distances down the menu each time, and Jensen Harris
-   * announced the reversal in 2006 with that as the first reason — and nothing is ever placed
-   * without it, because the system never writes nav order after first install (06 §3).
-   *
-   * IT SAID SO IN THE COMPLETED PAST TENSE AND WROTE NOTHING. The row vanished from the pen because
-   * this filtered a local array; the rail reads `boot()`, which filters on the declaration's own
-   * `placed` and `nav`, neither of which this could touch. So the page was back in the pen on
-   * reload and had never once been in the nav. A sentence in the past tense about a thing that did
-   * not happen is the worst kind of mock, because it is the kind somebody believes — and the undo
-   * on the toast made it worse, by offering to reverse it.
-   */
+  const pen = $derived(Object.values(pages()).filter((p) => p.placed === false && !placedHere.has(p.page)));
+
   /* AND THE CHARACTER KEYS TOO. It is the one preference that changes what the keyboard DOES, so
      forgetting it is the one somebody notices within a minute. And *Suggest new pages*, which is the
      other switch on this surface and would otherwise be the third control in this product to move a
@@ -553,16 +542,6 @@
     pref.write({ chars, suggestPages, navShape });
   });
 
-  /**
-   * Put a suggested page in the rail.
-   *
-   * IT SAID `${title} is in your nav` IN THE COMPLETED PAST TENSE and nothing of the kind happened.
-   * The row vanished from this list because `promote` filtered a local array; the rail reads
-   * `boot()`, which filters on the declaration's own `placed` and `nav` — neither of which this
-   * could touch — so the page was back in the pen on reload and never once in the nav. A sentence
-   * in the past tense about a thing that did not happen is the worst kind of mock, because it is the
-   * kind somebody believes.
-   */
   /* THE LADDER IN THE WORDS YOU WOULD USE ABOUT A COLLEAGUE. `member.level` keeps the schema's five
      and every value written is still one of them; only what the screen prints changes. */
   const LEVEL_SAID: Record<string, string> = {
@@ -1088,8 +1067,59 @@
     outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
   }
 
-  function promote(decl: PageDecl) {
-    toasts.push(copy.notWritten(`${decl.title} would be placed at the end of its section in your nav`), { intent: 'warn' });
+  /**
+   * Put a suggested page in the rail, by writing it.
+   *
+   * 29 §2's three tiers are derived → proposed → placed, and *"Movement is forward-only and needs a user action."*
+   * This is that action. Two rules from §4 govern what it writes: the page appends AT THE END OF ITS SECTION rather
+   * than being inserted mid-list — Microsoft's Personalized Menus put items at a different distance down the menu
+   * each time, and Jensen Harris announced the reversal in 2006 with that as the first reason — and nothing is ever
+   * placed without a person asking, because the system never writes nav order after first install (06 §3).
+   *
+   * THE SECTION IS THE ONE THE PAGE DECLARES, and a derived page declares none, so it takes the name of the list it
+   * was built from, which is the heading Spark files its own drafted pages under and the words this row already says.
+   *
+   * IT ONCE SAID SO IN THE COMPLETED PAST TENSE AND WROTE NOTHING. The row vanished from the pen because this
+   * filtered a local array; the rail reads `boot()`, which filters on the declaration's own `placed` and `nav`,
+   * neither of which this could touch — so the page was back in the pen on reload and had never once been in the
+   * nav. The write is a whole declaration set at the version the page was read at, so a page somebody else placed
+   * first is a conflict and the rail is read again rather than written over.
+   */
+  async function promote(decl: PageDecl) {
+    if (placing !== null) return;
+    const built = REGISTERS[String(decl.requires[0] ?? '').replace('register.', '')]?.name;
+    const section = decl.nav?.section ?? built ?? decl.title;
+    /* THE STEP IS TEN, as the seeded pages are spaced, so there is room to move a page between two without renumbering. */
+    const nav = { section, order: shell.nav.reduce((n, e) => (e.section === section ? Math.max(n, e.order) : n), 0) + 10 };
+
+    /* No record behind this host means there is no declaration to set, and the sample says what it would have done. */
+    if (!shell.live) {
+      toasts.push(copy.notWritten(`${decl.title} would be placed at the end of ${section} in your nav`), { intent: 'warn' });
+      return;
+    }
+
+    placing = decl.page;
+    const at = opened();
+    const [write, read] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/pages-live.ts')]);
+    const got = await read.pagesReader(location.origin).readOne(decl.page);
+    if (got.from !== 'live') {
+      placing = null;
+      closed(true, at);
+      /* A template is one declaration drawn once per row, and setting the expansion back would delete the other rows' pages. */
+      toasts.push(got.from === 'refused' ? got.fix : got.from === 'expanded' ? got.expanded.why : copy.recordNotReached, { intent: 'warn' });
+      return;
+    }
+    const out = await write.setBody(location.origin, { ...got.page.body, placed: true, nav }, undefined, got.page.version);
+    placing = null;
+    closed(true, at);
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    placedHere = new Set(placedHere).add(decl.page);
+    toasts.push(copy.promoted(decl.title));
+    /* The rail draws what `boot` says, so it reads again and the page is in it before the toast has gone. */
+    await invalidateAll();
   }
 
   /**
@@ -1437,7 +1467,7 @@
                   </span>
                   <span class="line-amount"></span>
                   <span class="line-when">
-                    <Button weight="quiet" onclick={() => promote(p)}>Place in nav</Button>
+                    <Button weight="quiet" disabled={placing !== null} onclick={() => promote(p)}>Place in nav</Button>
                   </span>
                 </div>
               </li>
