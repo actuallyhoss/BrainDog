@@ -23,17 +23,21 @@
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
+  import Queue from '../Queue.svelte';
   import Text from '../Text.svelte';
 
   let {
     block,
     opts = {},
     ontick,
+    onact,
   }: {
     block: Block;
     opts?: RenderOptions;
     /** The host's place to put the answer. Its absence is what keeps the box an image. */
     ontick?: ((row: Row, done: boolean) => void) | undefined;
+    /** The same for a queue: where an answer goes. Its absence is what keeps an option a word. */
+    onact?: ((row: Row, option: string) => void) | undefined;
   } = $props();
 
   /* THE STRINGS ARE LOCAL, because `packages/render` depends on nothing and the app's copy file is
@@ -97,6 +101,8 @@
 <Feed {block} {opts} />
 {:else if block.kind === 'agents'}
 <Agents {block} {opts} />
+{:else if block.kind === 'queue'}
+<Queue {block} {opts} {onact} />
 {:else}
 <svelte:element this={block.kind === 'steps' ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
   {#each block.rows as row, i}

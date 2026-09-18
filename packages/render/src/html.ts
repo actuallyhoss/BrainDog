@@ -19,6 +19,7 @@ import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions
 import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
+import { QUEUE_RECOMMENDED, queueMore, queuePlan } from './queue.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
@@ -328,6 +329,7 @@ function inlinePrimitive(b: Block, o: RenderOptions): string {
 function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'feed') return feed(b, o);
   if (b.kind === 'agents') return agents(b, o);
+  if (b.kind === 'queue') return queue(b, o);
   const spec = KINDS[b.kind];
   const tag = spec.ordered ? 'ol' : 'ul';
   const body = b.rows
@@ -612,6 +614,38 @@ function feed(b: Block, o: RenderOptions): string {
     })
     .join('');
   return `<div class="feed">${body}</div>`;
+}
+
+/**
+ * `queue`: what is waiting on a person, one card per question (`src/queue.ts`).
+ *
+ * The options are words here and never buttons: `toHTML` has no callbacks, which is the same read-only
+ * shape the Svelte drawer takes when a host passes no `onact`, so the two trees are equal by construction
+ * rather than by a promise. The recommendation is a word beside its option and nothing is pre-chosen.
+ */
+function queue(b: Block, o: RenderOptions): string {
+  const plan = queuePlan(b.rows);
+  if (plan.items.length === 0) return `<p class="queue-empty">${escape(plan.empty)}</p>`;
+  const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
+  const body = plan.items
+    .map((item) => {
+      const options = item.options
+        .map(
+          (opt) =>
+            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}><span class="queue-label">${escape(opt.label)}</span>${
+              opt.recommended ? `<span class="queue-rec">${escape(QUEUE_RECOMMENDED)}</span>` : ''
+            }${opt.because ? `<span class="queue-because">${drawn(opt.because)}</span>` : ''}</li>`,
+        )
+        .join('');
+      return `<article class="queue-card"${toneAttrs(item.row.tone)}><p class="queue-by"><span class="queue-who">${drawn(
+        item.who,
+      )}</span><span class="queue-when">${drawn(item.when)}</span></p><h3 class="queue-question">${drawn(item.question)}</h3>${
+        item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : ''
+      }<ul class="queue-options">${options}</ul></article>`;
+    })
+    .join('');
+  const more = plan.more > 0 ? `<p class="queue-more">${escape(queueMore(plan.more))}</p>` : '';
+  return `<div class="queue">${body}${more}</div>`;
 }
 
 /**

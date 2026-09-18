@@ -1,6 +1,6 @@
 /**
  * The two renderers, compared as trees: the Svelte drawers compiled and rendered on the server,
- * against `toHTML`, for every shape a `cards`, `section`, `feed` and `diff` block can take,
+ * against `toHTML`, for every shape a `cards`, `section`, `feed`, `queue` and `diff` block can take,
  * and the figures that keep their numbers in a fold.
  *
  * "EQUAL BY CONSTRUCTION" WAS A PROMISE AND NOTHING KEPT IT. The rest of this package asserts the
@@ -93,6 +93,12 @@ const SHAPES: Record<string, string> = {
     '```agents\nClaude | 3 | changed [Write the notes](/r/tickets/2) | 3h ago\nCodex | 1 | added Fix login | 5h ago | warn\nClaude | 9 |  | 1d ago\n```',
   'no agent has done anything': '```agents\n```',
   'a feed with no mark yet': '```feed\nseen | \n```',
+  'a queue of two questions, one recommended, with more waiting':
+    '```queue\nq | s1 | Claude | 3h ago | Raise the retainer? | [Kiln](/r/things/1) has run over for two months.\n' +
+    'opt | s1 | raise | Raise it to £4,000 | Covers the overrun | true\nopt | s1 | leave | Leave it | Nothing changes yet | \n' +
+    'q | s2 | Late fees | 1d ago | Chase invoice 2026-049? | \nopt | s2 | accept | Chase it | It is 12 days late | \n' +
+    'opt | s2 | reject | Leave it |  | \nmore | 4\n```',
+  'a queue with nothing waiting': '```queue\n```',
   'a diff with a change in the middle':
     '```diff | Deploy, v3 to v4\n  When a deploy fails,\n- retry once.\n+ retry twice,\n+ then page the owner.\n  Log the run.\n```',
   'a diff that folds its long runs':

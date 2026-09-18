@@ -865,10 +865,12 @@ test('A BLOCK KIND IS ONE OF THE TWENTY, and the closure is what the security ar
   assert.equal(said?.at, 'blocks[0]', 'a refusal names the block that was wrong (04 §5)');
   assert.ok(said?.allowed?.includes('note'), 'the refusal offers no alternative');
 
-  /* THE TWENTY STILL INSTALL. A gate red for every input is as useless as one never red. */
-  for (const kind of ['note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params', 'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff'])
-    assert.equal(refusedWith(block({ kind })), null, `${kind} is one of the twenty and was refused`);
-  assert.match(validateDeclaration(block({ kind: 'prose' }))?.fix ?? '', /not one of the twenty/);
+  /* EVERY KIND THIS BUILD DRAWS STILL INSTALLS. A gate red for every input is as useless as one never
+     red, and the list is read off the refusal's own `allowed` rather than typed out here: a copy of it
+     beside the copy in `declare.ts` is the drift this list has already had twice. */
+  for (const kind of said?.allowed ?? []) assert.equal(refusedWith(block({ kind })), null, `${kind} is a kind this build draws and was refused`);
+  assert.ok((said?.allowed?.length ?? 0) > 20, 'the refusal offers every kind, not a handful');
+  assert.match(validateDeclaration(block({ kind: 'prose' }))?.fix ?? '', /not a kind this build draws/);
 
   /* AND A SEVENTEENTH ARRIVES AS A DECLARATION, which is the whole reason the primitive layer
      exists (05 §2) — admitted by prefix, and checked as a document of its own. */

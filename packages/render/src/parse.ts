@@ -19,6 +19,7 @@
 import { BAR_HOLE, KINDS, TONE_ALIAS, TONES, isKind, type DegradeCode, type Kind, type Tone } from './kinds.ts';
 import { cardFault } from './cards.ts';
 import { feedFault } from './feed.ts';
+import { queueFault } from './queue.ts';
 import { diffFault } from './diff.ts';
 
 /**
@@ -382,6 +383,9 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
     const card = kind === 'cards' ? cardFault(rows[0]?.cells ?? []) : null;
     const feed = kind === 'feed' ? feedFault(rows.map((r) => r.cells)) : null;
     const diff = kind === 'diff' ? diffFault(rows.map((r) => r.cells[0] ?? '')) : null;
+    /* A QUEUE ROW IS A QUESTION OR ONE OF ITS OPTIONS, and an option under no question would be dropped
+       from the drawing, which is a way to answer quietly disappearing. Same code, same reason as a feed. */
+    const queue = kind === 'queue' ? queueFault(rows.map((r) => r.cells)) : null;
     /* A STAT'S FOURTH CELL IS A TREND, and a word there is a note in the wrong column rather than a
        line with no points: before the trend it was a fifth cell and degraded, and it still does. */
     const trend = kind === 'stat' ? rows.find((r) => (r.cells[3] ?? '').trim() !== '' && !/\d/u.test(r.cells[3]!)) : undefined;
@@ -391,9 +395,11 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
       ? `A cards block has ${card}. A card takes one figure and at most three facts.`
       : feed
         ? `A feed block has ${feed}.`
-        : diff !== null
-          ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
-          : null;
+        : queue
+          ? `A queue block has ${queue}.`
+          : diff !== null
+            ? `A diff row starts with "- ", "+ " or two spaces, and "${diff}" does not.`
+            : null;
     if (fault) {
       out.push({
         type: 'degraded',

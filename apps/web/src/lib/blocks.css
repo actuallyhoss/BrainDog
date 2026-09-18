@@ -1046,6 +1046,115 @@
     }
   }
 
+  /* ── queue: what is waiting on you ───────────────────────────────────────
+     One card a question, because a question is read whole: who asked, what they are asking, why, and
+     the ways to answer it. The options are a list rather than a row of buttons, so a long reason sits
+     under the words it belongs to and the recommendation is read beside its own option and no other. */
+
+  .queue {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .queue-card {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--s1);
+  }
+
+  .queue-by {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: baseline;
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--dim);
+  }
+
+  .queue-who {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  .queue-question {
+    margin: 0;
+    font-size: var(--t-lg);
+    line-height: var(--lh-tight);
+    color: var(--ink);
+  }
+
+  .queue-why {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink2);
+  }
+
+  .queue-options {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* THE REASON SITS UNDER THE OPTION, not beside it: read across, two reasons of different lengths
+     pull their options out of line, and the thing being compared is the options. */
+  .queue-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-1) var(--sp-2);
+    align-items: baseline;
+  }
+
+  .queue-act {
+    justify-self: start;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--s2);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .queue-act:hover {
+    background: var(--hover-wash);
+  }
+
+  .queue-label {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* A WORD AND NOT A HIGHLIGHT. What an agent suggests is worth saying and is not worth pre-pressing,
+     so it reads as a quiet label beside the option rather than as the option already chosen. */
+  .queue-rec {
+    justify-self: end;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s3);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .queue-because {
+    grid-column: 1 / -1;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .queue-more,
+  .queue-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
   /* ── diff: before and after ──────────────────────────────────────────────
      Track changes rather than a patch: a skill is prose, so its lines are in the UI face and wrap
      inside the box, and a phone never scrolls one sideways. What was taken out keeps its words,

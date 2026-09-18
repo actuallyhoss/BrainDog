@@ -222,6 +222,10 @@ const TABLE = {
   diff: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },
   /* What each agent did, one group per agent (`src/agents.ts`): `who | count | what | when`. Page-only, as `feed` is. */
   agents: { primitive: 'list', cells: 4, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
+  /* What is waiting on a person, a question and its ways to answer (`src/queue.ts`). Two kinds of row,
+     `q | id | who | when | question | why` and `opt | id | key | label | because | recommended`, as `feed`
+     marks one of its rows `seen`. Page-only, because the questions are the record's own. */
+  queue: { primitive: 'list', cells: 6, tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

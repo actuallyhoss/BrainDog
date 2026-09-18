@@ -440,15 +440,18 @@ function metricBody(decl: Declaration): Refusal | null {
  * comes back with rows filed under a kind the renderer cannot draw. A block that draws NOTHING and
  * says nothing is the exact silence `04 §1` calls the closure load-bearing for.
  *
- * A COPY THAT DRIFTS IS WORSE THAN NO COPY, so the count is stated where it can be wrong, and the
- * test asserts the twenty install. A PACK'S OWN KIND NEEDS NO EDIT HERE: `05 §2` says it arrives as
- * a `block.<id>` declaration, which this list admits by prefix and checks as a document of its own. A
- * kind added to the renderer's table does, which is how `cards`, `section`, `feed` and `diff` arrived.
+ * A COPY THAT DRIFTS IS WORSE THAN NO COPY, AND A COUNT IN PROSE IS THE FIRST THING TO DRIFT. This
+ * list said "the twenty" in two refusals and in this paragraph while holding twenty-eight, because
+ * every kind added since was added to the array and not to the sentence. So neither says a number now,
+ * and the test walks the array rather than a list typed out beside it. A PACK'S OWN KIND NEEDS NO EDIT
+ * HERE: `05 §2` says it arrives as a `block.<id>` declaration, which this list admits by prefix and
+ * checks as a document of its own. A kind added to the renderer's table does, which is how `cards`,
+ * `section`, `feed`, `diff` and `queue` arrived.
  */
 const BLOCK_KINDS = [
   'note', 'quote', 'stat', 'bar', 'gauge', 'chips', 'spec', 'params',
   'todo', 'steps', 'timeline', 'board', 'code', 'tree', 'comparison', 'table', 'cards', 'section', 'feed', 'diff',
-  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress',
+  'sparkline', 'split', 'bridge', 'series', 'forecast', 'agents', 'lines', 'progress', 'queue',
 ] as const;
 
 /**
@@ -503,7 +506,7 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
  */
 const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
-const COMPUTED_SOURCES = ['forecast.runway', 'activity', 'sessions.live', 'actions'] as const;
+const COMPUTED_SOURCES = ['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open'] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
@@ -677,7 +680,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (kind === undefined)
       return bad(
         'KIND_UNKNOWN',
-        `${id}.${at} names no kind, so nothing knows what to draw and the block comes back empty. Give it one of the twenty, or a block.<id> this pack declares.`,
+        `${id}.${at} names no kind, so nothing knows what to draw and the block comes back empty. Give it one this build draws, or a block.<id> this pack declares.`,
         at,
         BLOCK_KINDS as unknown as string[],
       );
@@ -685,7 +688,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (!declaredKind && !(BLOCK_KINDS as readonly unknown[]).includes(kind))
       return bad(
         'KIND_UNKNOWN',
-        `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not one of the twenty, and no block declares it.`,
+        `${id}.${at}: kind ${JSON.stringify(kind ?? null)} is not a kind this build draws, and no block declares it.`,
         at,
         BLOCK_KINDS as unknown as string[],
       );

@@ -23,6 +23,7 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 import { evaluate } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
+import { BODY_KINDS } from './govern.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
@@ -207,6 +208,8 @@ export type BlockResult = PageBlock & {
   rings?: (number | null)[];
   /** A `feed` block's rows, newest first, a burst being one row. */
   feed?: FeedRow[];
+  /** A `queue` block's questions, in the record's own order, cut to `limit`. `matched` is how many are open. */
+  queue?: QueueQuestion[];
   /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
   seen?: string | null;
   /** A `diff` block's versions of its field, newest first, at most `versions` of them. */
@@ -250,6 +253,18 @@ export type FeedRow = {
   /** On a `setup` row (`feed.ts`), how many example rows the record set itself up with. */
   rows?: number;
 };
+
+/** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
+export type QueueOption = { key: string; label: string; because: string; recommended: boolean };
+
+/**
+ * One open question, as the `governance.open` source reads it.
+ *
+ * `why` is what whoever opened it wrote (`body.context`), and it is empty when they wrote none. There is
+ * no cost here, because the record holds none: a queue draws the record's own order, which is the order
+ * questions were opened in, and calling that a ranking by cost would be a number nobody computed.
+ */
+export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; options: QueueOption[] };
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
@@ -300,6 +315,8 @@ export type PageDeps = {
   sessionsLive?: () => Entry[];
   /** Every active scheduled action, as the record's `actions` read lists them, keys by label. */
   actions?: () => ActionRow[];
+  /** The open questions, oldest first as the record holds them, and how many are open in all. */
+  openQuestions?: (limit: number) => { questions: QueueQuestion[]; open: number };
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
   tz?: string;
   /**
@@ -321,7 +338,7 @@ export type PageDeps = {
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions']);
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open']);
 
 /**
  * The kinds that add their rows up, whose `limit:` cuts the GROUPS they draw and never the rows they read.
@@ -726,6 +743,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'activity') return activityBlock(deps, block, base, also);
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
+  if (block.source === 'governance.open') return openBlock(deps, block, base, also);
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
@@ -1247,6 +1265,49 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
     matched: kept.length,
     ...(block.since === 'seen' ? { seen: read.seen } : {}),
   };
+}
+
+/* ── the open questions ──────────────────────────────────────────────────── */
+
+/**
+ * What a queue's `where:` may ask about a question: who opened it, and what kind of thing it proposes.
+ *
+ * NOT THE BODY ITSELF. A proposal's body is a different shape per kind, and a predicate over it would be
+ * a query language over something the record does not promise to keep stable. Who asked and what they are
+ * asking for is what a page filters on.
+ */
+const OPEN: Schema = {
+  register: 'governance',
+  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS } },
+};
+
+/** How many questions a queue draws when a page names no `limit:`. Past this, the rest is the count. */
+const QUEUE_LIMIT = 3;
+/** The most it will draw, however large a `limit:` a page asks for: a queue is not a list of everything. */
+const QUEUE_CEILING = 20;
+
+/**
+ * A `queue` over `governance.open`: the questions waiting on a person, and how many there are.
+ *
+ * THE COUNT IS OF WHAT MATCHED, NOT OF WHAT IS DRAWN, so "3 more" is three more and not the remainder of a
+ * page the reader cannot see. A predicate narrows both, which is why the filter runs before the cut.
+ */
+function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.openQuestions)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its open questions onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.open comes in the record’s own order, so it takes no order:.', at: 'order' }) };
+  const said = predicateOf(block.where, OPEN, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
+  /* READ MORE THAN WILL BE DRAWN, because a predicate over who asked can leave a page short otherwise, and
+     ask for the ceiling's worth at most: the count of what is open comes back with them either way. */
+  const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING));
+  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind }, OPEN));
+  /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
+     answered with. With one, the count is of what this page could see, and it says so by being smaller. */
+  const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;
+  return { ...base, queue: kept.slice(0, limit), matched };
 }
 
 /* ── the record's scheduled actions ──────────────────────────────────────── */

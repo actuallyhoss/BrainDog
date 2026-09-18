@@ -227,6 +227,22 @@ export function listGovernance(
   return ok(rows.map((r) => hydrate(register, r)));
 }
 
+/**
+ * How many questions are open right now, deferrals that have not come round left out.
+ *
+ * THE SAME TWO CONDITIONS `listGovernance` READS, in one place rather than two: a queue that draws three
+ * and says "six more" is counting the same thing it listed, and a second copy of the predicate is how
+ * those two numbers come to disagree.
+ */
+export function countOpenQuestions(deps: Pick<GovernDeps, 'sql' | 'nowMs'>): number {
+  return (
+    deps.sql.one<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)",
+      instant(deps.nowMs),
+    )?.n ?? 0
+  );
+}
+
 /** How many rows one governance register holds, every one of them: a count for a screen that pages. */
 export function countGovernance(sql: Sql, register: GovernRegister): number {
   if (!(GOVERNANCE as readonly string[]).includes(register)) return 0;

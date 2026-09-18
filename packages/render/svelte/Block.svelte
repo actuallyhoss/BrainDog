@@ -23,12 +23,13 @@
     opts = {},
     onmove,
     ontick,
+    onact,
   }: {
     block: Block;
     opts?: RenderOptions;
     /**
-     * TWO PRIMITIVES CAN BE CHANGED AND THE OTHER SIX CANNOT, so two callbacks cross this component
-     * and reach exactly the ones that take them.
+     * TWO PRIMITIVES CAN BE CHANGED AND THE OTHER SIX CANNOT, so these callbacks cross this component
+     * and reach exactly the ones that take them: one for `grid`, two for `list`.
      *
      * THEY ARE NOT ON `RenderOptions`. Every member of that type is a READ: a resolver, a link
      * builder, a clock. Putting a write callback on it would give `toHTML` a key it can never
@@ -41,6 +42,8 @@
      */
     onmove?: ((row: Row, to: string) => void) | undefined;
     ontick?: ((row: Row, done: boolean) => void) | undefined;
+    /** The list primitive's other write: answering one of a queue's questions. */
+    onact?: ((row: Row, option: string) => void) | undefined;
   } = $props();
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
@@ -90,7 +93,7 @@
          to the union the other six are in, it is a prop none of them declares. -->
     <Grid {block} {opts} {onmove} />
   {:else if spec.primitive === 'list'}
-    <List {block} {opts} {ontick} />
+    <List {block} {opts} {ontick} {onact} />
   {:else if Draw}
     <Draw {block} {opts} />
   {:else}

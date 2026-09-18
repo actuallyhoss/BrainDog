@@ -93,6 +93,7 @@ import {
   getGovernance,
   listGovernance,
   countGovernance,
+  countOpenQuestions,
   propose as openSuggestion,
   reopen,
   keepApplied,
@@ -2656,6 +2657,43 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         .filter((e): e is Entry => e !== null),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
+    /*
+     * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, in the record's own order.
+     *
+     * THE OPTIONS ARE THE BODY'S OWN AND NOTHING IS INVENTED HERE. A proposal of any other kind is
+     * accepted or rejected, and those two words belong to whatever is drawing the screen: the kernel
+     * does not know what language the reader has, and a host that filled them in here would have two
+     * places saying "Accept". So a question of another kind comes back with no options and the drawer
+     * puts its own two there.
+     *
+     * A BODY IS WHATEVER THE PROPOSER WROTE, so every field is checked on the way out rather than
+     * trusted: an option missing its label is left out, not drawn as `undefined`.
+     */
+    openQuestions: (limit) => {
+      const nowMs = clock.now();
+      const said = listGovernance({ sql, nowMs }, 'suggestion', { status: 'open', limit });
+      const rows = said.ok ? said.value : [];
+      const questions = rows.map((r) => {
+        const body = r.body !== null && typeof r.body === 'object' && !Array.isArray(r.body) ? (r.body as Record<string, unknown>) : {};
+        const offered = r.body_kind === 'options' && Array.isArray(body.options) ? (body.options as unknown[]) : [];
+        const options = offered.flatMap((o) => {
+          if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
+          const one = o as Record<string, unknown>;
+          if (typeof one.id !== 'string' || typeof one.label !== 'string') return [];
+          return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true }];
+        });
+        return {
+          id: String(r.id),
+          who: String(r.opened_by ?? ''),
+          at: String(r.opened_at ?? ''),
+          kind: String(r.body_kind ?? ''),
+          question: questionOf(sql, String(r.id)) ?? '',
+          why: typeof body.context === 'string' ? body.context : '',
+          options,
+        };
+      });
+      return { questions, open: countOpenQuestions({ sql, nowMs }) };
+    },
     /*
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,
      * `tickets#3`, with its title beside it, so a reader is never handed an entry id.
