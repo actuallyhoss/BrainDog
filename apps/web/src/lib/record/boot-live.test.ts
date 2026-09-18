@@ -260,7 +260,7 @@ test('THE SAMPLE SAYS ONE COUNT OF OPEN QUESTIONS: the rail and Home, the Decide
   assert.equal(metric('open-questions').value, String(QUEUE.length));
 });
 
-test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail, at its page, and one over a list the rail does not draw stays under Views', () => {
+test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail and at its page, and holds its list there even with no rows in it yet', () => {
   const shell = layoutOf({
     ...BOOT,
     pages: [
@@ -269,7 +269,14 @@ test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail, at its page, and
       { slug: 'services-cheap', title: 'Cheap services', nav: { section: 'Views', order: 900 }, icon: null, list: 'services' },
     ],
   } as never);
-  assert.deepEqual(shell.index.registers.map((r) => [r.id, r.views]), [['obligations', [{ key: 'obligations-late', name: 'Late to pay', href: '/p/obligations-late' }]]]);
+  /* `services` holds nothing, and would be dropped from the rail on its own; its view keeps it, and nests under it. */
+  assert.deepEqual(shell.index.registers.map((r) => [r.id, r.views]), [
+    ['obligations', [{ key: 'obligations-late', name: 'Late to pay', href: '/p/obligations-late' }]],
+    ['services', [{ key: 'services-cheap', name: 'Cheap services', href: '/p/services-cheap' }]],
+  ]);
+  /* The rail drops from Views every page it has already nested, so neither view is left under the generic heading. */
+  const placed = new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href)));
+  assert.deepEqual(shell.nav.filter((n) => !placed.has(n.href)).map((n) => n.href), ['/p/money']);
   assert.deepEqual(
     shell.nav.map((n) => n.href),
     ['/p/money', '/p/obligations-late', '/p/services-cheap'],

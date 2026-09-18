@@ -419,9 +419,11 @@ export function layoutOf(b: Boot): Shell {
       slug: record?.slug ?? '',
       name: record?.name ?? '',
       locale: record?.locale ?? 'en',
-      /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows. */
+      /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
+         A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
+         Views by matching against these, so dropping the list here strands the view under the generic heading. */
       registers: b.registers
-        .filter((r) => r.count > 0)
+        .filter((r) => r.count > 0 || views.has(r.id))
         .map((r) => ({ id: r.id, name: r.name, count: r.count, icon: iconFor(REGISTERS[r.id]?.icon, 'rows'), views: views.get(r.id) ?? [] })),
     },
     lists: b.registers.map((r) => ({ id: r.id, name: r.name })),
