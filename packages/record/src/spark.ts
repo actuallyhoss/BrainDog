@@ -41,6 +41,22 @@ const OPENED = { opens: 5, days: 3 };
 const AGENT_SHARE = 2 / 3;
 /** A label a page title may lend a list is a word or a few, as a label is (`declare` `usecase.ts`). */
 const LABEL_MOST = 40;
+/** A description line is a sentence's worth, as `declare` `usecase.ts` holds one. */
+const HOLDS_MOST = 280;
+
+/**
+ * One of a list, from its name: Issues, issue.
+ *
+ * THE RULE THE APP ALREADY APPLIES, from `apps/web/src/lib/voice.ts`. A list renamed with no singular given is already
+ * SHOWN in the singular this makes, so drafting it writes down the word the reader is seeing rather than guessing a new
+ * one. It is deliberately two cases and no more: anything it cannot turn comes back as the name in lower case, which is
+ * the right answer for a list whose name is already singular and is left undrafted below when it says nothing new.
+ */
+const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+
+/** One word of a line, matched whole and in any case, so renaming a list does not rewrite the middle of another word. */
+const wordIn = (word: string): RegExp => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`, 'giu');
+
 /** How Home heads its recent changes when agents do most of the work, and when no agent has worked in a quarter. */
 export const AGENTS_LINE = 'What you and your agents did since you last looked';
 export const QUIET_LINE = 'Since you last looked';
@@ -507,14 +523,50 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[]): { notice
       const title = p.title.trim();
       if (title.length > LABEL_MOST || title.toLowerCase() === word.toLowerCase()) continue;
       worded.add(list.id);
+      const seen = `You opened the ${title} page, which shows ${word}, ${plural(p.opens30, 'time')} on ${p.openDays30} separate days in the last thirty days.`;
       noticed.push({ kind: 'label', subject: list.id, text: `You opened ${title}, a page of ${word}, ${plural(p.opens30, 'time')} in the last thirty days.` });
       drafts.push({
         key: '',
-        question: `Call ${word} ${title} everywhere? You opened the ${title} page, which shows ${word}, ${plural(p.opens30, 'time')} on ${p.openDays30} separate days in the last thirty days.`,
+        question: `Call ${word} ${title} everywhere? ${seen}`,
         body_kind: 'settings',
         body: { pack: tone.pack, values: { [setting]: title } },
         by: 'rules',
       });
+
+      /**
+       * AND THE TWO WORDS THAT GO WITH THE NAME. A list carries three: what it is called, what ONE of it is called, and
+       * the line saying what it holds (`declare` `usecase.ts` `LIST_WORDS`). The name alone left a list called Issues
+       * saying "New ticket" on its own button and "every ticket we know about" under its empty state, which is two
+       * words for one thing on the screen the rename was supposed to fix. Both come off the signal already read here,
+       * so neither costs another reading; each is offered only where the use case declares the setting, as the name is,
+       * and only where it would say something the record does not say already.
+       */
+      const oneSetting = labelSetting(`${list.id}:one`);
+      const oneHeld = tone.settings[oneSetting];
+      const one = singularOf(title);
+      if (oneHeld && one !== '' && one !== (oneHeld.value ?? oneHeld.default ?? '').toLowerCase())
+        drafts.push({
+          key: '',
+          question: `Call one of them ${one}? ${seen}`,
+          body_kind: 'settings',
+          body: { pack: tone.pack, values: { [oneSetting]: one } },
+          by: 'rules',
+        });
+
+      /* WHAT IT HOLDS, IN THE NEW WORD. Only the old word is swapped, so the sentence stays the one its author wrote; a
+         line that never named the old word has nothing here to draft and is left alone. */
+      const holdsSetting = labelSetting(`${list.id}:holds`);
+      const holdsHeld = tone.settings[holdsSetting];
+      const line = holdsHeld ? (holdsHeld.value ?? holdsHeld.default ?? '') : '';
+      const said = line.replace(wordIn(word), title.toLowerCase()).replace(wordIn(singularOf(word)), one);
+      if (line !== '' && said !== line && said.length <= HOLDS_MOST)
+        drafts.push({
+          key: '',
+          question: `Say ${title} holds ${said}? The line reads "${line}" now, in the word this list was called before.`,
+          body_kind: 'settings',
+          body: { pack: tone.pack, values: { [holdsSetting]: said } },
+          by: 'rules',
+        });
     }
 
     /* HOME SAYS WHO DID THE WORK. Agents making most of the changes are named in how Home heads them; a heading that names

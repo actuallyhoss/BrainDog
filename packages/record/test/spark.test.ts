@@ -399,6 +399,62 @@ test('THE WORDS FOLLOW USE: a page the owner keeps opening lends its list its na
   sql.close();
 });
 
+/** The same use case, declaring all three of a list's words: its name, one of it, and the line saying what it holds. */
+const CREW = (() => {
+  const u = normaliseUseCase({
+    usecase: 'crew',
+    version: '1.0.0',
+    title: 'Crew',
+    summary: 'Crew.',
+    author: 'BrainDog',
+    license: 'MIT',
+    audience: 'team',
+    tone: 'plain',
+    signals: ['crew'],
+    modules: [],
+    voice: { home: 'Crew' },
+    labels: { tickets: 'Tickets', 'tickets:one': 'ticket', 'tickets:holds': 'every ticket we know about' },
+    pack: { ...manifest('usecase-crew'), declarations: [list('usecase-crew', 'tickets', 'Tickets'), page('crew-home', 'Crew', 'tickets', 'Crew')] },
+  });
+  assert.ok(u.ok, JSON.stringify(u));
+  return u.value;
+})();
+
+const CREW_CATALOGUE: CatalogueEntry[] = [...CATALOGUE, entry('usecase-crew', 'Crew', useCasePack(CREW)!, 'usecase')];
+
+test('A LIST RENAMED IS RENAMED IN ALL THREE WORDS: its name, one of it, and the line saying what it holds', async () => {
+  const { api, sql, install, day } = await record({ catalogue: CREW_CATALOGUE });
+  await install({ usecase: 'crew', why: ['A crew.'] }, 'arrange');
+  await install({ why: ['My pages.'], pages: [{ id: 'page.issues', body: page('issues', 'Issues', 'tickets', 'Crew') }] }, 'arrange');
+  for (const n of [20, 20, 11, 6, 2, 1]) {
+    day(n);
+    value(await api.page({ slug: 'issues' }, owner));
+  }
+  day(0);
+
+  const seen = value<Toned>(await api.spark({}, owner));
+  const words = seen.drafts.filter((d) => d.body_kind === 'settings').map((d) => d.question);
+  assert.deepEqual(words, [
+    'Call Tickets Issues everywhere? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
+    'Call one of them issue? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
+    'Say Issues holds every issue we know about? The line reads "every ticket we know about" now, in the word this list was called before.',
+  ]);
+  for (const q of words) assert.ok(!q.includes('—'), `an em dash in: ${q}`);
+
+  /* EACH IS A SETTING `prepare` CHECKS, filed and accepted the way the name is. */
+  const out = value<Filed>(await api.sparkPropose({}, owner));
+  for (const f of out.filed) value(await api.decide({ id: f.id, decide: { option: 'accept', reason: 'yes' } }, owner));
+  const now = await settingsOf(api, 'usecase-crew');
+  assert.equal(now.label_tickets, 'Issues');
+  assert.equal(now.one_tickets, 'issue', 'a list renamed to Issues was left saying one of them is an Issues');
+  assert.equal(now.holds_tickets, 'every issue we know about');
+
+  /* AND NOTHING IS ASKED TWICE. The page title is the list's word now, so there is nothing left to offer. */
+  const after = value<Toned>(await api.spark({}, owner));
+  assert.deepEqual(after.drafts.filter((d) => d.body_kind === 'settings').map((d) => d.question), []);
+  sql.close();
+});
+
 test('HOME SAYS WHO DID THE WORK: agents doing most of it are named, and a quarter with none puts the line back', async () => {
   const { api, sql, install, day } = await record({ catalogue: TEAM_CATALOGUE });
   await install({ usecase: 'team', why: ['A team.'] }, 'arrange');
