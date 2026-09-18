@@ -111,6 +111,13 @@ export async function recordFor(page, route) {
   if (SAMPLE_ONLY.some((r) => r.test(route))) await page.route(RECORD_PATHS, ABORT);
 }
 
+/**
+ * The server key of a record this module started, for the one gate that has to sign in as a person rather than
+ * be handed the record: `passkey` drives the real ceremony, and the key is the door the first person comes
+ * through before a passkey exists. It stays inside this process and is never printed, as it was before.
+ */
+export const serverKeyFor = (base) => KEYS.get(base);
+
 /** Headers that describe one hop and not the message, so they are not copied across this one. */
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'host', 'content-length', 'content-encoding']);
 
@@ -124,15 +131,19 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
  * as "draw the sample instead".
  *
  * EVERY `Set-Cookie` COMES BACK AS ITS OWN HEADER. `forEach` joins them into one value no browser can split.
+ *
+ * `bearer: false` KEEPS THE KEY OFF THE WIRE, which is what a gate about signing in needs: with the key on
+ * every request, each screen reads the record as its owner and there is no signed-out state left to drive.
+ * It is on by default because every other browser gate measures a screen rather than a door.
  */
-export async function forward(req, res, base) {
+export async function forward(req, res, base, { bearer = true } = {}) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
   const url = new URL(req.url ?? '/', base);
   const key = KEYS.get(base);
-  if (key !== undefined && /^\/+api(?:\/|$)/.test(url.pathname) && headers.authorization === undefined) headers.authorization = `Bearer ${key}`;
+  if (bearer && key !== undefined && /^\/+api(?:\/|$)/.test(url.pathname) && headers.authorization === undefined) headers.authorization = `Bearer ${key}`;
   try {
     const out = await fetch(url, {
       method: req.method ?? 'GET',

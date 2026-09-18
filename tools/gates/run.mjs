@@ -120,9 +120,16 @@ const GATES = [
      registry is that the sheet documents by READING it, so it cannot drift — and it had drifted
      three ways, found by a sweep rather than by anything here. */
   ['keys', ['node', [join(here, 'keys.mjs')]]],
-  // Last two because they are the slow ones: a real browser over every route.
+  // Last three because they are the slow ones: a real browser over every route.
   ['layout', ['node', [join(here, 'layout.mjs')]]],
   ['a11y', ['node', [join(here, 'a11y.mjs')]]],
+  /* THE ONE BROWSER GATE THAT DRIVES A DOOR RATHER THAN MEASURING A SCREEN. Both halves of sign-in were
+     tested and the join between them never was: the verifier against a software authenticator, the client
+     against a fake `navigator.credentials`, and nothing at all against a browser's own WebAuthn stack over
+     the challenge, origin and RP ID a real record issued. It comes in by the server key, adds a passkey,
+     signs out and comes back in with it. On its own ephemeral port, so it does not join the queue for 5189
+     the two above share. */
+  ['passkey', ['node', [join(here, 'passkey.mjs')]]],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The twenty-four above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
