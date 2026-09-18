@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from '../copy.ts';
-import { answer, DECIDED_PAGE, everyGovernance, olderDecisions, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor } from './governance.ts';
+import { answer, DECIDED_PAGE, everyGovernance, keepDecided, olderDecisions, pagesStanding, pairs, park, plainOf, questionOf, readOne, readQueue, type Governor, type Queue } from './governance.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import type { Question } from './schema.ts';
 
@@ -363,6 +363,35 @@ test('DECISIONS PAST THE NEWEST TWO HUNDRED: Decide reads a page, says how many 
   const last = all.at(-1)!;
   assert.equal(last.id, 'D1');
   assert.equal(last.options.find((o) => o.key === last.decided?.option)?.title, 'Yes to 1', 'the oldest decision is named by the option it chose');
+});
+
+test('DECISIONS ALREADY PAGED IN STAY DOWN THE SCREEN when the queue is read again, and paging carries on from there', () => {
+  const decision = (n: number): Question => ({ id: `D${n}`, title: `About SG${n}?`, cost: '', rank: 0, opened: '2026-09-01T00:00:00Z', options: [], decided: { option: 'yes', reason: 'r', by: 'sam', at: '2026-09-01T00:00:00Z' } });
+  const queue = (decided: Question[], cursor: string | null, total: number, suggestions: [string, Record<string, unknown>][]): Queue => ({
+    open: [],
+    decided,
+    rowsets: {},
+    registers: {},
+    rows: {},
+    older: { cursor, total, suggestions: new Map(suggestions), after: cursor, read: true },
+  });
+  /* The reader had three pages of fifty and was partway down; the answer they just gave conflicted. */
+  const had = queue(Array.from({ length: 150 }, (_, i) => decision(300 - i)), 'D151', 300, [['SG300', { id: 'SG300' }]]);
+  /* The fresh read answers the newest fifty only, led by the decision just written. */
+  const fresh = queue([decision(301), ...Array.from({ length: 49 }, (_, i) => decision(300 - i))], 'D252', 301, [['SG301', { id: 'SG301' }]]);
+
+  const merged = keepDecided(had, fresh);
+  assert.equal(merged.decided.length, 151, 'the fifty read again plus every older one already asked for');
+  assert.equal(merged.decided[0]?.id, 'D301', 'the decision just written leads');
+  assert.equal(merged.decided.at(-1)?.id, 'D151', 'the oldest one the reader had paged in is still there');
+  assert.equal(new Set(merged.decided.map((d) => d.id)).size, 151, 'nothing is drawn twice');
+  assert.equal(merged.older?.cursor, 'D151', 'the next page starts below what the reader already has');
+  assert.equal(merged.older?.total, 301, "the record's own count of every decision");
+  assert.deepEqual([...(merged.older?.suggestions.keys() ?? [])], ['SG301', 'SG300'], 'the suggestions read for both pages name the options');
+
+  /* A first read has nothing to keep, and a queue with no older page is taken as it comes. */
+  assert.equal(keepDecided(null, fresh), fresh);
+  assert.equal(keepDecided(queue([], null, 0, []), fresh), fresh);
 });
 
 test('A HOST THAT IGNORES THE CURSOR cannot loop a screen: a page that goes nowhere is the last', async () => {

@@ -335,6 +335,29 @@ export async function readQueue(client: Governor): Promise<Read<Queue>> {
 }
 
 /**
+ * THE DECISIONS ALREADY ASKED FOR SURVIVE A SECOND READ OF THE QUEUE.
+ *
+ * `readQueue` answers the newest `DECIDED_PAGE` decisions and no more, so a reader who had pressed for older ones and
+ * then hit a conflict watched the ledger fold back to fifty and lost their place. The fresh page leads, because it
+ * holds whatever was just decided; every older decision the reader had already paged in follows, in the order it was
+ * read, and paging carries on from where they had got to rather than from the top.
+ */
+export function keepDecided(had: Queue | null | undefined, fresh: Queue): Queue {
+  const kept = had?.decided ?? [];
+  if (kept.length === 0) return fresh;
+  const fresher = new Set(fresh.decided.map((d) => d.id));
+  const decided = [...fresh.decided, ...kept.filter((d) => !fresher.has(d.id))];
+  if (!had?.older || !fresh.older) return { ...fresh, decided };
+  /* The reader's own cursor and the suggestions read for it, which are further along than a first read's. */
+  const older: Older = {
+    ...had.older,
+    suggestions: new Map([...fresh.older.suggestions, ...had.older.suggestions]),
+    total: Math.max(fresh.older.total, decided.length),
+  };
+  return { ...fresh, decided, older };
+}
+
+/**
  * One question by id: a suggestion `SG<n>`, or a decision `D<n>`. A row the record does not give is `null`.
  *
  * A SUGGESTION NO LONGER OPEN IS DRAWN SETTLED: what was decided, by whom, when and why, from the

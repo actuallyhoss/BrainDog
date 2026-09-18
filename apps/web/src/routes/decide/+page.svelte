@@ -35,7 +35,7 @@
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
-  import { olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
+  import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -70,7 +70,8 @@
     const at = opened();
     client ??= createClient({ base: location.origin });
     const out = await readQueue(client);
-    if (out.from === 'live') live = out.value;
+    /* A RE-READ AFTER A CONFLICT KEEPS THE OLDER DECISIONS ALREADY ASKED FOR, which a fresh read answers without. */
+    if (out.from === 'live') live = keepDecided(live, out.value);
     if (out.from === 'refused') refusal = out.fix;
     from = out.from;
     closed(out.from !== 'refused', at);
