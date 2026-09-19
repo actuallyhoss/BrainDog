@@ -198,11 +198,17 @@ test('a lookup that resolves to nothing is a review too, not a broken reference'
 
 /* ── the transforms ──────────────────────────────────────────────────────── */
 
-const deps = { find: () => null } as never;
+const deps = { rows: () => [] } as never;
 
 /** `deps` with `43 §4.3`'s readers wired, the way `@braindog/record` wires them. */
 const wired = (over: Record<string, unknown>) =>
-  ({ find: () => null, numbers: { money: () => [], int: () => [], decimal: () => [], ...over } }) as never;
+  ({ rows: () => [], numbers: { money: () => [], int: () => [], decimal: () => [], ...over } }) as never;
+
+/** `deps` with `43 §4.3`'s literal rule wired, and the register rows a `lookup` searches. */
+const literate = (
+  literals: (text: string, entries: readonly (readonly [string, unknown])[]) => unknown[] | 'ambiguous',
+  rows: { id: string; value: string }[] = [],
+) => ({ rows: () => rows, literals }) as never;
 
 test("MONEY IS READ BY THE RECORD'S SCANNER, and a declared currency is handed to it as a fallback", () => {
   /* `43 §63`, verbatim: *`declared` is the fallback currency, never an override.* This file read
@@ -321,6 +327,84 @@ test('AND A RECORD WITH NO READERS WIRED READS ALL THREE THE WAY IT ALWAYS DID',
   assert.deepEqual(extractOutcome(deps, { decimal: {} }, 'Amount 1.234,56 EUR'), {
     value: 123_456,
     outcome: 'exact',
+  });
+});
+
+test("`enum` AND `lookup` ARE READ BY THE RECORD'S LITERAL RULE, and both can now say ambiguous", () => {
+  /* `43 §4.3` gives the two forms one rule: *the longest literal present as a whole token*, and
+     *two of equal length with different values → **ambiguous***. This file had neither half. It
+     matched substrings, so `coin` read as the literal `in`, and it had no ambiguity at all, so two
+     literals both present were settled by the order `Object.keys` gave them. Neither is fixable
+     by sorting harder; the rule is one function in `@braindog/extract`, which is rank 9 to this
+     package's 7, so it is handed down the way the number readers are. */
+  const seen: unknown[] = [];
+  const rule = (text: string, entries: readonly (readonly [string, unknown])[]) => {
+    seen.push([text, entries]);
+    if (text.includes('two')) return 'ambiguous' as const;
+    return text.includes('yes') ? ['found'] : [];
+  };
+
+  assert.deepEqual(extractOutcome(literate(rule), { enum: { map: { yes: 'found' } } }, 'the yes one'), {
+    value: 'found',
+    outcome: 'exact',
+  });
+  /* THE MAP REACHES THE RULE AS ITS TABLE, entries and all, rather than being walked here. */
+  assert.deepEqual(seen.at(-1), ['the yes one', [['yes', 'found']]]);
+
+  /* AND AMBIGUITY IS AN OUTCOME AND NOT A MISS, which is the word this runtime could not say.
+     `43 §5.1` step 7 files it at `needs-review`, and it carries no value because there is no
+     honest one to carry. */
+  assert.deepEqual(extractOutcome(literate(rule), { enum: { map: { yes: 'found' } } }, 'the two of them'), {
+    value: null,
+    outcome: 'ambiguous',
+  });
+
+  /* A `lookup`'s TABLE IS THE REGISTER'S ROWS, one SELECT — `43 §2` in those words. The old seam
+     took one value and answered yes or no, which cannot express *longest wins* or *two matched*. */
+  const rows = [{ id: 'e1', value: '1234' }, { id: 'e2', value: '4471' }];
+  extractOutcome(literate(rule, rows), { lookup: { register: 'accounts', by: 'last4' } }, 'the yes one');
+  assert.deepEqual(seen.at(-1), ['the yes one', [['1234', 'e1'], ['4471', 'e2']]]);
+
+  /* AND AMBIGUITY DOES NOT FALL THROUGH A COMBINATOR. The text held two readings and the next arm
+     cannot unsay that; `43 §4.3`'s `default` row says the same in its own words — *an ambiguous
+     `of` stays ambiguous* — and a default that covered it would write the declaration's value
+     over a text that contradicted it. */
+  const both = { enum: { map: { yes: 'found' } } };
+  assert.deepEqual(extractOutcome(literate(rule), { first: [both, { after: 'the ' }] }, 'the two of them'), {
+    value: null,
+    outcome: 'ambiguous',
+  });
+  assert.deepEqual(extractOutcome(literate(rule), { nth: { n: 1, of: both } }, 'the two of them'), {
+    value: null,
+    outcome: 'ambiguous',
+  });
+  assert.deepEqual(extractOutcome(literate(rule), { default: { value: 'x', of: both } }, 'the two of them'), {
+    value: null,
+    outcome: 'ambiguous',
+  });
+  /* AND ABSENCE IS STILL COVERED, which is what a `default` is for. */
+  assert.deepEqual(extractOutcome(literate(rule), { default: { value: 'x', of: both } }, 'nothing here'), {
+    value: 'x',
+    outcome: 'defaulted',
+  });
+});
+
+test('AND A RECORD WITH NO LITERAL RULE WIRED READS BOTH THE WAY IT ALWAYS DID', () => {
+  /* THE FALLBACK IS KEPT WHOLE, as it is for the three number forms: substring matching, no
+     ambiguity, and a `lookup` that reads the first token of its slice. These are the old answers
+     and they are the wrong ones. */
+  const plain = { rows: () => [{ id: 'e1', value: '1234' }] } as never;
+  assert.deepEqual(extractOutcome(plain, { enum: { map: { in: 'credit' } } }, 'coin'), {
+    value: 'credit',
+    outcome: 'exact',
+  });
+  assert.deepEqual(extractOutcome(plain, { lookup: { register: 'accounts', by: 'last4' } }, '1234 debited'), {
+    value: 'e1',
+    outcome: 'exact',
+  });
+  assert.deepEqual(extractOutcome(plain, { lookup: { register: 'accounts', by: 'last4' } }, 'Card 1234 debited'), {
+    value: null,
+    outcome: 'missing',
   });
 });
 
@@ -814,7 +898,7 @@ test('the function is a function, and it reads the record it was handed', async 
       ingests: () => [],
       schemaOf: () => null,
       write: () => ({ ok: false, refusal: { code: 'X', fix: 'x' } }),
-      find: () => null,
+      rows: () => [],
       mint: () => '01ABCDEFGHJKMNPQRSTVWXYZ99',
       allocate: () => 1,
       nowMs: NOW,
@@ -845,7 +929,7 @@ test("A DECIMAL'S `sep` IS THE DECIMAL POINT, and it was reading as the thousand
    * wrong is the grammar an author writes against.
    */
   const { sql } = await record();
-  const deps = { find: () => null } as never;
+  const deps = { rows: () => [] } as never;
   const read = (sep: string | undefined, text: string): unknown =>
     extractField(deps, { decimal: sep === undefined ? {} : { sep } } as never, text);
 
@@ -873,7 +957,7 @@ test('MONEY READS ITS OWN SEPARATORS, or every European amount is a thousandth o
      without one. So the key is gone and these assertions are unchanged, which is the proof: the
      declaration below no longer says how Europe writes a number, and still reads it. */
   const { k, sql } = await record();
-  const deps = { find: () => null } as never;
+  const deps = { rows: () => [] } as never;
 
   assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR' } }, 'EUR 1.234,56'), {
     amount: 123_456,

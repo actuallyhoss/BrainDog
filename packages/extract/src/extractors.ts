@@ -205,7 +205,16 @@ const collapse = (text: string): string => {
  * read, and picking the earlier one would write a debit where a credit belongs — silently, and only
  * sometimes, which is the worst of both.
  */
-function matchLiterals(folded: string, entries: readonly [string, Json][]): Json[] | 'ambiguous' {
+/**
+ * `43 §4.3`'s `enum` and `lookup` rule over already-folded text: the longest literal present as a
+ * WHOLE TOKEN wins, and two of equal length with different values are **ambiguous**.
+ *
+ * EXPORTED THROUGH `matchLiterals` BELOW, because the kernel reads both of those forms too and read
+ * them with `String.includes` and no ambiguity at all — so `coin` matched the literal `in`, and two
+ * literals both present were decided by `Object.keys` order. It is rank 9 to the kernel's 7, so it
+ * is handed down rather than imported, the way the number readers are (`31 §2`).
+ */
+function matchFolded(folded: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
   let best: { length: number; value: Json } | null = null;
   let clash = false;
 
@@ -230,6 +239,11 @@ function matchLiterals(folded: string, entries: readonly [string, Json][]): Json
 
   if (best === null) return [];
   return clash ? 'ambiguous' : [best.value];
+}
+
+/** `matchFolded` over text that has not been folded yet — the form a caller outside this file wants. */
+export function matchLiterals(text: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
+  return matchFolded(fold(text), entries);
 }
 
 /* ── the forms ───────────────────────────────────────────────────────────── */
@@ -383,7 +397,7 @@ function resolveOne(
   const table = entries();
   let answer: Json[] | null = null;
   for (const s of picked) {
-    const got = matchLiterals(folded.slice(s.start, s.end), table);
+    const got = matchFolded(folded.slice(s.start, s.end), table);
     if (got === 'ambiguous') return 'ambiguous';
     if (got.length === 0) continue;
     if (answer !== null && JSON.stringify(answer) !== JSON.stringify(got)) return 'ambiguous';

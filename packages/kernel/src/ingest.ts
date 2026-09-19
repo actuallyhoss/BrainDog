@@ -87,11 +87,16 @@ export type Extractor =
  * What reading one field ACTUALLY DID — `43 §4.3`'s outcome, so `43 §5.1`'s confidence rule has
  * something to read.
  *
- * FOUR OF THE SIX. `ambiguous` and `invalid` belong to a scanner that returns every match and to a
- * field-shape check against `34 §3`; this runtime has neither, and a word it can never emit would be
- * a promise in a type. The four it can tell apart are the four below.
+ * FIVE OF THE SIX. This said four, and said `ambiguous` "belongs to a scanner that returns every
+ * match — this runtime has neither". Half of that was true when it was written and neither half is
+ * now: the number forms got their scanner, and `enum` and `lookup` never needed one to be
+ * ambiguous. Two literals of equal length with different values, both present, is a text that said
+ * two things, and answering it with either one is a guess written into a register.
+ *
+ * `invalid` IS STILL HONESTLY ABSENT. It is a field-shape check against `34 §3` and nothing here
+ * runs one, so it stays out rather than becoming a word in a type that no code path can emit.
  */
-export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing';
+export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing' | 'ambiguous';
 
 /** What one field's form yielded, and how. */
 export type Extracted = { value: Json | null; outcome: FieldOutcome };
@@ -208,7 +213,28 @@ export type IngestDeps = {
   ingests: () => IngestDecl[];
   schemaOf: (register: string) => Schema | null;
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string) => Result<Entry>;
-  find: (register: string, by: string, value: string) => string | null;
+  /**
+   * Every live row's `by` value in a register — `43 §2`, in its own words: *the record runs one
+   * SELECT*. `§4.3`'s `lookup` is the id whose value occurs as a WHOLE TOKEN in the slice, longest
+   * wins, equal length with different ids ambiguous, and none of those three can be asked of a
+   * seam that takes one value and answers yes or no.
+   *
+   * IT USED TO TAKE THE FIRST TOKEN OF THE SLICE AND LOOK UP EXACTLY THAT. So a declaration with
+   * no anchor over `Card 1234 debited…` looked up `Card`, found nothing, and was silent on every
+   * arrival — the fourth time this loop has found a declaration that installs, matches, fires and
+   * says nothing. Multi-word values could not be found at all, because a token is one word.
+   */
+  rows: (register: string, by: string) => { id: string; value: string }[];
+  /**
+   * `43 §4.3`'s `enum` and `lookup` rule, when the record handed it down: the longest literal
+   * present as a whole token, or `'ambiguous'` for two of equal length with different values.
+   *
+   * ABSENT IS `String.includes` AND NO AMBIGUITY, which is what this file did alone and which is
+   * wrong two ways at once. `{ enum: { map: { in: 'credit' } } }` over `coin` wrote `credit` — a
+   * legal value for the field, off a substring of an unrelated word, so nothing downstream catches
+   * it — and two literals both present were decided by the order `Object.keys` happened to give.
+   */
+  literals?: ((text: string, entries: readonly (readonly [string, Json])[]) => Json[] | 'ambiguous') | undefined;
   mint: () => string;
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
@@ -719,6 +745,10 @@ export function resolve(deps: IngestDeps, form: Extractor, text: string): Extrac
 
 function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Extracted {
   const missing: Extracted = { value: null, outcome: 'missing' };
+  /* AMBIGUOUS CARRIES NO VALUE, which is what makes `43 §5.1` step 7 come out right for free: a
+     field with no value is already `needs-review` here, and *any outcome in `missing · ambiguous ·
+     invalid`* is what that step asks for. The word is what a person reading the reason sees. */
+  const ambiguous: Extracted = { value: null, outcome: 'ambiguous' };
   if (form === null || typeof form !== 'object' || depth > NESTING) return missing;
 
   /* `first` RUNS EVERY ARM AND NOT ONLY UNTIL ONE ANSWERS, which is the one thing about it that is
@@ -732,6 +762,9 @@ function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: numbe
     let yielded = 0;
     for (const arm of arms) {
       const got = candidatesAt(deps, arm, text, depth + 1);
+      /* AMBIGUITY IS NOT A MISS, so it does not fall through to the next arm. The text held two
+         readings and the next form cannot unsay that; `default:` takes the same line below. */
+      if (got === AMBIGUOUS) return ambiguous;
       if (got.length === 0) continue;
       yielded += 1;
       picked ??= got[0]!;
@@ -744,6 +777,7 @@ function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: numbe
     const { n, of } = form.nth;
     if (!Number.isInteger(n) || n < 1) return missing;
     const got = candidatesAt(deps, of, text, depth + 1);
+    if (got === AMBIGUOUS) return ambiguous;
     const at = got[n - 1];
     return at === undefined ? missing : { value: at, outcome: 'exact' };
   }
@@ -753,35 +787,66 @@ function resolveAt(deps: IngestDeps, form: Extractor, text: string, depth: numbe
      ordinary read at `proposed` every time somebody wrote a fallback for it. */
   if ('default' in form) {
     const got = resolveAt(deps, form.default.of, text, depth + 1);
+    /* A DEFAULT COVERS ABSENCE, NEVER AMBIGUITY — `43 §4.3`, on the `default` row: *an ambiguous
+       `of` stays ambiguous.* "The text did not say" is a thing a declaration can answer in
+       advance; "the text said two things" is not, and answering it with a default would write a
+       value chosen by the declaration over a text that contradicted it. */
+    if (got.outcome === 'ambiguous') return got;
     if (got.value !== null) return got;
     return { value: form.default.value, outcome: 'defaulted' };
   }
 
   const got = candidatesAt(deps, form, text, depth);
+  if (got === AMBIGUOUS) return ambiguous;
   return got.length === 0 ? missing : { value: got[0]!, outcome: 'exact' };
 }
 
 /**
  * Every candidate one form yields over one text, in text order — `43 §5.3`'s candidate contract.
  *
- * THE CANDIDATES COME FROM THE ANCHOR, AND THAT IS THIS RUNTIME'S CEILING. `43 §5.4`'s scanners
- * yield every match INSIDE a slice as well: `{ money: {} }` over "EGP 10 and EGP 20" is two
- * candidates there and one here, because this file parses the first number of a slice rather than
- * walking it. What it does implement is the other half and the half `nth` is usually written for —
- * each occurrence of the anchor is a slice, and the slices' values concatenate. So
- * `nth: { n: 2, of: { money: { after: 'EGP', currency: 'EGP' } } }` reads the second amount, and a
- * bare form still reads the first, byte for byte what it read before.
+ * THE CANDIDATES COME FROM THE ANCHOR AND, WHEN A READER WAS HANDED DOWN, FROM INSIDE THE SLICE.
+ * Each occurrence of the anchor is a slice and the slices' values concatenate, so
+ * `nth: { n: 2, of: { money: { after: 'EGP', currency: 'EGP' } } }` reads the second amount and a
+ * bare form still reads the first. `43 §5.4`'s other half — every match INSIDE one slice, so
+ * `{ money: {} }` over "EGP 10 and EGP 20" is two candidates — was this runtime's stated ceiling
+ * until the readers could be reached, and this paragraph said so. It is no longer: the three
+ * number forms walk their slice, and a record opened without the readers still yields one, which
+ * is the ceiling standing where it always did rather than everywhere.
+ *
+ * AND ONE ANSWER IS NOT A LIST. `enum` and `lookup` answer once for the whole form, and `43 §4.3`
+ * has one more word than a list can hold: two readings of the same text is `'ambiguous'`, which is
+ * neither a candidate nor the absence of one.
  *
  * A COMBINATOR HAS AT MOST ONE CANDIDATE. It takes a form's candidates and returns one value, so
  * `nth: { n: 2, of: { first: [...] } }` is nothing — correctly, and for the same reason the
  * specification counts combinators separately.
  */
-function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Json[] {
+function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: number): Candidates {
   if (form === null || typeof form !== 'object' || depth > NESTING) return [];
   if (COMBINATORS.some((key) => key in form)) {
     const got = resolveAt(deps, form, text, depth);
+    if (got.outcome === 'ambiguous') return AMBIGUOUS;
     return got.value === null ? [] : [got.value];
   }
+
+  /* `enum` AND `lookup` ANSWER ONCE FOR THE WHOLE FORM, and not once per slice. They match literals
+     rather than scanning for a shape, so two slices that answer differently is the same event as
+     two literals of equal length inside one: the text said two things. `43 §4.3`'s rule is one
+     rule and `@braindog/extract` holds it in one function, so it is reached here rather than
+     written twice. */
+  const table = literalsOf(deps, form);
+  if (table !== null && deps.literals !== undefined) {
+    let answer: Json[] | null = null;
+    for (const anchored of slices(form as Record<string, unknown>, text)) {
+      const got = deps.literals(anchored, table);
+      if (got === AMBIGUOUS) return AMBIGUOUS;
+      if (got.length === 0) continue;
+      if (answer !== null && JSON.stringify(answer) !== JSON.stringify(got)) return AMBIGUOUS;
+      answer = got;
+    }
+    return answer ?? [];
+  }
+
   const out: Json[] = [];
   for (const anchored of slices(form as Record<string, unknown>, text)) {
     /* THE THREE NUMBER FORMS YIELD EVERY MATCH IN THE SLICE AND THE OTHER SEVEN YIELD ONE, which
@@ -799,6 +864,25 @@ function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: nu
     if (got !== null) out.push(got);
   }
   return out;
+}
+
+/** `43 §4.3`'s answer when a text said two things: not a value, and not a miss either. */
+const AMBIGUOUS = 'ambiguous';
+
+/** What one form yielded over one text — candidates in text order, or the one word neither is. */
+type Candidates = Json[] | typeof AMBIGUOUS;
+
+/**
+ * The `[literal, value]` table a literal-matching form searches for, or `null` for the other eight.
+ *
+ * `lookup`'s TABLE IS THE REGISTER'S OWN ROWS, one SELECT, which is what `43 §2` says the record
+ * does: *every live row's `by` value*. Reading it here rather than one value at a time is what
+ * makes *longest wins* and *equal length is ambiguous* askable at all.
+ */
+function literalsOf(deps: IngestDeps, form: Extractor): readonly (readonly [string, Json])[] | null {
+  if ('enum' in form) return Object.entries(form.enum.map);
+  if ('lookup' in form) return deps.rows(form.lookup.register, form.lookup.by).map((r) => [r.value, r.id] as const);
+  return null;
 }
 
 /**
@@ -879,20 +963,29 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
     const n = number(anchored, form.decimal.sep ?? '.');
     return n;
   }
+  /* AND THESE TWO ARE THE FALLBACK AS WELL, kept whole for the same reason the other three are.
+     Both are wrong against `43 §4.3` and neither can be half-fixed into anything better than the
+     reader a record hands down, so a record opened without one keeps the reading it always had
+     rather than a sixth behaviour nobody has a test for. */
   if ('enum' in form) {
     /* THE LONGEST LITERAL FIRST, so a map with both `paid` and `unpaid` in it does not read "unpaid"
-       as "paid" because that key happened to be tried first. */
+       as "paid" because that key happened to be tried first. IT IS A SUBSTRING MATCH AND `§4.3`
+       SAYS WHOLE TOKEN, so `coin` reads as the literal `in` — a legal value for the field, off a
+       fragment of an unrelated word, which is why nothing downstream catches it. And two literals
+       of equal length both present are decided by `Object.keys` order rather than called
+       ambiguous. */
     for (const literal of Object.keys(form.enum.map).sort((a, b) => b.length - a.length))
       if (anchored.toLowerCase().includes(literal.toLowerCase())) return form.enum.map[literal] ?? null;
     return null;
   }
   if ('lookup' in form) {
-    /* THE FIRST TOKEN, not the rest of the payload. `after: 'card ending '` leaves `4471 was
-       debited EGP…`, and looking THAT up finds nothing — quietly, and the arrival goes to review
-       for a reason that is about the anchor rather than about the record. A key is one word; `text`
-       is the extractor for a phrase, and it is why that one usually carries a `between`. */
+    /* THE FIRST TOKEN, not the rest of the payload — and `§4.3` says the id whose value occurs as
+       a whole token ANYWHERE in the slice. So a form with no anchor over `Card 1234 debited…`
+       looks up `Card`, finds nothing, and is silent on every arrival; a value of more than one
+       word cannot be found at all, because a token is one word. */
     const said = /\S+/.exec(anchored)?.[0]?.replace(/[.,;:]+$/, '') ?? '';
-    return said ? deps.find(form.lookup.register, form.lookup.by, said) : null;
+    if (!said) return null;
+    return deps.rows(form.lookup.register, form.lookup.by).find((r) => r.value === said)?.id ?? null;
   }
   return null;
 }

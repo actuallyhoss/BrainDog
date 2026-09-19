@@ -123,8 +123,8 @@ on_conflict: skip          # skip | update | new
 | `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` |
 | `text` | trim and normalise whitespace | `{ text: { between? } }` |
 | `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` — grouping allowed, **no fraction** · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
-| `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` |
-| `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` |
+| `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` — the longest literal present **as a whole token**; two of equal length with different values are **ambiguous** |
+| `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` — the id whose `by` value occurs as a whole token, anywhere in the slice; longest wins, equal-length different ids **ambiguous** |
 | `first` / `nth` | pick from repeated matches | `{ first: [form, …] }` · `{ nth: { n, of: form } }` |
 | `default` | a value when the field is absent | `{ default: { value, of: form } }` |
 
@@ -177,7 +177,20 @@ contradicts its declaration reads nothing rather than reading anyway: under the 
 `"."`, `1.234,56` is not a number this form can take, where the older reading returned 123456 — a
 hundredfold on the field most likely to hold a price. Both arrive with `scanMoney`, down the same
 seam, for the same reason: one grammar per record, or a declaration means one thing in an integer
-field and another in an amount. **Landed September 20th 2026.** Every declared field is **required** and `default` is the only way
+field and another in an amount. **Landed September 20th 2026.**
+
+**A literal is a whole token, and two readings are `ambiguous`.** `enum` and `lookup` share one
+rule and now share one reader. Matching was `String.includes`, so an `enum` whose map held `in`
+read the word `coin` as that literal — a legal value for the field, off a fragment of an unrelated
+word, which is why nothing downstream catches it. And neither form could say `ambiguous` at all:
+two literals of equal length both present were settled by the order `Object.keys` gave them, and a
+`lookup` never noticed a second matching row because it read only the first token of its slice and
+looked up exactly that — so a form with no anchor over `Card 1234 debited…` looked up `Card`, found
+nothing, and was silent on every arrival. `lookup` now reads the register in one SELECT, which is
+what [43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §2 says the record does, and a value of more than one
+word can be found at all. **Ambiguity is `needs-review` and never a value** (§5.1 step 7): a text
+that said two things is not something a `default` may answer, because the fallback would write the
+declaration's guess over a message that contradicted it. **Landed September 20th 2026.** Every declared field is **required** and `default` is the only way
 to make one optional; `writes.confidence` is a ceiling, never a promise (§2).
 
 **No regular expressions.** A regex over a text field a stranger controls is catastrophic

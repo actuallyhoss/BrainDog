@@ -18,6 +18,7 @@ export {
   COMBINATORS,
   EXTRACTORS,
   fold,
+  matchLiterals,
   normalise,
   run,
   type Form,

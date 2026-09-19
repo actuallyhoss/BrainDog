@@ -37,8 +37,17 @@ the `map:` coercion), `cli` (`braindog ingest test`, §13 D15).
 
 ## 2 · Public API
 
-Nine exported functions and the types they need. A function throws only for a malformed declaration or path
-(§6); a payload can never make it throw — a payload produces outcomes, never exceptions.
+The functions a caller outside this package uses, and the types they need. A function throws only for a
+malformed declaration or path (§6); a payload can never make it throw — a payload produces outcomes, never
+exceptions.
+
+> *This section opened **"Nine exported functions"** and `§14`'s first box — ticked — said the package
+> "exports exactly the §2 surface". By September 20th 2026 `index.ts` exported 24 values and 9 types, and
+> three of the extras were deliberate seams this document describes elsewhere: `run`, `fold`, `scanMoney`,
+> `scanInts`, `scanDecimals`, `matchLiterals`. **The exports were right and the count was wrong**, the same
+> failure a stated count exists to catch, and the same one `07 §3` already carries a note about. The
+> functions below are the ones a caller outside this package is meant to reach; the rest are named where
+> they are handed down.*
 
 ```ts
 // index.ts — the `exports` map exposes "." only
@@ -73,6 +82,13 @@ export function select(value: Json, path: string): Json[];
 
 export function normalise(text: string): string;
 //   §5.1 step 1, exported because `connect` and the web app show the same text the extractors saw.
+
+export function matchLiterals(text: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous';
+//   §4.3's rule for `enum` and `lookup`, which share one: the longest literal present as a WHOLE TOKEN,
+//   and two of equal length with different values are `'ambiguous'`. Exported for the same reason
+//   `scanMoney` and `readRows` are — the kernel reads these forms too and is rank 7 to this package's 9,
+//   so the record hands it down (31 §2). Without it `enum` matched substrings and neither form could
+//   say `ambiguous` at all.
 
 export const UNPARSEABLE: unique symbol;      // readRows' one non-Json answer, for BODY_UNPARSEABLE
 export const EXTRACTORS: readonly ['after','before','between','money','date','text','int','decimal','enum','lookup'];
@@ -781,7 +797,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 
 ## 14 · Done when
 
-- [x] `packages/extract` has the seven `src/` files of §3 and exports exactly the §2 surface; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
+- [x] `packages/extract` has the seven `src/` files of §3 and exports §2's surface — which is 24 values and 9 types, not the nine functions §2 used to open by claiming; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
 - [x] `EXTRACTORS` and `COMBINATORS` read 10 + 3 and the `closed-lists` gate agrees with 34 §6
 - [x] no `RegExp` under `src/`; the scoped lint rule exists and fails a planted `/a+/`
 - [x] the money property runs 2,000 cases with no seed directory, and it has teeth: `padEnd` swapped for `padStart` in `readAmount` turns it red. It found the no-break space: `isSep` knew one space character and `normalise` folded sixteen, so `EGP 2 642,97` read as 2.00 for any caller of `parseMoney` who had not normalised first. One list now, in `money.ts`
@@ -789,7 +805,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 - [x] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
 - [x] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green
 - [ ] the sixteen amendments of §13 are applied to 02, 07, 25, 30, 31, 33, 34 in the same revision, and BUILD.md's loop table records it
-- [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between. **Two of the four have landed and neither was a move.** `readRows` reaches a page through `ExtractDeps.rows`, handed down by `@braindog/host` (September 19th 2026); `scanMoney`, `scanInts` and `scanDecimals` reach an arrival through `RecordOptions.numbers`, handed down by `@braindog/record` (September 20th). Both are injections rather than imports, because the caller in each case is rank 7 and this package is rank 9, so the edge would point up `31 §2`'s order — and the injecting package is the lowest rank that can reach both. **All three number forms travel under one key, all or nothing**, because a record reading its amounts by this package's grammar and its integers by the kernel's own would answer two ways about the same digits; over §9.1's message and nine others the two readers now agree on every one of the seven number forms. What is left of the box is `matches` and `isDuplicate`, and the kernel's `resolve` for the other seven forms, which still uses `RegExp` where `§13` D4 bans it under `src/`
+- [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between. **Two of the four have landed and neither was a move.** `readRows` reaches a page through `ExtractDeps.rows`, handed down by `@braindog/host` (September 19th 2026); `scanMoney`, `scanInts` and `scanDecimals` reach an arrival through `RecordOptions.numbers`, handed down by `@braindog/record` (September 20th). Both are injections rather than imports, because the caller in each case is rank 7 and this package is rank 9, so the edge would point up `31 §2`'s order — and the injecting package is the lowest rank that can reach both. **All three number forms travel under one key, all or nothing**, because a record reading its amounts by this package's grammar and its integers by the kernel's own would answer two ways about the same digits; over §9.1's message and nine others the two readers now agree on every one of the seven number forms. `matchLiterals` reaches `enum` and `lookup` the same way (September 20th), so five of the ten forms — money, int, decimal, enum, lookup — are now read by this package wherever a record is the caller. The five that are not are the four anchors and `date`, which need no table and no rule this package owns. What is left of the box is `matches` and `isDuplicate`
 
 ---
 

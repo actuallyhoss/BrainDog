@@ -655,6 +655,17 @@ export type RecordOptions = {
    * one grammar and its amounts by another.
    */
   numbers?: NumberReaders | undefined;
+  /**
+   * `43 §4.3`'s literal rule for `enum` and `lookup`, read by `@braindog/extract`'s
+   * `matchLiterals`, when the caller wired it: the longest literal present as a whole token, and
+   * `'ambiguous'` for two of equal length with different values.
+   *
+   * SAME SEAM AND SAME REASON AS `numbers`. It is rank 9 and the reader of an arrival is rank 7,
+   * so it is handed down rather than imported (`31 §2`). Absent is `String.includes` and no
+   * ambiguity at all, which read `coin` as the literal `in` and settled two literals both present
+   * by the order `Object.keys` gave them.
+   */
+  literals?: IngestDeps['literals'];
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -2967,19 +2978,35 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* THE LOOKUP PATH, which is the third of the three and the one that was still open — named
        in a commit message as fixed and not touched. `by` is `extract.<field>.lookup.by` from an
        ingest declaration, so a pack could point a `ref` at whatever row it liked and the row
-       looked ordinary afterwards. */
-    find: (register, by, value) =>
-      sql.one<{ id: string }>(
-        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ? LIMIT 1`,
-        register,
-        value,
-      )?.id ?? null,
+       looked ordinary afterwards; `jsonPath` is still the one place that decides whether an
+       identifier may become SQL.
+
+       ONE SELECT OF EVERY LIVE ROW'S `by` VALUE, which is `43 §2`'s own description of what the
+       record does here. It used to be one SELECT for one value with `= ?` and `LIMIT 1`, and that
+       shape cannot answer the row `§4.3` actually specifies: the id whose value occurs as a whole
+       token in the slice, longest wins, equal length with different ids ambiguous. None of those
+       three is a question about one value.
+
+       THE ROWS ARE BOUNDED BY THE REGISTER AND BY NOTHING ELSE, which `43 §7` costs as *r*
+       `indexOf` scans and `§10` leaves to the caller. A lookup over a register with a hundred
+       thousand rows is a hundred thousand rows read per arrival, and the honest place to cap that
+       is a cap somebody has measured a need for rather than a number invented here. */
+    rows: (register: string, by: string) =>
+      sql
+        .all<{ id: string; value: unknown }>(
+          `SELECT id, json_extract(fields, '${jsonPath(by)}') AS value FROM entry WHERE register = ? AND deleted_at IS NULL`,
+          register,
+        )
+        .flatMap((r) => (r.value === null || r.value === undefined ? [] : [{ id: r.id, value: String(r.value) }])),
     mint,
     allocate,
     nowMs: clock.now(),
     /* THE RECORD'S READERS FOR `43 §4.3`'s THREE NUMBER FORMS, WHEN THEY WERE WIRED. Absent is
        the old reading of all three, unchanged. */
     numbers: opts.numbers,
+    /* AND `43 §4.3`'s LITERAL RULE FOR `enum` AND `lookup`, when one was wired. Absent is
+       `String.includes` and no ambiguity, unchanged. */
+    literals: opts.literals,
   });
 
   const pullDeps = (): PullDeps => ({
