@@ -118,10 +118,10 @@ on_conflict: skip          # skip | update | new
 
 | Transform | Does | JSON form |
 |---|---|---|
-| `after` / `before` / `between` | literal-anchored slice | `{ after: L }` · `{ before: L }` · `{ between: [A, B] }` — also legal as an optional anchor key inside any value extractor below |
+| `after` / `before` / `between` | literal-anchored slice | `{ after: L }` · `{ before: L }` · `{ between: [A, B] }` — also legal as an optional anchor key inside any value extractor below. The literal matches **a case away** (ASCII, over a parallel copy, so the value keeps the capitals the provider sent), **each occurrence is a slice**, and a bare anchor hands back the slice as cut — `{ text: … }` is the one that trims |
 | `money` | parse a number and a currency into minor units | `{ money: { after?, currency? } }` |
 | `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` — `format` is built from `YYYY` `YY` `MM` `M` `DD` `D` and nothing else; each valid calendar day in the slice, in text order |
-| `text` | trim and normalise whitespace | `{ text: { between? } }` |
+| `text` | trim and normalise whitespace | `{ text: { between? } }` — the whole message is normalised first ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.1 step 4: zero-width characters removed, space-likes to a space, runs collapsed, lines trimmed), so this is the second trim and not the first |
 | `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` — grouping allowed, **no fraction** · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
 | `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` — the longest literal present **as a whole token**; two of equal length with different values are **ambiguous** |
 | `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` — the id whose `by` value occurs as a whole token, anywhere in the slice; longest wins, equal-length different ids **ambiguous** |

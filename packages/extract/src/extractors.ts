@@ -145,38 +145,61 @@ type Slice = { start: number; end: number };
  * meant to yield twenty merchants. `nth:` is how a declaration asks for one of them, and it can only do that
  * if they are all here.
  */
+/**
+ * An anchor literal at least one character long, or `null` for anything shorter.
+ *
+ * AN EMPTY LITERAL IS NOT AN ANCHOR (`43 §4.3`: an anchor literal is at least one character, and
+ * `declare` refuses a shorter one at install — this is the defence-in-depth check for a form that
+ * reaches here another way). `indexOf('')` is 0 at every index, so a walk that advances past each
+ * hit by the literal's own length advances by ZERO over an empty one: not a slow scan, an infinite
+ * loop that grows its slice list until the process runs out of memory. Treated here as no anchor at
+ * all, the way the kernel's own `slices()` treats it (`ingest.ts`).
+ */
+const literal = (v: string | undefined): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
+
 function slices(anchor: Anchor, text: string, folded: string, at: string): Slice[] {
   const keys = [anchor.after, anchor.before, anchor.between].filter((v) => v !== undefined);
   if (keys.length > 1)
     throw unknown(at, 'A form takes at most one of after, before or between. Use two fields, or between.');
 
-  if (anchor.after !== undefined) {
-    const needle = fold(anchor.after);
-    const out: Slice[] = [];
-    for (let i = folded.indexOf(needle); i !== -1; i = folded.indexOf(needle, i + 1))
-      out.push({ start: i + needle.length, end: text.length });
-    return out;
-  }
-  if (anchor.before !== undefined) {
-    const needle = fold(anchor.before);
-    const out: Slice[] = [];
-    for (let i = folded.indexOf(needle); i !== -1; i = folded.indexOf(needle, i + 1))
-      out.push({ start: 0, end: i });
-    return out;
-  }
   if (anchor.between !== undefined) {
     const [a, b] = anchor.between;
-    const open = fold(a);
+    const open = literal(a);
+    if (open === null) return [];
+    const needle = fold(open);
     const close = fold(b);
     const out: Slice[] = [];
-    for (let i = folded.indexOf(open); i !== -1; i = folded.indexOf(open, i + 1)) {
-      const from = i + open.length;
+    /* `43 §5.3` STEP 1, VERBATIM: "advancing past every hit" — past the whole literal, not one
+       character. See the `after` branch below for why a `+1` walk answers wrong. */
+    for (let i = folded.indexOf(needle); i !== -1; i = folded.indexOf(needle, i + needle.length)) {
+      const from = i + needle.length;
       const to = folded.indexOf(close, from);
       /* AN OPENING WITH NO CLOSE YIELDS NOTHING, rather than running to the end of the body. "after the
          merchant, to the end of a statement" is a different declaration from "between the merchant and the
          date", and quietly turning one into the other puts a page of text in a field. */
       if (to !== -1) out.push({ start: from, end: to });
     }
+    return out;
+  }
+
+  const after = literal(anchor.after);
+  if (after !== null) {
+    const needle = fold(after);
+    const out: Slice[] = [];
+    /* `43 §5.3` STEP 1, VERBATIM: "Each occurrence of the anchor literal (`indexOf` over `folded`,
+       advancing past every hit) yields one slice." Past every HIT — the whole literal — not past one
+       character: a `+1` walk turns an overlapping match into an extra occurrence, so `aaaa` under
+       `{ after: 'aa' }` would answer `['aa', 'a', '']` for a literal that only occurs twice. */
+    for (let i = folded.indexOf(needle); i !== -1; i = folded.indexOf(needle, i + needle.length))
+      out.push({ start: i + needle.length, end: text.length });
+    return out;
+  }
+  const before = literal(anchor.before);
+  if (before !== null) {
+    const needle = fold(before);
+    const out: Slice[] = [];
+    for (let i = folded.indexOf(needle); i !== -1; i = folded.indexOf(needle, i + needle.length))
+      out.push({ start: 0, end: i });
     return out;
   }
   return [{ start: 0, end: text.length }];
@@ -269,7 +292,12 @@ export function run(form: Form, text: string, folded: string, ctx: RunCtx, at = 
   if (depth > DEPTH_MAX)
     throw unknown(at, 'Forms nest three deep at most. Flatten the form, or extract two fields and combine them in a rule.');
 
-  const keys = Object.keys(form);
+  /* `NOTE` IS DATA, NOT PART OF THE FORM (`42 §4`, `42-SPEC-DECLARE.md` line 205: *a note is data,
+     not a YAML comment. Legal on every declaration, field, block, section and action below*).
+     `declare` filters it out of an extractor's keys before counting them, so `{ note: '...', money:
+     {...} }` installs clean — a key whose only job is to be ignored has to be ignored here too, or
+     an accepted declaration throws `EXTRACTOR_UNKNOWN` the first time an arrival reaches it. */
+  const keys = Object.keys(form).filter((k) => k !== 'note');
   if (keys.length !== 1)
     throw unknown(at, 'A form is one object with exactly one key from the ten extractors or the three combinators.');
   const key = keys[0]!;

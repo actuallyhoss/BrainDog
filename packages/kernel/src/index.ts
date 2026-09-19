@@ -685,6 +685,17 @@ export type RecordOptions = {
    * the direction a person can see and undo.
    */
   duplicate?: IngestDeps['duplicate'];
+  /**
+   * `43 §5.1` step 4, when the caller wired it: the body in the shape every form reads it.
+   *
+   * THE ONE MEMBER OF THIS SEAM THAT IS NOT A READER, and the one with a security argument under
+   * it. Four zero-width code points and sixteen space-like ones are a character set the kernel has
+   * no business holding, which is `§14`'s test; and a zero-width space is invisible to the person
+   * reading the arrival and visible to `indexOf`, so unwired an amount inside `EGP` walks past an
+   * anchor, an `enum` literal and a `match:` while the message reads correctly on screen (`§8`).
+   * Absent, the body is read exactly as it arrived.
+   */
+  normalise?: IngestDeps['normalise'];
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -3028,6 +3039,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     literals: opts.literals,
     dates: opts.dates,
     duplicate: opts.duplicate,
+    normalise: opts.normalise,
   });
 
   const pullDeps = (): PullDeps => ({

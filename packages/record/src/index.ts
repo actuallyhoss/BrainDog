@@ -27,7 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
-import { isDuplicate, matchLiterals, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
+import { isDuplicate, matchLiterals, normalise as normaliseText, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -747,6 +747,10 @@ export async function createRecordApi(deps: RecordDeps) {
        needs, because the same transaction arrives a day apart with the merchant extended — finds
        nothing to compare and writes the row twice. */
     duplicate: isDuplicate,
+    /* AND `§5.1` STEP 4, which is the one of the six that is not a reader. Without this line the
+       forms read the body exactly as it arrived, and a zero-width space inside `EGP` walks past
+       every anchor while the message still reads correctly on screen (`§8`). */
+    normalise: normaliseText,
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

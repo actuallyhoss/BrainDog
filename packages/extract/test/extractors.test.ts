@@ -9,6 +9,7 @@
  * No provider's real wording appears here (`43 §9`).
  */
 
+import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -127,4 +128,56 @@ test('three levels of nesting are allowed and a fourth is not', () => {
     () => run(four, M1, fold(M1), ctx(), 'extract.f'),
     (err: unknown) => (err as { code?: string }).code === 'EXTRACTOR_UNKNOWN',
   );
+});
+
+test('THE ANCHOR ADVANCES PAST THE WHOLE LITERAL, NOT PAST ONE CHARACTER (`43 §5.3` step 1)', () => {
+  /* Verbatim: "Each occurrence of the anchor literal (`indexOf` over `folded`, advancing past every
+     hit) yields one slice." Advancing past a two-character hit means the next scan starts two
+     characters later, not one. `aaaa` holds `aa` at index 0 and index 2 only — those are the
+     occurrences, and a `+length` walk finds exactly them: `['aa', '']`. A `+1` walk also catches the
+     OVERLAPPING match at index 1, which is not a second occurrence of a whole hit that was already
+     consumed, and yields a spurious third candidate: `['aa', 'a', '']`. */
+  const text = 'aaaa';
+  const got = run({ after: 'aa' }, text, fold(text), ctx(), 'extract.f');
+  if (got === 'ambiguous') throw new Error('unexpected ambiguous');
+  assert.deepEqual(got.values, ['aa', '']);
+});
+
+test('AN EMPTY LITERAL IS NOT AN ANCHOR, AND WALKING ONE CANNOT HANG THE PROCESS (`43 §4.3`)', () => {
+  /* `43 §4.3`: an anchor literal is at least one character, and `declare` refuses a shorter one at
+     install — this is the defence-in-depth check for a form that reaches here another way. Treated
+     as no anchor at all, the same as the kernel's own `slices()` treats it (`ingest.ts`).
+     `indexOf('')` hits at every index, so an unguarded `+length` walk over an empty literal advances
+     by zero and never ends — a real infinite loop, not a slow scan — so this runs the case in a
+     child process the parent can kill on a timeout rather than an await nothing could resolve. */
+  const child = spawnSync(
+    process.execPath,
+    [new URL('./empty-anchor-child.ts', import.meta.url).pathname.slice(1)],
+    { encoding: 'utf8', timeout: 5_000 },
+  );
+  assert.equal(child.signal, null, `the child was killed (${child.signal}): the empty-literal walk hung`);
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout), { values: ['hello world'], note: 'exact' });
+});
+
+test('A NOTE IS DATA, NOT PART OF THE FORM, AND IS IGNORED AT EVERY DEPTH (`42 §4`)', () => {
+  /* `42-SPEC-DECLARE.md` line 205, verbatim: "a note is data, not a YAML comment. Legal on every
+     declaration, field, block, section and action below." `declare.ts` filters `note` out of an
+     extractor's keys in three places so `{ note: '...', money: { after: 'EGP' } }` installs clean —
+     which makes a form `run` refuses at read time, over `EXTRACTOR_UNKNOWN`'s "one object with
+     exactly one key", the worst of the three states: accepted at install, fatal on arrival. A key
+     whose only job is to be ignored has to be ignored everywhere this file reads a form, not just
+     where `declare` counts keys. Tried both ways round, because the kernel's matching bug was a note
+     BEFORE the extractor key silently becoming the spec — a different failure, but the same reason
+     to check both orders here. */
+  const noted: Form = { note: 'the SMS one', money: { after: 'debited' } } as unknown as Form;
+  assert.deepEqual(one(noted, M1), { outcome: 'exact', value: { amount: 125000, currency: 'EGP' } });
+
+  const notedAfter: Form = { money: { after: 'debited' }, note: 'the SMS one' } as unknown as Form;
+  assert.deepEqual(one(notedAfter, M1), { outcome: 'exact', value: { amount: 125000, currency: 'EGP' } });
+
+  const notedNested: Form = {
+    first: [{ note: 'x', between: ['zz ', ' zz'] } as unknown as Form, { between: ['at ', ' on'] }],
+  };
+  assert.deepEqual(one(notedNested, M1), { outcome: 'exact', value: 'BEANS COFFEE' });
 });

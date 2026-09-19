@@ -309,6 +309,24 @@ export type IngestDeps = {
    * accents and case folded off, and that is the grammar's, at rank 9.
    */
   duplicate?: ((a: Record<string, Json>, b: Record<string, Json>, dedupe: Dedupe) => boolean) | undefined;
+  /**
+   * `43 §5.1` step 4, when the record handed it down: the body in the shape every form reads it —
+   * CR and CRLF to LF, tab and NBSP and the Unicode space separators to a space, the zero-width
+   * characters removed, runs of spaces collapsed, each line trimmed.
+   *
+   * THIS IS A SECURITY BOUNDARY AND NOT TIDYING, which is why it is the one member of this seam
+   * that is not a reader. A zero-width space is invisible to the person reading the arrival and
+   * visible to `indexOf`, so a provider — or somebody who can write into one — puts `U+200B`
+   * inside `EGP` and the amount walks past an anchor, past an `enum` literal and past a `match:`
+   * while the message still reads correctly on screen. Stripping them is what makes the text the
+   * reader saw and the text the scanner scanned the same string (`43 §8`).
+   *
+   * IT HOLDS TWO CHARACTER SETS, which is why it is handed down rather than written here: four
+   * zero-width code points and sixteen space-like ones, the same test `§14` applies to the
+   * currency table and the token set. Absent is the body as it arrived, which is what this file
+   * read for as long as it has existed.
+   */
+  normalise?: ((text: string) => string) | undefined;
   mint: () => string;
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
@@ -645,7 +663,15 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason: skipped.reason });
     }
 
-    const text = `${headers.subject ?? ''}\n${body}`;
+    /* THE ROW IS THE BODY — `43 §5.1` step 3, in four words: *`text` → one row, the body*. The
+       subject was prepended to it here, which put a line the document does not extract from in
+       front of every anchor: `{ before: "Card" }` cut the subject and nothing else, and a message
+       whose subject repeats its amount read the subject's. The subject is still matched on — it is
+       one of `34 §1.9`'s seven and `§5.2` builds it — and matching on a line is not reading a value
+       out of it.
+
+       THEN STEP 4 OVER IT, once, before a single form runs. */
+    const text = deps.normalise === undefined ? body : deps.normalise(body);
     const extracted: Record<string, unknown> = {};
     const missed: string[] = [];
 
@@ -1141,7 +1167,12 @@ function candidates(deps: IngestDeps, form: Extractor, anchored: string): Json[]
 
 /** One of the ten value forms over one slice. The anchors are already applied. */
 function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null {
-  if ('after' in form || 'before' in form || 'between' in form) return anchored.trim() || null;
+  /* A BARE ANCHOR HANDS BACK THE SLICE IT CUT, and `43 §4.3` gives the trim to `text` and to `text`
+     alone — *the slice with whitespace collapsed and trimmed*. That contrast is the whole reason
+     `{ text: { after } }` exists beside `{ after }`, and trimming both made the pair mean one
+     thing. The `|| null` went with it: an anchor at the very start of a message cuts an empty
+     slice, and an empty slice is what the message said there, not the message failing to say. */
+  if ('after' in form || 'before' in form || 'between' in form) return anchored;
   if ('text' in form) return anchored.replace(/\s+/g, ' ').trim() || null;
 
   /* THE READERS FIRST, so the one-value path and the candidate path cannot answer differently
@@ -1236,13 +1267,20 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
  * for byte, for every declaration that exists.
  *
  * NOTHING THIS RETURNS FIRST HAS MOVED, and the reason is worth stating because it is the only thing
- * that makes the change safe to make under money: every slice is a SUFFIX of the one before it, so a
- * `before` or a closing `B` that is missing from the first slice is missing from all of them. An
- * occurrence that yields nothing can therefore only be the tail, and skipping it rather than ending
- * the walk is a rule that can change candidate 2 onward and never candidate 1.
+ * that makes the change safe to make under money: under `after` and `between` every slice is a
+ * SUFFIX of the one before it, so a closing `B` that is missing from the first slice is missing from
+ * all of them, and under `before` every slice is a PREFIX of the next. An occurrence that yields
+ * nothing can therefore only be at the end of the walk, and skipping it rather than ending the walk
+ * is a rule that can change candidate 2 onward and never candidate 1.
  */
 function slices(form: Record<string, unknown>, text: string): string[] {
-  const inner = (Object.values(form)[0] ?? {}) as Record<string, unknown>;
+  /* `note:` IS LEGAL ON EVERY FORM AND IS NOT THE FORM — `42 §4`: *a note is data, not a YAML
+     comment. Legal on every declaration, field, block, section and action.* `declare` filters it
+     out of an extractor's keys in three places and this line did not, so `{ note: "the SMS one",
+     money: { after: "EGP" } }` took the note's own text as the specification, found no anchor in
+     it and read the whole message. Written first it silenced the anchor; written second it did
+     nothing. A key whose only job is to be ignored has to be ignored everywhere. */
+  const inner = (Object.entries(form).find(([key]) => key !== 'note')?.[1] ?? {}) as Record<string, unknown>;
   const spec = 'after' in form || 'before' in form || 'between' in form ? form : inner;
 
   /* AN EMPTY LITERAL IS NOT AN ANCHOR. `indexOf('')` is 0 at every index, so walking one would cut
@@ -1251,38 +1289,71 @@ function slices(form: Record<string, unknown>, text: string): string[] {
      single-slice walk did with it. */
   const literal = (at: unknown): string | null => (typeof at === 'string' && at.length > 0 ? at : null);
 
+  /* THE MATCH IS A CASE AWAY AND THE VALUE IS NOT. `43 §4.3`: *literal matching is ASCII-case-
+     insensitive over a parallel folded string, so positions align (`34 §1.2`'s `contains` rule);
+     values are sliced from the unfolded text*. Every `indexOf` below runs over `folded` and every
+     slice is cut out of `text`, which is what makes those two sentences one implementation.
+
+     ASCII AND NO FURTHER, deliberately. A fold that changes a length changes every index after it
+     — `ß` is two letters lowered, `İ` is two characters — and an index that has drifted cuts the
+     value somewhere the provider never put a boundary. So `É` is not `é` here. That is a stated
+     limit of the anchors rather than an oversight, and the money and date readers one rank down
+     fold their own tokens properly because they return values, not positions. */
+  const folded = fold(text);
+  const seek = (needle: string, from: number): number => folded.indexOf(fold(needle), from);
+
   const between = Array.isArray(spec.between) ? (spec.between as [string, string]) : null;
   if (between !== null) {
     const [a, b] = between;
     const out: string[] = [];
     if (literal(a) === null) return out;
-    for (let at = text.indexOf(a); at >= 0; at = text.indexOf(a, at + a.length)) {
-      const rest = text.slice(at + a.length);
-      const to = rest.indexOf(b);
+    for (let at = seek(a, 0); at >= 0; at = seek(a, at + a.length)) {
+      const from = at + a.length;
+      const to = seek(b, from);
       /* AN `A` WITH NO `B` YIELDS NOTHING AND DOES NOT END THE WALK — `43 §4.3`, verbatim. */
-      if (to >= 0) out.push(rest.slice(0, to));
+      if (to >= 0) out.push(text.slice(from, to));
     }
     return out;
   }
 
   const after = literal(spec.after);
   const before = literal(spec.before);
-  const cut = (slice: string): string | null => {
-    if (before === null) return slice;
-    const at = slice.indexOf(before);
-    return at < 0 ? null : slice.slice(0, at);
-  };
 
   if (after !== null) {
     const out: string[] = [];
-    for (let at = text.indexOf(after); at >= 0; at = text.indexOf(after, at + after.length)) {
-      const slice = cut(text.slice(at + after.length));
-      if (slice !== null) out.push(slice);
+    for (let at = seek(after, 0); at >= 0; at = seek(after, at + after.length)) {
+      const from = at + after.length;
+      if (before === null) {
+        out.push(text.slice(from));
+        continue;
+      }
+      const to = seek(before, from);
+      if (to >= 0) out.push(text.slice(from, to));
     }
     return out;
   }
-  const whole = cut(text);
-  return whole === null ? [] : [whole];
+
+  /* `before` WALKS ITS OCCURRENCES LIKE THE OTHER TWO — `43 §4.3`: *the text before EACH occurrence
+     of `L`, from the start*. It used to cut once and hand back one slice, so `nth: 2` over a
+     `before` could not reach candidate 2 out of any message that has ever arrived: the list it
+     counted through was one long. Candidate 1 is the same slice it always was. */
+  if (before !== null) {
+    const out: string[] = [];
+    for (let at = seek(before, 0); at >= 0; at = seek(before, at + before.length)) out.push(text.slice(0, at));
+    return out;
+  }
+  return [text];
+}
+
+/**
+ * `text` with `A`–`Z` lowered and nothing else touched, so `folded[i]` is `text[i]` for every `i`.
+ *
+ * `String.prototype.toLowerCase` is the wrong tool one character in a thousand and that is enough:
+ * it is locale-independent but not length-preserving, and a single `İ` in a subject line would
+ * shift every anchor after it by one and cut every value one character short.
+ */
+function fold(text: string): string {
+  return text.replace(/[A-Z]+/g, (run) => run.toLowerCase());
 }
 
 /** The first number in a run of text, with its separators. `null` when there is none. */
