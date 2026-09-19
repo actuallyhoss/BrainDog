@@ -137,7 +137,9 @@ import {
   egressOf,
   fireAction,
   finishAction,
+  approvalLines,
   keyNamed,
+  keyReady,
   listActions,
   originsOf,
   prepareAction,
@@ -150,6 +152,7 @@ import {
   type ActionsRun,
   type Execute,
   type Budget,
+  type KeyNotReady,
   type Paged,
   type PagedReport,
   type PagedRun,
@@ -274,13 +277,15 @@ export { extractPull } from './extract.ts';
 export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf, reserveFor } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
   Paged, PagedReport, PagedRun, PullHandoff,
   /* What one invocation has left to spend, when the host it runs on counts requests. */
   Budget,
+  /* Why a key cannot carry an approval, and what to do about it. */
+  KeyNotReady,
 } from './actions.ts';
 
 /**
@@ -3041,7 +3046,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         return before === null || before.host !== e.host || before.key !== e.key || before.sends.join('\n') !== e.sends.join('\n');
       });
       if (changed.length === 0) return ok(null);
-      return ok({ egress: changed, approve: changed.flatMap((e) => (e.key_line === null ? [e.line] : [e.line, e.key_line])) });
+      return ok({ egress: changed, approve: approvalLines(changed) });
     },
     row: (register, at) => {
       const found = get(at, { includeDeleted: true });
@@ -3748,8 +3753,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),
 
-    /** Whether the vault holds a live key by this label or id. The row is looked at, never its bytes. */
-    keyHeld: (name: string): boolean => keyNamed(sql, name) !== null,
+    /**
+     * Whether a key can carry an approval: held by the vault, and openable by a scheduled run.
+     * `null` for fine, otherwise the code and the sentence. The row is looked at, never its bytes.
+     */
+    keyReady: (name: string, paged = false): KeyNotReady | null => keyReady(sql, name, paged),
 
     /** A row by its title, for a row id or spoken id: how a plan names the project an action runs for. */
     titleOfRow: (ref: string): string | null => titleOfRow(ref),
@@ -3798,25 +3806,28 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * as a plan says them. Turning a pack on re-arms what it retired, so a proposal to do it shows these, as an install does.
      */
     callsWhenEnabled: (id: string): string[] =>
-      sql
-        .all<{ body: string }>(
-          "SELECT body FROM declaration WHERE coalesce(pack_id, json_extract(body, '$.pack')) = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 1 ORDER BY id",
-          id,
-        )
-        .flatMap((r) => {
-          const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
-          const e = egressOf(body, titleOfRow);
-          if (e === null) return [];
-          const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
-          let host: string | null = null;
-          try {
-            host = base === null ? null : new URL(base).host;
-          } catch {
-            host = null;
-          }
-          const line = host === null ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`);
-          return e.key_line === null ? [line] : [line, e.key_line];
-        }),
+      approvalLines(
+        sql
+          .all<{ body: string }>(
+            "SELECT body FROM declaration WHERE coalesce(pack_id, json_extract(body, '$.pack')) = ? AND kind = 'ingest' AND superseded_at IS NULL AND retired = 1 ORDER BY id",
+            id,
+          )
+          .flatMap((r) => {
+            const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
+            const e = egressOf(body, titleOfRow);
+            if (e === null) return [];
+            const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
+            let host: string | null = null;
+            try {
+              host = base === null ? null : new URL(base).host;
+            } catch {
+              host = null;
+            }
+            /* THE HOST IS REWRITTEN INTO THE LINE BEFORE THE LIST IS ASSEMBLED, because a `pull`
+               says `fetch.base` where the other two say `url`, and the line is built from `url`. */
+            return [{ ...e, line: host === null ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`) }];
+          }),
+      ),
 
     actionOrigins: (): string[] =>
       originsOf(

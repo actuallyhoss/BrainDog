@@ -1113,7 +1113,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
     forget: (id) => kernel.forgetPack(id),
     claimed: (pack) => kernel.packClaims(pack),
-    keyHeld: (name) => kernel.keyHeld(name),
+    keyReady: (name, paged) => kernel.keyReady(name, paged),
   });
 
   /* WHAT AN AGENT OR SPARK MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */

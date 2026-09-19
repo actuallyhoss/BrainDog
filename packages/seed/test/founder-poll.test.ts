@@ -125,13 +125,15 @@ test('ON A FOUNDER RECORD IT PLANS WITH THE HOST AND THE INTERVAL IN FRONT OF TH
   /* THE OWNER'S APPROVAL AT INSTALL: the host, how often, the key, and the project it runs for, per measure. */
   assert.deepEqual(diff.approve, [
     'CALLS OUT stats.northwind.example · every 1h · grant "northwind stats"',
-    `poll_northwind runs for the project things#1 and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`,
+    `poll_northwind runs for the project things#1 and sends the key "northwind stats".`,
+    /* AND WHAT A KEY REACHES, once at the end of the list rather than under each line (§2.7). */
+    'Keys are not kept per project yet, so any action in this record can send any key it names.',
   ]);
   /* A RECORD NAMES THE PROJECT BY ITS TITLE, as a person reads it on Decide, and not by the row id or spoken id the declaration holds. */
   const title = k.titleOfRow('things#1');
   assert.ok(title, 'the example project has a title');
   const named = await plan(pack, { ...stateOf(k), nameOf: (ref) => k.titleOfRow(ref) });
-  assert.equal(named.approve[1], `poll_northwind runs for the project ${title} and sends the key "northwind stats". Keys are not kept per project yet, so any project's action can send this key.`);
+  assert.equal(named.approve[1], `poll_northwind runs for the project ${title} and sends the key "northwind stats".`);
   const byId = k.get('things#1')!.id;
   assert.equal(k.titleOfRow(byId), title);
   /* NOT APPROVED IS NOT INSTALLED. */

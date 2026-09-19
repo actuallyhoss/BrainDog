@@ -165,7 +165,8 @@ test('A PACK THAT CALLS OUT ARMS NOTHING UNTIL THE OWNER APPROVES ITS LINES, in 
   const { sql, api, armed, planOf } = await books();
   const doc = BOOKS('1.0.0', PING);
   const planned = await planOf(doc);
-  assert.deepEqual(planned.approve, ['CALLS OUT hooks.example.test · every 15m · grant "hook key"']);
+  /* THE LINE, AND WHAT A KEY REACHES UNDER IT — once, whatever the pack calls (`§2.7`). */
+  assert.deepEqual(planned.approve, ['CALLS OUT hooks.example.test · every 15m · grant "hook key"', 'Keys are not kept per project yet, so any action in this record can send any key it names.']);
 
   /* NOT APPROVED: the whole pack stays out, because the install is one transaction, and nothing is armed. */
   const bare = refusal(await api.installPack({ doc, planHash: planned.planHash }, owner));
@@ -209,7 +210,11 @@ test('AN UPDATE ASKS ONLY FOR WHAT IS NEW, and declining it leaves the installed
   const v2 = BOOKS('1.1.0', PING, STATUS);
   const second = await planOf(v2);
   assert.deepEqual(second.calls_out.map((c) => [c.ingest, c.change]), [['ping', 'same'], ['status', 'new']]);
-  assert.deepEqual(second.approve, ['CALLS OUT status.example.test · every 1h · grant "hook key"'], 'an action already approved was asked for again');
+  assert.deepEqual(
+    second.approve,
+    ['CALLS OUT status.example.test · every 1h · grant "hook key"', 'Keys are not kept per project yet, so any action in this record can send any key it names.'],
+    'an action already approved was asked for again',
+  );
 
   /* DECLINED: the update does not land, the version installed keeps running, and the new action is not armed. */
   assert.equal(refusal(await api.installPack({ doc: v2, planHash: second.planHash }, owner)).code, 'REQUIRED_MISSING');

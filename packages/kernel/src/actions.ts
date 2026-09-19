@@ -206,19 +206,76 @@ export function actionJitterMs(recordId: string, pack: string | null, action: st
 
 /* ── firing a row ───────────────────────────────────────────────────────── */
 
-type Key = { id: string; label: string };
+type Key = { id: string; label: string; sealed_under: 'record' | 'connector' };
 
 /** The key a scheduled action names, by label or id, and never one that was revoked. The row, never its bytes. */
 export function keyNamed(sql: Sql, name: string | undefined): Key | null {
   if (name === undefined || name === '') return null;
   return (
     sql.one<Key>(
-      'SELECT id, label FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
+      'SELECT id, label, sealed_under FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1',
       name,
       name,
     ) ?? null
   );
 }
+
+/**
+ * Whether a scheduled run could ever open this key, said at the moment somebody approves it.
+ *
+ * THE CHECK BELONGS BEFORE THE PRESS AND NOT AT THE FIRST RUN. `sealedGrant` refuses a key sealed
+ * under the record key, which is right, but a refusal that arrives on the first run arrives after
+ * somebody has already approved the action: it reads as approved, it is armed, and it does nothing
+ * — the exact shape `govern.ts` already refuses a MISSING key to avoid. A key that exists and
+ * cannot be opened by the thing being approved is the same failure with a longer fuse.
+ *
+ * `null` MEANS FINE, and the string is the sentence to show. It says what to do rather than what
+ * went wrong, because the person reading it deposited this key themselves and the fix is theirs.
+ */
+export const runnerCannotOpen = (key: Key): string | null =>
+  key.sealed_under === 'connector'
+    ? null
+    : `The key "${key.label}" was added for you to use, not for a connector. Add it again under the connector before accepting, or this action will be approved and never run.`;
+
+/**
+ * The one sentence that says what a key reaches, appended to an approval list when any line sends one.
+ *
+ * ONCE, AT THE END, AND NOT UNDER EVERY LINE. It is the same fact about the record however many
+ * actions are being approved, and a list that repeats it four times is a list people stop reading —
+ * which costs exactly the thing the line is for. `§2.7`: every key counts as global until scope on
+ * credentials is built, and the screen says so in words.
+ */
+export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action in this record can send any key it names.';
+
+/** An approval list, with that sentence added when anything in it sends a key. */
+export const approvalLines = (egress: readonly Pick<Egress, 'key' | 'line' | 'key_line'>[]): string[] => {
+  const lines = egress.flatMap((e) => (e.key_line === null ? [e.line] : [e.line, e.key_line]));
+  return egress.some((e) => e.key !== null) ? [...lines, KEYS_REACH_ALL] : lines;
+};
+
+/** Why a key cannot carry an approval, and what to do: the code and the sentence, or `null` for fine. */
+export type KeyNotReady = { code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: string };
+
+/**
+ * Both questions a screen has to ask about a key before somebody approves what sends it: is it
+ * there, and could a run open it. `null` means yes to both.
+ *
+ * ONE ANSWER AND NOT TWO, because the two failures have one consequence — an action approved that
+ * cannot run — and a caller holding two booleans is a caller that will eventually check one. They
+ * keep separate CODES because they do not have the same fix: one is a key to add, the other is a
+ * key to add again, under the connector.
+ */
+export const keyReady = (sql: Sql, name: string | undefined, paged = false): KeyNotReady | null => {
+  const key = keyNamed(sql, name);
+  if (key === null)
+    return { code: 'REQUIRED_MISSING', fix: `Add the key called "${name ?? ''}" to the vault, then install.` };
+  /* AND ONLY A CONNECTOR IS HELD TO THE CONNECTOR KEY. A `call`, a `poll` and a single-request
+     `pull` open theirs through `openGrant`, which unwraps the RECORD key, so requiring the other
+     one of them would refuse every action in the record that is not a connector. */
+  if (!paged) return null;
+  const cannot = runnerCannotOpen(key);
+  return cannot === null ? null : { code: 'OUT_OF_BOUNDS', fix: cannot };
+};
 
 /** Pause the row an action runs from, and say so once through the notification path. */
 function pause(deps: ActionDeps, kind: string, ingest: string, say: string): void {
@@ -1083,13 +1140,22 @@ export type Egress = {
   per_day: number | null;
   /** The key by its label, or by a grant id for a `pull`. Never a value. */
   key: string | null;
+  /**
+   * Whether this action PAGES, which decides which of the record's two data keys has to open its credential.
+   *
+   * A CONNECTOR GOES THROUGH `sealedGrant` AND THE CONNECTOR KEY; everything else goes through `openGrant` and the
+   * record key (`12 §6`). So "the key must be sealed for a connector" is true of exactly these and false of the
+   * rest, and a check that did not know the difference would refuse every `call` and `poll` in the record.
+   */
+  paged: boolean;
   sends: string[];
   project: string | null;
   /** The diff's own sentence: `CALLS OUT <host> · every <n> · grant "<label>"`, and the trigger and fields when there are any. */
   line: string;
   /**
-   * A project action sending a key gets a line of its own (question 8). Keys are not kept per project yet, so every key
-   * is one any project's action can send, and approving this line is agreeing to that.
+   * An action sending a key gets a line of its own (question 8). Keys are not kept per project yet, so every key is
+   * one any action in the record can send, and approving this line is agreeing to that. A project's action says so
+   * naming the project, because that is where the mismatch is easiest to miss.
    */
   key_line: string | null;
 };
@@ -1136,12 +1202,22 @@ export function egressOf(body: unknown, nameOf?: (project: string) => string | n
       ? `every ${every ?? ''}`
       : `${trigger === 'both' ? `every ${every ?? ''} and ` : ''}when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`;
   const line = `CALLS OUT ${host ?? 'no host declared'} · ${when} · grant "${key ?? 'none'}"${sends.length ? ` · sends ${sends.join(', ')}` : ''}`;
+  /* A PROJECT'S ACTION GETS A LINE OF ITS OWN, and a global one does not.
+     The line is worth its space because it names a project and says the key is not confined to it,
+     which is the fact somebody would otherwise have to go and look up. For a global action there
+     is no such fact, and a line saying only what `KEYS_REACH_ALL` already says is one more line
+     between the reader and the hosts.
+
+     AND IT NO LONGER CARRIES THE SCOPE CLAUSE EITHER. It used to end "Keys are not kept per
+     project yet, so any project's action can send this key", which is the same thing
+     `KEYS_REACH_ALL` says at the end of the list. One sentence, one fact: this line names the
+     project and the key, and the list's last line says what a key reaches. */
   const key_line =
     project !== null && key !== null
-      ? `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}". Keys are not kept per project yet, so any project's action can send this key.`
+      ? `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}".`
       : null;
 
-  return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, sends, project, line, key_line };
+  return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, paged: pages(d as ActionDecl), sends, project, line, key_line };
 }
 
 /* ── a call a rule runs ─────────────────────────────────────────────────── */

@@ -214,9 +214,9 @@ test('and it says what a pack would DO, before anybody has to read the file', as
   assert.deepEqual(diff.spawns, [{ rule: 'expand', register: 'skus', bound: 60, when: 'state is approved' }]);
   /* EVERY HOST AN ACTION CALLS, AND HOW OFTEN, before anything is installed: the owner's third rule. */
   assert.deepEqual(diff.calls_out, [
-    { ingest: 'npm', channel: 'pull', method: 'GET', host: null, every: '6h', trigger: 'schedule', per_day: null, grant: 'g_1', sends: [], project: null, line: 'CALLS OUT no host declared · every 6h · grant "g_1"', key_line: null, change: 'new' },
-    { ingest: 'balance', channel: 'poll', method: 'GET', host: 'api.example.test', every: '1h', trigger: 'schedule', per_day: null, grant: 'example read', sends: [], project: null, line: 'CALLS OUT api.example.test · every 1h · grant "example read"', key_line: null, change: 'new' },
-    { ingest: 'ping', channel: 'call', method: 'POST', host: 'hooks.example.test', every: '15m', trigger: 'schedule', per_day: null, grant: 'hook key', sends: [], project: null, line: 'CALLS OUT hooks.example.test · every 15m · grant "hook key"', key_line: null, change: 'new' },
+    { ingest: 'npm', channel: 'pull', method: 'GET', host: null, every: '6h', trigger: 'schedule', per_day: null, grant: 'g_1', paged: false, sends: [], project: null, line: 'CALLS OUT no host declared · every 6h · grant "g_1"', key_line: null, change: 'new' },
+    { ingest: 'balance', channel: 'poll', method: 'GET', host: 'api.example.test', every: '1h', trigger: 'schedule', per_day: null, grant: 'example read', paged: false, sends: [], project: null, line: 'CALLS OUT api.example.test · every 1h · grant "example read"', key_line: null, change: 'new' },
+    { ingest: 'ping', channel: 'call', method: 'POST', host: 'hooks.example.test', every: '15m', trigger: 'schedule', per_day: null, grant: 'hook key', paged: false, sends: [], project: null, line: 'CALLS OUT hooks.example.test · every 15m · grant "hook key"', key_line: null, change: 'new' },
     /* A CALL A RULE RUNS: no clock, a daily ceiling, the fields that leave, and a line of its own for a key a project sends. */
     {
       ingest: 'made',
@@ -227,10 +227,11 @@ test('and it says what a pack would DO, before anybody has to read the file', as
       trigger: 'rule',
       per_day: 100,
       grant: 'hook key',
+      paged: false,
       sends: ['skus.code'],
       project: 'studio',
       line: 'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends skus.code',
-      key_line: 'made runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project\'s action can send this key.',
+      key_line: 'made runs for the project studio and sends the key "hook key".',
       change: 'new',
     },
   ]);
@@ -240,7 +241,12 @@ test('and it says what a pack would DO, before anybody has to read the file', as
     'CALLS OUT api.example.test · every 1h · grant "example read"',
     'CALLS OUT hooks.example.test · every 15m · grant "hook key"',
     'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends skus.code',
-    'made runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project\'s action can send this key.',
+    'made runs for the project studio and sends the key "hook key".',
+    /* ONCE, AT THE END, NOT UNDER EVERY KEYED LINE. Four actions here send a key, and four copies
+       of one sentence about the record is a list people stop reading, which costs exactly the
+       thing the sentence is for (`research-scheduled-actions.md` §2.7). The project's line stays
+       its own, because it names a project and says the key is not confined to it. */
+    'Keys are not kept per project yet, so any action in this record can send any key it names.',
   ]);
   assert.ok(diff.warnings.some((w) => w.say.includes('arrives empty')));
 });

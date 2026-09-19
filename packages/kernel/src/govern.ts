@@ -22,7 +22,7 @@
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-import { keyNamed, type Egress } from './actions.ts';
+import { keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { sparkMayWrite } from './spark.ts';
@@ -833,10 +833,26 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       /* EVERY KEY IT SENDS IS IN THE VAULT BEFORE ANYTHING IS ARMED. Accepting a call whose key is missing would arm
          it and pause it on its first run, which reads as approved and does nothing. Nothing is written until all are there. */
       if (row.body_kind === 'change' && Array.isArray(body.egress))
-        for (const out of body.egress as { key?: unknown }[]) {
+        for (const out of body.egress as { key?: unknown; paged?: unknown }[]) {
           const label = typeof out?.key === 'string' ? out.key : null;
-          if (label !== null && keyNamed(deps.sql, label) === null)
+          if (label === null) continue;
+          const key = keyNamed(deps.sql, label);
+          if (key === null)
             return no<Decided>('REQUIRED_MISSING', `Add the key called "${label}" to the vault, then accept.`, { at: 'body.egress' });
+          /* AND A CONNECTOR'S KEY MUST BE ONE A RUN CAN OPEN, checked here for the same reason the
+             line above checks it exists at all. `12 §6` keeps two data keys apart, and a credential
+             sealed under the record's — the ordinary deposit, opened on a screen with the person
+             there — is refused at `sealedGrant` on the first run. Refused then, the approval has
+             already happened: armed, approved, and doing nothing. Refused here, nobody has approved
+             anything yet.
+
+             ONLY A CONNECTOR, because a `call`, a `poll` and a single-request `pull` open theirs
+             through `openGrant` and the RECORD key. Holding those to the connector key would refuse
+             every action in the record that does not page. */
+          if (out.paged === true) {
+            const cannot = runnerCannotOpen(key);
+            if (cannot !== null) return no<Decided>('OUT_OF_BOUNDS', cannot, { at: 'body.egress' });
+          }
         }
     }
 

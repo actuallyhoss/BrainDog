@@ -189,7 +189,9 @@ test('THE REQUEST NAMES THE KEY AND NEVER CARRIES IT, and a call substitutes and
 
   const [request] = stand.seen;
   assert.ok(request);
-  assert.deepEqual({ ...request.grant }, { id: keys['hook key'], label: 'hook key' });
+  /* AND WHICH KEY SEALED IT TRAVELS WITH THE ROW, because the executor is the last place that can
+     tell a credential meant for a person from one meant for a run. */
+  assert.deepEqual({ ...request.grant }, { id: keys['hook key'], label: 'hook key', sealed_under: 'record' });
   assert.equal(request.method, 'POST');
   assert.equal(request.origin, 'https://hooks.example.test');
   assert.equal(request.url, `https://hooks.example.test/in?since=${new Date(NOW - 15 * 60_000).toISOString().slice(0, 10)}`);
@@ -625,8 +627,12 @@ test('AN AGENT PROPOSES ITS ACTIONS AS ONE CHANGE: every host, how often, the ke
   );
   assert.deepEqual(body.approve, [
     'CALLS OUT hooks.example.test · every 15m · grant "hook key"',
-    `ping runs for the project studio and sends the key "hook key". Keys are not kept per project yet, so any project's action can send this key.`,
+    `ping runs for the project studio and sends the key "hook key".`,
     'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what, invoices.party',
+    /* AND WHAT A KEY REACHES, ONCE AT THE END. `§2.7` says every key counts as global until scope
+       on credentials is built and that the approval says so in words. Under every keyed line it
+       would be the same sentence three times; here it is the record's own fact, said once. */
+    'Keys are not kept per project yet, so any action in this record can send any key it names.',
   ]);
   /* NOTHING IS ARMED BY ASKING. */
   assert.ok(!row(sql, 'call', 'ping'));
@@ -651,6 +657,7 @@ test('AN AGENT PROPOSES ITS ACTIONS AS ONE CHANGE: every host, how often, the ke
   assert.ok(narrower.ok, fixOf(narrower));
   assert.deepEqual(bodyOf<{ approve: string[] }>(sql, (narrower.value as { id: string }).id).approve, [
     'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what',
+    'Keys are not kept per project yet, so any action in this record can send any key it names.',
   ]);
 });
 
@@ -676,4 +683,84 @@ test('DECLINING ARMS NOTHING, a proposal that would not install is refused when 
   const waiting = k.decide(gone, { decide: { option: 'accept', reason: 'yes' } }, 'p_1');
   assert.equal(codeOf(waiting), 'REQUIRED_MISSING');
   assert.equal(sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', gone)?.status, 'open');
+});
+
+/* ── the key a connector's approval needs ────────────────────────────────── */
+
+/** A connector: it says how to page, so its credential is opened by `sealedGrant` and the connector key. */
+const PAGER = (grant: string): Declaration => ({
+  id: 'ingest.acme-charges',
+  kind: 'ingest',
+  body: {
+    ingest: 'acme-charges',
+    channel: 'pull',
+    every: '1h',
+    grant,
+    map: { what: { path: 'id', type: 'text' } },
+    fetch: {
+      base: 'https://api.example.test',
+      path: '/v1/charges',
+      auth: { kind: 'none' },
+      schedule: { every: '1h' },
+      page: { kind: 'page_number', param: 'page' },
+      read: { rows: 'data' },
+    },
+    writes: { register: 'notes', key: ['what'] },
+  } as never,
+});
+
+test('ACCEPTING A CONNECTOR WHOSE KEY WAS SEALED FOR A PERSON IS REFUSED BEFORE IT IS ARMED', async () => {
+  /* THE FAILURE THIS STOPS. `sealedGrant` refuses a record-sealed key on the first run, and by then
+     somebody has approved the action: it reads as approved, it is armed, and it does nothing. That
+     is the same shape `REQUIRED_MISSING` already refuses a MISSING key to avoid, with a longer
+     fuse, and the vault is the only party that can tell the difference. */
+  const { k, sql, keys } = await record(INVOICES);
+  const asked = k.propose(
+    { question: 'Pull charges?', body_kind: 'change', body: { declaration_id: 'ingest.acme-charges', to: PAGER(keys['example read']!) } },
+    'p_1',
+  );
+  assert.ok(asked.ok, fixOf(asked));
+  const id = (asked.value as { id: string }).id;
+
+  const refused = k.decide(id, { decide: { option: 'accept', reason: 'yes' } }, 'p_1');
+  assert.equal(codeOf(refused), 'OUT_OF_BOUNDS');
+  /* AND IT SAYS WHAT TO DO, because the person reading it deposited this key themselves. */
+  assert.match((refused as { refusal: { fix: string } }).refusal.fix, /under the connector/);
+  /* NOTHING WAS DECIDED. The question is still open, so accepting again after re-sealing works. */
+  assert.equal(sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', id)?.status, 'open');
+  assert.ok(!row(sql, 'pull', 'acme-charges'));
+  sql.close();
+});
+
+test('and the same connector is accepted once its key is sealed under the connector', async () => {
+  const { k, sql } = await record(INVOICES);
+  const made = k.bindGrant(
+    { label: 'acme', opens: 'api.example.test', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f', sealed_under: 'connector' },
+    'p_1',
+  );
+  assert.ok(made.ok, fixOf(made));
+  const asked = k.propose(
+    { question: 'Pull charges?', body_kind: 'change', body: { declaration_id: 'ingest.acme-charges', to: PAGER((made.value as GrantRow).id) } },
+    'p_1',
+  );
+  assert.ok(asked.ok, fixOf(asked));
+
+  const decided = k.decide((asked.value as { id: string }).id, { decide: { option: 'accept', reason: 'yes' } }, 'p_1');
+  assert.ok(decided.ok, fixOf(decided));
+  sql.close();
+});
+
+test('A CALL IS NOT HELD TO THE CONNECTOR KEY, because it opens its own through the record key', async () => {
+  /* `openGrant` unwraps the RECORD key and `sealedGrant` the connector one (`12 §6`). A check that
+     did not know the difference would refuse every `call` and `poll` in the record — which is what
+     the first version of this check did, and what this test exists to stop coming back. */
+  const { k, sql } = await record(INVOICES);
+  const asked = k.propose(
+    { question: 'Turn the hook on?', body_kind: 'change', body: { declaration_id: 'ingest.paid_hook', to: { declarations: [CALL(), HOOK(), PAID()] } } },
+    'p_1',
+  );
+  assert.ok(asked.ok, fixOf(asked));
+  const decided = k.decide((asked.value as { id: string }).id, { decide: { option: 'accept', reason: 'the owner read the hosts' } }, 'p_1');
+  assert.ok(decided.ok, fixOf(decided));
+  sql.close();
 });

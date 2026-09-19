@@ -26,7 +26,7 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { KINDS, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressOf as egressOfBody, fillConfig, jcs, readConfig, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -159,6 +159,8 @@ export type Diff = {
     /** The most rule-fired calls a day, or `null` when no rule runs it. */
     per_day: number | null;
     grant: string | null;
+    /** Whether it pages, which decides which of the record's two data keys has to open its credential (`12 §6`). */
+    paged: boolean;
     /** The fields that leave with a rule-fired call, each `register.field`. */
     sends: string[];
     project: string | null;
@@ -251,10 +253,14 @@ export type Host = {
   forget: (id: string) => void;
   claimed: (pack: string) => string[];
   /**
-   * Whether the vault holds a key by this label or id. OPTIONAL: a host without a vault checks nothing, and a record
-   * refuses an approved call whose key is missing, because arming it would pause it on its first run.
+   * Whether this key is one the install can actually be approved on: `null` when the vault holds it AND a scheduled
+   * run could open it, otherwise the sentence to show. OPTIONAL: a host without a vault checks nothing.
+   *
+   * TWO FAILURES, ONE ANSWER. A key that is missing and a key sealed for a person rather than a connector end the
+   * same way — an install approved and an action that never runs — and the record is the only party that knows
+   * either, so it says which and what to do about it.
    */
-  keyHeld?: (name: string) => boolean;
+  keyReady?: (name: string, paged: boolean) => { code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: string } | null;
 };
 
 /* ── reading the document ────────────────────────────────────────────────── */
@@ -893,7 +899,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
-    approve: calls.flatMap((c) => (c.change === 'same' ? [] : c.key_line === null ? [c.line] : [c.line, c.key_line])),
+    approve: approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
@@ -1212,6 +1218,7 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
         trigger: e.trigger,
         per_day: e.per_day,
         grant: e.key,
+        paged: e.paged,
         sends: e.sends,
         project: e.project,
         line,
@@ -1414,10 +1421,15 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       'What you approved is not what this install would call out. Read the plan again.',
       { at: 'approve' },
     );
-  if (host.keyHeld)
+  if (host.keyReady)
     for (const c of diff.calls_out) {
-      if (c.change === 'same' || c.grant === null || host.keyHeld(c.grant)) continue;
-      return no<Applied>('REQUIRED_MISSING', `Add the key called "${c.grant}" to the vault, then install.`, { at: 'approve' });
+      if (c.change === 'same' || c.grant === null) continue;
+      const why = host.keyReady(c.grant, c.paged);
+      if (why === null) continue;
+      /* MISSING READS `REQUIRED_MISSING` AND UNOPENABLE READS `OUT_OF_BOUNDS`: one is a key to add,
+         the other is a key to add AGAIN, under the connector, and a caller that collapsed them
+         would tell somebody to deposit a key they have already deposited. */
+      return no<Applied>(why.code, why.fix, { at: 'approve' });
     }
 
   /* THE SETTINGS ARE WRITTEN IN HERE, from the plan that was approved, so the bodies staged are the
