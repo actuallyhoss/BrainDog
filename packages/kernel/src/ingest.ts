@@ -36,7 +36,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { jsonPath, evaluate, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, evaluate, INBOX_RAW, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
@@ -189,44 +189,27 @@ export type IngestDeps = {
 };
 
 /**
- * The arrival, as a set of fields a predicate can be about.
+ * THE ARRIVAL'S SCHEMA IS `where`'s, AND THERE IS NO SECOND COPY OF IT HERE.
  *
- * SEVEN, WHICH IS WHAT `34 §1.9` PUBLISHES, AND THIS HELD FIVE. `declare.ts` enforces the seven
- * exactly and its refusal recites them, so `match: { field: ts, after: -7d }` and
- * `match: { field: state, is: untriaged }` installed cleanly and matched nothing, for ever:
- * `evaluate` answers `false` to whatever `compile` would refuse, and `compile` refuses a field that
- * is not in the schema it is handed. Which is the failure the header above `MATCH_FIELDS` in
- * `declare.ts` already names in its own words: *"an ingest that never fires and an ingest that
- * fires correctly look identical from the outside until somebody notices a month of arrivals
- * sitting untriaged"*. The fix that sentence stands over landed on the UNKNOWN names and never on
- * the two published ones. Scoping an email rule to the last week is an ordinary thing to write, and
- * the cost of it landing here rather than at install is days of somebody's inbox.
+ * There were two, and both were on the fire path. This file evaluated a `match:` against a local `ARRIVAL`
+ * and `@braindog/extract`'s `matches` evaluated the same predicate against `where`'s `INBOX_RAW`, so one
+ * arrival could match in the kernel and not match in `extract`. They disagreed about two things:
  *
- * `state` IS AN `enum` OVER `inbox_raw`'s OWN SEVEN, not a `text`, because the type is what decides
- * which operators the grammar allows on it: an `enum` takes `is`, `not`, `in` and `not_in`, and a
- * `text` would also take `gt` and `before`, which are not questions about a state. `ts` is an
- * `instant` for the same reason and the opposite effect: `before` and `after` are the operators a
- * temporal scope is written with, and on a `text` the grammar refuses both.
+ * - `channel` was a `text` here and is the DDL's `enum` there. `0001_kernel.ts` writes
+ *   `CHECK (channel IN ('email','webhook','pull','paste','api'))`, so `{ field: channel, in: [email, imap] }`
+ *   is a question no row can answer — and it compiled clean against the copy, fired here, and matched
+ *   nothing there. The ordinary typo, installing silently.
+ * - `subject` was absent here, and `subject` is what makes "exactly these seven fields" true: without it
+ *   `specOf` grants every schema the record's five kernel columns, so `{ field: created_at }` resolved
+ *   against a copy that has no columns at all.
  *
- * EXPORTED, BECAUSE THE INSTALL CHECK HAS TO ASK THE SAME QUESTION. `declare.ts` keeps its own list
- * of the seven names and compares against it by hand, which is how the two came to disagree in the
- * first place, and a hand-kept list cannot answer the operator half of `34 §1.9` at all. One schema
- * read by both is the only arrangement under which what installs and what fires cannot drift.
+ * THE HEADER THAT USED TO SIT HERE SAID THE RIGHT THING AND CLOSED THE WRONG GAP. Its words were *"one
+ * schema read by both is the only arrangement under which what installs and what fires cannot drift"*, and
+ * it made `declare.ts` read this file instead of its own hand-kept list. One layer up, the schema that
+ * fires in `extract` was still a third object. There is one now, and it is in the package that owns the
+ * grammar, which is where `34 §1.9` is written.
  */
-export const ARRIVAL: Schema = {
-  register: 'arrival',
-  fields: {
-    from: { type: 'text' },
-    to: { type: 'text' },
-    subject: { type: 'text' },
-    body: { type: 'text' },
-    channel: { type: 'text' },
-    /* `0001_kernel.ts`'s own CHECK list, in its own order. One list in two places is two lists the
-       day somebody adds a state to the table, so this is the DDL's and not a second opinion. */
-    state: { type: 'enum', values: ['untriaged', 'matched', 'skipped', 'review', 'proposed', 'ignored', 'erased'] },
-    ts: { type: 'instant' },
-  },
-};
+export { INBOX_RAW } from '@braindog/where';
 
 /**
  * The row an extraction is ABOUT, if the register already holds one. `43 §4.1`'s dedupe key.
@@ -314,7 +297,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
      * The arrival a `match:` is a question about, and it holds all seven of `34 §1.9`'s names.
      *
      * IT HELD FIVE, AND THE TWO IT LEFT OUT WERE THE TWO A PATTERN COULD INSTALL AND NEVER USE. See
-     * `ARRIVAL` above for what that cost. Both halves have to be here: a field in the schema with no
+     * `INBOX_RAW`'s re-export above for what that cost. Both halves have to be here: a field in the schema with no
      * value on the row answers `empty` and nothing else, and a value with no field in the schema is
      * a predicate `compile` refuses, which `evaluate` reads as `false` on every arrival.
      *
@@ -344,7 +327,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     const matched = deps
       .ingests()
       .filter((i) => i.channel === arrival.channel)
-      .find((i) => i.match === undefined || evaluate(i.match, fields, ARRIVAL));
+      .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
     const store = (state: Arrived['state'], reason: string | null): void => {
       deps.sql.exec(

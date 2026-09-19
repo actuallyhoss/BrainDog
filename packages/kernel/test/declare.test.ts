@@ -1649,8 +1649,23 @@ test('A MATCH IS ABOUT WHAT AN ARRIVAL HOLDS, and a field it does not hold match
   assert.equal(said?.at, 'match');
   assert.deepEqual(said?.allowed, ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts']);
 
-  for (const field of ['from', 'to', 'subject', 'body', 'channel', 'state', 'ts'])
-    assert.equal(refusedWith(ingest({ match: { all: [{ field, is: 'x' }] } })), null, `${field} is what an arrival holds`);
+  /* A VALUE THE FIELD CAN ACTUALLY HOLD, PER FIELD, and that is the assertion rather than a chore. This
+     loop used to ask every one of the seven `is: 'x'`, which is a legal question of the four text ones and
+     a question no row can answer of `channel` and `state`: the DDL's two CHECK lists do not hold `x`. It
+     passed because nothing compiled the predicate at install. It does now, so the loop has to name a real
+     value, which is the same thing the check is there to make authors do. */
+  const legal: Record<string, string> = {
+    from: 'x', to: 'x', subject: 'x', body: 'x',
+    channel: 'email', state: 'untriaged', ts: '2026-01-01T00:00:00.000Z',
+  };
+  for (const [field, is] of Object.entries(legal))
+    assert.equal(refusedWith(ingest({ match: { all: [{ field, is }] } })), null, `${field} is what an arrival holds`);
+
+  /* AND THE ORDINARY TYPO, WHICH USED TO INSTALL. `channel` is the DDL's enum on both sides now, so a
+     channel no row can hold is refused here instead of firing in the kernel and matching nothing in
+     `extract`. This is the leaf the two arrival schemas disagreed about. */
+  assert.equal(refusedWith(ingest({ match: { field: 'channel', in: ['email', 'imap'] } })), 'ENUM_VALUE_UNKNOWN');
+  assert.equal(refusedWith(ingest({ match: { field: 'subject', starts: 'Re:' } })), 'MATCH_OP_UNSUPPORTED', '34 s1.9 refuses starts on this backend');
   assert.equal(refusedWith(ingest({ match: { field: 'from', is: 'x' } })), null, 'a bare leaf is a predicate');
   assert.equal(refusedWith(ingest({ match: { any: [{ none: [{ field: 'merchant', is: 'x' }] }] } })), 'MATCH_FIELD_UNKNOWN', 'the walk does not reach a nested group');
   /* THE SENTENCE FORM IS NOT PARSED HERE, and saying so is the point: `parseWhere` needs a `Schema`

@@ -112,8 +112,7 @@ packages/extract/
 │   ├── date.ts             ~90 lines   format compile · scan · calendar validation · parseDate
 │   └── formats.ts          ~320 lines  select (path) · readRows · CSV · XML · HTML table · the map: coercion of §4.5
 └── test/
-    ├── extractors.test.ts · money.test.ts · date.test.ts · formats.test.ts · confidence.test.ts · bench.test.ts
-    └── seeds/              committed fast-check failures, { seed, path } per file
+    └── extractors · money · money-property · date · formats · confidence · dedupe · report · leak · bench · install-and-fire
 ```
 
 `index.ts` owns every decision that touches confidence, so a reviewer reads one file to answer *"why was this
@@ -542,8 +541,9 @@ trusted: it passed the gate and 42's lint. `ctx.lookup`'s values are the record'
 
 ## 9 · Tests and gates
 
-`node --test` over `test/**/*.test.ts`; `node:assert/strict`; one property test with fast-check 4.9.0, failing
-seeds committed under `test/seeds/`. Inputs are invented; no bank's real wording appears. The currency table in
+`node --test` over `test/**/*.test.ts`; `node:assert/strict`; one property test, over a seeded counter in the
+test file rather than a generator library, so the 2,000 cases are the same every run and there is no seed
+directory to keep (§9.2's row says why). Inputs are invented; no bank's real wording appears. The currency table in
 every test is `{ EGP: {2}, USD: {2, '$'}, CAD: {2, '$'}, EUR: {2, '€'}, JPY: {0, '¥'}, KWD: {3} }`.
 
 **Sample message `M1`** (used below):
@@ -612,7 +612,7 @@ every test is `{ EGP: {2}, USD: {2, '$'}, CAD: {2, '$'}, EUR: {2, '€'}, JPY: {
 | `on 29/08/26 EGP 5.00` | | 500 EGP — the date yields nothing |
 | `EGP 90,071,992,547,409.91` | | 9007199254740991 EGP — 2^53 − 1 |
 | `EGP 90,071,992,547,409.92` | | undefined — 2^53 |
-| **property** | | for 2,000 random `(amount ∈ ±10^13, currency ∈ table, style ∈ {en, eu, space, bare, parens})`: `parseMoney(render(amount, currency, style), table)` deep-equals `{ amount, currency }` |
+| **property** | | for 2,000 random `(amount ∈ ±10^13, currency ∈ table, style ∈ {en, eu, space, bare, parens})`: `parseMoney(render(amount, currency, style), table)` deep-equals `{ amount, currency }`. **A mulberry32 counter and not `fast-check`**: §13 asks for 2,000 cases and no seed under `test/seeds/`, which is the same 2,000 every run and a failure that reproduces from the test alone, and twenty lines buy that without a dependency. What a generator library adds is shrinking, and a failure here is already minimal — one amount, one currency, one style, all three in the message. The exponents are 0, 2 and 3, and the fraction's trailing zeroes are dropped half the time, because without that every rendered fraction is exactly `exponent` digits and the pad that turns `5` into `500` is never exercised |
 
 ### 9.3 · Dates — `test/date.test.ts`
 
@@ -731,7 +731,6 @@ package: `graph` (imports `where` only), `closed-lists` (`EXTRACTORS` + `COMBINA
 | workspace | `@braindog/where` | `workspace:*` | `Predicate`, `evaluate` — 31 §2 row 8 |
 | dev | `typescript` | 6.0.3 | type-check only (31 §3) |
 | dev | `@types/node` | 24.13.0 | the test files' `node:test` and `node:assert/strict` |
-| dev | `fast-check` | 4.9.0 | the money round-trip property (§9.2) |
 
 No Valibot: the declaration is validated by `declare`; this package's only structural check is the one `switch`
 that throws `EXTRACTOR_UNKNOWN`. No YAML: `declare` is the one package with a YAML parser (30 §7).
@@ -771,7 +770,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 | D9 | **`fetch.read` gains `format`** (`json` default · `csv` · `xml` · `html_table` · `text`), `delimiter`, `table` | 25 §3.2 — `read: { rows: data }` becomes `read: { format, rows, … }`; 34 §6 adds a five-member row owned by 25 |
 | D10 | **`map:` coercion table** of §4.5 incl. `currency:` on a single-path money and `format:` on a day; `ref file secret quantity list` unmappable | 25 §3.2 — state the keys; `type:` values "are the register field types" minus five |
 | D11 | **Per arrival, all rows or none**; the receipt is one row per arrival with `wrote` filled by the record; a skipped arrival has no receipt | 07 §7 steps 4–5 |
-| D12 | `extract` imports `evaluate(predicate, fields, schema, row?): boolean` and the `INBOX_RAW` schema from `@braindog/where`; `matches` evaluates the stored body, not the normalised one, and a test asserts that answer equals `body.toLowerCase().includes(needle.toLowerCase())` rather than trusting the sentence. **The signature this row used to state does not exist**: there is no `ctx`, and `now`/`tz` are not parameters because `sentence.ts` resolves `today` and its kin to concrete days before the evaluator sees them. `subject` became a property of the schema, which is what makes `34 §1.9`'s "exactly these seven fields" true rather than aspirational — `specOf` had been handing every schema the record's five kernel columns, so `{ field: id }` over an arrival threw instead of answering false. Still open: `§1.9` also refuses `via has lacks near matches starts ends` on this backend, and nothing enforces it, because a schema cannot express it (`starts` on text is legal on `entry`) | 34 §1.11 — rewritten to the contract that exists; 38 §2 exports it |
+| D12 | `extract` imports `evaluate(predicate, fields, schema, row?): boolean` and the `INBOX_RAW` schema from `@braindog/where`; `matches` evaluates the stored body, not the normalised one, and a test asserts that answer equals `body.toLowerCase().includes(needle.toLowerCase())` rather than trusting the sentence. **The signature this row used to state does not exist**: there is no `ctx`, and `now`/`tz` are not parameters because `sentence.ts` resolves `today` and its kin to concrete days before the evaluator sees them. `subject` became a property of the schema, which is what makes `34 §1.9`'s "exactly these seven fields" true rather than aspirational — `specOf` had been handing every schema the record's five kernel columns, so `{ field: id }` over an arrival threw instead of answering false. **Landed.** `§1.9`'s operator half is enforced by `compile` itself, keyed on `subject`: the list is `INBOX_RAW_REFUSES` and `declare` imports it rather than keeping a copy. The claim that a schema could not express it was about the TYPE, and the fact belongs to the backend. `kernel/src/ingest.ts`'s second copy of the arrival schema is gone with it — it disagreed with this one about `channel`'s type, so `{ field: channel, in: [email, imap] }` installed clean, fired in the kernel and matched nothing here | 34 §1.11 — rewritten to the contract that exists; 38 §2 exports it |
 | D13 | **Three codes**: `EXTRACTOR_UNKNOWN` (a key outside the thirteen), `DATE_FORMAT_INVALID` (§4.3's rules), `PATH_INVALID` (§4.4's grammar) — grammar group; fixtures `extractor-unknown`, `date-format-invalid`, `path-invalid`; 42 raises them at install, this package at first use | **Landed.** All three are in `30 §6`, with fixtures, in the `ports` union and raised from source. The row's old note read "grammar 10 → 13, total 75 → 78" against a table that is now 125 codes and 14 grammar: the codes were carried and the arithmetic was not, which is how a finished item keeps looking open; 34 §6 |
 | D14 | **The currency table** is `{ [code]: { exponent, symbol? } }`, owned by the kernel, passed in `ctx`; a shared symbol resolves to none | 02 §3 — the table has an exponent and an optional symbol |
 | D15 | **`braindog ingest test <id> --against <raw ids \| file>`** prints the `Report` in the 23 §4 shape; exit 1 when any field is `0 of n` | 33 §5 — one row beside `rule test` |
@@ -784,7 +783,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 - [x] `packages/extract` has the seven `src/` files of §3 and exports exactly the §2 surface; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
 - [x] `EXTRACTORS` and `COMBINATORS` read 10 + 3 and the `closed-lists` gate agrees with 34 §6
 - [x] no `RegExp` under `src/`; the scoped lint rule exists and fails a planted `/a+/`
-- [ ] every row of §9.1–§9.5 is a passing `node --test` case; the money property runs 2,000 cases with no seed under `test/seeds/`
+- [x] the money property runs 2,000 cases with no seed directory, and it has teeth: `padEnd` swapped for `padStart` in `readAmount` turns it red. It found the no-break space: `isSep` knew one space character and `normalise` folded sixteen, so `EGP 2 642,97` read as 2.00 for any caller of `parseMoney` who had not normalised first. One list now, in `money.ts`
 - [x] the leak test passes over every §9.5 case — over the receipt's leaves rather than its serialisation, which is the same rule without the artefact that fires on `"e":"` whenever the body is itself JSON
 - [x] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
 - [x] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green

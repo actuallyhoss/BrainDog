@@ -169,6 +169,22 @@ Ingest `match:` predicates over an arrival, not a row. Legal `field:` names are 
 this backend (`MATCH_FIELD_UNKNOWN`, `MATCH_OP_UNSUPPORTED`). `contains` is the same `instr` on both backends,
 which is why an author never learns there are two.
 
+**Both halves are enforced by `compile` itself**, keyed on `subject`, and `evaluate` answers `false` to whatever
+`compile` refuses. The list is `INBOX_RAW_REFUSES` in `where`; `declare` imports it rather than keeping a second
+copy, and ends its install check with one `compile(match, INBOX_RAW)` so that what installs is what fires. An
+earlier note here said a schema could not express the operator half, because `starts` on a text field is legal on
+`entry` and refused here and the type is the same text either way. True of the type, and never the question: the
+fact belongs to the backend, and `subject` is where the backend is written down.
+
+**One schema, and it is this package's.** `kernel/src/ingest.ts` held a second copy of the arrival's fields and
+evaluated against it while `extract`'s `matches` evaluated against `INBOX_RAW` — two objects, both on the fire
+path, disagreeing about `channel`'s type (a `text` there, the DDL's `enum` here) and about `subject`'s absence.
+`{ field: channel, in: [email, imap] }` therefore installed clean, fired in the kernel and matched nothing in
+`extract`. `ingest.ts` re-exports `INBOX_RAW` now and declares nothing.
+
+The sentence form of a `match:` is the one shape the install check does not compile, because parsing one needs a
+`Schema` and a clock and `declare` is context-free. It reaches `predicateOf` through the record's own read check.
+
 ### 1.10 · Limits, and the three legal subqueries
 
 | Rule | Value |

@@ -18,7 +18,11 @@
 import type { Json } from '@braindog/where';
 
 import { scanDates } from './date.ts';
-import { scanDecimals, scanInts, scanMoney, type CurrencyTable } from './money.ts';
+/* `SPACE_LIKE` COMES FROM `money.ts` and is not declared twice. It was here, with sixteen members,
+   while `money.ts` knew about the ASCII space alone, and the two disagreeing is how a no-break space
+   turned 2,642.97 into 2.00 for any caller who reached `parseMoney` without normalising first. The
+   list belongs to the file that has to tell a separator from the end of a number. */
+import { scanDecimals, scanInts, scanMoney, SPACE_LIKE, type CurrencyTable } from './money.ts';
 
 /* ONE `Json`, FROM `where`. It was defined here when this package had no dependencies; it has one now, and
    two structurally identical definitions of the same type are two places for it to stop being identical. */
@@ -72,24 +76,6 @@ const found = (values: Json[], note: 'exact' | 'chosen' | 'defaulted' = 'exact')
 
 /* ── normalise and fold ──────────────────────────────────────────────────── */
 
-const SPACE_LIKE = new Set([
-  '\t',
-  '\u00a0',
-  '\u2000',
-  '\u2001',
-  '\u2002',
-  '\u2003',
-  '\u2004',
-  '\u2005',
-  '\u2006',
-  '\u2007',
-  '\u2008',
-  '\u2009',
-  '\u200a',
-  '\u202f',
-  '\u205f',
-  '\u3000',
-]);
 
 const INVISIBLE = new Set(['\u200b', '\u200c', '\u200d', '\ufeff']);
 

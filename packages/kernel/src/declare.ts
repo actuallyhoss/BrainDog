@@ -19,7 +19,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
-import { jsonPath } from '@braindog/where';
+import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from '@braindog/where';
 
 import { FIELD_TYPES, coerce, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
@@ -29,7 +29,7 @@ import { checkInterval, type PullDecl } from './pull.ts';
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
    `31 §2`'s order is not about. `DATE_FORMATS` comes over the same edge for the same reason: a
    `date:` form this file accepts is one `day` can read, and there is one list of them. */
-import { ARRIVAL, DATE_FORMATS } from './ingest.ts';
+import { DATE_FORMATS } from './ingest.ts';
 import { MAP_TYPES } from './map.ts';
 import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
@@ -1171,7 +1171,7 @@ const NTH_CEILING = 64;
  * own sentence about itself. A hand-kept list beside a schema is how they came to disagree, and
  * one list is the only arrangement under which they cannot again.
  */
-const MATCH_FIELDS = Object.keys(ARRIVAL.fields) as readonly string[];
+const MATCH_FIELDS = Object.keys(INBOX_RAW.fields) as readonly string[];
 
 /**
  * The operators `34 §1.9` refuses on this backend, whatever the field's type would otherwise take.
@@ -1181,7 +1181,7 @@ const MATCH_FIELDS = Object.keys(ARRIVAL.fields) as readonly string[];
  * refuses them: wider than published in one direction and silent in the other. `38 §13` already
  * publishes the sentence a person should get, so this says it in those words.
  */
-const MATCH_OPS_ABSENT = ['via', 'has', 'lacks', 'near', 'matches', 'starts', 'ends'] as const;
+/* `INBOX_RAW_REFUSES`, and not a copy of it. See `MATCH_FIELDS` below for what the copy cost. */
 
 /** `43 §4.4`, closed: a key with an optional `[n]`, `[-1]` or `[]`, or a bare index. */
 const PATH_SEGMENT = /^(?:[^.[\]\s]+(?:\[(?:\d+|-1|)\])?|\[(?:\d+|-1|)\])$/u;
@@ -1219,6 +1219,30 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
      which raises `MATCH_FIELD_UNKNOWN`'s sibling for an unknown name; the tree form reached nothing. */
   const fault = matchFault(body.match, id, 'match');
   if (fault) return fault;
+
+  /**
+   * AND THEN THE GRAMMAR ITSELF, over the whole predicate, because what installs has to be what fires.
+   *
+   * The two checks above are hand-written and they are the ones that teach: they name the operator, recite
+   * the seven fields, and say to read the rest with `extract`. What they cannot do is answer for the rest
+   * of the grammar, and `compile` already does. `{ field: channel, in: [email, imap] }` passes both of
+   * them — `in` is a kept operator and `channel` is one of the seven — and `inbox_raw`'s `channel` is the
+   * DDL's enum, so `imap` is a value no row can hold. It installed clean and matched nothing, for ever,
+   * which is this file's oldest failure in a new place.
+   *
+   * ONE COMPILE, AT THE ROOT, over the same `INBOX_RAW` the kernel evaluates against a few files away. It
+   * is not run per leaf: `compile` walks the tree itself, and calling it inside the recursion would report
+   * the first leaf's refusal once per ancestor.
+   */
+  /* THE TREE FORM ONLY, for the reason the block above gives: a sentence is a legal `match:` and
+     `compile` reads it as neither a group nor a leaf. The sentence form still reaches `predicateOf`
+     through the record's own read check, which is where it gets a `Schema` and a clock, and it is
+     therefore the one shape this check does not cover. Said here rather than left to be found. */
+  if (body.match !== undefined && typeof body.match === 'object' && body.match !== null) {
+    const refused = compile(body.match as Predicate, INBOX_RAW).bad[0];
+    if (refused)
+      return bad(refused.code, `${id}.match: ${refused.fix}`, refused.at ?? 'match', refused.allowed);
+  }
 
   if (body.extract !== undefined) {
     const extract = body.extract;
@@ -1543,7 +1567,7 @@ function matchFault(node: unknown, id: string, at: string): Refusal | null {
      field it is about, and naming the field first would send an author to check a name that is
      right. `MATCH_OP_UNSUPPORTED` is in the registry and `30 §6` names it "the one code for THIS
      TEST CANNOT APPLY HERE", listing the `inbox_raw` backend as its first case. */
-  const said = MATCH_OPS_ABSENT.find((o) => o in (node as Record<string, unknown>));
+  const said = INBOX_RAW_REFUSES.find((o) => o in (node as Record<string, unknown>));
   if (said)
     return bad(
       'MATCH_OP_UNSUPPORTED',

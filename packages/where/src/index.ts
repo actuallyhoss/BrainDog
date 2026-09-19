@@ -24,7 +24,18 @@ import type { Refusal } from '@braindog/ports';
 export const QUANTIFIERS = ['all', 'any', 'none'] as const;
 export type Quantifier = (typeof QUANTIFIERS)[number];
 
-/** Nineteen, `34-GRAMMARS` §1.1. `near` needs the full-text index and is not read here yet. */
+/**
+ * `34 §1.1`'s nineteen tests, AND `matches`, WHICH IS NOT ONE OF THEM.
+ *
+ * The comment here said nineteen and the array holds twenty. Both are right about different things:
+ * `§1.1`'s `test` production names nineteen, and `matches` is a LEAF FORM beside it — `{ matches: "…" }`
+ * with no subject, because it asks about the register's text rather than about a field. It is in this list
+ * so that the walk finds it where it finds the others, and the cost is that the refusal reciting "one of"
+ * offers `matches` as a test. Left as it is, said out loud: taking it out would mean a second lookup on the
+ * path every leaf takes, to fix a sentence rather than an answer.
+ *
+ * `near` needs the full-text index and is not read here yet.
+ */
 export const OPERATORS = [
   'is', 'not', 'in', 'not_in', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between',
   'contains', 'matches', 'starts', 'ends', 'empty', 'present', 'has', 'lacks', 'near',
@@ -224,15 +235,31 @@ export const KERNEL_FIELDS: Readonly<Record<string, string>> = {
  * fact about the grammar and not about the asker. Put it in `extract` and the day a field is added there are
  * two lists, which is the same failure the path grammar had in three places.
  *
- * WHAT THIS DOES NOT YET DO, said plainly rather than left to be discovered. `34 §1.9` also refuses
- * `via has lacks near matches starts ends` on this backend, and that refusal is not enforced anywhere: the
- * implementation has no subject or backend notion at all, because `compile` takes a `Schema` and not
- * `§1.11`'s `ctx`. A schema alone cannot express it — `starts` on a text field is legal on `entry` and
- * refused here, and the type is the same text either way. So this constant makes an unknown FIELD answer
- * false, which is most of `MATCH_FIELD_UNKNOWN`'s job, and leaves `MATCH_OP_UNSUPPORTED` to `declare`'s lint
- * at install. Closing it properly means threading the subject through `compile`, which is the record's SQL
- * path and wants its own pass.
+ * AND `§1.9`'s OTHER HALF IS ENFORCED HERE NOW, which the paragraph this replaces said could not be. It
+ * argued that a schema cannot express the operator refusal, because `starts` on a text field is legal on
+ * `entry` and refused here and the type is the same text either way. That is true of the TYPE and it was
+ * never the question: the fact belongs to the backend, and `subject` is where the backend is written down.
+ * Once `subject` became a property of the schema (`34 §1.11`), the thing that could not be said became one
+ * comparison. See `INBOX_RAW_REFUSES`.
  */
+/**
+ * `34 §1.9`'s seven refused words, whatever field they are about.
+ *
+ * `via matches near` ARE IN THE LIST AND ALSO REFUSED EVERYWHERE, because this build reads no text index
+ * and hops no ref. Keeping them here anyway makes this constant `§1.9`'s sentence rather than the part of
+ * it this build happens to need, so the day the text index lands nobody has to notice that three of the
+ * seven were being refused for an unrelated reason and are now unrefused for this one.
+ *
+ * READ BY `declare` TOO. It kept its own copy of these seven, beside a hand-kept copy of the field names
+ * that had already drifted once. One list, exported by the package that owns the grammar.
+ */
+export const INBOX_RAW_REFUSES = ['via', 'has', 'lacks', 'near', 'matches', 'starts', 'ends'] as const;
+
+/** The fourteen an arrival keeps, for the refusal to recite. `OPERATORS` minus the six of the seven in it. */
+export const ARRIVAL_OPERATORS: readonly string[] = OPERATORS.filter(
+  (o) => !(INBOX_RAW_REFUSES as readonly string[]).includes(o),
+);
+
 export const INBOX_RAW: Schema = {
   register: 'inbox_raw',
   subject: 'inbox_raw',
@@ -307,7 +334,14 @@ const specOf = (schema: Schema, field: string): { type: string; values?: readonl
  * created_at, updated_at, version."* A refusal that lists only the declared fields teaches an agent
  * that the other five do not exist, and `10 §7`'s whole contract is that the refusal teaches.
  */
-export const addressable = (schema: Schema): string[] => [...Object.keys(schema.fields), ...Object.keys(KERNEL_FIELDS)];
+/* AND NOT ON `inbox_raw`, WHERE THOSE FIVE ARE NOT COLUMNS. `specOf` withholds them there and this handed
+   them out, so a refusal about an unknown field listed `created_at` among the names to use and the next
+   call answered `FIELD_UNKNOWN` about it. One schema, two answers, and the one a person reads was the wrong
+   one, which is the precise inverse of what `10 §7` asks a refusal to do. */
+export const addressable = (schema: Schema): string[] =>
+  schema.subject === 'inbox_raw'
+    ? Object.keys(schema.fields)
+    : [...Object.keys(schema.fields), ...Object.keys(KERNEL_FIELDS)];
 
 /**
  * The SQL that reads one field, and it is EXPORTED so the sort and the filter cannot disagree.
@@ -672,6 +706,24 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
               'SERIES_HAS_NO_TEXT',
               `${key} over ${schema.register}, which is series: true. A series has no text; filter ${schema.register} on its key fields or its numbers.`,
               key,
+            ),
+          );
+          return '';
+        }
+
+    /* `34 §1.9`, BEFORE THE BUILD-WIDE BRANCH BELOW, so a `matches` over an arrival is refused as a
+       question the backend cannot be asked rather than as one this build has not implemented. The first is
+       permanent and the second is a deploy away, and telling an author the second about the first sends
+       them back to wait for a release that will not change the answer. */
+    if (schema.subject === 'inbox_raw')
+      for (const key of INBOX_RAW_REFUSES)
+        if (key in leaf) {
+          bad.push(
+            refuse(
+              'MATCH_OP_UNSUPPORTED',
+              `${key} asks about a row, and a match: asks about an arrival. An arrival takes ${ARRIVAL_OPERATORS.join(', ')}.`,
+              key,
+              ARRIVAL_OPERATORS,
             ),
           );
           return '';

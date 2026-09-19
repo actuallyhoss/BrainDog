@@ -27,7 +27,30 @@ const isDigit = (ch: string | undefined): boolean => ch !== undefined && ch >= '
 const isLetter = (ch: string | undefined): boolean =>
   ch !== undefined && ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
 const isUpper = (ch: string | undefined): boolean => ch !== undefined && ch >= 'A' && ch <= 'Z';
-const isSep = (ch: string | undefined): boolean => ch === ',' || ch === '.' || ch === "'" || ch === ' ';
+/**
+ * THE SIXTEEN SPACES A STATEMENT PRINTS, and not just the one on the keyboard.
+ *
+ * `normalise` in `extractors.ts` folds all of these to a plain space before any extractor runs, and this
+ * file knew about `U+0020` alone, so two lists answered one question. Nothing inside the package noticed,
+ * because `pipeline.ts` normalises before it scans - but `parseMoney` is one of `43 §2`'s nine exported
+ * functions and its contract says nothing about normalising first.
+ *
+ * THE DISAGREEMENT COST A WRONG NUMBER RATHER THAN NO NUMBER, which is the class this package exists to
+ * avoid. `EGP 2<U+00A0>642,97` tokenised as `2` and `642,97`, so 2,642.97 read as 2.00: the right
+ * currency, in the ledger, three orders of magnitude out, and no outcome that puts it in front of
+ * anybody. `U+00A0` is the `&nbsp;` of every HTML email, and `U+202F` is what `Intl.NumberFormat('fr-FR')`
+ * itself prints, so the record could not read back a number it had formatted.
+ *
+ * EXPORTED, AND `normalise` READS IT. One list, and it lives here because this is the file that has to
+ * tell a group separator from the end of a number.
+ */
+export const SPACE_LIKE: ReadonlySet<string> = new Set([
+  '\t', '\u00a0', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006',
+  '\u2007', '\u2008', '\u2009', '\u200a', '\u202f', '\u205f', '\u3000',
+]);
+
+const isSep = (ch: string | undefined): boolean =>
+  ch === ',' || ch === '.' || ch === "'" || ch === ' ' || (ch !== undefined && SPACE_LIKE.has(ch));
 
 /* ── the tokenizer, shared by money, int and decimal ─────────────────────── */
 
