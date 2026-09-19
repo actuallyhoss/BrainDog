@@ -18,9 +18,16 @@
  */
 
 import type { Refusal } from '@braindog/ports';
+import type { Json } from '@braindog/where';
 
 /** Canonical JSON: what a field holds once it is in the record. */
-export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+/**
+ * ONE `Json`, RE-EXPORTED RATHER THAN DECLARED AGAIN. It was written out here and in `where/src/path.ts`,
+ * structurally identically, so TypeScript accepted one wherever the other was wanted and nothing ever
+ * complained: the surest way for a duplicate to survive. `kernel` already depends on `where` (`31 §2`:
+ * 7 to 3, pointing down), so the edge costs nothing that is not already paid.
+ */
+export type { Json };
 
 /**
  * The sixteen, plus the two containers. `list<T>` carries its element type in `of`.

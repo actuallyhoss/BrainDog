@@ -15,11 +15,18 @@
  *
  * A RECORD MADE BEFORE THE KEY STORE WAS BOUND HAS NO WRAPPED KEY, and it answers one sentence saying so.
  *
+ * THE BYTES ARE `@braindog/host`'S `sealing.ts`, shared with the self-host: `47 §13` D9's key hierarchy, held
+ * in one place so a credential deposited in one host opens in the other. They were written out in both, byte for
+ * byte the same, with nothing enforcing it. What stays here is where a DEK comes from, which is this host's
+ * binding. `openSealed` below is the higher-level one the reveal route reuses and it stays too, because it takes
+ * a `KeyStore` and that is the part the two hosts do not share.
+ *
  * ITS OWN FILE, free of `cloudflare:`, so the doors are tested in Node. It is one of the three files the `Plaintext`
  * brand lives in (`tools/gates/secret-grep.mjs`). Nothing here logs.
  */
 
 import {
+  grantKey as deriveGrantKey, NONCE_BYTES, openSealed as openBytes, seal as sealBytes,
   serveKeys, serveVault, servesKeys, servesVault, VAULT_HEADERS, vaultReply,
   type KeysDoor, type SessionHints, type VaultGrantSeen,
 } from '@braindog/host';
@@ -75,7 +82,6 @@ const UNKNOWN: Result<VaultGrantSeen> = {
 
 /** 64 KiB, which is more than a private key or an env file of keys. */
 const VALUE_LIMIT = 65_536;
-const NONCE_BYTES = 12;
 
 const NO_STORE = 'This host holds no key store yet, so it keeps no keys for agents.';
 export const OLD_RECORD = 'Keys need a record created after this host key store was bound, and this record is older than that.';
@@ -90,14 +96,10 @@ async function grantKey(store: KeyStore, record: string, key: SealTarget['key'],
   const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
   try {
-    const base = await crypto.subtle.importKey('raw', dek, 'HKDF', false, ['deriveKey']);
-    return await crypto.subtle.deriveKey(
-      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: utf8(grant) },
-      base,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt'],
-    );
+    /* AWAITED INSIDE THE `try`, so the derivation is done before the `finally` zeroes the DEK. Dropping the
+       `await` happens to work where `importKey` copies the key material eagerly, and nothing in the
+       WebCrypto specification promises it does. */
+    return await deriveGrantKey(dek, grant);
   } finally {
     dek.fill(0);
   }
@@ -116,16 +118,12 @@ export async function openSealed(
 ): Promise<string | null> {
   const key = await grantKey(store, record, sealed.key, sealed.id);
   if (!key) return null;
-  try {
-    const plain = new Uint8Array(
-      await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.nonce, additionalData: utf8(sealed.aad) }, key, sealed.ciphertext),
-    ) as Plaintext;
-    const said = new TextDecoder().decode(plain);
-    plain.fill(0);
-    return said;
-  } catch {
-    return null;
-  }
+  const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
+  if (opened === null) return null;
+  const plain = opened as Plaintext;
+  const said = new TextDecoder().decode(plain);
+  plain.fill(0);
+  return said;
 }
 
 /** The one answer a value leaves in. */
@@ -164,8 +162,8 @@ function doors(keys: KeyDeps, record: () => string | null) {
         const key = await grantKey(store, id, target.key, target.grant);
         if (!key || target.key.kek_id === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
         const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
-        const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: utf8(target.aad) }, key, value);
-        return ok({ ciphertext: new Uint8Array(sealed), nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
+        const sealed = await sealBytes(key, nonce, target.aad, value);
+        return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
       };
       /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT. A vault grant already carries its
          project, and reading a second one out of its body would be a way to put a key out of its reach. */
@@ -191,14 +189,11 @@ function doors(keys: KeyDeps, record: () => string | null) {
     const sealed = out.value;
     const key = await grantKey(store, id, sealed.key, sealed.id);
     if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
-    let decrypted: ArrayBuffer;
-    try {
-      decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.nonce, additionalData: utf8(sealed.aad) }, key, sealed.ciphertext);
-    } catch {
-      /* A failed decrypt says only that these bytes do not open under this key. */
+    const decrypted = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
+    /* A failed decrypt says only that these bytes do not open under this key. */
+    if (decrypted === null)
       return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
-    }
-    return answerOpen(sealed.credential, sealed.label, new Uint8Array(decrypted) as Plaintext);
+    return answerOpen(sealed.credential, sealed.label, decrypted as Plaintext);
   };
 
   return { deposit, open };

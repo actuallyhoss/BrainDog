@@ -407,6 +407,10 @@ the gate this becomes when the corpus record exists.
 3. For every sink call whose argument text contains a source → red.
 4. `Plaintext` (the brand) appears only in the two hosts' vault steps — the module 49 §5 step 9 and 51 §5 name for
    `openGrant`/`bindGrant`'s unwrap; anywhere else is red. The record never sees one.
+   *`47 §13` D9's key hierarchy moved into `packages/host/src/sealing.ts`, and that file carries no brand on
+   purpose. It takes and returns plain bytes; each host brands at its own boundary, which is where the answer is
+   built and where this rule is watching. Branding in the shared module would have made a fourth file and read as
+   a plaintext that escaped, when the value has simply not reached anything yet.*
 
 **`telemetry-allowlist`** (08 §5)
 

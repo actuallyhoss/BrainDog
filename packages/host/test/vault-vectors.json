@@ -1,0 +1,38 @@
+{
+  "dek": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "nonce": "oKGio6Slpqeoqaqr",
+  "cases": [
+    {
+      "grant": "g_0001",
+      "record": "rec_01",
+      "version": "1",
+      "value": "sk-live-not-a-real-key",
+      "aad": "rec_01\u001fg_0001\u001f1",
+      "ciphertext": "2r2CtZwBZ3i61kgGKVfxkNht5NB9dxUvFMJpG5G5OaB26_v76L8"
+    },
+    {
+      "grant": "g_0002",
+      "record": "rec_01",
+      "version": "2",
+      "value": "",
+      "aad": "rec_01\u001fg_0002\u001f2",
+      "ciphertext": "_RhZiqWtyDMltFvFH1A1Tw"
+    },
+    {
+      "grant": "g_0003",
+      "record": "rec_02",
+      "version": "1",
+      "value": "é ünicode ✓ 🔑",
+      "aad": "rec_02\u001fg_0003\u001f1",
+      "ciphertext": "cVlWKC0SO9MFWpa8uHUaJKXPvY17iNACl9jVg0QzfnE9TAzfCA"
+    },
+    {
+      "grant": "g_0004",
+      "record": "rec_02",
+      "version": "7",
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "aad": "rec_02\u001fg_0004\u001f7",
+      "ciphertext": "G2-mewflaFQaHRyJJ-rbWueh77RwWl1Y9V4SrSdyORNNJijPl38ixitJPUep0ws592dOvQSmuBnkGIfJb3BOzDbDyZcYCLfU4vvXmHp31LJSoG2ivYT0J4kc2N4SKetqsVu67Jna05VSaslwDhSjzDRERGWUWFUBjetQ7H0Eq-eyyPFyX6uD7852hFF8Hhk4jNI7U3m21HTBQldpU9C1AYJ4cp1wHoXyRd5b48H3qwHWG-08C4Z-Yk26Nz3WhWVZf_uggcOOe9F5m9vCWfPx1TSDlD1IOcBY6F7QEsa3eaNGDKKbU_5oNO2Xn_sGjjUdsBPQo0kRWAJE8s7CfJ3OYoD8F3p155zu_64t2CBOKk3L6WmFgVDmaB4LvQIP3fv58ggtYcUi5C2yYci3tXjF8XylL0i16GSLlcsFRQLgH3WZWE4cesVjeBbKa32L-dJI0k8hEvrRH2hSV_lugDLHkkq7l_27P9gGAvAgsz-oYDkc2NPU7JNQgoCZng-UtvpSInvUlD8GQMLMGIm3V2p7UTaXgHE6zJFp6ScY8qc_SBLmhGcTjvjM2cPNX_Qb4RA1zeVxDRnP8z7mf4tna4nNvMBknJfXFdBq0934jV_AnAtqTVh2M9hi06ZocrsmOFZDFabwQ3cTWuOXTF7xlVOLlwcsykLeH8_HT9e9HJxnNnUa0v7CRHtFKHADpNGVEgrc94vmzJQb2uAzPo4HsXdt8z7jsoy5-tDhGklEgh3GgF4V3vA2hHY0WgYDGsOxX_6-1gu0zhI_kQLr0s-X6Y0NcajlD_uPAKez3__Jxg-1gWDldczoIIf82woX0RKJEHianiXsoNVa9WcUB5RFYzcOEkz-CTwC6P6fjoN59aLh9Qi8saVF98Qh5oKwRKmxMcRqtS1W0OxWtmcnG6AoJzOWU6tvfuk9ZDP52KQafv7wB-TaW8_3f2083QqZsx3VhBPOTds7mhwzLqP4wkAq_N0Wdm1oMYkj9l0_hGtvpaWsOEbrw2AmneuTW4JoCFotdmvohOKeZRL9093bWX7Zd94fXDGTi5Xer6hG6PPN3dTWzgHzShtI4RHJmyCzbY52qGT5RRVKaV5FwoJDhP3rSZuGuZO8DU9OmPIWp6M3ONma8HSJql2bKeQPyTSWZzjNstHawA84oGkAhObaOKURp1RvvDJhCq8c2gEaiXsuDipI0ugzcKTVrpmwMyDIGneMJ_5EzGiuReSuDSrbuxy3GY5-I6HkpnBW2dsVy9PrmwKkxfjtJfNYvpMNxfy2VFENb5C_twU6BqvqPagEY1Iy9kIQbLLaMpJ44kysCGmXq-TzFzoKnnW6DycFS_6HROXBjHdMhYfQGo-aBxY"
+    }
+  ]
+}

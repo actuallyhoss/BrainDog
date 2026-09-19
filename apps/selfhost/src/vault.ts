@@ -13,15 +13,31 @@
  * else, so the second is a door beside the first rather than a hole in it: what decides whether a session may do
  * this is the record's `vault(ctx)` gate, which wants an owner, no token, and a proof under fifteen minutes old.
  *
- * THE BYTES ARE `47 §4.6`'S. The record's DEK is unwrapped under the KEK with `record ‖ 0x1F ‖ "record"`; the
- * grant key is HKDF-SHA-256 over it with an empty salt and the grant id as info; the value is AES-256-GCM under
- * that, with a fresh nonce and `record ‖ 0x1F ‖ grant ‖ 0x1F ‖ version` as additional data, which the record names.
+ * THE BYTES ARE `47 §4.6`'S AND THEY ARE NOT IN THIS FILE. The record's DEK is unwrapped under the KEK with
+ * `record ‖ 0x1F ‖ "record"`; the grant key is HKDF-SHA-256 over it with an empty salt and the grant id as info;
+ * the value is AES-256-GCM under that, with a fresh nonce and `record ‖ 0x1F ‖ grant ‖ 0x1F ‖ version` as
+ * additional data, which the record names. Those steps are `@braindog/host`'s `sealing.ts`, shared with the
+ * Worker, because a credential deposited here has to open there and back for as long as both exist. They were
+ * written out twice and were byte-identical, which is not the same as guaranteed to stay so, and nothing
+ * enforced it except the two files happening to match. What stays here is where a DEK comes from: this host's
+ * key store on disk, which is the half that genuinely differs.
  */
 
 import { randomBytes } from 'node:crypto';
 import type { webcrypto } from 'node:crypto';
 
-import { VAULT_HEADERS, vaultReply, type KeysDoor, type SessionHints, type VaultDoor, type VaultGrantSeen } from '@braindog/host';
+import {
+  grantKey as deriveGrantKey,
+  NONCE_BYTES,
+  openSealed as openBytes,
+  seal as sealBytes,
+  VAULT_HEADERS,
+  vaultReply,
+  type KeysDoor,
+  type SessionHints,
+  type VaultDoor,
+  type VaultGrantSeen,
+} from '@braindog/host';
 import type { CallContext, RecordApi, SealTarget, Sealed } from '@braindog/record';
 import { no, ok, type Result } from '@braindog/ports';
 
@@ -35,7 +51,6 @@ type By = VaultGrantSeen | CallContext;
 
 /** 64 KiB, which is more than a private key or an env file of keys. */
 const VALUE_LIMIT = 65_536;
-const NONCE_BYTES = 12;
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 const text = (x: unknown): string => (typeof x === 'string' ? x : '');
@@ -46,14 +61,10 @@ async function grantKey(store: KeyStore, record: string, key: SealTarget['key'],
   const dek = await unwrap(store, record, 'record', { wrapped: key.wrapped, nonce: key.nonce, kek_id: key.kek_id, wrapped_by: 'kek' });
   if (!dek) return null;
   try {
-    const base = await crypto.subtle.importKey('raw', dek, 'HKDF', false, ['deriveKey']);
-    return await crypto.subtle.deriveKey(
-      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: utf8(grant) },
-      base,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt'],
-    );
+    /* AWAITED INSIDE THE `try`, so the derivation is done before the `finally` zeroes the DEK. Node's
+       `importKey` copies the key material eagerly and dropping the `await` happens to work, but nothing in
+       the WebCrypto specification promises that copy and the Worker is a different implementation. */
+    return await deriveGrantKey(dek, grant);
   } finally {
     dek.fill(0);
   }
@@ -97,8 +108,8 @@ function steps(api: RecordApi, store: KeyStore) {
       const key = await grantKey(store, record, target.key, target.grant);
       if (!key || target.key.kek_id === null) return no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' });
       const nonce = new Uint8Array(randomBytes(NONCE_BYTES));
-      const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: utf8(target.aad) }, key, value);
-      return ok({ ciphertext: new Uint8Array(sealed), nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
+      const sealed = await sealBytes(key, nonce, target.aad, value);
+      return ok({ ciphertext: sealed, nonce, kdf: 'hkdf-sha256', kek_id: target.key.kek_id, bytes: value.length, hint });
     };
     /* A PERSON MAY NAME THE ROW AND THE PROJECT AND AN AGENT MAY NOT, which is why this is two shapes rather than
        one spread. A vault grant already carries its project, and reading a second one out of its body would be a
@@ -123,14 +134,11 @@ function steps(api: RecordApi, store: KeyStore) {
     const sealed = out.value;
     const key = await grantKey(store, record, sealed.key, sealed.id);
     if (!key) return vaultReply(no('WRONG_KEY', WRONG_KEY, { at: 'kek_id' }));
-    let opened: ArrayBuffer;
-    try {
-      opened = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.nonce, additionalData: utf8(sealed.aad) }, key, sealed.ciphertext);
-    } catch {
-      /* A failed decrypt says only that these bytes do not open under this key. */
+    const opened = await openBytes(key, sealed.nonce, sealed.aad, sealed.ciphertext);
+    /* A failed decrypt says only that these bytes do not open under this key. */
+    if (opened === null)
       return vaultReply(no('WRONG_KEY', 'The sealed value did not open under this host key store.', { at: 'kek_id' }));
-    }
-    return answerOpen(sealed.credential, sealed.label, new Uint8Array(opened) as Plaintext);
+    return answerOpen(sealed.credential, sealed.label, opened as Plaintext);
   };
 
   return { deposit, open };

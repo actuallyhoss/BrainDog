@@ -21,6 +21,7 @@ import { conflicted, refused } from '@braindog/ports';
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
 export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
+export { freshNonce, grantAad, grantKey, NONCE_BYTES, openSealed, recordAad, seal, type Bytes, type DerivedKey } from './sealing.ts';
 
 /**
  * What one argument IS, so the text a stranger typed becomes the value the handler was written for.
