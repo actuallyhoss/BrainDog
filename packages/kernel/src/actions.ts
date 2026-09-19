@@ -32,6 +32,7 @@ import { instant } from './migrate.ts';
 import type { Ack, OutboxRow } from './outbox.ts';
 import { FLOOR_MS, intervalMs, jitterMs } from './pull.ts';
 import type { Drained } from './schedule.ts';
+import type { LeasedSeal } from './vault.ts';
 
 /** The three kinds this runner claims. */
 export const ACTION_KINDS = ['pull', 'call', 'poll'] as const;
@@ -60,8 +61,15 @@ export type ActionDecl = {
   project?: string;
   /** `call` only: the JSON it posts, string leaves substituted and nothing evaluated. */
   body?: Record<string, unknown>;
-  /** `pull` only, `42 §4.7`: where it fetches when it does not say `url:`. */
-  fetch?: { base?: string; path?: string };
+  /**
+   * `pull` only, `42 §4.7`: where it fetches when it does not say `url:`.
+   *
+   * `page` AND `read` ARE WHAT MAKE IT A CONNECTOR rather than one request. This runner cannot page
+   * and cannot find rows in an answer; `@braindog/connect` does both. So the two keys are carried
+   * here opaquely — the kernel never looks inside them — purely so that `prepareAction` can tell
+   * which of the two runners a job belongs to, and hand the whole declaration on untouched.
+   */
+  fetch?: { base?: string; path?: string; page?: unknown; read?: unknown; auth?: unknown };
   extract?: Record<string, unknown>;
   /** A JSON answer read by paths, in place of `extract` (`map.ts`). A poll's may be a list, one row a map, from one answer. */
   map?: Record<string, unknown> | Record<string, unknown>[];
@@ -162,6 +170,16 @@ export type ActionDeps = {
   lookup: (ingest: string) => { decl: ActionDecl; pack: string | null } | null;
   /** Hand an answer to the ingest pipeline as this one declaration's arrival, so a write fires its rules. */
   arrive: (decl: ActionDecl, body: string, sha256: string) => Result<unknown>;
+  /**
+   * Open a credential for a job this runner is holding the lease on. `vault.ts`'s `sealedGrant`.
+   *
+   * INJECTED RATHER THAN IMPORTED for the same reason every other write here is: this file decides
+   * what a run needs, and the vault decides whether a lease is good enough to get it. Keeping the
+   * second decision in the vault is what keeps it in one place.
+   */
+  seal: (args: { outbox: string; leasedUntil: string; grant: string; actor: string }) => Result<LeasedSeal>;
+  /** The record's timezone, which a connector's window is measured in. */
+  tz: string;
 };
 
 /* ── the jitter ─────────────────────────────────────────────────────────── */
@@ -306,12 +324,48 @@ export function originOf(address: string): string | null {
 export type Ready = { job: OutboxRow; decl: ActionDecl; request: ActionRequest; host: string };
 
 /**
+ * What a connector run is handed. Structurally `@braindog/connect`'s `PullPayload`, and typed here
+ * rather than imported.
+ *
+ * WHY NOT IMPORT THE TYPE. `31 §2` puts the kernel below the connector, and a kernel that imported
+ * `@braindog/connect` would point the arrow the wrong way up the stack: the record would depend on
+ * something that depends on the record. The same reasoning already shaped `extract.ts`. The cost is
+ * that the two shapes can drift; the test that stops them is `apps/selfhost/test/connector.test.ts`,
+ * which builds one of these and hands it to the real `runPull`, so a drift fails there rather than
+ * at a customer's provider.
+ */
+export type PullHandoff = {
+  ingest: string;
+  decl: ActionDecl;
+  declaration_version: number;
+  /** Sealed, from `sealedGrant`. `null` when the connector declares no auth. */
+  grant: { ciphertext: string; nonce: string; kek_id: string; grant_id: string; version: number } | null;
+  dek: { wrapped: string; nonce: string; kek_id: string } | null;
+  record: { id: string; tz: string };
+  cursor: { watermark: string | null };
+  slot: string;
+};
+
+/** A leased job whose declaration pages, and so belongs to the connector runner rather than to this one. */
+export type Paged = { job: OutboxRow; decl: ActionDecl; host: string; paged: PullHandoff };
+
+/**
+ * Whether a declaration pages.
+ *
+ * ONE PREDICATE, USED ONCE, and named anyway, because "which runner owns this row" is the question
+ * a second copy of would eventually answer differently — and two runners that both believe they own
+ * a row is the double charge against a provider that a lease exists to prevent.
+ */
+const pages = (decl: ActionDecl): boolean =>
+  decl.channel === 'pull' && decl.fetch !== undefined && (decl.fetch.page !== undefined || decl.fetch.read !== undefined);
+
+/**
  * A leased job becomes a request, or is finished here because it cannot become one.
  *
  * THE KEY IS LOOKED UP BY ITS ID AND ITS LABEL AND NOTHING ELSE. `grant` in the request is a reference the
  * host resolves, and the columns this reads are the two a person already sees on the vault screen.
  */
-export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered {
+export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged | Metered {
   let payload: { channel?: string; ingest?: string; grant?: string; row?: unknown };
   try {
     payload = JSON.parse(job.payload) as typeof payload;
@@ -346,11 +400,80 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Metered
 
   const row = deps.sql.one<{ payload: string }>('SELECT payload FROM schedule WHERE kind = ? AND key = ?', channel, ingest);
   let since: number | null = null;
+  let watermark: string | null = null;
   try {
     const said = row ? (JSON.parse(row.payload) as { since?: unknown }).since : undefined;
     since = typeof said === 'string' ? Date.parse(said) : null;
+    watermark = typeof said === 'string' ? said : null;
   } catch {
     since = null;
+  }
+
+  /* ── the fork: one request, or a connector that pages ──────────────────────────────────────────
+     EVERYTHING ABOVE IS SHARED ON PURPOSE. The declaration, the key, the pause when the key is gone
+     and the window all mean the same thing for both runners, and a second copy of any of them is a
+     second answer to a question with one. What differs starts here, and only here. */
+  if (pages(decl)) {
+    /* THE CREDENTIAL IS OPENED UNDER THIS JOB'S OWN LEASE, which is the whole of the authorisation:
+       the vault checks that the lease is live, that it is still ours, and that this job is the one
+       that sends this key. A refusal is the run not happening, never the run happening unsigned. */
+    let seal: LeasedSeal | null = null;
+    if (key) {
+      const got = deps.seal({ outbox: job.id, leasedUntil: job.leasedUntil, grant: key.id, actor: `ingest:${ingest}` });
+      if (!got.ok) {
+        /* A CONFLICT CANNOT COME BACK FROM HERE — the vault only refuses — but `Result` allows one,
+           and reading `.refusal` off a conflict is how a type assertion becomes a crash in a queue
+           consumer. Name it rather than cast it. */
+        const refused = 'refusal' in got ? got.refusal : { code: 'PULL_LEASE_EDGE', fix: 'Another write moved this job.' };
+        deps.ack({ id: job.id, state: 'done', leasedUntil: job.leasedUntil });
+        /* A LAPSED LEASE IS NOT A PAUSE. The row is simply not ours any more, and the schedule will
+           fire it again; pausing the connector over it would stop a working connector because one
+           run was slow. A revoked or unopenable key IS a pause, because nothing will fix itself. */
+        const lapsed = refused.code === 'PULL_LEASE_EDGE';
+        if (!lapsed) pause(deps, channel, ingest, `${ingest} is paused: ${refused.fix}`);
+        return meter(
+          deps,
+          {
+            ingest,
+            channel,
+            host,
+            project: decl.project,
+            status: null,
+            outcome: lapsed ? 'dropped' : 'paused',
+            requests: 0,
+            bytes: 0,
+            ms: 0,
+            failures: lapsed ? 0 : 1,
+          },
+          `${ingest} did not run: ${refused.fix}`,
+        );
+      }
+      seal = got.value;
+    }
+
+    const version =
+      deps.sql.one<{ version: number }>(
+        'SELECT version FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1',
+        `ingest.${ingest}`,
+      )?.version ?? 1;
+
+    return {
+      job,
+      decl,
+      host,
+      paged: {
+        ingest,
+        decl,
+        declaration_version: version,
+        grant: seal?.grant ?? null,
+        dek: seal?.dek ?? null,
+        record: { id: deps.recordId, tz: deps.tz },
+        /* THE WATERMARK IS WHERE THE LAST RUN GOT TO, as the schedule row wrote it. A resumed run
+           reads back exactly what it left rather than recomputing a window from the clock. */
+        cursor: { watermark },
+        slot: instant(deps.nowMs),
+      },
+    };
   }
   const every = Math.max(intervalMs(decl.every ?? '') ?? FLOOR_MS, FLOOR_MS);
   const edges = { since: since !== null && Number.isFinite(since) ? since : deps.nowMs - every, until: deps.nowMs };
@@ -571,9 +694,23 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
 export type RunnerSteps = {
   drain: () => Drained;
   lease: (n: number) => OutboxRow[];
-  prepare: (job: OutboxRow) => Ready | Metered;
+  prepare: (job: OutboxRow) => Ready | Paged | Metered;
   finish: (ready: Ready, answer: ActionAnswer, hash: string) => Metered;
+  /** Finish a connector job this host cannot run, so the schedule can offer it to one that can. */
+  release: (paged: Paged) => void;
+  /** Meter that non-run, so a connector nobody can run is visible rather than silently absent. */
+  dropPaged: (paged: Paged, why: string) => Metered;
 };
+
+/**
+ * The connector runner, wired by the host because it is the host that has the network and the KEK.
+ *
+ * IT ACKS THE JOB ITSELF. `@braindog/connect`'s `runPull` writes each page and finishes the outbox
+ * row through the record's own API as it goes, so this pass must not ack it a second time — an ack
+ * on a row another writer already finished is the `PULL_LEASE_EDGE` that would make every healthy
+ * run look like a lost lease.
+ */
+export type PagedRun = (paged: Paged) => Promise<Metered>;
 
 /** The SHA-256 of an answer, hex. What a `poll` compares. */
 export async function answerHash(body: string): Promise<string> {
@@ -592,12 +729,42 @@ export async function answerHash(body: string): Promise<string> {
  * AN EXECUTOR THAT THROWS IS THE NETWORK. It is caught, and the run is a transient failure with a sentence
  * that names nothing the executor was holding.
  */
-export async function runActions(steps: RunnerSteps, execute: Execute, n = 5): Promise<ActionsRun> {
+export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, page?: PagedRun): Promise<ActionsRun> {
   const drained = steps.drain();
   const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0, held: 0, usage: [] };
 
   for (const job of steps.lease(n)) {
     const ready = steps.prepare(job);
+
+    /* ── a connector goes to the other runner, and one pass still leases every row ──────────────
+       THE LEASE IS TAKEN IN ONE PLACE, which is the only reason this is safe. A second runner with
+       its own `lease` call would be a second claimant on the same rows, and two hosts fetching one
+       window from one provider is the double charge the whole lease design exists to prevent. So
+       there is one leaser and two executors, and `prepare` decides which executor a row belongs to. */
+    if ('paged' in ready) {
+      if (!page) {
+        /* NO CONNECTOR RUNNER ON THIS HOST. Finish the row rather than leave it leased: the
+           schedule fires again on its own interval, and a host that does have one will take it.
+           Holding it here would stop the connector on every host, not just this one. */
+        steps.release(ready);
+        out.usage.push(
+          steps.dropPaged(ready, `${ready.paged.ingest} pages, and this host has no connector runner, so nothing was fetched.`),
+        );
+        out.dropped++;
+        continue;
+      }
+      const metered = await page(ready);
+      out.usage.push(metered);
+      out.ran++;
+      if (metered.outcome === 'ok' || metered.outcome === 'unchanged' || metered.outcome === 'changed') out.ok++;
+      else if (metered.outcome === 'paused') out.paused++;
+      else if (metered.outcome === 'failed') out.failed++;
+      else if (metered.outcome === 'dropped') (out.ran--, out.dropped++);
+      else if (metered.outcome === 'held') (out.ran--, out.held++);
+      else out.refused++;
+      continue;
+    }
+
     if (!('request' in ready)) {
       out.usage.push(ready);
       out.dropped++;

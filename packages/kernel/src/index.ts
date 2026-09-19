@@ -145,9 +145,13 @@ import {
   resumeAction as resumeScheduledAction,
   runActions as runScheduledActions,
   type ActionDecl,
+  meter,
   type ActionDeps,
   type ActionsRun,
   type Execute,
+  type Paged,
+  type PagedRun,
+  type PullHandoff,
 } from './actions.ts';
 import {
   bindGrant,
@@ -156,8 +160,10 @@ import {
   openGrant,
   revokeGrant,
   rotateDue,
+  sealedGrant,
   type BindGrantArgs,
   type GrantRow,
+  type LeasedSeal,
   type SealedGrant,
   type VaultDeps,
 } from './vault.ts';
@@ -267,7 +273,11 @@ export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf } from './actions.ts';
-export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute } from './actions.ts';
+export type {
+  ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
+  /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
+  Paged, PagedRun, PullHandoff,
+} from './actions.ts';
 
 /**
  * Several declarations proposed as one change, so one press installs and arms all of them.
@@ -282,7 +292,7 @@ export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } fro
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult, QueueOption, QueueQuestion } from './pages.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
-export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
+export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
 export type { ConfigDecl, ConfigType, Declaration, DeclKind, Expected, Installed, PackConfig, PackToggle } from './declare.ts';
@@ -2984,6 +2994,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     lookup: actionDecl,
     arrive: (decl, body, sha256) =>
       kernel.arrive({ channel: 'pull', body, sha256 }, { ...(decl as unknown as IngestDecl), channel: 'pull' } as IngestDecl),
+    /* THE VAULT DECIDES WHETHER A LEASE IS GOOD ENOUGH, not the runner. The actor is the connector
+       rather than a person, which is what the `grant.read` event will say. */
+    seal: ({ actor, ...args }) => sealedGrant(sql, vaultDeps(actor), args, transaction),
+    tz: recordIdentity(sql)?.tz ?? 'UTC',
   });
 
   /**
@@ -3669,7 +3683,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * THE EXECUTOR IS AN ARGUMENT, so there is no network in the kernel. Every step is its own transaction and
      * the executor runs between them, outside all of them.
      */
-    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler } = {}): Promise<ActionsRun> {
+    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler; page?: PagedRun } = {}): Promise<ActionsRun> {
       try {
         return await runScheduledActions(
           {
@@ -3677,9 +3691,20 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             lease: (n) => transaction(() => lease(sql, ackDeps(), ['pull.fetch'], n)),
             prepare: (job) => transaction(() => prepareAction(actionDeps(), job)),
             finish: (ready, answer, hash) => transaction(() => finishAction(actionDeps(), ready, answer, hash)),
+            release: (paged) =>
+              void transaction(() => ack(sql, ackDeps(), { id: paged.job.id, state: 'done', leasedUntil: paged.job.leasedUntil })),
+            dropPaged: (paged, why) =>
+              transaction(() =>
+                meter(
+                  actionDeps(),
+                  { ingest: paged.paged.ingest, channel: 'pull', host: paged.host, project: paged.decl.project, status: null, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 },
+                  why,
+                ),
+              ),
           },
           execute,
           opts.limit ?? 5,
+          opts.page,
         );
       } finally {
         if (opts.scheduler) await tail(opts.scheduler);
@@ -3795,6 +3820,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     openGrant: (args: { id: string; kek_id?: string | undefined }, actor: string): Result<SealedGrant> =>
       openGrant(sql, vaultDeps(actor), args, transaction),
+
+    /**
+     * Hand a credential to a runner that is holding a live lease on the job needing it.
+     *
+     * NOT `openGrant` WITH A DIFFERENT ACTOR. What authorises this is the lease, not a person, and
+     * it authorises one credential for as long as the lease lasts. The refusals are in `vault.ts`.
+     */
+    sealedGrant: (args: { outbox: string; leasedUntil: string; grant: string }, actor: string): Result<LeasedSeal> =>
+      sealedGrant(sql, vaultDeps(actor), args, transaction),
 
     /** Take a grant out of service and destroy the bytes. The row stays: what it opened is a fact. */
     revokeGrant: (id: string, actor: string): Result<null> => revokeGrant(sql, vaultDeps(actor), id, transaction),

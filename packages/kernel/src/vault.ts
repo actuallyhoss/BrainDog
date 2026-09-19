@@ -390,6 +390,138 @@ export function openGrant(
   });
 }
 
+/* ── handing a credential to a runner ────────────────────────────────────── */
+
+/**
+ * What a leased runner is handed: the sealed credential and the wrapped key that opens it.
+ *
+ * BASE64 AND NOT BYTES, because this goes into an outbox payload, which is JSON, and then to a
+ * runner that may be another process. `@braindog/connect` reads exactly these two shapes.
+ */
+export type LeasedSeal = {
+  grant: { ciphertext: string; nonce: string; kek_id: string; grant_id: string; version: number };
+  dek: { wrapped: string; nonce: string; kek_id: string };
+};
+
+/**
+ * Hand a credential to whoever is holding a live lease on the job that needs it.
+ *
+ * WHY THIS IS NOT `openGrant`. `openGrant` answers a PERSON: somebody on a screen pressed a button,
+ * and the thing that authorises it is that they are a member who may. A connector run has nobody on
+ * a screen. What authorises it is narrower and better: it is holding an unexpired lease on an
+ * outbox row, and that row names the credential it may open. So the lease is the authorisation, and
+ * it authorises exactly one credential for exactly as long as the lease lasts.
+ *
+ * THE LEASE IS CHECKED THREE WAYS, and each one is a different attack. The row must still be
+ * `leased`, or a job that was finished is being replayed. `leased_until` must match what the caller
+ * was handed, or the caller is holding a lease another host has since taken and renewed. And that
+ * instant must still be in the future, or the lease has lapsed and the row is anybody's — which is
+ * the same double-run a lease exists to prevent, except this one would also hand out a credential.
+ *
+ * AND THE ROW MUST NAME THE GRANT. Without this the whole thing collapses: a lease on any job would
+ * open any credential in the vault, and the narrow authorisation above would be a wide one wearing
+ * its clothes.
+ *
+ * THE RECORD STILL NEVER DECRYPTS. Sealed bytes and a wrapped key go out, exactly as they do to a
+ * person. The host unwraps, because the host is where the KEK is.
+ */
+export function sealedGrant(
+  sql: Sql,
+  deps: VaultDeps,
+  args: { outbox: string; leasedUntil: string; grant: string },
+  transaction: <T>(fn: () => T) => T,
+): Result<LeasedSeal> {
+  const job = sql.one<{ state: string; leased_until: string | null; payload: string }>(
+    "SELECT state, leased_until, payload FROM outbox WHERE id = ? AND kind = 'pull.fetch'",
+    args.outbox,
+  );
+  if (!job) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no connector job ${args.outbox}.`, { at: 'outbox' });
+  if (job.state !== 'leased' || job.leased_until === null)
+    return no<LeasedSeal>('PULL_LEASE_EDGE', `${args.outbox} is ${job.state}, not leased, so nothing is opened for it.`, {
+      at: 'outbox',
+    });
+  if (job.leased_until !== args.leasedUntil)
+    return no<LeasedSeal>(
+      'PULL_LEASE_EDGE',
+      `${args.outbox} was leased again since you took it, so this run is no longer the one holding it.`,
+      { at: 'leasedUntil' },
+    );
+  if (Date.parse(job.leased_until) <= deps.nowMs)
+    return no<LeasedSeal>(
+      'PULL_LEASE_EDGE',
+      `The lease on ${args.outbox} ran out at ${job.leased_until}. Take it again before opening anything.`,
+      { at: 'leasedUntil' },
+    );
+
+  /* THE JOB NAMES THE CREDENTIAL, and this is the line that makes a lease narrow. A malformed
+     payload names nothing, which refuses rather than matching anything. */
+  let named: unknown;
+  try {
+    named = (JSON.parse(job.payload) as { grant?: unknown }).grant;
+  } catch {
+    named = undefined;
+  }
+  if (typeof named !== 'string' || named !== args.grant)
+    return no<LeasedSeal>(
+      'FORBIDDEN',
+      `${args.outbox} does not send ${args.grant}, so holding it opens nothing.`,
+      { at: 'grant' },
+    );
+
+  const row = sql.one<{
+    id: string;
+    kind: GrantKind;
+    version: number;
+    ciphertext: Uint8Array | null;
+    nonce: Uint8Array | null;
+    kek_id: string;
+    revoked_at: string | null;
+  }>('SELECT id, kind, version, ciphertext, nonce, kek_id, revoked_at FROM grant WHERE id = ?', args.grant);
+  if (!row) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no grant ${args.grant}.`, { at: 'grant' });
+  /* REVOKED BETWEEN THE FIRE AND THE RUN is the ordinary case, not an exotic one: a person revokes a
+     key precisely when they have decided the thing using it should stop. */
+  if (row.revoked_at)
+    return no<LeasedSeal>('GRANT_REVOKED', `${args.grant} was revoked on ${row.revoked_at.slice(0, 10)}.`, { at: 'grant' });
+  if (!row.ciphertext || !row.nonce)
+    return no<LeasedSeal>('GRANT_REVOKED', `${args.grant} carries no sealed bytes.`, { at: 'grant' });
+
+  /* THE CONNECTOR DEK, NOT THE RECORD'S. `12 §6` keeps them apart so that what a connector run can
+     open is only ever a connector's credential, even if a runner were compromised outright. */
+  const dek = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null }>(
+    "SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = 'connector'",
+  );
+  if (!dek)
+    return no<LeasedSeal>('OUT_OF_BOUNDS', 'This record has no connector key, so a connector cannot open anything.', {
+      at: 'grant',
+    });
+  /* A CONNECTOR KEY IS ALWAYS WRAPPED BY A KEK (ADR-052), so a passphrase here is a record whose
+     connector key nobody can supply without a person present, which is the one thing a scheduled
+     run does not have. Say so rather than hand out bytes no runner can open. */
+  if (dek.wrapped_by !== 'kek' || !dek.kek_id)
+    return no<LeasedSeal>(
+      'WRONG_KEY',
+      'This record’s connector key is not held by a key this host can use, so scheduled runs cannot open it.',
+      { at: 'kek_id' },
+    );
+
+  return attempt(sql, transaction, () => {
+    /* A RUN IS A READING. `opened` answers "is this credential actually used", and a count that left
+       out every automated use would answer it wrongly for exactly the credentials that are. */
+    sql.exec('UPDATE grant SET opened = opened + 1, last_opened = ? WHERE id = ?', instant(deps.nowMs), args.grant);
+    event(sql, deps, 'grant.read', args.grant, row.kind);
+    return ok({
+      grant: {
+        ciphertext: base64(row.ciphertext!),
+        nonce: base64(row.nonce!),
+        kek_id: row.kek_id,
+        grant_id: row.id,
+        version: row.version,
+      },
+      dek: { wrapped: base64(dek.wrapped), nonce: base64(dek.nonce), kek_id: dek.kek_id! },
+    });
+  });
+}
+
 /**
  * Take a grant out of service, and destroy the bytes.
  *
@@ -464,6 +596,20 @@ export function rotateDue(sql: Sql, deps: VaultDeps, payload: string): number | 
 }
 
 /* ── the small parts ─────────────────────────────────────────────────────── */
+
+/**
+ * Bytes as base64, with padding.
+ *
+ * STANDARD ALPHABET AND NOT base64url, and it does not matter which: `unb64url` on the other side
+ * accepts either alphabet and either padding, on purpose, because a store may hold either. Written
+ * in a chunk rather than one `String.fromCharCode(...bytes)` because a spread of a large ciphertext
+ * is a stack overflow, and a credential is exactly the kind of value that is large once.
+ */
+function base64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
 
 const SPAN = /^(\d{1,4})([dwmy])$/;
 
