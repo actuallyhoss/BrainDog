@@ -51,6 +51,10 @@ const STRIPE = {
   kek_id: 'kek_2f',
   bytes: 64,
   hint: 'a 64-character token',
+  /* THE KEY THAT SEALED IT, and a connector credential is sealed under the connector key. Without
+     this the fixture is a credential a person deposited, and the door below is right to refuse it —
+     which is the assertion two tests down. */
+  sealed_under: 'connector' as const,
 };
 
 /** A record with both keys wrapped, which is what a record that runs connectors actually has. */
@@ -193,5 +197,38 @@ test('a record with no connector key says so rather than handing out the record 
   const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: made.id }, 'ingest:stripe-charges'));
   assert.equal(why.code, 'OUT_OF_BOUNDS');
   assert.ok(why.fix.includes('connector'), why.fix);
+  sql.close();
+});
+
+test('A CREDENTIAL SEALED FOR A PERSON IS NOT OPENED FOR A RUNNER, whatever the lease says', async () => {
+  const { k, sql } = await record();
+  /* The ordinary deposit: somebody typed a password in and it was sealed under the record key, to
+     be opened on a screen with them there. Every other check in this file passes for it. */
+  const mine = value<GrantRow>(k.bindGrant({ ...STRIPE, label: 'My bank', sealed_under: 'record' }, 'p_1'));
+  leased(sql, mine.id);
+
+  const why = refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: mine.id }, 'ingest:stripe-charges'));
+  assert.equal(why.code, 'OUT_OF_BOUNDS');
+  assert.equal(why.at, 'grant');
+  /* AND IT SAYS WHAT TO DO, because the alternative — the connector DEK handed back beside bytes
+     the record key sealed — is a decrypt that throws in the host with nothing naming the cause. */
+  assert.match(why.fix, /connector/);
+  assert.equal(k.grants().find((g) => g.id === mine.id)?.opened, 0, 'a refusal counted a reading');
+  sql.close();
+});
+
+test('and a grant bound without saying which key sealed it belongs to the person, not the runner', async () => {
+  /* THE DEFAULT IS THE SAFE ONE, in both directions: every grant that existed before the column
+     did was sealed under the record key, and a default of `connector` would be claiming a fact
+     about those rows that nobody checked and that is wrong in the direction that matters. */
+  const { k, sql } = await record();
+  const { sealed_under: _omitted, ...unsaid } = STRIPE;
+  const made = value<GrantRow>(k.bindGrant(unsaid, 'p_1'));
+  assert.equal(made.sealed_under, 'record');
+  leased(sql, made.id);
+  assert.equal(
+    refusal(k.sealedGrant({ outbox: 'ob_1', leasedUntil: LEASE, grant: made.id }, 'ingest:stripe-charges')).code,
+    'OUT_OF_BOUNDS',
+  );
   sql.close();
 });

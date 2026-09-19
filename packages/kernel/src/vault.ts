@@ -28,7 +28,7 @@ import { attempt } from './tx.ts';
 
 /** The columns a person may see. `ciphertext`, `nonce` and the two `prev_` are absent by design. */
 const VISIBLE =
-  'id, label, opens, kind, version, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, last_opened, created_at, expires_at, rotate_every, stale_at, rotated_at, revoked_at';
+  'id, label, opens, kind, version, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, last_opened, created_at, expires_at, rotate_every, stale_at, rotated_at, revoked_at, sealed_under';
 
 export type GrantKind = 'api_token' | 'password' | 'ssh_key' | 'recovery_codes' | 'note';
 export const GRANT_KINDS: readonly GrantKind[] = ['api_token', 'password', 'ssh_key', 'recovery_codes', 'note'];
@@ -53,6 +53,8 @@ export type GrantRow = {
   stale_at: string | null;
   rotated_at: string | null;
   revoked_at: string | null;
+  /** Which data key sealed the bytes. `12 §6` keeps the two apart; this says which one a row used. */
+  sealed_under: 'record' | 'connector';
 };
 
 /** What the host needs to unwrap. The kernel assembles it and cannot use it. */
@@ -96,6 +98,16 @@ export type BindGrantArgs = {
   expires_at?: string | null;
   /** `90d`, `1y` — puts a `rotate` row in the schedule. */
   rotate_every?: string | null;
+  /**
+   * Which of the record's two data keys sealed these bytes (`12 §6`). `record` is the default and
+   * the ordinary case: a credential a person deposited, opened on a screen with that person there.
+   *
+   * `connector` IS THE ONE A SCHEDULED RUN CAN OPEN, and it is not a preference — the bytes either
+   * were sealed under that key or they were not, and saying the wrong one here produces a decrypt
+   * that throws in the host rather than a refusal that names the cause. Whoever sealed the bytes
+   * says which key they used; nothing infers it.
+   */
+  sealed_under?: 'record' | 'connector';
   /**
    * The grant id and version a host sealed these bytes for, when it sealed them before the bind.
    *
@@ -241,8 +253,8 @@ export function bindGrant(
       event(sql, deps, 'grant.rotate', id, args.kind);
     } else {
       sql.exec(
-        `INSERT INTO grant (id, label, opens, kind, version, ciphertext, nonce, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, created_at, expires_at, rotate_every)
-         VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+        `INSERT INTO grant (id, label, opens, kind, version, ciphertext, nonce, kdf, wrapped_by, scopes, kek_id, bytes, hint, opened, created_at, expires_at, rotate_every, sealed_under)
+         VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
         id,
         args.label,
         args.opens,
@@ -258,6 +270,7 @@ export function bindGrant(
         at,
         args.expires_at ?? null,
         args.rotate_every ?? null,
+        args.sealed_under ?? 'record',
       );
       event(sql, deps, 'grant.add', id, args.kind);
     }
@@ -476,7 +489,8 @@ export function sealedGrant(
     nonce: Uint8Array | null;
     kek_id: string;
     revoked_at: string | null;
-  }>('SELECT id, kind, version, ciphertext, nonce, kek_id, revoked_at FROM grant WHERE id = ?', args.grant);
+    sealed_under: 'record' | 'connector';
+  }>('SELECT id, kind, version, ciphertext, nonce, kek_id, revoked_at, sealed_under FROM grant WHERE id = ?', args.grant);
   if (!row) return no<LeasedSeal>('OUT_OF_BOUNDS', `There is no grant ${args.grant}.`, { at: 'grant' });
   /* REVOKED BETWEEN THE FIRE AND THE RUN is the ordinary case, not an exotic one: a person revokes a
      key precisely when they have decided the thing using it should stop. */
@@ -484,6 +498,17 @@ export function sealedGrant(
     return no<LeasedSeal>('GRANT_REVOKED', `${args.grant} was revoked on ${row.revoked_at.slice(0, 10)}.`, { at: 'grant' });
   if (!row.ciphertext || !row.nonce)
     return no<LeasedSeal>('GRANT_REVOKED', `${args.grant} carries no sealed bytes.`, { at: 'grant' });
+  /* SEALED UNDER THE RECORD KEY IS NOT SEALED FOR A RUNNER. This function hands back the connector
+     DEK, and pairing it with bytes the record key sealed is a decrypt that throws several layers
+     away in the host, with nothing here saying why. It is also the more important half: a
+     credential a person deposited to open on a screen, with themselves present, is not one a
+     scheduled run may have. Re-seal it under the connector key; nothing else converts it. */
+  if (row.sealed_under !== 'connector')
+    return no<LeasedSeal>(
+      'OUT_OF_BOUNDS',
+      `${args.grant} was sealed for use by a person, not by a connector. Re-add it to the connector before it runs.`,
+      { at: 'grant' },
+    );
 
   /* THE CONNECTOR DEK, NOT THE RECORD'S. `12 §6` keeps them apart so that what a connector run can
      open is only ever a connector's credential, even if a runner were compromised outright. */

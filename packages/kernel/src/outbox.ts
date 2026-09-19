@@ -156,6 +156,24 @@ export const CEILING = 8;
  */
 export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 60_000, 6 * 3_600_000);
 
+/**
+ * Hand a leased row back, unrun, for the next invocation to take.
+ *
+ * NOT AN ACK, because nothing happened: no attempt was made, so the retry ladder must not move and
+ * the attempt count must not go up. This is the row going back on the shelf.
+ *
+ * FENCED ON THE LEASE, for the reason `Ack` spells out below. A pass that ran long, lost its lease
+ * to another host and then released what it thought it held would unclaim a row that host is in
+ * the middle of running, and two hosts would fetch one window from one provider.
+ */
+export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): void {
+  sql.exec(
+    "UPDATE outbox SET state = 'pending', leased_until = NULL WHERE id = ? AND state = 'leased' AND leased_until = ?",
+    args.id,
+    args.leasedUntil,
+  );
+}
+
 export type Ack = {
   id: string;
   state: 'done' | 'failed';

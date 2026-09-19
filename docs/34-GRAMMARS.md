@@ -438,6 +438,7 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Job event kinds | 9 | `start say think tool out limit note end error` | 26 §5 |
 | Grant kinds | 5 | `api_token password ssh_key recovery_codes note` | 12 §6 |
 | Vault key purposes | 3 | `record connector signing` | 12 §6 |
+| Grant `sealed_under` | 2 | `record connector` | 12 §6 |
 | Connector `auth.kind` | 8 | 25 §3 | 25 §3 |
 | Connector placeholders | 5 | 25 §3 | 25 §3 |
 | `fetch.read.format` | 5 | `json csv xml html_table text` | 25 §3.2 |

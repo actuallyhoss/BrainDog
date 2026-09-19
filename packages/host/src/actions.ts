@@ -25,7 +25,7 @@
  * NO RUNTIME HERE. No `node:` import and no bare `fetch`, so both hosts import it and the stack gate holds.
  */
 
-import type { PagedRun } from '@braindog/kernel';
+import { reserveFor, type Budget, type PagedRun } from '@braindog/kernel';
 import type { RecordApi } from '@braindog/record';
 
 type Kernel = RecordApi['kernel'];
@@ -523,3 +523,39 @@ export function readPublic<P extends object | undefined = undefined>(options: { 
     }
   };
 }
+
+
+/* ── what one invocation may spend ───────────────────────────────────────── */
+
+/**
+ * Requests one Cloudflare invocation may make, from `research-scheduled-actions` §2.3.
+ *
+ * EIGHT HUNDRED AND NOT A THOUSAND, which is what the Paid plan actually allows. The two hundred is
+ * for everything this file cannot see: the object's own reads, a Directory call, a queue send. A
+ * ceiling set at the real one is a ceiling the run reaches by surprise.
+ *
+ * IT LIVES HERE, in the one file both hosts import, because the self-host needs the same arithmetic
+ * to behave the same way and not the same limit — a Node process has no such ceiling, so it passes
+ * no budget and the kernel skips the check entirely.
+ */
+export const SUBREQUESTS = 800;
+
+/**
+ * A budget for one invocation, to be shared by every record it touches.
+ *
+ * ONE PER INVOCATION AND NOT ONE PER RECORD. The point of counting is that the platform counts the
+ * invocation, so two records that each stay under the limit can still take the invocation down
+ * between them. Whoever begins the invocation makes one of these and hands the same object down.
+ *
+ * `spent` IS FOR REPORTING and nothing reads it to decide: the decision is `left`, and `left` is
+ * the kernel's to spend. A caller that adjusted it would be a second opinion on one number.
+ */
+export function invocation(of = SUBREQUESTS): Budget {
+  return { left: of, total: of };
+}
+
+/** What an invocation has used so far, for a log line or a test. */
+export const spent = (budget: Budget): number => budget.total - budget.left;
+
+/** What `runActions` will reserve for a job of this shape, re-exported so a host can size a budget. */
+export { reserveFor };

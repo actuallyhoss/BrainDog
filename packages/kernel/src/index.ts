@@ -60,7 +60,7 @@ import {
   type Remindable,
   type ScheduleKind,
 } from './schedule.ts';
-import { ack, enqueue, lease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
+import { ack, enqueue, lease, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import {
@@ -149,6 +149,7 @@ import {
   type ActionDeps,
   type ActionsRun,
   type Execute,
+  type Budget,
   type Paged,
   type PagedReport,
   type PagedRun,
@@ -273,11 +274,13 @@ export { extractPull } from './extract.ts';
 export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf, reserveFor } from './actions.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
   Paged, PagedReport, PagedRun, PullHandoff,
+  /* What one invocation has left to spend, when the host it runs on counts requests. */
+  Budget,
 } from './actions.ts';
 
 /**
@@ -3684,7 +3687,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * THE EXECUTOR IS AN ARGUMENT, so there is no network in the kernel. Every step is its own transaction and
      * the executor runs between them, outside all of them.
      */
-    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler; page?: PagedRun } = {}): Promise<ActionsRun> {
+    async runActions(execute: Execute, opts: { limit?: number; scheduler?: Scheduler; page?: PagedRun; budget?: Budget } = {}): Promise<ActionsRun> {
       try {
         return await runScheduledActions(
           {
@@ -3694,6 +3697,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             finish: (ready, answer, hash) => transaction(() => finishAction(actionDeps(), ready, answer, hash)),
             release: (paged) =>
               void transaction(() => ack(sql, ackDeps(), { id: paged.job.id, state: 'done', leasedUntil: paged.job.leasedUntil })),
+            /* NOT AN ACK: this row was never attempted, so it goes back on the shelf rather than down
+               the retry ladder. `unlease` is fenced on the lease for the reason `ack` is. */
+            releaseJob: (job) => void transaction(() => unlease(sql, { id: job.id, leasedUntil: job.leasedUntil })),
             dropPaged: (paged, why) =>
               transaction(() =>
                 meter(
@@ -3728,6 +3734,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           execute,
           opts.limit ?? 5,
           opts.page,
+          opts.budget,
         );
       } finally {
         if (opts.scheduler) await tail(opts.scheduler);

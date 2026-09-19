@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SCHEDULE_KINDS, backoffMs, drainSchedule, openRecord, summary, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
+import { unlease } from '../src/outbox.ts';
 import { fixedClock, openSqlite, recordingScheduler, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -629,5 +630,44 @@ test('and a draft with nothing to file is a refusal rather than a retry', async 
   const leased = k.leaseOutbox(['infer.draft'], 10);
   const out = k.ackOutbox({ id: leased[0]!.id, state: 'done', result: { body_kind: 'options' } });
   assert.equal(refusal(out).at, 'result');
+  sql.close();
+});
+
+/* ── handing a row back unrun ────────────────────────────────────────────── */
+
+test('UNLEASE PUTS A ROW BACK WITHOUT MOVING THE RETRY LADDER, which an ack would', async () => {
+  const { k, sql } = await record();
+  k.outbox('infer.draft', {});
+  const held = k.leaseOutbox(['infer.draft'], 10)[0]!;
+
+  unlease(sql, { id: held.id, leasedUntil: held.leasedUntil });
+
+  const row = sql.one<{ state: string; leased_until: string | null; attempts: number }>(
+    'SELECT state, leased_until, attempts FROM outbox WHERE id = ?',
+    held.id,
+  );
+  assert.equal(row?.state, 'pending');
+  assert.equal(row?.leased_until, null, 'and the lease is gone, so the next pass can take it');
+  /* THE ATTEMPT COUNT DID NOT MOVE. Nothing was attempted: a row released because the invocation
+     ran out of room is not a row that failed, and counting it would walk a healthy connector to
+     the dead letter over a few busy afternoons. The ack is what counts an attempt, and an ack is
+     exactly what this is not. */
+  assert.equal(row?.attempts, 0);
+  /* And it is leasable again, which is the whole point. */
+  assert.equal(k.leaseOutbox(['infer.draft'], 10).length, 1);
+  sql.close();
+});
+
+test('AND IT IS FENCED ON THE LEASE: a stale holder cannot unclaim a row another host now has', async () => {
+  const { k, sql } = await record();
+  k.outbox('infer.draft', {});
+  const held = k.leaseOutbox(['infer.draft'], 10)[0]!;
+
+  /* A PASS THAT RAN LONG AND LOST ITS LEASE. Without the fence it would hand back a row the new
+     holder is in the middle of running, and two hosts would deliver one job. */
+  unlease(sql, { id: held.id, leasedUntil: '1999-01-01T00:00:00.000Z' });
+
+  const row = sql.one<{ state: string }>('SELECT state FROM outbox WHERE id = ?', held.id);
+  assert.equal(row?.state, 'leased', 'the row stayed with whoever holds the lease');
   sql.close();
 });

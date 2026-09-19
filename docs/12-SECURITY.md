@@ -196,6 +196,14 @@ the DEK via `KeyStore`, derives the grant key by HKDF, decrypts, and returns pla
 a `secret` field may hold only an id that exists. A connector's read is the same event by another door:
 `sealedGrant` hands the host the same sealed shape for a pull, logs `grant.read` with actor `ingest:<id>`
 and counts `opened` ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.4, [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §5.1).
+
+**And it hands back only what the connector key sealed.** `grant.sealed_under` records which of the two
+data keys a row was sealed with, and `sealedGrant` refuses anything but `connector` as `OUT_OF_BOUNDS`.
+Two reasons, and the second is the larger: pairing the connector DEK with bytes the record key sealed is a
+decrypt that throws in the host with nothing naming the cause; and a credential somebody deposited to open
+on a screen, with themselves present, is not one a scheduled run may have. `record` is the default, which
+is what every row bound before migration 10 actually is. Re-sealing under the connector key is the only
+thing that converts one, and it needs the plaintext, so it needs a person.
 A `WRONG_KEY` is judged against `vault_key`'s own `kek_id`, never guessed from the row.
 
 ### The optional second factor

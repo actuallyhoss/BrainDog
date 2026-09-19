@@ -59,6 +59,8 @@ export type ActionDecl = {
   sends?: string[];
   /** The project this action runs for. Absent is the whole record, which the meter calls `global`. */
   project?: string;
+  /** `pull` only: the declaration's own ceilings. Read here for `max_pages`, which is what a run may cost. */
+  limits?: { max_pages?: number };
   /** `call` only: the JSON it posts, string leaves substituted and nothing evaluated. */
   body?: Record<string, unknown>;
   /**
@@ -153,6 +155,13 @@ export type ActionsRun = {
   held: number;
   /** Every run this pass metered, in order. The host adds each to the Directory's ledger. */
   usage: Metered[];
+  /**
+   * Rows were due and this pass handed them back unrun, because the invocation ran out of budget.
+   *
+   * THE HOST HAS TO RING AGAIN. Nothing reschedules on its own here: the rows are released and
+   * waiting, and a host that ignored this would leave them for whenever the schedule next fires.
+   */
+  more: boolean;
 };
 
 export type ActionDeps = {
@@ -702,7 +711,45 @@ export type RunnerSteps = {
   dropPaged: (paged: Paged, why: string) => Metered;
   /** Meter a connector run the host carried out, on the record's terms rather than the host's. */
   meterPaged: (paged: Paged, report: PagedReport) => Metered;
+  /** Hand back a leased row this pass will not run, so the next invocation finds it waiting. */
+  releaseJob: (job: OutboxRow) => void;
 };
+
+/**
+ * WHAT ONE INVOCATION MAY SPEND, SHARED ACROSS EVERY RECORD IT DRAINS (`47 §2.3`).
+ *
+ * The Worker's ceiling is per invocation and not per record, and one invocation drains every
+ * record that rang. So a cap inside a single pass would not bound it: five records at five runs
+ * each is twenty-five runs under a limit meant for the lot. The host makes one of these per
+ * invocation and hands the same object to every pass.
+ *
+ * `left` GOES DOWN AND NEVER UP. A run that was reserved and then failed still spent the
+ * subrequests it made, and giving them back would let a failing connector retry inside one
+ * invocation until the real ceiling stopped it, which is the outage this exists to prevent.
+ */
+export type Budget = {
+  /** What is still unspent. Goes down and never up. */
+  left: number;
+  /** What it started at, so a pass can tell "nothing has run yet" from "there is no room left". */
+  total: number;
+};
+
+/**
+ * What one run may cost, in subrequests, reserved before it starts.
+ *
+ * A CONNECTOR IS RESERVED FOR ITS WHOLE PAGE RUN because that is what it may spend: two per page,
+ * the fetch and the write-back, plus the token step, the probe, the credential, the ack and the
+ * meter. Anything else is one request and the same tail.
+ */
+const PAGES_UNSAID = 40;
+const TAIL = 6;
+export const reserveFor = (ready: Ready | Paged | Metered): number =>
+  'paged' in ready
+    ? 2 * (ready.decl.limits?.max_pages ?? PAGES_UNSAID) + TAIL
+    : /* A JOB WHOSE DECLARATION HAD GONE COSTS NOTHING: it is already finished and sends nothing. */
+      'request' in ready
+      ? TAIL
+      : 0;
 
 /**
  * The connector runner, wired by the host because it is the host that has the network and the KEK.
@@ -754,12 +801,36 @@ export async function answerHash(body: string): Promise<string> {
  * AN EXECUTOR THAT THROWS IS THE NETWORK. It is caught, and the run is a transient failure with a sentence
  * that names nothing the executor was holding.
  */
-export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, page?: PagedRun): Promise<ActionsRun> {
+export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, page?: PagedRun, budget?: Budget): Promise<ActionsRun> {
   const drained = steps.drain();
-  const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0, held: 0, usage: [] };
+  const out: ActionsRun = { fired: drained.done, ran: 0, ok: 0, changed: 0, paused: 0, failed: 0, refused: 0, dropped: 0, held: 0, usage: [], more: false };
 
-  for (const job of steps.lease(n)) {
+  const leased = steps.lease(n);
+  for (let at = 0; at < leased.length; at++) {
+    const job = leased[at]!;
     const ready = steps.prepare(job);
+
+    /* ── what is left of the invocation ────────────────────────────────────────────────────────
+       RESERVED BEFORE THE RUN AND NOT COUNTED AFTER IT. A ceiling checked afterwards is a ceiling
+       already through: the run that broke it has made its requests, and on Cloudflare the next one
+       does not fail politely, it takes the whole invocation down with every other record in it.
+
+       AND ONE RUN ALWAYS GOES, however dear it is. A connector declaring more pages than a whole
+       invocation's budget would otherwise be released on every pass for ever, which is a connector
+       that never runs and never says why. It runs, it spends what it spends, and the budget is
+       over afterwards — which stops everything AFTER it rather than it. */
+    const spentAlready = budget !== undefined && budget.left < budget.total;
+    if (budget !== undefined && spentAlready && budget.left < reserveFor(ready)) {
+      /* `releaseJob` AND NOT `release`, INCLUDING FOR A CONNECTOR. `release` acks the row done,
+         which is right when no host here can ever run it and wrong when the only thing missing is
+         room in this invocation: that row is still due, and finishing it would skip the window it
+         was going to fetch. Everything still leased behind it goes back the same way. */
+      steps.releaseJob(job);
+      for (const rest of leased.slice(at + 1)) steps.releaseJob(rest);
+      out.more = true;
+      break;
+    }
+    if (budget !== undefined) budget.left -= reserveFor(ready);
 
     /* ── a connector goes to the other runner, and one pass still leases every row ──────────────
        THE LEASE IS TAKEN IN ONE PLACE, which is the only reason this is safe. A second runner with

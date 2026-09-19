@@ -31,7 +31,7 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
-import { ALARM_RUNS, actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader } from './actions.ts';
+import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpener, meterPass, pass, sharedReader } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -296,12 +296,26 @@ export class Record$ extends DurableObject<Env> {
          a refusal the run reports rather than a reason not to offer the runner at all. */
       const keys = (await keyStoreOf(this.env.KEK)) ?? undefined;
       const page = pagedRunner(api, { http: httpFor(), clock: { now: () => Date.now() }, keys });
+      /* THE INVOCATION'S REQUESTS, RESERVED BEFORE EACH RUN RATHER THAN COUNTED AFTER IT. Cloudflare
+         does not refuse the request that passes the ceiling, it ends the whole invocation — so a
+         pass that checked afterwards would learn it was over from the run that was already gone,
+         along with every other run in the same alarm. A connector at forty pages reserves eighty-six.
+
+         ONE BUDGET FOR THIS ALARM, which is one invocation and one record. §2.3 puts it in `consume`
+         instead, on the reading that one invocation drains every record; that is true of the outbox
+         pump and not of this path, where the alarm is per object and each object is billed its own. */
+      const budget = invocation();
       const out = await api.kernel.runActions(execute, {
         limit: ALARM_RUNS,
         scheduler: this.#alarm,
         page: holdingPaged(page, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions),
+        budget,
       });
       await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
+      /* ROWS LEFT BECAUSE THE BUDGET RAN OUT, NOT BECAUSE THEY ARE NOT DUE. They are `pending` again
+         and their schedule has not moved, so nothing re-arms them: this alarm has to. Now, because
+         the work was due before the budget was the reason it did not happen. */
+      if (out.more) await this.#alarm.set(Date.now());
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));
     }

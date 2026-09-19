@@ -112,7 +112,9 @@ async function record(of: (grant: string) => Declaration[]): Promise<{ k: Kernel
     }).ok,
   );
   const made = k.bindGrant(
-    { label: 'acme key', opens: 'api.acme.test', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' },
+    /* SEALED UNDER THE CONNECTOR KEY, because that is what a connector's credential is. A grant
+       sealed under the record key is refused at `sealedGrant`, which is `sealed-grant.test.ts`'s. */
+    { label: 'acme key', opens: 'api.acme.test', kind: 'api_token', ciphertext: b(1), nonce: b(9), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f', sealed_under: 'connector' },
     'p_1',
   );
   assert.ok(made.ok, fixOf(made));
