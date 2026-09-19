@@ -150,7 +150,7 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
     }
 
     /* ── the rows ── */
-    const key = decl.writes.key ?? [];
+    const key = decl.dedupe;
     const conflict = decl.on_conflict ?? 'skip';
     const wrote: string[] = [];
     let kept = 0;

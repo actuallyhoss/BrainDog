@@ -675,6 +675,16 @@ export type RecordOptions = {
    * is a deploy, so the gap has never been silent. Wired, it is not a gap.
    */
   dates?: IngestDeps['dates'];
+  /**
+   * `43 §5.7`'s `isDuplicate`, when the caller wired it: whether two rows are one event.
+   *
+   * THE SEAM IS HERE BECAUSE THE FOLD IS THE GRAMMAR'S. `existingRow` can narrow on the `on:`
+   * fields and the ±1 day window in SQL, and it does; what it cannot do is decide that
+   * `CAFÉ NERO` and `cafe nero` are one merchant, which is `§5.7` step 2 and lives at rank 9.
+   * Absent, a `near` key finds no existing row and the second copy of a transaction is written —
+   * the direction a person can see and undo.
+   */
+  duplicate?: IngestDeps['duplicate'];
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -3017,6 +3027,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        `String.includes` and no ambiguity, unchanged. */
     literals: opts.literals,
     dates: opts.dates,
+    duplicate: opts.duplicate,
   });
 
   const pullDeps = (): PullDeps => ({

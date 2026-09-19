@@ -27,7 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
-import { matchLiterals, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
+import { isDuplicate, matchLiterals, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -743,6 +743,10 @@ export async function createRecordApi(deps: RecordDeps) {
     /* AND `§4.3`'s `date`. Without this line a record reads four formats out of the token set the
        grammar allows, and one date per slice where `§5.4` says every one. */
     dates: scanDates,
+    /* AND `§5.7`'s fuzzy dedupe. Without this line a `near` key — the one a bank statement actually
+       needs, because the same transaction arrives a day apart with the merchant extended — finds
+       nothing to compare and writes the row twice. */
+    duplicate: isDuplicate,
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

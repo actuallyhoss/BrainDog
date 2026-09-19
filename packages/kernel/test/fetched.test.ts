@@ -32,7 +32,7 @@ const CONNECTOR = (over: Record<string, unknown> = {}): Declaration => ({
   kind: 'ingest',
   body: {
     ingest: 'stripe-charges', channel: 'pull', every: '1h', extract: {},
-    writes: { register: 'charges', key: ['ref'] },
+    writes: { register: 'charges' }, dedupe: ['ref'],
     ...over,
   } as never,
 });
@@ -176,7 +176,7 @@ test('a connector that routes to more than one register is refused, not crashed'
      object throws in the driver and takes the whole page with it, which reads as a record fault
      rather than as a declaration this record does not do yet. */
   const { k, sql } = await record(
-    CONNECTOR({ writes: { register: { by: ['kind'], to: [{ when: ['a'], register: 'charges' }] }, key: ['ref'] } }),
+    CONNECTOR({ writes: { register: { by: ['kind'], to: [{ when: ['a'], register: 'charges' }] } }, dedupe: ['ref'] }),
   );
   const out = k.applyPage(page());
 

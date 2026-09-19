@@ -705,7 +705,7 @@ const PAGER = (grant: string): Declaration => ({
       page: { kind: 'page_number', param: 'page' },
       read: { rows: 'data' },
     },
-    writes: { register: 'notes', key: ['what'] },
+    writes: { register: 'notes' }, dedupe: ['what'],
   } as never,
 });
 

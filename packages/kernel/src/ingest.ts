@@ -140,16 +140,32 @@ export type IngestDecl = {
      * until a person has looked at what it would have written.
      */
     confidence?: Confidence;
-    /**
-     * What makes two arrivals the same thing.
-     *
-     * WITHOUT ONE, `on_conflict` HAS NOTHING TO COMPARE. A redelivery of the same bytes is already
-     * caught by the raw's own hash; this is for the different email about the same invoice.
-     */
-    key?: string[];
   };
+  /**
+   * What makes two arrivals the same thing.
+   *
+   * WITHOUT ONE, `on_conflict` HAS NOTHING TO COMPARE. A redelivery of the same bytes is already
+   * caught by the raw's own hash; this is for the different email about the same invoice.
+   *
+   * AND IT IS SPELLED THE WAY A DECLARATION SPELLS IT. `42 section 4.7` lists `dedupe:` as an
+   * ingest's own key and `43 section 4.2` types it the same; this file read `writes.key`, which is a
+   * name no schema has and no pack writes. Every declaration written the way the specification
+   * writes it therefore deduped on nothing, installed clean, fired, and wrote the second row.
+   */
+  dedupe?: Dedupe;
   on_conflict?: 'skip' | 'update' | 'new';
 };
+
+/**
+ * `43 section 4.2`'s `Dedupe`, structurally — the exact list, or the near form of `07 section 2`.
+ *
+ * THE TYPE IS WRITTEN OUT HERE RATHER THAN IMPORTED. `31 section 2` ranks `extract` at 9 and this
+ * package at 7, so the edge would point the wrong way; the reader that uses it arrives injected for
+ * the same reason, beside the scanners.
+ */
+export type Dedupe =
+  | string[]
+  | { near: { on: string[]; day: string; prefix?: { field: string; chars?: number } } };
 
 export type Arrival = {
   channel: Channel;
@@ -249,6 +265,14 @@ export type IngestDeps = {
    * message. `§9.3` has that row too, and `day()` answers one day per slice.
    */
   dates?: ((text: string, format: string) => string[]) | undefined;
+  /**
+   * `43 §5.7`'s `isDuplicate`, when the record handed it down: whether two rows are one event.
+   *
+   * THE HALF SQL CANNOT ANSWER. `existingRow` narrows on the `on:` fields and the day window, which
+   * an index can do; deciding that `BEANS COFFEE` and `BEANS COFFEE LONDON` are one merchant needs
+   * accents and case folded off, and that is the grammar's, at rank 9.
+   */
+  duplicate?: ((a: Record<string, Json>, b: Record<string, Json>, dedupe: Dedupe) => boolean) | undefined;
   mint: () => string;
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
@@ -303,35 +327,116 @@ export { INBOX_RAW } from '@braindog/where';
  * a provider's correction would update a row over email and insert a duplicate over a connector.
  * `fetched.ts` calls this for every row of a page.
  *
- * A MONEY OR QUANTITY FIELD IS KEYED ON ITS NUMBER and not on the object, because `{amount, currency}`
- * compares as text and the same amount written twice in the same currency is two different strings
- * the moment a key order changes.
+ * A MONEY OR QUANTITY FIELD IS KEYED ON BOTH ITS PARTS, one level down. The object cannot be
+ * compared as text — `entry.fields` is written with `JSON.stringify`, so key order is whatever built
+ * it — and the number alone is not the value: `§5.7` step 1 says a money compares as
+ * `{ amount, currency }`, and its query binds `'.amount' = ? AND '.currency' = ?`.
  *
  * NO KEY MEANS NO EXISTING ROW, which is `on_conflict: new` by construction: a declaration that
  * names nothing to match on is a declaration saying every arrival is its own row.
  */
 export function existingRow(
-  deps: Pick<IngestDeps, 'sql' | 'schemaOf'>,
+  deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'duplicate'>,
   register: string,
-  key: readonly string[],
+  dedupe: Dedupe | null | undefined,
   extracted: Record<string, unknown>,
 ): { id: string; seq: number } | undefined {
-  if (key.length === 0) return undefined;
-  const path = (f: string): string => {
-    const type = deps.schemaOf(register)?.fields[f]?.type;
-    return `json_extract(fields, '${jsonPath(f)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
-  };
-  const bound = (f: string): string | number | null => {
-    const v = extracted[f];
-    if (v === undefined || v === null) return null;
-    if (typeof v === 'object') return (v as { amount?: number; value?: number }).amount ?? (v as { value?: number }).value ?? null;
-    return typeof v === 'number' ? v : String(v);
-  };
-  return deps.sql.one<{ id: string; seq: number }>(
-    `SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND ${key.map((f) => `${path(f)} = ?`).join(' AND ')} LIMIT 1`,
-    register,
-    ...key.map(bound),
+  /* `null` AS WELL AS ABSENT, because this value is read back out of a JSON column: a declaration
+     stored with the key written and left empty comes back holding one rather than missing one. */
+  if (dedupe === undefined || dedupe === null) return undefined;
+  const near = Array.isArray(dedupe) ? undefined : dedupe.near;
+  const on = Array.isArray(dedupe) ? dedupe : dedupe.near.on;
+  if (on.length === 0) return undefined;
+
+  /* THE TERMS SQL CAN ANSWER. A money field is two of them and a quantity is two, because that is
+     what the value IS: `§5.7`'s query binds `'.amount' = ? AND '.currency' = ?`, and comparing the
+     number alone makes EGP 1,250.00 and USD 1,250.00 one row — which, under the default
+     `on_conflict: skip`, drops the second and leaves nothing downstream able to say what went. */
+  const terms: string[] = [];
+  const bound: (string | number | null)[] = [];
+  let inJs = false;
+  for (const field of on) {
+    const type = deps.schemaOf(register)?.fields[field]?.type;
+    const at = `json_extract(fields, '${jsonPath(field)}`;
+    const value = extracted[field];
+    const parts: [string, unknown][] =
+      type === 'money'
+        ? [[`${at}.amount')`, (value as { amount?: unknown })?.amount], [`${at}.currency')`, (value as { currency?: unknown })?.currency]]
+        : type === 'quantity'
+          ? [[`${at}.value')`, (value as { value?: unknown })?.value], [`${at}.unit')`, (value as { unit?: unknown })?.unit]]
+          : [[`${at}')`, value]];
+    for (const [sql, v] of parts) {
+      /* AN OBJECT THAT IS NEITHER OF THOSE IS NOT A TERM. `json_extract` hands back the stored text
+         of an object, and `entry.fields` is written with `JSON.stringify` — so key order is whatever
+         built it, and two equal values compare unequal about as often as not. It goes to the reader
+         below, which compares canonically. Binding it as `null` here would be the wrong-answer
+         version of the same thing. */
+      if (v !== null && typeof v === 'object') { inJs = true; continue; }
+      terms.push(`${sql} = ?`);
+      bound.push(v === undefined || v === null ? null : typeof v === 'number' ? v : String(v));
+    }
+  }
+
+  /* THE EXACT FORM, ANSWERED WHERE THE ROWS ARE. Every term is a scalar equality, so one indexed
+     read settles it and no candidate has to be carried into this process. */
+  if (near === undefined && !inJs)
+    return deps.sql.one<{ id: string; seq: number }>(
+      `SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND ${terms.join(' AND ')} LIMIT 1`,
+      register,
+    ...bound,
   );
+
+  /* AND EVERYTHING ELSE IS `43 §5.7`'s DIVISION OF LABOUR, verbatim: *the record fetches candidates
+     and calls this per candidate*. The day window is SQL — `YYYY-MM-DD` sorts as it counts — and the
+     prefix rule is not, because folding accents and case off a merchant string is the grammar's, and
+     the grammar lives one rank up at `extract`. It arrives injected, the way the scanners do.
+
+     WITHOUT THE READER, NO EXISTING ROW. A record opened without one writes the second copy of a
+     transaction, which a person can see and delete; the other direction drops a real one silently.
+     `§5.7`'s own paragraph leans this way at every step and so does this. */
+  const duplicate = deps.duplicate;
+  if (duplicate === undefined) return undefined;
+
+  let window = '';
+  if (near !== undefined) {
+    const day = extracted[near.day];
+    const around = neighbours(typeof day === 'string' ? day : '');
+    if (around === undefined) return undefined;
+    window = ` AND json_extract(fields, '${jsonPath(near.day)}') BETWEEN ? AND ?`;
+    bound.push(around[0], around[1]);
+  }
+
+  const where = terms.length > 0 ? ` AND ${terms.join(' AND ')}` : '';
+  const candidates = deps.sql.all<{ id: string; seq: number; fields: string }>(
+    `SELECT id, seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL${where}${window}`,
+    register,
+    ...bound,
+  );
+  return candidates.find((row) => duplicate(extracted as Record<string, Json>, JSON.parse(row.fields) as Record<string, Json>, dedupe));
+}
+
+/**
+ * Every field id a dedupe names, in both forms. The backstop that keeps an unchecked identifier out
+ * of `jsonPath`, which throws, reads all of them and not just the `on:` list.
+ */
+export function named(dedupe: Dedupe | null | undefined): string[] {
+  if (dedupe === undefined || dedupe === null) return [];
+  if (Array.isArray(dedupe)) return dedupe;
+  const { on, day, prefix } = dedupe.near;
+  return [...on, day, ...(prefix ? [prefix.field] : [])];
+}
+
+/**
+ * The day before and the day after a `YYYY-MM-DD`, or `undefined` if it is not one.
+ *
+ * THE CALENDAR HAS THE LAST WORD, as it does in `dedupe.ts`: `2026-02-30` is a shape and not a day,
+ * and a window built around one would be a day out at exactly the boundary the window exists for.
+ */
+function neighbours(day: string): [string, string] | undefined {
+  if (day.length !== 10 || day[4] !== '-' || day[7] !== '-') return undefined;
+  const at = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
+  if (!Number.isFinite(at) || new Date(at).toISOString().slice(0, 10) !== day) return undefined;
+  return [new Date(at - 86_400_000).toISOString().slice(0, 10), new Date(at + 86_400_000).toISOString().slice(0, 10)];
 }
 
 /**
@@ -550,16 +655,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        `int` field and an object for a `money` one, and SQLite compares storage classes — so
        `= '1234'` never matched an integer and a numeric dedupe key silently wrote a duplicate row
        every time. Money is compared on its amount, one level down, for the same reason. */
-    const key = matched.writes.key ?? [];
+    const key = named(matched.dedupe);
     /* A REFUSAL IS A VALUE HERE, even for the backstop. `jsonPath` throws on an id that never went
        through the install check, and this is a `Result`-returning method — an exception crossing it
        is the one thing this package promises does not happen. */
     const wrongId = key.find((f) => typeof f !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(f));
     if (wrongId !== undefined)
       return no<Arrived>('DECLARATION_INVALID', `${matched.ingest} names ${JSON.stringify(wrongId)} as a field, and it is not one.`, {
-        at: 'writes.key',
+        at: 'dedupe',
       });
-    const existing = existingRow(deps, matched.writes.register, key as string[], extracted);
+    const existing = existingRow(deps, matched.writes.register, matched.dedupe, extracted);
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {

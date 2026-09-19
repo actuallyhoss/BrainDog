@@ -54,7 +54,7 @@ const HSBC = (over: Record<string, unknown> = {}): Declaration => ({
       account: { lookup: { register: 'accounts', by: 'last4', after: 'card ending ' } },
       kind: { enum: { map: { debited: 'debit', credited: 'credit' } } },
     },
-    writes: { register: 'transactions', confidence: 'exact', key: ['merchant', 'date'] },
+    writes: { register: 'transactions', confidence: 'exact' }, dedupe: ['merchant', 'date'],
     on_conflict: 'skip',
     ...over,
   } as never,
@@ -1036,7 +1036,7 @@ test('A FIELD ID FROM A DECLARATION CANNOT BECOME SQL', async () => {
   const k = await openRecord(sql, fixedClock(NOW));
   const out = await k.install([
     TRANSACTIONS,
-    HSBC({ writes: { register: 'transactions', key: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"] } }),
+    HSBC({ writes: { register: 'transactions' }, dedupe: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"] }),
   ]);
   assert.equal(out.ok, false);
   assert.equal((out as { refusal: { code: string } }).refusal.code, 'DECLARATION_INVALID');
@@ -1047,7 +1047,7 @@ test('A NUMERIC DEDUPE KEY MATCHES, which it never did', async () => {
   /* The key values were bound as strings and `json_extract` answers an INTEGER for an `int` field
      and an object for a `money` one — and SQLite compares storage classes, so `= '1234'` never
      matched. Every re-notice of one payment wrote a second row and the money was counted twice. */
-  const { k, sql } = await record(HSBC({ writes: { register: 'transactions', key: ['amount'] } }));
+  const { k, sql } = await record(HSBC({ writes: { register: 'transactions' }, dedupe: ['amount'] }));
   const first = value<Arrived>(
     k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'm1' }),
   );

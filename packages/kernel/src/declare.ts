@@ -1201,8 +1201,35 @@ const PATH_SEGMENT_CEILING = 16;
  * ingest that never fires and an ingest that fires correctly look identical from the outside until
  * somebody notices a month of arrivals sitting untriaged.
  */
+/** `42 §4.7`'s dedupe row, as a shape. Field existence is the register's to answer; this is the name. */
+function dedupeFault(dedupe: unknown, id: string): Refusal | null {
+  if (dedupe === undefined || dedupe === null) return null;
+  const at = 'dedupe';
+  const wrong = (said: string) => bad('DECLARATION_INVALID', `${id}'s dedupe ${said}`, at);
+  const names = (list: unknown, most: number, what: string): Refusal | null => {
+    if (!Array.isArray(list) || list.length === 0 || list.length > most)
+      return wrong(`${what} is 1 to ${most} field ids.`);
+    const notOne = list.find((f) => typeof f !== 'string' || !IDENT.test(f));
+    return notOne === undefined ? null : wrong(`names ${JSON.stringify(notOne)} as a field, and it is not one.`);
+  };
+  if (Array.isArray(dedupe)) return names(dedupe, 4, 'is a field list, which');
+  if (typeof dedupe !== 'object') return wrong('is a field list, or { near: { on, day, prefix } } — 07 §2.');
+  const near = (dedupe as { near?: unknown }).near;
+  if (near === null || typeof near !== 'object') return wrong('is a field list, or { near: { on, day, prefix } } — 07 §2.');
+  const { on, day, prefix } = near as { on?: unknown; day?: unknown; prefix?: unknown };
+  const wrongOn = names(on, 4, "near.on, which");
+  if (wrongOn) return wrongOn;
+  if (typeof day !== 'string' || !IDENT.test(day)) return wrong(`dates rows by ${JSON.stringify(day ?? null)}, and it is not a field.`);
+  if (prefix === undefined || prefix === null) return null;
+  const { field, chars } = prefix as { field?: unknown; chars?: unknown };
+  if (typeof field !== 'string' || !IDENT.test(field)) return wrong(`compares the prefix of ${JSON.stringify(field ?? null)}, and it is not a field.`);
+  if (chars !== undefined && (typeof chars !== 'number' || !Number.isInteger(chars) || chars < 1 || chars > 64))
+    return bad('OUT_OF_BOUNDS', `${id}'s dedupe compares 1 to 64 characters of ${field}.`, at);
+  return null;
+}
+
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1243,6 +1270,18 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
     if (refused)
       return bad(refused.code, `${id}.match: ${refused.fix}`, refused.at ?? 'match', refused.allowed);
   }
+
+  /**
+   * `42 §4.7`'s `dedupe:` — 1 to 4 field ids, or the near form.
+   *
+   * A FIELD ID FROM A DECLARATION BECOMES SQL. `existingRow` builds `json_extract(fields, '$.<f>')`
+   * out of these names, and `jsonPath` is what keeps that from being an injection — but `jsonPath`
+   * THROWS, and this is the one place the name can still be refused to somebody who can fix it.
+   * The check the key had under its old spelling came free from the register grammar; under the
+   * spelling the schema documents, nothing read it at all, and an unreadable key installed clean.
+   */
+  const wrongKey = dedupeFault(body.dedupe, id);
+  if (wrongKey) return wrongKey;
 
   if (body.extract !== undefined) {
     const extract = body.extract;

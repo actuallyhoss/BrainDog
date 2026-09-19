@@ -59,7 +59,7 @@ const reader = (form: Record<string, unknown>, field: string) => ({
     channel: 'email',
     match: { all: [{ field: 'from', is: 'alerts@bank.example' }] },
     extract: { what: { text: { before: ' at' } }, [field]: form },
-    writes: { register: 'moves', confidence: 'exact', key: ['what'] },
+    writes: { register: 'moves', confidence: 'exact' }, dedupe: ['what'],
     on_conflict: 'skip',
   } as never,
 });

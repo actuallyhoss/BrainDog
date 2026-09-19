@@ -74,7 +74,7 @@ const CONNECTOR = (grant: string): Declaration => ({
       page: { kind: 'page_number', param: 'page' },
       read: { rows: 'data' },
     },
-    writes: { register: 'charges', key: ['ref'] },
+    writes: { register: 'charges' }, dedupe: ['ref'],
   } as never,
 });
 

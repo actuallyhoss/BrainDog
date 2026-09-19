@@ -2326,3 +2326,33 @@ test('STEPS NAME A REF AND A BOOL OF THEIR OWN LIST, or the list is refused', ()
     assert.equal(said?.at, 'steps');
   }
 });
+
+test("A DEDUPE KEY IS CHECKED WHERE IT IS WRITTEN, because a field id from one becomes SQL", () => {
+  /**
+   * `42 §4.7`: *1–4 field ids, or `{ near: { on, day, prefix: { field, chars?: int 1–64 } } }`*.
+   *
+   * NOTHING READ THIS KEY AT ALL. The kernel deduped on `writes.key`, a name no schema has, so a
+   * declaration written the way the specification writes it installed clean and matched nothing —
+   * `on_conflict` with nothing to compare, and the second email about one invoice writing a second
+   * row. The names now reach `json_extract`, which is why the grammar check is not optional.
+   */
+  assert.equal(refusedWith(ingest({ dedupe: ['ref'] })), null);
+  assert.equal(refusedWith(ingest({ dedupe: ['ref', 'amount', 'day', 'merchant'] })), null);
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day' } } })), null);
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant' } } } })), null);
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant', chars: 12 } } } })), null);
+
+  /* AND THE ONE THAT MATTERS: an identifier that is not one. */
+  assert.equal(refusedWith(ingest({ dedupe: ["ref') = 1 OR 1 = 1 OR json_extract(fields, '$.x"] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ["x') = 1 OR 1 = 1 --"], day: 'day' } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: "d') --" } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: "m') --" } } } })), 'DECLARATION_INVALID');
+
+  /* A KEY THAT NAMES NOTHING IS NOT A KEY, and five fields is past the row's cap. */
+  assert.equal(refusedWith(ingest({ dedupe: [] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: ['a', 'b', 'c', 'd', 'e'] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: 'ref' })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'] } } })), 'DECLARATION_INVALID', 'the near form dates its rows');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant', chars: 0 } } } })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant', chars: 65 } } } })), 'OUT_OF_BOUNDS');
+});
