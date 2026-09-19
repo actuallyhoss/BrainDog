@@ -44,6 +44,15 @@ export type Predicate = Node;
 export type Schema = {
   register: string;
   /**
+   * WHICH BACKEND, `34 §1.11`'s own word. Absent means `entry`, which is every register.
+   *
+   * IT EXISTS SO THAT "EXACTLY THESE FIELDS" CAN BE TRUE. `34 §1.9` says an ingest `match:` may name
+   * exactly `from to subject body channel state ts`, but `specOf` grants every schema the record's five
+   * kernel columns as well, so `{ field: id }` resolved against an arrival that has no such column. On
+   * `entry` that fallback is right and load-bearing; on `inbox_raw` it is a name the grammar does not have.
+   */
+  subject?: 'entry' | 'inbox_raw';
+  /**
    * `label` IS OPTIONAL AND IT IS NOT DECORATION.
    *
    * A page prints its own `where:` back to the reader using each field's LABEL, so
@@ -208,6 +217,40 @@ export const KERNEL_FIELDS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The second backend's fields, `34 §1.9` exactly: `from to subject body channel state ts` and nothing else.
+ *
+ * IT IS HERE BECAUSE THE GRAMMAR IS HERE. An ingest `match:` asks a question about an arrival rather than a
+ * row, and `extract` is the package that asks it — but which names are legal, and what each one holds, is a
+ * fact about the grammar and not about the asker. Put it in `extract` and the day a field is added there are
+ * two lists, which is the same failure the path grammar had in three places.
+ *
+ * WHAT THIS DOES NOT YET DO, said plainly rather than left to be discovered. `34 §1.9` also refuses
+ * `via has lacks near matches starts ends` on this backend, and that refusal is not enforced anywhere: the
+ * implementation has no subject or backend notion at all, because `compile` takes a `Schema` and not
+ * `§1.11`'s `ctx`. A schema alone cannot express it — `starts` on a text field is legal on `entry` and
+ * refused here, and the type is the same text either way. So this constant makes an unknown FIELD answer
+ * false, which is most of `MATCH_FIELD_UNKNOWN`'s job, and leaves `MATCH_OP_UNSUPPORTED` to `declare`'s lint
+ * at install. Closing it properly means threading the subject through `compile`, which is the record's SQL
+ * path and wants its own pass.
+ */
+export const INBOX_RAW: Schema = {
+  register: 'inbox_raw',
+  subject: 'inbox_raw',
+  fields: {
+    /* `json_extract(headers, '$.<name>')`, lower-cased on arrival. */
+    from: { type: 'text' },
+    to: { type: 'text' },
+    subject: { type: 'text' },
+    /* The body AS STORED. `43 §5.2` step 1 is explicit that it is not the normalised copy, so that this
+       answer equals the `instr(lower(body), lower(?))` the record could run over the same row. */
+    body: { type: 'text' },
+    channel: { type: 'enum', values: ['email', 'webhook', 'pull', 'paste', 'api'] },
+    state: { type: 'enum', values: ['untriaged', 'matched', 'skipped', 'review', 'proposed', 'ignored', 'erased'] },
+    ts: { type: 'instant' },
+  },
+};
+
+/**
  * WHICH NAMES READ A COLUMN INSTEAD OF A KEY OF THE `fields` JSON.
  *
  * `02 §1` raises the question of what `{ field: state, is: open }` compiles against, calls it *not
@@ -253,7 +296,7 @@ export const mirrorsState = (schema: Schema, field: string): boolean =>
 const specOf = (schema: Schema, field: string): { type: string; values?: readonly string[]; label?: string } | undefined =>
   Object.hasOwn(schema.fields, field)
     ? schema.fields[field]
-    : Object.hasOwn(KERNEL_FIELDS, field)
+    : schema.subject !== 'inbox_raw' && Object.hasOwn(KERNEL_FIELDS, field)
       ? { type: KERNEL_FIELDS[field]! }
       : undefined;
 
@@ -1074,7 +1117,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
  * not others, and an exception that depends on the data is worse than either answering or refusing.
  * The predicate is a handful of leaves and this walk allocates nothing.
  */
-const namesColumn = (node: unknown, level = 1): boolean => {
+const namesColumn = (node: unknown, schema: Schema, level = 1): boolean => {
   /* AND IT COUNTS ITS DEPTH, because the first version of this walk did not and a four-thousand
      deep `all:` was a `RangeError: Maximum call stack size exceeded` again, out of a guard added to
      prevent a silent wrong answer. `MAX_DEPTH`'s paragraph is that failure, and the test that
@@ -1085,8 +1128,12 @@ const namesColumn = (node: unknown, level = 1): boolean => {
   const n = node as Record<string, unknown>;
   for (const q of QUANTIFIERS) {
     const kids = n[q];
-    if (Array.isArray(kids)) return kids.some((k) => namesColumn(k, level + 1));
+    if (Array.isArray(kids)) return kids.some((k) => namesColumn(k, schema, level + 1));
   }
+  /* A KERNEL COLUMN ONLY WHERE THERE ARE KERNEL COLUMNS. On `inbox_raw` these five are not fields at
+     all, so a predicate naming one must answer false through `specOf` rather than ask the caller for a row
+     that does not exist. */
+  if (schema.subject === 'inbox_raw') return false;
   return typeof n.field === 'string' && Object.hasOwn(KERNEL_FIELDS, n.field);
 };
 
@@ -1149,7 +1196,7 @@ export function evaluate(
      It is asked AFTER the compile check so that a predicate the compiler already refuses answers
      `false` rather than throwing: an unreadable predicate is a refusal at this boundary, and only
      a readable one the caller under-supplied is a bug in the caller. */
-  if (row === undefined && namesColumn(where))
+  if (row === undefined && namesColumn(where, schema))
     throw new TypeError(
       `A predicate over ${schema.register} names one of ${Object.keys(KERNEL_FIELDS).join(', ')}, which the record keeps in a column of the row and not in its fields. Pass the row as evaluate()'s fourth argument.`,
     );

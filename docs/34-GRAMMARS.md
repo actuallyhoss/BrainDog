@@ -182,21 +182,40 @@ which is why an author never learns there are two.
 ### 1.11 · The compile contract
 
 ```
-compile(predicate | null, ctx) → { sql, params, uses }
-  sql  = the WHOLE clause: 'WHERE register = ? AND deleted_at IS NULL AND (…)'; null = an absent where:, every row
-  ctx  = { subject: 'entry' | 'inbox_raw', register, schemas, now, tz, includeDeleted?, scope: { registers: '*' | string[], rows?: predicate } }
-  uses = { fts: bool, vec: bool, indexes: string[], currency_excluded: bool }
-evaluate(predicate, row, { subject, now, tz }) → boolean        the reference evaluator, exported beside compile
+compile(predicate | undefined, schema) → { sql, params, bad }
+  sql    = a PARENTHESISED FRAGMENT over entry, never the whole clause; the caller composes around it
+  params = the bound values, in the order the fragment holds its ?
+  bad    = every refusal the predicate earned; non-empty means run nothing
+schema   = { register, subject?: 'entry' | 'inbox_raw', fields: { name: { type, values?, label?, labels? } }, state?, series? }
+evaluate(predicate | undefined, fields, schema, row?) → boolean   the reference evaluator, exported beside compile
+  row    = required only when the predicate names one of KERNEL_FIELDS (id seq created_at updated_at version)
 ```
 
-`compile` returns the **whole** `WHERE` clause; the kernel composes `SELECT … FROM entry <compiled.sql> AND <its own
-terms>` and never splices a fragment into a `WHERE` of its own. `includeDeleted` is a `ctx` flag that drops the
-`deleted_at IS NULL` term — not a kernel rewrite. `ctx.schemas` is required: one `RegisterSchema` per installed
-register, built by `where.toSchema(declarationBody)`, so the kernel needs nothing from `declare`. `ctx.now` is an RFC
-3339 UTC string. `ctx.scope.rows` is `AND`-ed **inside** the SQL, never filtered after ranking. `evaluate` is the
-evaluator the property test runs — over the stored body for `matches`, never the normalised one — and `where` also
-exports `derive`, `searchText`, `normalise`, `jcs` and `jsonPath`: the grammar's helpers, imported by the kernel, so the
-stored `unique:` fingerprint and the compiled inline share one definition (38 §2). The property test in
+**This block was rewritten to the contract that exists.** What it described before was never built, in three
+ways, and a spec that states a contract the code does not have is worse than no spec, because it is what a
+reader checks instead of the code. The differences, and where each one's safety argument went:
+
+- **A fragment, not the whole clause.** The old text said in bold that `compile` returns the whole `WHERE`
+  and that the kernel *never splices a fragment into a `WHERE` of its own*. The kernel splices at nine
+  sites. The hazard that rule was guarding, an `OR` at the top of a predicate escaping its scope, is handled
+  instead by `compile` parenthesising its own output, including a top-level `any` — checked, not assumed.
+  The other half of the rule has no replacement: `deleted_at IS NULL` is now each caller's to remember, and
+  eight of the nine sites do. The ninth, `rules.ts`'s `WHERE id = ? AND (…)`, is scoped to one id mid-write,
+  which may be why; it is written down here rather than left as a thing somebody notices twice.
+- **A `schema`, not a `ctx`.** `subject` is a property of the schema now rather than of the call, which is
+  what makes "exactly these seven fields" true for `inbox_raw` instead of aspirational. `register` is on the
+  schema. `now` and `tz` are gone from both signatures because relative words never reach them: `sentence.ts`
+  resolves `today`, `bom` and `eoy` to concrete days first, so the evaluator only ever sees a date.
+- **`bad`, not `uses`.** Nothing reports `fts`, `vec`, `indexes` or `currency_excluded`. `bad` carries the
+  refusals, and `evaluate` answers `false` for any predicate that earns one.
+
+`includeDeleted` is the **kernel's** flag, `q.includeDeleted`, read where the query is built and not anything
+`where` knows about; the old text had it as a `ctx` flag and "not a kernel rewrite", which is backwards. One
+schema per call rather than a `schemas` map, and `toSchema` does not exist — the caller builds the `Schema`.
+Of the helpers the old text said `where` exports beside the grammar, `derive`, `searchText` and `toSchema` do
+not exist anywhere in the tree, `normalise` exists here but is not exported, `jcs` lives in
+`packages/kernel/src/declare.ts`, and only `jsonPath` is what it says. `evaluate` is still the evaluator the
+property test runs, over the stored body for `matches` and never the normalised one. The property test in
 [30-BLUEPRINT](30-BLUEPRINT.md) §7 generates a random predicate and a random row set, evaluates §1.2–§1.3 in plain
 JS, runs the compiled SQL over the same rows, and asserts the two sets are equal — 1,000 runs in CI, 10,000 nightly
 ([33-CONTRACTS](33-CONTRACTS.md) §8). Every failing `{seed, path}` is committed as a permanent example.
