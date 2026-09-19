@@ -707,7 +707,7 @@ package: `graph` (imports `where` only), `closed-lists` (`EXTRACTORS` + `COMBINA
 - `ponytail: no month names (MMM); add the token when the 50-message test of 21 §13 needs it — never regex.`
 - `ponytail: exponent-3 currencies read a lone separator + 3 digits as the decimal point; KWD 1,250 meaning 1,250 dinars is misread — add decimal: "." | "," to the money form when a real ledger hits it. This key would name the DECIMAL POINT, the same thing §4.3's decimal.sep names, and not the thousands character: the kernel's money form carried a sep that meant the other one and it was removed on September 19th 2026 because the digit rule above already answers every text it was added for. A money form that gets this key gets §4.3's meaning or it gets neither.`
 - `ponytail: trailing minus (1,250.00-) and DR/CR suffixes are not read; add when a statement uses them — the sign rule is one branch.`
-- `ponytail: a symbol two table rows share resolves to none; declare currency: — a locale hint is not worth a key until a second currency table exists.`
+- `ponytail: a symbol two table rows share resolves to none; declare currency: — a locale hint is not worth a key until a second currency table exists. The record's own table, built from Intl.supportedValuesOf('currency') on September 20th 2026, carries codes and NO symbols, so an unambiguous symbol reads nothing there rather than being guessed — the answer an ambiguous one gets. Adding symbols is a data decision; reading an unambiguous code is not.`
 - `ponytail: no anchor kinds beyond literal after/before/between; 21 §13 names the next three (table cell, label-adjacent, nth line) — add each as an extractor form.`
 - `ponytail: every declared field is required and default is the only optional; add optional: true if authors keep wrapping fields in defaults they do not want written.`
 - `ponytail: the JSON path has no quoted keys, wildcards or filters; a key containing . or [ is unaddressable — add "quoted.keys" when a real API needs one.`
@@ -788,7 +788,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 - [x] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
 - [x] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green
 - [ ] the sixteen amendments of §13 are applied to 02, 07, 25, 30, 31, 33, 34 in the same revision, and BUILD.md's loop table records it
-- [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between
+- [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between. **Two of the four have landed and neither was a move.** `readRows` reaches a page through `ExtractDeps.rows`, handed down by `@braindog/host` (September 19th 2026); `scanMoney` reaches an arrival through `RecordOptions.money`, handed down by `@braindog/record` (September 20th). Both are injections rather than imports, because the caller in each case is rank 7 and this package is rank 9, so the edge would point up `31 §2`'s order — and the injecting package is the lowest rank that can reach both. What is left of the box is `matches` and `isDuplicate`, and the kernel's `resolve` for the other nine forms, which still uses `RegExp` where `§13` D4 bans it under `src/`
 
 ---
 

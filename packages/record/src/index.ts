@@ -27,6 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
+import { scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -37,6 +38,7 @@ import {
   fill,
   GRANT_KINDS,
   isStale,
+  exponentOf,
   openRecord,
   ulids,
   type GrantKind,
@@ -702,10 +704,33 @@ export type RecordDeps = {
 /** What `invite` says when the host never said it can take invitations. */
 const INVITES_OFF = 'This BrainDog has no sign-in switched on, so an invitation link would lead nowhere. Set up sign-in first.';
 
+/**
+ * The currency table `43 §4.3`'s money is read against, from `Intl` rather than from shipped data.
+ *
+ * ONE SOURCE FOR THE CODES AND THE EXPONENTS. `Intl.supportedValuesOf('currency')` is ISO 4217's
+ * active list as the runtime holds it, and `exponentOf` reads each exponent from the same place —
+ * so a record cannot know that `KWD` has three decimals and not know that `KWD` is a currency.
+ * A LIST IS WHAT MAKES THE READING SAFE: without one, `VAT 500` and `EGP 500` are the same three
+ * letters beside a number, which is why `ingest.ts` refused to read a currency out of a payload
+ * at all until this existed.
+ *
+ * NO SYMBOLS, DELIBERATELY. `43 §710`'s ponytail already says why — a symbol two rows share
+ * resolves to none, and `$` is at least five currencies — so `E£ 450` reads nothing rather than
+ * guessing, exactly as an ambiguous one would. Adding them is a data decision with a table behind
+ * it; reading an unambiguous code is not.
+ */
+const CURRENCIES: CurrencyTable = Object.fromEntries(
+  Intl.supportedValuesOf('currency').map((code) => [code, { exponent: exponentOf(code) }]),
+);
+
 export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
+    /* `43 §4.3`'s money, wired where both halves can be reached: the scanner is rank 9, the
+       record that reads an arrival is rank 7, and this package is 11. Without this line a record
+       reads money the way `ingest.ts` does alone, which is wrong against `43 §9.1` three ways. */
+    money: (text, declared) => scanMoney(text, CURRENCIES, declared),
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

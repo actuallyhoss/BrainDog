@@ -200,6 +200,73 @@ test('a lookup that resolves to nothing is a review too, not a broken reference'
 
 const deps = { find: () => null } as never;
 
+test("MONEY IS READ BY THE RECORD'S SCANNER, and a declared currency is handed to it as a fallback", () => {
+  /* `43 §63`, verbatim: *`declared` is the fallback currency, never an override.* This file read
+     it as an override and could not read a currency out of a payload at all, so
+     `{ money: { currency: 'EGP' } }` over `You paid USD 99.95` wrote EGP 99.95 — wrong money in a
+     register from a declaration that reads correctly — and `{ money: {} }` read nothing on every
+     arrival, for ever. Neither is fixable here: telling `EGP 500` from `VAT 500` needs the list of
+     currency codes, and this package has not got one. `@braindog/extract`'s `scanMoney` has, and
+     is rank 9 to this package's 7, so it is handed down by the record rather than imported. */
+  const seen: [string, string | undefined][] = [];
+  const scanner = (text: string, declared?: string) => {
+    seen.push([text, declared]);
+    return text.includes('USD') ? [{ amount: 9995, currency: 'USD' }] : [];
+  };
+
+  assert.deepEqual(extractOutcome({ ...(deps as object), money: scanner } as never, { money: { currency: 'EGP' } }, 'You paid USD 99.95'), {
+    value: { amount: 9995, currency: 'USD' },
+    outcome: 'exact',
+  });
+  /* THE DECLARED CURRENCY REACHES THE SCANNER AS ITS FALLBACK ARGUMENT AND NOT AS A RELABELLING. */
+  assert.deepEqual(seen.at(-1), ['You paid USD 99.95', 'EGP']);
+
+  /* AND A FORM WITH NO `currency:` IS A FORM THAT ASKS THE TEXT, which is what `43 §9.1`'s
+     `{ money: {} }` row is: the first amount that has a code beside it, not nothing. */
+  extractOutcome({ ...(deps as object), money: scanner } as never, { money: {} }, 'You paid USD 99.95');
+  assert.deepEqual(seen.at(-1), ['You paid USD 99.95', undefined]);
+});
+
+test('AND EVERY AMOUNT IN A SLICE IS A CANDIDATE, which is what `nth` over money was missing', () => {
+  /* `43 §5.4`'s scanners yield every match inside a slice; this runtime yielded the first number
+     of one and said so in `candidatesAt`'s own paragraph. So `nth: { n: 2, of: { money: {} } }`
+     over a message carrying two amounts could not reach the second however it was anchored. A
+     scanner that returns a list closes it without a second walker. */
+  const two = (text: string) =>
+    text.includes('and')
+      ? [{ amount: 1000, currency: 'EGP' }, { amount: 2000, currency: 'EGP' }]
+      : [{ amount: 1000, currency: 'EGP' }];
+  const withScan = { ...(deps as object), money: two } as never;
+
+  assert.deepEqual(extractOutcome(withScan, { nth: { n: 2, of: { money: {} } } }, 'EGP 10 and EGP 20'), {
+    value: { amount: 2000, currency: 'EGP' },
+    outcome: 'exact',
+  });
+  assert.deepEqual(extractOutcome(withScan, { nth: { n: 3, of: { money: {} } } }, 'EGP 10 and EGP 20'), {
+    value: null,
+    outcome: 'missing',
+  });
+  /* AND A NESTED ARM MEANS THE SAME THING AS A BARE ONE. `first:` and `default:` run the single-
+     value path rather than the candidate path, so a form whose meaning depended on what it was
+     nested inside would be the worst kind of wrong: right in every test written one way. */
+  assert.deepEqual(extractOutcome(withScan, { first: [{ money: {} }] }, 'EGP 10 and EGP 20'), {
+    value: { amount: 1000, currency: 'EGP' },
+    outcome: 'exact',
+  });
+});
+
+test('AND A RECORD WITH NO SCANNER WIRED READS MONEY THE WAY IT ALWAYS DID', () => {
+  /* THE FALLBACK IS KEPT WHOLE AND NOT HALF-FIXED. Half of the old reading is the half that needs
+     the code list, so a record opened without a scanner keeps all of it — a declared currency, the
+     first number of the slice, no sign from parentheses — rather than a third behaviour nobody
+     has a test for. */
+  assert.deepEqual(extractOutcome(deps, { money: { currency: 'EGP' } }, 'You paid USD 99.95'), {
+    value: { amount: 9995, currency: 'EGP' },
+    outcome: 'exact',
+  });
+  assert.deepEqual(extractOutcome(deps, { money: {} }, 'You paid USD 99.95'), { value: null, outcome: 'missing' });
+});
+
 test('A DATE IS PARSED IN THE FORMAT THE PATTERN DECLARES, never guessed', () => {
   /* `03/04/26` is the third of April in Britain and the fourth of March in America. An extractor
      that decided by looking at the number would be right most of the time and wrong about every

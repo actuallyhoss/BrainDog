@@ -275,6 +275,9 @@ importers:
       '@braindog/declare':
         specifier: workspace:*
         version: link:../declare
+      '@braindog/extract':
+        specifier: workspace:*
+        version: link:../extract
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../kernel

@@ -127,7 +127,7 @@ import {
 } from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
-import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
+import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type MoneyScan } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
@@ -269,7 +269,9 @@ export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } fro
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { Minted, Scope, TokenRow, Verified } from './token.ts';
 export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
-export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
+/* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
+   `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
+export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
@@ -298,7 +300,7 @@ export type {
  */
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
-export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps } from './ingest.ts';
+export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, MoneyScan } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
@@ -638,6 +640,19 @@ export type RecordOptions = {
    * cannot make a file anybody can verify, and saying so at export is better than at import.
    */
   sign?: Signer | undefined;
+  /**
+   * `43 §4.3`'s money, read by `@braindog/extract`'s `scanMoney`, when the caller wired it.
+   *
+   * IT IS A CALLBACK FOR THE SAME REASON `sign` IS. That scanner is rank 9 and this package is 7,
+   * so the edge would point up `31 §2`'s order; `@braindog/record` is rank 11, may reach both,
+   * and is the one production caller of `openRecord`. Nothing in this package can read a currency
+   * out of a payload, and nothing in it can be made to by passing it the wrong argument.
+   *
+   * ABSENT MEANS THIS RECORD READS MONEY THE WAY `ingest.ts` DID ALONE, which `MoneyScan`'s own
+   * paragraph sets out and which is wrong against `43 §9.1` in three ways. The gap is a currency
+   * table: without one, `VAT 500` and `EGP 500` are the same three letters beside a number.
+   */
+  money?: MoneyScan | undefined;
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -2960,6 +2975,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     nowMs: clock.now(),
+    /* THE RECORD'S MONEY READER, WHEN ONE WAS WIRED. Absent is the old reading, unchanged. */
+    money: opts.money,
   });
 
   const pullDeps = (): PullDeps => ({

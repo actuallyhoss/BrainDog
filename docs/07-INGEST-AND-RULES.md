@@ -156,7 +156,19 @@ that would need rounding is refused ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 
 bought. The exponent comes from
 `Intl.NumberFormat`, cached per code — **no currency table is shipped anywhere**; `extract` owns only a
 symbol → code map for detection (`€` → EUR, `E£` → EGP …) and refuses an ambiguous bare `$`
-([02-DATA-MODEL](02-DATA-MODEL.md) §3). Every declared field is **required** and `default` is the only way
+([02-DATA-MODEL](02-DATA-MODEL.md) §3).
+
+**`currency:` is the fallback and never an override** ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.3, in
+those words). A code written beside the number is the provider saying what it sent; `currency:` is the
+reader saying what it expects, and when both exist and disagree the provider wins, because it is the one
+that moved the money. A form with no `currency:` reads the first amount that has a code beside it rather
+than reading nothing, two currencies either side of one number yield no candidate at all, and
+parentheses are negative — `(EGP 75.00)` is a refund. The record reads money through
+`@braindog/extract`'s `scanMoney`, handed down by `@braindog/record` because the reader of an arrival is
+rank 7 and the scanner is rank 9 ([31-STACK](31-STACK.md) §2); its code list is
+`Intl.supportedValuesOf('currency')`, the same place the exponents come from, so `VAT 500` is not five
+hundred of anything. **Landed September 20th 2026**; a record opened without that scanner keeps the
+older reading, where a declared currency relabelled whatever the text said. Every declared field is **required** and `default` is the only way
 to make one optional; `writes.confidence` is a ceiling, never a promise (§2).
 
 **No regular expressions.** A regex over a text field a stranger controls is catastrophic

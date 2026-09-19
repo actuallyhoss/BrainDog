@@ -176,6 +176,21 @@ export type Arrived = {
   redelivered?: true;
 };
 
+/**
+ * Every amount in a slice, in text order — `43 §4.3`'s money, read by whoever can reach it.
+ *
+ * `declared` IS A FALLBACK AND NEVER AN OVERRIDE (`43 §63`, in those words). A currency written
+ * next to the number is the provider saying what it sent; `currency:` in a declaration is the
+ * reader saying what it expects. When both exist and disagree the provider wins, because it is the
+ * one that moved the money.
+ *
+ * IT IS INJECTED BECAUSE IT CANNOT BE IMPORTED. `@braindog/extract`'s `scanMoney` is exactly this
+ * function and is rank 9 to this package's 7, so the edge would point up `31 §2`'s order. It
+ * arrives the way `extract.ts`'s `rows` does — handed down by the record, which is rank 11 and may
+ * reach both — rather than being written out a second time here.
+ */
+export type MoneyScan = (text: string, declared?: string) => { amount: number; currency: string }[];
+
 export type IngestDeps = {
   sql: Sql;
   ingests: () => IngestDecl[];
@@ -186,6 +201,18 @@ export type IngestDeps = {
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
   nowMs: number;
+  /**
+   * `43 §4.3`'s money, when the record handed one down.
+   *
+   * ABSENT IS THE READING THIS FILE DID ON ITS OWN, and it is wrong against the specification in
+   * three ways that are all kept rather than half-fixed: a form with no `currency:` reads nothing
+   * where `43 §9.1` reads the first amount that has a code beside it, a declared `currency`
+   * overrides the text's rather than standing behind it, and `(EGP 75.00)` reads positive where
+   * `§233`'s grammar makes parentheses negative. Half-fixing needs a list of the currency codes,
+   * which needs a table, which is the thing this package has not got — so the fallback is the old
+   * reading, unchanged, and a record that wires the scanner gets the specification's.
+   */
+  money?: MoneyScan | undefined;
 };
 
 /**
@@ -740,6 +767,15 @@ function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: nu
   }
   const out: Json[] = [];
   for (const anchored of slices(form as Record<string, unknown>, text)) {
+    /* MONEY YIELDS EVERY AMOUNT IN THE SLICE AND THE OTHER NINE YIELD ONE, which is `43 §5.4`'s
+       contract and was this runtime's stated ceiling until the scanner could be reached. The
+       paragraph above described `{ money: {} }` over "EGP 10 and EGP 20" as two candidates there
+       and one here; with a scanner handed down it is two in both. Without one it is still one,
+       because the fallback below reads a slice's first number and cannot walk it. */
+    if ('money' in form && deps.money !== undefined) {
+      for (const found of deps.money(anchored, form.money.currency)) out.push(found as Json);
+      continue;
+    }
     const got = value(deps, form, anchored);
     if (got !== null) out.push(got);
   }
@@ -752,9 +788,13 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
   if ('text' in form) return anchored.replace(/\s+/g, ' ').trim() || null;
 
   if ('money' in form) {
-    /* THE NUMBER IS PARSED AND THE CURRENCY IS DECLARED. Reading a currency out of a payload means
-       guessing from a symbol, and `$` is at least five currencies — so the pattern says which, and a
-       pattern that does not is a pattern that cannot be trusted with money. */
+    /* BELOW HERE IS THE READING FOR A RECORD WITH NO SCANNER WIRED, KEPT WHOLE.
+       It parses the number and takes the currency from the declaration, and the paragraph that
+       defended that said reading one out of a payload means guessing from a symbol, `$` being at
+       least five currencies. Half of that was right and the wrong half was expensive: an
+       unambiguous ISO code beside the number is the provider saying what it sent, not a guess, and
+       telling `EGP` from `VAT` needs only the list of codes. This package has not got one, so the
+       old reading stays exactly as it was here and `MoneyScan` is how a record gets the other. */
     /* AND THE THOUSANDS SEPARATOR IS DECLARED HERE TOO. `decimal` took one and `money` did not, so
        every European amount was read a thousand times too small — €1.234,56 became €1.23 — which is
        the worst possible place for that bug because the row still looks plausible. */
@@ -763,6 +803,11 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
        *unless the exponent is 3*, so `KWD 1.250` is one and a quarter dinars rather than one
        thousand two hundred and fifty; and the scale is `10 ** exponent`, so `JPY 1250` is 1250 yen
        and not 125,000 of a subunit that does not exist. Both were hard-coded at two. */
+    /* THE SCANNER FIRST, so the one-value path and the candidate path cannot answer differently
+       about the same slice. `candidatesAt` reaches it before this function for the money form, so
+       this branch is what a `first:` or a `default:` arm runs through; both have to mean the same
+       thing or a form's meaning would depend on what it was nested inside. */
+    if (deps.money !== undefined) return deps.money(anchored, form.money.currency)[0] ?? null;
     if (!form.money.currency) return null;
     const exp = exponentOf(form.money.currency);
     const n = number(anchored, undefined, exp);
