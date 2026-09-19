@@ -65,7 +65,16 @@ const RESUME_MS = 60_000;
 
 const EMPTY_GRANT: Grant = { id: '', version: 0, fields: {} };
 
-const utf8 = new TextEncoder();
+/**
+ * `TextEncoder`, DECLARED TO RETURN `Bytes`.
+ *
+ * Node's lib types `encode` as `Uint8Array<ArrayBuffer>` and `@cloudflare/workers-types` types it
+ * as `Uint8Array<ArrayBufferLike>`, so this package typechecked under one runtime and not the
+ * other for as long as only one of them imported it. The assertion is safe where widening `Bytes`
+ * would not be: a `TextEncoder` allocates its own buffer and can never hand back a view onto a
+ * `SharedArrayBuffer`, which is the one case `crypto.subtle` refuses.
+ */
+const utf8 = new TextEncoder() as { encode(input?: string): Uint8Array<ArrayBuffer> };
 
 const hex = async (text: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', utf8.encode(text));

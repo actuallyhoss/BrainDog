@@ -102,7 +102,17 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
   const opened = provision.indexOf('keyStoreOf(env.KEK)');
   assert.ok(opened > 0 && opened < provision.indexOf('directory.prepare('), 'provisioning writes before it opens the key store');
   assert.match(provision, /\.\.\.\(store \? \{ keys: await recordKeys\(store, id\) \} : \{\}\)/, 'provisioning does not wrap keys when the store is bound');
-  /* THE LAST IS THE ALARM'S, and it goes through `keyOpener`, which answers `null` when KEK is unbound. */
+  /* THE ALARM READS IT TWICE, for two different things, and both are named here on purpose.
+     `keyOpener` opens ONE grant for a single-request action and answers `null` when KEK is unbound.
+     The connector runner needs the key STORE itself, because `@braindog/connect` unwraps the
+     record's connector DEK inside the run and then opens the sealed credential against it. An
+     opener cannot stand in for a store, and a store handed to the single-request path would be
+     more key than that path has ever needed. */
   assert.match(source, /keyOpener\(api, this\.env\.KEK\)/, 'the alarm reads KEK some other way than through keyOpener');
-  assert.equal((source.match(/env\.KEK\b/g) ?? []).length, 5, 'something other than the two doors, the half they share, provisioning and the alarm reads KEK');
+  assert.match(source, /keyStoreOf\(this\.env\.KEK\)/, 'the connector runner reads KEK some other way than through keyStoreOf');
+  assert.equal(
+    (source.match(/env\.KEK\b/g) ?? []).length,
+    6,
+    'something other than the two doors, the half they share, provisioning, the alarm and the connector runner reads KEK',
+  );
 });

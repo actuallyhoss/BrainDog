@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { runPull, type ConnectDeps, type IngestDecl, type OutboxRow, type PullPayload } from '@braindog/connect';
 import { openRecord, type Declaration } from '@braindog/kernel';
 
-import { pagedRunner } from '../src/connector.ts';
+import { pagedRunner } from '@braindog/host/connector';
 import { fixOf, type Http } from '@braindog/ports';
 
 import { fixedClock, openSqlite, type NodeSql } from '../../../packages/kernel/test/sqlite.ts';

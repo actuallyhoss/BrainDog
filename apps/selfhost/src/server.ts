@@ -47,7 +47,7 @@ import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
-import { pagedRunner } from './connector.ts';
+import { pagedRunner } from '@braindog/host/connector';
 import { httpFor } from './http.ts';
 import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
@@ -630,7 +630,10 @@ export async function start(options: {
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
          and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
       paged ??= pagedRunner(api, {
-        http: httpFor({ send: options.actions.send, resolve: options.shared?.resolve }),
+        /* ITS OWN SOCKET AND NOT `shared`'s. `shared` is how a use-case FILE is read from an
+           address; borrowing its name service here would mean a test that stubs one silently
+           stubs the other. A connector's `send` comes from `actions`, beside the executor's. */
+        http: httpFor({ send: options.actions.send }),
         clock: { now: () => Date.now() },
         keys: options.keys,
       });

@@ -32,6 +32,8 @@ import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsag
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
 import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
+import { pagedRunner } from '@braindog/host/connector';
+
 import { alarmScheduler } from './alarm.ts';
 import { sparkLook, workerSparkModel } from './spark.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
@@ -40,6 +42,7 @@ import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { copyAsked, copyRefusal, drained, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
+import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
 
@@ -285,7 +288,13 @@ export class Record$ extends DurableObject<Env> {
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
       const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey: keyOpener(api, this.env.KEK) });
       const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending));
-      const out = await api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler: this.#alarm });
+      /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without a runner the kernel finishes the
+         row and meters it `dropped`, which is honest and means the hosted runtime never runs one.
+         The store may be absent — `KEK` unbound is a deployment without hosted keys — and that is
+         a refusal the run reports rather than a reason not to offer the runner at all. */
+      const keys = (await keyStoreOf(this.env.KEK)) ?? undefined;
+      const page = pagedRunner(api, { http: httpFor(), clock: { now: () => Date.now() }, keys });
+      const out = await api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler: this.#alarm, page });
       await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));

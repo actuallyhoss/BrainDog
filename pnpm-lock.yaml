@@ -219,6 +219,12 @@ importers:
 
   packages/host:
     dependencies:
+      '@braindog/connect':
+        specifier: workspace:*
+        version: link:../connect
+      '@braindog/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports

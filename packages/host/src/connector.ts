@@ -1,12 +1,18 @@
 /**
- * The self-host's connector runner: one leased `pull.fetch` row, handed to `@braindog/connect`.
+ * The connector runner both hosts wire: one leased `pull.fetch` row, handed to `@braindog/connect`.
+ *
+ * WHY THIS IS HERE AND NOT IN EITHER APP. The mapping between a leased row and a `runPull` call is
+ * the same on the Worker as on the self-host; what differs is the socket, the key store and the
+ * clock, and those are arguments. A copy in each app would be two answers to one question, and the
+ * one that ran less often would be the one that drifted. `31 §2`: `host` is rank 15 and `connect`
+ * is 14, so the edge points down the order, and both packages are platform-neutral — nothing here
+ * or below it names `node:` or `cloudflare:`.
  *
  * WHAT THE KERNEL HANDS ACROSS IS A `Paged` AND NOT A REQUEST. `actions.ts` can send one request; a
  * connector pages, and paging is `@braindog/connect`'s. The kernel has already leased the row,
  * resolved the declaration, computed the window and opened the credential under that lease, so what
  * is left here is a seam and nothing else: one shape turned into the other, plus the three things
- * only a Node host holds — a socket that checks the address it connects to, the root key, and a
- * clock.
+ * only a host holds — a socket that checks the address it connects to, the root key, and a clock.
  *
  * `runPull` ACKS THE ROW AND THE KERNEL MUST NOT. The ack carries the cursor, the due time and the
  * points a second ack could not reconstruct, so `runActions` deliberately leaves a `Paged` job alone

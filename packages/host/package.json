@@ -5,11 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./auth": "./src/auth.ts",
     "./actions": "./src/actions.ts",
+    "./auth": "./src/auth.ts",
+    "./connector": "./src/connector.ts",
     "./spark": "./src/spark.ts"
   },
   "dependencies": {
+    "@braindog/connect": "workspace:*",
+    "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"
   },
