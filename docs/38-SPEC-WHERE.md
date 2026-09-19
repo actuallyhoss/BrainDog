@@ -22,6 +22,18 @@ oracle of 30 §7), and `compile` to a `WHERE` clause with bound parameters over 
 | `@braindog/where` | types · `parse` · `print` · `jcs` · `flatten` · `validate` · `resolveTemporal` · `evaluate` · `derive` · `searchText` · `INBOX_RAW` | browser and server — no SQL text anywhere in it |
 | `@braindog/where/sql` | `compile` · `jsonPath` | server only |
 
+> **What is built is one entry, and this table is the plan.** `packages/where/package.json` publishes `"."` and
+> nothing else, so `compile` and `jsonPath` ship from the same entry as the tree types and the boundary above is a
+> boundary nobody can rely on yet. What the built package exports today: the types · `QUANTIFIERS` · `OPERATORS` ·
+> `INBOX_RAW` · `INBOX_RAW_REFUSES` · `ARRIVAL_OPERATORS` · `KERNEL_FIELDS` · `jsonPath` · `isColumn` ·
+> `mirrorsState` · `addressable` · `fieldSql` · `fieldSqlIn` · `operatorAllowed` · `compile` · `evaluate` ·
+> `parseWhere` · `resolveDay` · `fansOut` · `pathFault` · `readPath` · `selectAll`. Seven of this table's names do
+> not exist anywhere in the tree — `parse`, `print`, `jcs`, `flatten`, `validate`, `resolveTemporal`, `derive`,
+> `searchText` — and `jcs` is not missing but moved: it is `@braindog/kernel`'s, which is rank 7 to this package's
+> 2, so every caller reaches it downward and none of them reaches it here. §14's first two boxes stay open and say
+> which. A specification that describes a surface nobody built is what somebody reads instead of the code, which is
+> the failure 34 §1.11 was rewritten for.
+
 **Refuses to do.**
 
 | Not here | Where it is |
@@ -165,6 +177,13 @@ export class WhereError extends Error { readonly code: GrammarCode; readonly ref
 ```
 
 ### 2.4 · Functions — the browser entry
+
+> **Of this block, `evaluate` is built and the rest is not.** Its signature is
+> `evaluate(where: Predicate | undefined, fields: Record<string, unknown>, schema: Schema, row?: Readonly<Record<string, unknown>>): boolean`
+> — the schema is an argument rather than a member of an `EvalCtx`, there is no `EvalCtx`, and an absent `where` is
+> `true` rather than an error. 34 §1.11 records the same contract and says it was rewritten to the one that exists;
+> this block had not been. `parse`, `print`, `flatten`, `validate`, `resolveTemporal`, `derive` and `searchText` are
+> unbuilt, and `jcs` is `@braindog/kernel`'s.
 
 ```ts
 // print.ts
@@ -1030,7 +1049,7 @@ is `declare`'s".
 | 41 §2: `jsonPath(fieldId) → "'$.<id>'"`, imported from the root entry | `jsonPath(field, key?)` returns the whole `json_extract(fields,'$.<id>[.key]')` expression and lives in `./sql`, so the money and quantity pair need no string surgery and the root entry stays free of SQL | 41 imports from `@braindog/where/sql` and drops its own `json_extract(` wrapper |
 | 41, 42: `jcs` from `@braindog/where` | exported, §2.4 | — |
 | 42 §5: `validate(tree, { backend, consumer, fields, predicates })` | `validate(pred, schema: RegisterSchema, schemas)` — `schema` carries `id`, `backend`, `fields`, `predicates`, `search`, `series`; `schemas` is needed for `via` and `ref` targets; there is no `consumer` — `near`'s placement is structural (L18) and the rule/lock/match ban on `near` is one check on the root's last leaf in `declare` | 42 passes its `RegisterSchema` projection and the pack's schemas |
-| 43 §5: `evaluate(match, subject, { subject: 'inbox_raw', now, tz })` | accepted as written — `EvalCtx.subject` selects `INBOX_RAW` (§2.4) | — |
+| 43 §5: `evaluate(match, subject, { subject: 'inbox_raw', now, tz })` | **superseded by what is built:** `evaluate(where, fields, schema, row?)`, and the caller passes the `INBOX_RAW` schema itself rather than naming it in a context. 43 §13 D12 already says so and 34 §1.11 is written to it | this row was the last place the old signature was still stated |
 | 46 §2: `import('@braindog/where').Where` | `export type Where = Predicate` | — |
 | 50 §5: `where.evaluate(leaf, value, { now, tz })` — a leaf over one cell | `evaluate` takes a row; a cell test is `evaluate(leaf, { fields: { [leaf.field]: value } }, { now, tz, schema })` | 50 wraps the value |
 | 52 §9: `where-property` at 1,000 runs ≤ 20 s, seeds replayed first | the same numbers, §7 and §9.6 | — |
@@ -1039,8 +1058,8 @@ is `declare`'s".
 
 ## 14 · Done when
 
-- [ ] `packages/where` exists with the seven files of §3 and the two entries of §1; `pnpm --filter @braindog/where typecheck` is clean under `tsconfig.base.json`.
-- [ ] Every signature of §2 is exported with the stated types; nothing else is importable.
+- [ ] `packages/where` exists with the seven files of §3 and the two entries of §1; `pnpm --filter @braindog/where typecheck` is clean under `tsconfig.base.json`. **Half done, and the half that is missing is named in §2:** the package is built and typechecks, in three files (`index.ts`, `path.ts`, `sentence.ts`) rather than seven, under one entry rather than two — so `compile` and `jsonPath` ship beside the tree types and §1's no-SQL-in-the-browser boundary is not enforced by anything.
+- [ ] Every signature of §2 is exported with the stated types; nothing else is importable. **Open, in both directions.** Seven of §2's names do not exist (`parse`, `print`, `flatten`, `validate`, `resolveTemporal`, `derive`, `searchText`), `jcs` is `@braindog/kernel`'s, `evaluate` takes the schema as an argument rather than an `EvalCtx`, and the built package exports names §2 never lists — among them `parseWhere` and `resolveDay` (the sentence layer), `fansOut`, `pathFault`, `readPath` and `selectAll` (the path grammar of 43 §4.4, which landed here because three packages were writing it out by hand), and `INBOX_RAW_REFUSES` and `ARRIVAL_OPERATORS` (34 §1.9's closed lists).
 - [ ] `tree.test.ts`, `validate.test.ts`, `temporal.test.ts`, `evaluate.test.ts`, `compile.test.ts` pass with every row of §9.1–§9.5 as a case, exact strings included.
 - [ ] `property.test.ts` runs `FC_RUNS=1000` green in under 20 s and `FC_RUNS=10000` green nightly; `test/seeds/` exists and holds every counter-example the build found, the first one included (52 §14); a seed is never deleted.
 - [ ] The fourteen `GRAMMAR_CODES` each have a `fixtures/refusals/<kebab>.yaml` that `validate` produces, and the `refusal-fixtures` gate passes.
