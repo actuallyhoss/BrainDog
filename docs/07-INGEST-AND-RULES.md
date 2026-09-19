@@ -136,8 +136,8 @@ shows the count. Thirteen forms, then, and every key, type and default is
 `declare`'s schema encodes them verbatim ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.7). Three grammar codes
 guard them — `EXTRACTOR_UNKNOWN` (a key outside the thirteen), `DATE_FORMAT_INVALID` (a `format` breaking
 §4.3's token rules), `PATH_INVALID` (a path outside §4.4's grammar) — raised by `declare` at install and by
-`extract` at first use; they take the grammar family of [30-BLUEPRINT](30-BLUEPRINT.md) §6 from ten to
-thirteen.
+`extract` at first use; the grammar family they join is counted in [30-BLUEPRINT](30-BLUEPRINT.md) §6,
+which owns the number — a count written twice is a count that goes stale in one of the two places.
 
 > *An earlier draft said nine and enumerated ten, collapsing `int` and `decimal` — two separate rows
 > in the table above — into a single invented name, `number`, which appears nowhere else in this

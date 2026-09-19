@@ -449,11 +449,11 @@ checked-in fixtures LF so the same hash comes out on Windows and Linux CI ([31-S
 | Combinators | 3 | `ratio diff product` | 08 §2 |
 | `derive:` combinators | 7 | `sum diff product ratio band via normalise` | 02 §5 |
 | Rule actions | 11 | `set untag move schedule suggest link notify tag create run stop` | 07 §6 |
-| Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §4 |
+| Extractors | 10 + 3 | `after before between money date text int decimal enum lookup` · `first nth default` | 07 §3 |
 | Notification fields | 6 | `tone say because to key urgent` | 09 §4 |
 | Series kinds | 5 | `gauge flow cumulative unique fact` | 08 §3 |
 | Suggestion body kinds | 4 (+ `query`, never filed) | `options pattern rowset change` · `query` is the palette's unfiled answer | 23 §4 |
-| Refusal codes | 122, in 9 families | pack and declaration 52 · grammar 14 · write path 18 · auth and vault 7 · format and lifecycle 8 · dialect 2 · spark 5 · connector 12 · host and client 4 | 30 §6 |
+| Refusal codes | 125, in 9 families | pack and declaration 54 · grammar 14 · write path 18 · auth and vault 8 · format and lifecycle 8 · dialect 2 · spark 5 · connector 12 · host and client 4 | 30 §6 |
 | `SqlErrorCode` | 13 | 33 §3 — the adapter vocabulary, not refusal codes | 30 §13 |
 | `Http` error names | 4 | `PrivateRange TooLarge Timeout Network` — a vocabulary, not refusal codes | 33 §1 |
 | Event kinds | 40 | 30 §2 | 30 §2 |

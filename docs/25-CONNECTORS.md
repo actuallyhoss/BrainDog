@@ -144,7 +144,8 @@ fetch:
     - { path: object, is: list }
 
   # conditional: etag                   # NOT v1 — a 304 is a no-op, not a failure, when it returns
-  read: { format: json, rows: data }    # format: json (the default under fetch:) | text — 43 §5.5
+  read: { format: json, rows: data }    # json csv xml html_table text — 43 §5.5
+                                        # csv takes delimiter: (default ,) and html_table takes table: (1-based, default 1)
   limits: { response_bytes: 2000000, rows_per_run: 5000, max_pages: 40, timeout: 6s }   # the first two are extraction's caps — 43 §13 D16
 
   on_error:
@@ -166,15 +167,21 @@ on_conflict: update
 
 `type:` values are the **existing register field types** minus five — `ref`, `file`, `secret`, `quantity`
 and `list` cannot be mapped from a response — and no new type system; `from: epoch_s | epoch_ms` reads an
-epoch into a `day` or `instant`, and `scale:` is an integer multiplier on an `int` or `money` value
-([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.5). The whole `fetch:` block follows
+epoch into a `day` or `instant`; `currency:` names the code for a money read from a single path, where the
+two-path form reads the code out of the response; `format:` names a `day`'s token layout, default
+`YYYY-MM-DD`; and an entry may state a value outright as `{ value: <literal> }` or take the arrival's own
+instant as `{ arrived: true }` ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §4.5). There is no `scale:`: a
+multiplier was cited here for a key §4.5 never defined and `map.ts` never read, and a documented key
+nothing implements is the silence this corpus exists to prevent. The whole `fetch:` block follows
 [47-SPEC-CONNECT](47-SPEC-CONNECT.md) §4.1 key for key, and `declare`'s schema encodes it verbatim
 ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §4.7). Four keys the example once carried are **not in v1** —
 `for_each`, `conditional`, `on_error.backoff`, `on_error.pause_after` — and are refused as unknown keys;
 `limits.timeout` and `limits.max_pages` are in. *They return when a connector needs them*: `for_each` with
 a sixth placeholder, `{each}`, that nothing can yet name ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D7).
-`read.format` is `json` (the default under a `fetch:`) or `text`; `csv`, `xml` and `html_table` readers
-arrive with the first connector that returns one ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.5). The two
+`read.format` is one of the five of [34-GRAMMARS](34-GRAMMARS.md) §6 — `json` (the default under a
+`fetch:`), `csv`, `xml`, `html_table`, `text` — and all five readers have landed
+([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.5). Two keys belong to one reader each: `read.delimiter`
+(default `,`, `csv` only) and `read.table` (1-based, default 1, `html_table` only). The two
 `limits` caps are extraction's own — 2,000,000 bytes and 5,000 rows — and a page over either is kept raw in
 `review` ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D16).
 
