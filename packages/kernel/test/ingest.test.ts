@@ -704,17 +704,58 @@ test('the function is a function, and it reads the record it was handed', async 
 
 /* ── what the transforms get wrong when nobody looks ──────────────────── */
 
-test('MONEY DECLARES ITS THOUSANDS SEPARATOR, or every European amount is a thousandth of itself', async () => {
+test("A DECIMAL'S `sep` IS THE DECIMAL POINT, and it was reading as the thousands separator", async () => {
+  /**
+   * ONE `number()` AND TWO MEANINGS OF `sep`. The helper is shared by `money` and `decimal`, and it
+   * was written for `money`, where `sep` named the THOUSANDS character — the test above, before the
+   * digit rule made that key unnecessary. `decimal` inherited that meaning by sharing the helper.
+   *
+   * `43 §4.3` gives `decimal` the other one: *`sep` default `"."` — each decimal in the slice; the
+   * other separator groups*, and `§9` repeats it. `@braindog/extract` does that. So the same
+   * declaration over the same text read two ways, a hundredfold apart, on the line a European
+   * bank's SMS actually writes:
+   *
+   *     { decimal: { sep: ',' } } over "EGP 1.234,56"   kernel 123456   extract 1234.56
+   *
+   * Nothing in the tree declared a `sep` on a `decimal`, so no row anybody holds is wrong. What was
+   * wrong is the grammar an author writes against.
+   */
+  const { sql } = await record();
+  const deps = { find: () => null } as never;
+  const read = (sep: string | undefined, text: string): unknown =>
+    extractField(deps, { decimal: sep === undefined ? {} : { sep } } as never, text);
+
+  assert.equal(read(',', 'EGP 1.234,56'), 1234.56, 'the comma is the point and the stop groups');
+  assert.equal(read(',', 'EGP 1.250'), 1250, 'no comma, so the stop groups');
+  assert.equal(read(',', 'EGP 1,250'), 1.25, 'the comma is the point wherever it falls');
+  assert.equal(read(',', 'EGP 1 234 567,89'), 1234567.89, 'a space groups in either locale');
+
+  /* AND THE DEFAULT IS `.`, WHICH IS `43 §4.3`'s. `07 §3`'s thousands rule is about `money`, where
+     a currency's exponent breaks the tie; a bare decimal has no currency, so the declaration
+     decides and its default decides when it is absent. */
+  assert.equal(read(undefined, 'EGP 1.250'), 1.25, 'the default point is the stop');
+  assert.equal(read(undefined, 'EGP 1,250'), 1250);
+  assert.equal(read(undefined, 'EGP 1,234.56'), 1234.56);
+  assert.equal(read('.', 'EGP 10.5555'), 10.5555, 'four decimals are four decimals');
+
+  sql.close();
+});
+
+test('MONEY READS ITS OWN SEPARATORS, or every European amount is a thousandth of itself', async () => {
   /* `decimal` took a `sep` and `money` did not, so €1.234,56 was written as €1.23 — the worst place
-     for that bug, because the row still looks plausible. */
+     for that bug, because the row still looks plausible. The first repair gave `money` a `sep` of
+     its own, meaning the THOUSANDS separator; the digit rule that landed after it (`07 §3`: with
+     two or more separators the last differing one is the decimal point) answers both of these
+     without one. So the key is gone and these assertions are unchanged, which is the proof: the
+     declaration below no longer says how Europe writes a number, and still reads it. */
   const { k, sql } = await record();
   const deps = { find: () => null } as never;
 
-  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR', sep: '.' } }, 'EUR 1.234,56'), {
+  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR' } }, 'EUR 1.234,56'), {
     amount: 123_456,
     currency: 'EUR',
   });
-  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR', sep: '.' } }, 'EUR 1.234.567,89'), {
+  assert.deepEqual(extractField(deps, { money: { after: 'EUR', currency: 'EUR' } }, 'EUR 1.234.567,89'), {
     amount: 123_456_789,
     currency: 'EUR',
   });

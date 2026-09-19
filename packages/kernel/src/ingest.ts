@@ -71,7 +71,7 @@ export type Extractor =
   | { before: string }
   | { between: readonly [string, string] }
   | { text: { after?: string; before?: string; between?: readonly [string, string] } }
-  | { money: { currency?: string; sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
+  | { money: { currency?: string; after?: string; before?: string; between?: readonly [string, string] } }
   | { date: { format: string; after?: string; before?: string; between?: readonly [string, string] } }
   | { int: { after?: string; before?: string; between?: readonly [string, string] } }
   | { decimal: { sep?: string; after?: string; before?: string; between?: readonly [string, string] } }
@@ -765,7 +765,7 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
        and not 125,000 of a subunit that does not exist. Both were hard-coded at two. */
     if (!form.money.currency) return null;
     const exp = exponentOf(form.money.currency);
-    const n = number(anchored, form.money.sep, exp);
+    const n = number(anchored, undefined, exp);
     if (n === null) return null;
     /* A VALUE THAT WOULD NEED ROUNDING IS REFUSED — 07 §3, and it is the difference between an
        extractor that is wrong and one that says it cannot read this. `USD 10.555` is not 1056 minor
@@ -783,7 +783,7 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
     return n === null || !Number.isInteger(n) ? null : n;
   }
   if ('decimal' in form) {
-    const n = number(anchored, form.decimal.sep);
+    const n = number(anchored, form.decimal.sep ?? '.');
     return n;
   }
   if ('enum' in form) {
@@ -953,13 +953,24 @@ function number(text: string, sep?: string, exponent = 2): number | null {
 
      THE DIGITS SAY WHICH IS WHICH. A lone separator followed by exactly three digits is grouping; a
      lone one followed by any other count is the decimal point; with two or more, the LAST one that
-     differs from the others is the decimal point and the rest are grouping. A declared `sep` still
-     wins where a caller supplied one, because a caller who knows the locale knows better than the
-     digits do. */
+     differs from the others is the decimal point and the rest are grouping. That rule is `money`'s
+     and `int`'s, and it is all either of them needs: it reads `EUR 1.234,56` and `EUR 1.234.567,89`
+     the European way without being told, which is why `money` no longer declares a separator.
+
+     `sep` IS THE DECIMAL POINT AND ONLY `decimal` PASSES ONE. `43 §4.3`: *`sep` default `"."` —
+     each decimal in the slice; the other separator groups.* A bare decimal has no currency, so no
+     exponent breaks the tie the digits leave in `1.250`, and the declaration decides instead.
+
+     THIS PARAMETER MEANT THE OTHER THING UNTIL SEPTEMBER 19th 2026, because the helper was written
+     for `money`, where `sep` named the thousands character, and `decimal` inherited that meaning by
+     sharing it. `{ decimal: { sep: ',' } }` over `EGP 1.234,56` read 123456 where `43 §4.3` and
+     `@braindog/extract` both read 1234.56 — a hundredfold, silently, on the line a European bank's
+     SMS writes. Nothing in the tree declared one, so the defect was in the grammar rather than in
+     anybody's rows. */
   const decimalAt = ((): number | null => {
     if (marks.length === 0) return null;
     const last = marks.at(-1)!;
-    if (sep !== undefined) return last[0] === sep ? null : last.index;
+    if (sep !== undefined) return last[0] === sep ? last.index : null;
     /* UNLESS THE EXPONENT IS 3, which is 07 §3's own clause and the reason this takes one: in a
        currency with three minor digits, `1.250` is a decimal and not a group. */
     if (marks.length === 1) return raw.length - last.index - 1 === 3 && exponent !== 3 ? null : last.index;

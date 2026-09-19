@@ -1431,6 +1431,87 @@ test("and a COMBINATOR'S OWN ARGUMENTS, which went through unread", () => {
   assert.equal(refusedWith(ingest({ extract: { a: { int: {} } } })), null);
 });
 
+test("and AN EXTRACTOR'S OWN ARGUMENTS, which went through unread too", () => {
+  /* The check above closed the gap for `first`, `nth` and `default`, and `date.format` has its own
+     paragraph. The other nine forms still take anything. Driven against `validate`, all of these
+     installed clean — every one of them an author's declaration that matches arrivals, writes rows
+     and leaves the field empty on every one, which is the silence the two checks above exist to
+     break. `43 §4.3`'s second column is the list each form is held to. */
+
+  /* A FORM IS ONE OBJECT WITH ONE KEY, and the key loop above counts none and two the same as one. */
+  assert.equal(refusedWith(ingest({ extract: { a: {} } })), 'EXTRACTOR_UNKNOWN', 'no form at all');
+  assert.equal(refusedWith(ingest({ extract: { a: { money: {}, int: {} } } })), 'EXTRACTOR_UNKNOWN', 'two forms');
+  assert.equal(refusedWith(ingest({ extract: { a: { text: {}, note: 'a comment' } } })), null, 'note is a comment, not a form');
+
+  /* AN ANCHOR IS THE TEXT TO LOOK FOR. The empty one anchors at every position, which is no anchor. */
+  assert.equal(refusedWith(ingest({ extract: { a: { after: '' } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { after: 42 } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { between: ['a'] } } })), 'EXTRACTOR_UNKNOWN', 'one end');
+  assert.equal(refusedWith(ingest({ extract: { a: { between: 'a' } } })), 'EXTRACTOR_UNKNOWN', 'not a pair');
+  assert.equal(refusedWith(ingest({ extract: { a: { decimal: { after: 7 } } } })), 'EXTRACTOR_UNKNOWN', 'inside a form');
+
+  /* AT MOST ONE OF `after · before · between` PER FORM — `43 §4.3`. Two is a slice, and a slice is
+     `between`; taking both and applying one is a declaration that reads differently than it looks. */
+  assert.equal(refusedWith(ingest({ extract: { a: { text: { after: 'a', before: 'b' } } } })), 'EXTRACTOR_UNKNOWN');
+
+  /* AN ARGUMENT NO FORM TAKES IS DROPPED IN SILENCE, and these three are the ones an author would
+     reasonably write. `money` has no `sep` in `43 §4.3` — though `ingest.ts`'s own type has one —
+     and `int` has none either, so a declaration saying how the thousands are written is read by
+     nothing. */
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { sep: ',' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { int: { sep: ',' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { decimal: { grouping: '.' } } } })), 'EXTRACTOR_UNKNOWN');
+
+  /* `sep` NAMES WHICH OF `.` AND `,` IS THE POINT, and anything else makes every separator group:
+     the field reads 1250 where the message said 1.25, silently, in whatever the register calls
+     money. */
+  assert.equal(refusedWith(ingest({ extract: { a: { decimal: { sep: 'x' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { decimal: { sep: '.' } } } })), null);
+  assert.equal(refusedWith(ingest({ extract: { a: { decimal: { sep: ',' } } } })), null);
+
+  /* A CURRENCY THAT IS NOT A CODE puts money in the register in a currency that does not exist, and
+     nothing downstream can convert it or add it up. `42 §4.2`'s `Cur` is the test, and it is the one
+     `mappingFault` already runs on a `map:` — hoisted rather than copied, which is the fourth
+     duplicate of a small grammar this work has found. */
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'NOTACODE' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'EG' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'EG1' } } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { currency: 'egp' } } } })), 'EXTRACTOR_UNKNOWN', 'Cur is upper case');
+
+  /* THE MAP IS THE WHOLE OF WHAT AN ENUM IS and the register is the whole of what a lookup is. */
+  assert.equal(refusedWith(ingest({ extract: { a: { enum: {} } } })), 'EXTRACTOR_UNKNOWN', 'no map');
+  assert.equal(refusedWith(ingest({ extract: { a: { enum: { map: {} } } } })), 'EXTRACTOR_UNKNOWN', 'empty map');
+  assert.equal(refusedWith(ingest({ extract: { a: { enum: { map: [] } } } })), 'EXTRACTOR_UNKNOWN', 'a list');
+  assert.equal(refusedWith(ingest({ extract: { a: { lookup: {} } } })), 'EXTRACTOR_UNKNOWN', 'no register');
+  assert.equal(refusedWith(ingest({ extract: { a: { lookup: { register: 'r' } } } })), 'EXTRACTOR_UNKNOWN', 'no by');
+
+  /* A FORM'S ARGUMENTS ARE AN OBJECT, and `{}` is how a form says it takes none. */
+  assert.equal(refusedWith(ingest({ extract: { a: { money: null } } })), 'EXTRACTOR_UNKNOWN');
+  assert.equal(refusedWith(ingest({ extract: { a: { int: [] } } })), 'EXTRACTOR_UNKNOWN');
+
+  /* A LITERAL IS 1 TO 200 BYTES — `42 §4.7` — and over it is `OUT_OF_BOUNDS`, not
+     `EXTRACTOR_UNKNOWN`: the form is one of the thirteen and it is the size that is wrong. Bytes,
+     because an anchor is matched against a payload a stranger sent. */
+  const long = 'x'.repeat(201);
+  assert.equal(refusedWith(ingest({ extract: { a: { after: long } } })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(ingest({ extract: { a: { between: ['a', long] } } })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(ingest({ extract: { a: { money: { after: long } } } })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(ingest({ extract: { a: { enum: { map: { [long]: 'v' } } } } })), 'OUT_OF_BOUNDS');
+  assert.equal(refusedWith(ingest({ extract: { a: { after: 'x'.repeat(200) } } })), null, 'the ceiling is inclusive');
+
+  /* AND AN OVER-LONG MAP LITERAL POINTS AT THE MAP, because a 201-byte `at` is carried by every log
+     line the refusal reaches. */
+  const big = validateDeclaration(ingest({ extract: { amount: { enum: { map: { [long]: 'v' } } } } }));
+  assert.equal(big?.at, 'ingest.hsbc_sms.extract.amount.enum.map');
+
+  /* AND THE REFUSAL SAYS WHAT IS TAKEN. An author reading "sep is none of them" with no list has to
+     go and find `43 §4.3`; `ports`' Refusal carries an `allowed` for exactly this. */
+  const said = validateDeclaration(ingest({ extract: { amount: { money: { sep: ',' } } } }));
+  assert.equal(said?.code, 'EXTRACTOR_UNKNOWN');
+  assert.ok(said?.allowed?.includes('currency'), 'the refusal names nothing money does take');
+  assert.ok(said?.at?.endsWith('.money'), `the refusal points at the form, and points at ${said?.at}`);
+});
+
 test('A DATE FORMAT NOTHING COULD READ INSTALLED, AND THE FIELD STAYED EMPTY ON EVERY ARRIVAL FOR EVER', () => {
   /**
    * `extractorFault` checked a form's key against the thirteen and never looked at the format.

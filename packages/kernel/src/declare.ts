@@ -1625,6 +1625,52 @@ function dateFormatFault(format: string): string | null {
   return null;
 }
 
+/** `42 §4.7`'s anchors: at most one per form, and none means the whole text. */
+const ANCHORS = ['after', 'before', 'between'] as const;
+
+/** `42 §4.7`'s form table, second column: what each extractor holds beside an anchor. */
+const ARGUMENTS: Record<string, readonly string[]> = {
+  text: [], money: ['currency'], date: ['format'], int: [], decimal: ['sep'], enum: ['map'], lookup: ['register', 'by'],
+};
+
+/**
+ * `42 §4.2`'s `Cur`, SPELLED ONCE. `mappingFault` tested it inline and a form needs the same test,
+ * and a second copy of a three-character grammar is how the path grammar, `MATCH_FIELDS` and `Json`
+ * each drifted. Upper case, because `Cur` is and `02 §3` is.
+ */
+const CUR = /^[A-Z]{3}$/u;
+const isCur = (v: unknown): boolean => typeof v === 'string' && CUR.test(v);
+
+const ENUM_LITERALS = 64;
+const LITERAL_BYTES = 200;
+
+const isLiteral = (v: unknown): boolean => typeof v === 'string' && v.length >= 1;
+
+/** Every literal a form holds, with where it sits, so the byte ceiling is applied in one place. */
+function* literalsOf(form: Record<string, unknown>): Generator<[string, string]> {
+  const key = Object.keys(form).filter((k) => k !== 'note')[0];
+  if (key === undefined) return;
+  if (key === 'after' || key === 'before') {
+    if (typeof form[key] === 'string') yield [key, form[key]];
+    return;
+  }
+  if (key === 'between') {
+    if (Array.isArray(form.between))
+      for (const [i, v] of form.between.entries()) if (typeof v === 'string') yield [`between[${i}]`, v];
+    return;
+  }
+  const body = form[key];
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return;
+  const args = body as Record<string, unknown>;
+  for (const a of ['after', 'before'] as const) if (typeof args[a] === 'string') yield [`${key}.${a}`, args[a]];
+  if (Array.isArray(args.between))
+    for (const [i, v] of args.between.entries()) if (typeof v === 'string') yield [`${key}.between[${i}]`, v];
+  /* A MAP'S LITERALS POINT AT THE MAP, not at themselves: the one being refused is over 200 bytes
+     long, and putting it in `at` puts it in every log line that carries the refusal. */
+  if (key === 'enum' && args.map !== null && typeof args.map === 'object' && !Array.isArray(args.map))
+    for (const l of Object.keys(args.map as Record<string, unknown>)) yield ['enum.map', l];
+}
+
 /** A form's own key, against the thirteen — and through a combinator, which holds forms. */
 function extractorFault(form: unknown, at: string, depth: number): Refusal | null {
   if (form === null || typeof form !== 'object' || Array.isArray(form))
@@ -1691,6 +1737,151 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         [...DATE_FORMATS],
       );
   }
+
+  /**
+   * AND AN EXTRACTOR'S OWN ARGUMENTS, WHICH WENT THROUGH UNREAD TOO.
+   *
+   * `42 §4.7` already writes every rule below, in one paragraph, and says this schema is what
+   * enforces it: *"A form (43 §4.3, whose keys this schema accepts exactly) is one object with one
+   * key … `anchor` is at most one of after before between inside the form … a literal is 1-200
+   * bytes."* The table was written and the schema accepted anything. Driven against `validate`,
+   * every one of these installed clean:
+   *
+   *     {}                                   { money: {}, int: {} }      { after: 42 }
+   *     { between: ['a'] }                   { text: { after, before } } { money: { sep } }
+   *     { int: { sep } }                     { decimal: { sep: 'x' } }   { enum: {} }
+   *     { lookup: { register } }             { decimal: { nonsense: 1 } }
+   *     { money: { currency: 'NOTACODE' } }
+   *
+   * Each one matches arrivals, writes rows and leaves the field empty on every one — the silence
+   * the `date.format` paragraph above describes at length, nine more forms over.
+   */
+  const named = Object.keys(form).filter((k) => k !== 'note');
+  if (named.length !== 1)
+    return bad(
+      'EXTRACTOR_UNKNOWN',
+      named.length === 0
+        ? `${at} holds no form. One object with one of the thirteen keys reads the field; an empty one reads nothing, on every arrival.`
+        : `${at} holds ${named.length} forms — ${named.join(', ')} — and a form is one object with one key. Two ways of reading a field is first: [a, b].`,
+      at,
+    );
+
+  const only = named[0] as string;
+  const body = (form as Record<string, unknown>)[only];
+
+  if (only === 'after' || only === 'before') {
+    if (!isLiteral(body))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.${only} is ${JSON.stringify(body ?? null)}, and an anchor is the text to look for: one character or more.`,
+        `${at}.${only}`,
+      );
+  } else if (only === 'between') {
+    if (!Array.isArray(body) || body.length !== 2 || !body.every(isLiteral))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.between is ${JSON.stringify(body ?? null)}, and it takes two anchors: the one to start after and the one to stop before.`,
+        `${at}.between`,
+      );
+  } else if (ARGUMENTS[only] !== undefined) {
+    const takes = ARGUMENTS[only] as readonly string[];
+    if (body === null || typeof body !== 'object' || Array.isArray(body))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.${only} is ${JSON.stringify(body ?? null)}, and a form's arguments are an object — {} when it takes none.`,
+        `${at}.${only}`,
+      );
+    const args = body as Record<string, unknown>;
+
+    const legal = [...takes, ...ANCHORS];
+    for (const k of Object.keys(args))
+      if (!legal.includes(k))
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${at}.${only} takes ${legal.join(', ')}, and ${JSON.stringify(k)} is none of them, so it would install and do nothing.`,
+          `${at}.${only}`,
+          legal,
+        );
+
+    /* AT MOST ONE ANCHOR — `42 §4.7`. Two is a slice, and a slice is `between`; taking both and
+       applying one is a declaration that reads differently than it looks. */
+    const anchors = ANCHORS.filter((a) => a in args);
+    if (anchors.length > 1)
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.${only} narrows the text ${anchors.length} ways — ${anchors.join(' and ')} — and an extractor takes at most one. between: [a, b] is how a slice takes both ends.`,
+        `${at}.${only}`,
+      );
+    for (const a of ['after', 'before'] as const)
+      if (a in args && !isLiteral(args[a]))
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${at}.${only}.${a} is ${JSON.stringify(args[a] ?? null)}, and an anchor is the text to look for: one character or more.`,
+          `${at}.${only}.${a}`,
+        );
+    if ('between' in args && (!Array.isArray(args.between) || args.between.length !== 2 || !args.between.every(isLiteral)))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.${only}.between is ${JSON.stringify(args.between ?? null)}, and it takes two anchors: the one to start after and the one to stop before.`,
+        `${at}.${only}.between`,
+      );
+
+    /* `sep` NAMES WHICH OF `.` AND `,` IS THE POINT, and anything else makes every separator group:
+       the field reads 1250 where the message said 1.25, in whatever the register calls money. */
+    if (only === 'decimal' && 'sep' in args && args.sep !== '.' && args.sep !== ',')
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.decimal's sep is ${JSON.stringify(args.sep ?? null)}, and it names which of . and , is the decimal point. The other one groups.`,
+        `${at}.decimal.sep`,
+        ['.', ','],
+      );
+
+    if (only === 'money' && 'currency' in args && !isCur(args.currency))
+      return bad(
+        'EXTRACTOR_UNKNOWN',
+        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: three upper-case letters, EGP or USD.`,
+        `${at}.money.currency`,
+      );
+
+    if (only === 'enum') {
+      const map = args.map;
+      if (map === null || typeof map !== 'object' || Array.isArray(map))
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${at}.enum's map is ${map === undefined ? 'missing' : JSON.stringify(map)}, and the map is the whole of what an enum is: the literals to look for, and the value each one means.`,
+          `${at}.enum.map`,
+        );
+      const spelt = Object.keys(map as Record<string, unknown>);
+      if (spelt.length < 1 || spelt.length > ENUM_LITERALS)
+        return bad(
+          'EXTRACTOR_UNKNOWN',
+          `${at}.enum's map holds ${spelt.length} literals, and it takes 1 to ${ENUM_LITERALS}.`,
+          `${at}.enum.map`,
+        );
+    }
+
+    if (only === 'lookup')
+      for (const k of ['register', 'by'] as const)
+        if (!isLiteral(args[k]))
+          return bad(
+            'EXTRACTOR_UNKNOWN',
+            `${at}.lookup's ${k} is ${JSON.stringify(args[k] ?? null)}. A lookup resolves a row by naming the register to look in and the field to match on.`,
+            `${at}.lookup.${k}`,
+          );
+  }
+
+  /* AND A LITERAL HAS A CEILING — `42 §4.7`, 1 to 200 bytes — under `OUT_OF_BOUNDS` and not
+     `EXTRACTOR_UNKNOWN`, because the form is one of the thirteen and it is the size that is wrong;
+     `34 §1.2`'s `contains` has the same ceiling under the same code. One pass over every literal
+     the form holds, rather than a check inside each branch above, so a form cannot acquire a
+     literal and miss the rule. */
+  for (const [where, value] of literalsOf(form as Record<string, unknown>))
+    if (byteLength(value) > LITERAL_BYTES)
+      return bad(
+        'OUT_OF_BOUNDS',
+        `${at}.${where} is ${byteLength(value)} bytes, and an anchor is 1 to ${LITERAL_BYTES}. An anchor is the short run of text either side of the value, not the value.`,
+        `${at}.${where}`,
+      );
 
   const held = form as {
     first?: unknown;
@@ -1797,7 +1988,7 @@ function mappingFault(entry: unknown, at: string): Refusal | null {
   }
   if (e.from !== undefined && e.from !== 'epoch_s' && e.from !== 'epoch_ms')
     return bad('DECLARATION_INVALID', `${at}'s from is epoch_s or epoch_ms.`, `${at}.from`, ['epoch_s', 'epoch_ms']);
-  if (e.type === 'money' && !Array.isArray(e.path) && (typeof e.currency !== 'string' || !/^[A-Z]{3}$/u.test(e.currency)))
+  if (e.type === 'money' && !Array.isArray(e.path) && !isCur(e.currency))
     return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with a three-letter code.`, `${at}.currency`);
   if (e.type === 'enum' && (!Array.isArray(e.values) || e.values.length === 0 || e.values.some((v) => typeof v !== 'string')))
     return bad('DECLARATION_INVALID', `${at} is an enum, so it lists its values.`, `${at}.values`);

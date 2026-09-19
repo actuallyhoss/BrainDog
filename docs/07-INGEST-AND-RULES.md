@@ -122,7 +122,7 @@ on_conflict: skip          # skip | update | new
 | `money` | parse a number and a currency into minor units | `{ money: { after?, currency? } }` |
 | `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` |
 | `text` | trim and normalise whitespace | `{ text: { between? } }` |
-| `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` · `{ decimal: { after?, sep? } }` |
+| `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
 | `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` |
 | `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` |
 | `first` / `nth` | pick from repeated matches | `{ first: [form, …] }` · `{ nth: { n, of: form } }` |
@@ -151,7 +151,9 @@ and no way to say which currency the number was in. The forms are `{ money: { af
 nothing else — and `{ text: { between: ["at ", " on"] } }`; `money` accepts `1,250.00`, `1.250,00` and
 `1250`. **The thousands rule:** a lone separator followed by exactly three digits is grouping unless the
 currency's exponent is 3; with two or more separators the last differing one is the decimal point; a value
-that would need rounding is refused ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D2). The exponent comes from
+that would need rounding is refused ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D2). `money` declares no separator and needs none: the rule above reads `EUR 1.234,56` and
+`EUR 1.234.567,89` the European way without being told, which is the whole of what a declared one
+bought. The exponent comes from
 `Intl.NumberFormat`, cached per code — **no currency table is shipped anywhere**; `extract` owns only a
 symbol → code map for detection (`€` → EUR, `E£` → EGP …) and refuses an ambiguous bare `$`
 ([02-DATA-MODEL](02-DATA-MODEL.md) §3). Every declared field is **required** and `default` is the only way
