@@ -796,6 +796,11 @@ export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, pa
           say: `${ready.paged.ingest} stopped part way through and fetched nothing.`,
         };
       }
+      /* A HELD OR DROPPED CONNECTOR NEVER RAN, SO IT NEVER ACKED, so the row is still leased and
+         this pass has to let it go. Leaving it would keep the connector claimed on every host
+         until the lease lapsed, which turns "you are at your allowance" into "this connector
+         stopped" for as long as the lease lasts. */
+      if (report.outcome === 'held' || report.outcome === 'dropped') steps.release(ready);
       const metered = steps.meterPaged(ready, report);
       out.usage.push(metered);
       out.ran++;

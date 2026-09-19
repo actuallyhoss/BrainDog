@@ -31,7 +31,7 @@ import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler
 import { createDirectory, type AccountUsage, type Directory as Dir, type RunUsage } from '@braindog/record/directory';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 
-import { ALARM_RUNS, actionExecutor, holding, keyOpener, meterPass, sharedReader } from './actions.ts';
+import { ALARM_RUNS, actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
@@ -287,14 +287,20 @@ export class Record$ extends DurableObject<Env> {
          hosted plan at its monthly allowance answers `held`, sends nothing, and waits for the first of next month. */
       const ledger = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
       const inner = actionExecutor(() => api.kernel.actionOrigins(), { openKey: keyOpener(api, this.env.KEK) });
-      const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending));
+      /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
+      const admissions = pass();
+      const execute = holding(inner, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without a runner the kernel finishes the
          row and meters it `dropped`, which is honest and means the hosted runtime never runs one.
          The store may be absent — `KEK` unbound is a deployment without hosted keys — and that is
          a refusal the run reports rather than a reason not to offer the runner at all. */
       const keys = (await keyStoreOf(this.env.KEK)) ?? undefined;
       const page = pagedRunner(api, { http: httpFor(), clock: { now: () => Date.now() }, keys });
-      const out = await api.kernel.runActions(execute, { limit: ALARM_RUNS, scheduler: this.#alarm, page });
+      const out = await api.kernel.runActions(execute, {
+        limit: ALARM_RUNS,
+        scheduler: this.#alarm,
+        page: holdingPaged(page, record, (r, action, pending) => ledger.mayRun(r, action, pending), admissions),
+      });
       await meterPass((r, run) => ledger.meter(r, run), record, out.usage);
     } catch (e) {
       console.error('actions:', e instanceof Error ? e.message : String(e));

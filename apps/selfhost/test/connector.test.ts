@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { runPull, type ConnectDeps, type IngestDecl, type OutboxRow, type PullPayload } from '@braindog/connect';
 import { openRecord, type Declaration } from '@braindog/kernel';
 
+import { holding, holdingPaged, pass } from '@braindog/host/actions';
 import { pagedRunner } from '@braindog/host/connector';
 import { fixOf, type Http } from '@braindog/ports';
 
@@ -290,5 +291,85 @@ test('A DUE CONNECTOR FILLS ITS REGISTER through the host runner, and the pass c
   /* AND THE RUN IS ON THE RECORD, metered by the record rather than by this host. */
   const ev = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'pull' ORDER BY rowid DESC LIMIT 1");
   assert.ok(ev, 'a connector ran and left no event behind');
+  sql.close();
+});
+
+/* ── the allowance, and what a run is never allowed to carry ─────────────── */
+
+/**
+ * A HELD RECORD FETCHES NOTHING, AND THE CONNECTOR IS THE KIND THAT WOULD HAVE COST THE MOST.
+ *
+ * `holding` wraps the EXECUTOR, and the connector runner is not the executor: the pass hands a
+ * `Paged` straight to it. So for one pass this allowance had a hole exactly the shape of the
+ * expensive kind — a record at its monthly limit was held for `call`, `poll` and a one-request
+ * `pull`, and its paging connectors, which make more requests than anything else, ran on.
+ */
+test('A HELD RECORD FETCHES NOTHING, and the row goes back rather than staying leased', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(k.createRecord({ id: RECORD, slug: 'acme', name: 'Acme', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok((await k.install([CHARGES, { id: 'ingest.acme-charges', kind: 'ingest', body: DECL as never }])).ok);
+
+  let fetched = 0;
+  const http: Http = {
+    fetch: () => {
+      fetched += 1;
+      return Promise.resolve(new Response('{"data":[]}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    },
+  };
+  const say = 'acme-charges is waiting until 1 October. This record has used its runs for September.';
+  const asked: string[] = [];
+  const page = holdingPaged(
+    pagedRunner({ kernel: k } as never, { http, clock: { now: () => NOW } }),
+    RECORD,
+    (record, action) => (asked.push(`${record} ${action}`), { until: Date.UTC(2026, 9, 1), say }),
+  );
+
+  const out = await k.runActions(async () => ({ status: 200, body: '', bytes: 0, ms: 0, requests: 1 }), { page });
+
+  assert.equal(fetched, 0, 'a held record still reached the provider');
+  assert.deepEqual(asked, [`${RECORD} acme-charges`], 'the ledger was not asked about the connector');
+  assert.equal(out.held, 1);
+  assert.equal(out.ran, 0);
+  /* NOTHING IS CHARGED FOR A RUN THAT DID NOT HAPPEN. */
+  assert.deepEqual(out.usage[0]?.usage, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
+  /* AND THE ROW GOES BACK. A held run never acks, so a pass that left it leased would turn "you are
+     at your allowance" into "this connector stopped" for as long as the lease lasted. */
+  assert.equal(sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'pull.fetch'")?.state, 'done');
+  sql.close();
+});
+
+/**
+ * ONE ADMISSION COUNT AND NOT TWO.
+ *
+ * The ledger is told of a run only after the pass, so each wrapper carries what it has already let
+ * through. Given a count each, a record with one run left is told there is room by both, and sends
+ * two. This asserts the second asks with `pending: 1` rather than `0`.
+ */
+test('the two runners share one admission count, so one run left cannot be spent twice', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(k.createRecord({ id: RECORD, slug: 'acme', name: 'Acme', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok((await k.install([CHARGES, { id: 'ingest.acme-charges', kind: 'ingest', body: DECL as never }])).ok);
+
+  const seen: number[] = [];
+  const admissions = pass();
+  const mayRun = (_r: string, _a: string, pending?: number): null => (seen.push(pending ?? 0), null);
+  const page = holdingPaged(
+    pagedRunner({ kernel: k } as never, { http: provider([{ data: [] }]), clock: { now: () => NOW } }),
+    RECORD,
+    mayRun,
+    admissions,
+  );
+  const execute = holding(async () => ({ status: 200, body: '{}', bytes: 2, ms: 1, requests: 1 }), RECORD, mayRun, admissions);
+
+  await k.runActions(execute, { page });
+  /* THE FIRST SEES NOTHING PENDING AND THE SECOND SEES THE FIRST. With a count each, both see 0. */
+  assert.deepEqual(seen, [0], 'exactly one run was due, so only one question should have been asked');
+
+  /* A SECOND PASS ON THE SAME COUNT KEEPS COUNTING, which is what makes it the pass's and not the run's. */
+  await admissions.ask(RECORD, 'acme-charges', mayRun);
+  await admissions.ask(RECORD, 'acme-charges', mayRun);
+  assert.deepEqual(seen.slice(1), [1, 2]);
   sql.close();
 });

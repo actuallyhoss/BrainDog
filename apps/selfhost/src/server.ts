@@ -46,7 +46,7 @@ import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
-import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
+import { actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
 import { httpFor } from './http.ts';
 import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
@@ -637,7 +637,11 @@ export async function start(options: {
         clock: { now: () => Date.now() },
         keys: options.keys,
       });
-      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun), { page: paged });
+      /* ONE ADMISSION COUNT FOR BOTH, so a record with one run left cannot spend it twice. */
+      const admissions = pass();
+      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun, admissions), {
+        page: holdingPaged(paged, record, ledger.mayRun, admissions),
+      });
       await meterPass(ledger.meter, record, out.usage);
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
     } catch (e) {

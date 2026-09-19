@@ -326,6 +326,14 @@ test('a runner that throws is the network: the pass survives it and the run is m
 
   assert.equal(out.failed, 1);
   assert.equal(out.ok, 0);
+  /* METERED ONCE AND NOT TWICE. The throw happens between the run and the ack, which is the one
+     window where a pass could both record the attempt and record the failure of recording it. */
+  assert.equal(out.usage.length, 1);
+  assert.equal(
+    sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE kind = 'pull'")?.n,
+    1,
+    'one run left more than one meter reading',
+  );
   /* A FAILURE IS FREE. The account got no pages, and the schedule will offer the row again, so
      billing for it would charge somebody up to eight times for one provider's bad afternoon. */
   assert.equal(out.usage[0]?.usage.runs, 0);

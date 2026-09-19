@@ -25,6 +25,7 @@
  * NO RUNTIME HERE. No `node:` import and no bare `fetch`, so both hosts import it and the stack gate holds.
  */
 
+import type { PagedRun } from '@braindog/kernel';
 import type { RecordApi } from '@braindog/record';
 
 type Kernel = RecordApi['kernel'];
@@ -79,20 +80,55 @@ export type Ledger = {
  * ASKED BEFORE ANYTHING IS RESOLVED, OPENED OR SENT. A held run answers `{ held }` with every count at zero, and the
  * kernel writes its event and moves the action to the day it may run again.
  */
-export function holding(execute: Execute, record: string, mayRun: Ledger['mayRun']): Execute {
-  /* THE RUNS THIS PASS LET THROUGH, because the ledger is told of them only after the pass. Asked without them, every
-     run of a pass saw the count from before it, so a record one run short of its allowance sent a whole pass. Taken
-     before the await, so two runs asked at once cannot both be told there is room for one. ONE PER PASS: the count is
-     forgotten only when the executor is. */
-  let admitted = 0;
+export function holding(execute: Execute, record: string, mayRun: Ledger['mayRun'], admissions: Admissions = pass()): Execute {
   return async (request) => {
-    const pending = admitted++;
-    const hold = await mayRun(record, request.ingest, pending);
-    if (hold) {
-      admitted--;
-      return { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: hold };
-    }
+    const hold = await admissions.ask(record, request.ingest, mayRun);
+    if (hold) return { status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: hold };
     return execute(request);
+  };
+}
+
+/**
+ * The same question, asked of a connector.
+ *
+ * WITHOUT THIS THE ALLOWANCE HAD A HOLE THE SIZE OF THE EXPENSIVE KIND. `holding` wraps the
+ * executor, and the connector runner is not the executor — the pass hands a `Paged` straight to it.
+ * So a record at its monthly limit was held for `call`, `poll` and a one-request `pull`, and its
+ * paging connectors ran on, which are the runs that make the most requests of anybody.
+ *
+ * A HELD RUN NEVER ACKS, so the pass releases the row. That is the difference from a held
+ * single-request action, where the kernel moves the schedule to the day it may run again: here the
+ * row goes back and the connector's own interval decides when it is offered next.
+ */
+export function holdingPaged(page: PagedRun, record: string, mayRun: Ledger['mayRun'], admissions: Admissions = pass()): PagedRun {
+  return async (paged) => {
+    const hold = await admissions.ask(record, paged.paged.ingest, mayRun);
+    if (hold) return { outcome: 'held', requests: 0, bytes: 0, ms: 0, failures: 0, say: hold.say };
+    return page(paged);
+  };
+}
+
+/**
+ * The runs one pass has let through, shared by both wrappers.
+ *
+ * ONE COUNT AND NOT TWO. The ledger is told of a run only after the pass, so each wrapper has to
+ * carry what it has already admitted. Two counts would each start at zero, and a record with one
+ * run left would be allowed one request AND one connector — which is the allowance overrun this
+ * count exists to prevent, arriving by a different door.
+ */
+export type Admissions = { ask: (record: string, action: string, mayRun: Ledger['mayRun']) => Promise<Hold> };
+
+/** A fresh admission count. One per pass; passed to both wrappers so they share it. */
+export function pass(): Admissions {
+  let admitted = 0;
+  return {
+    /* TAKEN BEFORE THE AWAIT, so two runs asked at once cannot both be told there is room for one. */
+    ask: async (record, action, mayRun) => {
+      const pending = admitted++;
+      const hold = await mayRun(record, action, pending);
+      if (hold) admitted--;
+      return hold;
+    },
   };
 }
 
