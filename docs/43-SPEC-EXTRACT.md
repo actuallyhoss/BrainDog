@@ -42,9 +42,13 @@ Nine exported functions and the types they need. A function throws only for a ma
 
 ```ts
 // index.ts — the `exports` map exposes "." only
-export function matches(decl: IngestDeclaration, raw: RawArrival, ctx: ExtractCtx): boolean;
+export function matches(decl: Matchable, raw: RawArrival): boolean;
 //   `match:` evaluated over the arrival as 34 §1.9 defines the subject. Absent `match:` = true.
 //   Throws the grammar codes of §6 exactly as `where` raises them.
+//   NO `ctx`, AND THERE IS NOTHING FOR ONE TO DO: the subject is the arrival, the schema is `INBOX_RAW`,
+//   and neither `now` nor `tz` is reachable from a `match:` predicate, because `sentence.ts` resolves
+//   `today`, `bom` and `eoy` to concrete days before the evaluator is entered. The earlier signature here
+//   was the same guess as 34 §1.11's, corrected the same way: against the export.
 
 export function extract(decl: IngestDeclaration, raw: RawArrival, ctx: ExtractCtx): Extraction;
 //   Assumes `matches` was true. Runs §5.1–§5.6. Never throws for a payload.
@@ -83,15 +87,26 @@ payload text (§8).
 
 ## 3 · Files
 
-Five, counted. One more than the four the design sketched; the formats are the only file `connect` needs and
-keeping them out of `extractors.ts` keeps that file text-only.
+Seven, counted. The sketch said four, then five once the formats were pulled out so that the only file
+`connect` needs does not drag the text scanners with it. The two beyond that are `arrival.ts` and
+`pipeline.ts`, split out of the `index.ts` this section first drew holding everything.
+
+THE SPLIT KEEPS THE PROPERTY THE ONE-FILE RULE WAS FOR. The reason given below for a single file is that a
+reviewer reads one file to answer *"why was this row proposed?"*, and that is still true of `pipeline.ts`:
+every confidence decision is in it and nothing outside it makes one. `arrival.ts` answers a different
+question, whether this reader owns the arrival at all, and it is asked before any row exists. `index.ts` is
+the barrel.
 
 ```
 packages/extract/
 ├── package.json            name @braindog/extract · private · "exports": { ".": "./src/index.ts" } · type module
 ├── tsconfig.json           extends ../../tsconfig.base.json; references ../where
 ├── src/
-│   ├── index.ts            ~180 lines  matches · extract · testAgainst · isDuplicate · confidence · receipt · route · skip
+│   ├── index.ts            the barrel; the `exports` map exposes "." only
+│   ├── arrival.ts          ~80 lines   subjectOf · matches · skip (§5.2)
+│   ├── pipeline.ts         ~290 lines  extract · confidence · receipt · route (§5.1)
+│   ├── dedupe.ts           ~110 lines  isDuplicate (§5.7)
+│   ├── report.ts           ~60 lines   testAgainst (23 §4's counts)
 │   ├── extractors.ts       ~260 lines  normalise · the ten forms as candidate scanners · the three combinators · enum/lookup token match
 │   ├── money.ts            ~140 lines  the number grammar · currency detection · parseMoney · int and decimal share the tokenizer
 │   ├── date.ts             ~90 lines   format compile · scan · calendar validation · parseDate
@@ -481,15 +496,28 @@ prints the median, and the target is what a laptop should show. All warm, single
 |---|---|---|---|
 | one message | 2 KB text, one declaration, 6 fields (money, date, two `between`, enum, lookup over 50 rows) | 0.3 ms | 5 ms |
 | match fan-out | one arrival against 50 declarations' `match:` | 1 ms | 10 ms |
-| one CSV | 1 MB, 10,000 rows × 8 columns, `map:` of 6 fields incl. money and day | 250 ms | 1,000 ms |
+| one CSV | 1 MB, 5,000 rows × 8 columns, `map:` of 6 fields incl. money and day | 250 ms | 1,000 ms |
 | one JSON | 1 MB, 5,000 rows under `data[]`, `map:` of 6 | 150 ms | 600 ms |
 | one HTML table | 1 MB, 5,000 rows × 6 cells | 300 ms | 1,200 ms |
 | the cap check | a 2 MB body | 2 ms (`TextEncoder`) | 20 ms |
 | `testAgainst` | 3 samples × 6 fields | 1 ms | 10 ms |
-| peak heap | 1 MB CSV | ≤ 8× the body | 16× |
+| retained heap | 1 MB CSV | ≤ 8× the body | 16× |
 
 Everything is linear in the slice length; the only multiplicative factors are `first`'s forms, `enum`'s literals
 and `lookup`'s rows, each capped or bounded by the caller (§4.3, §10).
+
+**The CSV row said 10,000 and §10 caps rows at 5,000**, so a benchmark written to the letter timed the refusal
+path: parse the file, hit the cap, map nothing, report a number that answers a different question. It took a
+row-count assertion in the harness to see it, which is now in every row, because the failure of a performance
+test is silence rather than red.
+
+**"Peak heap" became "retained heap", and the measurement is the reason.** Peak RSS over one run is dominated
+by V8 arena growth and by whatever the collector has not got to yet; it moves with the runtime's scheduling
+rather than with what the code holds, so asserting it asserts the wrong thing and flakes. Retained after a
+collection is stable to the decimal across runs and answers the question the row is asking, which is whether
+reading a big body costs memory in proportion to it. The figure is taken in a child process, with a collection
+before the baseline as well as after: without the first one the baseline carries the garbage from loading the
+modules, the second collection clears it, and the delta comes out negative.
 
 ---
 
@@ -753,12 +781,12 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 
 ## 14 · Done when
 
-- [ ] `packages/extract` has the five `src/` files of §3 and exports exactly the §2 surface; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
+- [x] `packages/extract` has the seven `src/` files of §3 and exports exactly the §2 surface; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
 - [x] `EXTRACTORS` and `COMBINATORS` read 10 + 3 and the `closed-lists` gate agrees with 34 §6
 - [x] no `RegExp` under `src/`; the scoped lint rule exists and fails a planted `/a+/`
 - [ ] every row of §9.1–§9.5 is a passing `node --test` case; the money property runs 2,000 cases with no seed under `test/seeds/`
-- [ ] the leak test passes over every §9.5 case
-- [ ] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
+- [x] the leak test passes over every §9.5 case — over the receipt's leaves rather than its serialisation, which is the same rule without the artefact that fires on `"e":"` whenever the body is itself JSON
+- [x] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
 - [x] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green
 - [ ] the sixteen amendments of §13 are applied to 02, 07, 25, 30, 31, 33, 34 in the same revision, and BUILD.md's loop table records it
 - [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between

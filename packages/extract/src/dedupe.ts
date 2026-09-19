@@ -1,0 +1,120 @@
+/**
+ * `43 §5.7` — whether two rows are the same event seen twice.
+ *
+ * THE KEY OF `07 §2` MADE EXACT: same `on:` fields, day within one, prefix equal. A provider that sends the
+ * same transaction twice sends it with a different id, often a day apart at a boundary, and often with the
+ * merchant string extended. Exact equality misses all three, which is how a ledger doubles.
+ *
+ * FALSE IS THE SAFE ANSWER AND THE CODE LEANS THAT WAY EVERYWHERE. A false negative writes a duplicate row
+ * that a person can see and delete. A false positive silently drops a real transaction, and nothing
+ * downstream will ever show them what went missing. So every absent value, every malformed day and every
+ * unreadable field answers false rather than "near enough".
+ *
+ * NOTHING HERE USES A REGULAR EXPRESSION (`43 §8`), the day check included.
+ */
+
+import { jcs } from '@braindog/kernel';
+import type { Json } from '@braindog/where';
+
+import { normalise } from './extractors.ts';
+import type { Fields } from './pipeline.ts';
+
+export type Dedupe =
+  | string[]
+  | { near: { on: string[]; day: string; prefix?: { field: string; chars?: number } } };
+
+const DAY = 86_400_000;
+const PREFIX_CHARS = 12;
+
+/**
+ * Canonical equality for one field.
+ *
+ * ABSENT ON EITHER SIDE IS NOT EQUAL, including absent on both. `§5.7` form 1 says "present on both sides
+ * and canonically equal", and the stronger reading is the right one: two rows that both lack a reference
+ * have not agreed on anything, and calling that a match would collapse every row without one into a single
+ * event. `null` is present and compares as itself.
+ */
+function sameField(a: Fields, b: Fields, field: string): boolean {
+  if (!Object.hasOwn(a, field) || !Object.hasOwn(b, field)) return false;
+  const l = a[field];
+  const r = b[field];
+  if (l === undefined || r === undefined) return false;
+  /* Sorted-key JSON, so a money value compares as `{ amount, currency }` whichever order it was built in. */
+  return jcs(l) === jcs(r);
+}
+
+/** `YYYY-MM-DD` to a UTC instant, or `undefined`. Hand-checked, because this package holds no `RegExp`. */
+function utcDay(value: Json | undefined): number | undefined {
+  if (typeof value !== 'string' || value.length !== 10) return undefined;
+  if (value[4] !== '-' || value[7] !== '-') return undefined;
+  for (const i of [0, 1, 2, 3, 5, 6, 8, 9]) {
+    const c = value.charCodeAt(i);
+    if (c < 48 || c > 57) return undefined;
+  }
+  const y = Number(value.slice(0, 4));
+  const m = Number(value.slice(5, 7));
+  const d = Number(value.slice(8, 10));
+  const at = Date.UTC(y, m - 1, d);
+  /* THE CALENDAR HAS THE LAST WORD. `Date.UTC` rolls 2026-02-30 forward to March, so a day that did not
+     exist would compare as one that did, one day out, which is exactly the tolerance this function feeds. */
+  const back = new Date(at);
+  if (back.getUTCFullYear() !== y || back.getUTCMonth() !== m - 1 || back.getUTCDate() !== d) return undefined;
+  return at;
+}
+
+/**
+ * `normalise`, then accents off, then case off, then trim. For comparison and nothing else.
+ *
+ * THIS IS NOT `extractors.fold` AND THE DIFFERENCE IS INDICES. That one folds `A-Z` and only `A-Z`, because
+ * every position it hands back is a position in the text the record stored and `43 §10` refuses any
+ * normalisation that changes a length. Nothing downstream of this one is an index: two strings go in and a
+ * boolean comes out, so it can afford to lose information that the scanners cannot. Naming them both `fold`
+ * would put two different contracts behind one word in one package, which is worse than a copy, so this one
+ * says in its name that it is the lossy one.
+ *
+ * `CAFÉ` AND `CAFE` ARE THE SAME MERCHANT, which is what a person would say and what a provider does when it
+ * stops sending accents halfway through a year.
+ */
+function foldForComparison(text: string): string {
+  let out = '';
+  for (const ch of normalise(text).normalize('NFD')) {
+    /* Drop the combining marks NFD just separated out (U+0300 to U+036F). */
+    const code = ch.codePointAt(0)!;
+    if (code < 0x0300 || code > 0x036f) out += ch;
+  }
+  /* `toLowerCase` AND NOT `extractors.fold`, which folds `A-Z` and stops. Nothing here is an index, so
+     there is no reason to be conservative: `Ørsted` and `ØRSTED` are one merchant. */
+  return out.toLowerCase().trim();
+}
+
+/** `§5.7` step 2's prefix rule. Absent on both counts equal; on one side it does not. */
+function samePrefix(a: Fields, b: Fields, field: string, chars: number): boolean {
+  const l = a[field];
+  const r = b[field];
+  const lHas = typeof l === 'string';
+  const rHas = typeof r === 'string';
+  if (!lHas && !rHas) return true;
+  if (!lHas || !rHas) return false;
+  return foldForComparison(l).slice(0, chars) === foldForComparison(r).slice(0, chars);
+}
+
+export function isDuplicate(a: Fields, b: Fields, dedupe: Dedupe): boolean {
+  if (Array.isArray(dedupe)) {
+    /* AN EMPTY LIST IS NOT A MATCH ON NOTHING. `every` over `[]` is true, which would make every pair of
+       rows in the register a duplicate of every other. A key that names no fields is not a key. */
+    if (dedupe.length === 0) return false;
+    return dedupe.every((field) => sameField(a, b, field));
+  }
+
+  const { on, day, prefix } = dedupe.near;
+  if (on.length === 0) return false;
+  if (!on.every((field) => sameField(a, b, field))) return false;
+
+  const l = utcDay(a[day]);
+  const r = utcDay(b[day]);
+  if (l === undefined || r === undefined) return false;
+  if (Math.abs(l - r) > DAY) return false;
+
+  if (prefix === undefined) return true;
+  return samePrefix(a, b, prefix.field, prefix.chars ?? PREFIX_CHARS);
+}

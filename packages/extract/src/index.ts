@@ -6,11 +6,8 @@
  * row and logs no byte, which is what makes it the one part of ingest that can be driven entirely from a
  * string in a test (`43 §1`).
  *
- * WHAT IS HERE AND WHAT IS NOT, YET. This is the text half: the scanners, the ten forms and the three
- * combinators. `43 §2`'s full surface also holds `matches`, `extract`, `testAgainst`, `isDuplicate`,
- * `readRows` and `select`; those need the five response formats and the `where` evaluator, and they land with
- * `formats.ts` and the pipeline. The surface below is a subset of §2 rather than a different shape, so
- * nothing here has to be unpicked when the rest arrives.
+ * `43 §2`'s NINE FUNCTIONS ARE ALL HERE: `matches`, `extract`, `testAgainst`, `isDuplicate`, `parseMoney`,
+ * `parseDate`, `readRows`, `select` and `run`. A message goes in one end and rows come out the other.
  *
  * NO `RegExp` UNDER `src/`, AND A GATE SAYS SO (`43 §8`, `31 §3` layer 4). A payload is a stranger's, and the
  * classic way to turn one into an outage is a pattern that backtracks. Every scanner in this package is a
@@ -60,3 +57,7 @@ export {
   type Receipt,
   type Route,
 } from './pipeline.ts';
+
+export { isDuplicate, type Dedupe } from './dedupe.ts';
+
+export { testAgainst, type Report, type Tally } from './report.ts';

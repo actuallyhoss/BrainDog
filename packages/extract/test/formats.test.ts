@@ -217,3 +217,23 @@ test('html_table: tag names are case-insensitive', () => {
   const body = '<TABLE><TR><TH>a</TH></TR><Tr><Td>1</Td></Tr></TABLE>';
   assert.deepEqual(readRows(body, 'html_table'), [{ a: '1' }]);
 });
+
+test('a final record of one quoted empty is a field, and the trailing-line rule then drops it', () => {
+  /**
+   * THE ONE BEHAVIOUR THE SLICE REWRITE CHANGED. Appending could not tell an empty cell from no cell, so
+   * `""` on its own line was read as nothing; it is a field, and it is kept. Every differing body between
+   * the two implementations, over all of them up to five tokens, is this case.
+   */
+  assert.deepEqual(readRows('c0,c1\na,b\n""', 'csv', {}), [{ c0: 'a', c1: 'b' }]);
+  assert.deepEqual(readRows('c0\na\n""', 'csv', {}), [{ c0: 'a' }]);
+  /* And an explicit empty that is not the last line is a field either way. */
+  assert.deepEqual(readRows('c0,c1\n"",b', 'csv', {}), [{ c0: '', c1: 'b' }]);
+});
+
+test('a quoted cell keeps what quoting is for, after the rewrite', () => {
+  assert.deepEqual(readRows('c0,c1\n"a,b",c', 'csv', {}), [{ c0: 'a,b', c1: 'c' }]);
+  assert.deepEqual(readRows('c0,c1\n"a\nb",c', 'csv', {}), [{ c0: 'a\nb', c1: 'c' }]);
+  assert.deepEqual(readRows('c0,c1\n"a""b",c', 'csv', {}), [{ c0: 'a"b', c1: 'c' }]);
+  assert.deepEqual(readRows('c0,c1\n"""",c', 'csv', {}), [{ c0: '"', c1: 'c' }]);
+  assert.deepEqual(readRows('c0,c1\n"unclosed,c', 'csv', {}), [{ c0: 'unclosed,c' }]);
+});
