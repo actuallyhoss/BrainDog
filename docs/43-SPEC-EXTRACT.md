@@ -369,9 +369,13 @@ and never `map:` beside `extract:`. A `pull`'s `map:` keeps the path check it ha
    otherwise empty: a person told only about the missing field fixes it and gets the arrival back with a
    sentence that was true the first time.
 
-**What the record does with it** (07 §7 steps 4–5, restated for the contract): `exact` and `proposed` → write
-every row in one transaction with `actor: ingest:<id>`, fill `receipt.wrote`, insert `ingest_receipt`, set
-`inbox_raw.state = 'matched'`. `needs-review` → write nothing, insert the receipt with `wrote: []`, set
+**What the record does with it** (07 §7 steps 4–5, restated for the contract): `exact` → write every row in
+one transaction with `actor: ingest:<id>`, fill `receipt.wrote`, insert `ingest_receipt`, set
+`inbox_raw.state = 'matched'`. `proposed` → write **no row** and open a `rowset` suggestion, the arrival parked
+at `state = 'proposed'`. (This paragraph said *`exact` and `proposed` → write every row*, which contradicts the
+section it says it is restating: `07 §2` is *`proposed` writes no row and opens a `rowset` suggestion*. A
+combinator that chose between two readings, or filled a field the message did not carry, is exactly the case a
+person should see before it is in the ledger. The runtime followed `07`; only this sentence did not.) `needs-review` → write nothing, insert the receipt with `wrote: []`, set
 `state = 'review'` and `reason`. `skipped` → `state = 'skipped'`, `reason`, no receipt. Per arrival, all rows or
 none (§10).
 

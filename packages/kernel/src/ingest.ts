@@ -1116,7 +1116,22 @@ function candidatesAt(deps: IngestDeps, form: Extractor, text: string, depth: nu
       continue;
     }
     const got = value(deps, form, anchored);
-    if (got !== null) out.push(got);
+    /* AN ABSENT VALUE IS NOT A CANDIDATE — `34 §1.3`, which makes JSON null, the empty string and
+       the empty list one state, and kernel invariant K2, which is that state at the write:
+       `isAbsent` strips such a key out of `entry.fields` and the row never holds it.
+
+       SO AN EMPTY SLICE HAS TO BE A MISS HERE OR IT IS NOTHING ANYWHERE. Counted as a candidate it
+       reads `exact`, carries no reason, passes the confidence gate, and is then deleted at the
+       write — a field the declaration required, gone from the row, with the receipt saying the
+       pattern read it exactly. That is the one shape this file exists to prevent. Counted as a
+       miss it is `43 §5.1` step 5, in the document's own words: *every declared field is required;
+       `default` is how a field is optional* — and a `default:` over an empty slice now fires,
+       which it could not while the empty string counted as an answer.
+
+       THE TRIM IS STILL GONE, which is the part of this that `§4.3` governs: `{ between: ["a",
+       "b"] }` over `a   b` is three spaces and a value, not a miss. Only the empty slice is
+       absent, because only the empty slice is what `§1.3` names. */
+    if (got !== null && got !== '') out.push(got);
   }
   return out;
 }

@@ -114,20 +114,23 @@ test('AND A BARE ANCHOR HANDS BACK THE SLICE IT CUT, untrimmed', async () => {
   assert.equal(await reads({ after: 'debited' }), ' EGP 1,250.00 at BEANS COFFEE on 29/08/26. Ref 88213. Balance EGP 3,020.15.');
   assert.equal(await reads({ between: ['a', 'b'] }, 'a   b'), ' ');
 
-  /* AN EMPTY SLICE IS A READ AND NOT A MISS, and the two layers below it disagree on purpose.
-     `{ before: "Card" }` over a message that opens with `Card` cuts nothing, which the extractor
-     hands back as a value read exactly — so the arrival MATCHES, and every other field in the
-     declaration is written. The row then does not hold the key, because kernel invariant K2 and
-     `34 §1.3` behind it make `null`, the empty string and the empty list one state, absent, and
-     `isAbsent` strips it at the write.
-
-     THAT IS THE WHOLE DIFFERENCE THIS FIXES. Read as a MISS, the empty slice put the arrival in
-     `review` and wrote NO rows at all: one anchor landing at index 0 threw away every other field
-     the message had. Read as a value, the record keeps what the message said and drops only the
-     key that says nothing. */
+  /* AND AN EMPTY SLICE IS A MISS, which is the one place the untrimmed slice stops. `34 §1.3`
+     makes JSON null, the empty string and the empty list one state, absent, and kernel invariant
+     K2 is that state at the write: `isAbsent` strips such a key and the row never holds it. So a
+     field that read an empty slice cannot be `exact` — it would pass the confidence gate with no
+     reason, be deleted at the write, and leave a receipt saying the pattern read a field the row
+     does not have. `43 §5.1` step 5 says what to do instead: *every declared field is required;
+     `default` is how a field is optional*. */
   const empty = await lands({ before: 'Card' });
-  assert.equal(empty.state, 'matched');
-  assert.deepEqual(empty.fields, {});
+  assert.equal(empty.state, 'review');
+  assert.equal(empty.fields, null);
+
+  /* AND A `default:` OVER ONE FIRES, which it could not while the empty string counted as an
+     answer: `default` covers absence, and this is absence. The arrival lands at `proposed` and not
+     at `review`, which is the whole difference: `07 §2` parks a defaulted read for a person to
+     accept, where a missing one is a pattern to fix. */
+  const fell = await lands({ default: { value: 'nothing there', of: { before: 'Card' } } });
+  assert.equal(fell.state, 'proposed');
 
   /* AND `text` STILL COLLAPSES AND TRIMS, and still reads an empty slice as nothing. */
   assert.equal(await reads({ text: { after: 'debited' } }), 'EGP 1,250.00 at BEANS COFFEE on 29/08/26. Ref 88213. Balance EGP 3,020.15.');
