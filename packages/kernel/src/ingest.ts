@@ -187,6 +187,16 @@ export type IngestDecl = {
  * allowed to reach inside for — `43 §5.1` step 6, and `§9.5`'s worked row routes on
  * `[kind, amount.currency]`.
  */
+/**
+ * `07 §2`'s cap on a body, in bytes. The rows cap is `43 §5.5`'s and lives where the rows are read.
+ *
+ * THE SAME NUMBER `extract` HOLDS, and it is the same number for the same reason: `25 §7` rule 7 is
+ * a BLOB ceiling, so this is a fact about what a row can hold rather than a policy either package
+ * chose. Written twice is a risk; written once in a package this one may not import is not an
+ * option, and the `stack` gate is what says the two agree.
+ */
+export const BODY_BYTES_MAX = 2_000_000;
+
 export type Route = { by: string[]; to: { when: string[]; register: string }[] };
 
 export type Dedupe =
@@ -599,6 +609,27 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          recognise this" is to drop it is a pipeline whose failures are invisible. */
       store('untriaged', null);
       return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [] });
+    }
+
+    /* `43 §5.1` STEP 1, WHICH IS BEFORE THE SKIP LIST AND BEFORE ANY FIELD. `07 §2`: *two caps bound
+       extraction — a body of 2,000,000 bytes and 5,000 rows; over either, the arrival is kept raw in
+       `review` with the reason and never extracted.*
+
+       THE ENCODED LENGTH AND NOT `body.length`, which is the same rule `extract` writes down at its
+       own step 1: a body of emoji is twice the characters it looks like, and measuring the wrong one
+       lets through a payload the row cannot hold, which then fails later and somewhere else.
+
+       AND `review` RATHER THAN A REFUSAL, because the bytes are already stored below and the sender
+       did nothing wrong. The mapped half of this file had a cap of its own inside `parseAnswer`,
+       which answers `undefined` over the ceiling — so an oversized JSON payload came back as *could
+       not read total, kind, ref*, sending a person to look at their paths when the problem was the
+       size of the thing. One cap, one sentence, both halves. */
+    const bytes = new TextEncoder().encode(body).length;
+    if (bytes > BODY_BYTES_MAX) {
+      const reason = `body too large (${bytes} bytes; the cap is ${BODY_BYTES_MAX})`;
+      store('review', reason);
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review' });
     }
 
     /* `43 §5.1` STEP 2, WHICH IS BEFORE ANYTHING IS READ: *a hit → `{ rows: [], skipped: reason }`,

@@ -70,9 +70,18 @@ test('an empty window is an ordinary answer and not something to look at', () =>
   assert.equal(out.reason, undefined);
 });
 
-test("the run's remaining budget is applied before any field is read", () => {
+test("a page over the run's remaining budget is kept whole, and never the first n of it", () => {
+  /* `07 §2`: *over either, the arrival is kept raw in `review` with the reason and never
+     extracted*. This took the first `maxRows` rows and reported success, so a page of six thousand
+     charges wrote five thousand and the rest were gone with nothing to say they had arrived.
+     `@braindog/extract`'s `test/pipeline.test.ts` is the oracle and the reason is its sentence. */
   const out = extractPull(deps, DECL, body([CHARGE, CHARGE, CHARGE]), { maxRows: 2 });
-  assert.equal(out.rows.length, 2);
+  assert.deepEqual(out.rows, []);
+  assert.equal(out.reason, 'rows over cap (3; the cap is 2)');
+  assert.equal(out.confidence, 'needs-review');
+
+  /* AND A PAGE THAT FITS IS READ WHOLE. */
+  assert.equal(extractPull(deps, DECL, body([CHARGE, CHARGE, CHARGE]), { maxRows: 3 }).rows.length, 3);
 });
 
 /* ── The four formats this package cannot read itself ────────────────────────────────────────── */

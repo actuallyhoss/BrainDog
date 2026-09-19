@@ -138,11 +138,22 @@ export function extractPull(
   const fields = typeof register === 'string' ? (deps.schemaOf(register)?.fields ?? {}) : {};
   const typeOf = (field: string): string | undefined => fields[field]?.type;
 
+  /* OVER THE CAP IS KEPT AND NEVER TRUNCATED — `07 §2`, and `@braindog/extract`'s own step 3 says
+     it in the same words: *answering the first five thousand with no way to say so is the silent
+     wrong answer this rule exists to prevent.* This file took `list.slice(0, budget)` and reported
+     success, so a page of six thousand charges wrote five thousand and a thousand rows of somebody's
+     money were gone with nothing in the record to say they had ever arrived.
+
+     THE REASON IS WORD FOR WORD THE ONE `extract` GIVES, because the two are one rule read at two
+     ranks and a person comparing a connector's report with a test fixture should not find two
+     sentences. */
   const budget = ctx.maxRows ?? list.length;
+  if (list.length > Math.max(0, budget)) return nothing(`rows over cap (${list.length}; the cap is ${Math.max(0, budget)})`);
+
   const rows: ExtractedRow[] = [];
   let worst: Confidence = 'exact';
 
-  for (const element of list.slice(0, Math.max(0, budget))) {
+  for (const element of list) {
     const got = readRow({ exponent: deps.exponent, day: deps.day }, map, element, raw.ts, typeOf);
 
     /* THE OUTCOME PER FIELD, which is what a person reads when a row is in front of them: not
