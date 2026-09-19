@@ -220,3 +220,50 @@ test('A PULL ANSWER WITH A MAP ARRIVES THROUGH THE SAME PATH', async () => {
   assert.equal(out.value.state, 'matched');
   assert.deepEqual(points(sql)[0], { name: 'Users', value: 128, at: new Date(NOW - HOUR).toISOString() });
 });
+
+/**
+ * `43 §4.5`'s table says `invalid` for a value that is there and cannot be read, and this returned
+ * `missing` for every one of them until now. Nothing in 868 tests noticed, because both outcomes make
+ * the row `needs-review` and no wrong row was ever written.
+ *
+ * WHAT THEY COST IS THE SENTENCE A PERSON READS. `missing` sends somebody to the provider to ask why a
+ * field was not sent; `invalid` sends them to a value that WAS sent and that we could not read, which is
+ * almost always a format that changed. And `invalid` outranks `missing` in `§5.1` step 9's severity, so
+ * collapsing them made a field that was invalid in one row and absent in another report as merely absent.
+ */
+test('A VALUE THAT IS NOT THERE IS `missing`', () => {
+  assert.equal(read({ path: 'nope', type: 'int' }, { a: 1 }).outcome, 'missing');
+  assert.equal(read({ path: 'a.b.c', type: 'text' }, { a: 1 }).outcome, 'missing');
+  /* A path that fans out to several is not one value, so it is absent rather than unreadable. */
+  assert.equal(read({ path: 'xs[]', type: 'int' }, { xs: [1, 2] }).outcome, 'missing');
+});
+
+test('A VALUE THAT IS THERE AND WILL NOT COERCE IS `invalid`', () => {
+  assert.equal(read({ path: 'a', type: 'int' }, { a: 'abc' }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'int' }, { a: 1.5 }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'decimal' }, { a: 'x' }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'bool' }, { a: 'yes' }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'instant' }, { a: 'last Tuesday' }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'day', format: 'YYYY-MM-DD' }, { a: '29/08/26' }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'text' }, { a: { deep: 1 } }).outcome, 'invalid');
+  assert.equal(read({ path: 'a', type: 'enum', values: ['x'] }, { a: 'y' }).outcome, 'invalid');
+});
+
+test('an enum with a declared `other:` is `defaulted`, which is neither of those', () => {
+  const got = read({ path: 'a', type: 'enum', values: ['x'], other: 'x' }, { a: 'y' });
+  assert.deepEqual(got, { value: 'x', outcome: 'defaulted' });
+});
+
+test('money tells an absent currency from an unreadable one', () => {
+  assert.equal(read({ path: ['amt', 'cur'], type: 'money' }, { amt: 5 }).outcome, 'missing');
+  assert.equal(read({ path: ['amt', 'cur'], type: 'money' }, { amt: 5, cur: 'pounds' }).outcome, 'invalid');
+  assert.equal(read({ path: ['amt', 'cur'], type: 'money' }, { cur: 'EGP' }).outcome, 'missing');
+  assert.equal(read({ path: ['amt', 'cur'], type: 'money' }, { amt: 'x', cur: 'EGP' }).outcome, 'invalid');
+});
+
+test('precision the currency cannot hold is invalid, not absent', () => {
+  /* `JPY 12.5` is a real number the yen cannot carry, and the two available answers are 12 and 13, so
+     the answer is neither (`43 §4.3`). */
+  assert.equal(read({ path: 'amt', type: 'money', currency: 'JPY' }, { amt: 12.5 }).outcome, 'invalid');
+  assert.equal(read({ path: 'amt', type: 'money', currency: 'JPY' }, { amt: 12 }).outcome, 'exact');
+});

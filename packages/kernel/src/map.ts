@@ -43,9 +43,20 @@ export type Mapping =
 const SIGNIFICANT = 15;
 
 /** One field read: its value, or `null`, and whether a declared `other:` stood in for it. */
-export type Mapped = { value: Json | null; outcome: 'exact' | 'defaulted' | 'missing' };
+export type Mapped = { value: Json | null; outcome: 'exact' | 'defaulted' | 'missing' | 'invalid' };
 
 const MISSING: Mapped = { value: null, outcome: 'missing' };
+/**
+ * A VALUE WAS THERE AND COULD NOT BE READ, which is not the same as one that was not there.
+ *
+ * `43 §4.5`'s table says `invalid` for every type given something it cannot take, and this returned `missing`
+ * for all of them. Both are `needs-review`, so no wrong row was ever written — but the receipt and the reason
+ * are read by a person deciding what to do, and the two say opposite things. `missing` sends them to the
+ * provider to ask why a field was not sent; `invalid` sends them to a value that WAS sent and that we could
+ * not read, which is usually a format that changed. `invalid` also outranks `missing` in `§5.1` step 9's
+ * severity, so collapsing them understated a field that was invalid in one row and absent in another.
+ */
+const INVALID: Mapped = { value: null, outcome: 'invalid' };
 const exact = (value: Json): Mapped => ({ value, outcome: 'exact' });
 
 /**
@@ -133,17 +144,22 @@ export function mapField(deps: MapDeps, mapping: Mapping, root: unknown, arrived
   if (mapping.type === 'money') {
     const [amountPath, currencyPath] = Array.isArray(mapping.path) ? mapping.path : [mapping.path as string, undefined];
     const currency = currencyPath === undefined ? mapping.currency : one(root, currencyPath);
-    if (typeof currency !== 'string' || !/^[A-Za-z]{3}$/u.test(currency)) return MISSING;
+    /* A CURRENCY PATH THAT REACHED NOTHING IS ABSENT; ONE THAT REACHED SOMETHING UNREADABLE IS INVALID. */
+    if (currency === undefined) return MISSING;
+    if (typeof currency !== 'string' || !/^[A-Za-z]{3}$/u.test(currency)) return INVALID;
     const raw = one(root, amountPath);
+    if (raw === undefined) return MISSING;
     const code = currency.toUpperCase();
     if (mapping.minor === true) {
       const n = intOf(raw);
-      return n === null ? MISSING : exact({ amount: n, currency: code });
+      return n === null ? INVALID : exact({ amount: n, currency: code });
     }
     const n = decimalOf(raw);
-    if (n === null) return MISSING;
+    if (n === null) return INVALID;
     const minor = n * 10 ** deps.exponent(code);
-    if (Math.abs(minor - Math.round(minor)) > 1e-6) return MISSING;
+    /* PRECISION BEYOND THE CURRENCY'S EXPONENT IS INVALID, not absent: `JPY 12.5` is a real number that the
+       yen cannot hold, and the two available answers are 12 and 13, so the answer is neither (`43 §4.3`). */
+    if (Math.abs(minor - Math.round(minor)) > 1e-6) return INVALID;
     return exact({ amount: Math.round(minor), currency: code });
   }
 
@@ -156,43 +172,45 @@ export function mapField(deps: MapDeps, mapping: Mapping, root: unknown, arrived
     case 'url':
     case 'email':
     case 'document':
-      return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? exact(String(v)) : MISSING;
+      return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? exact(String(v)) : INVALID;
     case 'int': {
       const n = intOf(v);
-      return n === null ? MISSING : exact(n);
+      return n === null ? INVALID : exact(n);
     }
     case 'duration': {
       const n = intOf(v);
-      return n === null ? MISSING : exact(n);
+      return n === null ? INVALID : exact(n);
     }
     case 'decimal': {
       const n = decimalOf(v);
-      return n === null ? MISSING : exact(n);
+      return n === null ? INVALID : exact(n);
     }
     case 'bool':
       if (v === true || v === 'true' || v === 1) return exact(true);
       if (v === false || v === 'false' || v === 0) return exact(false);
-      return MISSING;
+      return INVALID;
     case 'instant': {
       const at = instantOf(v, mapping.from);
-      return at === null ? MISSING : exact(at);
+      return at === null ? INVALID : exact(at);
     }
     case 'day': {
       if (mapping.from !== undefined) {
         const at = instantOf(v, mapping.from);
-        return at === null ? MISSING : exact(at.slice(0, 10));
+        return at === null ? INVALID : exact(at.slice(0, 10));
       }
-      if (typeof v !== 'string') return MISSING;
+      if (typeof v !== 'string') return INVALID;
       const d = deps.day(v.trim(), mapping.format ?? 'YYYY-MM-DD');
-      return d === null ? MISSING : exact(d);
+      return d === null ? INVALID : exact(d);
     }
     case 'enum': {
       const values = Array.isArray(mapping.values) ? mapping.values : [];
       if (typeof v === 'string' && values.includes(v)) return exact(v);
-      return typeof mapping.other === 'string' ? { value: mapping.other, outcome: 'defaulted' } : MISSING;
+      return typeof mapping.other === 'string' ? { value: mapping.other, outcome: 'defaulted' } : INVALID;
     }
     case 'json':
       return exact(v as Json);
+    /* AN UNKNOWN TYPE IS THE DECLARATION'S FAULT AND NOT THE VALUE'S, so it stays `missing`:
+       `MAP_TYPES` is closed and `declare` refuses anything outside it at install. */
     default:
       return MISSING;
   }

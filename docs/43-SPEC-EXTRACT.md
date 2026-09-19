@@ -334,7 +334,10 @@ and never `map:` beside `extract:`. A `pull`'s `map:` keeps the path check it ha
 9. **Receipt and reason.** `receipt.fields` is the worst outcome per field over rows, on the severity
    `invalid > ambiguous > missing > defaulted > chosen > exact`. `reason` is written only for `needs-review`:
    `needs-review: <field> <outcome>[; …]` for one row, `needs-review: row <i> <field> <outcome>[; …]` for many,
-   at most eight items then `; +<n> more`. Field ids, outcome words, indices and counts only.
+   at most eight items then `; +<n> more`. Field ids, outcome words, indices and counts only. A route miss
+   (step 6) is an item on the same list, `route miss on <by ids>`, and not a fallback used when the list is
+   otherwise empty: a person told only about the missing field fixes it and gets the arrival back with a
+   sentence that was true the first time.
 
 **What the record does with it** (07 §7 steps 4–5, restated for the contract): `exact` and `proposed` → write
 every row in one transaction with `actor: ingest:<id>`, fill `receipt.wrote`, insert `ingest_receipt`, set
@@ -741,7 +744,7 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 | D10 | **`map:` coercion table** of §4.5 incl. `currency:` on a single-path money and `format:` on a day; `ref file secret quantity list` unmappable | 25 §3.2 — state the keys; `type:` values "are the register field types" minus five |
 | D11 | **Per arrival, all rows or none**; the receipt is one row per arrival with `wrote` filled by the record; a skipped arrival has no receipt | 07 §7 steps 4–5 |
 | D12 | `extract` imports `evaluate(predicate, fields, schema, row?): boolean` and the `INBOX_RAW` schema from `@braindog/where`; `matches` evaluates the stored body, not the normalised one, and a test asserts that answer equals `body.toLowerCase().includes(needle.toLowerCase())` rather than trusting the sentence. **The signature this row used to state does not exist**: there is no `ctx`, and `now`/`tz` are not parameters because `sentence.ts` resolves `today` and its kin to concrete days before the evaluator sees them. `subject` became a property of the schema, which is what makes `34 §1.9`'s "exactly these seven fields" true rather than aspirational — `specOf` had been handing every schema the record's five kernel columns, so `{ field: id }` over an arrival threw instead of answering false. Still open: `§1.9` also refuses `via has lacks near matches starts ends` on this backend, and nothing enforces it, because a schema cannot express it (`starts` on text is legal on `entry`) | 34 §1.11 — rewritten to the contract that exists; 38 §2 exports it |
-| D13 | **Three codes**: `EXTRACTOR_UNKNOWN` (a key outside the thirteen), `DATE_FORMAT_INVALID` (§4.3's rules), `PATH_INVALID` (§4.4's grammar) — grammar group; fixtures `extractor-unknown`, `date-format-invalid`, `path-invalid`; 42 raises them at install, this package at first use | 30 §6 — grammar 10 → 13, total 75 → 78; 34 §6 |
+| D13 | **Three codes**: `EXTRACTOR_UNKNOWN` (a key outside the thirteen), `DATE_FORMAT_INVALID` (§4.3's rules), `PATH_INVALID` (§4.4's grammar) — grammar group; fixtures `extractor-unknown`, `date-format-invalid`, `path-invalid`; 42 raises them at install, this package at first use | **Landed.** All three are in `30 §6`, with fixtures, in the `ports` union and raised from source. The row's old note read "grammar 10 → 13, total 75 → 78" against a table that is now 125 codes and 14 grammar: the codes were carried and the arithmetic was not, which is how a finished item keeps looking open; 34 §6 |
 | D14 | **The currency table** is `{ [code]: { exponent, symbol? } }`, owned by the kernel, passed in `ctx`; a shared symbol resolves to none | 02 §3 — the table has an exponent and an optional symbol |
 | D15 | **`braindog ingest test <id> --against <raw ids \| file>`** prints the `Report` in the 23 §4 shape; exit 1 when any field is `0 of n` | 33 §5 — one row beside `rule test` |
 | D16 | **Body cap 2,000,000 bytes and row cap 5,000** at extraction; over either is kept raw in `review` with the reason | 07 §2 — a body over the row ceiling is kept and never extracted; 25 §3.2 `limits` cite it |
@@ -751,12 +754,12 @@ Sixteen, counted. Each names the design document to amend in the same revision (
 ## 14 · Done when
 
 - [ ] `packages/extract` has the five `src/` files of §3 and exports exactly the §2 surface; `pnpm -F @braindog/extract typecheck` is clean under `tsconfig.base.json`
-- [ ] `EXTRACTORS` and `COMBINATORS` read 10 + 3 and the `closed-lists` gate agrees with 34 §6
-- [ ] no `RegExp` under `src/`; the scoped lint rule exists and fails a planted `/a+/`
+- [x] `EXTRACTORS` and `COMBINATORS` read 10 + 3 and the `closed-lists` gate agrees with 34 §6
+- [x] no `RegExp` under `src/`; the scoped lint rule exists and fails a planted `/a+/`
 - [ ] every row of §9.1–§9.5 is a passing `node --test` case; the money property runs 2,000 cases with no seed under `test/seeds/`
 - [ ] the leak test passes over every §9.5 case
 - [ ] `test/bench.test.ts` passes the CI-ceiling column of §7 and prints the medians
-- [ ] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green
+- [x] the three D13 codes are in 30 §6 with fixtures, and `refusal-fixtures` is green
 - [ ] the sixteen amendments of §13 are applied to 02, 07, 25, 30, 31, 33, 34 in the same revision, and BUILD.md's loop table records it
 - [ ] `record`'s pipeline compiles against `matches · extract · isDuplicate` and `connect` against `readRows · select` with no adapter code between
 

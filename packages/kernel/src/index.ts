@@ -274,6 +274,9 @@ export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
 export { extractPull } from './extract.ts';
+/* `43 §4.5`'s coercion. `extract` is rank 9 and this is 7, so that edge points down and the reader of a
+   structured row calls this rather than growing a second table (`31 §2`). */
+export { MAP_TYPES, mapField, select, type MapDeps, type Mapped, type Mapping } from './map.ts';
 export type { ExtractDecl, ExtractDeps } from './extract.ts';
 export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';

@@ -219,6 +219,9 @@ importers:
 
   packages/extract:
     dependencies:
+      '@braindog/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@braindog/where':
         specifier: workspace:*
         version: link:../where
