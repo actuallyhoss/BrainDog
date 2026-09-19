@@ -1670,7 +1670,10 @@ test('and a path is 43 §4.4’s grammar, because one outside it reaches nothing
   assert.equal(pull({ v: { path: ['a.b', 'c d'] } }), 'PATH_INVALID');
 
   /* AND THE SAME GRAMMAR EVERYWHERE IT IS ONE (25 §3.1, 47 §4.3). */
-  const fetch = (f: unknown) => refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, fetch: f }));
+  /* A `base:` ON EVERY ONE, because a connector cannot be declared without one and this test is
+     about the path grammar rather than about the address. */
+  const fetch = (f: Record<string, unknown>) =>
+    refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, fetch: { base: 'https://api.example.com', ...f } }));
   assert.equal(fetch({ read: { rows: 'data.rows' } }), null);
   assert.equal(fetch({ read: { rows: 'data rows' } }), 'PATH_INVALID');
   assert.equal(fetch({ expect: [{ path: 'a.b', present: true }] }), null);
@@ -1679,6 +1682,29 @@ test('and a path is 43 §4.4’s grammar, because one outside it reaches nothing
   assert.equal(fetch({ page: { from: 'meta next' } }), 'PATH_INVALID');
   assert.equal(fetch({ probe: { read: { who: 'user.id' } } }), null);
   assert.equal(fetch({ probe: { read: { who: 'user id' } } }), 'PATH_INVALID');
+});
+
+test("and a connector's base is an https host on its own, checked where it is written", () => {
+  /* BOTH `Http` ADAPTERS SAY LINT HOLDS THIS LINE and treat a bad scheme arriving at run time as a
+     fault in this repository rather than as one of the four transport failures. Lint did not hold
+     it. `47 §8`'s origin check is `new URL(base)` and a comparison, so everything below either
+     weakens that check or reads as though it says something it does not. */
+  const base = (b: unknown) =>
+    refusedWith(ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, fetch: { base: b, path: '/v1/x' } }));
+
+  for (const good of ['https://api.example.com', 'https://api.example.com:8443', 'https://x.y.z-1.test'])
+    assert.equal(base(good), null, `${good} is a base`);
+
+  assert.equal(base('http://api.example.com'), 'ACTION_NOT_HTTPS', 'a connector was allowed to talk over http');
+  /* A PATH IS DROPPED SILENTLY by the origin check, so the declaration reads as though it pins
+     `/v1` and pins only the host. */
+  assert.equal(base('https://api.example.com/v1'), 'ACTION_NOT_HTTPS');
+  assert.equal(base('https://api.example.com/'), 'ACTION_NOT_HTTPS');
+  /* AND A PLACEHOLDER READS AS THOUGH A GRANT FIELD DECIDES WHERE THE REQUEST GOES. Nothing
+     substitutes one here, so it would be sent as those literal characters or not at all. */
+  assert.equal(base('https://{grant.region}.example.com'), 'ACTION_NOT_HTTPS');
+  assert.equal(base(undefined), 'ACTION_NOT_HTTPS', 'a connector with no address at all installed');
+  assert.equal(base(7), 'ACTION_NOT_HTTPS');
 });
 
 test('and an ingest arrives by one of the seven channels, and a pull is still held to its floor', () => {

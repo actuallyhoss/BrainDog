@@ -42,7 +42,7 @@ import type { Entry, Json } from './index.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 import { sparkMayWrite } from './spark.ts';
-import { mapField, parseAnswer, type Mapping } from './map.ts';
+import { parseAnswer, readRow, type Mapping } from './map.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -52,7 +52,7 @@ export const CONFIDENCES = ['needs-review', 'proposed', 'exact'] as const;
 export type Confidence = (typeof CONFIDENCES)[number];
 
 /** The lower of two confidences. A ceiling can only ever bring one down. */
-const worse = (a: Confidence, b: Confidence): Confidence =>
+export const worse = (a: Confidence, b: Confidence): Confidence =>
   CONFIDENCES.indexOf(a) <= CONFIDENCES.indexOf(b) ? a : b;
 
 /**
@@ -114,7 +114,14 @@ export type IngestDecl = {
   channel: Channel;
   /** Over the ARRIVAL, `34 §1.9`'s seven: `from to subject body channel state ts`. Never a register. */
   match?: Predicate;
-  extract: Record<string, Extractor>;
+  /**
+   * OPTIONAL, AND THE TYPE SAID OTHERWISE. `declare` refuses a declaration carrying both this and
+   * `map`, so a connector that reads JSON cannot have an `extract` at all — and every one of them
+   * was being read back through a type that promised one. `arrive` defends itself with `?? {}`, so
+   * nothing broke; what it cost was that a map-only declaration could not be written down in
+   * TypeScript without a cast, which is how the integration test found it.
+   */
+  extract?: Record<string, Extractor>;
   /**
    * A JSON answer read by paths (`map.ts`, `43 §4.5`), in place of `extract`. A declaration carries one or the
    * other, and `declare` refuses both.
@@ -220,6 +227,45 @@ export const ARRIVAL: Schema = {
     ts: { type: 'instant' },
   },
 };
+
+/**
+ * The row an extraction is ABOUT, if the register already holds one. `43 §4.1`'s dedupe key.
+ *
+ * ONE MATCHER FOR THE ONE-ROW PATH AND THE PAGE PATH. An arrival carries one extraction and a
+ * pulled page carries five hundred, and if the two found their existing rows by different SQL then
+ * a provider's correction would update a row over email and insert a duplicate over a connector.
+ * `fetched.ts` calls this for every row of a page.
+ *
+ * A MONEY OR QUANTITY FIELD IS KEYED ON ITS NUMBER and not on the object, because `{amount, currency}`
+ * compares as text and the same amount written twice in the same currency is two different strings
+ * the moment a key order changes.
+ *
+ * NO KEY MEANS NO EXISTING ROW, which is `on_conflict: new` by construction: a declaration that
+ * names nothing to match on is a declaration saying every arrival is its own row.
+ */
+export function existingRow(
+  deps: Pick<IngestDeps, 'sql' | 'schemaOf'>,
+  register: string,
+  key: readonly string[],
+  extracted: Record<string, unknown>,
+): { id: string; seq: number } | undefined {
+  if (key.length === 0) return undefined;
+  const path = (f: string): string => {
+    const type = deps.schemaOf(register)?.fields[f]?.type;
+    return `json_extract(fields, '${jsonPath(f)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
+  };
+  const bound = (f: string): string | number | null => {
+    const v = extracted[f];
+    if (v === undefined || v === null) return null;
+    if (typeof v === 'object') return (v as { amount?: number; value?: number }).amount ?? (v as { value?: number }).value ?? null;
+    return typeof v === 'number' ? v : String(v);
+  };
+  return deps.sql.one<{ id: string; seq: number }>(
+    `SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND ${key.map((f) => `${path(f)} = ?`).join(' AND ')} LIMIT 1`,
+    register,
+    ...key.map(bound),
+  );
+}
 
 /**
  * One payload through the pipeline.
@@ -345,24 +391,24 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     const soft: string[] = [];
 
     /* A MAP READS THE BODY AS JSON, once, and each field by its path; an extract reads the text with anchors. The
-       outcomes are the same words, so everything below files a mapped row exactly as it files an extracted one. */
-    const reads: [string, () => { value: Json | null; outcome: string }][] =
-      matched.map !== undefined && matched.extract === undefined
-        ? (() => {
-            const root = parseAnswer(body);
-            const fields = deps.schemaOf(matched.writes.register)?.fields ?? {};
-            return Object.entries(matched.map).map(([field, mapping]) => [
-              field,
-              () => mapField({ exponent: exponentOf, day }, mapping, root, at, fields[field]?.type),
-            ] as [string, () => { value: Json | null; outcome: string }]);
-          })()
-        : Object.entries(matched.extract ?? {}).map(([field, form]) => [field, () => resolve(deps, form, text)]);
-    for (const [field, read] of reads) {
-      const got = read();
-      if (got.value === null) missed.push(field);
-      else {
-        extracted[field] = got.value;
-        if (got.outcome !== 'exact') soft.push(field);
+       outcomes are the same words, so everything below files a mapped row exactly as it files an extracted one.
+
+       AND THE MAPPED HALF IS `readRow`, WHICH A CONNECTOR'S PAGE CALLS TOO. One arrival here and five
+       hundred rows there is the same read over a different number of roots (`30 §2`). */
+    if (matched.map !== undefined && matched.extract === undefined) {
+      const fields = deps.schemaOf(matched.writes.register)?.fields ?? {};
+      const got = readRow({ exponent: exponentOf, day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
+      Object.assign(extracted, got.fields);
+      missed.push(...got.missed);
+      soft.push(...got.soft);
+    } else {
+      for (const [field, form] of Object.entries(matched.extract ?? {})) {
+        const got = resolve(deps, form, text);
+        if (got.value === null) missed.push(field);
+        else {
+          extracted[field] = got.value;
+          if (got.outcome !== 'exact') soft.push(field);
+        }
       }
     }
 
@@ -446,25 +492,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return no<Arrived>('DECLARATION_INVALID', `${matched.ingest} names ${JSON.stringify(wrongId)} as a field, and it is not one.`, {
         at: 'writes.key',
       });
-    const path = (f: string): string => {
-      const type = deps.schemaOf(matched.writes.register)?.fields[f]?.type;
-      return `json_extract(fields, '${jsonPath(f)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
-    };
-    const bound = (f: string): string | number | null => {
-      const v = extracted[f];
-      if (v === undefined || v === null) return null;
-      if (typeof v === 'object') return (v as { amount?: number; value?: number }).amount ?? (v as { value?: number }).value ?? null;
-      return typeof v === 'number' ? v : String(v);
-    };
-    const existing = key.length
-      ? deps.sql.one<{ id: string; seq: number }>(
-          `SELECT id, seq FROM entry WHERE register = ? AND deleted_at IS NULL AND ${key
-            .map((f) => `${path(f)} = ?`)
-            .join(' AND ')} LIMIT 1`,
-          matched.writes.register,
-          ...key.map(bound),
-        )
-      : undefined;
+    const existing = existingRow(deps, matched.writes.register, key as string[], extracted);
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {

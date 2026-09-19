@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@braindog/connect": "workspace:*",
     "@braindog/declare": "workspace:*",
     "@braindog/host": "workspace:*",
     "@braindog/kernel": "workspace:*",

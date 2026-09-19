@@ -324,7 +324,11 @@ test('OPEN QUESTIONS PAST BOOT’S TWENTY: the queue reads every one, a page at 
   assert.ok(out.from === 'live');
   assert.equal(out.value.open.length, 437);
   assert.equal(new Set(out.value.open.map((q) => q.id)).size, 437);
-  assert.equal(out.value.open.at(-1)?.title, 'Q436?', 'a question past boot’s twenty keeps the words it asks');
+  /* BY ID AND NOT BY POSITION. The queue comes back ranked by cost of being wrong, and these 437 are
+     all `options` — one band, so the tie falls to the oldest and then to the id, which is not the order
+     the pages arrived in. What this line is about is the WORDS, and they belong to a question, not to a
+     place in a list. */
+  assert.equal(out.value.open.find((q) => q.id === 'SG564')?.title, 'Q436?', 'a question past boot’s twenty keeps the words it asks');
   assert.deepEqual(pages, [null, 'SG801', 'SG601']);
 });
 

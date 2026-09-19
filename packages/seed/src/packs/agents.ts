@@ -159,6 +159,19 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
     icon: 'session',
     requires: ['register.session', 'register.learnings', 'register.skills', 'register.tools', 'register.credentials'],
     blocks: [
+      /* WHAT IS WAITING ON YOU, FIRST, because an agent that has asked a question is blocked on the
+         answer and every row below it is work that carried on without one. The source is the record's
+         own open suggestions, so the page needs no register for it and nothing is written here about
+         how to answer: the options a question carries are its proposer's, and every other kind is
+         accepted or rejected in the reader's own words. */
+      {
+        kind: 'queue',
+        heading: 'Waiting on you',
+        span: 12,
+        source: 'governance.open',
+        limit: 3,
+        empty: 'Nothing is waiting on you.',
+      },
       /* ONLY THE RUNS STILL WORKING. The end hook leaves a run idle and a handoff waits for a pickup, and both were
          listed here as working, the run that closed a minute ago beside the one typing now. */
       {

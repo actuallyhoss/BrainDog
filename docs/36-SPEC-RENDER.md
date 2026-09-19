@@ -136,7 +136,7 @@ interface KindSpec {
 }
 ```
 
-`KINDS`, twenty-six, counted:
+`KINDS`, twenty-nine, counted:
 
 | Kind | Primitive | Cells, in order | Arity | Tone | Row cap | Flags |
 |---|---|---|---|---|---|---|
@@ -168,6 +168,7 @@ interface KindSpec {
 | `feed` | list | by (`agent rule you`, or `seen`) · who · count · what · when | 5 | yes | — | pageOnly |
 | `diff` | media | — verbatim, each row marked `- `, `+ ` or two spaces | 0 | no | — | |
 | `agents` | list | who · count · what (empty on the row that folds an agent's rest) · when | 4 | yes | none | pageOnly |
+| `queue` | list | a row per part: `q · id · who · when · question · why · cost`, `opt · id · key · label · because · recommended`, `more · n` | 7 | yes | none | pageOnly |
 
 ```ts
 type Segment = Markdown | Block | Degraded;
@@ -397,6 +398,7 @@ in the kind's order; an absent cell renders as an empty span — columns never s
 | `cards` | `<ul class="cards-grid"><li class="cards-item"[ data-intent][ data-quiet]><div class="cards-head">` mark or face · `<h3 class="cards-title">` · glyph · `<span class="cards-when">` `</div>` · `<div class="cards-body">` figure · trend `<svg role="img" viewBox="0 0 1000 100" preserveAspectRatio="none">` with `vector-effect="non-scaling-stroke"` paths · ring `<svg aria-hidden="true">` with `stroke-dasharray` against `pathLength="100"`, beside its printed value `</div>` · `<dl class="cards-facts">` · `<div class="cards-who">` face and name `</li>…</ul>`. `data-quiet=""` is on a card whose `quiet` cell holds anything, and that cell is never printed. No cards → `<p class="cards-empty">Nothing to show.</p>`. No `figcaption` is withheld; the page passes none. Every mark is placed by an attribute and no `style` is written |
 | `section` | no `figcaption`: `<div class="sec"><h2 class="sec-title">`glyph? heading `<span class="sec-count">`count, when not zero`</span></h2>` and, when folded, `<details class="sec-fold"><summary class="sec-toggle"><span class="sec-show">Show</span><span class="sec-hide">Hide</span></summary></details></div>`. The host hides the blocks after a shut `sec-fold` |
 | `feed` | `<div class="feed">`, then per group, in the order agents, rules, you: `<div class="feed-group" data-by="agent\|rule\|you"><h3 class="feed-head">`Agents · Rules · You `<span class="feed-new">N new</span>` when any row is new, else `<span class="feed-tally">N</span></h3><ul class="feed-rows">`, and per row `<li class="feed-row"[ data-new][ data-intent]><span class="feed-count">`count, when not zero`</span><span class="feed-face" aria-hidden="true">`initial`</span><span class="feed-what"><span class="feed-who">`who`</span> `what, glyph`</span><span class="feed-when">`when`</span></li>`; before a group's first read row, when new rows sit above it, `<li class="feed-seen">Before you last looked</li>`. A count is the sum of the rows' counts, a row without one being one. No rows → `<p class="feed-empty">Nothing new.</p>`, or, when the `seen` row has no time, `Nothing to catch up on yet. From your next visit, what changed while you were away shows here.` |
+| `queue` | `<div class="queue">`, then per question `<article class="queue-card"[ data-intent]><p class="queue-by"><span class="queue-who">`who`</span><span class="queue-when">`when`</span>`, `<span class="queue-cost" data-cost="`cost`">`the band's word`</span>` when the record sent a band this build has a word for, `</p><h3 class="queue-question">`question`</h3>`, `<p class="queue-why">`why`</p>` when there is one, then `<ul class="queue-options">` and per option `<li class="queue-option"[ data-recommended]><span class="queue-label">`label`</span>`, `<span class="queue-rec">Recommended</span>` when it is, `<span class="queue-because">`because`</span>` when there is one, `</li></ul></article>`. Past the cards, `<p class="queue-more">N more</p>` when the count says so. No questions → `<p class="queue-empty">Nothing is waiting on you.</p>`. Nothing is ever pre-selected: `queue-rec` is a label beside the option it names |
 | `diff` | `<div class="diff"><p class="diff-sum">`2 lines added, 1 removed · No change`</p><div class="diff-lines">`, a line per row: `<div class="diff-line" data-op="same"><span class="diff-mark" aria-hidden="true"></span>`, `<del class="diff-line" data-op="del"><span class="diff-mark" role="img" aria-label="removed">−</span>` or `<ins class="diff-line" data-op="add"><span class="diff-mark" role="img" aria-label="added">+</span>`, then `<span class="diff-text">`text`</span>`. A run of shared lines that would hide four or more, keeping three beside each change, is `<details class="diff-fold"><summary class="diff-toggle">N lines unchanged</summary>`lines`</details>`. The lines wrap, so there is no scrolling box and no `tabindex` |
 | degraded | `<figure class="block block-degraded" data-kind="K"><figcaption>fix</figcaption><pre class="block-degraded" data-code="C"[ data-row="n"]><code>source</code></pre></figure>` |
 

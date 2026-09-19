@@ -292,7 +292,7 @@ test('A CAPITALISED KIND IS TOLD ABOUT ITS CAPITAL, NOT TOLD IT WROTE NO KIND', 
 
   // And the three sentences that were already right stay right: a word that is not a kind in any
   // case, a fence with no kind at all, and a kind that is spelled correctly and page-bound.
-  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-six kinds/u);
+  assert.match(fixFor('```Reactor | H\nA\n```'), /is not one of the twenty-nine kinds/u);
   assert.equal(fixFor('```\nA\n```'), 'A fence with no kind is shown as you wrote it.');
   assert.match(fixFor('```table | Open\n```'), /draws a register on a page/u);
 });
@@ -1563,7 +1563,7 @@ test('a stored value is drawn as a word: a lane head starts with a capital, a ch
   assert.equal(valueWord('cli', true), 'CLI');
   const html = toHTML(parse('```chips\nglyph | 6 | saas\n```\n\n```board\nopen | Chase Halden\n```'));
   assert.match(html, /<span class="pill-word">SaaS<\/span>/);
-  assert.match(html, /<h4 class="board-head">Open<\/h4>/);
+  assert.match(html, /<h4 class="board-head">Open<span class="board-count num">1<\/span><\/h4>/);
 });
 
 /* ── stat's trend and lead, and sparkline ─────────────────────────────────── */

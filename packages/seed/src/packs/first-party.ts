@@ -52,13 +52,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
+ * - work 1.4.0: the Board says which cards an agent is on right now.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.2.0',
   people: '1.0.0',
   'money-core': '1.1.0',
   estate: '1.1.0',
-  work: '1.3.0',
+  work: '1.4.0',
 };
 
 type Body = Record<string, unknown>;

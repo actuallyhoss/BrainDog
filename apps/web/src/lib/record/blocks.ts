@@ -35,11 +35,12 @@
  */
 
 import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
-import { day as longDay, money, parse, type Block } from 'braindog-render';
+import { day as longDay, money, parse, since, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, isKind, type CardRole } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { NOW, REGISTERS, ROWS, display, homeCurrency, walkTable, type BlockResult } from './api.ts';
+import { NOW, REGISTERS, ROWS, display, feedWho, homeCurrency, walkTable, type BlockResult } from './api.ts';
 import { copy } from '../copy.ts';
+import type { Entry } from './schema.ts';
 import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
@@ -460,9 +461,19 @@ function boardOrder(block: BlockResult): BlockResult {
     return i === -1 ? values.length : i;
   };
   /* THE ROWS MOVE WITH THEIR ENTRIES. A link is drawn from the row's own cells, so sorting only the entries put each card
-     under the project of whichever row had stood in its place. */
+     under the project of whichever row had stood in its place.
+     AND SO DOES EVERY OTHER ARRAY ALIGNED WITH THEM, which is the same bug a second time: the
+     evaluator answers `working_now` in the declaration's order, this sorts the rows, and the dot
+     landed on whichever card had stood where the worked-on one was — an agent shown on a row it has
+     never touched. Anything aligned with `rows` added here must be moved here too. */
   const order = block.entries.map((e, i) => ({ e, i })).sort((a, b) => rank(a.e) - rank(b.e));
-  return { ...block, entries: order.map((o) => o.e), rows: order.map((o) => block.rows[o.i]!).filter(Boolean) };
+  const working = block.working_now;
+  return {
+    ...block,
+    entries: order.map((o) => o.e),
+    rows: order.map((o) => block.rows[o.i]!).filter(Boolean),
+    ...(working ? { working_now: order.map((o) => working[o.i] === true) } : {}),
+  };
 }
 
 /**
@@ -504,6 +515,20 @@ function projectRows(block: BlockResult, cells: number): string[] {
      */
     const spec = KINDS[block.kind as keyof typeof KINDS];
     const out = values.map(escapeCell);
+    /**
+     * `working: true`'s DOT, on the cell the kind calls the row by — `workingCell` knows which, so the
+     * writing side and the drawing side cannot drift about it. Written BEFORE the checkbox mark below,
+     * which has to sit at the very head of the line for the dialect's own parser to read it as one: a
+     * dot in front of `[ ]` would not be read as a box at all.
+     *
+     * WHETHER AN AGENT IS ON THE ROW IS THE EVALUATOR'S ANSWER (`working_now`), never worked out here.
+     * This used to ask the SAMPLE's ledger directly, so the dot was a thing only the demo could draw:
+     * a live record ran the same code and got `false` for every row it owned.
+     */
+    if (block.working_now?.[i] === true) {
+      const at = workingCell(block.kind);
+      if (out[at] !== undefined) out[at] = `${WORKING_MARK}${out[at]}`;
+    }
     if (spec?.checkbox && entry) {
       const reg = REGISTERS[block.register ?? ''];
       const state = reg?.state ? String(entry.fields[reg.state] ?? '') : '';
@@ -609,6 +634,42 @@ function sectionRow(block: BlockResult): string {
   /* `total` AND NOT `matched.length`: a live answer sends the count and only the rows that fit. */
   const count = block.register ? String(block.total) : '';
   return `${escapeCell(icon ?? '')} | ${count} | ${fold ? 'fold' : ''}`;
+}
+
+/**
+ * A queue's rows: a question, then a row an option, then the count of what it is not drawing.
+ *
+ * `render/src/queue.ts` documents the grammar. Two things are settled here rather than there:
+ *
+ * THE TWO WORDS A PROPOSAL OF ANY OTHER KIND IS ANSWERED WITH. The record sends the options an
+ * `options` body carries and no others, deliberately: it does not know what language the reader has.
+ * Every other kind is accepted or rejected, and those are this app's words, the same two
+ * `governance.ts` already puts on the decide screen.
+ *
+ * AND HOW MANY ARE LEFT, which is what is open against what came back. A queue that drew three of
+ * nine with no line saying so would be a queue that lies about how much is waiting.
+ */
+function queueRows(block: BlockResult): string[] {
+  const waiting = block.queue ?? [];
+  /* THE BLOCK'S OWN CLOCK AND NOT THE MODULE'S. `NOW` is the sample's fixed instant; a live answer
+     carries the record's in `stale_at`, and reading the wrong one drew a question opened this morning
+     as "in 13d". */
+  const at = Date.parse(block.stale_at);
+  const rows = waiting.flatMap((q) => {
+    const options = q.options.length > 0 ? q.options : [{ key: 'accept', label: copy.acceptIt, because: '', recommended: false }, { key: 'reject', label: copy.rejectIt, because: '', recommended: false }];
+    return [
+      /* AND THE BAND THE RECORD PUT IT IN, last, which is also the order these rows arrive in
+         (`@braindog/kernel`'s `weigh.ts`). Passed through as the record's own word rather than as a
+         sentence: the words a reader sees are `render/src/queue.ts`'s, the way tone's are. */
+      ['q', q.id, feedWho(q.who, null), since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
+      ...options.map((o) => ['opt', q.id, o.key, o.label, o.because, o.recommended ? 'true' : ''].map(escapeCell).join(' | ')),
+    ];
+  });
+  const more = Math.max(0, block.total - waiting.length);
+  /* AND WHERE THE REST OF THEM ARE. A count with nowhere to press told a reader there were five more
+     questions and stranded them; Decide is where every open question lives, and the address is written
+     HERE rather than in the renderer, which knows no routes. */
+  return more > 0 ? [...rows, `more | ${more} | /decide`] : rows;
 }
 
 /**
@@ -860,6 +921,8 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
         ? progressRows(block)
       : block.kind === 'cards'
         ? cardsRows(block)
+      : block.kind === 'queue' && block.queue
+        ? queueRows(block)
       : block.kind === 'section'
         ? [sectionRow(block)]
       : block.register && block.columns.length > 0 && spec
@@ -874,7 +937,7 @@ function drawSegments(block: BlockResult): ReturnType<typeof parse> {
     !conflicted &&
     !block.authored?.length &&
     !block.metrics &&
-    !['bar', 'split', 'chips', 'gauge', 'progress', 'cards', 'section', 'stat'].includes(block.kind) &&
+    !['bar', 'split', 'chips', 'gauge', 'progress', 'cards', 'section', 'stat', 'queue'].includes(block.kind) &&
     Boolean(block.register && block.columns.length > 0 && spec);
   return projected && block.register
     ? withRefs(segments, block.register, block.kind === 'board' ? boardOrder(block).entries : block.entries)

@@ -32,7 +32,7 @@
 -->
 <script lang="ts">
   import { titleOf } from '$lib/title.ts';
-  import { day, since, symbolText } from 'braindog-render';
+  import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { DECIDED, DEPLOYMENT, NOW, QUESTIONS, REGISTERS, ROWS, display, whoDid } from '$lib/record/api.ts';
@@ -426,6 +426,20 @@
     deferOpened = id;
     untrack(() => defer());
   });
+
+  /* AND AN OPTION PRESSED IN A `queue` BLOCK LANDS HERE HIGHLIGHTED, once per question. That does not
+     break the rule at the top of this file: what is marked is the reader's own press on the page they
+     came from, not the machine's recommendation, and highlighted is still not chosen. The reason is
+     typed here and nothing is written without it. An option this question does not offer is ignored. */
+  let cameWith = '';
+  $effect(() => {
+    const id = question?.id;
+    const want = page.url.searchParams.get('option');
+    if (!id || cameWith === id || !want) return;
+    if (question.decided || (from === 'live' && live?.closed)) return;
+    cameWith = id;
+    if (question.options.some((o) => o.key === want)) highlighted = want;
+  });
 </script>
 
 <svelte:head><title>{titleOf(question?.title, copy.decide)}</title></svelte:head>
@@ -565,6 +579,14 @@
         {#if question.cost}
           <h2 class="cost-label">{copy.costOfDelay}</h2>
           <p class="cost-body">{symbolText(question.cost)}</p>
+        {/if}
+        <!-- AND THE OTHER COST, WHICH NOBODY TYPED. The one above is why deciding late is expensive,
+             written by whoever asked; this is what the record worked out getting it wrong would cost,
+             from what accepting the proposal would do, and it is what puts the question where it is
+             in the queue. Absent on a question whose body this build cannot read. -->
+        {#if queueCost(question.band ?? '')}
+          <h2 class="cost-label">{copy.costOfWrong}</h2>
+          <p class="cost-body" data-cost={question.band}>{queueCost(question.band ?? '')}</p>
         {/if}
         <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
       </section>

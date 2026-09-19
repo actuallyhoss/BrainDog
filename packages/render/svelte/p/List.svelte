@@ -19,7 +19,7 @@
   worse than a picture of one, because it also spends a tab stop and a promise.
 -->
 <script lang="ts">
-  import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
+  import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -108,6 +108,8 @@
   {#each block.rows as row, i}
     {#if block.kind === 'todo'}
       {@const state = tickState(row.done, ticks.get(i))}
+      <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
+      {@const title = takeWorking(row.cells[0] ?? '')}
       <li class="item">
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
@@ -124,7 +126,7 @@
             role="checkbox"
             class="item-marker tap"
             aria-checked={state.done}
-            aria-label={text(inline(row.cells[0] ?? '', opts)) || TASK}
+            aria-label={text(inline(takeWorking(row.cells[0] ?? '').text ?? '', opts)) || TASK}
             data-done={state.done ? 'yes' : 'no'}
             tabindex={i === at ? 0 : -1}
             {@attach (el) => {
@@ -141,7 +143,9 @@
             >{row.done ? '✓' : ''}</span
           >
         {/if}
-        <span class="item-title"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
+        <span class="item-title"
+          >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
+        >
         <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
         <!-- THE ROW STAYS, WEARING WHAT HAPPENED TO IT, AND THE WAY BACK IS THE BOX.
              Thirteen of eighty-five human writes in the record this product is modelled on reversed
@@ -163,6 +167,7 @@
         {/if}
       </li>
     {:else if block.kind === 'timeline'}
+      {@const title = takeWorking(row.cells[1] ?? '')}
       <li class="item" data-intent={row.tone}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
@@ -171,17 +176,20 @@
         <!-- The glyph sits with the TITLE, not at the far edge of the row. A tone belongs to the
              thing it qualifies, and five hundred pixels away it belongs to nothing — the same
              finding the stat cell's layout is built on (13 §2.3). -->
-        <span class="item-title">
-          <Text nodes={inline(row.cells[1] ?? '', opts)} {opts} />
-          {#if row.tone}
-            <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
-          {/if}
-        </span>
+        <span class="item-title"
+          >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text
+            nodes={inline(title.text ?? '', opts)}
+            {opts}
+          />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
+        >
         <span class="item-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       </li>
     {:else}
+      {@const title = takeWorking(row.cells[0] ?? '')}
       <li class="item">
-        <span class="item-title"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
+        <span class="item-title"
+          >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
+        >
         <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
         <span class="item-state"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       </li>

@@ -71,13 +71,14 @@ const MODULES = [
  */
 const ALLOWED = new Map([
   ['copy.askBrainDog', 'CORRECT — 23 §3.1: with no model the assistant is absent, not disabled. The sentence waits.'],
-  ['copy.promoted', 'UNBUILT — a suggested page moving into the rail writes nothing yet (29 §2 needs a nav write).'],
   ['copy.restored', 'UNBUILT — Settings → backups (53 §5.4). No restore control exists.'],
   /* `markAllRead` LEFT THIS LIST WHEN IT GOT A SURFACE, and the gate is what noticed: an excuse that
      outlives its reason is the same defect as a sentence with no renderer, one direction along.
-     `marked` is the per-item form and stays — the browser's mark is one instant, not a flag a row. */
+     `marked` is the per-item form and stays — the browser's mark is one instant, not a flag a row.
+     `copy.rankedBy` left it the same way, and its excuse had been wrong twice over: it read "19 §6's
+     For You ordering", and what `19 §8` risk 6 asks for is the queue ranked by cost of being wrong,
+     which `/decide` now says over the list it ranks. */
   ['copy.marked', 'UNBUILT — the PER-ROW read mark. Home marks the whole feed with one instant instead.'],
-  ['copy.rankedBy', 'UNBUILT — 19 §6\'s "For You" ordering.'],
   ['copy.noFilters', 'UNBUILT — the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
   ['copy.displayOptions', 'UNBUILT — the display menu names its sections directly.'],
   ['copy.saveAsView', 'UNBUILT — a saved view is seeded, never created from the grid.'],

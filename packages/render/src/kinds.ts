@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the twenty-eight kinds, and the four intent words.
+ * The eight primitives, the twenty-nine kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -223,9 +223,10 @@ const TABLE = {
   /* What each agent did, one group per agent (`src/agents.ts`): `who | count | what | when`. Page-only, as `feed` is. */
   agents: { primitive: 'list', cells: 4, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
   /* What is waiting on a person, a question and its ways to answer (`src/queue.ts`). Two kinds of row,
-     `q | id | who | when | question | why` and `opt | id | key | label | because | recommended`, as `feed`
-     marks one of its rows `seen`. Page-only, because the questions are the record's own. */
-  queue: { primitive: 'list', cells: 6, tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
+     `q | id | who | when | question | why | cost` and `opt | id | key | label | because | recommended`, as
+     `feed` marks one of its rows `seen`. The seventh cell is the band the record put the question in, which
+     is also the order the rows arrive in. Page-only, because the questions are the record's own. */
+  queue: { primitive: 'list', cells: 7, tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

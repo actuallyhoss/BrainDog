@@ -107,6 +107,19 @@
     void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title);
   }
 
+  /**
+   * An option pressed in a `queue` block takes you to the gate with that option highlighted.
+   *
+   * THE PRESS IS NOT THE ANSWER. A decision carries a reason and the reason is written on the gate,
+   * so what the press buys is the two steps of getting there: the question opened, and the option
+   * the reader already leaned to marked as leaned to rather than typed again.
+   */
+  function askGate(row: Row, option: string) {
+    const id = row.cells[1] ?? '';
+    if (id === '') return;
+    void goto(`/decide/${encodeURIComponent(id)}?option=${encodeURIComponent(option)}`);
+  }
+
   function tickTask(row: Row, done: boolean) {
     const title = row.cells[0] ?? copy.cardFallback;
     if (!live) return void toasts.push(copy.taskTicked(title, done), { intent: 'warn' });
@@ -795,6 +808,7 @@
                     opts={{ ...optsFor(block), cellHref: (i: number) => block.metrics?.[i]?.href ?? null }}
                     onmove={(row, to) => moveCard(block, row, to)}
                     ontick={(row, done) => tickTask(row, done)}
+                    onact={(row, option) => askGate(row, option)}
                   />{:else if segment.type === 'degraded'}<Degraded {segment} />{:else if segment.type === 'markdown'}<div class="document"><Markdown {segment} /></div>{/if}
               {/each}
             {/if}
@@ -826,7 +840,14 @@
             {#if block.kind === 'section' && block.heading === copy.reportHeading && param && !arranging}
               <Reporting register={param.register} seq={param.seq} title={param.title} />
             {/if}
-            {#if !drawn.refusal && !block.cannot && block.total > block.shown}
+<!--
+              EXCEPT WHERE THE BLOCK ALREADY SAID IT, BETTER. A `queue` ends in its own count of what
+              is left and that count is a door: under it this line added "Showing 3 of 8." in the same
+              breath, which is the same fact twice, and the second telling is the one with nowhere to
+              press. One kind, named, rather than a rule about kinds: every other kind is silent about
+              its own slice, which is why this line exists at all.
+            -->
+            {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown}
               {@const to = openHref(block)}
               <p class="block-slice" role="status">
                 {block.source === 'forecast.runway'

@@ -130,8 +130,14 @@ const GATES = [
      signs out and comes back in with it. On its own ephemeral port, so it does not join the queue for 5189
      the two above share. */
   ['passkey', ['node', [join(here, 'passkey.mjs')]]],
+  /* AND THE OTHER ONE THAT DRIVES A BLOCK RATHER THAN MEASURING IT. `queue` was tested at every seam
+     and in screenshots and nothing had ever pressed one: an option word that goes nowhere and a count
+     of what is left that goes nowhere both pass every unit test there is. It presses an option and
+     checks the gate it lands on, presses the count and checks it reaches Decide. Its own ephemeral
+     port, for the reason `passkey` has one. */
+  ['queue', ['node', [join(here, 'queue.mjs')]]],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
-     (52 §3; 51 §5.17). The twenty-four above ask whether the tree is right; this asks whether the
+     (52 §3; 51 §5.17). The twenty-seven above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
      ask — so everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */

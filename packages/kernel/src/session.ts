@@ -32,7 +32,15 @@ export function sessionDeclaration(): Declaration {
 }
 
 const DECLARED = sessionDeclaration().body;
-const PREFIX = String(DECLARED.seq_prefix);
+/**
+ * What a run is called out loud: `S` for `S42`, taken from the declaration so there is one copy.
+ *
+ * Exported because a run's NAME is what its writes are signed with (`event.actor = 'S42'`), so any
+ * reader joining an event back to the run that made it needs the same prefix the ladder wrote.
+ */
+export const SESSION_PREFIX = String(DECLARED.seq_prefix);
+
+const PREFIX = SESSION_PREFIX;
 /** The states a run does not come back from, which is what a page of live runs leaves out. */
 export const FINISHED = DECLARED.done as readonly string[];
 

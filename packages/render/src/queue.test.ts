@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { QUEUE_CLEARED, queueFault, queueMore, queuePlan } from './queue.ts';
+import { QUEUE_CLEARED, QUEUE_COSTS, queueFault, queueMore, queuePlan } from './queue.ts';
 
 const rows = (...lines: string[][]) => lines.map((cells) => ({ cells }));
 
@@ -54,6 +54,19 @@ test('an empty queue says so, and the sentence is the package’s own', () => {
   assert.equal(plan.empty, QUEUE_CLEARED);
 });
 
+test('where the rest of them are comes off the row, and only when it is a path of this record', () => {
+  const plan = (where: string) => queuePlan(rows(['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''], ['more', '4', where]));
+  assert.equal(plan('/decide').moreHref, '/decide');
+  /* NOT AN ADDRESS THIS PACKAGE INVENTED, AND NOT ONE OFF THIS RECORD. An absolute URL in a count is a
+     queue that can send a reader anywhere, which is not what a count of what is waiting is for. */
+  assert.equal(plan('https://elsewhere.example/decide').moreHref, null);
+  assert.equal(plan('decide').moreHref, null);
+  assert.equal(plan('').moreHref, null);
+  assert.equal(queuePlan(rows(['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''])).moreHref, null);
+  assert.match(queueFault([['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''], ['more', '4', 'nowhere']]) ?? '', /not a path/);
+  assert.equal(queueFault([['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''], ['more', '4', '/decide']]), null);
+});
+
 test('what is left is a count, and what is left of nothing is nothing', () => {
   assert.equal(queuePlan(rows(['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''], ['more', '4'])).more, 4);
   assert.equal(queuePlan(rows(['q', 's1', 'a', 'now', 'Q', ''], ['opt', 's1', 'a', 'A', '', ''])).more, 0);
@@ -70,6 +83,28 @@ test('an option before any question is a fault, and is left out rather than thro
 test('a question with no way to answer it is a fault, wherever it sits', () => {
   assert.match(queueFault([['q', 's1', 'a', 'now', 'Q', '']]) ?? '', /no way to answer/);
   assert.match(queueFault([['q', 's1', 'a', 'now', 'Q', ''], ['q', 's2', 'a', 'now', 'Q2', ''], ['opt', 's2', 'a', 'A', '', '']]) ?? '', /no way to answer/);
+});
+
+/* THE BAND IS THE RANKING, so a band this build cannot read is a ranking it silently ignored — which is
+   the failure that looks exactly like it worked. No band at all is a different thing and is allowed. */
+test('a cost band with no word is named, and a question with no band is not', () => {
+  const q = (band: string) => [['q', 's1', 'Claude', 'now', 'Q', '', band], ['opt', 's1', 'a', 'A', '', '']];
+  assert.match(queueFault(q('undoable')) ?? '', /no word for: "undoable"/);
+  assert.equal(queueFault(q('')), null);
+  assert.equal(queueFault(q('undo')), null);
+  assert.equal(queueFault(q('shape')), null);
+  assert.equal(queueFault(q('rows')), null);
+  assert.equal(queueFault(q('call')), null);
+});
+
+test('a question carries its band and the word for it, and an unknown band has no word', () => {
+  const plan = (band: string) => queuePlan(rows(['q', 's1', 'Claude', 'now', 'Q', '', band], ['opt', 's1', 'a', 'A', '', '']));
+  assert.deepEqual([plan('undo').items[0]?.cost, plan('undo').items[0]?.costLabel], ['undo', QUEUE_COSTS.undo]);
+  assert.deepEqual([plan('').items[0]?.cost, plan('').items[0]?.costLabel], ['', '']);
+  /* `queuePlan` IS LENIENT WHERE `queueFault` IS STRICT, as it is for every other row: a band it has no
+     word for comes back as itself with no word, and the drawer draws no chip. */
+  assert.deepEqual([plan('undoable').items[0]?.cost, plan('undoable').items[0]?.costLabel], ['undoable', '']);
+  assert.deepEqual(Object.keys(QUEUE_COSTS), ['undo', 'shape', 'rows', 'call']);
 });
 
 test('a row under no kind is named, and so is a count that is not one', () => {

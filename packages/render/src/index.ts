@@ -34,8 +34,10 @@ export {
 export { AGENTS_EARLIER, AGENTS_NOTHING, AGENT_VERBS, agentDoing, agentsPlan, type AgentGroup } from './agents.ts';
 export {
   QUEUE_CLEARED,
+  QUEUE_COSTS,
   QUEUE_RECOMMENDED,
   QUEUE_ROWS,
+  queueCost,
   queueFault,
   queueMore,
   queuePlan,
@@ -43,6 +45,20 @@ export {
   type QueueOption,
   type QueueRowKind,
 } from './queue.ts';
+export { takeWorking, workingCell, WORKING_GLYPH, WORKING_LABEL, WORKING_MARK } from './working.ts';
+export {
+  TABLE_CHUNK,
+  TABLE_ROWS_LABEL,
+  ariaSort,
+  chunkRows,
+  comparisonPlan,
+  glyphColumn,
+  intrinsicRows,
+  tableCellBody,
+  type Column,
+  type TableCellBody,
+  type TableRow,
+} from './table.ts';
 export {
   FEED_BY,
   FEED_EARLIER,

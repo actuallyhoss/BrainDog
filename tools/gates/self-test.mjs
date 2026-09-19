@@ -74,6 +74,12 @@ const CASES = [
   { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
+  /* AND THE OTHER HALF OF THAT RULE: a `fetch(` the gate must NOT name. `37 §2.2`'s `Http` port
+     declares a method called `fetch`, and the rule matched the signature exactly as it matches a
+     call — so the gate that stops a package reaching the network reported the port that exists so
+     none of them does. The fixture holds both in one file and asserts a count of one, because a
+     gate that went red here would look identical to a gate that got it right. */
+  { gate: 'stack-signature', run: 'stack', expect: /calls fetch/, findings: 1 },
   /* THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte
      does not survive being typed through an editing tool — the same reason the gate's own header
      insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
@@ -151,6 +157,11 @@ const CASES = [
   { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
   { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
   { gate: 'closed-lists', expect: /the migration admits/, findings: 1 },
+  /* AND THE OTHER HALF OF THAT GATE: a `CHECK` a later migration widened, over a document that
+     never says which migration did it. `30 §1` is migration 0001 verbatim and cannot be corrected
+     to the running schema, so this is the only thing standing between a member the database
+     enforces and nobody being able to learn it exists by reading. */
+  { gate: 'closed-lists-widened', run: 'closed-lists', expect: /widened outbox\.kind/, findings: 1 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only
      for `apps/web`, and only when there was a build. The source form needs neither, and it reaches
@@ -199,116 +210,121 @@ const named = (said, seeded) => said.split('\n').filter((l) => l.includes(seeded
 const failed = [];
 
 /**
- * The browser gate's negative, which cannot be a fixture tree.
+ * The negatives that cannot be a fixture tree, because the thing under test is a real browser over
+ * a real build. Five gates run that way, and each one is run again with one violation seeded.
  *
- * The thing under test is a real browser over a real build, and there is no smaller way to hold
- * that. `BRAINDOG_GATE_SEED` puts a 2000px heading inside `#main` — the exact bug the gate is named
- * after, and the one it could not see while it treated the app's own scroll container as an
- * exemption. Skipped when there is no build, like the gate itself.
+ * THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT COST AN EVENING. This was written as
+ * `if (r.status === 0 || !said.includes(names))`, so a gate that went red for something else
+ * entirely — a route that never settled, a browser that would not launch, a build too old for the
+ * fixtures it is served with — was reported in the same words as a gate that saw the seeded
+ * violation and shrugged: "PASSED an intent with no glyph". That sentence sends a reader into the
+ * rule, and the rule was fine. The fixture runner below has always said "went red but never named
+ * X" and printed what the gate did say; these four now say the same thing, for the same reason.
+ *
+ * AND THE TAIL RATHER THAN THE HEAD. A browser gate's first lines are a row of progress dots per
+ * width and scheme; its findings are at the bottom. The fixture gates print theirs first, which is
+ * why that branch slices the other end.
  */
-function seededLayout() {
+const BROWSER = [
+  /**
+   * `layout`: `BRAINDOG_GATE_SEED=1` puts a 2000px heading inside `#main` — the exact bug the gate
+   * is named after, and the one it could not see while it treated the app's own scroll container
+   * as an exemption.
+   */
+  {
+    gate: 'layout',
+    seed: '1',
+    names: 'reaches 2000px',
+    blind: 'PASSED a 2000px heading inside #main — it is examining nothing.',
+    red: 'red on a 2000px heading inside #main',
+  },
+  /**
+   * `a11y`: `BRAINDOG_GATE_SEED=intent` prepends an `a[data-intent="bad"]` with no name for the
+   * intent. `13 §5.1`'s rule is about what reaches the DOM, so a rendered page is the only place it
+   * can be checked.
+   *
+   * AN ANCHOR BECAUSE A `div` PROVED NOTHING. The gate's exemption was written `button, a[href], …`,
+   * so every phone card — each one an anchor — was exempt, and the negative was seeding the one
+   * shape that could not slip through. The rule looked tested and covered a third of what it claimed.
+   */
+  {
+    gate: 'a11y',
+    seed: 'intent',
+    names: 'a.seeded[bad]',
+    blind: 'PASSED an intent with no glyph — colour is carrying meaning alone and nothing sees it.',
+    red: 'red on an intent with no glyph',
+  },
+  /**
+   * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants — which
+   * is precisely what the build shipped for the life of the Text control — and the gate must notice
+   * that two settings come back identical.
+   */
+  {
+    gate: 'prefs',
+    seed: 'prefs',
+    names: 'the body step',
+    blind: 'PASSED a pinned token — a preference could reach the cookie and nothing else.',
+    red: 'red on a preference pinned to a constant',
+  },
+  /**
+   * `keys`: `BRAINDOG_GATE_SEED=keys` swallows every `y` in the capture phase, which is what a
+   * binding nobody wrote looks like from outside the page — and the gate must name `copy-id`.
+   */
+  {
+    gate: 'keys',
+    seed: 'keys',
+    names: 'copy-id',
+    blind: 'PASSED a swallowed key — the sheet could advertise a binding nothing answers.',
+    red: 'red on a key the page never receives',
+  },
+  /**
+   * `queue`: `BRAINDOG_GATE_SEED=queue` puts the cheapest band at the top of the queue and the
+   * dearest at the bottom, which is `19 §6`'s fourth countermeasure read backwards. The rank is
+   * computed in one file, carried through a page source, and drawn by two renderers, and every one
+   * of those seams has its own test; what nothing asserted until this gate is the end of the chain,
+   * so what nothing can assert until this negative is that the gate looks at it.
+   */
+  {
+    gate: 'queue',
+    seed: 'queue',
+    names: 'not ranked by cost of being wrong',
+    blind: 'PASSED a queue with the cheapest question first — the ranking could be reversed and nothing would say.',
+    red: 'red on a queue ranked backwards',
+  },
+];
+
+function seededBrowser({ gate, seed, names, blind, red }) {
+  /* Skipped when there is no build, like the gate itself. */
   if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
-    console.log('  layout: no build, so its negative is not run');
+    console.log(`  ${gate}: no build, so its negative is not run`);
     return;
   }
-  const r = spawnSync(process.execPath, [join(here, 'layout.mjs')], {
+  const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
     cwd: join(here, '..', '..'),
     encoding: 'utf8',
-    env: { ...process.env, BRAINDOG_GATE_SEED: '1' },
+    env: { ...process.env, BRAINDOG_GATE_SEED: seed },
   });
   const said = `${r.stdout}${r.stderr}`;
-  if (r.status === 0 || !said.includes('reaches 2000px')) {
-    console.error('  layout: PASSED a 2000px heading inside #main — it is examining nothing.');
-    failed.push('layout');
+  if (r.status === 0) {
+    console.error(`  ${gate}: ${blind}`);
+    failed.push(gate);
+  } else if (!said.includes(names)) {
+    console.error(`  ${gate}: went red but never named ${names}, so this run says nothing about the rule. What it did say:`);
+    console.error(
+      said
+        .split('\n')
+        .filter((l) => l.trim())
+        .slice(-8)
+        .map((l) => `      ${l}`)
+        .join('\n'),
+    );
+    failed.push(gate);
   } else {
     ran++;
-    console.log('  layout: red on a 2000px heading inside #main');
+    console.log(`  ${gate}: ${red}`);
   }
 }
 
-/**
- * The a11y gate's `intent-without-glyph` negative, and it cannot be a fixture tree either.
- *
- * `13 §5.1`'s rule is about what reaches the DOM, so the only place it can be checked is a rendered
- * page. `BRAINDOG_GATE_SEED=intent` prepends an `a[data-intent="bad"]` with no name for the intent
- * and the gate must go red.
- *
- * AN ANCHOR BECAUSE A `div` PROVED NOTHING. The gate's exemption was written `button, a[href], …`,
- * so every phone card — each one an anchor — was exempt, and the negative was seeding the one shape
- * that could not slip through. The rule looked tested and covered a third of what it claimed.
- */
-function seededIntent() {
-  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
-    console.log('  a11y: no build, so its negative is not run');
-    return;
-  }
-  const r = spawnSync(process.execPath, [join(here, 'a11y.mjs')], {
-    cwd: join(here, '..', '..'),
-    encoding: 'utf8',
-    env: { ...process.env, BRAINDOG_GATE_SEED: 'intent' },
-  });
-  const said = `${r.stdout}${r.stderr}`;
-  if (r.status === 0 || !said.includes('a.seeded[bad]')) {
-    console.error('  a11y: PASSED an intent with no glyph — colour is carrying meaning alone and nothing sees it.');
-    failed.push('a11y');
-  } else {
-    ran++;
-    console.log('  a11y: red on an intent with no glyph');
-  }
-}
-
-/**
- * The prefs gate's negative, and it cannot be a fixture tree either.
- *
- * `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants — which is precisely what the
- * build shipped for the life of the Text control — and the gate must notice that two settings come
- * back identical.
- */
-function seededPrefs() {
-  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
-    console.log('  prefs: no build, so its negative is not run');
-    return;
-  }
-  const r = spawnSync(process.execPath, [join(here, 'prefs.mjs')], {
-    cwd: join(here, '..', '..'),
-    encoding: 'utf8',
-    env: { ...process.env, BRAINDOG_GATE_SEED: 'prefs' },
-  });
-  const said = `${r.stdout}${r.stderr}`;
-  if (r.status === 0 || !said.includes('the body step')) {
-    console.error('  prefs: PASSED a pinned token — a preference could reach the cookie and nothing else.');
-    failed.push('prefs');
-  } else {
-    ran++;
-    console.log('  prefs: red on a preference pinned to a constant');
-  }
-}
-
-/**
- * The keys gate's negative, and it cannot be a fixture tree.
- *
- * `BRAINDOG_GATE_SEED=keys` swallows every `y` in the capture phase, which is what a binding nobody
- * wrote looks like from outside the page — and the gate must name `copy-id`.
- */
-function seededKeys() {
-  if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
-    console.log('  keys: no build, so its negative is not run');
-    return;
-  }
-  const r = spawnSync(process.execPath, [join(here, 'keys.mjs')], {
-    cwd: join(here, '..', '..'),
-    encoding: 'utf8',
-    env: { ...process.env, BRAINDOG_GATE_SEED: 'keys' },
-  });
-  const said = `${r.stdout}${r.stderr}`;
-  if (r.status === 0 || !said.includes('copy-id')) {
-    console.error('  keys: PASSED a swallowed key — the sheet could advertise a binding nothing answers.');
-    failed.push('keys');
-  } else {
-    ran++;
-    console.log('  keys: red on a key the page never receives');
-  }
-}
 
 let ran = 0;
 
@@ -354,10 +370,7 @@ for (const { gate, expect, findings, run } of CASES) {
   }
 }
 
-seededLayout();
-seededIntent();
-seededPrefs();
-seededKeys();
+for (const b of BROWSER) seededBrowser(b);
 
 /* AND EVERY FIXTURE IS CLAIMED. A directory under `negative/` that no case runs is a violation
    nobody is seeding, which is the same silence this file exists to break. */

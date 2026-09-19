@@ -1051,9 +1051,13 @@
      the ways to answer it. The options are a list rather than a row of buttons, so a long reason sits
      under the words it belongs to and the recommendation is read beside its own option and no other. */
 
+  /* THE BLOCK IS ITS OWN CONTAINER, so a queue answers the width of the slot it was placed in rather
+     than the width of the window. A queue at `span: 6` on a wide screen is as narrow as the same
+     queue on a phone, and it is the block that has to fit. */
   .queue {
     display: grid;
     gap: var(--sp-3);
+    container-type: inline-size;
   }
 
   .queue-card {
@@ -1079,6 +1083,29 @@
     font-weight: 500;
   }
 
+  /* THE BAND SITS AT THE END OF THE BY-LINE, pushed there rather than placed there, because it is
+     the one thing on that line that is about the card's PLACE in the list rather than about the
+     card. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that shouts is a
+     ranking that decides.
+
+     THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
+     reader has to learn and an a11y failure the moment one of them is the only difference, so the
+     dearest band takes weight and the darker ink, and the other three are identical. `data-cost` is
+     matched rather than the English, so a translated label still weights the right card. */
+  .queue-cost {
+    margin-inline-start: auto;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s3);
+    color: var(--ink2);
+    white-space: nowrap;
+  }
+
+  .queue-cost[data-cost='undo'] {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
   .queue-question {
     margin: 0;
     font-size: var(--t-lg);
@@ -1092,21 +1119,41 @@
     color: var(--ink2);
   }
 
+  /* THREE COLUMNS SHARED BY EVERY OPTION: the way to answer, the recommendation, the reason. The
+     tracks are declared once here and each option borrows them with `subgrid`, so the buttons line
+     up down one edge and the reasons start at one x no matter how long any of them is.
+
+     THE REASON USED TO SIT UNDER ITS OPTION, on a row of its own, and the note for it said reading
+     across would pull the options out of line. That is true of a flow layout and not of a grid: a
+     shared track holds them in line by construction. It cost three lines per option, so one card
+     with three ways to answer was four hundred pixels and `/p/agents` opened on the queue and
+     nothing else, which is the page that is supposed to say what the agents are doing.
+
+     AND THE RECOMMENDATION SITS AGAINST THE OPTION IT NAMES. Pushed to the far edge of a wide block it
+     was a word a reader had to track thirteen hundred pixels to attach to anything, which is a label
+     that has stopped labelling. */
   .queue-options {
     display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr);
     gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* THE REASON SITS UNDER THE OPTION, not beside it: read across, two reasons of different lengths
-     pull their options out of line, and the thing being compared is the options. */
   .queue-option {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sp-1) var(--sp-2);
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: var(--sp-1) var(--sp-3);
     align-items: baseline;
+  }
+
+  /* EACH PART NAMES ITS OWN COLUMN, because an option with no recommendation would otherwise slide
+     its reason into the recommendation's track and the reasons would go ragged down the card. */
+  .queue-act,
+  .queue-label {
+    grid-column: 1;
   }
 
   .queue-act {
@@ -1133,7 +1180,8 @@
   /* A WORD AND NOT A HIGHLIGHT. What an agent suggests is worth saying and is not worth pre-pressing,
      so it reads as a quiet label beside the option rather than as the option already chosen. */
   .queue-rec {
-    justify-self: end;
+    grid-column: 2;
+    justify-self: start;
     padding-inline: var(--sp-2);
     border-radius: var(--r-pill);
     background: var(--s3);
@@ -1142,7 +1190,7 @@
   }
 
   .queue-because {
-    grid-column: 1 / -1;
+    grid-column: 3;
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-xs);
@@ -1153,6 +1201,33 @@
     max-inline-size: var(--measure);
     margin: 0;
     color: var(--dim);
+  }
+
+  /* AND UNDER IT AGAIN WHEN THE BLOCK IS NARROW, because three tracks in a phone's width leaves the
+     reason about a hundred pixels and a reason nobody can read is worse than a reason below its
+     option. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide screen is
+     as narrow as the same queue on a phone, and it is the block that has to fit. */
+  @container (inline-size < 34rem) {
+    .queue-options {
+      grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .queue-because {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* AND A COUNT THAT LEADS SOMEWHERE LOOKS LIKE IT DOES. It is an `<a>` only when the evaluator said
+     where the rest are; dimmed like the sentence beside it, underlined so it reads as the door it is. */
+  a.queue-more {
+    display: inline-block;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a.queue-more:hover,
+  a.queue-more:focus-visible {
+    color: var(--ink);
   }
 
   /* ── diff: before and after ──────────────────────────────────────────────
@@ -1440,6 +1515,28 @@
   .prop-label {
     color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  /* AND A PART'S NAME IS A TARGET, so on a thumb it is one. Measured at 61x17 on `/p/work` below
+     640: "No project", the row a `bar` block draws for what belongs to no part, which opens exactly
+     those rows. A name that opens a list is not a link inside a sentence, so neither WCAG 2.5.8 nor
+     `13 §7` exempts it. `.tap`'s trick grows the hit box without moving the word, and the row grows
+     with it so the box stays inside its own row rather than taking the press meant for the row
+     above. The same rule a split legend's name takes in `blocks-charts.css`. */
+  @media (pointer: coarse) {
+    .prop-row {
+      min-block-size: var(--tap);
+    }
+
+    .prop-label a {
+      position: relative;
+    }
+
+    .prop-label a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2)) 0;
+    }
   }
 
   .prop-value {

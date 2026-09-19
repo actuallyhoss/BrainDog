@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
+import { costOf, isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
 import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
@@ -83,6 +83,34 @@ function depsOf(k: Kernel): PageDeps {
       return f?.to ? { field: f.id, to: f.to } : null;
     },
     inScope: (register, project, opts) => k.inScope(register, project, opts),
+    /* THE RECORD'S OWN OPEN QUESTIONS, wired the way `pageDeps()` wires them, so a `queue` block on the
+       agents page is answered here rather than refused as unwired. A freshly seeded record has opened
+       none, which is the answer, not a gap. */
+    openQuestions: (limit) => {
+      const said = k.openSuggestions();
+      const rows = said.ok ? said.value : [];
+      return {
+        questions: rows.slice(0, limit).map((r) => ({
+          id: String(r.id),
+          who: String(r.opened_by ?? ''),
+          at: String(r.opened_at ?? ''),
+          kind: String(r.body_kind ?? ''),
+          question: k.question(String(r.id)) ?? '',
+          why: '',
+          cost: costOf(String(r.body_kind ?? ''), r.body),
+          options: [],
+        })),
+        open: rows.length,
+      };
+    },
+    /* EVERY EVENT ABOUT ONE ROW, as `pageDeps()` wires it, which is half of what `working: true` asks:
+       the other half is `sessionsLive` below, and a record wired for one of them refuses the block. */
+    history: (register, row) => {
+      const found = k.get(row);
+      return found && found.register === register
+        ? { ok: true, value: k.history(found.id) }
+        : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: `${row} is not a row of ${register}.`, at: 'row' } };
+    },
     sessionsLive: () => {
       const done = k.register('session')?.done ?? [];
       const out = k.list({ register: 'session', where: { none: [{ field: 'state', in: [...done] }] }, order: [{ field: 'last_seen', dir: 'desc' }], limit: 200 });
@@ -217,6 +245,21 @@ test('/p/AGENTS, AS THE PACK DECLARES IT, draws the same runs, learnings and ski
     const web: NonNullable<ReturnType<typeof page>>['blocks'][number] = drawn.blocks[n]!;
     assert.deepEqual(kernel.refusals, [], `${at}, the kernel: ${JSON.stringify(kernel.refusals)}`);
     assert.deepEqual(web.refusals, [], `${at}, the demo: ${web.refusals.join('; ')}`);
+    /* A QUEUE IS NOT A REGISTER'S ROWS, so the two are held on what they answered rather than on cells.
+       They cannot hold the same questions: the demo draws the sample's decide queue and a freshly
+       seeded record has opened none. What must agree is that both read the source, neither refused,
+       and each question the demo drew is one a person could actually answer. */
+    if (block.source === 'governance.open') {
+      assert.ok(Array.isArray(kernel.queue), `${at}: the record did not read its open questions`);
+      assert.ok(Array.isArray(web.queue) && web.queue.length > 0, `${at}: the demo drew no questions`);
+      assert.equal(web.queue!.length, Math.min(3, web.total), `${at}: the demo drew a different number than it counted`);
+      for (const q of web.queue!) {
+        assert.ok(q.question.trim() !== '', `${at}: a question with nothing to read`);
+        assert.ok(q.options.length >= 2, `${at}: ${q.id} offers fewer than two ways to answer`);
+        assert.ok(q.options.every((o) => o.key !== '' && o.label !== ''), `${at}: ${q.id} has a nameless option`);
+      }
+      continue;
+    }
     const title = block.columns![0]!.field;
     assert.ok(kernel.rows.length > 0, `${at} draws nothing on the seed`);
     assert.deepEqual(web.rows.map((r) => r.cells[0]), kernel.rows.map((r) => String(r.fields[title])), at);
@@ -462,4 +505,40 @@ test('A CARD SAYS "Everywhere" FOR A ROW OF NO PROJECT: a scope column on a card
   const global = kernel.rows.findIndex((r) => r.fields.name === 'review-pr' && !r.fields.project);
   assert.ok(global >= 0 && kernel.scopes?.[global] === null, 'the seed has no global review-pr');
   assert.ok(web.rows.some((r) => r.cells[0] === 'review-pr' && r.cells[1] === 'Everywhere'), JSON.stringify(web.rows.map((r) => r.cells)));
+});
+
+test('WORKING: TRUE IS ANSWERED BY BOTH ENGINES, aligned with the rows and only when the block asks', async () => {
+  const deps = await seeded;
+  const block = {
+    kind: 'todo',
+    source: 'register.skills',
+    columns: [{ field: 'name' }],
+    working: true,
+    empty: 'No skills apply here.',
+  } as KernelBlock & PageBlock;
+
+  const kernel = kernelBlock(deps, block);
+  const web = webBlock(block);
+  assert.deepEqual(kernel.refusals, [], JSON.stringify(kernel.refusals));
+  assert.deepEqual(web.refusals, [], web.refusals.join('; '));
+
+  /* THAT THE KEY IS THERE AT ALL IS THE POINT. `working: true` used to be read by neither engine —
+     it was not in either `READS`, so a declaration carrying it was refused as a key this build does
+     not read, and the dot the renderers draw was a thing no page could ever turn on. */
+  assert.ok(Array.isArray(kernel.working_now), 'the record does not answer working: true');
+  assert.ok(Array.isArray(web.working_now), 'the app does not answer working: true');
+  assert.equal(kernel.working_now!.length, kernel.rows.length, 'the record’s answer is not aligned with its rows');
+  assert.equal(web.working_now!.length, web.entries.length, 'the app’s answer is not aligned with its rows');
+  assert.ok(kernel.working_now!.every((v) => typeof v === 'boolean'));
+  assert.ok(web.working_now!.every((v) => typeof v === 'boolean'));
+
+  /* AND NOBODY IS ON A SEEDED ROW, in either engine: the seed's writes are the installer's and its
+     runs were last heard from long before the fixed clock. A pass here that read `true` anywhere
+     would mean one of the two had invented work nobody is doing. */
+  assert.deepEqual(web.working_now, kernel.working_now, 'the two engines disagree about who is working');
+  assert.ok(!kernel.working_now!.includes(true), 'the seed has somebody working on a row at the fixed clock');
+
+  const { working: _off, ...unasked } = block;
+  assert.equal(kernelBlock(deps, unasked as KernelBlock & PageBlock).working_now, undefined);
+  assert.equal(webBlock(unasked as KernelBlock & PageBlock).working_now, undefined);
 });

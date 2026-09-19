@@ -1264,9 +1264,20 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
   }
 
   const fetch = body.fetch as
-    | { read?: { rows?: unknown }; expect?: unknown; page?: { from?: unknown }; probe?: { read?: unknown } }
+    | { base?: unknown; read?: { rows?: unknown }; expect?: unknown; page?: { from?: unknown }; probe?: { read?: unknown } }
     | undefined;
   if (fetch !== undefined && fetch !== null && typeof fetch === 'object') {
+    /* THE ADDRESS A CONNECTOR MAY TALK TO, CHECKED WHERE IT IS WRITTEN. Both `Http` adapters carry
+       a comment reading "Lint refuses a `base:` that is not `https://`" and treat a non-https URL
+       arriving at run time as a fault in this repository rather than one of the four transport
+       failures — and lint did not refuse it. A declaration is the one place this can be caught
+       before a credential has been sealed against it. */
+    if (typeof fetch.base !== 'string' || !FETCH_BASE.test(fetch.base))
+      return bad(
+        'ACTION_NOT_HTTPS',
+        `${id} fetches from ${JSON.stringify(String(fetch.base).slice(0, 80))}, and a connector's base is an https:// host on its own — no path, no placeholder.`,
+        'fetch.base',
+      );
     if (fetch.read?.rows !== undefined) {
       const wrong = pathFault(fetch.read.rows, `${id}.fetch.read.rows`);
       if (wrong) return wrong;
@@ -1316,6 +1327,16 @@ const CALL_TRIGGERS = ['schedule', 'rule', 'both'] as const;
 const SENDS_CEILING = 32;
 /** The most rows one poll fills from one answer, one map each. */
 export const POLL_MAPS_MOST = 20;
+/**
+ * `47 §4.1`'s `base:` — an origin and nothing else: `https`, a host, an optional port.
+ *
+ * NO PATH AND NO PLACEHOLDER, and both halves matter. `§8`'s whole origin check is `new URL(base)`
+ * and a comparison, so a `base` carrying a path has that path silently dropped — the declaration
+ * reads as though it pins `/v1` and pins only the host. A placeholder is worse: it reads as though
+ * a grant field decides where the request goes, and nothing substitutes it.
+ */
+const FETCH_BASE = /^https:\/\/[a-z0-9.-]+(:[0-9]+)?$/u;
+
 /** `<register>.<field>`, both in the identifier grammar. */
 const SENDS_NAME = /^([a-z][a-z0-9_]{0,31})\.([a-z][a-z0-9_]{0,31})$/;
 

@@ -305,10 +305,19 @@ them. `ROUTES` in `@braindog/host` routes 68 of the ninety at `/api/<method>`, 3
 **Idempotency:** `op_id` is stored on the first event row only; a replay returns the current row with the original
 rowid as `version` — the kernel's replay, never the host's (41 §13 #9).
 
-**Suggestion bodies:** `options { question, options: [{ id, label, because }], requires_reason: true }` ·
+**Suggestion bodies, all seven** (`BODY_KINDS` in `packages/kernel/src/govern.ts`; the schema's `CHECK` was
+widened from four by migration `0008_arrange`): `options { question, options: [{ id, label, because }], requires_reason: true }` ·
 `pattern { ingest: <declaration body>, samples: [raw_id…] }` · `rowset { register, rows: [{ fields } | { at, version, patch }], ingest? }` ·
 `change { declaration_id, from, to, observed, prediction }` — accepting a `change` writes the `prediction` row
-(24 §4.6). Spark's palette answer has a fifth shape, `query`, which is never filed (23 §4).
+(24 §4.6). Then the three that change what the record IS, applied by the caller after the gate says yes because
+installing is asynchronous (`ARRANGING`): `pack { install | enable | disable: <pack id>, doc? }`, exactly one verb
+naming one pack · `settings { pack, values, before? }` · `arrange { why: […], packs?, pages?, settings?, rows? }`,
+several of the others as one reviewable question, which says why in words and must change something.
+Spark's palette answer has a further shape, `query`, which is never filed (23 §4).
+
+**What it would cost to get each one wrong** is computed from the body, never declared in it
+(`packages/kernel/src/weigh.ts`), and is what `governance.open` ranks the queue by — `undo`, `shape`, `rows`,
+`call`, worst first, oldest first within a band (19 §8 risk 6).
 
 **A `rowset` row that carries `at` updates a row; any other row creates one.** `at` is the row's spoken id or row id
 in `register`, `version` is the version it was read at, and `patch` holds the fields it changes, with `deleted_at` to

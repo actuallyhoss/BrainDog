@@ -51,6 +51,9 @@ importers:
 
   apps/selfhost:
     dependencies:
+      '@braindog/connect':
+        specifier: workspace:*
+        version: link:../../packages/connect
       '@braindog/declare':
         specifier: workspace:*
         version: link:../../packages/declare
@@ -193,6 +196,15 @@ importers:
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
+
+  packages/connect:
+    dependencies:
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
 
   packages/declare:
     dependencies:

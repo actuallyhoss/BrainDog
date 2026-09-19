@@ -27,6 +27,11 @@ import {
   stamp,
 } from '@braindog/seed';
 
+/* THE SAME FUNCTION THE RECORD RANKS WITH. The sample is the product with the wires showing, so a
+   queue ordered here by a number somebody typed would be a demonstration of a rule the product does
+   not follow. */
+import { costOf, costRank } from '@braindog/kernel';
+
 import type {
   AuditEvent,
   Credential,
@@ -545,13 +550,6 @@ export const ARRANGING: Question[] = [
   },
 ];
 
-/**
- * EVERY QUESTION THE SAMPLE HAS OPEN, in the queue's order: the one count the rail, Home and Decide say.
- * The rail and Home counted `QUESTIONS` and Decide drew `ARRANGING` after them, so the badge said 5
- * over a screen headed Open questions 8.
- */
-export const QUEUE: Question[] = [...QUESTIONS, ...ARRANGING].sort((a, b) => a.rank - b.rank);
-
 export const PROPOSALS: Record<string, Proposal> = {
   SG40: {
     kind: 'pack',
@@ -609,6 +607,22 @@ export const PROPOSALS: Record<string, Proposal> = {
     pagesNow: { 'page.money': { title: 'Money', blocks: [{ kind: 'table', heading: 'Bills due' }] } },
   },
 };
+
+/**
+ * EVERY QUESTION THE SAMPLE HAS OPEN, in the queue's order: the one count the rail, Home and Decide say.
+ * The rail and Home counted `QUESTIONS` and Decide drew `ARRANGING` after them, so the badge said 5
+ * over a screen headed Open questions 8.
+ *
+ * DEAREST TO GET WRONG FIRST, BY THE RECORD'S OWN FUNCTION, which is why it is declared down here
+ * rather than beside the questions: the band comes off the proposal attached to a question, and
+ * `PROPOSALS` is above. The sample's three arrangements carry bodies, so they band; the five
+ * creative questions carry nothing but options, so they are judgements and tie. `rank` breaks the
+ * tie, which is the one thing a fixture can say that a record cannot: which of five equally cheap
+ * questions its author wanted read first. A live record breaks the same tie by age.
+ */
+export const QUEUE: Question[] = [...QUESTIONS, ...ARRANGING]
+  .map((q) => ({ ...q, band: costOf(PROPOSALS[q.id]?.kind ?? 'options', PROPOSALS[q.id]?.body) }))
+  .sort((a, b) => costRank(a.band) - costRank(b.band) || a.rank - b.rank);
 
 /* ── the vault ───────────────────────────────────────────────────────────
    The register indexes what a key OPENS, never the key. No agent tool returns a secret, reveal is
@@ -889,6 +903,11 @@ export const SUSPENDED: string | null = null;
  * from the migration's again.
  */
 const WRITTEN: AuditEvent[] = [
+  /* THE RUN THAT IS GOING RIGHT NOW, ON THE ROW IT IS ON. `session#1` is Claude, active, heard from
+     three minutes ago, doing "Variable axis QA, instances 3 of 9" — and until this line nothing in
+     the ledger said WHICH row that was, so `working: true` was a dot the demo could never light. A
+     demo that ships a feature it cannot show is a feature nobody reviews. */
+  { seq: 4193, at: stamp(-0.1), by: 'claude', kind: 'edit', target: 'tasks#8', note: 'instances 3 of 9 checked', version: 4193 },
   { seq: 4192, at: stamp(-3), by: 'claude', kind: 'create', target: 'services#6', note: 'Object storage, from the Fenwick invoice', version: 4192 },
   { seq: 4191, at: stamp(-3), by: 'claude', kind: 'create', target: 'services#7', note: 'Workers plan, from the Fenwick invoice', version: 4191 },
   /* THE ARRIVAL THAT CAUSED THE TWO ROWS ABOVE, and it was the missing half of the story. `45 §5`:

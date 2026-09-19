@@ -1,0 +1,63 @@
+/**
+ * What the Worker's adapter holds that the platform does not.
+ *
+ * ONE ADAPTER'S `PrivateRange` IS THE OTHER'S PLATFORM. Cloudflare will not route a Worker's
+ * `fetch` to a private address, so the three names left are the three this file asserts — and the
+ * point of asserting them is that `47 §5.1` turns each into a different repair.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { httpFor } from '../src/http.ts';
+import type { Send } from '../src/actions.ts';
+
+const AT = new URL('https://api.example.com/v1/things');
+const INIT = { method: 'GET' as const, headers: { accept: 'application/json' }, timeoutMs: 1_000 };
+
+const named = async (fn: () => Promise<unknown>): Promise<string> => {
+  try {
+    await fn();
+  } catch (e) {
+    return e instanceof Error ? e.name : 'not an Error';
+  }
+  throw new assert.AssertionError({ message: 'nothing was refused, and a refusal was wanted' });
+};
+
+test('a redirect is asked for manually and comes back intact', async () => {
+  const seen: RequestInit[] = [];
+  const send: Send = (_url, init) => {
+    seen.push(init);
+    return Promise.resolve(new Response(null, { status: 301, headers: { location: 'https://evil.example/' } }));
+  };
+  const res = await httpFor(send).fetch(AT, INIT);
+
+  assert.equal(seen[0]?.redirect, 'manual');
+  assert.equal(res.status, 301);
+});
+
+test('a body past two megabytes is refused as it streams', async () => {
+  const send: Send = () =>
+    Promise.resolve(
+      new Response(
+        new ReadableStream<Uint8Array>({ pull(c) { c.enqueue(new Uint8Array(200_000)); } }),
+        { status: 200, headers: { 'content-length': '900' } },
+      ),
+    );
+  assert.equal(await named(() => httpFor(send).fetch(AT, INIT)), 'TooLarge');
+});
+
+test('nothing answering is a timeout, and anything else is the network', async () => {
+  const hangs: Send = (_url, init) =>
+    new Promise((_r, reject) => { init.signal?.addEventListener('abort', () => { reject(new Error('aborted')); }); });
+  assert.equal(await named(() => httpFor(hangs).fetch(AT, { ...INIT, timeoutMs: 20 })), 'Timeout');
+
+  const breaks: Send = () => Promise.reject(new Error('ECONNRESET'));
+  assert.equal(await named(() => httpFor(breaks).fetch(AT, INIT)), 'Network');
+});
+
+test('a body under the cap comes through whole', async () => {
+  const send: Send = () => Promise.resolve(new Response('{"items":[1,2,3]}', { status: 200 }));
+  const res = await httpFor(send).fetch(AT, INIT);
+  assert.equal(await res.text(), '{"items":[1,2,3]}');
+});

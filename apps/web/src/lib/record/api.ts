@@ -42,6 +42,7 @@ import {
   SOURCES,
   QUESTIONS,
   QUEUE,
+  PROPOSALS,
   DECIDED,
   REGISTERS,
   ROWS,
@@ -55,10 +56,10 @@ import { runway } from './forecast.ts';
 import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
-import { STALE_MS, barsOf, findingsFrom, isStale, stepsPercent, tallySteps, type Bars, type MeasureSeries, type Part, type Rate, type SeriesLine } from '@braindog/kernel';
+import { STALE_MS, barsOf, costOf, costRank, findingsFrom, isStale, stepsPercent, tallySteps, type Bars, type Cost, type MeasureSeries, type Part, type QueueQuestion, type Rate, type SeriesLine } from '@braindog/kernel';
 import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam } from './metrics.ts';
 import { REDUCES } from './schema.ts';
-import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, RegisterDecl } from './schema.ts';
+import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, Question, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
 import { listLine } from './tags.ts';
 
@@ -1628,6 +1629,12 @@ export type BlockResult = PageBlock & {
   metrics?: Metric[] | undefined;
   /** On a block that inherits: how many of `entries`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
+  /**
+   * A `queue` block's questions, as the record answered them: what is waiting, who opened it, why,
+   * and the ways to answer it. `total` is how many are open, which is how the block knows what it
+   * left out.
+   */
+  queue?: QueueQuestion[];
   /** A `feed` block's rows before they are words, newest first, a burst being one row. */
   feed?: FeedRow[];
   /** On a feed with `since: seen`: the reader's read mark, or `null` when they have none yet. */
@@ -2048,6 +2055,8 @@ const READS = new Set([
   'spent', 'toward',
   /* A note whose body is a whole document. */
   'document',
+  /* Whether each row says an agent is on it right now, and the answer that asking produces. */
+  'working', 'working_now',
 ]);
 
 export function page(slug: string): { page: PageDecl; blocks: BlockResult[]; values: Record<string, string> } | null {
@@ -2125,6 +2134,8 @@ export function readBlock(b: PageBlock): BlockResult {
     if (b.kind === 'series') return seriesBlock(b);
     /* A FEED READS THE LEDGER and a diff reads one row's history, so neither is a register's rows. */
     if (b.source === 'activity') return activityBlock(b);
+    /* WHAT IS WAITING ON A PERSON, which is the decide queue read onto a page. */
+    if (b.source === 'governance.open') return openBlock(b);
     if (b.kind === 'diff') return diffBlock(b);
     /* THE RUNS WORKING NOW are `session`'s rows in the order the kernel's `sessionsLive` gives them,
        so a declared order would be a second answer to a question the source settles. */
@@ -2149,7 +2160,7 @@ export function readBlock(b: PageBlock): BlockResult {
          - a key the type does not carry at all — `when:` is in 06 §1.1 and is not read anywhere.
        All three are the block's own error, so they go where `explain()` goes. */
     const said = [...refusals];
-    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id>, forecast.runway, activity and sessions.live`);
+    if (b.source && !register) said.push(`source: ${b.source} is not a source this build reads. It reads register.<id>, forecast.runway, activity, governance.open and sessions.live`);
     if (register) {
       /* `seq` is a column and not a field: it is on the ROW rather than in its fields, and `toRows`
          renders it as `#4`. Any pack may name it, so it belongs in the set a column may resolve to
@@ -2230,6 +2241,11 @@ export function readBlock(b: PageBlock): BlockResult {
       rows,
       /* The kernel's own test of a run gone quiet, so the two hosts dim the same runs. */
       ...(live ? { quiet: entries.map((e) => isStale({ fields: e.fields as never, updated_at: e.created }, NOW)) } : {}),
+      /* ALIGNED WITH THE ROWS, NOT WORKED OUT WHILE DRAWING THEM. The dot used to be decided inside
+         `projectRows`, which reads the sample's own ledger, so a LIVE record drew no dot at all no
+         matter what its agents were doing. Both engines answer the question now and the drawer only
+         reads the answer. */
+      ...(b.working === true && register ? { working_now: entries.map((e) => workingNow(register, e.seq)) } : {}),
       ...(own === undefined ? {} : { inherited: Math.max(0, entries.length - own) }),
       ...(figured.spentBy === undefined ? {} : { spentBy: figured.spentBy }),
       /* A KIND THAT REDUCES DRAWS THE WHOLE ANSWER, so it is never showing a slice of it. `bar`,
@@ -2436,6 +2452,45 @@ const computed = (b: PageBlock, refusals: string[]): BlockResult => ({
   stale_at: new Date(NOW).toISOString(),
   metrics: undefined,
 });
+
+/**
+ * The questions still open, as a `queue` block reads them: the sample's own decide queue, which is the
+ * same list `/decide` draws, in the same order.
+ *
+ * ONE ANSWER AND NOT A SECOND ONE. The kernel's `openBlock` is the real evaluator; this is the sample's
+ * copy, and it is here for the reason every other branch in this file is: the demo has no record behind
+ * it, and a page that drew nothing without one would make the kind unreviewable. The two are held
+ * against each other in `engines.test.ts`.
+ *
+ * `spark` IS WHO OPENED THEM, because the sample's proposals are all Spark's (`PROPOSALS`), and the
+ * `Question` it keeps carries no author of its own.
+ */
+function openBlock(b: PageBlock): BlockResult {
+  if (b.order?.length) return computed(b, ['order: governance.open comes ranked by what each question would cost to get wrong, so it takes no order:']);
+  const limit = Math.min(20, Math.max(1, Math.floor(b.limit ?? 3)));
+  /* DEAREST FIRST, AND FROM THE SAME FUNCTION THE RECORD USES. `QUEUE` is sorted by the fixture's own
+     hand-written `rank`, which is what makes the sample read like a real morning; the band is computed
+     from the proposal's body where there is one, so the sample's order and the record's are one rule
+     and not two. A question the fixture wrote with no body behind it is a judgement, which is what
+     those questions are (`weigh.ts`). */
+  const open = QUEUE.filter((q) => q.decided === undefined);
+  const band = (q: Question): Cost => costOf(PROPOSALS[q.id]?.kind ?? 'options', PROPOSALS[q.id]?.body);
+  const queue = open
+    .slice()
+    .sort((x, y) => costRank(band(x)) - costRank(band(y)) || x.opened.localeCompare(y.opened) || x.id.localeCompare(y.id))
+    .slice(0, limit)
+    .map((q) => ({
+      id: q.id,
+      who: 'spark',
+      at: q.opened,
+      kind: PROPOSALS[q.id]?.kind ?? 'options',
+      question: q.title,
+      why: q.context ?? q.cost,
+      cost: band(q),
+      options: q.options.map((o) => ({ key: o.key, label: o.title, because: o.body, recommended: o.recommended === true })),
+    }));
+  return { ...computed(b, []), queue, shown: queue.length, total: open.length };
+}
 
 /** The kinds of actor a feed groups by, the kernel's `FEED_BY`. */
 const FEED_KINDS: readonly string[] = ['agent', 'rule', 'you'];
@@ -2863,6 +2918,48 @@ function provenanceOf(register: string, e: Entry): { by: string; at: string } {
   const said = [...NEWS.filter((n) => n.href === href), ...AUDIT.filter((a) => a.target === target)].sort((a, b) => (a.at < b.at ? 1 : -1))[0];
   return said ? { by: said.by, at: said.at } : { by: e.by, at: e.created };
 }
+
+/** Only these three sign a run (`session.agent`, `30 §3`): a person or a rule has no run to be at. */
+const LIVE_AGENTS = new Set(['claude', 'codex', 'cursor']);
+
+/** The newest ledger event about one exact row, or `null` when nothing has touched it. */
+function lastTouchIn(audit: readonly { by: string; at: string; target?: string | undefined }[], register: string, seq: number): { by: string; at: string } | null {
+  const target = `${register}#${seq}`;
+  const said = audit.filter((a) => a.target === target).sort((a, b) => (a.at < b.at ? 1 : -1))[0];
+  return said ? { by: said.by, at: said.at } : null;
+}
+
+/**
+ * `working: true`'s question, asked with the ledger and the runs handed to it rather than read from
+ * the module's own — which is what makes it a function a test can put a made-up row and a made-up
+ * run through, the way `workingNow` below puts the record's real ones.
+ *
+ * NOT WHO CHANGED THE ROW LAST, WHETHER THAT ACTOR IS STILL AT IT: only an agent has a run to be at,
+ * so a row last touched by `you` or a rule answers `false` before the runs are even read. Then two
+ * clocks, not one — the touch itself has to sit inside the kernel's 45-minute staleness window
+ * (`STALE_MS`), because an agent that is still running does not mean it is still on the row it wrote
+ * three hours ago, and the run that agent is named on has to be heard from inside that same window
+ * (`workingAt`) — the same fact `sessions.live` shows for a run, asked here of a row instead.
+ *
+ * THE KERNEL ANSWERS THE SAME QUESTION in `pages.ts` `workingOf`, off the row's history rather than
+ * off a sample ledger, and `engines.test.ts` holds the two to the same answer.
+ */
+export function workingNowAt(
+  register: string,
+  seq: number,
+  now: number,
+  audit: readonly { by: string; at: string; target?: string | undefined }[],
+  runs: readonly Entry[],
+): boolean {
+  const touch = lastTouchIn(audit, register, seq);
+  if (!touch || !LIVE_AGENTS.has(touch.by)) return false;
+  if (now - Date.parse(touch.at) >= STALE_MS) return false;
+  return runs.some((run) => run.fields.agent === touch.by && workingAt(run, now));
+}
+
+/** The same question, asked against the record's own ledger and runs, at the record's own clock. */
+export const workingNow = (register: string, seq: number, now: number = NOW): boolean =>
+  workingNowAt(register, seq, now, AUDIT, ROWS.session ?? []);
 
 /** `You, 3 Sep` or `Reply rule, 9 Sep`: who changed a row last, and the day. */
 export const changedText = (by: string, at: string): string => {

@@ -52,6 +52,12 @@ const INTERVAL = /^(\d{1,4})([smhdw])$/;
  * a fetch every three months, and both of those are the kind of wrong nobody reads twice.
  */
 export function intervalMs(text: string): number | null {
+  /* A DECLARATION THAT NAMES NO INTERVAL REACHED HERE AND THREW. `install` is the door a `.brain`
+     pack comes through, and `checkInterval` is called from the validator, so an ingest with no
+     `every:` took the whole install down with a `TypeError` instead of being refused with a
+     sentence — every other declaration in the same pack included. The type said `string`; the
+     value came out of `JSON.parse`. */
+  if (typeof text !== 'string') return null;
   const m = INTERVAL.exec(text.trim());
   if (!m) return null;
   const n = Number(m[1]);
@@ -96,7 +102,15 @@ export type PullDeps = {
 export function checkInterval(decl: PullDecl): Result<number> {
   const every = intervalMs(decl.every);
   if (every === null)
-    return no<number>('VALUE_MALFORMED', `${decl.every} is not an interval — write 15m, 1h, 6h or 1d.`, { at: 'every' });
+    return no<number>(
+      'VALUE_MALFORMED',
+      /* NAMED RATHER THAN PRINTED WHEN THERE IS NOTHING TO PRINT. "undefined is not an interval" is
+         a sentence about this program and not about the declaration somebody wrote. */
+      typeof decl.every === 'string'
+        ? `${decl.every} is not an interval — write 15m, 1h, 6h or 1d.`
+        : `${decl.ingest} says how to fetch but not how often — write every: 15m, 1h, 6h or 1d.`,
+      { at: 'every' },
+    );
 
   const floor = decl.floor ? intervalMs(decl.floor) : null;
   if (decl.floor && floor === null)
@@ -158,6 +172,26 @@ export function firePull(deps: PullDeps, row: { id: string; payload: string }, d
   }
 
   const every = intervalMs(decl.every) ?? FLOOR_MS;
+
+  /* A RUN THAT HAS NOT FINISHED IS NOT RUN AGAIN. `call` and `poll` have checked this since they
+     were written (`actions.ts`, the `busy` query) and `pull` never did, so a connector whose hour
+     came round while the last hour's run was still leased got a second row — two runs of the same
+     window, against the same provider, paying twice for it. Each row carries its own lease, so the
+     write-side fence in `fetched.ts` does not see the other one and cannot help.
+
+     THE STATES ARE THE UNFINISHED ONES. `failed` is in the list because a row on the retry ladder
+     is still going to run; only `done` and `dropped` mean this connector is idle.
+
+     AND THE NEXT OCCURRENCE IS STILL ARMED. Skipping the queue is not skipping the schedule: a run
+     that overruns its interval should resume its cadence afterwards, not stop. */
+  const busy = deps.sql.one(
+    `SELECT 1 AS x FROM outbox WHERE kind = 'pull.fetch' AND state IN ('pending', 'leased', 'failed')
+     AND json_extract(payload, '$.ingest') = ? LIMIT 1`,
+    ingest,
+  );
+  if (busy)
+    return { ingest, outbox: null, nextMs: deps.nowMs + every + jitterMs(deps.recordId, ingest, every), paused: false };
+
   const id = deps.outbox({
     ingest,
     ...(cursor === undefined ? {} : { cursor }),

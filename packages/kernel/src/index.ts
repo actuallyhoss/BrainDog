@@ -107,6 +107,7 @@ import {
 import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provisioned } from './provision.ts';
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
+import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -126,9 +127,11 @@ import {
 } from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
-import { arrive, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
+import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
+import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
+import { extractPull, type ExtractDecl, type Extraction } from './extract.ts';
 import {
   ACTION_KINDS,
   egressOf,
@@ -219,6 +222,10 @@ export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
+/* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
+   reads `governance` directly rather than through `governance.open`, and two rankings of one queue
+   that disagreed would be worse than no ranking at all. */
+export { COSTS, MANY_ROWS, costOf, costRank, worseCost, type Cost } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -254,6 +261,10 @@ export type { Arranging, Decision, Decided, Proposal, Suggestion, Verdict, Gover
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, extract as extractField, resolve as extractOutcome, shapeOf } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
+export { applyPage, writePoints } from './fetched.ts';
+export { extractPull } from './extract.ts';
+export type { ExtractDecl, ExtractDeps } from './extract.ts';
+export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts';
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, egressOf, originsOf } from './actions.ts';
 export type { ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute } from './actions.ts';
@@ -269,7 +280,7 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult } from './pages.ts';
+export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult, QueueOption, QueueQuestion } from './pages.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
@@ -2658,7 +2669,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
     /*
-     * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, in the record's own order.
+     * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, dearest first.
+     *
+     * RANKED BY WHAT IT WOULD COST TO GET EACH ONE WRONG (`weigh.ts`), which is `19 §6`'s fourth
+     * countermeasure against the decision gate becoming a rubber stamp. The band is computed here
+     * rather than stored, so it needs no migration and no proposer can assert it about their own
+     * question. Within a band the OLDEST comes first, and that is the opposite of the SQL underneath:
+     * `listGovernance` reads newest first because a queue nobody has answered is read from the top,
+     * and once there is a rank, the one worth meeting is the expensive question that has been sitting
+     * rather than the expensive question that arrived a minute ago.
      *
      * THE OPTIONS ARE THE BODY'S OWN AND NOTHING IS INVENTED HERE. A proposal of any other kind is
      * accepted or rejected, and those two words belong to whatever is drawing the screen: the kernel
@@ -2689,9 +2708,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           kind: String(r.body_kind ?? ''),
           question: questionOf(sql, String(r.id)) ?? '',
           why: typeof body.context === 'string' ? body.context : '',
+          cost: costOf(String(r.body_kind ?? ''), r.body),
           options,
         };
       });
+      /* A STABLE SORT, and `opened_at` is the tie-break the band needs: two questions in one band
+         come back in the order they were asked, oldest first. `id` settles a tie on the instant,
+         because two proposals written in the same millisecond must not swap places between reads. */
+      questions.sort((a, b) => costRank(a.cost) - costRank(b.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       return { questions, open: countOpenQuestions({ sql, nowMs }) };
     },
     /*
@@ -2885,6 +2909,37 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     });
 
   /** What a connector needs beyond SQL: who this record is, and the one insertion path to the outbox. */
+  /**
+   * What the ingest path is given. One factory, because `arrive` and `applyPage` write through the
+   * same register with the same dedupe key — and two of these would be two answers to *is this row
+   * already here*, one for an email and one for a connector.
+   */
+  const ingestDeps = (only?: IngestDecl): IngestDeps => ({
+    sql,
+    /* `only` IS A SCHEDULED ACTION'S ANSWER, offered to the declaration that fetched it and to no other. */
+    ingests: () =>
+      only
+        ? [only]
+        : sql
+            .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
+            .map((r) => JSON.parse(r.body) as IngestDecl),
+    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    write: (register, spoken, patch, actor) => write(register, spoken, patch, { actor }),
+    /* THE LOOKUP PATH, which is the third of the three and the one that was still open — named
+       in a commit message as fixed and not touched. `by` is `extract.<field>.lookup.by` from an
+       ingest declaration, so a pack could point a `ref` at whatever row it liked and the row
+       looked ordinary afterwards. */
+    find: (register, by, value) =>
+      sql.one<{ id: string }>(
+        `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ? LIMIT 1`,
+        register,
+        value,
+      )?.id ?? null,
+    mint,
+    allocate,
+    nowMs: clock.now(),
+  });
+
   const pullDeps = (): PullDeps => ({
     sql,
     recordId: recordIdentity(sql)?.id ?? 'self',
@@ -3534,35 +3589,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * pattern for is a row somebody can see rather than a silence.
      */
     arrive: (arrival: Arrival, only?: IngestDecl): Result<Arrived> => {
-      const out = arrive(
-        {
-          sql,
-          /* `only` IS A SCHEDULED ACTION'S ANSWER, offered to the declaration that fetched it and to no other. */
-          ingests: () =>
-            only
-              ? [only]
-              : sql
-                  .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'ingest' AND superseded_at IS NULL AND retired = 0")
-                  .map((r) => JSON.parse(r.body) as IngestDecl),
-          schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
-          write: (register, spoken, patch, actor) => write(register, spoken, patch, { actor }),
-          /* THE LOOKUP PATH, which is the third of the three and the one that was still open — named
-             in a commit message as fixed and not touched. `by` is `extract.<field>.lookup.by` from an
-             ingest declaration, so a pack could point a `ref` at whatever row it liked and the row
-             looked ordinary afterwards. */
-          find: (register, by, value) =>
-            sql.one<{ id: string }>(
-              `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ? LIMIT 1`,
-              register,
-              value,
-            )?.id ?? null,
-          mint,
-          allocate,
-          nowMs: clock.now(),
-        } satisfies IngestDeps,
-        arrival,
-        transaction,
-      );
+      const out = arrive(ingestDeps(only), arrival, transaction);
 
       /* 3′ — OUTSIDE THE ARRIVAL'S TRANSACTION, and deliberately. What is queued here is a model
          call somebody will pay for; the payload is already stored, and a draft that could roll the
@@ -3606,6 +3633,34 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     applyPull: (finish: { ingest: string; outcome: 'ok' | 'paused'; cursor?: string; dueAtMs?: number; error?: string }) =>
       transaction(() => applyPull(pullDeps(), finish)),
+
+    /**
+     * One page of a connector run, written. `47 §5.1` step 6.9.
+     *
+     * THE RUNNER NAMES THE RUN AND THE RECORD NAMES EVERYTHING ELSE. It hands over an outbox id
+     * and rows; which connector that is, which register it writes to and who the rows are written
+     * as are all read here, off this record's own declaration. A runner that could name the
+     * register would be a stranger's API deciding where its answer lands.
+     */
+    applyPage: (page: PulledPage): Result<PageWrote> => applyPage(ingestDeps(), page, transaction),
+
+    /**
+     * A connector's page, read into rows. Handed to `@braindog/connect` as its `extract`, so the
+     * only thing that ever turns a stranger's JSON into fields is the one the record already uses
+     * for an email.
+     */
+    extract: (decl: ExtractDecl, raw: { ts: string; body: string }, ctx: { maxRows?: number } = {}): Extraction =>
+      extractPull({ schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null), exponent: exponentOf, day }, decl, raw, ctx),
+
+    /**
+     * A completed window's figures, upserted (`47 §5.1` step 10, `08 §3`).
+     *
+     * A CORRECTED DAY REPLACES THE DAY IT CORRECTS, because the key is the series, the grain and
+     * the instant. A run that read the same window twice writes the same rows twice and the record
+     * holds one of each.
+     */
+    writePoints: (ingest: string, points: readonly MetricPoint[]): Result<number> =>
+      transaction(() => ok(writePoints(sql, `ingest:${ingest}`, clock.now(), points))),
 
     /**
      * One pass of the scheduled actions: claim the due `pull`, `call` and `poll` rows, send each job through the

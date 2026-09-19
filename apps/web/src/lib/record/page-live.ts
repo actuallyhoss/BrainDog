@@ -17,7 +17,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type TargetIn } from '@braindog/kernel';
+import { COSTS, isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
 import { MISSING, integer, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -392,6 +392,36 @@ function feedOf(v: unknown): FeedRow[] | null {
   return ok ? (v as FeedRow[]) : null;
 }
 
+/**
+ * A `queue` block's questions, when every one of them is a question a person can be shown.
+ *
+ * Checked field by field for the reason `feedOf` is: what arrives here is whatever a record sent, and
+ * a question drawn with `undefined` where its options should be is worse than a block that says it
+ * cannot be drawn. An option missing any of its four parts drops the whole question rather than the
+ * option, because a choice that quietly lost one of its ways to answer is a different choice.
+ */
+function queueOf(v: unknown): QueueQuestion[] | null {
+  if (!Array.isArray(v)) return null;
+  const ok = v.every(
+    (q) =>
+      isObject(q) &&
+      typeof q.id === 'string' &&
+      typeof q.who === 'string' &&
+      typeof q.at === 'string' &&
+      typeof q.kind === 'string' &&
+      typeof q.question === 'string' &&
+      typeof q.why === 'string' &&
+      /* THE BAND IS CHECKED AGAINST THE FOUR, not merely for being a string. It is the ranking, and a
+         record a version ahead that sent a fifth band would otherwise have its whole queue drawn in an
+         order this build could not explain. A record a version BEHIND sends no band at all, which is
+         why absent is allowed and a wrong one is not. */
+      (q.cost === undefined || (typeof q.cost === 'string' && (COSTS as readonly string[]).includes(q.cost))) &&
+      Array.isArray(q.options) &&
+      q.options.every((o) => isObject(o) && typeof o.key === 'string' && typeof o.label === 'string' && typeof o.because === 'string' && typeof o.recommended === 'boolean'),
+  );
+  return ok ? (v as QueueQuestion[]) : null;
+}
+
 /** A `diff` block's `history`, newest first, when every version is text. */
 function historyOf(v: unknown): { at: string; by: string; text: string }[] | null {
   if (!Array.isArray(v)) return null;
@@ -465,10 +495,13 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     walks: walkedApart,
     walkFx,
     feed: fed,
+    queue: waiting,
     seen: mark,
     history: versions,
     bars: barred,
     changes: changed,
+    working: onIt,
+    working_now: atWork,
     past: remembered,
     measures: measured,
     ...rest
@@ -547,6 +580,12 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (b.source === 'actions') {
     const actions = got.map((r) => actionOf(r.fields));
     return { ...shell, actions, shown: actions.length, total: matched };
+  }
+  /* WHAT IS WAITING ON A PERSON. `total` is how many are open and `shown` how many came back, so the
+     block can say what it left out rather than drawing three of nine as though that were all of it. */
+  if (b.source === 'governance.open') {
+    const queue = queueOf(waiting);
+    return queue ? { ...shell, queue, shown: queue.length, total: matched } : cannot;
   }
 
   /* A WALK, A FEED AND A DIFF ARE NOT ROWS OF A REGISTER. The kernel answers each as its own key, and each
@@ -629,6 +668,11 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   const rows = toRows(register, drawnEntries, shell.columns, now, namesOf(refs));
   /* WHO CHANGED EACH ROW LAST, named by the kernel on `changes`, and each money column's sign. */
   markColumns(register, b.columns, entries, rows, (_e, n) => changeOf(changed, n));
+  /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
+     runs. Narrowed here like everything else the record sends: a `working_now` that is not an array
+     of booleans is left off, and the block draws no dots rather than drawing one for `"yes"`. */
+  const working = onIt === true;
+  const workingNow = working && Array.isArray(atWork) ? atWork.map((v) => v === true) : undefined;
   /* WHERE A ROW APPLIES, and which project a run is in, are named by the kernel on `scopes`. */
   (b.columns ?? []).forEach((c, i) => {
     if (c.as !== 'scope' && !(live && c.field === 'project')) return;
@@ -648,6 +692,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     names: namesOf(refs),
     ...(inherited === undefined ? {} : { inherited }),
     ...(live ? { quiet: got.map((r) => isStale({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
+    ...(working ? { working } : {}),
+    ...(workingNow ? { working_now: workingNow } : {}),
   };
 }
 

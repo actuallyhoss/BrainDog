@@ -23,7 +23,7 @@
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
-  import { since, symbolText } from 'braindog-render';
+  import { queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DECIDED as SAMPLE_DECIDED, DOM_CAP, NOW, REGISTERS, ROWS, display, metric } from '$lib/record/api.ts';
   import { PROPOSALS, QUEUE, ROWSETS } from '$lib/record/data.ts';
@@ -553,6 +553,9 @@
               {/if}
               {#if aboutFor(q)?.by === 'spark'}<span class="q-entity">{copy.fromSpark}</span>{/if}
               <span class="q-age">opened {since(q.opened, now)}</span>
+              <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
+                   word is `braindog-render`'s, the same one the `queue` block draws. -->
+              {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
               <span class="q-id">{q.id}</span>
             </span>
           </span>
@@ -699,7 +702,10 @@
       {#each groups as g (g.key)}
         <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
           {#if grouping !== 'none'}<h3 class="group-head">{g.name}<span class="group-n">{g.items.length}</span></h3>{/if}
-          <ol class="queue">
+          <!-- THE ORDER IS SAID OUT LOUD, because a list whose order cannot be seen is a list a reader
+               assumes is arbitrary, and this one is not: it is dearest-to-get-wrong first. Grouped, the
+               heading above already names the list and a second label would be the same list twice. -->
+          <ol class="queue" aria-label={grouping === 'none' ? copy.rankedBy : undefined}>
             {#each g.items as q (q.id)}{@render card(q)}{/each}
           </ol>
         </div>
@@ -950,6 +956,15 @@
 
   .q-entity {
     color: var(--ink2);
+  }
+
+  /* THE BAND TAKES THE LINE'S OWN SEPARATOR RATHER THAN A PILL. Every other item on this line is a
+     word after a dot, and a capsule among them would be the loudest thing in a list of questions —
+     which is a ranking arguing for itself. The dearest band takes the darker ink and nothing else:
+     the word is what says it, and `data-cost` is matched instead of the English. */
+  .q-band[data-cost='undo'] {
+    color: var(--ink2);
+    font-weight: 500;
   }
 
   /* The identifier ends the line, in the id face and quiet. */

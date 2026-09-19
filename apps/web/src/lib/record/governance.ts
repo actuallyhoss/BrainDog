@@ -11,6 +11,11 @@
  */
 
 import { money } from 'braindog-render';
+/* THE SAME FUNCTION THE RECORD RANKS WITH, and not a second one. `/decide` does not go through
+   `governance.open`: it reads `governance` raw and builds its own `Question`, so a band computed only
+   inside the kernel's page source would never reach this screen, and two rankings of one queue that
+   disagreed would be worse than no ranking at all. */
+import { costOf, costRank } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
 import { callsOutOf, type CallOut } from './actions.ts';
@@ -98,9 +103,15 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
- * One open suggestion as the queue draws a question. The record has no cost and no rank for it, so the
- * rank is its place in the record's own order and the cost is empty. An `options` body offers its
- * options; every other kind is accepted or rejected, which are the two words `decide` takes for it.
+ * One open suggestion as the queue draws a question.
+ *
+ * `band` IS WHAT IT WOULD COST TO GET THIS ONE WRONG, computed from what accepting it would do, and it
+ * is the ranking (`19 §6`). `cost` stays empty on a live question: that field is the cost of DELAY,
+ * which is prose somebody has to write and nobody has. `rank` is the caller's, because a rank is a
+ * place in a list and this function sees one row.
+ *
+ * An `options` body offers its options; every other kind is accepted or rejected, which are the two
+ * words `decide` takes for it.
  */
 export function questionOf(row: Row, asked: string | undefined, rank: number): Question {
   const id = String(row.id);
@@ -119,7 +130,8 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
         ];
   /* THE REASONING IS THE QUESTION'S, written by whoever opened it (`body.context`), and it is drawn above the options. */
   const context = text(body.context).trim();
-  return { id, title: asked?.trim() || id, cost: '', rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
+  const band = costOf(text(row.body_kind), row.body);
+  return { id, title: asked?.trim() || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}) };
 }
 
 /**
@@ -304,6 +316,25 @@ function missed(out: Wire<unknown>): Read<never> {
   return { from: 'refused', fix: copy.changedSince };
 }
 
+/**
+ * The open questions dearest first, and their rank is where they landed.
+ *
+ * SORTED HERE AND NOT IN SQL, because the band is computed from the body rather than stored, so there
+ * is no column to order by. Within a band the OLDEST comes first, which is the opposite of the read
+ * underneath (`listGovernance` answers newest first, because a queue nobody has answered is read from
+ * the top): once there is a rank, the one worth meeting is the expensive question that has been
+ * sitting, not the expensive question that arrived a minute ago. `id` settles a tie on the instant so
+ * two questions never swap places between reads.
+ *
+ * The same order the kernel's `openQuestions` puts a `queue` block in, deliberately: one queue, read
+ * two ways, must not be two orders.
+ */
+const ranked = (open: Question[]): Question[] =>
+  open
+    .slice()
+    .sort((a, b) => costRank(a.band ?? '') - costRank(b.band ?? '') || a.opened.localeCompare(b.opened) || a.id.localeCompare(b.id))
+    .map((q, i) => ({ ...q, rank: i + 1 }));
+
 const questionsAsked = (booted: Awaited<ReturnType<Governor['boot']>> | null): Map<string, string | undefined> =>
   new Map((booted?.ok ? (booted.value.waiting ?? []) : []).map((w) => [w.id, w.question]));
 
@@ -324,7 +355,7 @@ export async function readQueue(client: Governor): Promise<Read<Queue>> {
   return {
     from: 'live',
     value: {
-      open: rows.map((r, i) => questionOf(r, asked.get(String(r.id)) || text(r.question), i + 1)),
+      open: ranked(rows.map((r) => questionOf(r, asked.get(String(r.id)) || text(r.question), 0))),
       decided: decided.decided,
       ...(decided.older ? { older: { ...decided.older, total: Math.max(total ?? 0, decided.decided.length) } } : {}),
       rowsets,

@@ -23,7 +23,9 @@ log, a result or an RPC argument.
 makes no outbound call ([12-SECURITY](12-SECURITY.md) §4) and never sees a plaintext credential (ADR-062).
 `mode: agent` never reaches this package: the record opens the suggestion when the `pull` row fires (25 §6).
 
-**May import.** `@braindog/ports` (types: `Http`, `KeyStore`, `Clock`) and `@braindog/extract` (`extract()`,
+**May import.** `@braindog/ports` (types: `Http`, `KeyStore`, `Clock`; and `HTTP_FAULTS`, `REFUSAL_CODES`),
+`@braindog/where` (`readPath`, the response-path grammar of §4.3 — one grammar with three readers, so it lives
+in the package that already owns how a declaration names a thing) and `@braindog/extract` (`extract()`,
 `ExtractCtx`). The record's surface it calls is declared **here**, structurally, as `RecordApi` — the pattern
 46 §4.6 set — so no edge to `record` exists. Nothing imports connect except `apps/*` ([31-STACK](31-STACK.md) §2).
 
@@ -31,7 +33,8 @@ makes no outbound call ([12-SECURITY](12-SECURITY.md) §4) and never sees a plai
 
 ```ts
 // index.ts — the whole surface; the exports map names nothing else
-import type { Http, KeyStore, Clock } from '@braindog/ports';
+import type { Http, KeyStore, Clock, RefusalCode } from '@braindog/ports';
+import type { Json } from '@braindog/where';
 import type { ExtractCtx } from '@braindog/extract';
 
 /** What this package asks of the record — two INTERNAL methods, declared structurally (§13 D1). The host
@@ -85,9 +88,11 @@ export function openSealed(sealed: Sealed, dek: WrappedDek, recordId: string, ke
 export function seal(plain: Uint8Array, grantId: string, version: number, dek: WrappedDek, recordId: string,
                      keys: KeyStore): Promise<Sealed>;
 
-export const PULL_CODES = ['PULL_AUTH_REJECTED', 'PULL_PROVIDER_UNAVAILABLE', 'PULL_REQUEST_REFUSED',
-  'PULL_EXPECT_FAILED', 'PULL_SHAPE_MISMATCH', 'PULL_ORIGIN_REFUSED', 'PULL_LEASE_EDGE'] as const;   // seven — §6
-export type PullCode = (typeof PULL_CODES)[number] | 'WRONG_KEY';
+// The seven are NARROWED from 30 §6's corpus, never re-listed: they already live in @braindog/ports'
+// REFUSAL_CODES, and a second literal here is the copy that drifts silently because both compile (§13 D16).
+export type PullCode = Extract<RefusalCode, `PULL_${string}`> | 'WRONG_KEY';
+export const PULL_CODES: readonly PullCode[];                                      // seven — §6
+export const PULL_FIXES: Readonly<Record<PullCode, string>>;    // §6's `fix` column, with <at> <found> <wanted> <base>
 export class PullError extends Error {
   code: PullCode; at: string; found?: unknown; wanted?: string; fix: string;
   notBefore?: number;                  // ms — Retry-After honoured, capped at 6 h
@@ -106,8 +111,8 @@ packages/connect/
 │   ├── index.ts            runPull, probe, proveScopes, jitterSeconds, nextDue, the window arithmetic, the two
 │   │                       Intl tz helpers (dayOf, startOfGrain), parseDuration, all types, RecordApi,
 │   │                       PULL_CODES, PullError                                                    ~240 lines
-│   ├── request.ts          placeholder grammar, response-path grammar (readPath), resolveRequest, expect,
-│   │                       the on_error classifier                                                  ~200 lines
+│   ├── request.ts          placeholder grammar, resolveRequest, expect, the on_error classifier. The
+│   │                       response-path grammar is @braindog/where's readPath — §4.3               ~200 lines
 │   ├── auth.ts             the eight auth.kinds → applyAuth; refresh, signJwt, sigv4; openSealed, seal  ~240 lines
 │   ├── page.ts             five paginators + none, Link-header parse, nextCursor, the stop rules     ~110 lines
 │   └── write.ts            one extract() per page, bucketing, the kind reducer (writeSeries), PullPage shaping ~100 lines
@@ -249,6 +254,9 @@ index = "[" integer "]" | "[-1]" | "[]" ;            (* [] = every element; lega
 ```
 
 `readPath(json, path)` returns the value, `undefined` when any step is missing, and a list when `[]` was used.
+It is `@braindog/where`'s, not this package's: `extract` reads `read.rows` with the same grammar and the record
+reads a page back with it in `applyPull`, and three readers of one grammar is one grammar. Own properties only —
+the object on the left is JSON a stranger sent, so `constructor` and `__proto__` are missing keys.
 An `expect:` operator over a list applies to every element (a list is implicitly `all`). This covered every
 response shape of 25 §4; there is no wildcard key, no filter, no function.
 
@@ -488,7 +496,7 @@ literal (`SECRET_IN_PACK`, 42 §4), `every` coarser than half `source_retention`
 | `PULL_AUTH_REJECTED` | the provider answered 401 or 403 to the token step, the probe or a page | "Reconnect the credential — the provider rejected it; the connector is paused until you do." |
 | `PULL_PROVIDER_UNAVAILABLE` | a status in `error_when`, a timeout, a network failure, a body-path `error_when` | "Nothing to do; the next attempt is scheduled." |
 | `PULL_REQUEST_REFUSED` | a status in `fatal_when` or any unlisted non-2xx, a body over `response_bytes`, a header value outside ASCII, a placeholder naming a secret or an unknown name | "Fix the declaration — the provider refused the request as declared." |
-| `PULL_EXPECT_FAILED` | an `expect:` or the `more:` test failed with `on_fail: review` or `fail` | "The server did not do what was asked: `<at>` was `<found>`, expected `<wanted>`. Nothing was written." |
+| `PULL_EXPECT_FAILED` | an `expect:` or the `more:` test failed with `on_fail: review` or `fail` | "The server did not do what was asked: `<at>` was `<found>`, expected `<wanted>`; nothing was written." |
 | `PULL_SHAPE_MISMATCH` | the body is not JSON, `read.rows` is not a list, a `probe.read` or `page.from` path is missing, the paginator repeated a value | "The response shape changed; check `<at>` against a recent response." |
 | `PULL_ORIGIN_REFUSED` | a 3xx, a resolved URL or Link off `base`, a `..` segment, the `Http` port's private-range refusal | "The connector may only call `<base>`; a redirect or a foreign link was not followed." |
 | `PULL_LEASE_EDGE` | the loop stopped before the 300 s edge with pages left, or the record found the lease no longer this runner's on `applyPull` | "The run was longer than its lease; it continues at the next attempt." |
@@ -651,7 +659,8 @@ non-ASCII, `resolveRequest` either throws `PULL_ORIGIN_REFUSED` or returns a URL
 |---|---|---|---|
 | runtime, external | — | — | none |
 | runtime, workspace | `@braindog/extract` | `workspace:*` | `extract(decl, raw, ctx)` once per page — §13 D4 |
-| types only | `@braindog/ports` | `workspace:*` | `Http KeyStore Clock` |
+| runtime, workspace | `@braindog/where` | `workspace:*` | `readPath`, the response-path grammar of §4.3 — §13 D16 |
+| types only | `@braindog/ports` | `workspace:*` | `Http KeyStore Clock RefusalCode`, and `HTTP_FAULTS` at run |
 | dev | `typescript` | 6.0.3 | type-check |
 | dev | `@types/node` | 24.13.0 | `node:test` types |
 | dev | `fast-check` | 4.9.0 | the one property test |
@@ -664,7 +673,8 @@ arithmetic (41 §10), so `dayOf(ms, tz)` and `startOfGrain(ms, grain, tz)` are f
 ## 12 · Build order
 
 Twelfth of the packages (35 §4). **Needs before it:** `ports` (37: the `Http`, `KeyStore`, `Clock` types and
-the memory `Http`); `extract` (43: `extract()` over a `channel: pull` arrival, `readRows`, the `map:` forms).
+the memory `Http`); `where` (§4.3's `readPath`); `extract` (43: `extract()` over a `channel: pull` arrival,
+`readRows`, the `map:` forms).
 **Needs beside it, by contract not import:** `record` (45: `applyPull`, `ackOutbox(result)`, the `PullPayload` the
 schedule writes, the `pull` row's `paused` state — §13 D1, D8). **Unblocks:** the Worker's queue consumer for `pull.fetch`
 and the bind route's `proveScopes` (51); the self-host's outbox poller (49); the Sources screen's `ok / failing /
@@ -691,7 +701,15 @@ ever gains it (48, not planned). Phase 4 of [BUILD.md](../BUILD.md) delivers it 
 | D14 | **The `Http` port's refusals are named**: the adapter throws an `Error` whose `name ∈ PrivateRange \| TooLarge \| Timeout \| Network`; connect maps them in §5.1 step 6.3 | 33 §1; 37 |
 | D15 | **Grant plaintext for connectors** is a JSON object of string fields; the secret keys per `auth.kind` are §4.5's closed set; `{grant.<name>}` may name only the others; `require_scopes` are proven by `proveScopes` at bind and stored in `grant.scopes` | 12 §6; 25 §7 |
 
-Fifteen, counted. Each amendment lands in the same revision loop iteration as this draft ([BUILD.md](../BUILD.md)).
+| D16 | **The seven codes are narrowed from `30 §6`, not re-declared** — `PullCode` is `Extract<RefusalCode, \`PULL_${string}\`>`, and `PULL_CODES` filters `@braindog/ports`' `REFUSAL_CODES`. §2's own `as const` array of seven was the second copy of a list that already exists in the corpus every package answers from, and two copies of one list is one list and a memory of it (`30 §2`). The `closed-lists` check still reads *seven*, and now it cannot read seven here and eight there. `readPath` moves to `@braindog/where` for the same reason: `43` and `45` read the same grammar | 30 §2, §6; 31 §2 row 14; 43 §4.4 |
+| D17 | **`nextCursor` takes the window and the zone**, which §2's draft signature has neither of. A `more:` is an `Expect`, and `eq`/`ne` substitute placeholders in their literal (D10) — so evaluating one without a window means either refusing every `eq` in a paginator or substituting a wrong instant silently, and the second is the failure this package exists to prevent. The run holds both already, so the argument costs nothing | §4.4; §5.3 |
+| D18 | **`KeyStore` is declared in `@braindog/ports`** and `apps/selfhost` re-exports it. `37 §2` always put port 8 there and the port did not exist in code; the app had written the two methods out over `webcrypto.CryptoKey`, which is the import an app may make and a package may not (`31 §1`). Ports names the key type off the global class instead — `type Key = InstanceType<typeof CryptoKey>` — because this tree carries no `dom` lib. The two copies agreed; the one that would have drifted is the one nobody was reading | 30 §2; 33 §1 port 8; 37 §2 |
+| D19 | **`jitterSeconds` and `nextDue` are `async`**, where §2 declares both synchronous. The jitter is a SHA-256 and `crypto.subtle.digest` is the only one a package may reach for — `31 §1` bans `node:crypto` under `packages/**` — and it returns a promise. The alternative was forty lines of hand-written SHA-256 inside a connector to satisfy a signature, which is a primitive reimplemented for a keyword; the only caller is `runPull` and it is already `async` | 31 §1; §4.8 |
+
+| D20 | **A duration may be `<int>(s\|m\|h\|d)`**, where §4.1's type block writes `<int>(m\|h\|d)` — and four rows below it gives `limits.timeout` a default of `6s` and a range of `1s`–`30s`. Every timeout a declaration could legally state was unreadable by the shared parser, fell through to the default, and did it silently: a declaration saying `30s` against a slow provider was abandoned at six. Seconds go in the grammar rather than a second parser going beside it | §4.1 |
+| D21 | **`page.param` is applied by `resolveRequest`**, and a `link_header` state replaces the whole URL there. §5.1 step 6.1 and §5.2 both describe the request without saying where the paginator's own key goes, and `25 §3.2`'s Stripe example declares `param: starting_after` with no `query:` at all — so a run that only substituted `{page}` asked for page one, got page one, and asked again until `max_pages`. A register deduplicates forty identical pages into silence; a `flow` series adds them up. The parameter replaces a declared pair of the same name rather than repeating it, and the next link is origin-checked again where the request is built | §5.1 step 6.1; §5.2; §5.3; 25 §3.2 |
+
+Twenty-one, counted. Each amendment lands in the same revision loop iteration as this draft ([BUILD.md](../BUILD.md)).
 
 ## 14 · Done when
 

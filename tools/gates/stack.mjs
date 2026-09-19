@@ -11,6 +11,10 @@
  * So: under `packages/*` and `src/`, no `node:` import, no `cloudflare:` import, no bare `fetch`,
  * no `Buffer`. WebCrypto, `TextEncoder`, `Intl` and `URL` are the whole platform these packages get.
  *
+ * A SIGNATURE IS NOT A CALL. `interface Http { fetch(url, init) }` is the port that exists so no
+ * package calls the global one, and the rule is about the call. Interface bodies are blanked before
+ * the identifier rules run; see `dedeclare`.
+ *
  * `test/` IS EXEMPT AND THAT IS THE POINT. The adapter that binds the kernel to `node:sqlite` lives
  * there, on the other side of the line: it is allowed to know exactly which runtime it is in, and
  * the kernel is not allowed to ask.
@@ -58,8 +62,54 @@ const BANNED = [
   },
 ];
 
+/**
+ * Blanked, not removed, so a line number still means the line it names.
+ *
+ * IT USED TO COLLAPSE A BLOCK COMMENT TO ONE SPACE, and every finding below the first one in a file
+ * was reported at the wrong line — this file's own header is twenty lines, so a violation on line
+ * forty-five came back as line fifteen. `graph.mjs` has always blanked; the two were written apart.
+ */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+
 /** Comments go, always: a banned word inside prose is prose. */
-const decomment = (text) => text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ');
+const decomment = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/(^|[^:])(\/\/.*)$/gm, (_, a, c) => a + blank(c));
+
+/**
+ * An `interface` body holds signatures and never statements, so a name in one is a DECLARATION.
+ *
+ * `37 §2.2`'s `Http` port has one method and it is called `fetch`, because a reader who knows what
+ * `fetch` does knows what the port does minus what the adapter took away. Written as a method,
+ * `fetch(url: URL, init: HttpInit)` matched the rule below exactly as a call would — so the gate
+ * that exists to stop a package reaching the network reported the port whose whole purpose is that
+ * it must not. Renaming the method would have been the gate choosing the vocabulary, which is `52
+ * §9`'s subject from the other side.
+ *
+ * BALANCED BRACES, NOT A REGEX. A signature can carry an object type (`{ method: string }`), so the
+ * body ends at the brace that closes it and nothing shorter. Run after the strings are blanked, so
+ * a brace inside a string cannot move the end.
+ *
+ * ONLY FOR THE IDENTIFIER RULES. `type X = import('node:crypto').Hash` is a runtime edge written in
+ * a type position, and blanking types for the string rules would hide it.
+ */
+const dedeclare = (text) => {
+  let out = '';
+  let at = 0;
+  for (const hit of text.matchAll(/\binterface\s+[A-Za-z_$][\w$]*[^{;]*\{/gu)) {
+    if (hit.index < at) continue; // an interface nested inside one already blanked
+    const open = hit.index + hit[0].length;
+    let depth = 1;
+    let i = open;
+    while (i < text.length && depth > 0) {
+      if (text[i] === '{') depth += 1;
+      else if (text[i] === '}') depth -= 1;
+      i += 1;
+    }
+    out += text.slice(at, open) + blank(text.slice(open, i));
+    at = i;
+  }
+  return out + text.slice(at);
+};
 
 /**
  * STRINGS ARE ONLY BLANKED FOR THE IDENTIFIER RULES, and getting that backwards is how the first
@@ -98,7 +148,7 @@ for (const pkg of packages)
   for (const file of walk(join(root, 'packages', pkg, 'src'))) {
     scanned++;
     const bare = decomment(readFileSync(file, 'utf8'));
-    const stripped = destring(bare);
+    const stripped = dedeclare(destring(bare));
     for (const rule of BANNED) {
       const text = rule.strings ? bare : stripped;
       /* EVERY HIT, NOT THE FIRST. `exec` once per rule per file named one line and stopped, so a

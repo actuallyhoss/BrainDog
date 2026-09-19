@@ -18,6 +18,9 @@ __*
 # `scripts/shot.mjs`. Anchored per app rather than a bare `shots/`, because the marketing site
 # SERVES product shots from `apps/site/static/shots/` and a bare pattern silently excluded them.
 apps/*/shots/
+# AND THE ROOT ONE, because `shot.mjs` writes relative to where it was RUN, and it is run from the
+# repository root as often as from an app: a per-app anchor left `/shots/` staged and ready to commit.
+/shots/
 packages/theme/proof.txt
 
 # the a11y gate writes its run here

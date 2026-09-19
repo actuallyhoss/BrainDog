@@ -197,7 +197,12 @@ test('page check: a syntactically valid file the kernel would still refuse gets 
   const bad: DogPage = { page: 'x', title: 'X', requires: ['register.things'], blocks: [{ kind: 'not-a-kind' }] };
   writeFileSync(file, dogText(bad));
   assert.equal(await page(['check', file], h.io), 1);
-  assert.match(h.said[0] ?? '', /is not one of the twenty/);
+  /* THE KERNEL'S OWN WORDS, whatever they are today: it used to count the kinds in the sentence and now
+     names what the build draws, and a test pinned to the old count was red about the wording rather than
+     about the refusal. What matters here is that a file the parser accepts is still refused, by the kernel,
+     naming the kind. */
+  assert.match(h.said[0] ?? '', /kind "not-a-kind"/);
+  assert.match(h.said[0] ?? '', /page\.x\.blocks\[0\]/);
 });
 
 test('page: a missing file or a wrong verb is exit 1 with a plain sentence', async (t) => {

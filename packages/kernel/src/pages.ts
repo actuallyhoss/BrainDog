@@ -30,7 +30,9 @@ import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
+import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
 import { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
+import { COSTS, type Cost } from './weigh.ts';
 import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
 
 export type PageBlock = {
@@ -58,6 +60,18 @@ export type PageBlock = {
    * the nearer wins (`scope.ts`).
    */
   inherit?: boolean;
+  /**
+   * Whether each row says an agent is on it right now.
+   *
+   * A BLOCK OPTION AND NOT A COLUMN ONE, though `34 §2` planned it as a column: the render primitives
+   * take a plain string per cell and carry no column metadata, so a flag living inside one `columns:`
+   * entry would need a new field on another package's `Column` type. A row either has an agent on it
+   * or it does not, which is a fact about the ROW, so it is declared once here.
+   *
+   * The answer comes back as `working_now`, aligned with `rows`. It is computed only when asked,
+   * because it reads every row's history.
+   */
+  working?: boolean;
   /** A `feed`'s: `seen` marks the rows after the reader's read mark as new, and `first` caps the rows. */
   since?: 'seen';
   first?: number;
@@ -157,6 +171,8 @@ const READS = new Set([
   'recorded', 'knobs', 'past',
   /* Who changed each row of a table last, when a column asks, and the row for what no part holds. */
   'changes', 'unset', 'tones',
+  /* Whether an agent is on each row right now, when the block asks, and the answer it comes back with. */
+  'working', 'working_now',
   /* A `forecast`'s late mark and its warning reach, and the lateness it answers with. */
   'late', 'under', 'lateness', 'late_name',
   /* A card grid's out-of-date rule. */
@@ -222,6 +238,8 @@ export type BlockResult = PageBlock & {
   past?: { at: string; value: number }[];
   /** Aligned with `rows`, when a column is `changed`: who changed each row last, as a kind of actor and by name, and when. */
   changes?: ({ by: FeedBy; who: string; at: string } | null)[];
+  /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
+  working_now?: boolean[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
   /** That figure's name as the record declares it, which the late knob is called by, so a use case's words reach it. */
@@ -260,11 +278,16 @@ export type QueueOption = { key: string; label: string; because: string; recomme
 /**
  * One open question, as the `governance.open` source reads it.
  *
- * `why` is what whoever opened it wrote (`body.context`), and it is empty when they wrote none. There is
- * no cost here, because the record holds none: a queue draws the record's own order, which is the order
- * questions were opened in, and calling that a ranking by cost would be a number nobody computed.
+ * `why` is what whoever opened it wrote (`body.context`), and it is empty when they wrote none.
+ *
+ * `cost` IS WHAT IT WOULD COST TO GET THIS ONE WRONG (`weigh.ts`), and it is the order they arrive
+ * in. It is computed from what accepting the proposal would do, never declared by whoever opened it:
+ * a queue ranked by self-declared importance is a queue in which everything is urgent by the second
+ * week. This paragraph used to say the opposite — that the record holds no cost, and that calling
+ * recency a ranking by cost would be a number nobody computed. That was true, and the answer was to
+ * compute one rather than to keep saying so (`19 §6`, risk 6, the fourth countermeasure).
  */
-export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; options: QueueOption[] };
+export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[] };
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
@@ -890,6 +913,11 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   const asksChanged = (block.columns ?? []).some((c) => c.field === CHANGED) && !Object.hasOwn(schema.fields, CHANGED);
   if (asksChanged && !deps.history)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
+  /* `working: true` NEEDS BOTH HALVES OR NEITHER. It is one question asked of two reads, and a record
+     wired for one of them would answer `false` for every row, which is a block quietly saying nobody
+     is working rather than saying it cannot tell. */
+  if (block.working === true && !(deps.history && deps.sessionsLive))
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read whether an agent is on a row onto a page yet.', at: 'working' }) };
 
   const rows = listed.value.rows;
   /* A BUDGET SETS ITS ROWS AGAINST A FIGURE, read here beside them, so a limit and what was spent come from one answer.
@@ -918,6 +946,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     rows,
     ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
     ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
+    ...(block.working === true ? { working_now: workingOf(deps, register, rows) } : {}),
     matched: listed.value.matched,
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? { scopes: scopesOf(deps, rows, scope) } : {}),
@@ -1127,6 +1156,42 @@ function changesOf(deps: PageDeps, register: string, rows: readonly Entry[]): ({
 }
 
 /**
+ * Whether an agent is on each row right now, aligned with `rows`.
+ *
+ * NOT WHO CHANGED THE ROW LAST, WHETHER THAT ACTOR IS STILL AT IT, which is a different question and
+ * the reason this is not read off `changes`. Only an agent has a run to be at, so a row last touched
+ * by a person or a rule answers `false` before the runs are read at all.
+ *
+ * THEN TWO CLOCKS AND NOT ONE. The touch itself has to sit inside `STALE_MS`, because an agent that
+ * is still running does not mean it is still on the row it wrote three hours ago; and the run the
+ * write was signed by has to have been heard from inside the same window, which is the same fact
+ * `sessions.live` shows for a run, asked here of a row instead.
+ *
+ * THE JOIN IS THE RUN'S NAME AND NOT THE AGENT'S. `30 §3`: an agent's write is signed by its run,
+ * `event.actor = 'S42'`, because three agents under one token are three runs and the question worth
+ * answering later is which RUN wrote the row. Joining on `session.agent` instead would have marked
+ * every row Claude touched today as worked on the moment any Claude run was open.
+ */
+function workingOf(deps: PageDeps, register: string, rows: readonly Entry[]): boolean[] {
+  const now = deps.ctx.nowMs;
+  const live = new Set(
+    (deps.sessionsLive?.() ?? [])
+      /* ACTIVE AND HEARD FROM, which is narrower than `sessions.live`'s own "not finished": an idle
+         run is a run that has stopped, and a run nobody has heard from in 45 minutes is one whose
+         machine went to sleep mid-task. Neither is somebody working on a row now. */
+      .filter((run) => run.fields.state === 'active' && !isStale(run, now) && run.seq !== null)
+      .map((run) => `${SESSION_PREFIX}${String(run.seq)}`),
+  );
+  if (live.size === 0) return rows.map(() => false);
+  return rows.map((r) => {
+    const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
+    const last = events?.ok ? events.value.at(-1) : undefined;
+    if (!last || byOf(last.actor) !== 'agent') return false;
+    return now - Date.parse(last.ts) < STALE_MS && live.has(last.actor);
+  });
+}
+
+/**
  * HOW FAR ALONG EACH CARD IS, when its ring's field is empty and a list declares steps of this one: the share of its steps
  * done. Absent when no ring would take one, so a page with nothing to derive answers as it did.
  */
@@ -1275,10 +1340,16 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
  * NOT THE BODY ITSELF. A proposal's body is a different shape per kind, and a predicate over it would be
  * a query language over something the record does not promise to keep stable. Who asked and what they are
  * asking for is what a page filters on.
+ *
+ * AND WHAT IT WOULD COST TO GET WRONG, which is a fact about the body that the record computes rather
+ * than reads (`weigh.ts`). It is here because a page that wants only the expensive half — a Home that
+ * draws what must be thought about, with the rest behind a count — can then say so, and because
+ * without it the only way to filter to the same set is to name the body kinds one by one and keep
+ * that list in step with `weigh.ts` by hand.
  */
 const OPEN: Schema = {
   register: 'governance',
-  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS } },
+  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS } },
 };
 
 /** How many questions a queue draws when a page names no `limit:`. Past this, the rest is the count. */
@@ -1296,14 +1367,14 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   if (!deps.openQuestions)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its open questions onto a page yet.', at: 'source' }) };
   if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.open comes in the record’s own order, so it takes no order:.', at: 'order' }) };
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.open comes ranked by what each question would cost to get wrong, so it takes no order:.', at: 'order' }) };
   const said = predicateOf(block.where, OPEN, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
   /* READ MORE THAN WILL BE DRAWN, because a predicate over who asked can leave a page short otherwise, and
      ask for the ceiling's worth at most: the count of what is open comes back with them either way. */
   const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING));
-  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind }, OPEN));
+  const kept = read.questions.filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost }, OPEN));
   /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
      answered with. With one, the count is of what this page could see, and it says so by being smaller. */
   const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;

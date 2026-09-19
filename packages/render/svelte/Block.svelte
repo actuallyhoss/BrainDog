@@ -16,6 +16,7 @@
   import InlineRun from './p/Inline.svelte';
   import List from './p/List.svelte';
   import Table from './p/Table.svelte';
+  import { comparisonPlan } from '../src/table.ts';
   import Media from './p/Media.svelte';
 
   let {
@@ -51,15 +52,11 @@
   const spec = $derived(KINDS[block.kind]);
   const Draw = $derived(PRIMITIVE[spec.primitive as keyof typeof PRIMITIVE]);
 
-  /** `comparison` builds its columns from its first row, which fixes the column count. */
-  const comparison = $derived.by(() => {
-    const [head, ...body] = block.rows;
-    if (!head) return null;
-    return {
-      columns: head.cells.map((label, i) => ({ field: String(i), label, width: 'minmax(0,1fr)' })),
-      rows: body.map((r, i) => ({ key: String(i), cells: head.cells.map((_, j) => r.cells[j] ?? null) })),
-    };
-  });
+  /* `comparison` builds its columns from its first row, which fixes the column count. The
+     derivation is `comparisonPlan` in `../src/table.ts` rather than here, because `toHTML` has to
+     reach the same columns: it used to write its own and spelled the same track list differently,
+     so the two renderers differed on every table in the product. */
+  const comparison = $derived(comparisonPlan(block.rows));
 </script>
 
 <figure

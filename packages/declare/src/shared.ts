@@ -109,7 +109,8 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
 }
 
 /**
- * THE KERNEL'S SENTENCE IS FOR SOMEBODY WRITING A PACK (`page.evil.blocks[0]: kind "iframe" is not one of the twenty`),
+ * THE KERNEL'S SENTENCE IS FOR SOMEBODY WRITING A PACK (`page.evil.blocks[0]: kind "iframe" is not a kind this build
+ * draws, and no block declares it`),
  * and a shared file is read by somebody installing one. The same refusal, the same code and the same `at`, said as what
  * it means to them. A block with no kind at all is said as a block this version cannot read.
  */

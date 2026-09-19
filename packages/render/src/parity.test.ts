@@ -93,12 +93,49 @@ const SHAPES: Record<string, string> = {
     '```agents\nClaude | 3 | changed [Write the notes](/r/tickets/2) | 3h ago\nCodex | 1 | added Fix login | 5h ago | warn\nClaude | 9 |  | 1d ago\n```',
   'no agent has done anything': '```agents\n```',
   'a feed with no mark yet': '```feed\nseen | \n```',
+  /* `working: true`'s dot, on each primitive that draws one. What the app writes is three characters at
+     the head of one cell, and if the two renderers read them differently one of them prints a glyph
+     nobody asked for. */
+  'a todo with an agent working on one of its rows': '```todo\n[ ] ●︎ Draft the September issue | due Friday\n[x] Send the quote | done\n```',
+  'a timeline whose newest row is being worked on': '```timeline\n3h ago | ●︎ Specimen page rebuild | Codex picked it up | warn\n2d ago | Variable axis QA | Claude finished\n```',
+  'steps with one being worked on': '```steps\n●︎ Cut the masters | Codex | running\nProof the italics |  | waiting\n```',
+  'a board with an agent on one card': '```board\nDoing | ●︎ Write the notes | Claude\nDone | Fix login | Codex\n```',
+  /* THE `table` PRIMITIVE, WHICH HAD NO SHAPE HERE AT ALL until adding one showed the two renderers
+     drawing genuinely different trees: a scroll region on one side and none on the other, a
+     `rowgroup` on one side and none on the other, `data-align` and `data-truncate` on every cell of
+     one and neither on the other, a missing mark on one and a blank on the other, and two spellings
+     of the same `--cols` track list. They are drawn from one set of decisions now (`src/table.ts`),
+     and the one difference that remains is named and asserted below. */
+  'a comparison of two columns': '```comparison\nWhat | Then | Now\nRetainer | £3,000.00 | £4,000.00\nHours | 40 | 52\n```',
+  'a comparison with money, a cell nobody filled and one the row does not have': '```comparison\nAccount | Balance | Note\nCurrent | GBP 12,400.00 | \nSavings | EGP 43,700.00\nCard | −£190.00 | over\n```',
+  'a comparison whose cells hold what looks like a link': '```comparison\nThing | Who\n[Kiln](/r/things/1) | Claude\n```',
+  'a comparison of one column and one row': '```comparison\nOnly\nRow\n```',
+  'a comparison with nothing in it at all': '```comparison\n```',
+  'a comparison with an agent working on one of its rows': '```comparison\nTask | Who\n●︎ Variable axis QA | Claude\nProof the italics | Codex\n```',
   'a queue of two questions, one recommended, with more waiting':
     '```queue\nq | s1 | Claude | 3h ago | Raise the retainer? | [Kiln](/r/things/1) has run over for two months.\n' +
     'opt | s1 | raise | Raise it to £4,000 | Covers the overrun | true\nopt | s1 | leave | Leave it | Nothing changes yet | \n' +
     'q | s2 | Late fees | 1d ago | Chase invoice 2026-049? | \nopt | s2 | accept | Chase it | It is 12 days late | \n' +
     'opt | s2 | reject | Leave it |  | \nmore | 4\n```',
+  /* THE COUNT AS A DOOR AND THE COUNT AS WORDS are two trees, and only one of them was ever drawn. */
+  'a queue whose count of what is left says where the rest are':
+    '```queue\nq | s1 | Claude | 3h ago | Raise the retainer? | \nopt | s1 | raise | Raise it |  | true\n' +
+    'opt | s1 | leave | Leave it |  | \nmore | 5 | /decide\n```',
   'a queue with nothing waiting': '```queue\n```',
+  /* THE FOUR BANDS, all four in one shape, because the chip is drawn per card and a shape carrying
+     one proves the branch and not the table. */
+  'a queue ranked by what each question would cost to get wrong':
+    '```queue\nq | s1 | Claude | 3h ago | Turn the Estate pack off? |  | undo\n' +
+    'opt | s1 | accept | Turn it off |  | \n' +
+    'q | s2 | Spark | 1d ago | Install Money? |  | shape\nopt | s2 | accept | Install it |  | \n' +
+    'q | s3 | Codex | 2d ago | Add 12 tasks from the plan? |  | rows\nopt | s3 | accept | Add them |  | \n' +
+    'q | s4 | Claude | 3d ago | Raise the retainer? |  | call\nopt | s4 | raise | Raise it |  | \n```',
+  /* A QUESTION WITH NO BAND DRAWS NO CHIP, on both surfaces. A host building a `Block` by hand has
+     none, and every queue written before the ranking existed is this shape. (A band that is spelled
+     and unknown is a FAULT and degrades the block, so it cannot be a parity shape: it is asserted in
+     `queue.test.ts`.) */
+  'a queue whose question came with no band':
+    '```queue\nq | s1 | Claude | now | Which? | \nopt | s1 | a | A |  | \n```',
   'a diff with a change in the middle':
     '```diff | Deploy, v3 to v4\n  When a deploy fails,\n- retry once.\n+ retry twice,\n+ then page the owner.\n  Log the run.\n```',
   'a diff that folds its long runs':
@@ -136,14 +173,54 @@ const SHAPES: Record<string, string> = {
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
+/**
+ * The one difference between the two trees, taken off both sides so the rest can be held equal.
+ *
+ * `Table.svelte` puts `tabindex="0"` on exactly one cell and `-1` on every other, and moves it with
+ * the arrow keys. That pair is ONE PROMISE: there is a caret in this grid and the arrows move it.
+ * A static page has no key handler to keep it, so the mirror carries the focusable scroll region,
+ * which a keyboard can still reach and scroll, and no cell tab stop at all. The reasoning is in
+ * `src/table.ts`.
+ *
+ * TAKEN OFF BOTH SIDES AND THEN PINNED DOWN SEPARATELY, so the exception cannot quietly grow: the
+ * test below asserts that the Svelte side has exactly one tab stop among its cells and the mirror
+ * has none, which is a thing this strip would otherwise hide.
+ */
+const noRovingStop = (t: string): string =>
+  t.replace(/<span [^>]*>/gu, (tag) => (tag.includes('role="gridcell"') ? tag.replace(/ tabindex="(?:0|-1)"/u, '') : tag));
+
 for (const [name, src] of Object.entries(SHAPES)) {
   test(`the two renderers draw one tree: ${name}`, () => {
     const block = page(src);
     const svelte = tree(render(Block, { props: { block } }).body);
     const html = tree(toHTML([block]));
-    assert.equal(svelte, html);
+    assert.equal(noRovingStop(svelte), noRovingStop(html));
   });
 }
+
+test('the roving tab stop is the whole of the difference: one cell in the app, none in the mirror', () => {
+  const block = page(SHAPES['a comparison of two columns']!);
+  const svelte = tree(render(Block, { props: { block } }).body);
+  const html = tree(toHTML([block]));
+  const cells = (t: string) => [...t.matchAll(/<span [^>]*role="gridcell"[^>]*>/gu)].map((m) => m[0]);
+  assert.equal(cells(svelte).length, 6, 'two rows of three columns');
+  assert.equal(cells(svelte).filter((c) => c.includes('tabindex="0"')).length, 1, 'a composite widget has exactly one tab stop');
+  assert.equal(cells(svelte).filter((c) => c.includes('tabindex="-1"')).length, 5);
+  assert.equal(cells(html).filter((c) => c.includes('tabindex')).length, 0, 'a static mirror promises no caret it cannot move');
+
+  /* AND THE REGION IS REACHABLE ON BOTH, which is what makes withholding the cell stop acceptable:
+     a wide table can still be scrolled with a keyboard in the mirror. */
+  const tag = (t: string, cls: string) => [...t.matchAll(/<div [^>]*>/gu)].map((m) => m[0]).find((d) => d.includes(`class="${cls}"`)) ?? '';
+  for (const t of [svelte, html]) {
+    assert.ok(tag(t, 'table-region').includes('role="group"') && tag(t, 'table-region').includes('tabindex="0"'), tag(t, 'table-region'));
+    assert.ok(tag(t, 'table').includes('role="grid"') && tag(t, 'table').includes('tabindex="-1"'), tag(t, 'table'));
+  }
+
+  /* AND THE STRIP IS NOT A BLANKET. It takes the attribute off a gridcell and off nothing else, so
+     a tab stop that appeared anywhere new would still break the comparison above. */
+  assert.equal(noRovingStop('<span class="x" role="gridcell" tabindex="0">'), '<span class="x" role="gridcell">');
+  assert.equal(noRovingStop('<span class="x" tabindex="0">'), '<span class="x" tabindex="0">');
+});
 
 test('and the comparison is not vacuous: a tree that differs is told apart', () => {
   const a = tree(toHTML([page(SHAPES['a section with a count']!)]));

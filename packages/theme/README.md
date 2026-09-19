@@ -18,7 +18,7 @@ A theme in this product is a **token document and nothing else**: it may set col
 pairing, a spacing scale, radii and density. It may not inject CSS, target a selector, load a font,
 override one block or write a hex at a call site.
 
-That strictness is what makes sixteen block kinds look like one product. A theme that can reach past
+That strictness is what makes twenty-nine block kinds look like one product. A theme that can reach past
 tokens breaks all sixteen at once — and the author will never find out which one, because they will
 only hear that it looks broken.
 

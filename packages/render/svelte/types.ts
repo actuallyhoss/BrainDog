@@ -6,105 +6,16 @@
  * shared page all need to build these shapes.
  */
 
-import type { CardRole, Tone } from '../src/index.ts';
+import { type Column, type TableRow } from '../src/table.ts';
 
-export type Column = {
-  field: string;
-  label: string;
-  /**
-   * A CSS track. DECLARED, never content-derived: `content-visibility` needs size containment,
-   * `subgrid` is nullified by it, so one `--cols` track list on the grid root is what keeps the
-   * header and the body in step. The reason the fast path exists is that pages are declared (22 §4).
-   */
-  width: string;
-  /**
-   * The header carries the name and does not SHOW it.
-   *
-   * For a column whose cells are a control rather than a value — a row picker — where a visible
-   * heading would be a word wider than the column and a heading nobody reads. The name is still
-   * there, because a column header with no name is an unnamed button in the tab order and an empty
-   * `columnheader` in the tree, which is what the accessibility gate found the moment one existed.
-   * A column like that is never sortable: there is nothing to sort by.
-   */
-  hideLabel?: boolean | undefined;
-  /** Quantities, dates and counts end; text and refs start (13 §4.2). */
-  align?: 'start' | 'end' | undefined;
-  /**
-   * Text truncates at the end; an IDENTIFIER truncates in the middle, keeping prefix and suffix;
-   * a FIGURE NEVER TRUNCATES, because a truncated figure is not shortened, it is wrong.
-   */
-  truncate?: 'end' | 'middle' | 'never' | undefined;
-  /**
-   * This column carries the row's intent: the glyph sits at the head of its cells and its text takes
-   * the intent's colour, so a register's state reads `⊘ open` in one place. A table that names no
-   * such column puts the glyph at the head of its first value, as it always has.
-   */
-  tone?: boolean | undefined;
-  /**
-   * What this column is on a card, for a `cards` block (`src/cards.ts`). A table ignores it. Absent,
-   * the page's evaluator places the column the way a phone card does: text first, a figure after.
-   */
-  as?: CardRole | undefined;
-};
-
-export type TableRow = {
-  /** A stable key, never an index — deep-linking a paged list needs one (19 §5). */
-  key: string;
-  cells: (string | null)[];
-  /** From a column's `tone_when`, or from the row's own state. Reaches the DOM with its glyph. */
-  tone?: Tone | undefined;
-  href?: string | undefined;
-};
-
-/**
- * The rows in groups, for the chunked `content-visibility` the measurement above bought.
- *
- * Here rather than inside the component because the step is the one number in that file that can be
- * wrong in a way nothing catches: `chunk={0}` is `i += 0`, a loop with no end, running during
- * render. The tab froze with no error and nothing on screen to say which component did it.
- *
- * The step is also the row index's unit — `aria-rowindex` is `group * step + i` — so the two cannot
- * be allowed to disagree, which is the second reason this is one function.
+/*
+ * `Column`, `TableRow`, `chunkRows` and `ariaSort` MOVED TO `../src/table.ts` AND ARE RE-EXPORTED
+ * HERE. None of them was ever markup, and while they lived under `svelte/` the HTML renderer could
+ * not read them, so it hand-rolled a second, smaller answer for the same primitive and the two
+ * trees came apart. They keep their names here because six call sites across three packages import
+ * them from this path, and moving a type is not a reason to touch six files.
  */
-export function chunkRows<T>(rows: readonly T[], size: number): { step: number; groups: T[][] } {
-  const step = Number.isFinite(size) ? Math.max(1, Math.floor(size)) : 1;
-  const groups: T[][] = [];
-  for (let i = 0; i < rows.length; i += step) groups.push(rows.slice(i, i + step));
-  return { step, groups };
-}
-
-/**
- * What a column header announces about sorting, which for most of them is NOTHING.
- *
- * `aria-sort="none"` WAS ON EVERY VISIBLE HEADER OF EVERY TABLE. It does not mean "this column is
- * not involved in sorting"; it means "this column is sortable and is not the one currently
- * sorted", so it is the attribute that tells a screen-reader user there is a control here to
- * press. Five of the six callers of `Table` pass no `onsort` at all and the sixth passes one only
- * once it has two rows to put in an order, so on a `comparison` block, a shared page, a related
- * list and a saved view, every heading advertised a control that does not exist and the reader
- * spent the keystrokes finding out. The register's own call site had already written the sentence
- * down, *"eight header buttons over a single row, each announcing `aria-sort="none"`"*, as the
- * reason it withholds `onsort`, and withholding it did not withhold the claim.
- *
- * A COLUMN THAT IS SORTED STILL SAYS SO. The direction is a fact about the list the reader is
- * looking at and is true whether or not the control that set it is this header: a host can sort
- * from a URL, which is exactly what the register does with one row. So `undefined` is only for the
- * case where there is no sort on this column AND no way to ask for one.
- *
- * Here rather than in the component for the reason `moveCell` is here: it is a decision with an
- * answer, and an attribute that is absent is not visible in a rendered tree.
- */
-export function ariaSort(
-  column: Column,
-  sort: { field: string; dir: 'asc' | 'desc' } | undefined,
-  sortable: boolean,
-): 'ascending' | 'descending' | 'none' | undefined {
-  /* A column whose cells are a control is never sortable, and `hideLabel` is already the declaration
-     for that, and it is the same one the header reads to decide it has no visible name. */
-  if (column.hideLabel) return undefined;
-  if (sort?.field === column.field) return sort.dir === 'asc' ? 'ascending' : 'descending';
-  return sortable ? 'none' : undefined;
-}
+export { ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, TABLE_CHUNK, TABLE_ROWS_LABEL, type Column, type TableRow } from '../src/table.ts';
 
 /**
  * Every column of a row, paired with the value the phone card draws for it.

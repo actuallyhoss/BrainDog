@@ -547,6 +547,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
         where: 'state is not dropped',
+        /* AND WHICH CARDS AN AGENT IS ON RIGHT NOW. This is the page that answers "what are my agents
+           doing", and until now it answered it only in a strip beside the board: a card being worked
+           on looked exactly like one nobody had opened in a week. */
+        working: true,
         empty: 'Nothing open.',
       },
       {

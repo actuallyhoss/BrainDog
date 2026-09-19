@@ -1,0 +1,5 @@
+code:   PULL_SHAPE_MISMATCH
+via:    rpc
+raises: packages/connect/src/page.ts
+at:     fetch.page.from
+fix:    The response shape changed; check fetch.page.from against a recent response.

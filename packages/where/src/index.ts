@@ -1343,3 +1343,8 @@ const truth = (v: unknown): boolean | null =>
 
 export { parseWhere, resolveDay } from './sentence.ts';
 export type { Parsed, SentenceDeps } from './sentence.ts';
+
+/* One path into a body a stranger sent — `47 §4.3`'s grammar, read by connect, extract and the
+   record's `applyPull`. It shares this package's posture and none of its vocabulary; see `path.ts`. */
+export { fansOut, pathFault, readPath } from './path.ts';
+export type { Json, Read } from './path.ts';

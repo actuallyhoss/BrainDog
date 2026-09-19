@@ -14,6 +14,7 @@
   import { tick } from 'svelte';
   import { figureChars, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
+  import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { valueWord } from '../../src/format.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
@@ -244,12 +245,19 @@
     e.dataTransfer.effectAllowed = 'move';
     /* A payload, because Firefox starts no drag without one, and the card's own title so that a
        drop outside this board arrives as the words the reader was dragging rather than as nothing. */
-    e.dataTransfer.setData('text/plain', text(inline(row.cells[1] ?? '', opts)));
+    e.dataTransfer.setData('text/plain', text(inline(takeWorking(row.cells[1] ?? null).text ?? '', opts)));
   }
 </script>
 
 {#snippet cardBody(row: Row, unsaved: boolean)}
-  <span class="card-title"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
+  <!-- `working: true`'s dot, on the cell the kind calls the card by, which `workingCell` settles for
+       both sides of the convention. Read off that cell and no other: a dot found on the detail and
+       drawn on the title would be this drawer disagreeing with `html.ts`, which draws each cell where
+       it found it, and the two are held equal by `src/parity.test.ts`. -->
+  {@const title = takeWorking(row.cells[1] ?? null)}
+  <span class="card-title">
+    {#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} />
+  </span>
   <span class="card-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
   <!-- A WORD, NOT A COLOUR, so it needs no tone and draws no glyph: `13 §5.1` bans colour carrying
        meaning alone, and the way out of that rule is to say the thing rather than to tint it. The

@@ -226,3 +226,37 @@ export function parseAnswer(body: string, cap = 2_000_000): unknown {
     return undefined;
   }
 }
+
+/** One mapped row: what was read, and which fields were not read cleanly. */
+export type RowRead = { fields: Record<string, Json>; missed: string[]; soft: string[] };
+
+/**
+ * A whole row, by its `map:`, over one parsed answer.
+ *
+ * ONE ROW OR FIVE HUNDRED IS THE SAME READ. An email carrying `{"total":4200}` and page three of a
+ * provider's charges differ in how many roots there are, not in what a root means — so the field
+ * loop, the missing list and the *chose or defaulted* list are this function, and `arrive` and the
+ * connector extractor both call it. Two copies of this loop would be two definitions of what
+ * `proposed` means, and the copy that drifts is the one nobody is reading when a number looks wrong.
+ */
+export function readRow(
+  deps: MapDeps,
+  map: Readonly<Record<string, Mapping>>,
+  root: unknown,
+  arrivedAt: string,
+  typeOf: (field: string) => string | undefined,
+): RowRead {
+  const fields: Record<string, Json> = {};
+  const missed: string[] = [];
+  const soft: string[] = [];
+
+  for (const [field, mapping] of Object.entries(map)) {
+    const got = mapField(deps, mapping, root, arrivedAt, typeOf(field));
+    /* A FIELD THAT READ NOTHING IS NAMED AND NOT WRITTEN AS `null`. A null in a row is a value
+       somebody could act on; a name in `missed` is the row saying it could not be read. */
+    if (got.value === null) { missed.push(field); continue; }
+    fields[field] = got.value;
+    if (got.outcome !== 'exact') soft.push(field);
+  }
+  return { fields, missed, soft };
+}

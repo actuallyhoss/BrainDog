@@ -86,7 +86,7 @@ devDependency is an edge — a build-time import is an import.
 | 11 | `record` | 1, 2, 3, 7, 8 — `./directory` is a subpath, not a package. **1 is the other edge the boundary table forbids** |
 | 12 | `mcp` | 2, 11 (types) — the wrapper sits above what it wraps |
 | 13 | `spark` | 2, 3, 11 *(unbuilt)* — Phase B7; ports `{ Sql, Clock, Inference }`, hosted by `apps/worker/src/do/spark.ts` |
-| 14 | `connect` | 2, 9, 11 *(unbuilt)* |
+| 14 | `connect` | 2, 3 — the `Http`, `KeyStore` and `Clock` types, and `readPath` for a response path. `9` and `11` were in this row and are not edges: `extract` is unbuilt, and the record's surface is declared structurally here as `RecordApi` (47 §1), which is how connect calls it without importing it |
 | 15 | `host` | 2, 11 — platform-neutral ([ADR-064](16-DECISIONS.md)) |
 | 16 | `client` | 2, 15 — the typed client, and the third way into the route table |
 | 17 | `dog` | — the printed form of a page, and the parser that reads one back. It depends on nothing, so the app that prints a page and the command line that reads one can each hold it without holding the other |

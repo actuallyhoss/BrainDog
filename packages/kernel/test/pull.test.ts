@@ -339,3 +339,34 @@ test('AND AN INTERVAL UNDER THE FLOOR DOES NOT INSTALL', async () => {
   assert.ok((await k.install([CONNECTOR({ ingest: 'other', every: '6h', floor: '6h' })])).ok);
   sql.close();
 });
+
+test('A CONNECTOR WHOSE LAST RUN IS STILL GOING IS NOT RUN AGAIN, and its cadence is kept', async () => {
+  /* `call` AND `poll` HAVE CHECKED THIS SINCE THEY WERE WRITTEN and `pull` never did. An hour that
+     comes round while the last hour is still leased queued a second row: two runs of one window,
+     against one provider, paid for twice. Each row carries its own lease, so the write-side fence
+     cannot see the other one. */
+  const { k, sql, clock } = await record(CONNECTOR(), true);
+  arm(sql, 'npm-downloads', NOW);
+  clock.set(NOW + 1000);
+  await k.drain();
+  assert.equal(outbox(sql).length, 1);
+
+  /* THE FIRST RUN IS STILL OUT. */
+  sql.exec("UPDATE outbox SET state = 'leased' WHERE kind = 'pull.fetch'");
+  arm(sql, 'npm-downloads', NOW + 3_600_000);
+  clock.set(NOW + 3_601_000);
+  await k.drain();
+
+  assert.equal(outbox(sql).length, 1, 'the same connector was queued twice with one run still out');
+  /* AND SKIPPING THE QUEUE IS NOT SKIPPING THE SCHEDULE: a run that overruns its interval resumes
+     its cadence rather than stopping. */
+  assert.ok(Date.parse(row(sql).due_at) > NOW + 3_601_000, 'the connector stopped being scheduled');
+
+  /* ONCE IT IS DONE, THE NEXT TURN QUEUES AGAIN. */
+  sql.exec("UPDATE outbox SET state = 'done' WHERE kind = 'pull.fetch'");
+  arm(sql, 'npm-downloads', NOW + 7_200_000);
+  clock.set(NOW + 7_201_000);
+  await k.drain();
+  assert.equal(outbox(sql).length, 2);
+  sql.close();
+});

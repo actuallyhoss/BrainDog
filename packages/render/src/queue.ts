@@ -4,20 +4,34 @@
  * Kept out of the markup for the reason `feed.ts` and `cards.ts` are: an answer here can be tested
  * without a DOM, and two drawers that each worked it out would be two answers.
  *
- * WHAT IT IS FOR. A queue is the short list of things waiting on a person, costliest first, with what
- * their agents recommend. It is the shape `20 §3` asks for and the one Decide is built around: a
- * question, who opened it, why it is being asked, and the ways to answer it.
+ * WHAT IT IS FOR. A queue is the short list of things waiting on a person, with what their agents
+ * recommend. It is the shape `20 §3` asks for and the one Decide is built around: a question, who
+ * opened it, why it is being asked, and the ways to answer it.
+ *
+ * DEAREST FIRST, AND THE ORDER IS THE EVALUATOR'S. `19 §6` asks for the queue ranked by cost of
+ * being wrong, and for a week this file said it was while `governance.open` ordered by recency —
+ * a docstring making a promise the evaluator never made. The record computes the band now
+ * (`@braindog/kernel`'s `weigh.ts`) from what accepting the proposal would do, and sends it down as
+ * the question row's seventh cell. THIS NEVER REORDERS, and that has not changed: what is dearest
+ * is the record's judgement to make, not the drawer's, and a queue that re-sorted what it was
+ * handed would be a second ranking nobody could see the input to.
  *
  * THE ROWS ARE WHAT A PAGE'S EVALUATOR WRITES, in the record's own order. A question and its options
  * are separate rows, the first cell saying which:
  *
- *   q    | id | who | when | question | why
+ *   q    | id | who | when | question | why | cost
  *   opt  | id | key | label | because | recommended
- *   more | n
+ *   more | n | where the rest of them are, optional
  *
  * The `more` row, last and at most one, is how many are waiting past the ones drawn, so a person
  * reading three cards knows whether that is the whole of it. The evaluator counts it; a queue that
  * silently drew the first three of nine would be a queue that lies about how much is waiting.
+ *
+ * AND ITS THIRD CELL IS WHERE THEY ARE, because a count with nowhere to press is a dead end: "5 more"
+ * told a reader there was more and gave them no way to reach it. The ADDRESS IS THE EVALUATOR'S, never
+ * this package's — a renderer that knew `/decide` would be a renderer with a route in it, and the
+ * host is the only thing that knows where its own questions live (the same rule `cellHref` and `link`
+ * follow). Without it the count is still drawn, as plain words.
  *
  * A ROW PER OPTION RATHER THAN ONE WIDE ROW, because the number of options is not fixed and a row of
  * cells is. `feed` already marks one of its rows the same way, with `seen`, so this is the primitive's
@@ -42,6 +56,29 @@ const isRowKind = (s: string): s is QueueRowKind => (QUEUE_ROWS as readonly stri
  */
 export const QUEUE_CLEARED = 'Nothing is waiting on you.';
 export const QUEUE_RECOMMENDED = 'Recommended';
+
+/**
+ * What each cost band is called on screen, and the closed set of them.
+ *
+ * THE FACT IS THE RECORD'S AND THE WORDS ARE THIS PACKAGE'S, which is the same split `TONES` makes
+ * in `kinds.ts`: the kernel decides which band a question is in, because that is a judgement about
+ * the record, and it holds no English because a kernel with a reader in it is a kernel that has to
+ * know what language they read. A band this package does not know draws nothing rather than drawing
+ * its own name, because a chip reading `undo-ish` is worse than no chip.
+ *
+ * FOUR WORDS AND NO SENTENCE. The band is the reason the question is where it is in the list, and
+ * that is all it says: a chip is a label, not an argument for the ranking. Why a proposal is
+ * expensive is in the question's own `why`, written by whoever opened it.
+ */
+export const QUEUE_COSTS: Record<string, string> = {
+  undo: 'Hard to undo',
+  shape: 'Changes the setup',
+  rows: 'Adds rows',
+  call: 'A judgement',
+};
+
+/** What a question's band is called, or `''` for a band this package has no word for. */
+export const queueCost = (band: string): string => QUEUE_COSTS[band] ?? '';
 /** What the last line says when a queue holds more than it draws. */
 export const queueMore = (n: number): string => `${n} more`;
 
@@ -52,6 +89,9 @@ export const queueMore = (n: number): string => `${n} more`;
  * question would otherwise vanish, and a queue that quietly loses a way to answer is a silent decision
  * about somebody else's choice.
  */
+/** Where the rest of a queue is: a path of this host's, or nothing. Anything else is a fault. */
+const PATH = /^\/[^\s]*$/u;
+
 export function queueFault(rows: readonly (readonly string[])[]): string | null {
   let open = false;
   let options = 0;
@@ -62,11 +102,18 @@ export function queueFault(rows: readonly (readonly string[])[]): string | null 
     if (ended) return 'a row after the count of what is left';
     if (word === 'more') {
       if (!/^\d+$/u.test((cells[1] ?? '').trim())) return 'a count of what is left that is not a whole number';
+      const where = (cells[2] ?? '').trim();
+      if (where !== '' && !PATH.test(where)) return 'a place to see the rest that is not a path of this record';
       ended = true;
       continue;
     }
     if (word === 'q') {
       if (open && options === 0) return 'a question with no way to answer it';
+      /* A BAND WITH NO WORD IS A FAULT, AND NO BAND AT ALL IS NOT. A host writing a queue by hand may
+         not have one, and a question with no chip is a question; a band spelled `undoable` is a
+         ranking this package silently ignored, which is the failure that looks like it worked. */
+      const band = (cells[6] ?? '').trim();
+      if (band !== '' && !Object.hasOwn(QUEUE_COSTS, band)) return `a cost band this build has no word for: "${band}"`;
       open = true;
       options = 0;
     } else {
@@ -98,6 +145,10 @@ export type QueueItem<R> = {
   question: string;
   /** Why it is being asked, written by whoever opened it. Empty when they wrote none. */
   why: string;
+  /** The band the record put it in, and the reason it sits where it does. Empty when it said none. */
+  cost: string;
+  /** That band's word, or `''` for a band this package has no word for. */
+  costLabel: string;
   options: QueueOption<R>[];
 };
 
@@ -111,18 +162,22 @@ const cell = (cells: readonly string[], i: number): string => (cells[i] ?? '').t
  * evaluator's, which is the record's own, and this never reorders: what is costliest is the record's
  * judgement to make, not the drawer's.
  */
-export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { items: QueueItem<R>[]; more: number; empty: string } {
+export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { items: QueueItem<R>[]; more: number; moreHref: string | null; empty: string } {
   const items: QueueItem<R>[] = [];
   let more = 0;
+  let moreHref: string | null = null;
   for (const row of rows) {
     const word = cell(row.cells, 0);
     if (word === 'more') {
       const n = Number(cell(row.cells, 1));
       more = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      const where = cell(row.cells, 2);
+      moreHref = PATH.test(where) ? where : null;
       continue;
     }
     if (word === 'q') {
-      items.push({ row, id: cell(row.cells, 1), who: cell(row.cells, 2), when: cell(row.cells, 3), question: cell(row.cells, 4), why: cell(row.cells, 5), options: [] });
+      const band = cell(row.cells, 6);
+      items.push({ row, id: cell(row.cells, 1), who: cell(row.cells, 2), when: cell(row.cells, 3), question: cell(row.cells, 4), why: cell(row.cells, 5), cost: band, costLabel: queueCost(band), options: [] });
       continue;
     }
     if (word !== 'opt') continue;
@@ -130,5 +185,5 @@ export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly
     if (!at) continue;
     at.options.push({ row, key: cell(row.cells, 2), label: cell(row.cells, 3) || cell(row.cells, 2), because: cell(row.cells, 4), recommended: cell(row.cells, 5).toLowerCase() === 'true' });
   }
-  return { items, more, empty: QUEUE_CLEARED };
+  return { items, more, moreHref, empty: QUEUE_CLEARED };
 }

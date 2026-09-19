@@ -20,6 +20,8 @@ import { MISSING, day, figureChars, leadingCode, symbolFigure, symbolText, value
 import { CARDS_NONE, FOLD_HIDE, FOLD_SHOW, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, trendOf } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, queueMore, queuePlan } from './queue.ts';
+import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
+import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
@@ -131,8 +133,23 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
     .join('');
 }
 
-const cell = (name: string, value: string | undefined, opts: RenderOptions, extra = ''): string =>
-  `<span class="${name}"${extra}>${value ? renderInline(inline(value, opts), opts) : ''}</span>`;
+/**
+ * One named cell, with `working: true`'s dot taken off its front and drawn as the mark it is.
+ *
+ * EVERY CELL AND NOT A CHOSEN FEW, because the writing side (`blocks.ts`) decides which cell carries
+ * it and this side must not hold a second opinion about that. A cell with no mark is unchanged, which
+ * is every cell on every block that did not ask for one.
+ */
+const cell = (name: string, value: string | undefined, opts: RenderOptions, extra = '', after = ''): string => {
+  const { text, working } = takeWorking(value ?? null);
+  return `<span class="${name}"${extra}>${working ? workingSpan() : ''}${text ? renderInline(inline(text, opts), opts) : ''}${after ? ` ${after}` : ''}</span>`;
+};
+
+/** The dot itself, said the same way `Table`, `Grid` and `List` say it. */
+/* AND A TOOLTIP, because a dot is not self-explaining to somebody looking at it. A screen reader has
+   been told since this shipped; a sighted reader was left with a mark and no way to ask what it means.
+   `aria-label` still names it — `title` is only the hover. */
+const workingSpan = (): string => `<span role="img" aria-label="${WORKING_LABEL}" title="${WORKING_LABEL}">${WORKING_GLYPH}</span> `;
 
 /** The intent reaches the DOM only as `data-intent` plus its glyph. There is no other path. */
 const toneAttrs = (tone?: string): string => (tone ? ` data-intent="${tone}"` : '');
@@ -197,13 +214,15 @@ function grid(b: Block, o: RenderOptions): string {
   if (b.kind === 'board') {
     const columns = [...new Set(b.rows.map((r) => r.cells[0] ?? ''))];
     const body = columns
-      .map(
-        (col) =>
-          `<div class="board-col"><h4 class="board-head">${escape(valueWord(col, true))}</h4>${b.rows
-            .filter((r) => r.cells[0] === col)
-            .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${cell('card-detail', r.cells[2], o)}</div>`)
-            .join('')}</div>`,
-      )
+      .map((col) => {
+        const cards = b.rows.filter((r) => r.cells[0] === col);
+        /* HOW MANY ARE UNDER IT, which `Grid.svelte` has drawn on every column since it was written
+           and this did not: the two renderers differed on the head of every board in the record, and
+           no shape in `parity.test.ts` was a board, so nothing said so. */
+        return `<div class="board-col"><h4 class="board-head">${escape(valueWord(col, true))}<span class="board-count num">${cards.length}</span></h4>${cards
+          .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${cell('card-detail', r.cells[2], o)}</div>`)
+          .join('')}</div>`;
+      })
       .join('');
     return `<div class="grid" style="--cells:${columns.length}">${body}</div>`;
   }
@@ -337,27 +356,83 @@ function list(b: Block, o: RenderOptions): string {
       if (b.kind === 'todo')
         return `<li class="item"><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}</li>`;
       if (b.kind === 'timeline')
-        return `<li class="item"${toneAttrs(r.tone)}>${cell('item-marker num', r.cells[0], o)}${cell('item-title', r.cells[1], o)}${cell('item-detail', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+        /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
+           from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the
+           detail instead, so the two renderers differed on every timeline row that carried a tone, and
+           no shape here was a timeline with one. */
+        return `<li class="item"${toneAttrs(r.tone)}>${cell('item-marker num', r.cells[0], o)}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', r.cells[2], o)}</li>`;
       return `<li class="item">${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
     .join('');
   return `<${tag} class="list" data-kind="${b.kind}">${body}</${tag}>`;
 }
 
+/**
+ * `table` — the static mirror of `svelte/p/Table.svelte`, drawn from the same decisions.
+ *
+ * IT USED TO BE A SECOND, SMALLER TABLE and that was the largest hole in this package's "equal by
+ * construction" claim. There was no scroll region, no `rowgroup`, no `data-align` or
+ * `data-truncate` on a cell, no missing mark, no figure in its symbol, and `--cols` spelled
+ * `repeat(2,minmax(0,1fr))` against the component's `minmax(0,1fr) minmax(0,1fr)`. Everything
+ * `blocks.css` hangs off those attributes was styled on one surface and not on the other, and
+ * `parity.test.ts` had no `comparison` shape to notice any of it.
+ *
+ * WHAT IT DELIBERATELY DOES NOT CARRY is the roving tab stop: one cell at `tabindex="0"` and the
+ * rest at `-1` is a promise that the arrow keys move a caret, and a static page has no handler to
+ * keep it. The scroll region IS focusable here, as it is there, so a keyboard can still reach and
+ * scroll a wide table. `src/table.ts` sets out the reasoning and `parity.test.ts` asserts that this
+ * is the only difference between the two trees.
+ */
 function table(b: Block, o: RenderOptions): string {
-  const [head, ...body] = b.rows;
-  if (!head) return `<div class="table"></div>`;
-  const cols = head.cells.length;
-  const th = head.cells.map((c) => `<span class="th" role="columnheader">${escape(c)}</span>`).join('');
-  const tr = body
-    .map(
-      (r, i) =>
-        `<div class="tr" role="row" aria-rowindex="${i + 2}">${head.cells
-          .map((_, j) => `<span class="td" role="gridcell">${renderInline(inline(r.cells[j] ?? '', o), o)}</span>`)
-          .join('')}</div>`,
-    )
+  const plan = comparisonPlan(b.rows);
+  /* NOTHING, AND NOT AN EMPTY GRID. `Block.svelte` draws no table for a block with no rows at all,
+     and an empty `role="grid"` is a thing a screen reader stops on and announces, so the mirror
+     was putting a table nobody wrote into the tree. */
+  if (!plan) return '';
+  const { columns, rows } = plan;
+  const glyphAt = glyphColumn(columns);
+  const th = columns
+    .map((c) => {
+      const sorted = ariaSort(c, undefined, false);
+      return `<span class="th" role="columnheader"${sorted ? ` aria-sort="${sorted}"` : ''} data-align="${c.align ?? 'start'}">${escape(c.label)}</span>`;
+    })
     .join('');
-  return `<div class="table" role="grid" aria-rowcount="${body.length + 1}" aria-colcount="${cols}" style="--cols:repeat(${cols},minmax(0,1fr))"><div class="tr" role="row" aria-rowindex="1">${th}</div>${tr}</div>`;
+  const grouped = chunkRows(rows, TABLE_CHUNK);
+  const body = grouped.groups
+    .map((group, g) => {
+      const trs = group
+        .map((row, i) => {
+          const index = g * grouped.step + i;
+          const tds = columns
+            .map((column, c) => {
+              const drawn = tableCellBody(row.cells[c] ?? null);
+              const inner =
+                drawn.body.kind === 'missing'
+                  ? `<span class="missing">${MISSING}</span>`
+                  : drawn.body.kind === 'coded'
+                    ? `${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span> ${escape(drawn.body.rest)}`
+                    : escape(drawn.body.text);
+              /* NO TONE GLYPH AND NO `data-tone` HERE, because a dialect table cannot carry either:
+                 `comparisonPlan` builds its rows from cells and a block's tone belongs to the whole
+                 figure. The component draws both for the register grid, which passes rows it built
+                 itself. If the dialect ever grows a per-row tone the parity test fails on the first
+                 shape that uses one, which is the right way to find out. */
+              return `<span class="td" role="gridcell" data-align="${column.align ?? 'start'}" data-truncate="${column.truncate ?? 'end'}"${c === glyphAt ? ' data-glyph=""' : ''}>${drawn.working ? workingSpan() : ''}${inner}</span>`;
+            })
+            .join('');
+          return `<div class="tr" role="row" aria-rowindex="${index + 2}">${tds}</div>`;
+        })
+        .join('');
+      return `<div class="rowgroup" role="rowgroup" style="${intrinsicRows(group.length)}">${trs}</div>`;
+    })
+    .join('');
+  const label = b.heading ?? TABLE_ROWS_LABEL;
+  const tracks = columns.map((c) => c.width).join(' ');
+  return (
+    `<div class="table-region" role="group" tabindex="0" aria-label="${escape(label)}">` +
+    `<div class="table" role="grid" aria-rowcount="${rows.length + 1}" aria-colcount="${columns.length}" style="--cols:${tracks}" tabindex="-1">` +
+    `<div class="tr th-row" role="row" aria-rowindex="1">${th}</div>${body}</div></div>`
+  );
 }
 
 /**
@@ -637,14 +712,20 @@ function queue(b: Block, o: RenderOptions): string {
             }${opt.because ? `<span class="queue-because">${drawn(opt.because)}</span>` : ''}</li>`,
         )
         .join('');
+      /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits last on the by-line, in the same register as
+         who asked and when, because it is the answer to "why is this card here" and not the card's
+         content. `data-cost` carries the band's own word so a stylesheet can weight the dearest one
+         without matching on English. */
+      const cost = item.costLabel ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
       return `<article class="queue-card"${toneAttrs(item.row.tone)}><p class="queue-by"><span class="queue-who">${drawn(
         item.who,
-      )}</span><span class="queue-when">${drawn(item.when)}</span></p><h3 class="queue-question">${drawn(item.question)}</h3>${
+      )}</span><span class="queue-when">${drawn(item.when)}</span>${cost}</p><h3 class="queue-question">${drawn(item.question)}</h3>${
         item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : ''
       }<ul class="queue-options">${options}</ul></article>`;
     })
     .join('');
-  const more = plan.more > 0 ? `<p class="queue-more">${escape(queueMore(plan.more))}</p>` : '';
+  const said = escape(queueMore(plan.more));
+  const more = plan.more === 0 ? '' : plan.moreHref ? `<a class="queue-more" href="${escape(plan.moreHref)}">${said}</a>` : `<p class="queue-more">${said}</p>`;
   return `<div class="queue">${body}${more}</div>`;
 }
 

@@ -195,6 +195,22 @@ export type PageBlock = {
     /** A money column's sign, read from an enum: the value that makes the amount go out draws `−`, any other `+`. */
     sign?: { field: string; minus: string };
   }[];
+  /**
+   * A `table`, `todo` or `board`'s live-session dot: on, next to the row's own name, when the agent
+   * that last touched the row is heard from right now (`sessions.live`'s own question, asked of a
+   * row instead of a run).
+   *
+   * PLANNED AS A COLUMN OPTION AND BUILT AS A BLOCK ONE, the way `provenance: true` was planned and
+   * shipped as a column named `changed` instead: the render primitives take a plain string per cell
+   * and carry no column metadata of their own, so a flag that survived only inside one `columns:`
+   * entry would need a new field on the primitives' own `Column` type — which is a different
+   * package's, not this build's to widen for one feature. A row either has an agent on it right now
+   * or it does not, which is a fact about the ROW, so it sits here, once, rather than waiting on a
+   * column an author would have had to pick correctly.
+   */
+  working?: boolean;
+  /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
+  working_now?: boolean[];
   /** A `section` that starts shut, folding the blocks after it up to the next section. */
   fold?: boolean;
   /** The glyph beside a `section`'s heading. */
@@ -376,8 +392,19 @@ export type PageDecl = {
 export type Question = {
   id: string;
   title: string;
-  /** Why deciding late is expensive. This is the ranking, made legible. */
+  /**
+   * Why deciding LATE is expensive, written by whoever asked. It is not the ranking, and this line
+   * said it was: the cost of delay and the cost of being wrong are two different questions, and only
+   * one of them can be computed. It is drawn under `copy.costOfDelay`, which is what it always was.
+   */
   cost: string;
+  /**
+   * What it would cost to get this one WRONG: the band the record computed from what accepting the
+   * proposal would do (`@braindog/kernel`'s `weigh.ts`). This is the ranking. Absent on a question
+   * whose body this build cannot read, and on every question a fixture wrote by hand before it.
+   */
+  band?: string;
+  /** Its place in the queue, dearest band first and oldest first within a band. */
   rank: number;
   opened: string;
   entity?: string;

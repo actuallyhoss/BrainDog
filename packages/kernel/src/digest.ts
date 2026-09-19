@@ -38,7 +38,7 @@ export type DigestSection = {
   /** `metric.<id>` or `register.<id>`. */
   source: string;
   where?: string;
-  /** One of the sixteen block kinds. `table` is the one bound to a source with columns. */
+  /** One of the twenty-nine block kinds. `table` is the one bound to a source with columns. */
   as?: string;
   columns?: { field: string; label?: string }[];
   omit_when_empty?: boolean;

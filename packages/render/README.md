@@ -57,7 +57,7 @@ a theme swap can never break a page, and an agent can never make a page ugly.
 
 ---
 
-## Twenty kinds over eight primitives
+## Twenty-nine kinds over eight primitives
 
 Kinds are declarations over primitives, so primitives compose and kinds do not have to. `cards`,
 `section` and `feed` are page-only: a page's evaluator writes their rows and passes
@@ -69,9 +69,9 @@ Kinds are declarations over primitives, so primitives compose and kinds do not h
 | `panel` | a bounded region with a tone and a nested document | `note` `quote` `section` |
 | `grid` | *n* cells of label and figure | `stat` `board` `cards` |
 | `rows` | label · value · note, one per line | `spec` `params` |
-| `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` |
+| `proportional` | rows whose number drives a drawn magnitude | `bar` `gauge` `sparkline` `split` `bridge` `series` `lines` `progress` `forecast` |
 | `inline` | a run of pills | `chips` |
-| `list` | title · detail · optional state marker | `steps` `todo` `timeline` `feed` |
+| `list` | title · detail · optional state marker | `todo` `steps` `timeline` `feed` `agents` `queue` |
 | `table` | real columns, a header, per-column alignment | `comparison` `table` |
 | `media` | a figure with a caption | `code` `tree` `diff` |
 
@@ -80,7 +80,7 @@ inlines**. Which is why a third party can add a kind without asking a designer �
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
-**The primitive set is the real API surface.** Eight is reviewable; twenty kinds plus unbounded
+**The primitive set is the real API surface.** Eight is reviewable; twenty-nine kinds plus unbounded
 third-party kinds is not. Adding a primitive is easy; renaming or removing one breaks every pack ever
 written, so ship fewer than you think you need.
 

@@ -10,6 +10,9 @@ import { readFileSync } from 'node:fs';
 
 import { MISSING } from 'braindog-render';
 
+import { WORKING_MARK } from 'braindog-render';
+
+import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
 import { ROWS, feedTable } from './api.ts';
 import { toSegments } from './blocks.ts';
@@ -422,6 +425,58 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.equal(blockOf({ kind: 'diff', source: 'register.obligations', rows: [], matched: 0, refusals: [] }, new Map(), now).cannot, liveWords.cannot);
 });
 
+test('A QUEUE THE RECORD ANSWERED becomes questions with the ways to answer them, and says how many it left out', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const asked = (id: string, kind: string, options: { key: string; label: string; because: string; recommended: boolean }[], cost = 'call') => ({
+    id,
+    who: 'spark',
+    at: '2026-09-16T09:00:00.000Z',
+    kind,
+    question: `Question ${id}?`,
+    why: kind === 'options' ? 'It has run over for two months.' : '',
+    /* The band the record computed, which the page source passes through as the record's own word. */
+    cost,
+    options,
+  });
+  const queue = blockOf(
+    {
+      kind: 'queue', source: 'governance.open', limit: 2, rows: [], matched: 9, refusals: [],
+      queue: [
+        asked('SG1', 'options', [
+          { key: 'raise', label: 'Raise it', because: 'Covers the overrun', recommended: true },
+          { key: 'leave', label: 'Leave it', because: '', recommended: false },
+        ]),
+        asked('SG2', 'rowset', [], 'rows'),
+      ],
+    },
+    new Map(),
+    now,
+  );
+  assert.equal(queue.cannot, undefined, 'a queue the record answered was drawn as one it cannot');
+  assert.deepEqual([queue.shown, queue.total], [2, 9]);
+
+  const [drawn] = toSegments(queue);
+  assert.ok(drawn?.type === 'block' && drawn.kind === 'queue', 'the queue was not drawn as a queue');
+  const cells = (drawn as { rows: { cells: string[] }[] }).rows.map((r) => r.cells);
+  assert.deepEqual(cells.map((c) => c[0]), ['q', 'opt', 'opt', 'q', 'opt', 'opt', 'more']);
+  assert.deepEqual(cells[0]?.slice(1, 5), ['SG1', 'the assistant', '3h ago', 'Question SG1?']);
+  /* AND THE BAND IS THE SEVENTH CELL, which is what `render/src/queue.ts` reads it from. */
+  assert.deepEqual([cells[0]?.[6], cells[3]?.[6]], ['call', 'rows']);
+  assert.deepEqual(cells[1]?.slice(2), ['raise', 'Raise it', 'Covers the overrun', 'true']);
+  /* THE TWO WORDS FOR EVERY OTHER KIND ARE THIS APP'S, because the record sends none and does not know
+     what language the reader has. */
+  assert.deepEqual([cells[4]?.[3], cells[5]?.[3]], [copy.acceptIt, copy.rejectIt]);
+  /* AND WHAT IT LEFT OUT IS SAID, rather than two of nine drawn as though that were all of it. */
+  /* AND WHERE THE OTHER SEVEN ARE, because a count with nowhere to press is a dead end. */
+  assert.deepEqual(cells[6], ['more', '7', '/decide']);
+
+  /* A QUEUE THE RECORD SENT IN A SHAPE THIS CANNOT READ says so, rather than drawing "nothing is waiting". */
+  assert.equal(
+    blockOf({ kind: 'queue', source: 'governance.open', rows: [], matched: 1, refusals: [], queue: [{ id: 'SG1', who: 'spark' }] }, new Map(), now).cannot,
+    liveWords.cannot,
+  );
+});
+
 test('a tile over a quantity is drawn as the quantity, and only a currency as money', () => {
   /* Any reading with a unit went to `money`, so 150 kg drew `KG 1.50` and 12.5 h drew `H 0.13`. */
   const reading = (value: number, unit: string) => ({ metric, reading: { value, unit, rows: 2, met: null, refusals: [] } });
@@ -593,4 +648,37 @@ test("a table over a use case's own lists names each link by the linked row, not
   const [table] = out.page.blocks;
   assert.equal(table!.cannot, undefined);
   assert.equal(table!.rows[0]!.cells[1], 'The Remains of the Day');
+});
+
+test('A LIVE ANSWER’S WORKING MARK IS THE RECORD’S, and a malformed one draws no dots rather than a wrong one', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const register = 'tasks';
+  const drawn = (working_now: unknown) =>
+    toSegments(
+      blockOf(
+        {
+          kind: 'todo',
+          source: `register.${register}`,
+          columns: [{ field: 'what' }],
+          working: true,
+          working_now,
+          rows: [row(1, { what: 'Ship the kerning pass' }), row(2, { what: 'Answer Fenwick' })],
+          matched: 2,
+          refusals: [],
+        } as never,
+        new Map(),
+        now,
+      ),
+    ).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]).map((r) => r.cells[0] ?? '') : []));
+
+  /* THE RECORD SAYS WHO IS BEING WORKED ON. Before this the dot was worked out while drawing, from the
+     SAMPLE's own ledger, so a live record drew none however busy its agents were. */
+  const marked = drawn([true, false]);
+  assert.equal(marked.length, 2);
+  assert.ok(marked[0]!.startsWith(WORKING_MARK), 'the row the record named carries no mark');
+  assert.ok(!marked[1]!.startsWith(WORKING_MARK));
+
+  /* AND ANYTHING ELSE IS NOT AN ANSWER. A record that sends a string, or one entry for two rows,
+     leaves the block unmarked: a dot on the wrong row says an agent is somewhere it is not. */
+  for (const bad of ['yes', null, { 0: true }, [1, 0]]) assert.ok(!drawn(bad).some((c) => c.startsWith(WORKING_MARK)), JSON.stringify(bad));
 });

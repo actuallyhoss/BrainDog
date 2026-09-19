@@ -255,7 +255,9 @@ test('THE SAMPLE SAYS ONE COUNT OF OPEN QUESTIONS: the rail and Home, the Decide
   const { boot, metric } = await import('./api.ts');
   const { ARRANGING, QUEUE } = await import('./data.ts');
   const shell = sampleShell(boot() as never, 0);
-  assert.ok(ARRANGING.every((q) => QUEUE.includes(q)), 'Decide draws the arranging proposals, so the count holds them');
+  /* BY ID AND NOT BY IDENTITY. `QUEUE` bands each question as it composes the list, so its entries are
+     copies of these rather than these; what the count needs is that every arrangement is in it. */
+  assert.ok(ARRANGING.every((q) => QUEUE.some((x) => x.id === q.id)), 'Decide draws the arranging proposals, so the count holds them');
   assert.equal(shell.open, QUEUE.length);
   assert.equal(metric('open-questions').value, String(QUEUE.length));
 });

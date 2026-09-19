@@ -75,9 +75,12 @@ const value = <T>(r: unknown): T => {
   return out.value as T;
 };
 
-async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
+async function record(): Promise<{ k: Kernel; sql: NodeSql; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  /* THE CLOCK COMES BACK OUT, so a test that needs a write to have happened an hour ago can put it
+     there rather than wait for one. Every read below still asks at `NOW`. */
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
   value(await k.install([PROJECTS, SKILLS, KEYS]));
   value(k.create('things', { name: 'Kiln' }, OWNER));
   value(k.create('things', { name: 'Portage' }, OWNER));
@@ -86,7 +89,7 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   value(k.create('skills', { name: 'deploy', body: '# Deploy' }, OWNER));
   value(k.create('credentials', { label: 'Kiln deploy key', project: 'things#1' }, OWNER));
   value(k.create('credentials', { label: 'DNS' }, OWNER));
-  return { k, sql };
+  return { k, sql, clock };
 }
 
 /** The deps a host wires, from the record's public reads. */
@@ -474,5 +477,134 @@ test('AN `actions` BLOCK LISTS THE RECORD’S SCHEDULED ACTIONS, keys by label, 
   const wired = k.block({ kind: 'table', source: 'actions' } as PageBlock);
   assert.deepEqual(wired.refusals, []);
   assert.deepEqual(wired.rows.map((r) => [r.fields.ingest, r.fields.host, r.fields.state]), [['balance', 'api.example.test', 'pending']]);
+  sql.close();
+});
+
+/*
+ * ── what is waiting on a person ───────────────────────────────────────────
+ *
+ * Every assertion below goes through `k.block`, which is the record's own wiring of `openQuestions`,
+ * because the half worth testing is the mapping from a governance row to a question: a body is
+ * whatever the proposer wrote, and the read has to survive one that is wrong.
+ */
+test('GOVERNANCE.OPEN IS THE QUESTIONS STILL OPEN, newest first as the register keeps them, with the options their bodies carry', async () => {
+  const { k, sql } = await record();
+  const opt = (id: string, label: string, because: string, recommended?: boolean) => ({ id, label, because, ...(recommended ? { recommended } : {}) });
+  const first = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Raise the retainer on Kiln?',
+        body_kind: 'options',
+        body: { context: 'Kiln has run over for two months.', options: [opt('raise', 'Raise it', 'Covers the overrun', true), opt('leave', 'Leave it', 'Keeps the price it was quoted at')] },
+      },
+      'spark',
+    ),
+  );
+  const second = value<{ id: string }>(
+    k.propose({ question: 'Add the Portage deploy key?', body_kind: 'rowset', body: { register: 'credentials', rows: [{ label: 'Portage deploy key' }] } }, 'spark'),
+  );
+
+  const drawn = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock);
+  assert.deepEqual(drawn.refusals, []);
+  assert.deepEqual(
+    (drawn.queue ?? []).map((q) => [q.id, q.who, q.kind, q.question, q.why]),
+    [
+      [second.id, 'spark', 'rowset', 'Add the Portage deploy key?', ''],
+      [first.id, 'spark', 'options', 'Raise the retainer on Kiln?', 'Kiln has run over for two months.'],
+    ],
+  );
+  assert.equal(drawn.matched, 2);
+  assert.ok((drawn.queue?.[0]?.at ?? '').startsWith('2026-09-15'));
+
+  /* THE OPTIONS ARE THE BODY'S OWN, and a kind that has none comes back with none: the two words a
+     rowset is answered with are the drawer's to write, not the kernel's. */
+  assert.deepEqual(
+    (drawn.queue?.[1]?.options ?? []).map((o) => [o.key, o.label, o.because, o.recommended]),
+    [
+      ['raise', 'Raise it', 'Covers the overrun', true],
+      ['leave', 'Leave it', 'Keeps the price it was quoted at', false],
+    ],
+  );
+  assert.deepEqual(drawn.queue?.[0]?.options, []);
+
+  /* AN ANSWERED QUESTION LEAVES, which is the one thing a queue must get right: a person who answers
+     and still sees it waiting answers it twice. */
+  value(k.decide(first.id, { decide: { option: 'leave', reason: 'The quote stands.' } }, 'p_1'));
+  assert.deepEqual(k.block({ kind: 'queue', source: 'governance.open' } as PageBlock).queue?.map((q) => q.id), [second.id]);
+
+  sql.close();
+});
+
+test('A QUEUE SAYS HOW MANY ARE WAITING PAST THE ONES IT DRAWS, and a where: narrows both', async () => {
+  const { k, sql } = await record();
+  const options = [
+    { id: 'yes', label: 'Yes', because: 'It is due' },
+    { id: 'no', label: 'No', because: 'It is not' },
+  ];
+  for (let i = 0; i < 5; i += 1) value(k.propose({ question: `Question ${i}?`, body_kind: 'options', body: { options } }, i < 2 ? 'spark' : 'p_1'));
+
+  /* THREE IS WHAT A QUEUE DRAWS UNASKED, and the count is of everything open rather than of the page read. */
+  const three = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock);
+  assert.equal(three.queue?.length, 3);
+  assert.equal(three.matched, 5);
+  assert.equal(k.block({ kind: 'queue', source: 'governance.open', limit: 2 } as PageBlock).queue?.length, 2);
+
+  /* WITH A PREDICATE THE COUNT IS OF WHAT THE PAGE COULD SEE, and says so by being smaller. */
+  const mine = k.block({ kind: 'queue', source: 'governance.open', where: 'who is spark' } as PageBlock);
+  assert.equal(mine.matched, 2);
+  assert.deepEqual(mine.queue?.map((q) => q.who), ['spark', 'spark']);
+
+  /* AND THE RECORD'S ORDER IS THE ONLY ORDER, because a source that settles it would be answering twice. */
+  assert.equal(k.block({ kind: 'queue', source: 'governance.open', order: [{ field: 'who' }] } as PageBlock).refusals[0]?.code, 'DECLARATION_INVALID');
+  assert.equal(k.block({ kind: 'queue', source: 'governance.open', where: 'colour is red' } as PageBlock).refusals[0]?.code, 'FIELD_UNKNOWN');
+
+  /* AN UNWIRED HOST IS TOLD SO RATHER THAN HANDED AN EMPTY QUEUE, which would read as "nothing is waiting". */
+  const { openQuestions: _unwired, ...bare } = depsOver(k, sql);
+  assert.equal(readBlock(bare, { kind: 'queue', source: 'governance.open' }).refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  sql.close();
+});
+
+/* ── working: true ───────────────────────────────────────────────────────── */
+
+test('WORKING: TRUE MARKS THE ROWS AN AGENT IS ON RIGHT NOW, by the run that signed the write and not by the agent’s name', async () => {
+  const { k, sql, clock } = await record();
+  const deps = depsOver(k, sql);
+  /* Two runs of one agent: one still going, one that has stopped. Their NAMES are what a write is
+     signed with, which is how "Claude is open somewhere" is told apart from "Claude is on this row". */
+  const run = (doing: string, state: string) =>
+    value<Entry>(k.create('session', { doing, agent: 'claude', state }, { actor: OWNER.actor, stamp: { last_seen: new Date(NOW - 5 * 60_000).toISOString() } }));
+  const going = `S${String(run('Axis QA', 'active').seq)}`;
+  const stopped = `S${String(run('Kerning pass', 'idle').seq)}`;
+
+  const skills = value<{ rows: Entry[] }>(k.list({ register: 'skills', order: [{ field: 'seq' }] })).rows;
+  const touch = (row: Entry, actor: string) => value(k.update('skills', row.id, { body: `# Touched by ${actor}` }, { actor }));
+
+  clock.set(NOW - 3 * 60_000);
+  touch(skills[0]!, going);
+  touch(skills[1]!, stopped);
+  touch(skills[2]!, OWNER.actor);
+  clock.set(NOW);
+
+  const block: PageBlock = { kind: 'todo', source: 'register.skills', columns: [{ field: 'name' }], order: [{ field: 'seq' }], working: true };
+  const drawn = readBlock(deps, block);
+  assert.deepEqual(drawn.refusals, []);
+  assert.deepEqual(drawn.working_now, [true, false, false], 'the live run’s row alone: not the stopped run’s, and not the owner’s');
+
+  /* THE SECOND CLOCK. A write by a run that is still going, made four hours ago, is not somebody
+     working on that row now: it is a row that run finished with. */
+  clock.set(NOW - 4 * 3_600_000);
+  touch(skills[2]!, going);
+  clock.set(NOW);
+  assert.deepEqual(readBlock(deps, block).working_now, [true, false, false], 'a write older than the staleness window is not work in progress');
+
+  /* NOT ASKED, NOT ANSWERED: it reads every row’s history, and no page pays for a key it did not write. */
+  assert.equal(readBlock(deps, { ...block, working: false }).working_now, undefined);
+  assert.equal(readBlock(deps, { kind: 'todo', source: 'register.skills', columns: [{ field: 'name' }] }).working_now, undefined);
+
+  /* AND A RECORD WIRED FOR HALF THE QUESTION SAYS SO, rather than answering false for every row. */
+  const { sessionsLive: _unwired, ...bare } = deps;
+  const early = readBlock(bare, block);
+  assert.equal(early.refusals[0]?.code, 'NOT_IN_THIS_BUILD');
+  assert.equal(early.working_now, undefined);
   sql.close();
 });

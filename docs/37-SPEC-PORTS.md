@@ -137,16 +137,35 @@ interface Http {
 }
 ```
 The connector's fetch and nothing else's ([25-CONNECTORS](25-CONNECTORS.md)); the constraints are the
-adapter's, not the caller's.
+adapter's, not the caller's — an `init` that could relax them would be a port that moved the decision back to
+the place that cannot make it. The address check is the adapter's for the same reason: on a self-host
+`localhost:3000` is the record itself, and only the adapter knows which machine it is on (47 §8).
 
 ```ts
+const HTTP_FAULTS = ['PrivateRange', 'TooLarge', 'Timeout', 'Network'] as const;   // Error.name — 47 §13 D14
+```
+The four ways an adapter refuses, by `Error.name` rather than by class: the adapter lives in an app and the
+caller in a package, so a class crossing that seam is an edge pointing the wrong way up 31 §2's order. Closing
+the set is what makes the caller's mapping exhaustive — `httpFault(e)` answers `null` for anything else, which
+is a defect and not a provider behaviour.
+
+```ts
+type Key = InstanceType<typeof CryptoKey>;         // no `dom` lib here, and 31 §1 bans `node:`
+
 interface KeyStore {
-  current(): Promise<{ kekId: string; key: CryptoKey }>;
-  byId(kekId: string): Promise<CryptoKey | null>;
+  current(): Promise<{ kekId: string; key: Key }>;
+  byId(kekId: string): Promise<Key | null>;
 }
 ```
 The root KEK — one key in Secrets Store, or a `0600` file on the self-host. The record has no `KeyStore` port and
 never sees a plaintext credential (12 §6, ADR-062).
+
+`Key` is named off the global class rather than imported, and that is not a flourish. `tsconfig.base.json` sets
+no `dom` lib on purpose — a package that can name `document` is a package that can reach for it — so the TYPE
+`CryptoKey` is only declared by `node:crypto`, which 31 §1 bans under `packages/**`. The VALUE is a global, so
+the type comes off it. `apps/selfhost` wrote the same two methods out a second time over `webcrypto.CryptoKey`,
+because that is the import an app is allowed to make; it now re-exports this one, and the copy that would have
+drifted is the one nobody was looking at (30 §2).
 
 ```ts
 interface Snapshots {

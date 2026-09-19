@@ -26,8 +26,11 @@
 <script lang="ts">
   import { rowsAsCards } from '../cards.svelte.ts';
   import type { Snippet } from 'svelte';
-  import { leadingCode, symbolFigure, TONES } from '../../src/index.ts';
+  import { TONES } from '../../src/index.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
+  import { glyphColumn, intrinsicRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
+  import { MISSING } from '../../src/format.ts';
+  import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
 
   let {
     columns,
@@ -38,7 +41,7 @@
     sort,
     focus = $bindable(),
     selected,
-    chunk = 100,
+    chunk = TABLE_CHUNK,
     onactivate,
     onsort,
     onmore,
@@ -91,23 +94,11 @@
    */
   const toned = $derived(rows.some((r) => r.tone));
 
-  /**
-   * THE FIRST COLUMN THAT CARRIES A VALUE, which is not always the first column.
-   *
-   * The register grid leads with the row picker — a column whose cells are a checkbox and whose
-   * `hideLabel` says exactly that. Putting the mark there sat it on top of the checkbox: a glyph
-   * qualifying a control instead of a row. `hideLabel` is already the declaration for "this column
-   * is a control, not a value", so it is the one this reads.
-   */
-  const lead = $derived(Math.max(0, columns.findIndex((c) => !c.hideLabel)));
-
-  /* WHERE THE TONE'S GLYPH GOES: the column that declares it carries the tone, which on a register
-     is its state, so the mark and the word it qualifies read as one thing (`⊘ open`). A table that
-     declares none keeps it at the head of its first value. */
-  const glyphAt = $derived.by(() => {
-    const declared = columns.findIndex((c) => c.tone);
-    return declared >= 0 ? declared : lead;
-  });
+  /* WHERE THE TONE'S GLYPH GOES, decided in `../../src/table.ts` so the static mirror puts it in
+     the same cell: the column that declares it carries the tone, and failing that the first column
+     that carries a VALUE, which is not always the first column. The register grid leads with a row
+     picker, and a glyph there sits on top of a checkbox, qualifying a control instead of a row. */
+  const glyphAt = $derived(glyphColumn(columns));
 
   /* WHICH LINE OF A PHONE CARD EACH COLUMN SITS ON, decided once from the columns and never from a
      row. The two rules and the measurement that bought them are with `cardPlan` in `../types.ts`. */
@@ -237,11 +228,7 @@
   Rendering it once is also the only form of the fix that stays fixed. The two arms are two hundred
   lines apart and the next change to a cell will be made in whichever one the author is reading.
 -->
-{#snippet cellBody(row: TableRow, column: Column, value: string | null)}
-  {#if cellSnippet}{@render cellSnippet(row, column, value)}
-  {:else if value === null}<span class="missing">—</span>
-  {:else}{@const symbol = symbolFigure(value)}{@const coded = leadingCode(value)}{#if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span> {coded.rest}{:else}{value}{/if}{/if}
-{/snippet}
+{#snippet cellBody(row: TableRow, column: Column, value: string | null)}{#if cellSnippet}{@render cellSnippet(row, column, value)}{:else}{@const drawn = tableCellBody(value)}{#if drawn.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{#if drawn.body.kind === 'missing'}<span class="missing">{MISSING}</span>{:else if drawn.body.kind === 'coded'}{drawn.body.sign}<span class="amount-code">{drawn.body.currency}</span> {drawn.body.rest}{:else}{drawn.body.text}{/if}{/if}{/snippet}
 
 {#snippet pair(row: TableRow, cell: CardCell)}
   <span class="table-card-pair" data-truncate={cell.column.truncate ?? 'end'}>
@@ -341,7 +328,7 @@
 </ul>
 {:else}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="table-region" role="group" tabindex="0" aria-label={label ?? 'Rows'}>
+<div class="table-region" role="group" tabindex="0" aria-label={label ?? TABLE_ROWS_LABEL}>
   <div
     class="table"
     role="grid"
@@ -377,7 +364,7 @@
       <div
         class="rowgroup"
         role="rowgroup"
-        style="contain-intrinsic-size: auto calc({group.length} * var(--tr-h, var(--row-h)))"
+        style={intrinsicRows(group.length)}
       >
         {#each group as row, i}
           {@const index = g * grouped.step + i}
@@ -449,12 +436,14 @@
 
                      THE GUTTER IS RESERVED FOR THE COLUMN, NOT FOR THE ROW. Otherwise the toned rows
                      indent and the column's left edge goes ragged, which reads as five different
-                     columns rather than one column with five marks in it. -->
-                {#if c === glyphAt && row.tone}
-                  <span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
-                {/if}
-                {@render cellBody(row, column, value)}
-              </span>
+                     columns rather than one column with five marks in it.
+
+                     AND THE CHILDREN TOUCH THE TAG, which is not a formatting preference. A line
+                     break between `>` and the first child is a space inside the cell, so every
+                     value in every table was drawn one space in from its own left edge and the
+                     static mirror, which emits no such space, drew a different tree. Found by
+                     giving `parity.test.ts` its first `comparison` shape. -->
+                {#if c === glyphAt && row.tone}<span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}{@render cellBody(row, column, value)}</span>
             {/each}
           </div>
         {/each}

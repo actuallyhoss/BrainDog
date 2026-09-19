@@ -36,6 +36,7 @@ const DECLARED: Record<string, string> = {
   'work@1.1.0': 'b49e051fe7c26ac5',
   'work@1.2.0': '49a30d2ef8c1d672',
   'work@1.3.0': 'fb82e66d80644e3d',
+  'work@1.4.0': '0173aa61c9b3bc21',
   'estate@1.1.0': '90cc384470cccf30',
 };
 

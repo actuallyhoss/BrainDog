@@ -73,6 +73,33 @@ export interface Scheduler {
   wake(): Promise<void>;
 }
 
+/**
+ * WebCrypto's key, named from the class rather than from a library.
+ *
+ * `tsconfig.base.json` SETS NO `dom` LIB, deliberately — a package that can name `document` is a
+ * package that can reach for it — and `31 §1` bans `node:` under `packages/**`, which is where
+ * `webcrypto.CryptoKey` lives. What is left is the global class, which is a VALUE, so the type is
+ * taken off it. The alternative was the one import this half of the tree is not allowed to make.
+ */
+export type Key = InstanceType<typeof CryptoKey>;
+
+/**
+ * The root key store. `33 §1` port 8: the host has it, the record does not.
+ *
+ * THE SAFE CANNOT HOLD WHAT OPENS IT (`12 §6`). A record holds sealed bytes and the fingerprint of
+ * what wrapped them, and no way to open either — so the two methods live behind a port that only a
+ * host implements, and every package that needs a key asks for one it cannot make.
+ *
+ * `byId` ANSWERS `null` RATHER THAN THROWING, because "the root key rotated" is an operational event
+ * with a repair a person can carry out, and it reaches them as `WRONG_KEY` and a sentence.
+ */
+export interface KeyStore {
+  /** The key new wrapping uses, and the id that records which one it was. */
+  current(): Promise<{ kekId: string; key: Key }>;
+  /** A key this host still holds, or `null` — which is a rotated root key and not a bug. */
+  byId(kekId: string): Promise<Key | null>;
+}
+
 /** A page boundary: what a list hands back so the next call resumes where it stopped. */
 export type Cursor = string | null;
 
@@ -402,6 +429,10 @@ export interface Snapshots {
   restore(id: string): Promise<void>;
   prune(keep: number): Promise<void>;
 }
+/* The connector's one outbound call, and the four names its adapter refuses by (`47 §13` D14). */
+export { HTTP_FAULTS, httpFault } from './http.ts';
+export type { Http, HttpFault, HttpInit } from './http.ts';
+
 /* Sign-in's seam between a host and the Directory, type-only like everything above. */
 export type {
   AssertionJSON, AssertionOptions, Auth, AuthBodies, AuthCall, AuthFlow, AuthResult, Mail, Methods, PasskeyInfo,

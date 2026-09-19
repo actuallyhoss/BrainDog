@@ -230,6 +230,23 @@ Six rules, each earned:
 6. **A decision is immutable.** Superseding writes a new row pointing at the old one. There is no
    edit, and no delete.
 
+### And the order they arrive in is not the order they were asked
+
+A queue sorted by recency teaches one habit: clear the top. So the queue is ranked by **what it
+would cost to get each one wrong**, dearest first, oldest first within a band.
+
+The band is **computed, never declared** — from what accepting the proposal would do, which the
+proposal already says. A field the proposer fills in would be a field the party with an interest in
+being read first controls, and by the second week everything is urgent.
+
+Four bands, worst first: `undo` changes rows somebody already has, replaces a declaration, or turns
+a pack off; `shape` installs or configures a pack, or adds a page; `rows` adds rows, or a rule that
+will; `call` is a judgement with nothing attached. A judgement ranks last because pressing the other
+button tomorrow undoes it, and does not undo a write.
+
+The card names its band in a word and says nothing else about it. Why a proposal is expensive is in
+its own reason, written by whoever opened it.
+
 ### The reason must be worth having
 
 The failure mode is a required field filled with "ok". Three cheap countermeasures:

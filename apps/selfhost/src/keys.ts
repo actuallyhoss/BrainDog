@@ -46,11 +46,16 @@ export type WrappedKey = {
 /** The three `vault_key.purpose` admits. A fourth is a migration. */
 export type Purpose = 'record' | 'connector' | 'signing';
 
-/** `33 §1` port 8. The host has it; the record does not. */
-export type KeyStore = {
-  current(): Promise<{ kekId: string; key: webcrypto.CryptoKey }>;
-  byId(kekId: string): Promise<webcrypto.CryptoKey | null>;
-};
+/**
+ * `33 §1` port 8. The host has it; the record does not.
+ *
+ * DECLARED IN `@braindog/ports` AND RE-EXPORTED HERE. It was written out a second time in this file,
+ * which was one port and a memory of it (`30 §2`): `packages/connect` needs the same two methods to
+ * open a grant, and a package cannot import an app. The two copies agreed, and the one that would
+ * have diverged is the one nobody was looking at.
+ */
+import type { KeyStore } from '@braindog/ports';
+export type { KeyStore };
 
 const KEK_BYTES = 32;
 const NONCE_BYTES = 12;

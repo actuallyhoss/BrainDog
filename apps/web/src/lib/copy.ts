@@ -443,6 +443,8 @@ export const copy = {
   openQuestions: 'Open questions',
   rankedBy: 'Ranked by the cost of being wrong',
   costOfDelay: 'Cost of deciding late',
+  /** Over the band the record computed, which is the one thing on the page nobody typed. */
+  costOfWrong: 'Cost of getting it wrong',
   /** The heading over the reasoning a question was opened with. */
   whyAsked: 'Why this is asked',
   theOptions: 'The options',

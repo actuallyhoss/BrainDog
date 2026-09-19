@@ -63,7 +63,7 @@
         onclick={flip}><span class="switch-track"></span></button
       >
     </div>
-    {#if link}<a class="spark-daily-link" href="/spark">{words.dailyMore}</a>{/if}
+    {#if link}<a class="spark-daily-link tap" href="/spark">{words.dailyMore}</a>{/if}
   </Section>
 {/if}
 
