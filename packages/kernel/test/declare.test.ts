@@ -1780,6 +1780,60 @@ test('and a path is 43 §4.4’s grammar, because one outside it reaches nothing
   assert.equal(fetch({ probe: { read: { who: 'user id' } } }), 'PATH_INVALID');
 });
 
+test('AND `fetch.read` IS `42 §4.7`’S ROW, which until now was one path and four keys nobody checked', () => {
+  /* `read: { format: 'csv' }` installed clean, matched, fetched, and answered every page *not
+     JSON* — the `date.format` failure one block over. And the four keys are only half of it: a
+     non-JSON page has no document, so `expect:`, an `on_error` condition with a `path`, a `more:`
+     and the two paginators that read the body would never match. Nothing fails loudly; a cursor
+     that is never found reads as *the provider stopped sending one*, so the connector would fetch
+     its first page for ever. */
+  const fetch = (f: Record<string, unknown>) =>
+    validateDeclaration(
+      ingest({ channel: 'pull', every: '1h', match: undefined, extract: undefined, fetch: { base: 'https://api.example.com', ...f } }),
+    );
+  const code = (f: Record<string, unknown>) => fetch(f)?.code ?? null;
+
+  /* THE ROW ITSELF. */
+  for (const format of ['json', 'csv', 'xml', 'html_table', 'text'])
+    assert.equal(code({ read: { format } }), null, `${format} is one of 42 §4.7's five`);
+  assert.equal(code({ read: {} }), null, 'an empty read is a JSON body that is the list');
+  assert.equal(code({ read: { format: 'html' } }), 'DECLARATION_INVALID', 'html is not html_table');
+  assert.equal(code({ read: { format: 'CSV' } }), 'DECLARATION_INVALID');
+  assert.equal(code({ read: { format: 7 } }), 'DECLARATION_INVALID');
+  assert.equal(code({ read: { rows: 'data', nonsense: 1 } }), 'DECLARATION_INVALID', 'a read took a key it has not got');
+  assert.equal(code({ read: [] }), 'DECLARATION_INVALID');
+  assert.deepEqual(fetch({ read: { format: 'html' } })?.allowed, ['json', 'csv', 'xml', 'html_table', 'text']);
+
+  /* A DELIMITER IS CSV'S AND A TABLE IS HTML'S, and on any other format it is a key that would be
+     read by nothing — which is the author believing they set something. */
+  assert.equal(code({ read: { format: 'csv', delimiter: ';' } }), null);
+  assert.equal(code({ read: { format: 'csv', delimiter: '|' } }), 'DECLARATION_INVALID');
+  assert.equal(code({ read: { format: 'json', delimiter: ',' } }), 'DECLARATION_INVALID');
+  assert.equal(code({ read: { format: 'html_table', table: 2 } }), null);
+  assert.equal(code({ read: { format: 'html_table', table: -1 } }), 'OUT_OF_BOUNDS');
+  assert.equal(code({ read: { format: 'html_table', table: 1.5 } }), 'OUT_OF_BOUNDS');
+  assert.equal(code({ read: { format: 'csv', table: 0 } }), 'DECLARATION_INVALID');
+
+  /* AND WHAT A DOCUMENT-LESS PAGE MAY NOT ALSO DECLARE. Every one of these is legal on its own. */
+  const csv = (f: Record<string, unknown>) => code({ read: { format: 'csv' }, ...f });
+  assert.equal(csv({ expect: [{ path: 'ok', present: true }] }), 'DECLARATION_INVALID');
+  assert.equal(csv({ on_error: { fatal_when: [{ path: 'error.code', eq: 'gone' }] } }), 'DECLARATION_INVALID');
+  assert.equal(csv({ page: { kind: 'cursor_param', param: 'after', from: 'meta.next' } }), 'DECLARATION_INVALID');
+  assert.equal(csv({ page: { kind: 'keyset', param: 'since', from: 'id' } }), 'DECLARATION_INVALID');
+  assert.equal(csv({ page: { kind: 'offset', param: 'from', size: 50, more: { path: 'has_more', eq: true } } }), 'DECLARATION_INVALID');
+  /* THE REFUSAL NAMES THE KEY THAT HAS TO GO, because the author can see both at once. */
+  assert.match(fetch({ read: { format: 'csv' }, expect: [{ path: 'ok', present: true }] })?.fix ?? '', /expect/);
+
+  /* AND WHAT IT MAY. A status-only condition reads no body, and the three paginators that stop on
+     a count or a header need no document. */
+  assert.equal(csv({ on_error: { error_when: [{ status_in: [503] }] } }), null);
+  assert.equal(csv({ page: { kind: 'offset', param: 'from', size: 50 } }), null);
+  assert.equal(csv({ page: { kind: 'page_number', param: 'page' } }), null);
+  assert.equal(csv({ page: { kind: 'link_header', stop_when: { param: 'rel', is: 'last' } } }), null);
+  /* A JSON PAGE KEEPS ALL OF THEM, which is the half of this rule that must not have moved. */
+  assert.equal(code({ read: { rows: 'data' }, expect: [{ path: 'ok', present: true }], page: { kind: 'cursor_param', param: 'after', from: 'meta.next' } }), null);
+});
+
 test("and a connector's base is an https host on its own, checked where it is written", () => {
   /* BOTH `Http` ADAPTERS SAY LINT HOLDS THIS LINE and treat a bad scheme arriving at run time as a
      fault in this repository rather than as one of the four transport failures. Lint did not hold

@@ -15,6 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { readRows, UNPARSEABLE } from '@braindog/extract';
 import type { Clock, Http, HttpInit } from '@braindog/ports';
 
 import {
@@ -626,4 +627,103 @@ test('the sealed grant opens to exactly what was sealed, and the run reads it', 
   await runPull(jobOf(decl, { grant, dek }), deps);
 
   assert.equal(seen[0]?.init.headers.authorization, 'Bearer tok_7');
+});
+
+/* ── A page that is not JSON ──────────────────────────────────────────────────────── */
+
+/** `43`'s reader, wired for real: this is the one the host hands down for the four other formats. */
+const csvExtract: ExtractFn = (decl, raw): Extraction => {
+  const out = readRows(raw.body, 'csv', decl.fetch?.read ?? {});
+  if (out === UNPARSEABLE) return { rows: [], confidence: 'needs-review' };
+  return {
+    rows: out.map((item) => ({ fields: item as Extraction['rows'][number]['fields'], confidence: 'exact', outcome: {} })),
+    confidence: 'exact',
+  };
+};
+
+const ORDERS_CSV = `id,at,value
+o_1,2026-01-19T10:00:00Z,1
+o_2,2026-01-19T11:00:00Z,2
+`;
+
+/** A LAST PAGE WITH ITS HEADER AND NOTHING UNDER IT, which is how a CSV export says *no more*. */
+const HEADER_ONLY_CSV = `id,at,value
+`;
+
+test('A CSV PAGE REACHES THE RECORD, and until now it was refused before anybody read a byte of it', async () => {
+  /* `42 §4.7` has given `fetch.read` a `format` since it was written, and every path here parsed
+     the body as JSON at step 6.5. So a connector declared `csv` — the format banks and payroll
+     providers export — failed on its first page with a shape fault naming the read. */
+  const seen: Call[] = [];
+  const { deps, wrote } = depsOf(
+    provider(
+      [{ body: ORDERS_CSV }, { body: HEADER_ONLY_CSV }],
+      seen,
+    ),
+    { extract: csvExtract },
+  );
+  const out = await runPull(jobOf(registerDecl({ read: { format: 'csv' } })), deps);
+
+  assert.equal(out.outcome, 'ok');
+  assert.equal(seen.length, 2, 'a csv page did not paginate');
+  assert.deepEqual(
+    wrote.pages.flatMap((page) => page.rows.map((r) => r.fields)),
+    [
+      { id: 'o_1', at: '2026-01-19T10:00:00Z', value: '1' },
+      { id: 'o_2', at: '2026-01-19T11:00:00Z', value: '2' },
+    ],
+  );
+  /* THE SECOND PAGE IS WHAT ENDS THE RUN, and it ends it on the extraction's count rather than on a
+     list read out of a document, because a CSV has no document to read one out of. */
+  assert.equal(wrote.ack?.result?.outcome, 'ok');
+});
+
+test('AND A CSV BODY THE PROVIDER BROKE IS A PAGE WITH NO ROWS, not a run that threw', async () => {
+  const { deps, wrote } = depsOf(provider([{ body: '<!doctype html><title>maintenance</title>' }]), {
+    extract: csvExtract,
+  });
+  const out = await runPull(jobOf(registerDecl({ read: { format: 'csv' }, page: { kind: 'none' } })), deps);
+
+  assert.equal(out.outcome, 'ok');
+  assert.deepEqual(wrote.pages[0]?.rows, []);
+});
+
+test('AND A FORTY-PAGE RUN FINISHES IN UNDER TWO SECONDS, which is the ceiling an invocation is held to', async () => {
+  /**
+   * `47 §5.5`, verbatim: *"The fixtures test (§9) asserts a forty-page run over the memory `Http`
+   * completes in under 2 s of wall time on the CI runner; the 300 s budget is the table in §7."*
+   *
+   * FORTY PAGES THAT END BECAUSE THE PROVIDER RAN OUT, NOT BECAUSE THE CEILING CAUGHT THEM.
+   * `max_pages` defaults to 40, so forty answers against the default stops on the ceiling — outcome
+   * `partial`, cursor kept, retry in a minute — and the test would be timing the ceiling rather
+   * than the work. `max_pages: 50` is legal (`§4.1`, 1–50) and the fortieth answer is empty, so
+   * forty requests are made and the loop ends on the data.
+   */
+  const page = (n: number, rows: number): { items: Record<string, unknown>[] } => ({
+    items: Array.from({ length: rows }, (_, i) => ({ id: `o_${n}_${i}`, at: '2026-01-19T12:00:00Z', value: 100 + i })),
+  });
+  const answers: Answer[] = Array.from({ length: 40 }, (_, i) => ({ body: page(i + 1, i === 39 ? 0 : 50) }));
+
+  const seen: Call[] = [];
+  const { deps, wrote } = depsOf(provider(answers, seen));
+  const decl = registerDecl({ limits: { max_pages: 50, rows_per_run: 5_000 } });
+
+  const started = performance.now();
+  const out = await runPull(jobOf(decl), deps);
+  const ms = performance.now() - started;
+
+  /* THE WORK IS ASSERTED BEFORE THE CLOCK IS READ, and that order is the whole discipline of a
+     performance test: its failure mode is silence rather than red. `@braindog/extract`'s HTML
+     benchmark came in at 6 ms against a 300 ms target and looked like good news; the format was
+     named `html` instead of `html_table`, so the reader fell through to XML and returned one row
+     with no fields. All three of these hold before the number below means anything. */
+  assert.equal(seen.length, 40, 'forty pages were not fetched');
+  assert.equal(out.outcome, 'ok', 'the run did not finish on the data');
+  assert.equal(
+    wrote.pages.reduce((n, p) => n + p.rows.length, 0),
+    39 * 50,
+    'the rows of thirty-nine full pages did not reach the record',
+  );
+
+  assert.ok(ms < 2_000, `a forty-page run took ${Math.round(ms)} ms, and §5.5 allows 2,000`);
 });

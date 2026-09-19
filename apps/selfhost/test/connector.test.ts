@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runPull, type ConnectDeps, type IngestDecl, type OutboxRow, type PullPayload } from '@braindog/connect';
+import { readRows, UNPARSEABLE, type Format, type Read } from '@braindog/extract';
 import { openRecord, type Declaration } from '@braindog/kernel';
 
 import { holding, holdingPaged, pass } from '@braindog/host/actions';
@@ -76,20 +77,40 @@ const DECL = {
   writes: { register: 'charges', key: ['ref'] },
 };
 
+/**
+ * The same connector, answered in CSV — `42 §4.7`'s `format`, which had no reader anywhere.
+ *
+ * NO `expect:`, NO CURSOR AND NO `more:`, and that is the rule rather than this test being small: a
+ * CSV page has rows and no document, so `declare` refuses those keys beside a non-JSON format. What
+ * is left — `page_number`, which stops on an empty page — is what a CSV export can actually answer.
+ */
+const CSV_DECL = {
+  ...DECL,
+  ingest: 'acme-csv',
+  id: 'acme-csv',
+  fetch: { ...DECL.fetch, path: '/v1/charges.csv', read: { format: 'csv' } },
+};
+
 async function record(): Promise<{ k: Record_; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   assert.ok(k.createRecord({ id: RECORD, slug: 'acme', name: 'Acme', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
-  const put = await k.install([CHARGES, { id: 'ingest.acme-charges', kind: 'ingest', body: DECL as never }]);
+  const put = await k.install([
+    CHARGES,
+    { id: 'ingest.acme-charges', kind: 'ingest', body: DECL as never },
+    { id: 'ingest.acme-csv', kind: 'ingest', body: CSV_DECL as never },
+  ]);
   assert.ok(put.ok, fixOf(put));
 
-  sql.exec(
-    `INSERT INTO outbox (id, created, kind, payload, state, leased_until, attempts)
-     VALUES ('ob_1', ?, 'pull.fetch', ?, 'leased', ?, 1)`,
-    new Date(NOW).toISOString(),
-    JSON.stringify({ ingest: 'acme-charges' }),
-    new Date(NOW + 300_000).toISOString(),
-  );
+  for (const [id, ingest] of [['ob_1', 'acme-charges'], ['ob_2', 'acme-csv']] as const)
+    sql.exec(
+      `INSERT INTO outbox (id, created, kind, payload, state, leased_until, attempts)
+       VALUES (?, ?, 'pull.fetch', ?, 'leased', ?, 1)`,
+      id,
+      new Date(NOW).toISOString(),
+      JSON.stringify({ ingest }),
+      new Date(NOW + 300_000).toISOString(),
+    );
   return { k, sql };
 }
 
@@ -111,6 +132,19 @@ const charge = (id: string, amount: number, created: number): Record<string, unk
 
 /* ── The wiring the runner will do ───────────────────────────────────────────────────────────── */
 
+/**
+ * `42 §4.7`'s four non-JSON formats, read — the same line `pagedRunner` hands down.
+ *
+ * WRITTEN OUT HERE BECAUSE THE WIRING BELOW IS. This file drives `runPull` by hand on purpose, so
+ * anything the real runner supplies has to be supplied here too or the hand-wiring stops being a
+ * check on the real one. `@braindog/extract` is rank 9 and the extractor is the record's at rank 7;
+ * neither may import the other, so whoever assembles the two hands the reader across.
+ */
+const pageRows = (body: string, read: { format?: string }): unknown[] | null => {
+  const out = readRows(body, (read.format ?? 'json') as Format, read as Read);
+  return out === UNPARSEABLE ? null : out;
+};
+
 /** What the record was told at the end, which is where a run's counts live rather than on its result. */
 type Acked = { state?: 'done' | 'failed'; needs_review?: number | undefined; points?: number | undefined };
 
@@ -121,7 +155,7 @@ const wire = (k: Record_, http: Http, acked: Acked = {}): ConnectDeps => ({
   /* THE EXTRACTOR IS THE RECORD'S, which is the whole reason it is a dependency and not something
      `@braindog/connect` imports: the currency exponents and the register's field types are facts
      only the record holds. */
-  extract: (decl, raw, ctx) => k.extract(decl as never, raw, ctx) as never,
+  extract: (decl, raw, ctx) => k.extract(decl as never, raw, { ...ctx, rows: pageRows } as never) as never,
   currencies: { EGP: { exponent: 2 } },
   lookup: () => [],
   record: {
@@ -142,14 +176,14 @@ const wire = (k: Record_, http: Http, acked: Acked = {}): ConnectDeps => ({
   },
 });
 
-const jobOf = (): OutboxRow<'pull.fetch'> => ({
-  id: 'ob_1',
+const jobOf = (decl: { id: string } = DECL, id = 'ob_1'): OutboxRow<'pull.fetch'> => ({
+  id,
   kind: 'pull.fetch',
   leased_until: new Date(NOW + 300_000).toISOString(),
   attempts: 0,
   payload: {
-    ingest: 'acme-charges',
-    decl: DECL as unknown as IngestDecl,
+    ingest: decl.id,
+    decl: decl as unknown as IngestDecl,
     declaration_version: 1,
     grant: null,
     dek: null,
@@ -372,4 +406,49 @@ test('the two runners share one admission count, so one run left cannot be spent
   await admissions.ask(RECORD, 'acme-charges', mayRun);
   assert.deepEqual(seen.slice(1), [1, 2]);
   sql.close();
+});
+
+/* ── A provider that does not answer in JSON ──────────────────────────────────────── */
+
+const CSV_PAGE = `id,amount,currency,created
+ch_9,4200,egp,1758270000
+ch_8,900,egp,1758270060
+`;
+
+/** A LAST PAGE WITH ITS HEADER AND NOTHING UNDER IT, which is how a CSV export says *no more*. */
+const HEADER_ONLY = `id,amount,currency,created
+`;
+
+const csvProvider = (pages: string[]): Http => {
+  let i = 0;
+  return {
+    fetch: () => {
+      const body = pages[i] ?? '';
+      i += 1;
+      return Promise.resolve(new Response(body, { status: 200, headers: { 'content-type': 'text/csv' } }));
+    },
+  };
+};
+
+test('A CSV PROVIDER REACHES THE REGISTER, through both halves and in the money it was sent', async () => {
+  /* THE WHOLE CHAIN, WHICH IS THE POINT OF THIS FILE. `42 §4.7` has given `fetch.read` a `format`
+     since it was written and no half of the repository read one: `connect` parsed every body as
+     JSON at step 6.5, and the record's extractor answered *not JSON* if anything got past it. A
+     bank that exports CSV — which is most of them — could be declared, installed, fetched, and
+     never read a row. */
+  const { k, sql } = await record();
+  const acked: Acked = {};
+  const out = await runPull(
+    jobOf(CSV_DECL, 'ob_2'),
+    wire(k, csvProvider([CSV_PAGE, HEADER_ONLY]), acked),
+  );
+
+  assert.equal(out.outcome, 'ok', out.error?.fix);
+  assert.equal(acked.state, 'done');
+  /* MINOR UNITS AND AN UPPER-CASE CODE, which is the record's coercion and not the reader's: the
+     CSV handed over the string "4200" and the string "egp". */
+  assert.deepEqual(rows(sql).map((r) => ({ ...r })), [
+    { ref: 'ch_8', paid: '{"amount":900,"currency":"EGP"}', at: '2025-09-19T08:21:00.000Z' },
+    { ref: 'ch_9', paid: '{"amount":4200,"currency":"EGP"}', at: '2025-09-19T08:20:00.000Z' },
+  ]);
 });

@@ -131,7 +131,7 @@ import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, 
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
-import { extractPull, type ExtractDecl, type Extraction } from './extract.ts';
+import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
 import {
   ACTION_KINDS,
   egressOf,
@@ -3675,8 +3675,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * only thing that ever turns a stranger's JSON into fields is the one the record already uses
      * for an email.
      */
-    extract: (decl: ExtractDecl, raw: { ts: string; body: string }, ctx: { maxRows?: number } = {}): Extraction =>
-      extractPull({ schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null), exponent: exponentOf, day }, decl, raw, ctx),
+    extract: (
+      decl: ExtractDecl,
+      raw: { ts: string; body: string },
+      /* `rows` COMES THROUGH THE CONTEXT BECAUSE IT CANNOT COME THROUGH AN IMPORT. `42 §4.7`'s four
+         non-JSON formats are read by `@braindog/extract`, rank 9 to this package's 7; the host is
+         rank 15 and can reach both, so it hands the reader down beside the currency table. A host
+         that does not is answered per page rather than silently. */
+      ctx: { maxRows?: number; rows?: ExtractDeps['rows'] } = {},
+    ): Extraction =>
+      extractPull(
+        { schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null), exponent: exponentOf, day, rows: ctx.rows },
+        decl,
+        raw,
+        ctx,
+      ),
 
     /**
      * A completed window's figures, upserted (`47 §5.1` step 10, `08 §3`).

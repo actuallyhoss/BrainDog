@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@braindog/connect": "workspace:*",
+    "@braindog/extract": "workspace:*",
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"

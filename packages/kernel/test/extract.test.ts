@@ -74,3 +74,58 @@ test("the run's remaining budget is applied before any field is read", () => {
   const out = extractPull(deps, DECL, body([CHARGE, CHARGE, CHARGE]), { maxRows: 2 });
   assert.equal(out.rows.length, 2);
 });
+
+/* ── The four formats this package cannot read itself ────────────────────────────────────────── */
+
+const CSV = `id,amount,currency,created
+ch_1,4200,egp,1758270000
+ch_2,900,egp,1758270060
+`;
+
+const CSV_DECL: ExtractDecl = { ...DECL, fetch: { read: { format: 'csv' } } };
+
+test('A CSV PAGE IS READ THROUGH THE INJECTED READER, because rank 7 cannot import rank 9', () => {
+  /* `42 §4.7` has always given `fetch.read` a `format`, and this function parsed every body as
+     JSON — so `csv` reached a person as "was answered with something that is not JSON". The reader
+     lives in `@braindog/extract`, which this package may not import (`31 §2`), so it arrives the
+     way the currency exponents do: as a dependency the host supplies. */
+  const rows = (body: string): unknown[] => {
+    const [head, ...lines] = body.trim().split('\n');
+    const keys = (head ?? '').split(',');
+    return lines.map((line) => Object.fromEntries(line.split(',').map((cell, i) => [keys[i] ?? '', cell])));
+  };
+
+  const out = extractPull({ ...deps, rows }, CSV_DECL, { ts: TS, body: CSV });
+  assert.equal(out.confidence, 'exact');
+  assert.equal(out.rows.length, 2);
+  assert.deepEqual(out.rows[0]?.fields['paid'], { amount: 4200, currency: 'EGP' });
+  assert.equal(out.rows[1]?.fields['ref'], 'ch_2');
+});
+
+test('AND A HOST WITH NO READER SAYS SO, rather than answering every page with no rows', () => {
+  const out = extractPull(deps, CSV_DECL, { ts: TS, body: CSV });
+  assert.deepEqual(out.rows, []);
+  assert.equal(out.confidence, 'needs-review');
+  /* THE SENTENCE NAMES THE FORMAT, which is the difference between a person changing the
+     declaration and a person filing a bug against the provider. */
+  assert.match(out.reason ?? '', /csv/);
+  assert.match(out.reason ?? '', /JSON only/);
+});
+
+test('AND A BODY THAT IS NOT THE FORMAT IT WAS DECLARED AS IS A REASON, naming that format', () => {
+  const out = extractPull({ ...deps, rows: () => null }, CSV_DECL, { ts: TS, body: '<html>maintenance</html>' });
+  assert.deepEqual(out.rows, []);
+  assert.equal(out.reason, 'stripe-charges was answered with something that is not csv.');
+});
+
+test("AND JSON KEEPS ITS OWN READER even when a host supplies the other one", () => {
+  /* ONE INSTALLED CONNECTOR MUST NOT CHANGE MEANING. `@braindog/extract` reads a `rows:` path with
+     its own grammar and `run.ts` validated this one with `readPath`; routing today's JSON through
+     the other reader would quietly re-decide what every existing declaration points at. */
+  const out = extractPull(
+    { ...deps, rows: () => assert.fail('a JSON page was sent to the injected reader') },
+    DECL,
+    body([CHARGE]),
+  );
+  assert.equal(out.rows.length, 1);
+});

@@ -25,6 +25,7 @@
  */
 
 import { REFUSAL_CODES, type Clock, type Http, type KeyStore, type RefusalCode } from '@braindog/ports';
+import type { Read as FetchRead } from '@braindog/extract';
 import type { Json } from '@braindog/where';
 
 /* TYPE-ONLY, AND SO NOT THE CYCLE IT LOOKS LIKE. `auth.ts` imports this file for its declaration
@@ -130,8 +131,15 @@ export type FetchDecl = {
   page?: PageDecl;
   /** Implicitly all. */
   expect?: Expect[];
-  /** Response path to the list. Absent means the body is the list. */
-  read?: { rows: string };
+  /**
+   * How a page is read: `42 §4.7`'s row, whole. Absent means a JSON body that is itself the list.
+   *
+   * `format` OTHER THAN `json` IS READ BY THE EXTRACTOR AND NOT HERE. A CSV page has no document,
+   * so `expect:`, the `on_error` body paths and the two body-reading paginators have nothing to
+   * read; `declare` refuses that combination at install, and this package relies on that refusal
+   * rather than re-deciding it per page.
+   */
+  read?: FetchRead;
   limits?: { response_bytes?: number; rows_per_run?: number; timeout?: Duration; max_pages?: number };
   on_error?: { error_when?: Cond[]; fatal_when?: Cond[]; honour?: 'retry_after' };
 };

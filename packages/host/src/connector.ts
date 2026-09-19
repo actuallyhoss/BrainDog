@@ -42,6 +42,7 @@ import {
   type PullPayload,
   type PullResult,
 } from '@braindog/connect';
+import { readRows, UNPARSEABLE, type Format, type Read } from '@braindog/extract';
 import type { Paged, PagedReport, PagedRun } from '@braindog/kernel';
 import { fixOf, type Clock, type Http, type KeyStore } from '@braindog/ports';
 import type { RecordApi } from '@braindog/record';
@@ -86,6 +87,22 @@ const reportOf = (out: PullResult): PagedReport => ({
       : `${out.ingest} stopped at ${out.error.at}: ${out.error.fix}`,
 });
 
+/**
+ * `42 §4.7`'s four non-JSON page formats, read.
+ *
+ * THE HOST IS WHERE THE TWO ENDS CAN MEET. The reader is `@braindog/extract`'s, rank 9; the
+ * extractor is the record's, rank 7; neither may import the other and this package is rank 15 and
+ * may import both (`31 §2`). So the reader is handed down beside the row budget, and a host that
+ * did not hand one down would answer the page with a sentence rather than with no rows.
+ *
+ * `UNPARSEABLE` BECOMES `null` AND NOT A THROW, because a page already paid for should reach a
+ * person as *this is not the CSV it said it was* rather than as a stack in a queue consumer.
+ */
+const pageRows = (body: string, read: { format?: string }): unknown[] | null => {
+  const out = readRows(body, (read.format ?? 'json') as Format, read as Read);
+  return out === UNPARSEABLE ? null : out;
+};
+
 /** The connector runner this host hands `runActions`. */
 export function pagedRunner(
   api: Pick<RecordApi, 'kernel'>,
@@ -95,7 +112,7 @@ export function pagedRunner(
     http: options.http,
     clock: options.clock,
     keys: options.keys ?? NO_KEYS,
-    extract: (decl, raw, ctx) => api.kernel.extract(decl as never, raw, ctx) as never,
+    extract: (decl, raw, ctx) => api.kernel.extract(decl as never, raw, { ...ctx, rows: pageRows } as never) as never,
     currencies: {},
     lookup: () => [],
     record: {

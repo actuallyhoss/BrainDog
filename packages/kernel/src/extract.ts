@@ -15,10 +15,12 @@
  * one with no date is not a clean page, and it is also not four hundred rows withheld: the clean
  * ones write, the one that could not be read is counted, and the page says so.
  *
- * AND THIS LIVES IN THE RECORD RATHER THAN IN `@braindog/extract`, WHICH IS UNBUILT. The mapper,
- * the currency exponents and the register schemas are all here, so the alternative today is a
- * package that imports the record — the wrong way up `31 §2`'s order. It is written as a free
- * function over declared dependencies so that moving it is a move and not a rewrite.
+ * AND THIS LIVES IN THE RECORD RATHER THAN IN `@braindog/extract`, WHICH IS RANK 9 TO THIS FILE'S
+ * 7. The mapper, the currency exponents and the register schemas are all here, so a package holding
+ * this would have to import the record — the wrong way up `31 §2`'s order. That package is built
+ * now and it does hold the four non-JSON readers this one never had, so they arrive the way every
+ * other capability this file does not own arrives: as a dependency a host supplies. It is written
+ * as a free function over declared dependencies so that moving it is a move and not a rewrite.
  */
 
 import { readPath, type Schema } from '@braindog/where';
@@ -44,9 +46,18 @@ export type ExtractDecl = {
   id?: string;
   ingest?: string;
   map?: Readonly<Record<string, Mapping>> | undefined;
-  fetch?: { read?: { rows?: string } | undefined } | undefined;
+  fetch?: { read?: FetchRead | undefined } | undefined;
   writes: { register?: unknown; confidence?: Confidence | undefined };
 };
+
+/**
+ * `42 §4.7`'s read row, spelled here rather than imported.
+ *
+ * `@braindog/extract` OWNS THIS TYPE AND IS RANK 9 TO THIS FILE'S 7, so importing it is the wrong
+ * way up `31 §2`'s order. The reader itself arrives the same way the currency exponents do — as a
+ * dependency a host supplies — and this is the shape the two ends agree on.
+ */
+export type FetchRead = { format?: string; rows?: string; delimiter?: string; table?: number };
 
 /** One row, as `43 §4.1` hands it on and `fetched.ts` writes it. */
 export type ExtractedRow = { fields: Record<string, Json>; confidence: Confidence; outcome: Record<string, string> };
@@ -58,6 +69,15 @@ export type ExtractDeps = {
   schemaOf: (register: string) => Schema | null;
   exponent: (currency: string) => number;
   day: (text: string, format: string) => string | null;
+  /**
+   * A page in one of `42 §4.7`'s four non-JSON formats, read into rows. `null` is a body that is
+   * not the format it was declared as.
+   *
+   * OPTIONAL, BECAUSE A HOST THAT CANNOT READ THEM SHOULD SAY SO RATHER THAN GUESS. Absent, a
+   * `format:` other than `json` is refused per page with a sentence naming the format, which is
+   * the same answer a person gets today and not a silently empty page.
+   */
+  rows?: ((body: string, read: FetchRead) => unknown[] | null) | undefined;
 };
 
 const nothing = (reason: string): Extraction => ({ rows: [], confidence: 'needs-review', reason });
@@ -88,10 +108,24 @@ export function extractPull(
   if (map === undefined || Object.keys(map).length === 0)
     return nothing(`${name} declares no map, so this answer was not read.`);
 
-  const root = parseAnswer(raw.body);
-  if (root === undefined) return nothing(`${name} was answered with something that is not JSON.`);
+  /* JSON KEEPS ITS OWN READER AND THE OTHER FOUR GET THE INJECTED ONE. `@braindog/extract` reads a
+     `rows:` path with its own grammar, and `run.ts` validated this one with `readPath`; routing
+     today's JSON through the other reader would change what an installed connector means. So the
+     formats that had no reader at all get one, and the format that had one keeps it. */
+  const read = decl.fetch?.read ?? {};
+  const format = read.format ?? 'json';
 
-  const list = rowsOf(decl, root);
+  let list: unknown[] | null;
+  if (format === 'json') {
+    const root = parseAnswer(raw.body);
+    if (root === undefined) return nothing(`${name} was answered with something that is not JSON.`);
+    list = rowsOf(decl, root);
+  } else if (deps.rows === undefined) {
+    return nothing(`${name} is declared as ${format}, and this host reads JSON only.`);
+  } else {
+    list = deps.rows(raw.body, read);
+    if (list === null) return nothing(`${name} was answered with something that is not ${format}.`);
+  }
   if (list === null) return nothing(`${name} did not find a list of rows where its declaration says one is.`);
 
   /* THE CEILING IS CHECKED HERE TOO. A declaration can arrive through a `.brain` import as well as

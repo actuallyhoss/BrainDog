@@ -705,7 +705,7 @@ package: `graph` (imports `where` only), `closed-lists` (`EXTRACTORS` + `COMBINA
 - `ponytail: no Unicode normalisation; a decomposed payload misses a composed anchor — add String.normalize('NFC') on text and literals when a real message needs it.`
 - `ponytail: YY is always 20YY — add a pivot key to the date form when a pre-2000 date is ever extracted.`
 - `ponytail: no month names (MMM); add the token when the 50-message test of 21 §13 needs it — never regex.`
-- `ponytail: exponent-3 currencies read a lone separator + 3 digits as the decimal point; KWD 1,250 meaning 1,250 dinars is misread — add decimal: "." | "," to the money form when a real ledger hits it.`
+- `ponytail: exponent-3 currencies read a lone separator + 3 digits as the decimal point; KWD 1,250 meaning 1,250 dinars is misread — add decimal: "." | "," to the money form when a real ledger hits it. This key would name the DECIMAL POINT, the same thing §4.3's decimal.sep names, and not the thousands character: the kernel's money form carried a sep that meant the other one and it was removed on September 19th 2026 because the digit rule above already answers every text it was added for. A money form that gets this key gets §4.3's meaning or it gets neither.`
 - `ponytail: trailing minus (1,250.00-) and DR/CR suffixes are not read; add when a statement uses them — the sign rule is one branch.`
 - `ponytail: a symbol two table rows share resolves to none; declare currency: — a locale hint is not worth a key until a second currency table exists.`
 - `ponytail: no anchor kinds beyond literal after/before/between; 21 §13 names the next three (table cell, label-adjacent, nth line) — add each as an extractor form.`

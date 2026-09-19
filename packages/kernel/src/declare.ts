@@ -1288,7 +1288,14 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
   }
 
   const fetch = body.fetch as
-    | { base?: unknown; read?: { rows?: unknown }; expect?: unknown; page?: { from?: unknown }; probe?: { read?: unknown } }
+    | {
+        base?: unknown;
+        read?: Record<string, unknown>;
+        expect?: unknown;
+        page?: Record<string, unknown>;
+        probe?: { read?: unknown };
+        on_error?: Record<string, unknown>;
+      }
     | undefined;
   if (fetch !== undefined && fetch !== null && typeof fetch === 'object') {
     /* THE ADDRESS A CONNECTOR MAY TALK TO, CHECKED WHERE IT IS WRITTEN. Both `Http` adapters carry
@@ -1302,10 +1309,8 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
         `${id} fetches from ${JSON.stringify(String(fetch.base).slice(0, 80))}, and a connector's base is an https:// host on its own — no path, no placeholder.`,
         'fetch.base',
       );
-    if (fetch.read?.rows !== undefined) {
-      const wrong = pathFault(fetch.read.rows, `${id}.fetch.read.rows`);
-      if (wrong) return wrong;
-    }
+    const wrongRead = readFault(fetch, id);
+    if (wrongRead) return wrongRead;
     if (fetch.page?.from !== undefined) {
       const wrong = pathFault(fetch.page.from, `${id}.fetch.page.from`);
       if (wrong) return wrong;
@@ -1992,6 +1997,93 @@ function mappingFault(entry: unknown, at: string): Refusal | null {
     return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with a three-letter code.`, `${at}.currency`);
   if (e.type === 'enum' && (!Array.isArray(e.values) || e.values.length === 0 || e.values.some((v) => typeof v !== 'string')))
     return bad('DECLARATION_INVALID', `${at} is an enum, so it lists its values.`, `${at}.values`);
+  return null;
+}
+
+/** `42 §4.7`'s response formats, closed. */
+const FETCH_FORMATS = ['json', 'csv', 'xml', 'html_table', 'text'] as const;
+
+/** `42 §4.7`'s `delimiter`, closed. A tab is written as one character and not as `	`. */
+const FETCH_DELIMITERS = [',', ';', '	'] as const;
+
+/**
+ * `fetch.read`, held to `42 §4.7`'s row — and to what the rest of the block can survive.
+ *
+ * TWO RULES AND NOT ONE. The first is the row itself: four keys, a closed format, a closed
+ * delimiter, a whole table index. Until this existed only `rows` was checked, so
+ * `read: { format: 'csv' }` installed clean against a runner that had no CSV reader and answered
+ * every page *not JSON* — the `date.format` failure again, one block over.
+ *
+ * THE SECOND IS THAT A NON-JSON PAGE HAS NO DOCUMENT. `expect:`, an `on_error` condition with a
+ * `path`, a `more:` and the two paginators that read the body (`cursor_param`, `keyset`) all reach
+ * into a parsed response. A CSV page has rows and nothing else. Installed together they do not
+ * fail loudly: the conditions never match, the `expect:`s never fire, and a cursor that is never
+ * found reads as *the provider stopped sending one*, which is the end of the run. So a connector
+ * declared in one of the four other formats would quietly fetch its first page for ever. It is
+ * refused here, naming the key that has to go, because the author can see both of them at once.
+ */
+function readFault(
+  fetch: { read?: Record<string, unknown>; expect?: unknown; page?: Record<string, unknown>; on_error?: Record<string, unknown> },
+  id: string,
+): Refusal | null {
+  const read = fetch.read;
+  if (read === undefined || read === null) return null;
+  const at = `${id}.fetch.read`;
+  if (typeof read !== 'object' || Array.isArray(read))
+    return bad('DECLARATION_INVALID', `${at} is ${JSON.stringify(read)}, and a read is an object.`, at);
+
+  for (const key of Object.keys(read))
+    if (!['format', 'rows', 'delimiter', 'table'].includes(key))
+      return bad('DECLARATION_INVALID', `${at} carries ${JSON.stringify(key)}, which a read does not take.`, at, [
+        'format', 'rows', 'delimiter', 'table',
+      ]);
+
+  if (read.rows !== undefined) {
+    const wrong = pathFault(read.rows, `${at}.rows`);
+    if (wrong) return wrong;
+  }
+
+  const format = read.format ?? 'json';
+  if (typeof format !== 'string' || !(FETCH_FORMATS as readonly string[]).includes(format))
+    return bad('DECLARATION_INVALID', `${at}.format is ${JSON.stringify(read.format)}.`, `${at}.format`, FETCH_FORMATS);
+
+  if (read.delimiter !== undefined) {
+    if (format !== 'csv')
+      return bad('DECLARATION_INVALID', `${at}.delimiter is for csv, and this read is ${format}.`, `${at}.delimiter`);
+    if (typeof read.delimiter !== 'string' || !(FETCH_DELIMITERS as readonly string[]).includes(read.delimiter))
+      return bad(
+        'DECLARATION_INVALID',
+        `${at}.delimiter is ${JSON.stringify(read.delimiter)}.`,
+        `${at}.delimiter`,
+        FETCH_DELIMITERS,
+      );
+  }
+
+  if (read.table !== undefined) {
+    if (format !== 'html_table')
+      return bad('DECLARATION_INVALID', `${at}.table is for html_table, and this read is ${format}.`, `${at}.table`);
+    if (typeof read.table !== 'number' || !Number.isInteger(read.table) || read.table < 0)
+      return bad('OUT_OF_BOUNDS', `${at}.table is ${JSON.stringify(read.table)}, and a table index is 0 or more.`, `${at}.table`);
+  }
+
+  if (format === 'json') return null;
+
+  const page = fetch.page ?? {};
+  const conditions = [...((fetch.on_error?.error_when ?? []) as unknown[]), ...((fetch.on_error?.fatal_when ?? []) as unknown[])];
+  const reads: [boolean, string][] = [
+    [Array.isArray(fetch.expect) && fetch.expect.length > 0, 'expect'],
+    [conditions.some((c) => typeof c === 'object' && c !== null && 'path' in c), 'on_error'],
+    [page.kind === 'cursor_param' || page.kind === 'keyset', `page.kind ${JSON.stringify(page.kind)}`],
+    [page.more !== undefined, 'page.more'],
+  ];
+  for (const [present, key] of reads)
+    if (present)
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} reads ${format} pages and also declares ${key}, which reads the body as JSON. A ${format} page has rows and no document, so that ${key} would never match and the run would never end.`,
+        `${id}.fetch.${key.split(' ')[0]}`,
+      );
+
   return null;
 }
 

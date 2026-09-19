@@ -400,12 +400,21 @@ with one key: `{ after: text }` · `{ before: text }` · `{ between: [text, text
 | `probe` | `{ path, read: { name: Path } ≤ 8 }` — exactly one | no | — | — |
 | `page` | `{ kind: none }` · `{ kind: cursor_param, param, from: Path, more?: expect }` · `{ kind: offset, param, size: int 1–1000, more? }` · `{ kind: page_number, param, start?: int, more? }` · `{ kind: keyset, param, from: Path }` · `{ kind: link_header, stop_when: { param, is } }` | no | `{ kind: none }` | six kinds |
 | `expect` | 1–16 of `{ path: Path, <one op>, on_fail? }` — no nesting; a list is `all` | no | `[]` | ops `eq ne is is_not present absent contains starts ends len_lte len_gte` · `on_fail ∈ warn review fail` · string ops ≤ 40 bytes (`PATTERN_OVER_CAP`) |
-| `read` | `{ format?, rows?: Path, delimiter?: `,` \| `;` \| tab, table?: int }` — 43 §4.2's `Read` | no | the body is the list | `format ∈ json csv xml html_table text` |
+| `read` | `{ format?, rows?: Path, delimiter?: `,` \| `;` \| tab, table?: int }` — 43 §4.2's `Read` | no | the body is the list, in JSON | `format ∈ json csv xml html_table text` · `delimiter` is csv's and `table` is html_table's · `table ≥ 0` |
 | `limits` | `{ response_bytes?: int ≤ 2 000 000, rows_per_run?: int ≤ 5 000, timeout?: Interval 1s–30s, max_pages?: int 1–50 }` | no | `2000000 · 5000 · 6s · 40` | — |
 | `on_error` | `{ error_when?: [cond], fatal_when?: [cond], honour?: retry_after }`; a cond is `{ status_in: [int] }` or an `expect` without `on_fail` | no | 47 §4.1's | — |
 
 `for_each`, `conditional`, `on_error.backoff` and `on_error.pause_after` — keys 25 §3.2's example carries — are not v1 (47 §13 D7) and
 are refused as unknown keys.
+
+**A `read.format` other than `json` is refused beside anything that reads a document.** `expect`, an
+`on_error` cond with a `path` (a `{ status_in }` cond is fine), any `more:`, and `page.kind` of
+`cursor_param` or `keyset` all reach into a parsed body; a csv, xml, html_table or text page has rows
+and no body to reach into. Installed together they do not fail loudly — the conds never match, the
+`expect`s never fire, and a cursor that is never found reads as *the provider stopped sending one*,
+which ends the run after page one. So the pair is `DECLARATION_INVALID` at install, naming the key
+that has to go. `offset`, `page_number` and `link_header` stop on a count or a header and are legal
+with every format.
 
 ### 4.8 · `rule` — 07 §6
 

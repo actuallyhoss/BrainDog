@@ -230,6 +230,10 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
    * those on as rows would hand the extractor a gap it would read as a row with nothing in it — a
    * receipt for a row the provider never sent.
    */
+  /* `42 §4.7`'s default: a declaration naming no format is answered in JSON, and only JSON has a
+     document the conditions, the `expect:`s and the two body-reading paginators can read. */
+  const document = (fetch.read?.format ?? 'json') === 'json';
+
   const listOf = (json: Json, at: string): readonly Json[] => {
     const path = fetch.read?.rows;
     const found: Read = path === undefined ? json : readPath(json, path);
@@ -306,7 +310,12 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
       /* 6.5 — the bytes. */
       const text = await res.text();
       bytes += text.length;
-      const json = parse(text, `${at}.read`);
+      /* A PAGE IN ONE OF `42 §4.7`'s FOUR OTHER FORMATS HAS NO DOCUMENT, and `null` here is that
+         absence rather than a body that said `null`. Everything below that would read one —
+         `expect:`, the `on_error` body paths, `cursor_param` and `keyset` — is refused at install
+         alongside a non-JSON `format`, so `null` never reaches a reader that would mistake it for
+         an answer. The rows come out of the extractor, which is the half that knows the format. */
+      const json = document ? parse(text, `${at}.read`) : null;
       const sha256 = await hex(text);
       const answered = headersOf(res);
 
@@ -334,8 +343,10 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
         });
       }
 
-      /* 6.7 — the list. */
-      const list = listOf(json, at);
+      /* 6.7 — the list. A non-JSON page's is its extraction's, read below: there is no second
+         reader here, because two readers of one page is how a receipt comes to name rows that were
+         never written. */
+      const list = document ? listOf(json, at) : null;
 
       /* 6.8 — one extraction per arrival, `n` rows for a pull (`43 §4.1`, `47 §13` D4). */
       const extraction = deps.extract(
@@ -348,7 +359,13 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
 
       /* 6.10 BEFORE 6.9, because the cursor a page is written with is the one it moves TO: written
          with the cursor it was fetched at, a page that landed is a page the next run fetches again. */
-      const next = nextCursor(fetch, json, list, { headers: res.headers, url: req.url }, page, win, tz);
+      /* A NON-JSON PAGE PAGINATES ON WHAT WAS READ OUT OF IT. `offset` and `page_number` stop on a
+         short page or an empty one, which is a count, and the extraction has the same count as the
+         body it came from. The three that read a document or a raw row — `cursor_param`, `keyset`
+         and any `more:` — are refused at install beside a non-JSON `format`, so the fields below
+         stand in for rows nothing reads rather than for rows read wrong. */
+      const paged = list ?? extraction.rows.map((r) => r.fields);
+      const next = nextCursor(fetch, json, paged, { headers: res.headers, url: req.url }, page, win, tz);
 
       pages = n;
       rows += extraction.rows.length;

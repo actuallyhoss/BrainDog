@@ -57,6 +57,9 @@ importers:
       '@braindog/declare':
         specifier: workspace:*
         version: link:../../packages/declare
+      '@braindog/extract':
+        specifier: workspace:*
+        version: link:../../packages/extract
       '@braindog/host':
         specifier: workspace:*
         version: link:../../packages/host
@@ -199,6 +202,9 @@ importers:
 
   packages/connect:
     dependencies:
+      '@braindog/extract':
+        specifier: workspace:*
+        version: link:../extract
       '@braindog/ports':
         specifier: workspace:*
         version: link:../ports
@@ -231,6 +237,9 @@ importers:
       '@braindog/connect':
         specifier: workspace:*
         version: link:../connect
+      '@braindog/extract':
+        specifier: workspace:*
+        version: link:../extract
       '@braindog/kernel':
         specifier: workspace:*
         version: link:../kernel
