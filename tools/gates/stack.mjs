@@ -60,6 +60,24 @@ const BANNED = [
     re: /(?<![.\w])(process\.|__dirname|__filename)/g,
     why: 'names a Node global — `process` and `__dirname` exist in neither runtime this ships to.',
   },
+  /* THE ONLY SCOPED RULES HERE, and `31 §3` layer 4 is where the scope comes from: `no RegExp` is
+     true of `packages/extract` and of nothing else, because every other package matches literals
+     it wrote itself while that one matches a stranger's payload. A pattern over untrusted text is
+     the classic way to turn an arrival into an outage, and `43 §8` answers it by having nothing to
+     compile: every scanner there is one index that only advances. The rule is what keeps that true
+     after the fourth person edits the file. */
+  {
+    id: 'regexp-literal',
+    under: 'packages/extract/',
+    re: /(?:^|[=(,:[!&|?{};]|=>|\breturn\b|\bcase\b)\s*\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\/[dgimsuvy]*/gm,
+    why: 'holds a regular expression — extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
+  },
+  {
+    id: 'regexp-built',
+    under: 'packages/extract/',
+    re: /(?<![.\w])(?:new\s+)?RegExp\s*\(/g,
+    why: 'builds a RegExp — extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
+  },
 ];
 
 /**
@@ -147,9 +165,14 @@ let scanned = 0;
 for (const pkg of packages)
   for (const file of walk(join(root, 'packages', pkg, 'src'))) {
     scanned++;
+    const rel = relative(root, file).replace(/\\/g, '/');
     const bare = decomment(readFileSync(file, 'utf8'));
     const stripped = dedeclare(destring(bare));
     for (const rule of BANNED) {
+      /* A RULE MAY BE SCOPED TO A PATH, and one is. Everything above holds under every package's
+         `src`; `under` is for a ban that belongs to one package's job rather than to the stack
+         (`31 §3` layer 4). */
+      if (rule.under !== undefined && !rel.startsWith(rule.under)) continue;
       const text = rule.strings ? bare : stripped;
       /* EVERY HIT, NOT THE FIRST. `exec` once per rule per file named one line and stopped, so a
          file with four `node:` imports was reported as having one — and the three below it were
@@ -159,7 +182,7 @@ for (const pkg of packages)
       for (const hit of text.matchAll(rule.re)) {
         const line = text.slice(0, hit.index).split('\n').length;
         findings.push({
-          file: `${relative(root, file).replace(/\\/g, '/')}:${line}`,
+          file: `${rel}:${line}`,
           why: rule.why.replace('$1', hit[1] ?? ''),
         });
       }

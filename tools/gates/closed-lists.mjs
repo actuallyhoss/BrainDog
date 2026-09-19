@@ -403,6 +403,48 @@ if (kindTotal === undefined) {
   named(kindsInReadme(), kindsDeclared(), 'packages/render/README.md’s kinds table');
 }
 
+/**
+ * THE TEN EXTRACTORS AND THE THREE COMBINATORS, against `34 §6`'s row for them.
+ *
+ * A COUNT AGREEING IS NOT THE LIST AGREEING, which is the same argument the kinds table above makes
+ * and the reason this is read rather than counted. The stake is different here, though: these
+ * thirteen are the whole vocabulary a declaration may use to read a stranger's message, and the one
+ * `switch` that refuses everything else (`43 §5.3`) is what keeps a payload from reaching code
+ * nobody meant it to. A word in the document that the package does not implement is an author
+ * writing a declaration that installs and never runs; a word in the package that the document does
+ * not list is a surface nobody reviewed.
+ *
+ * MISSING EITHER SIDE IS NOT A FINDING, because the fixtures under `tools/gates/negative` are small
+ * trees that carry only the files their own case needs, and a gate that demanded the whole
+ * repository could not be aimed at one.
+ */
+try {
+  const row = /^\| Extractors \| (\d+) \+ (\d+) \| ([^|]*) \|/m.exec(read('docs/34-GRAMMARS.md'));
+  const src = read('packages/extract/src/extractors.ts');
+  const listed = (name) => {
+    const at = src.indexOf(`export const ${name} = [`);
+    const end = src.indexOf(']', at);
+    return [...src.slice(at, end).matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+  };
+  if (row === null) findings.push('34 §6 has no Extractors row, and this gate reads the list from it');
+  else {
+    const [drawnExtractors, drawnCombinators] = row[3].split('·').map((half) => [...half.matchAll(/([a-z]+)/g)].map((m) => m[1]));
+    for (const [what, doc, said, code] of [
+      ['extractor', drawnExtractors, Number(row[1]), listed('EXTRACTORS')],
+      ['combinator', drawnCombinators, Number(row[2]), listed('COMBINATORS')],
+    ]) {
+      if (doc.length !== said) findings.push(`34 §6 says ${said} ${what}s and names ${doc.length}`);
+      /* IN ORDER, not as a set. `EXTRACTORS` is exported so a refusal can list the forms that do
+         exist, and a list a person reads in a different order from the one the document taught them
+         is a list they have to check twice. */
+      if (doc.join(' ') !== code.join(' '))
+        findings.push(`34 §6's ${what}s (${doc.join(' ')}) and extractors.ts's (${code.join(' ')}) are not the same list in the same order`);
+    }
+  }
+} catch {
+  /* One side or the other is not in this tree. */
+}
+
 if (findings.length === 0) {
   console.log(
     `  closed-lists: ${said.size} CHECKs agree across the document and the DDL, ${counted} counted lists add up, and ${spelledOut} spelled-out kind counts agree`,

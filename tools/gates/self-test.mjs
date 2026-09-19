@@ -80,6 +80,13 @@ const CASES = [
      none of them does. The fixture holds both in one file and asserts a count of one, because a
      gate that went red here would look identical to a gate that got it right. */
   { gate: 'stack-signature', run: 'stack', expect: /calls fetch/, findings: 1 },
+  /* THE ONE SCOPED RULE, AND BOTH HALVES OF IT. `43 §8` bans regular expressions under
+     `packages/extract` and nowhere else, so the fixture seeds three: a literal and a constructor
+     inside that package, which must be named, and a literal in another package, which must not.
+     Two findings rather than three is the assertion — a count of three would mean the gate had
+     quietly become a repository-wide ban, and a count of one would mean it knew the slash form and
+     not `new RegExp(source)`, which is the spelling somebody reaches for next. */
+  { gate: 'stack-regexp', run: 'stack', expect: /compiles nothing/, findings: 2 },
   /* THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte
      does not survive being typed through an editing tool — the same reason the gate's own header
      insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
@@ -162,6 +169,11 @@ const CASES = [
      to the running schema, so this is the only thing standing between a member the database
      enforces and nobody being able to learn it exists by reading. */
   { gate: 'closed-lists-widened', run: 'closed-lists', expect: /widened outbox\.kind/, findings: 1 },
+  /* THE LIST, NOT THE COUNT. The fixture swaps `lookup` for `regex` and leaves the ten at ten, so
+     every check that counts agrees and the vocabulary a declaration may use to read a stranger's
+     message has quietly gained a member nobody reviewed. That is the whole argument for reading a
+     closed list rather than counting it, and it is the one the render kinds table lost first. */
+  { gate: 'closed-lists-extractors', run: 'closed-lists', expect: /not the same list in the same order/, findings: 1 },
   /* THE SHELL CHECK, WHICH READS EVERY `apps/*\/src/app.html` IN THE WORKSPACE. It is in `bundle`
      because that gate already reads a built shell, and until now it read only the built one, only
      for `apps/web`, and only when there was a build. The source form needs neither, and it reaches

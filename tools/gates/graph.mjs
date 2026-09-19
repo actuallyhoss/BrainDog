@@ -103,9 +103,11 @@ const started = performance.now();
  * changes this goes red on the next run and says the table could not be read, which is the correct
  * failure — a silent fallback to a remembered order is how the drift happened the first time.
  *
- * A ROW MARKED *(unbuilt)* KEEPS ITS RANK. `fixtures`, `extract`, `spark`, `connect` and `cli` are
- * specified and absent from the tree, so nothing ever resolves to them; reserving the rank is what
- * stops every package renumbering on the day one arrives.
+ * A ROW MARKED *(unbuilt)* KEEPS ITS RANK. `fixtures` and `spark` are specified and absent from the
+ * tree, so nothing ever resolves to them; reserving the rank is what stops every package
+ * renumbering on the day one arrives. `connect`, `cli` and `extract` were in that list and have
+ * each since arrived at the rank it held for them, which is the mechanism working rather than a
+ * note going stale.
  */
 const ORDER_DOC = join(root, 'docs/31-STACK.md');
 
