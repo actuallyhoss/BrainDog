@@ -217,7 +217,11 @@ importers:
 
   packages/dog: {}
 
-  packages/extract: {}
+  packages/extract:
+    dependencies:
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
 
   packages/host:
     dependencies:

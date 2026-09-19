@@ -17,6 +17,8 @@
  * files for review with its bytes kept, as an unreadable email does.
  */
 
+import { selectAll } from '@braindog/where';
+
 import type { Json } from './index.ts';
 
 /** `43 §4.5`'s types. `ref`, `file`, `secret`, `quantity` and `list` cannot be mapped from an answer. */
@@ -37,8 +39,6 @@ export type Mapping =
   | { value: Json }
   | { arrived: true };
 
-/** `43 §4.4`'s ceiling on a path. */
-export const MAP_PATH_SEGMENTS = 16;
 /** `43 §4.5`: fifteen significant digits, past which a decimal is not the number that was sent. */
 const SIGNIFICANT = 15;
 
@@ -51,40 +51,23 @@ const exact = (value: Json): Mapped => ({ value, outcome: 'exact' });
 /**
  * Every value a path reaches: `data.items[0].id`, `[-1]` the last, `[]` every element.
  *
- * OWN PROPERTIES ONLY, so `__proto__` and `constructor` reach nothing. A path outside the grammar reaches
- * nothing too; `declare` refuses one at install, and this is the backstop for a declaration that came some
- * other way.
+ * `where` OWNS THE GRAMMAR AND THIS IS THE SEAM. `43 §4.4` is one grammar with three readers, and this file
+ * used to carry the third hand-written copy of it. `packages/where` already owned the other two and this
+ * package already depended on it, so the copy was never buying anything except a second answer to
+ * `data[-1].id`.
+ *
+ * THE `catch` IS THE ONE REAL DIFFERENCE AND IT IS DELIBERATE. `selectAll` refuses a malformed path, because
+ * a path is a declaration and install is where an author should hear about a typo. Here a malformed path
+ * must reach nothing instead: `declare` has already refused one at install, so anything that arrives
+ * malformed at THIS point came some other way, and a coercion step that throws mid-write would take an
+ * ingest down over a field. Both postures are right for their own door; this line is where they meet.
  */
 export function select(root: unknown, path: string): unknown[] {
-  if (path === '') return [root];
-  const segments = path.split('.');
-  if (segments.length > MAP_PATH_SEGMENTS) return [];
-  let at: unknown[] = [root];
-  for (const segment of segments) {
-    const m = /^([^.[\]\s]+)?(?:\[(\d+|-1|)\])?$/u.exec(segment);
-    if (!m || (m[1] === undefined && m[2] === undefined)) return [];
-    const [, key, index] = m;
-    const next: unknown[] = [];
-    for (const node of at) {
-      let here: unknown = node;
-      if (key !== undefined) {
-        if (here === null || typeof here !== 'object' || Array.isArray(here) || !Object.hasOwn(here, key)) continue;
-        here = (here as Record<string, unknown>)[key];
-      }
-      if (index === undefined) {
-        next.push(here);
-        continue;
-      }
-      if (!Array.isArray(here)) continue;
-      if (index === '') next.push(...here);
-      else {
-        const i = index === '-1' ? here.length - 1 : Number(index);
-        if (i >= 0 && i < here.length) next.push(here[i]);
-      }
-    }
-    at = next;
+  try {
+    return selectAll(root as Json, path);
+  } catch {
+    return [];
   }
-  return at;
 }
 
 /** The one value a path reaches, or `undefined` when it reaches none or several. */

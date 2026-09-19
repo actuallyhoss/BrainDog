@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fansOut, pathFault, readPath, type Json } from '../src/index.ts';
+import { fansOut, pathFault, readPath, selectAll, type Json } from '../src/index.ts';
 
 const BODY: Json = {
   object: 'list',
@@ -85,7 +85,7 @@ test('what is wrong with a path is a sentence, and a good one has none', () => {
 });
 
 /* A PATH LINT REFUSED READS AS MISSING RATHER THAN THROWING. A connector must not die halfway
-   through a page over the shape of its own declaration; `declare` is where that is caught. */
+   through a page over the doc of its own declaration; `declare` is where that is caught. */
 test('a path this grammar cannot read is undefined at run time', () => {
   assert.equal(readPath(BODY, 'data[a]'), undefined);
   assert.equal(readPath(BODY, ''), undefined);
@@ -94,4 +94,138 @@ test('a path this grammar cannot read is undefined at run time', () => {
 test('whether a path fans out is askable without reading anything', () => {
   assert.equal(fansOut('data[].id'), true);
   assert.equal(fansOut('data[-1].id'), false);
+});
+
+/**
+ * `43 §4.4`, beside `readPath`'s own tests for `47 §4.3`.
+ *
+ * THE TWO SETS SIT TOGETHER SO THE DIVERGENCES ARE READABLE AS TESTS and not only as a comment: a
+ * namespace-prefixed key, a second fan, and a hole in a fan are each a case here and each the opposite
+ * case there.
+ */
+
+const doc = {
+  data: [
+    { id: 1, amount: '10.00', tags: ['a', 'b'] },
+    { id: 2, amount: '20.00', tags: [] },
+  ],
+  page: { next: 'tok', empty: null },
+};
+
+/* ── select ──────────────────────────────────────────────────────────────── */
+
+test('an empty path is the root', () => {
+  assert.deepEqual(selectAll(doc, ''), [doc]);
+});
+
+test('a key reaches one value', () => {
+  assert.deepEqual(selectAll(doc, 'page.next'), ['tok']);
+});
+
+test('null is a value and not an absence', () => {
+  assert.deepEqual(selectAll(doc, 'page.empty'), [null]);
+});
+
+test('a missing key reaches nothing', () => {
+  assert.deepEqual(selectAll(doc, 'page.missing'), []);
+  assert.deepEqual(selectAll(doc, 'nope.deeper.still'), []);
+});
+
+test('an index reaches one element', () => {
+  assert.deepEqual(selectAll(doc, 'data[0].id'), [1]);
+  assert.deepEqual(selectAll(doc, 'data[1].id'), [2]);
+});
+
+test('an index past the end reaches nothing', () => {
+  assert.deepEqual(selectAll(doc, 'data[9].id'), []);
+});
+
+test('[-1] is the last', () => {
+  assert.deepEqual(selectAll(doc, 'data[-1].id'), [2]);
+  assert.deepEqual(selectAll({ a: [] }, 'a[-1]'), []);
+});
+
+test('[] multiplies', () => {
+  assert.deepEqual(selectAll(doc, 'data[].id'), [1, 2]);
+  assert.deepEqual(selectAll(doc, 'data[].tags[]'), ['a', 'b']);
+});
+
+test('[] over a missing key in one row skips that row', () => {
+  assert.deepEqual(selectAll({ a: [{ b: 1 }, {}, { b: 3 }] }, 'a[].b'), [1, 3]);
+});
+
+test('an index on a root array', () => {
+  assert.deepEqual(selectAll([{ id: 7 }], '[0].id'), [7]);
+  assert.deepEqual(selectAll([{ id: 7 }, { id: 8 }], '[].id'), [7, 8]);
+});
+
+test('an index on a non-array reaches nothing', () => {
+  assert.deepEqual(selectAll(doc, 'page[]'), []);
+  assert.deepEqual(selectAll(doc, 'page[0]'), []);
+});
+
+test('a key on a non-object reaches nothing', () => {
+  assert.deepEqual(selectAll(doc, 'page.next.deeper'), []);
+});
+
+test('inherited properties are not reached', () => {
+  assert.deepEqual(selectAll({}, '__proto__'), []);
+  assert.deepEqual(selectAll({}, 'constructor'), []);
+  assert.deepEqual(selectAll({}, 'toString'), []);
+});
+
+test('an own property named like a prototype member is reached', () => {
+  assert.deepEqual(selectAll(JSON.parse('{"constructor": 5}'), 'constructor'), [5]);
+});
+
+test('keys are exact and case-sensitive', () => {
+  assert.deepEqual(selectAll({ Amount: 1 }, 'amount'), []);
+  assert.deepEqual(selectAll({ Amount: 1 }, 'Amount'), [1]);
+});
+
+const refuses = (path: string) => {
+  assert.throws(
+    () => selectAll(doc, path),
+    (e: unknown) => (e as { code: string }).code === 'PATH_INVALID',
+    `expected ${path} to be refused`,
+  );
+};
+
+test('a malformed path is refused, and a path is a declaration', () => {
+  refuses('a..b');
+  refuses('a[');
+  refuses('a[x]');
+  refuses('a[1');
+  refuses('a[-2]');
+  refuses('a[0][1]');
+  refuses('a]b');
+  refuses('.a');
+});
+
+test('sixteen segments is the ceiling', () => {
+  const ok = Array.from({ length: 16 }, () => 'a').join('.');
+  assert.deepEqual(selectAll({}, ok), []);
+  refuses(`${ok}.a`);
+});
+
+
+/* ── where the two grammars part company, as cases ───────────────────────── */
+
+test('a key outside 47 §4.3’s charset is a key here', () => {
+  assert.deepEqual(selectAll({ 'atom:entry': 1 }, 'atom:entry'), [1]);
+  assert.deepEqual(selectAll({ 'Amount (EGP)': 2 }, 'Amount (EGP)'), [2]);
+  assert.deepEqual(selectAll({ 'été': 3 }, 'été'), [3]);
+});
+
+test('a second fan is legal here and the answer stays flat', () => {
+  const rows = { a: [{ b: [1, 2] }, { b: [3] }] };
+  assert.deepEqual(selectAll(rows, 'a[].b[]'), [1, 2, 3]);
+});
+
+test('a hole in a fan is dropped here, where readPath keeps it', () => {
+  assert.deepEqual(selectAll({ a: [{ b: 1 }, {}, { b: 3 }] }, 'a[].b'), [1, 3]);
+});
+
+test('a malformed path is refused here, where readPath answers undefined', () => {
+  assert.throws(() => selectAll({}, 'a[x]'), (e: unknown) => (e as { code: string }).code === 'PATH_INVALID');
 });

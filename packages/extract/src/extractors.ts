@@ -15,10 +15,14 @@
  * a person actually received (`34 §1.2`).
  */
 
+import type { Json } from '@braindog/where';
+
 import { scanDates } from './date.ts';
 import { scanDecimals, scanInts, scanMoney, type CurrencyTable } from './money.ts';
 
-export type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+/* ONE `Json`, FROM `where`. It was defined here when this package had no dependencies; it has one now, and
+   two structurally identical definitions of the same type are two places for it to stop being identical. */
+export type { Json };
 
 export const EXTRACTORS = [
   'after',

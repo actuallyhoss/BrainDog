@@ -43,3 +43,5 @@ export {
 } from './money.ts';
 
 export { parseDate, scanDates, type DateFormatInvalid } from './date.ts';
+
+export { readRows, select, UNPARSEABLE, type Format, type Read } from './formats.ts';

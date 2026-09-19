@@ -111,3 +111,132 @@ export function readPath(json: Json | undefined, path: string): Read {
 
   return fanned ? here : here[0];
 }
+
+/**
+ * `43 §4.4`'s path, to live beside `readPath` in `packages/where/src/path.ts`.
+ *
+ * TWO GRAMMARS IN ONE FILE, ON PURPOSE. `path.ts` opens by arguing that three readers of one grammar is one
+ * grammar, and that a second copy in `connect` would be a second answer to `data[-1].id`. That argument is
+ * right and this is what honouring it costs: `47 §4.3` and `43 §4.4` are not the same grammar, so the choice
+ * is not "one or two" but "two where a reader can see both, or two in packages that never look at each other".
+ *
+ * WHERE THEY DIVERGE, AND WHY EACH DIVERGENCE IS LOAD-BEARING:
+ *
+ *   key charset · `47` keys are `[A-Za-z_][A-Za-z0-9_-]*`; `43` keys are anything but `.`, `[` and `]`.
+ *     A connector's path names a field in a JSON body somebody designed. An extractor's path names a CSV
+ *     header (`Amount (EGP)`) or an XML element carrying a namespace prefix (`atom:entry`, which `43 §5.5`
+ *     requires be literal). Narrowing `43` to `47`'s charset would make the Atom case unreadable; widening
+ *     `47` to `43`'s would stop `declare` catching a typo at install, which is `47`'s whole reason for
+ *     having `pathFault`.
+ *
+ *   a missing element in a fan · `47` keeps it as `undefined`; `43` drops it.
+ *     `readPath`'s comment says why: a check over every element must not quietly become a check over the
+ *     elements that had the field. `selectAll` answers rows to extract from, and a row that is not there is
+ *     not a row — keeping a hole would make `data[].amount` over ten rows with two gaps produce ten
+ *     candidates, two of which are the absence of a candidate.
+ *
+ *   how many fans · `47` allows one, `43` allows one per segment.
+ *     One fan keeps `Read`'s list arm one level deep, which is what lets an `expect:` mean *all of them*
+ *     without nesting. `selectAll` returns a flat list either way, so the restriction buys it nothing and
+ *     costs it `data[].tags[]`.
+ *
+ *   a malformed path · `47` reads `undefined` at run and is caught by `pathFault` at install; `43` refuses.
+ *     Same posture, different door. Both say a bad path is a declaration somebody mistyped.
+ *
+ * NO `RegExp` HERE EVEN THOUGH THE FILE AROUND IT HAS THREE, and not because of `43 §8`'s ban — that ban is
+ * scoped to `packages/extract/` and this is `where`. It is because `PATH` and `STEPS` match a declaration,
+ * which is short and authored, while everything `selectAll`'s caller does next walks a stranger's body. The
+ * one-index parser below is about the same length as the pattern it replaces, so the cheap thing and the
+ * careful thing are the same thing.
+ */
+
+export type PathInvalid = { code: 'PATH_INVALID'; at: string; fix: string };
+
+const bad = (at: string, fix: string): PathInvalid => ({ code: 'PATH_INVALID', at, fix });
+
+/** `43 §10`. A path longer than this is a shape that wants a person, not a deeper walk. */
+const SEGMENTS_MAX = 16;
+
+const isDigit = (ch: string | undefined): boolean => ch !== undefined && ch >= '0' && ch <= '9';
+
+type Segment = { key: string | null; index: 'all' | 'last' | number | null };
+
+/**
+ * One segment: a key, an index, or a key with one index after it.
+ *
+ * ONE INDEX PER SEGMENT, which is what `43 §4.4`'s `segment = key [ index ] | index` says and what `a[0][1]`
+ * does not get. A second index is refused rather than quietly reading the first, because an author who wrote
+ * it meant something the grammar cannot express and install is where they should hear that.
+ */
+function segment(text: string, at: string): Segment {
+  const open = text.indexOf('[');
+  if (open === -1) {
+    if (text.length === 0) throw bad(at, 'A path segment cannot be empty. Write a.b, not a..b.');
+    if (text.includes(']')) throw bad(at, 'A key cannot hold [ or ]; those are how an index is written.');
+    return { key: text, index: null };
+  }
+  const key = text.slice(0, open);
+  if (key.includes(']')) throw bad(at, 'A key cannot hold [ or ]; those are how an index is written.');
+  if (text[text.length - 1] !== ']')
+    throw bad(at, 'An index is written [n], [-1] or [], and ends the segment.');
+  const inner = text.slice(open + 1, text.length - 1);
+  if (inner.includes('[') || inner.includes(']'))
+    throw bad(at, 'One index per segment: a[0][1] is not a path this grammar can read.');
+
+  let index: Segment['index'];
+  if (inner === '') index = 'all';
+  else if (inner === '-1') index = 'last';
+  else {
+    for (const ch of inner)
+      if (!isDigit(ch)) throw bad(at, 'An index is [n] for a position, [-1] for the last, or [] for every one.');
+    index = Number(inner);
+  }
+  return { key: key === '' ? null : key, index };
+}
+
+/** The compiled path, or a refusal. An empty path is the root. */
+function compile(path: string, at: string): Segment[] {
+  if (path === '') return [];
+  const parts = path.split('.');
+  if (parts.length > SEGMENTS_MAX)
+    throw bad(at, `A path reads at most ${SEGMENTS_MAX} segments deep. Read a shorter path and map the rest.`);
+  return parts.map((p) => segment(p, at));
+}
+
+const isObject = (v: Json): v is { [k: string]: Json } =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Every value the path reaches, in order. Missing reaches nothing; `[]` multiplies.
+ *
+ * A LIST AND NOT A VALUE, because `[]` exists: `data[].amount` over ten rows is ten answers, and a function
+ * returning one would have to pick, here, with nothing to pick on. `map:` needs exactly one and says so at
+ * its own door (`43 §4.5`), which is where that rule belongs.
+ *
+ * OWN PROPERTIES ONLY, the same `Object.hasOwn` and for the same reason as `readPath`: the object on the left
+ * is a body a stranger sent, so `__proto__` and `constructor` reach nothing rather than reach a function. No
+ * key from a payload is ever assigned here, so there is no pollution surface at all — this is about not
+ * reading the host's `Object` where a field was expected.
+ */
+export function selectAll(value: Json, path: string, at = 'path'): Json[] {
+  let here: Json[] = [value];
+  for (const seg of compile(path, at)) {
+    const next: Json[] = [];
+    for (const one of here) {
+      let got: Json | undefined = one;
+      if (seg.key !== null) got = isObject(one) && Object.hasOwn(one, seg.key) ? one[seg.key] : undefined;
+      if (got === undefined) continue;
+      if (seg.index === null) {
+        next.push(got);
+        continue;
+      }
+      if (!Array.isArray(got)) continue;
+      if (seg.index === 'all') next.push(...got);
+      else if (seg.index === 'last') {
+        if (got.length > 0) next.push(got[got.length - 1]!);
+      } else if (seg.index < got.length) next.push(got[seg.index]!);
+    }
+    here = next;
+  }
+  return here;
+}

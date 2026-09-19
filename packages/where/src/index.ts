@@ -1346,5 +1346,5 @@ export type { Parsed, SentenceDeps } from './sentence.ts';
 
 /* One path into a body a stranger sent — `47 §4.3`'s grammar, read by connect, extract and the
    record's `applyPull`. It shares this package's posture and none of its vocabulary; see `path.ts`. */
-export { fansOut, pathFault, readPath } from './path.ts';
-export type { Json, Read } from './path.ts';
+export { fansOut, pathFault, readPath, selectAll } from './path.ts';
+export type { Json, PathInvalid, Read } from './path.ts';
