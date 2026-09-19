@@ -120,6 +120,16 @@ export type IngestDecl = {
   /** Over the ARRIVAL, `34 §1.9`'s seven: `from to subject body channel state ts`. Never a register. */
   match?: Predicate;
   /**
+   * `07 §2`'s skip list: the arrivals this pattern recognises and does not want.
+   *
+   * A REFUND IS THE EXAMPLE AND IT IS NOT A SMALL ONE. A pattern that matches a bank's alerts
+   * matches the refund alerts too, and the refund is not a transaction to write — `07 §2` names a
+   * refund and a PIN reminder in the same breath. This member did not exist and `declare` had no
+   * unknown-key check, so a declaration carrying one installed clean, reported success, and wrote
+   * the refund into the register as a charge.
+   */
+  skip?: { when: Predicate; reason: string }[];
+  /**
    * OPTIONAL, AND THE TYPE SAID OTHERWISE. `declare` refuses a declaration carrying both this and
    * `map`, so a connector that reads JSON cannot have an `extract` at all — and every one of them
    * was being read back through a type that promised one. `arrive` defends itself with `?? {}`, so
@@ -552,6 +562,19 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          recognise this" is to drop it is a pipeline whose failures are invisible. */
       store('untriaged', null);
       return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [] });
+    }
+
+    /* `43 §5.1` STEP 2, WHICH IS BEFORE ANYTHING IS READ: *a hit → `{ rows: [], skipped: reason }`,
+       no receipt. Stop.* The same evaluator over the same subject the `match:` was asked about, in
+       declared order, first true wins — `§5.2` step 3.
+
+       AND THE RAW IS STILL STORED, which is the difference between a skip and a drop. The bytes are
+       in the record with the reason beside them, so "why did that not come through" has an answer
+       and the pattern can be changed by somebody looking at the payload that provoked it. */
+    const skipped = (matched.skip ?? []).find((rule) => evaluate(rule.when, fields, INBOX_RAW));
+    if (skipped) {
+      store('skipped', skipped.reason);
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason: skipped.reason });
     }
 
     const text = `${headers.subject ?? ''}\n${body}`;

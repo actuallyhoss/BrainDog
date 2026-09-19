@@ -1228,8 +1228,12 @@ function dedupeFault(dedupe: unknown, id: string): Refusal | null {
   return null;
 }
 
+/** `42 §4.7`'s two caps on a skip list: how many rules, and how long a reason a person has to read. */
+const SKIP_MOST = 16;
+const SKIP_REASON_MOST = 120;
+
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1282,6 +1286,42 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
    */
   const wrongKey = dedupeFault(body.dedupe, id);
   if (wrongKey) return wrongKey;
+
+  /**
+   * `42 §4.7`'s `skip:` — 1 to 16 of `{ when: predicate on inbox_raw, reason: text ≤ 120 }`.
+   *
+   * THE SAME COMPILE THE `match:` GETS, for the same reason, and it is the reason with teeth here:
+   * a skip that never fires is invisible. A `match:` that matches nothing shows up as an inbox
+   * filling with untriaged payloads; a `skip:` that reaches nothing shows up as refunds written as
+   * charges, and the register looks ordinary. `{ field: kind, is: refund }` is that typo — `kind`
+   * is not one of `34 §1.9`'s seven — and it installed clean.
+   */
+  if (body.skip !== undefined) {
+    const list = body.skip;
+    if (!Array.isArray(list) || list.length === 0 || list.length > SKIP_MOST)
+      return bad('DECLARATION_INVALID', `${id}'s skip is 1 to ${SKIP_MOST} of { when, reason }.`, 'skip');
+    for (const [i, rule] of list.entries()) {
+      const at = `skip[${i}]`;
+      if (rule === null || typeof rule !== 'object' || Array.isArray(rule))
+        return bad('DECLARATION_INVALID', `${id}'s ${at} is { when, reason }.`, at);
+      const { when, reason } = rule as { when?: unknown; reason?: unknown };
+      if (typeof reason !== 'string' || reason.trim() === '' || reason.length > SKIP_REASON_MOST)
+        return bad(
+          'DECLARATION_INVALID',
+          `${id}'s ${at} names no reason. A skipped arrival is one somebody will come looking for, and the reason is what they find.`,
+          `${at}.reason`,
+        );
+      if (when === null || typeof when !== 'object')
+        return bad('DECLARATION_INVALID', `${id}'s ${at} skips on nothing, so it would skip every arrival this pattern matches.`, `${at}.when`);
+      /* THE HAND-WRITTEN CHECK FIRST, because it is the one that teaches: it names the operator and
+         recites the seven fields, where `compile` answers `FIELD_UNKNOWN` and leaves the author to
+         find the list. Same order as the `match:` above it. */
+      const unknown = matchFault(when, id, `${at}.when`);
+      if (unknown) return unknown;
+      const refused = compile(when as Predicate, INBOX_RAW).bad[0];
+      if (refused) return bad(refused.code, `${id}.${at}.when: ${refused.fix}`, refused.at ?? `${at}.when`, refused.allowed);
+    }
+  }
 
   if (body.extract !== undefined) {
     const extract = body.extract;

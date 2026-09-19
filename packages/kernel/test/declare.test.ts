@@ -2356,3 +2356,27 @@ test("A DEDUPE KEY IS CHECKED WHERE IT IS WRITTEN, because a field id from one b
   assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant', chars: 0 } } } })), 'OUT_OF_BOUNDS');
   assert.equal(refusedWith(ingest({ dedupe: { near: { on: ['amount'], day: 'day', prefix: { field: 'merchant', chars: 65 } } } })), 'OUT_OF_BOUNDS');
 });
+
+test('A SKIP LIST IS COMPILED LIKE THE MATCH IT SITS BESIDE, because a skip that never fires is invisible', () => {
+  /**
+   * `42 §4.7`: *1 to 16 of `{ when: predicate on inbox_raw, reason: text ≤ 120 }`*.
+   *
+   * A `match:` THAT REACHES NOTHING FILLS AN INBOX WITH UNTRIAGED PAYLOADS, which somebody notices.
+   * A `skip:` that reaches nothing writes the refunds as charges and the register looks ordinary.
+   * `kind` is not one of `34 §1.9`'s seven and neither is `amount`, and both installed clean.
+   */
+  const skip = (when: unknown, reason: unknown = 'refund') => ingest({ skip: [{ when, reason }] });
+  assert.equal(refusedWith(skip({ field: 'body', contains: 'REFUND' })), null);
+  assert.equal(refusedWith(skip({ any: [{ field: 'subject', contains: 'PIN' }, { field: 'body', contains: 'REFUND' }] })), null);
+
+  assert.equal(refusedWith(skip({ field: 'kind', is: 'refund' })), 'MATCH_FIELD_UNKNOWN');
+  assert.equal(refusedWith(skip({ field: 'amount', gt: 0 })), 'MATCH_FIELD_UNKNOWN');
+
+  /* AND A SKIP WITHOUT A REASON IS A ROW SOMEBODY WILL COME LOOKING FOR AND NOT FIND. */
+  assert.equal(refusedWith(skip({ field: 'body', contains: 'REFUND' }, '')), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ skip: [{ when: { field: 'body', contains: 'REFUND' } }] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(skip({ field: 'body', contains: 'REFUND' }, 'x'.repeat(121))), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(skip(undefined)), 'DECLARATION_INVALID', 'a when that is nothing would skip everything');
+  assert.equal(refusedWith(ingest({ skip: [] })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ skip: Array.from({ length: 17 }, () => ({ when: { field: 'body', contains: 'x' }, reason: 'r' })) })), 'DECLARATION_INVALID');
+});
