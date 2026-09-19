@@ -150,6 +150,7 @@ import {
   type ActionsRun,
   type Execute,
   type Paged,
+  type PagedReport,
   type PagedRun,
   type PullHandoff,
 } from './actions.ts';
@@ -276,7 +277,7 @@ export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, RULE_CALLS_PER_DAY, 
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
-  Paged, PagedRun, PullHandoff,
+  Paged, PagedReport, PagedRun, PullHandoff,
 } from './actions.ts';
 
 /**
@@ -3699,6 +3700,28 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
                   actionDeps(),
                   { ingest: paged.paged.ingest, channel: 'pull', host: paged.host, project: paged.decl.project, status: null, outcome: 'dropped', requests: 0, bytes: 0, ms: 0, failures: 0 },
                   why,
+                ),
+              ),
+            /* THE RECORD METERS THE RUN AND THE HOST ONLY REPORTS IT. What the host holds is what it
+               spent; what the account owes is `meter`'s to decide, and it is decided in one place for
+               all three channels rather than once here and once in whatever host is wired next. */
+            meterPaged: (paged, report) =>
+              transaction(() =>
+                meter(
+                  actionDeps(),
+                  {
+                    ingest: paged.paged.ingest,
+                    channel: 'pull',
+                    host: paged.host,
+                    project: paged.decl.project,
+                    status: report.status ?? null,
+                    outcome: report.outcome,
+                    requests: report.requests,
+                    bytes: report.bytes,
+                    ms: report.ms,
+                    failures: report.failures,
+                  },
+                  report.say,
                 ),
               ),
           },

@@ -29,6 +29,7 @@ import {
   type GrantRow,
   type Kernel,
   type Paged,
+  type PagedRun,
 } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -133,25 +134,23 @@ function host(): { execute: Execute; seen: ActionRequest[] } {
   };
 }
 
-/** The connector runner, as a host would wire it. It acks the job itself, as `runPull` does. */
-function connector(k: Kernel): { page: (p: Paged) => Promise<never | ReturnType<typeof metered>>; seen: Paged[] } {
+/**
+ * The connector runner, as a host would wire it.
+ *
+ * IT REPORTS WHAT IT SPENT AND DOES NOT METER ITSELF. A host that returned a finished `Metered`
+ * would write no event and could call a failed run billable, so what crosses back is a
+ * `PagedReport` and the record turns it into a meter reading.
+ */
+function connector(k: Kernel, opts: { throws?: boolean } = {}): { page: PagedRun; seen: Paged[] } {
   const seen: Paged[] = [];
-  const metered = (p: Paged) => ({
-    event: 'ev_test',
-    at: new Date(NOW).toISOString(),
-    ingest: p.paged.ingest,
-    channel: 'pull',
-    scope: 'global',
-    outcome: 'ok' as const,
-    usage: { runs: 1, requests: 2, bytes: 40, ms: 5, failures: 0, held: 0 },
-  });
   return {
     seen,
     page: async (p) => {
       seen.push(p);
+      if (opts.throws) throw new Error('the socket went away mid-page');
       /* THE CONNECTOR RUNNER FINISHES ITS OWN ROW, which is why `runActions` must not ack it again. */
       k.ackOutbox({ id: p.job.id, state: 'done', leasedUntil: p.job.leasedUntil });
-      return metered(p);
+      return { outcome: 'ok', requests: 2, bytes: 40, ms: 5, failures: 0, status: 200, say: `${p.paged.ingest} read 2 pages.` };
     },
   };
 }
@@ -281,5 +280,61 @@ test('a connector whose key was revoked fetches nothing, and is paused before it
   /* NOTHING WAS QUEUED, which is the part worth asserting: a queued job for a revoked key would be
      leased, prepared and dropped on every pass until somebody noticed. */
   assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'pull.fetch'")?.n, 0);
+  sql.close();
+});
+
+/* ── who does the metering ───────────────────────────────────────────────── */
+
+/**
+ * THE RECORD METERS THE RUN, NOT THE HOST, and this is the test that keeps it that way.
+ *
+ * The first version of the fork had `PagedRun` return a finished `Metered`. Every assertion above
+ * still passed, and three things were quietly wrong: no `pull` event was written for a connector
+ * run, so the one channel that talks to somebody else's API was the one channel with no record of
+ * having done so; the "a failure is free" rule lived in `meter` and a host never reached it; and
+ * the event id was minted by the party with the most reason to want it different.
+ */
+test('A CONNECTOR RUN IS WRITTEN TO THE EVENT LOG, by the record and not by the host', async () => {
+  const { k, sql } = await record((g) => [CONNECTOR(g)]);
+  const { execute } = host();
+  const { page } = connector(k);
+
+  const out = await k.runActions(execute, { page });
+  assert.equal(out.ok, 1);
+
+  const ev = sql.one<{ kind: string; target: string; to_v: string; note: string }>(
+    "SELECT kind, target, to_v, note FROM event WHERE kind = 'pull' ORDER BY rowid DESC LIMIT 1",
+  );
+  assert.ok(ev, 'a connector ran and left no event behind');
+  /* THE EVENT POINTS AT THE DECLARATION AND NOT AT THE INGEST NAME, so a run stays findable after
+     the connector is renamed, and `target_kind` says which table to look in. */
+  assert.equal(ev.target, 'declaration:ingest.acme-charges');
+  /* THE COUNTS ARE THE ONES THE HOST REPORTED, carried through rather than recomputed. */
+  assert.match(ev.to_v, /\b2\b/, `requests missing from ${ev.to_v}`);
+  assert.match(ev.to_v, /\b40\b/, `bytes missing from ${ev.to_v}`);
+  /* AND NOTHING THE RUN WAS HOLDING IS IN IT: no address, no header, no credential. */
+  assert.ok(!/acme\.test|Authorization|token/i.test(ev.note), ev.note);
+  sql.close();
+});
+
+test('a runner that throws is the network: the pass survives it and the run is metered failed', async () => {
+  const { k, sql } = await record((g) => [CONNECTOR(g)]);
+  const { execute } = host();
+  const { page } = connector(k, { throws: true });
+
+  const out = await k.runActions(execute, { page });
+
+  assert.equal(out.failed, 1);
+  assert.equal(out.ok, 0);
+  /* A FAILURE IS FREE. The account got no pages, and the schedule will offer the row again, so
+     billing for it would charge somebody up to eight times for one provider's bad afternoon. */
+  assert.equal(out.usage[0]?.usage.runs, 0);
+  assert.equal(out.usage[0]?.usage.requests, 0);
+  assert.equal(out.usage[0]?.usage.failures, 1);
+  /* AND THE SENTENCE NAMES THE CONNECTOR AND NOT THE ERROR, which came from a stack this record
+     did not write and may be holding anything at all. */
+  const ev = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' ORDER BY rowid DESC LIMIT 1");
+  assert.match(ev?.note ?? '', /acme-charges/);
+  assert.ok(!/socket went away/.test(ev?.note ?? ''), ev?.note);
   sql.close();
 });

@@ -36,7 +36,7 @@ import {
   type CookieMode,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
-import type { Execute, OutboxKind, OutboxRow, Signer } from '@braindog/kernel';
+import type { Execute, OutboxKind, OutboxRow, PagedRun, Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
@@ -47,6 +47,8 @@ import { createDirectory, type Directory } from '@braindog/record/directory';
 import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports';
 
 import { actionExecutor, holding, keyOpener, meterPass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
+import { pagedRunner } from './connector.ts';
+import { httpFor } from './http.ts';
 import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
@@ -603,6 +605,9 @@ export async function start(options: {
    * back here: a pass that re-armed nothing and ran nothing stops the circle rather than spinning it.
    */
   let execute: Execute | null = null;
+  /* THE CONNECTOR RUNNER IS BUILT ONCE, beside the executor and for the same reason: both hold a
+     socket and a key store, and a new one per pass would resolve and unwrap on every tick. */
+  let paged: PagedRun | null = null;
   let acting = false;
   /* THE DIRECTORY IS OPENED BELOW, after the record, so a pass that fires first waits for the next one. */
   let ledger: Directory | null = null;
@@ -622,7 +627,14 @@ export async function start(options: {
         send: options.actions.send,
         rehearseOnThisMachine: options.actions.rehearseOnThisMachine,
       });
-      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun));
+      /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
+         and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
+      paged ??= pagedRunner(api, {
+        http: httpFor({ send: options.actions.send, resolve: options.shared?.resolve }),
+        clock: { now: () => Date.now() },
+        keys: options.keys,
+      });
+      const out = await api.kernel.runActions(holding(execute, record, ledger.mayRun), { page: paged });
       await meterPass(ledger.meter, record, out.usage);
       if (out.fired > 0 || out.ran > 0 || out.dropped > 0) await api.kernel.tail(scheduler);
     } catch (e) {

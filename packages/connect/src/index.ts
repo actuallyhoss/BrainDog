@@ -2,9 +2,9 @@
  * `@braindog/connect` — one leased `pull.fetch` row, one run against somebody else's API.
  *
  * `47-SPEC-CONNECT` is the specification and this file is its types, its refusals and the arithmetic
- * every other file in the package shares. The run itself (`runPull`, `probe`, the paginators, the
- * write-time reducer) is the next build step; what is here is the half that can be got right without
- * a network: what a declaration says, what a request resolves to, and what a refusal is called.
+ * every other file in the package shares. The run itself is `run.ts`, `probe.ts`, the paginators and
+ * the write-time reducer; what is here is the half that can be got right without a network: what a
+ * declaration says, what a request resolves to, and what a refusal is called.
  *
  * WHAT THIS PACKAGE IS FOR, in one line: a `fetch:` block is a DECLARATION and never a program.
  * Five placeholders, substituted; no expression, no loop, no branch. `25 §3.1` draws that line and

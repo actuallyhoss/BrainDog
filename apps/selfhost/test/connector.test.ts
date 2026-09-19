@@ -7,10 +7,10 @@
  * expecting another, an extractor that returns minor units to a register that wants major ones.
  * This is the one test where a scripted provider's bytes reach an actual register through both.
  *
- * IT IS NOT THE RUNNER. Nothing in this repository yet leases a `pull.fetch` row and calls
- * `runPull`; `actions.ts` still owns that kind and fetches it in one request. This wires the two
- * halves by hand so that when the runner is built, the shape it has to produce is a shape something
- * already proved.
+ * THE RUNNER NOW EXISTS AND THIS FILE PREDATES IT. `src/connector.ts` leases nothing itself — the
+ * kernel does that and hands a `Paged` across — but it is what turns one into a `runPull` call. The
+ * hand-wiring below is kept deliberately: it drives `runPull` with a payload typed out in full, so
+ * a change to `PullPayload` that the real runner silently satisfies still fails here.
  */
 
 import { test } from 'node:test';
@@ -18,6 +18,8 @@ import assert from 'node:assert/strict';
 
 import { runPull, type ConnectDeps, type IngestDecl, type OutboxRow, type PullPayload } from '@braindog/connect';
 import { openRecord, type Declaration } from '@braindog/kernel';
+
+import { pagedRunner } from '../src/connector.ts';
 import { fixOf, type Http } from '@braindog/ports';
 
 import { fixedClock, openSqlite, type NodeSql } from '../../../packages/kernel/test/sqlite.ts';
@@ -234,5 +236,59 @@ test('the same window run twice writes its rows once', async () => {
     ['ch_1'],
     'a replayed window duplicated its rows',
   );
+  sql.close();
+});
+
+/* ── the runner, which is no longer hand-wiring ──────────────────────────────────────────────── */
+
+/**
+ * THE WHOLE PATH, WITH NOBODY HOLDING IT TOGETHER BY HAND.
+ *
+ * Every test above calls `runPull` directly with a payload typed out in this file. This one starts
+ * where a real pass starts — a due schedule row — and asserts that the register filled. Between the
+ * two are the parts no other test covers together: the kernel firing the schedule, leasing the row
+ * and deciding it is a connector rather than one request; `pagedRunner` turning that decision into
+ * a `runPull` call with this host's socket; and the record metering what came back.
+ *
+ * WHAT WOULD HAVE PASSED WITHOUT IT: a runner wired to the wrong executor, a payload the kernel
+ * builds one way and `runPull` reads another, an ack written twice, or a run that fetched perfectly
+ * and left no event behind. All four are green in one suite or the other.
+ */
+test('A DUE CONNECTOR FILLS ITS REGISTER through the host runner, and the pass counts one run', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(k.createRecord({ id: RECORD, slug: 'acme', name: 'Acme', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  const put = await k.install([CHARGES, { id: 'ingest.acme-charges', kind: 'ingest', body: DECL as never }]);
+  assert.ok(put.ok, fixOf(put));
+
+  const http = provider([
+    { data: [charge('ch_1', 4200, 1_768_900_000), charge('ch_2', 15_000, 1_768_900_100)] },
+    { data: [charge('ch_3', 999, 1_768_900_200)] },
+  ]);
+  const page = pagedRunner({ kernel: k } as never, { http, clock: { now: () => NOW } });
+
+  /* THE SINGLE-REQUEST EXECUTOR IS HANDED IN AND MUST NEVER BE CALLED. A connector arriving here is
+     a fork that sent a paging declaration down the one-request path. */
+  let sent = 0;
+  const out = await k.runActions(async () => (sent++, { status: 200, body: '', bytes: 0, ms: 0, requests: 1 }), { page });
+
+  assert.equal(sent, 0, 'the connector was sent as a single request');
+  assert.equal(out.fired, 1, 'the schedule never fired');
+  assert.equal(out.ran, 1);
+  assert.equal(out.ok, 1);
+
+  /* THE ROWS ARE IN THE REGISTER, in the money they were sent in: minor units in, major units out. */
+  assert.deepEqual(
+    rows(sql).map((r) => r.ref),
+    ['ch_1', 'ch_2', 'ch_3'],
+  );
+
+  /* THE ROW IS FINISHED ONCE. `runPull` acks it, and a kernel that acked it again would turn every
+     healthy run into a lost lease. */
+  assert.equal(sql.one<{ state: string }>("SELECT state FROM outbox WHERE kind = 'pull.fetch'")?.state, 'done');
+
+  /* AND THE RUN IS ON THE RECORD, metered by the record rather than by this host. */
+  const ev = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'pull' ORDER BY rowid DESC LIMIT 1");
+  assert.ok(ev, 'a connector ran and left no event behind');
   sql.close();
 });

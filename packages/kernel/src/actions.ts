@@ -700,6 +700,8 @@ export type RunnerSteps = {
   release: (paged: Paged) => void;
   /** Meter that non-run, so a connector nobody can run is visible rather than silently absent. */
   dropPaged: (paged: Paged, why: string) => Metered;
+  /** Meter a connector run the host carried out, on the record's terms rather than the host's. */
+  meterPaged: (paged: Paged, report: PagedReport) => Metered;
 };
 
 /**
@@ -710,7 +712,30 @@ export type RunnerSteps = {
  * on a row another writer already finished is the `PULL_LEASE_EDGE` that would make every healthy
  * run look like a lost lease.
  */
-export type PagedRun = (paged: Paged) => Promise<Metered>;
+export type PagedRun = (paged: Paged) => Promise<PagedReport>;
+
+/**
+ * What a connector run reports back, which is what it SPENT and not what it is owed.
+ *
+ * THE HOST DOES NOT METER ITS OWN RUN, and that is the whole reason this type exists rather than
+ * `Metered`. Metering writes a `pull` event, mints its id and applies one billing rule — a run that
+ * failed is free, because a 429 or a timeout gave the account nothing and will be tried again. A
+ * host that built its own `Metered` would bypass all three: no event, no rule, and an id minted by
+ * the one party with a reason to want it different. So the host says what happened and the record
+ * decides what it costs.
+ *
+ * `say` is the sentence the event carries. It names the connector and the outcome and nothing else:
+ * no URL, no header, no field of the credential.
+ */
+export type PagedReport = {
+  outcome: Metered['outcome'];
+  requests: number;
+  bytes: number;
+  ms: number;
+  failures: number;
+  status?: number | null;
+  say: string;
+};
 
 /** The SHA-256 of an answer, hex. What a `poll` compares. */
 export async function answerHash(body: string): Promise<string> {
@@ -753,7 +778,25 @@ export async function runActions(steps: RunnerSteps, execute: Execute, n = 5, pa
         out.dropped++;
         continue;
       }
-      const metered = await page(ready);
+      /* A CONNECTOR RUNNER THAT THROWS IS THE NETWORK, exactly as the executor below is. `runPull`
+         is written not to throw, but the host's adapter around it is the host's, and one bad page
+         must not take down a pass that is draining four other rows. The row stays acked by whoever
+         got that far; what is recorded here is that this pass got nothing. */
+      const started = Date.now();
+      let report: PagedReport;
+      try {
+        report = await page(ready);
+      } catch {
+        report = {
+          outcome: 'failed',
+          requests: 0,
+          bytes: 0,
+          ms: Date.now() - started,
+          failures: 1,
+          say: `${ready.paged.ingest} stopped part way through and fetched nothing.`,
+        };
+      }
+      const metered = steps.meterPaged(ready, report);
       out.usage.push(metered);
       out.ran++;
       if (metered.outcome === 'ok' || metered.outcome === 'unchanged' || metered.outcome === 'changed') out.ok++;
