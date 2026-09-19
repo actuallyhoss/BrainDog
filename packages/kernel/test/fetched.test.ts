@@ -171,17 +171,26 @@ test('a completed window upserts its points, and reading the window twice writes
   sql.close();
 });
 
-test('a connector that routes to more than one register is refused, not crashed', async () => {
-  /* `43` D8 IS SPECIFIED AND UNIMPLEMENTED, and `declare` installs one. Bound into a query an
-     object throws in the driver and takes the whole page with it, which reads as a record fault
-     rather than as a declaration this record does not do yet. */
+test('a connector that routes sends each row where that row says, and keeps the misses', async () => {
+  /* `43` D8 WAS SPECIFIED AND UNIMPLEMENTED, and this test asserted the refusal that said so:
+     *nothing implements the routing; `arrive` reads `writes.register` as a string and so does this
+     file*. `arrive` routes now, so a page does — `§5.1` step 6 routes a ROW, and a page is five
+     hundred of them.
+
+     AND A MISS IS KEPT, NOT GUESSED into whichever target is listed first. On one arrival that is a
+     `review` somebody reads; on a page it is the `kept` count, which is the same answer at the
+     scale a page comes in at. */
   const { k, sql } = await record(
-    CONNECTOR({ writes: { register: { by: ['kind'], to: [{ when: ['a'], register: 'charges' }] } }, dedupe: ['ref'] }),
+    CONNECTOR({ writes: { register: { by: ['what'], to: [{ when: ['one'], register: 'charges' }] } }, dedupe: ['ref'] }),
   );
   const out = k.applyPage(page());
 
-  assert.ok(refused(out));
-  assert.equal(entries(sql), 0);
-  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM inbox_raw')?.n, 0);
+  assert.ok(out.ok, fixOf(out));
+  assert.deepEqual(out.value, { wrote: 1, kept: 1 });
+  assert.equal(entries(sql), 1);
+
+  /* THE BYTES AND THE RECEIPT ARE THE PAGE'S, whatever the rows did. */
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM inbox_raw')?.n, 1);
+  assert.equal((JSON.parse(sql.one<{ wrote: string }>('SELECT wrote FROM ingest_receipt')!.wrote) as string[]).length, 1);
   sql.close();
 });

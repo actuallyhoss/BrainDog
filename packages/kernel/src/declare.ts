@@ -1228,12 +1228,60 @@ function dedupeFault(dedupe: unknown, id: string): Refusal | null {
   return null;
 }
 
+/**
+ * `42 §4.7`'s `writes.register` when it is a table rather than a name — `43 §5.1` step 6.
+ *
+ * A `by` ID IS A FIELD, OR A MONEY FIELD'S CURRENCY, and nothing else reaches inside a value. The
+ * rest is arithmetic a person gets wrong once and cannot see afterwards: a `when` that is shorter
+ * or longer than `by` can never equal it, so the table is a table every row misses, and every
+ * arrival lands in `review` with a reason about routing rather than about the typo.
+ */
+function routeFault(register: unknown, id: string): Refusal | null {
+  if (typeof register === 'string') return IDENT.test(register) ? null : bad('DECLARATION_INVALID', `${id} writes to ${JSON.stringify(register)}, and it is not a register.`, 'writes.register');
+  if (register === null || typeof register !== 'object')
+    return bad('DECLARATION_INVALID', `${id} writes to a register, or to a table of them — { by, to }.`, 'writes.register');
+  const { by, to } = register as { by?: unknown; to?: unknown };
+  if (!Array.isArray(by) || by.length === 0 || by.length > ROUTE_BY_MOST)
+    return bad('DECLARATION_INVALID', `${id}'s routing table routes on 1 to ${ROUTE_BY_MOST} fields.`, 'writes.register.by');
+  const notOne = by.find((f) => typeof f !== 'string' || !(IDENT.test(f) || (f.endsWith('.currency') && IDENT.test(f.slice(0, -'.currency'.length)))));
+  if (notOne !== undefined)
+    return bad(
+      'DECLARATION_INVALID',
+      `${id}'s routing table routes on ${JSON.stringify(notOne)}, and a route reads a field or a money field's currency.`,
+      'writes.register.by',
+    );
+  if (!Array.isArray(to) || to.length === 0 || to.length > ROUTE_TO_MOST)
+    return bad('DECLARATION_INVALID', `${id}'s routing table has 1 to ${ROUTE_TO_MOST} rows.`, 'writes.register.to');
+  for (const [i, row] of to.entries()) {
+    const at = `writes.register.to[${i}]`;
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) return bad('DECLARATION_INVALID', `${id}'s ${at} is { when, register }.`, at);
+    const { when, register: target } = row as { when?: unknown; register?: unknown };
+    if (typeof target !== 'string' || !IDENT.test(target))
+      return bad('DECLARATION_INVALID', `${id}'s ${at} sends its rows to ${JSON.stringify(target ?? null)}, and it is not a register.`, `${at}.register`);
+    if (!Array.isArray(when) || when.length !== by.length)
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} routes on ${by.length} field${by.length === 1 ? '' : 's'} and ${at} answers with ${Array.isArray(when) ? when.length : 0}, so no row can ever equal it.`,
+        `${at}.when`,
+      );
+    const notText = when.find((v) => typeof v !== 'string' || v === '' || v.length > ROUTE_VALUE_MOST);
+    if (notText !== undefined)
+      return bad('DECLARATION_INVALID', `${id}'s ${at} matches on a value that is not text of 1 to ${ROUTE_VALUE_MOST} characters.`, `${at}.when`);
+  }
+  return null;
+}
+
+/** `42 §4.7`'s routing table, bounded: fields routed on, rows in the table, and a value's length. */
+const ROUTE_BY_MOST = 4;
+const ROUTE_TO_MOST = 64;
+const ROUTE_VALUE_MOST = 200;
+
 /** `42 §4.7`'s two caps on a skip list: how many rules, and how long a reason a person has to read. */
 const SKIP_MOST = 16;
 const SKIP_REASON_MOST = 120;
 
 function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
-  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown };
+  const body = decl.body as { channel?: unknown; match?: unknown; extract?: unknown; map?: unknown; fetch?: unknown; dedupe?: unknown; skip?: unknown; writes?: unknown };
   const id = decl.id;
 
   if (typeof body.channel !== 'string' || !(CHANNELS_IN as readonly string[]).includes(body.channel))
@@ -1286,6 +1334,14 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
    */
   const wrongKey = dedupeFault(body.dedupe, id);
   if (wrongKey) return wrongKey;
+
+  /* `writes.register`, WHICH IS A NAME OR `07 §2`'s TABLE. A series ingest writes no register and
+     is left to the block below, which is where `series:` is read. */
+  const writes = body.writes as { register?: unknown; series?: unknown } | undefined;
+  if (writes !== undefined && writes !== null && typeof writes === 'object' && writes.series === undefined) {
+    const wrongTarget = routeFault(writes.register, id);
+    if (wrongTarget) return wrongTarget;
+  }
 
   /**
    * `42 §4.7`'s `skip:` — 1 to 16 of `{ when: predicate on inbox_raw, reason: text ≤ 120 }`.

@@ -2380,3 +2380,29 @@ test('A SKIP LIST IS COMPILED LIKE THE MATCH IT SITS BESIDE, because a skip that
   assert.equal(refusedWith(ingest({ skip: [] })), 'DECLARATION_INVALID');
   assert.equal(refusedWith(ingest({ skip: Array.from({ length: 17 }, () => ({ when: { field: 'body', contains: 'x' }, reason: 'r' })) })), 'DECLARATION_INVALID');
 });
+
+test('A ROUTING TABLE IS CHECKED AT INSTALL, because a table every row misses looks like a pattern that cannot read', () => {
+  /**
+   * `42 §4.7`: `writes.register` is `Id | Route`, and `43 §4.2` types the route
+   * `{ by: string[]; to: { when: string[]; register: string }[] }`.
+   *
+   * THE ARITHMETIC IS THE PART A PERSON GETS WRONG ONCE AND CANNOT SEE AFTERWARDS. A `when` of a
+   * different length than `by` can never equal it, so every arrival lands in `review` with a reason
+   * about routing rather than about the typo, and the pattern looks like one that cannot read.
+   */
+  const route = (over: Record<string, unknown>) => ingest({ writes: { register: { by: ['kind'], to: [{ when: ['debit'], register: 'txn' }] }, ...over } });
+  assert.equal(refusedWith(ingest({ writes: { register: { by: ['kind', 'amount.currency'], to: [{ when: ['debit', 'EGP'], register: 'txn_egp' }] } } })), null);
+  assert.equal(refusedWith(route({})), null);
+
+  assert.equal(
+    refusedWith(ingest({ writes: { register: { by: ['kind', 'amount.currency'], to: [{ when: ['debit'], register: 'txn' }] } } })),
+    'DECLARATION_INVALID',
+    'two fields routed on and one value answered',
+  );
+  assert.equal(refusedWith(ingest({ writes: { register: { by: [], to: [{ when: [], register: 'txn' }] } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ writes: { register: { by: ['kind'], to: [] } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ writes: { register: { by: ['amount.amount'], to: [{ when: ['1'], register: 'txn' }] } } })), 'DECLARATION_INVALID', 'a route reads a currency, not any part of any value');
+  assert.equal(refusedWith(ingest({ writes: { register: { by: ['kind'], to: [{ when: ['debit'], register: 'Txn Ledger' }] } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ writes: { register: { by: ['kind'], to: [{ when: [7], register: 'txn' }] } } })), 'DECLARATION_INVALID');
+  assert.equal(refusedWith(ingest({ writes: { register: 'Txn Ledger' } })), 'DECLARATION_INVALID');
+});

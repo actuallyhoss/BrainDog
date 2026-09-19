@@ -143,7 +143,14 @@ export type IngestDecl = {
    */
   map?: Record<string, Mapping>;
   writes: {
-    register: string;
+    /**
+     * ONE REGISTER, OR `07 §2`'s ROUTING TABLE. One bank's alerts are two registers when the
+     * currency differs, and the alternative to a table is a declaration per currency, each with the
+     * same nine extractors in it. This was typed `string`, so a declaration carrying a route
+     * installed clean, matched, read every field and then asked a register named `[object Object]`
+     * to hold them.
+     */
+    register: string | Route;
     /**
      * A CEILING, NEVER A PROMISE. The extraction's own outcome is the other half, and the lower of
      * the two is what happens. Default `exact`; a pattern a model proposed files at `needs-review`
@@ -173,6 +180,15 @@ export type IngestDecl = {
  * package at 7, so the edge would point the wrong way; the reader that uses it arrives injected for
  * the same reason, beside the scanners.
  */
+/**
+ * `43 §4.2`'s `Route`: kind × currency → register.
+ *
+ * `by` NAMES A FIELD, OR A MONEY FIELD'S CURRENCY, which is the one part of a value a route is
+ * allowed to reach inside for — `43 §5.1` step 6, and `§9.5`'s worked row routes on
+ * `[kind, amount.currency]`.
+ */
+export type Route = { by: string[]; to: { when: string[]; register: string }[] };
+
 export type Dedupe =
   | string[]
   | { near: { on: string[]; day: string; prefix?: { field: string; chars?: number } } };
@@ -426,6 +442,27 @@ export function existingRow(
 }
 
 /**
+ * `43 §5.1` step 6. Where a row goes: a register, or the `by` ids that nothing matched.
+ *
+ * NONE MEANS NOBODY GUESSES. A credit filed as a debit is a number that is right with a sign that
+ * is wrong, and no later check catches it because both rows look ordinary; `07 §2` says the miss
+ * *lands in `review` rather than guessing*, and this returns the ids so the reason can name them.
+ *
+ * THE VALUES ARE COMPARED AS STRINGS, which is what `§5.1` step 6 says and what the table is: a
+ * `when` is written in a declaration, so both sides of the comparison are text a person typed.
+ */
+export function routeTo(register: string | Route, extracted: Record<string, unknown>): { to: string } | { miss: string } {
+  if (typeof register === 'string') return { to: register };
+  const said = register.by.map((id) => {
+    const dot = id.indexOf('.');
+    const value = dot === -1 ? extracted[id] : (extracted[id.slice(0, dot)] as Record<string, unknown> | undefined)?.[id.slice(dot + 1)];
+    return value === undefined || value === null ? null : String(value);
+  });
+  const hit = register.to.find((row) => row.when.length === said.length && row.when.every((want, i) => said[i] === want));
+  return hit ? { to: hit.register } : { miss: register.by.join(', ') };
+}
+
+/**
  * Every field id a dedupe names, in both forms. The backstop that keeps an unchecked identifier out
  * of `jsonPath`, which throws, reads all of them and not just the `on:` list.
  */
@@ -591,7 +628,11 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        AND THE MAPPED HALF IS `readRow`, WHICH A CONNECTOR'S PAGE CALLS TOO. One arrival here and five
        hundred rows there is the same read over a different number of roots (`30 §2`). */
     if (matched.map !== undefined && matched.extract === undefined) {
-      const fields = deps.schemaOf(matched.writes.register)?.fields ?? {};
+      /* A ROUTED WRITE HAS NO SCHEMA YET AND THIS IS THE ORDER SAYING SO: `43 §5.1` reads the
+         fields at step 5 and routes at step 6, because the route reads the values step 5 produced.
+         So a mapped row under a route is typed by nothing, exactly as it was before routes could be
+         written at all, rather than by whichever target happened to be listed first. */
+      const fields = (typeof matched.writes.register === 'string' ? deps.schemaOf(matched.writes.register)?.fields : undefined) ?? {};
       const got = readRow({ exponent: exponentOf, day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
       Object.assign(extracted, got.fields);
       missed.push(...got.missed);
@@ -629,6 +670,21 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       });
     }
 
+    /* `43 §5.1` STEP 6, WHICH IS AFTER THE FIELDS AND BEFORE THE CONFIDENCE, because a route reads
+       the values step 5 produced and a miss is one of the things step 7 files as `needs-review`. */
+    const routed = routeTo(matched.writes.register, extracted);
+    if ('miss' in routed) {
+      /* A MISS IS `needs-review` WHATEVER THE CEILING SAYS, and it opens no `rowset`: a rowset is a
+         suggestion a person ACCEPTS INTO a register, and the whole of what went wrong is that no
+         register was named. The bytes, the state and the reason are stored; what happens next is an
+         edit to the table or to the pattern, and both of those are edits to the declaration. */
+      const reason = `${matched.ingest} read this one and its routing table takes no row like it: route miss on ${routed.miss}.`;
+      store('review', reason);
+      note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
+      return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review' });
+    }
+    const register = routed.to;
+
     /* `43 §5.1` STEP 7, ALL THREE LEVELS. A field the pattern could not read is `needs-review`; a
        field it CHOSE between two forms, or DEFAULTED in because the payload did not carry one, is
        `proposed` — read by the record, not sent by anybody, and therefore a thing a person should
@@ -660,9 +716,9 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
-        register: matched.writes.register,
+        register,
         rows: [extracted],
-        question: `${reason} Accept it into ${matched.writes.register}, or fix the pattern.`,
+        question: `${reason} Accept it into ${register}, or fix the pattern.`,
       });
       return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
     }
@@ -687,11 +743,11 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       return no<Arrived>('DECLARATION_INVALID', `${matched.ingest} names ${JSON.stringify(wrongId)} as a field, and it is not one.`, {
         at: 'dedupe',
       });
-    const existing = existingRow(deps, matched.writes.register, matched.dedupe, extracted);
+    const existing = existingRow(deps, register, matched.dedupe, extracted);
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {
-      const reason = `${existing.seq === null ? existing.id : `${matched.writes.register}#${existing.seq}`} already says this.`;
+      const reason = `${existing.seq === null ? existing.id : `${register}#${existing.seq}`} already says this.`;
       store('skipped', reason);
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'skipped', wrote: [], reason });
     }
@@ -699,7 +755,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'exact');
 
     const wrote = deps.write(
-      matched.writes.register,
+      register,
       /* BY ID, NOT BY SPOKEN REF. A series register has `seq = null`, so `<register>#null` missed and
          the arrival landed in `review` citing a row id that does not exist. `rules.ts` fixed the
          same bug by passing the id; this had the old form. */
@@ -713,11 +769,11 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        exist. It is the same answer the unreadable-field branch above gives, for the same reason, and
        it is what keeps the `write.refused` observation the write left behind. */
     if (!wrote.ok) {
-      const reason = `${matched.writes.register} refused what ${matched.ingest} read: ${fixOf(wrote)}`;
+      const reason = `${register} refused what ${matched.ingest} read: ${fixOf(wrote)}`;
       store('review', reason);
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
-        register: matched.writes.register,
+        register,
         rows: [extracted],
         question: `${reason} Fix it here, or fix the pattern.`,
       });

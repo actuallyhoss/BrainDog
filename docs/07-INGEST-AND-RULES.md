@@ -212,8 +212,11 @@ why `first` exists and why no regex is needed. The rule reaches from the declara
 implementation: zero `RegExp` in the package, enforced by a lint rule scoped to `packages/extract`
 ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D4; [31-STACK](31-STACK.md) §3).
 
-`dedupe:` and `on_conflict:` are the record's to apply — inside `arrive`, and for a pull per page inside
-`applyPull`: an exact `dedupe: [id]` matches every named field (lint requires `index: true` on each), a
+`skip:`, the routing table, `dedupe:` and `on_conflict:` are the record's to apply — inside `arrive`, and
+for a pull per page inside `applyPull`. A skip hit stops the pipeline before anything is read, keeps the
+bytes, and writes no receipt (43 §5.1 step 2). A routed `writes.register` reads the row's own `by` values
+after the fields and before the confidence (43 §5.1 step 6), and a row that matches no `when` tuple is
+`review` on an arrival and `kept` on a page — a miss is never guessed into the first target. Then: an exact `dedupe: [id]` matches every named field (lint requires `index: true` on each), a
 `near` dedupe runs the window query of §2, and a hit then goes by `on_conflict` — `update` re-enters the
 write path, `skip` is counted, `new` creates ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D3).
 

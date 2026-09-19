@@ -26,7 +26,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
-import { existingRow, type Confidence, type IngestDeps } from './ingest.ts';
+import { existingRow, routeTo, type Confidence, type IngestDeps } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 
@@ -115,19 +115,11 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
     const decl = deps.ingests().find((one) => one.ingest === ingest);
     if (!decl) return no<PageWrote>('DECLARATION_UNKNOWN', `There is no connector called ${ingest}.`, { at: 'ingest' });
 
-    /* A FANNED CONNECTOR IS REFUSED HERE RATHER THAN CRASHING TWO STATEMENTS LATER. `43` D8 lets
-       `writes.register` be `{ by, to }` — one page routed to several registers by a field's value —
-       and `declare` installs one today, because it is specified. Nothing implements the routing:
-       `arrive` reads `writes.register` as a string and so does this file. Bound into
-       `WHERE register = ?` an object is a driver-level throw that rolls the whole page back, with a
-       sentence about SQLite rather than about the declaration somebody wrote. */
-    if (typeof decl.writes.register !== 'string')
-      return no<PageWrote>(
-        'VALUE_MALFORMED',
-        `${ingest} routes its rows to more than one register, and this record writes a connector's rows to one.`,
-        { at: 'writes.register' },
-      );
-    const register = decl.writes.register;
+    /* A FANNED CONNECTOR USED TO BE REFUSED HERE, and the refusal said why: *nothing implements the
+       routing; `arrive` reads `writes.register` as a string and so does this file*. `arrive` does
+       not any more, so neither does this. `43 §5.1` step 6 routes a ROW, and a page is five hundred
+       of them — the same table, read per row, which is what a table keyed on a row's own values
+       means when the answer arrives five hundred at a time. */
 
     /* ── the bytes, first and always ── */
     const raw = deps.mint();
@@ -157,6 +149,13 @@ export function applyPage(deps: PageDeps, page: PulledPage, transaction: <T>(fn:
 
     for (const row of page.rows) {
       if (row.confidence === 'needs-review') { kept += 1; continue; }
+
+      /* A ROUTE MISS KEEPS THE ROW RATHER THAN GUESSING IT INTO THE FIRST TARGET, which is the same
+         answer `arrive` gives one row at a time: `07 §2` says a miss lands in `review` rather than
+         being guessed, and on a page `kept` is what says so. The count is the report. */
+      const routed = routeTo(decl.writes.register, row.fields);
+      if ('miss' in routed) { kept += 1; continue; }
+      const register = routed.to;
 
       const existing = existingRow(deps, register, key, row.fields);
       if (existing && conflict === 'skip') { kept += 1; continue; }
