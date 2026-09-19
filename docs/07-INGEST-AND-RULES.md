@@ -122,7 +122,7 @@ on_conflict: skip          # skip | update | new
 | `money` | parse a number and a currency into minor units | `{ money: { after?, currency? } }` |
 | `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` |
 | `text` | trim and normalise whitespace | `{ text: { between? } }` |
-| `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
+| `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` — grouping allowed, **no fraction** · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
 | `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` |
 | `lookup` | resolve a foreign row by a named field | `{ lookup: { register, by, after? } }` |
 | `first` / `nth` | pick from repeated matches | `{ first: [form, …] }` · `{ nth: { n, of: form } }` |
@@ -168,7 +168,16 @@ parentheses are negative — `(EGP 75.00)` is a refund. The record reads money t
 rank 7 and the scanner is rank 9 ([31-STACK](31-STACK.md) §2); its code list is
 `Intl.supportedValuesOf('currency')`, the same place the exponents come from, so `VAT 500` is not five
 hundred of anything. **Landed September 20th 2026**; a record opened without that scanner keeps the
-older reading, where a declared currency relabelled whatever the text said. Every declared field is **required** and `default` is the only way
+older reading, where a declared currency relabelled whatever the text said.
+
+**`int` takes no fraction, and `decimal`'s `sep` is its point** — the two rows in the table above,
+read the same way and by the same reader. `1,250.00` is not an integer written with grouping, so
+`{ int: {} }` over it yields nothing; `1,250` is, and yields 1250. And a `decimal` whose text
+contradicts its declaration reads nothing rather than reading anyway: under the default `sep` of
+`"."`, `1.234,56` is not a number this form can take, where the older reading returned 123456 — a
+hundredfold on the field most likely to hold a price. Both arrive with `scanMoney`, down the same
+seam, for the same reason: one grammar per record, or a declaration means one thing in an integer
+field and another in an amount. **Landed September 20th 2026.** Every declared field is **required** and `default` is the only way
 to make one optional; `writes.confidence` is a ceiling, never a promise (§2).
 
 **No regular expressions.** A regex over a text field a stranger controls is catastrophic

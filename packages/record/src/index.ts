@@ -27,7 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
-import { scanMoney, type CurrencyTable } from '@braindog/extract';
+import { scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -727,10 +727,15 @@ export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
     ...(deps.sign === undefined ? {} : { sign: deps.sign }),
-    /* `43 §4.3`'s money, wired where both halves can be reached: the scanner is rank 9, the
-       record that reads an arrival is rank 7, and this package is 11. Without this line a record
-       reads money the way `ingest.ts` does alone, which is wrong against `43 §9.1` three ways. */
-    money: (text, declared) => scanMoney(text, CURRENCIES, declared),
+    /* `43 §4.3`'s three number forms, wired where both halves can be reached: the readers are
+       rank 9, the record that reads an arrival is rank 7, and this package is 11. Without these
+       lines a record reads them the way `ingest.ts` does alone, which is wrong against `§4.3`
+       five ways — money three, and `1,250.00` read as an integer and `1.234,56` as 123456. */
+    numbers: {
+      money: (text, declared) => scanMoney(text, CURRENCIES, declared),
+      int: scanInts,
+      decimal: scanDecimals,
+    },
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

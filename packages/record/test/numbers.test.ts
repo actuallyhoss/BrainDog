@@ -1,16 +1,17 @@
 /**
- * `43 §4.3`'s money, read the way a real record reads it.
+ * `43 §4.3`'s three number forms — money, int and decimal — read the way a real record reads them.
  *
  * THE ORACLE IS THE DOCUMENT AND NOT EITHER IMPLEMENTATION. Every expected value below is copied
  * out of `43 §9.1`'s worked table, over that section's own message M1. Two readers of `07 §3`'s
- * money exist — `packages/kernel/src/ingest.ts`'s and `@braindog/extract`'s — and when they were
- * driven against each other the kernel's failed three of the five rows the document writes out.
+ * numbers exist — `packages/kernel/src/ingest.ts`'s and `@braindog/extract`'s — and when they were
+ * driven against each other the kernel's failed three of the five money rows the document writes
+ * out, read `1,250.00` as the integer 1250, and read `1.234,56` as 123456.
  *
- * AND IT IS TESTED HERE BECAUSE THIS IS WHERE THE TWO MEET. The scanner is rank 9 and the reader
+ * AND IT IS TESTED HERE BECAUSE THIS IS WHERE THE TWO MEET. The readers are rank 9 and the reader
  * of an arrival is rank 7; neither may import the other (`31 §2`), so `createRecordApi` at rank 11
- * hands the scanner down. A test in either package can only assert half of that: the kernel's own
- * suite asserts that a scanner handed down is used and that a record without one is unchanged,
- * and this file asserts what the record actually reads off somebody's bank message.
+ * hands them down. A test in either package can only assert half of that: the kernel's own suite
+ * asserts that readers handed down are used and that a record without them is unchanged, and this
+ * file asserts what the record actually reads off somebody's bank message.
  */
 
 import { test } from 'node:test';
@@ -34,22 +35,34 @@ const AMOUNTS = {
     fields: [
       { id: 'what', type: 'text', required: true },
       { id: 'paid', type: 'money' },
+      { id: 'count', type: 'int' },
+      { id: 'rate', type: 'decimal' },
     ],
   } as never,
 };
 
-const reader = (form: Record<string, unknown>) => ({
+const reader = (form: Record<string, unknown>, field = 'paid') => ({
   id: 'ingest.bank-sms',
   kind: 'ingest' as const,
   body: {
     ingest: 'bank-sms',
     channel: 'email',
     match: { all: [{ field: 'from', is: 'alerts@bank.example' }] },
-    extract: { what: { text: { before: ' at' } }, paid: form },
+    extract: { what: { text: { before: ' at' } }, [field]: form },
     writes: { register: 'amounts', confidence: 'exact', key: ['what'] },
     on_conflict: 'skip',
   } as never,
 });
+
+/** One message through one declaration, and the value it wrote into `field`. */
+async function reads(field: string, form: Record<string, unknown>, body: string): Promise<unknown> {
+  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) } as never);
+  const put = await api.kernel.install([AMOUNTS, reader(form, field)]);
+  assert.ok(put.ok, JSON.stringify(put));
+  const out = api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@bank.example' }, body, sha256: 'a1' });
+  assert.ok(out.ok, JSON.stringify(out));
+  return api.kernel.get('amounts#1')?.fields[field] ?? null;
+}
 
 /** One message through one declaration, and the money it wrote. */
 async function read(form: Record<string, unknown>, body = M1): Promise<unknown> {
@@ -138,4 +151,46 @@ test('AND THREE LETTERS BESIDE A NUMBER ARE NOT A CURRENCY UNLESS THEY ARE ONE',
      table this record builds carries codes and no symbols, so an unambiguous symbol reads nothing
      rather than being guessed — the same answer an ambiguous one would get. */
   assert.equal(await read({ money: {} }, 'E£ 450 spent at Acme'), null);
+});
+
+test("43 §9.1'S THREE INT AND DECIMAL ROWS, and neither read what the document says", async () => {
+  /* `§4.3`, verbatim: *each integer in the slice; grouping allowed, **no fraction*** and *each
+     decimal in the slice; the other separator groups*. Iteration fourteen measured both against
+     the extractor, found them divergent, and filed them as contract rather than defect. They are
+     not contract. The document states both in words and gives three worked rows for them. */
+  assert.equal(await reads('count', { int: { after: 'Ref ' } }, M1), 88_213);
+  assert.equal(await reads('count', { int: {} }, M1), 1_234);
+  assert.equal(await reads('rate', { decimal: { after: 'Balance EGP ' } }, M1), 3020.15);
+});
+
+test('AN INTEGER TAKES NO FRACTION, which is the whole of the row', async () => {
+  /* `1,250.00` IS NOT AN INTEGER WRITTEN WITH GROUPING. The old reading parsed the number and
+     asked whether the result was whole, so a price with two zero pence read as 1250 and the same
+     price with any other pence read as nothing — a form that is silent or wrong depending on the
+     cents of the row it is given, which is the shape that survives every review. */
+  assert.equal(await reads('count', { int: {} }, 'Charged 1,250.00 at Acme'), null);
+  assert.equal(await reads('count', { int: {} }, 'Charged 1,250.75 at Acme'), null);
+  /* AND GROUPING IS ALLOWED, which is the other half of the same row. */
+  assert.equal(await reads('count', { int: {} }, 'Qty 1,250 at Acme'), 1_250);
+  assert.equal(await reads('count', { int: {} }, 'Qty 1250 at Acme'), 1_250);
+  /* AND EVERY INTEGER IN THE SLICE IS A CANDIDATE — `§5.4`. Before the readers were reached a
+     slice yielded one number, so the second integer of a message was unreachable however it was
+     anchored. */
+  assert.equal(await reads('count', { nth: { n: 2, of: { int: {} } } }, 'Ref 88213 and 42 at Acme'), 42);
+  assert.equal(await reads('count', { nth: { n: 3, of: { int: {} } } }, 'Ref 88213 and 42 at Acme'), null);
+});
+
+test('AND A DECIMAL OWNS ITS POINT, so separators that contradict it read nothing', async () => {
+  /* THIS IS THE ONE THAT WROTE A NUMBER A HUNDRED TIMES TOO LARGE. `sep` names the decimal point
+     and *the other separator groups*, so under the default `.` the text `1.234,56` is a number
+     this declaration cannot read. The old reading stripped every separator it did not recognise
+     and returned 123456 — not missing, not refused, a plausible figure written into a register.
+     It is iteration fourteen's defect class on the field most likely to hold a price. */
+  assert.equal(await reads('rate', { decimal: {} }, 'Amount 1.234,56 at Acme'), null);
+  assert.equal(await reads('rate', { decimal: { sep: ',' } }, 'Amount 1.234,56 at Acme'), 1234.56);
+  assert.equal(await reads('rate', { decimal: {} }, 'Amount 1,234.56 at Acme'), 1234.56);
+  assert.equal(await reads('rate', { decimal: { sep: ',' } }, 'Amount 1,234.56 at Acme'), null);
+  /* AND A WHOLE NUMBER IS A DECIMAL, because `§4.3` says *each decimal* and not *each number
+     with a point in it*. `3` is 3, and a field declared decimal takes it. */
+  assert.equal(await reads('rate', { decimal: {} }, 'Rate 3 at Acme'), 3);
 });

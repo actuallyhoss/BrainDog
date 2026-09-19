@@ -200,6 +200,10 @@ test('a lookup that resolves to nothing is a review too, not a broken reference'
 
 const deps = { find: () => null } as never;
 
+/** `deps` with `43 §4.3`'s readers wired, the way `@braindog/record` wires them. */
+const wired = (over: Record<string, unknown>) =>
+  ({ find: () => null, numbers: { money: () => [], int: () => [], decimal: () => [], ...over } }) as never;
+
 test("MONEY IS READ BY THE RECORD'S SCANNER, and a declared currency is handed to it as a fallback", () => {
   /* `43 §63`, verbatim: *`declared` is the fallback currency, never an override.* This file read
      it as an override and could not read a currency out of a payload at all, so
@@ -214,7 +218,7 @@ test("MONEY IS READ BY THE RECORD'S SCANNER, and a declared currency is handed t
     return text.includes('USD') ? [{ amount: 9995, currency: 'USD' }] : [];
   };
 
-  assert.deepEqual(extractOutcome({ ...(deps as object), money: scanner } as never, { money: { currency: 'EGP' } }, 'You paid USD 99.95'), {
+  assert.deepEqual(extractOutcome(wired({ money: scanner }), { money: { currency: 'EGP' } }, 'You paid USD 99.95'), {
     value: { amount: 9995, currency: 'USD' },
     outcome: 'exact',
   });
@@ -223,7 +227,7 @@ test("MONEY IS READ BY THE RECORD'S SCANNER, and a declared currency is handed t
 
   /* AND A FORM WITH NO `currency:` IS A FORM THAT ASKS THE TEXT, which is what `43 §9.1`'s
      `{ money: {} }` row is: the first amount that has a code beside it, not nothing. */
-  extractOutcome({ ...(deps as object), money: scanner } as never, { money: {} }, 'You paid USD 99.95');
+  extractOutcome(wired({ money: scanner }), { money: {} }, 'You paid USD 99.95');
   assert.deepEqual(seen.at(-1), ['You paid USD 99.95', undefined]);
 });
 
@@ -236,7 +240,7 @@ test('AND EVERY AMOUNT IN A SLICE IS A CANDIDATE, which is what `nth` over money
     text.includes('and')
       ? [{ amount: 1000, currency: 'EGP' }, { amount: 2000, currency: 'EGP' }]
       : [{ amount: 1000, currency: 'EGP' }];
-  const withScan = { ...(deps as object), money: two } as never;
+  const withScan = wired({ money: two });
 
   assert.deepEqual(extractOutcome(withScan, { nth: { n: 2, of: { money: {} } } }, 'EGP 10 and EGP 20'), {
     value: { amount: 2000, currency: 'EGP' },
@@ -255,7 +259,50 @@ test('AND EVERY AMOUNT IN A SLICE IS A CANDIDATE, which is what `nth` over money
   });
 });
 
-test('AND A RECORD WITH NO SCANNER WIRED READS MONEY THE WAY IT ALWAYS DID', () => {
+test("AN INTEGER TAKES NO FRACTION AND A DECIMAL OWNS ITS POINT, which is `43 §4.3`'s two rows", () => {
+  /* *each integer in the slice; grouping allowed, **no fraction*** and *each decimal in the slice;
+     the other separator groups*, verbatim. This file read both with one `number()` that takes the
+     first number of a slice and drops what it cannot use, so `1,250.00` came back as the integer
+     1250 — it is not an integer, it is a decimal, and the form that asked for an integer should
+     read nothing — and `1.234,56` under the default `sep` came back as 123456, a hundredfold on
+     the field most likely to hold a price. Both are now the record's readers, wired here as stubs
+     so this file asserts the delegation and `packages/record/test/numbers.test.ts` asserts what a
+     real record reads. */
+  const seen: unknown[] = [];
+  const ints = (text: string) => {
+    seen.push(['int', text]);
+    return text.includes('1,250.00') ? [] : [1250];
+  };
+  const decs = (text: string, sep?: string) => {
+    seen.push(['decimal', text, sep]);
+    return sep === ',' ? [1234.56] : [];
+  };
+  const with3 = wired({ int: ints, decimal: decs });
+
+  assert.deepEqual(extractOutcome(with3, { int: {} }, 'EGP 1,250.00 debited'), { value: null, outcome: 'missing' });
+  assert.deepEqual(extractOutcome(with3, { int: {} }, 'Qty 1,250 units'), { value: 1250, outcome: 'exact' });
+
+  /* AND `sep` REACHES THE READER AS THE POINT IT IS, default included. A `decimal` with no `sep`
+     is a `decimal` with `sep: '.'`, which `§4.3` writes out, and a text whose separators
+     contradict it is one this declaration cannot read rather than one to read anyway. */
+  assert.deepEqual(extractOutcome(with3, { decimal: {} }, 'Amount 1.234,56 EUR'), { value: null, outcome: 'missing' });
+  assert.deepEqual(seen.at(-1), ['decimal', 'Amount 1.234,56 EUR', '.']);
+  assert.deepEqual(extractOutcome(with3, { decimal: { sep: ',' } }, 'Amount 1.234,56 EUR'), {
+    value: 1234.56,
+    outcome: 'exact',
+  });
+  assert.deepEqual(seen.at(-1), ['decimal', 'Amount 1.234,56 EUR', ',']);
+
+  /* AND EVERY MATCH IN THE SLICE IS A CANDIDATE, as it now is for money — `43 §5.4`. The same
+     ceiling was in force for these two and for the same reason: one `number()` per slice. */
+  const many = wired({ int: () => [7, 8, 9] });
+  assert.deepEqual(extractOutcome(many, { nth: { n: 3, of: { int: {} } } }, 'x'), { value: 9, outcome: 'exact' });
+  assert.deepEqual(extractOutcome(many, { nth: { n: 4, of: { int: {} } } }, 'x'), { value: null, outcome: 'missing' });
+  /* AND A NESTED ARM MEANS THE SAME AS A BARE ONE, for these as for money. */
+  assert.deepEqual(extractOutcome(many, { first: [{ int: {} }] }, 'x'), { value: 7, outcome: 'exact' });
+});
+
+test('AND A RECORD WITH NO READERS WIRED READS ALL THREE THE WAY IT ALWAYS DID', () => {
   /* THE FALLBACK IS KEPT WHOLE AND NOT HALF-FIXED. Half of the old reading is the half that needs
      the code list, so a record opened without a scanner keeps all of it — a declared currency, the
      first number of the slice, no sign from parentheses — rather than a third behaviour nobody
@@ -265,6 +312,16 @@ test('AND A RECORD WITH NO SCANNER WIRED READS MONEY THE WAY IT ALWAYS DID', () 
     outcome: 'exact',
   });
   assert.deepEqual(extractOutcome(deps, { money: {} }, 'You paid USD 99.95'), { value: null, outcome: 'missing' });
+
+  /* INCLUDING THE TWO THAT COULD HAVE BEEN FIXED HERE. Nothing about `no fraction` needs a
+     currency table, so half-fixing was available and was not taken: a record reading its integers
+     by one grammar and its amounts by another is a third behaviour nobody has a test for, and the
+     line that wires all three is one line. These are the old answers, and they are the wrong ones. */
+  assert.deepEqual(extractOutcome(deps, { int: {} }, 'EGP 1,250.00 debited'), { value: 1250, outcome: 'exact' });
+  assert.deepEqual(extractOutcome(deps, { decimal: {} }, 'Amount 1.234,56 EUR'), {
+    value: 123_456,
+    outcome: 'exact',
+  });
 });
 
 test('A DATE IS PARSED IN THE FORMAT THE PATTERN DECLARES, never guessed', () => {

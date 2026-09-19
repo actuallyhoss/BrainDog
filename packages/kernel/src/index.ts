@@ -127,7 +127,7 @@ import {
 } from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type RuleDecl, type RulesDeps } from './rules.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
-import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type MoneyScan } from './ingest.ts';
+import { arrive, day, exponentOf, propose, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
@@ -300,7 +300,7 @@ export type {
  */
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
-export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, MoneyScan } from './ingest.ts';
+export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders } from './ingest.ts';
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
@@ -641,18 +641,20 @@ export type RecordOptions = {
    */
   sign?: Signer | undefined;
   /**
-   * `43 §4.3`'s money, read by `@braindog/extract`'s `scanMoney`, when the caller wired it.
+   * `43 §4.3`'s money, int and decimal, read by `@braindog/extract`, when the caller wired them.
    *
-   * IT IS A CALLBACK FOR THE SAME REASON `sign` IS. That scanner is rank 9 and this package is 7,
-   * so the edge would point up `31 §2`'s order; `@braindog/record` is rank 11, may reach both,
+   * THEY ARE CALLBACKS FOR THE SAME REASON `sign` IS. Those readers are rank 9 and this package is
+   * 7, so the edge would point up `31 §2`'s order; `@braindog/record` is rank 11, may reach both,
    * and is the one production caller of `openRecord`. Nothing in this package can read a currency
    * out of a payload, and nothing in it can be made to by passing it the wrong argument.
    *
-   * ABSENT MEANS THIS RECORD READS MONEY THE WAY `ingest.ts` DID ALONE, which `MoneyScan`'s own
-   * paragraph sets out and which is wrong against `43 §9.1` in three ways. The gap is a currency
-   * table: without one, `VAT 500` and `EGP 500` are the same three letters beside a number.
+   * ONE KEY AND NOT THREE, and all three or none: `NumberReaders`'s own paragraph sets out what a
+   * record without them reads, which is wrong against `43 §4.3` in five ways. Money's gap is a
+   * currency table — without one, `VAT 500` and `EGP 500` are the same three letters beside a
+   * number — and a record that fixed the two it could reach locally would read its integers by
+   * one grammar and its amounts by another.
    */
-  money?: MoneyScan | undefined;
+  numbers?: NumberReaders | undefined;
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -2975,8 +2977,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     mint,
     allocate,
     nowMs: clock.now(),
-    /* THE RECORD'S MONEY READER, WHEN ONE WAS WIRED. Absent is the old reading, unchanged. */
-    money: opts.money,
+    /* THE RECORD'S READERS FOR `43 §4.3`'s THREE NUMBER FORMS, WHEN THEY WERE WIRED. Absent is
+       the old reading of all three, unchanged. */
+    numbers: opts.numbers,
   });
 
   const pullDeps = (): PullDeps => ({
