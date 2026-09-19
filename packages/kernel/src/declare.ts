@@ -27,9 +27,9 @@ import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
 /* THE SCHEMA THE MATCHER RUNS AGAINST, so the names this file refuses and the names that fire are
    one list. See `MATCH_FIELDS`: they were two lists and they disagreed. A same-package edge, which
-   `31 §2`'s order is not about. `DATE_FORMATS` comes over the same edge for the same reason: a
-   `date:` form this file accepts is one `day` can read, and there is one list of them. */
-import { DATE_FORMATS } from './ingest.ts';
+   `31 §2`'s order is not about. `DATE_FORMATS` used to come over it for the same reason — a
+   `date:` form this file accepted was one `day` could read — and is gone with the list itself:
+   the reader a record hands down reads the token set, so there is no shorter list to agree with. */
 import { MAP_TYPES } from './map.ts';
 import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
@@ -1734,13 +1734,14 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         `${at}.date's format ${typeof format === 'string' ? `${format} ` : ''}${fault}. Write it with one year, one month and one day token: YYYY or YY, MM or M, DD or D.`,
         `${at}.date.format`,
       );
-    if (typeof format === 'string' && !DATE_FORMATS.includes(format))
-      return bad(
-        'NOT_IN_THIS_BUILD',
-        `${at}.date's format ${format} is in the grammar and this build reads only ${DATE_FORMATS.join(', ')}, so the field would install and stay empty on every arrival. The repair is a deploy, not an edit.`,
-        `${at}.date.format`,
-        [...DATE_FORMATS],
-      );
+    /* THIS REFUSED EVERY FORMAT THE GRAMMAR ADMITS AND THIS BUILD DID NOT READ, and it was right
+       to while that was true: `NOT_IN_THIS_BUILD`, naming the four, saying *the repair is a
+       deploy, not an edit*. It was the one refusal in the tree whose fix was a deploy, and it
+       existed because `ingest.ts` held a second date grammar — four formats keyed by name —
+       beside `@braindog/extract`'s, which reads the token set. A record now reaches that reader
+       (`RecordOptions.dates`, September 20th 2026), so there is no build to be behind and no list
+       to name. What is left here is `DATE_FORMAT_INVALID` above, which is about the format's own
+       tokens and is the check `43 §6` actually specifies. */
   }
 
   /**

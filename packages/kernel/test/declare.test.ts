@@ -1557,19 +1557,21 @@ test('A DATE FORMAT NOTHING COULD READ INSTALLED, AND THE FIELD STAYED EMPTY ON 
   assert.equal(nested?.code, 'DATE_FORMAT_INVALID');
   assert.equal(nested?.at, 'ingest.hsbc_sms.extract.due.first[0].date.format');
 
-  /* A FORMAT THE GRAMMAR ADMITS AND THIS BUILD DOES NOT READ IS NOT THE AUTHOR'S MISTAKE. `43 §9.3`
-     reads `29.08.2026` with `DD.MM.YYYY`, so refusing it as invalid would be untrue, and installing
-     it is the silence above. The build is behind, and says so, and names what it does read. */
-  for (const format of ['DD.MM.YYYY', 'D/M/YY', 'DDMMYYYY']) {
-    const said = validateDeclaration(dated(format));
-    assert.equal(said?.code, 'NOT_IN_THIS_BUILD', format);
-    assert.equal(said?.at, 'ingest.hsbc_sms.extract.due.date.format', format);
-    assert.match(said?.fix ?? '', /reads only DD\/MM\/YY, DD\/MM\/YYYY, MM\/DD\/YYYY, YYYY-MM-DD, so the field would install/, format);
-    assert.ok(said?.allowed?.includes('DD/MM/YYYY'), format);
-  }
+  /* A FORMAT THE GRAMMAR ADMITS NOW INSTALLS, because the build is no longer behind the grammar.
+     These three were `NOT_IN_THIS_BUILD` until September 20th 2026 — the one refusal in the tree
+     whose repair was a deploy — and the reason was that `ingest.ts` held a second date grammar of
+     four named formats beside `@braindog/extract`'s, which reads the token set. A record reaches
+     that reader now, so there is no shorter list to refuse against and the list is deleted rather
+     than extended. What each of them READS is asserted where both halves exist, over `43 §9.3`'s
+     own table: `packages/record/test/dates.test.ts`. */
+  for (const format of ['DD.MM.YYYY', 'D/M/YY', 'DDMMYYYY']) assert.equal(refusedWith(dated(format)), null, format);
 
-  /* AND EVERY FORMAT THAT INSTALLS IS ONE `day` READS, which is the whole point: the four still
-     install, and each reads a real day out of a real sentence. */
+  /* AND THE TOKEN CHECK IS STILL THE CHECK. `DATE_FORMAT_INVALID` is about a format's own tokens,
+     which is what `43 §6` specifies, and it did not depend on what any build could read. */
+  assert.equal(validateDeclaration(dated('DD/MM'))?.code, 'DATE_FORMAT_INVALID');
+
+  /* AND THE FOUR `day` READS ALONE STILL INSTALL AND STILL READ, which is what a record opened
+     without the reader falls back to. */
   for (const [format, text] of [
     ['DD/MM/YY', 'due 03/04/26'],
     ['DD/MM/YYYY', 'due 03/04/2026'],

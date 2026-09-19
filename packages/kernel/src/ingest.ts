@@ -235,6 +235,20 @@ export type IngestDeps = {
    * it — and two literals both present were decided by the order `Object.keys` happened to give.
    */
   literals?: ((text: string, entries: readonly (readonly [string, Json])[]) => Json[] | 'ambiguous') | undefined;
+  /**
+   * `43 §4.3`'s `date`, when the record handed it down: every valid calendar day in the text
+   * matching `format`, in text order.
+   *
+   * ABSENT IS `day()` BELOW, which reads four formats where the grammar has a token set. `§9.3`'s
+   * own table reads `9/8/26` as `D/M/YY`, `29.08.2026` as `DD.MM.YYYY` and `29082026` as
+   * `DDMMYYYY`, and none of those three is one of the four. That gap is not silent — `declare.ts`
+   * refuses a format this build cannot read, and its message says the repair is a deploy — which
+   * is why this is the one reader whose absence costs capability rather than correctness.
+   *
+   * AND IT YIELDS A LIST, so `nth: { n: 2, of: { date: … } }` reaches the second date in a
+   * message. `§9.3` has that row too, and `day()` answers one day per slice.
+   */
+  dates?: ((text: string, format: string) => string[]) | undefined;
   mint: () => string;
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
@@ -894,6 +908,11 @@ function literalsOf(deps: IngestDeps, form: Extractor): readonly (readonly [stri
  * ways about the same digits.
  */
 function candidates(deps: IngestDeps, form: Extractor, anchored: string): Json[] | null {
+  /* `date` IS ITS OWN READER AND NOT ONE OF THE THREE, wired separately because what it costs is
+     different: the number readers replace a reading that is WRONG, and this one replaces a reading
+     that is BEHIND — four formats where `43 §4.3`'s tokens make more, refused at install rather
+     than swallowed. */
+  if ('date' in form && deps.dates !== undefined) return deps.dates(anchored, form.date.format);
   const n = deps.numbers;
   if (n === undefined) return null;
   if ('money' in form) return n.money(anchored, form.money.currency) as Json[];
@@ -946,6 +965,8 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
     return { amount: Math.round(minor), currency: form.money.currency };
   }
 
+  /* AND THE DATE FALLBACK, reached only when no reader was handed down. `day` reads four formats
+     where `43 §9.3`'s table has seven, and one day per slice where `§5.4` says every one. */
   if ('date' in form) return day(anchored, form.date.format);
 
   /* AND THESE TWO ARE THE FALLBACK AS WELL, wrong against `43 §4.3` in the two ways its rows
@@ -1193,8 +1214,6 @@ const FORMATS: Record<string, RegExp> = {
  * what it returns for a text holding no date, so the two were one answer and nothing upstream could
  * tell them apart. A second list in `declare.ts` would be the drift `MATCH_FIELDS` records.
  */
-export const DATE_FORMATS: readonly string[] = Object.freeze(Object.keys(FORMATS));
-
 /**
  * A day, in the format the pattern DECLARES.
  *

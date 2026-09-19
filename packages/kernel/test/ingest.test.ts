@@ -408,6 +408,38 @@ test('AND A RECORD WITH NO LITERAL RULE WIRED READS BOTH THE WAY IT ALWAYS DID',
   });
 });
 
+test("A DATE IS READ BY THE RECORD'S READER, and every date in the slice is a candidate", () => {
+  /* `43 §4.3`'s tokens are `YYYY YY MM M DD D` and this file read four named formats, which is a
+     second date grammar beside `@braindog/extract`'s. It was never silent about it — `declare.ts`
+     refused what it could not read and said *the repair is a deploy, not an edit* — so what this
+     closes is a gap rather than a defect, and what it deletes is the list rather than the
+     honesty. */
+  const seen: [string, string][] = [];
+  const reader = (text: string, format: string) => {
+    seen.push([text, format]);
+    return format === 'D/M/YY' ? ['2026-01-01', '2026-02-02'] : [];
+  };
+  const withDates = { rows: () => [], dates: reader } as never;
+
+  /* THE FORMAT REACHES THE READER AS DECLARED, never guessed at and never rewritten. */
+  assert.deepEqual(extractOutcome(withDates, { date: { format: 'D/M/YY' } }, '1/1/26 and 2/2/26'), {
+    value: '2026-01-01',
+    outcome: 'exact',
+  });
+  assert.deepEqual(seen.at(-1), ['1/1/26 and 2/2/26', 'D/M/YY']);
+
+  /* AND `nth` REACHES THE SECOND DATE — `43 §9.3`'s own row. The fallback answers one day per
+     slice, so the second date of a one-slice message was unreachable however it was anchored. */
+  assert.deepEqual(extractOutcome(withDates, { nth: { n: 2, of: { date: { format: 'D/M/YY' } } } }, '1/1/26 and 2/2/26'), {
+    value: '2026-02-02',
+    outcome: 'exact',
+  });
+
+  /* AND A RECORD WITH NO READER WIRED KEEPS `day`, four formats and one date per slice. */
+  assert.equal(extractField(deps, { date: { format: 'D/M/YY' } }, '1/1/26'), null, 'a format the fallback lacks');
+  assert.equal(extractField(deps, { date: { format: 'DD/MM/YY' } }, 'paid 01/01/26'), '2026-01-01');
+});
+
 test('A DATE IS PARSED IN THE FORMAT THE PATTERN DECLARES, never guessed', () => {
   /* `03/04/26` is the third of April in Britain and the fourth of March in America. An extractor
      that decided by looking at the number would be right most of the time and wrong about every

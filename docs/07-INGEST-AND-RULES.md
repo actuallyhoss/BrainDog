@@ -120,7 +120,7 @@ on_conflict: skip          # skip | update | new
 |---|---|---|
 | `after` / `before` / `between` | literal-anchored slice | `{ after: L }` · `{ before: L }` · `{ between: [A, B] }` — also legal as an optional anchor key inside any value extractor below |
 | `money` | parse a number and a currency into minor units | `{ money: { after?, currency? } }` |
-| `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` |
+| `date` | parse to a plain day with an explicit format — never a guess | `{ date: { format, after? } }` — `format` is built from `YYYY` `YY` `MM` `M` `DD` `D` and nothing else; each valid calendar day in the slice, in text order |
 | `text` | trim and normalise whitespace | `{ text: { between? } }` |
 | `int` / `decimal` | numeric parse with locale-aware separators | `{ int: { after? } }` — grouping allowed, **no fraction** · `{ decimal: { after?, sep?: "." \| "," } }` — `sep` is the **decimal point**, default `"."`; the other separator groups |
 | `enum` | map a matched literal to a declared value | `{ enum: { map: { L: V }, after? } }` — the longest literal present **as a whole token**; two of equal length with different values are **ambiguous** |
@@ -190,7 +190,19 @@ nothing, and was silent on every arrival. `lookup` now reads the register in one
 what [43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §2 says the record does, and a value of more than one
 word can be found at all. **Ambiguity is `needs-review` and never a value** (§5.1 step 7): a text
 that said two things is not something a `default` may answer, because the fallback would write the
-declaration's guess over a message that contradicted it. **Landed September 20th 2026.** Every declared field is **required** and `default` is the only way
+declaration's guess over a message that contradicted it. **Landed September 20th 2026.**
+
+**A date reads the whole token set, and the build stops being behind the grammar.** The runtime
+read four named formats — `DD/MM/YY`, `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD` — where
+[43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §9.3's own table also reads `9/8/26` as `D/M/YY`,
+`29.08.2026` as `DD.MM.YYYY` and `29082026` as `DDMMYYYY`. **That gap was never silent**, which is
+what makes it a gap and not a defect: `declare` refused a format the grammar admits and the build
+could not read, with the code `NOT_IN_THIS_BUILD` and the sentence *the repair is a deploy, not an
+edit*. This was that deploy. The refusal is gone, the four-format list is deleted rather than
+extended — it was a second date grammar beside `extract`'s — and `nth` reaches the second date in
+a message, which `§9.3` has a row for and one-day-per-slice could not do. `DATE_FORMAT_INVALID` is
+untouched: a format's own tokens are what §6 checks, and that never depended on any build.
+**Landed September 20th 2026.** Every declared field is **required** and `default` is the only way
 to make one optional; `writes.confidence` is a ceiling, never a promise (§2).
 
 **No regular expressions.** A regex over a text field a stranger controls is catastrophic

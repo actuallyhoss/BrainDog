@@ -27,7 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
-import { matchLiterals, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
+import { matchLiterals, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -740,6 +740,9 @@ export async function createRecordApi(deps: RecordDeps) {
        length with different values is ambiguous. Without this line `coin` reads as the literal
        `in` and a lookup reads only the first token of its slice. */
     literals: matchLiterals,
+    /* AND `§4.3`'s `date`. Without this line a record reads four formats out of the token set the
+       grammar allows, and one date per slice where `§5.4` says every one. */
+    dates: scanDates,
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

@@ -666,6 +666,15 @@ export type RecordOptions = {
    * by the order `Object.keys` gave them.
    */
   literals?: IngestDeps['literals'];
+  /**
+   * `43 §4.3`'s `date`, read by `@braindog/extract`'s `scanDates`, when the caller wired it.
+   *
+   * SAME SEAM, DIFFERENT COST. The other readers replace a reading that is wrong; this one
+   * replaces one that is behind — `ingest.ts` reads four formats and `43 §9.3`'s table has seven
+   * plus an `nth` row. Absent, `declare.ts` refuses the formats it cannot read and says the repair
+   * is a deploy, so the gap has never been silent. Wired, it is not a gap.
+   */
+  dates?: IngestDeps['dates'];
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -3007,6 +3016,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /* AND `43 §4.3`'s LITERAL RULE FOR `enum` AND `lookup`, when one was wired. Absent is
        `String.includes` and no ambiguity, unchanged. */
     literals: opts.literals,
+    dates: opts.dates,
   });
 
   const pullDeps = (): PullDeps => ({
