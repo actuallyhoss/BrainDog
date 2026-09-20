@@ -117,7 +117,7 @@ export type Profile = {
 
 export const HOUSE_PROFILE: Profile = {
   id: 'house',
-  ink: [12, 8, 6, 4.5],
+  ink: [14, 9, 6.5, 4.5],
   edge: 3,
   intentText: 4.5,
   intentFill: 3,

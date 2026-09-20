@@ -176,15 +176,25 @@ test('an achromatic seed is refused, not silently substituted', () => {
 test('the accent is in the brand red family, and is not the alarm', () => {
   // 2026-09-16, the owner's call, reversing the indigo: production's accent is reddish again. What
   // keeps it from reading as a warning is held here. It sits within 45 degrees of the mark, at least
-  // 15 degrees cooler than `danger`, and at lower chroma than the mark, so the brand is the loudest
-  // red and the alarm is its own hue. Neither `danger` nor the accent is ever colour alone.
+  // 15 degrees cooler than `danger`, and under the chroma of the `danger` chip, so the alarm stays a
+  // step more insistent than the brand it shares a family with. Neither is ever colour alone.
+  //
+  // THE CEILING USED TO BE `mark.C` AND IT WAS THE REASON THE BRAND WAS THE PALEST THING ON SCREEN.
+  // `BRAND_RED` is a constant that paints nothing: since the September ruling the mark IS the accent
+  // (`theme.mjs` emits `brand(HOUSE.schemes.light.accent)`), so this compared the accent to a colour
+  // no longer in the product and capped it at 0.180. What shipped under that cap was 0.150, quieter
+  // than `danger` at 0.160, which is the opposite of what the paragraph above says it is for. The
+  // `danger` chip is 0.233 by construction (`fillChroma`), so it is the ceiling the sentence meant.
+  // The hue gap to the mark still uses `BRAND_RED`, which is correct: that is the angle alpha steers
+  // away from, and it is a direction rather than a colour anybody draws.
   const mark = rgbToLch(parseColour(BRAND_RED));
   for (const scheme of ['dark', 'light'] as const) {
     const accent = rgbToLch(parseColour(HOUSE.schemes[scheme].accent));
     const danger = rgbToLch(parseColour(HOUSE.schemes[scheme].danger));
     assert.ok(hueGap(accent.H, mark.H) <= 45, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees from the mark`);
     assert.ok(hueGap(accent.H, danger.H) >= 15, `the ${scheme} accent is ${hueGap(accent.H, danger.H).toFixed(0)} degrees from danger`);
-    assert.ok(accent.C < mark.C, `the ${scheme} accent is as saturated as the mark`);
+    const fill = rgbToLch(parseColour(HOUSE.schemes[scheme]['danger-fill']));
+    assert.ok(accent.C < fill.C, `the ${scheme} accent is as saturated as the danger chip`);
   }
 });
 

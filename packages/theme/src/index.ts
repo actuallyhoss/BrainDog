@@ -35,10 +35,10 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * surface. The ground is now a barely warm grey (hue 75, chroma capped at 0.004 in the profile).
  *
  * FIVE · THE ACCENT IS THE BRAND'S FAMILY AGAIN, BUT NOT ITS ALARM. Production is BrainDog, and
- * BrainDog is red, so the accent is a rose red at hue 10: 17 degrees cooler than `danger` at 27 and
- * lower in chroma than the mark, which is the distance between a brand colour and a warning. It is
- * spent sparingly: focus, selection, links, checked controls, the record's tile and the place you
- * are. Primary actions are drawn in ink. Alpha derives its own accent from this one, so the two
+ * BrainDog is red, so the accent is a red at hue 6, cooler than `danger` at 27, and under the chroma
+ * of the `danger` chip, which is the distance between a brand colour and a warning. It is spent
+ * sparingly: focus, selection, links, checked controls, the record's tile and the place you are.
+ * Primary actions are drawn in ink. Alpha derives its own accent from this one, so the two
  * deployments stay apart at a glance.
  *
  * SIX · THE LOGO WEARS THE ACCENT. The owner asked for the mark to match this tone, so `--brand` and
@@ -50,9 +50,32 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * `oklch(0.565 0.18 278)` it is #6164DC with a white label at 4.81:1. It is 14 degrees from
  * `info`'s anchor, which the intent floor does not govern because the accent is not an intent:
  * `info` is only ever a glyphed word, and the accent is a control.
+ *
+ * SEVEN · 2026-09-20, THE CHROMA GOES BACK IN. The owner's words: the colours are pale, and the
+ * accent "is not gonna be persistent". He is right, and the cause was in this file. §FIVE solved
+ * "must not read as a warning" by draining saturation, and the test below it capped the accent at
+ * the mark's chroma, so what shipped was 0.150, quieter than `danger` at 0.160. The brand colour
+ * was the palest thing on the screen and the palest thing on a 16 pixel favicon, where half the
+ * glyph is antialiased edge and a low chroma blends into the browser chrome.
+ *
+ * CHROMA WAS NEVER THE LEVER. The references he named, PostHog and FirstLook, both run a red at
+ * 0.20 to 0.21 and neither reads as an error. What stops it is hue distance, the rule that primary
+ * actions are drawn in ink rather than in the accent (§FIVE already has it), an error state that
+ * differs by FORM and not by hue (a filled chip with a glyph, which `blocks.css` already does), and
+ * rarity: saturation reads as identity when it is rare and consistent. So the accent is hue 6 at
+ * L 0.575 and C 0.215, which is where chroma peaks inside the red family while the fill still
+ * clears 3:1 on the darkest surface (it never did before, at 2.83) and a white label keeps 4.90:1.
+ * Twenty-one degrees from `danger`, up from seventeen, so it is further from the alarm than the
+ * pale one was, not nearer.
+ *
+ * AND THE INK RAMP GOES WITH IT, because "how readable everything is" was the other half of what he
+ * asked for. `HOUSE_PROFILE.ink` was `[12, 8, 6, 4.5]` and is now `[14, 9, 6.5, 4.5]`, the most the
+ * validator will accept. Body text lands at 15.4:1 in light and 17.6:1 in dark, against PostHog's
+ * 17.6. That is a bigger readability gain than the accent, and it is the one that shows on every
+ * screen rather than on the few things the accent touches.
  */
 export const HOUSE_SEED: Seed = {
-  accent: 'oklch(0.55 0.15 10)',
+  accent: 'oklch(0.575 0.215 6)',
   neutralHue: 75,
   space: 4,
   radius: { sm: 6, md: 8, lg: 12 },
