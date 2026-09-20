@@ -407,6 +407,34 @@ test('and the same block under the ceiling still draws every row it matched', as
   sql.close();
 });
 
+test('AND A REGISTER THAT IS EXACTLY ONE READ IS A WHOLE ANSWER, not a slice of one', async () => {
+  /**
+   * THE CEILING WAS TESTED AT 3 AND AT 301 AND NOWHERE IN BETWEEN, so the comparison itself was
+   * unmeasured. Changing `matched > READ_WHOLE` to `matched >= READ_WHOLE` in `pages.ts` and
+   * re-running every suite that touches this rule left all 44 tests green: `packages/kernel/test/
+   * pages.test.ts`, `apps/web/src/lib/record/page-live.test.ts` and `block-kinds.test.ts`. An
+   * off-by-one there refuses a `split` over exactly 200 rows with "matched 200 where a block that
+   * adds up reads 200", which is a sentence that contradicts itself and a figure the kernel had
+   * read in full and thrown away.
+   *
+   * 200 IS THE ONLY COUNT THAT DISTINGUISHES THE TWO, which is why the row count here is exact:
+   * 199 passes under either spelling and 201 refuses under either.
+   */
+  const { k, sql } = await record(
+    pageOf({ kind: 'split', heading: 'By state', source: 'register.obligations', columns: [{ field: 'state' }, { field: 'amount' }] }),
+  );
+  /* 3 rows come with the record above, so 197 more is the ceiling exactly. */
+  for (let n = 0; n < 197; n += 1)
+    assert.ok(k.create('obligations', { what: `Row ${n}`, amount: gbp(100), due: day(1), state: 'open' }, { actor: 'p_1' }).ok);
+  assert.equal((k.list({ register: 'obligations' }) as { value: { matched: number } }).value.matched, 200);
+
+  const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: unknown[] };
+  assert.deepEqual(split.refusals, [], 'a sum the kernel read in full was refused for being as long as one read');
+  assert.equal(split.matched, 200);
+  assert.equal((split.rows ?? []).length, 200, 'the block matched its whole answer and drew fewer rows than it added up');
+  sql.close();
+});
+
 /* ── which register a page came out of ───────────────────────────────────── */
 
 const PROJECTS: Declaration = {
