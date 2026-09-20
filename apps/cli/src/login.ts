@@ -12,6 +12,7 @@ import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { hostKey, inTheClear, isLoopback, readHosts, saveHosts } from './http.ts';
+import type { Answering } from './json.ts';
 
 export type LoginIo = {
   /** The hosts file the token is kept in. */
@@ -29,6 +30,14 @@ export type LoginIo = {
    * kept under that scope in the hosts file, beside the login token and never in its place.
    */
   vault?: string | undefined;
+  /**
+   * Under `--json`, where the machine-readable half of the answer goes (`json.ts`).
+   *
+   * THE VALUE IS THE THREE FACTS THE SENTENCE CARRIES AND NOT ONE MORE: which host, under which
+   * label, until when. The bearer is not in it, and this is the one command that has a bearer in hand
+   * at the moment it answers.
+   */
+  answer?: Answering | undefined;
 };
 
 /** A project by its spoken id or row id, or `*`. Checked before it is sent or written into a sentence. */
@@ -206,6 +215,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
           ? `logged in to ${key} as ${label} · token expires ${expires.slice(0, 10)}`
           : `vault grant for ${vault} on ${key} kept as ${label} · expires ${expires.slice(0, 10)}`,
       );
+      io.answer?.({ value: { host: key, label, expires, vault: vault ?? null } });
       return 0;
     }
   } catch {

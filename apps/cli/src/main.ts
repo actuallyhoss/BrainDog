@@ -28,6 +28,7 @@ import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
 import { installAt, installInto, profilesOf } from './install.ts';
+import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
 import { logout } from './logout.ts';
@@ -46,8 +47,19 @@ import { usecase } from './usecase.ts';
    `process.exit` does not wait for it. */
 const say = (line: string) => writeFileSync(2, `${line}\n`);
 
+/**
+ * The `--json` sinks for this run, or `null` in human mode. Set once by the dispatch at the bottom,
+ * before any command is called, and read by everything that can end the process.
+ *
+ * ONE VARIABLE RATHER THAN AN ARGUMENT THREADED THROUGH EVERY WRAPPER, because `stop()` is the reason
+ * it exists: a bad argument or an unknown host must still be one document on stdout, and `stop` is
+ * called from six places that have no idea which command asked for it.
+ */
+let json: Machine | null = null;
+
 const stop = (line: string): never => {
-  say(line);
+  (json ? json.say : say)(line);
+  if (json) emit(json.envelope(1));
   return process.exit(1);
 };
 
@@ -59,8 +71,14 @@ const stop = (line: string): never => {
  * for a version has.
  */
 declare const __BUILD__: string;
-const version = (): string =>
-  `app ${typeof __BUILD__ === 'string' ? __BUILD__ : 'dev+0000000'} · format ${FORMAT_VERSION} · kernel ${KERNEL_MIGRATION} · primitives ${PRIMITIVES_VERSION}`;
+const build = (): string => (typeof __BUILD__ === 'string' ? __BUILD__ : 'dev+0000000');
+const version = (): string => `app ${build()} · format ${FORMAT_VERSION} · kernel ${KERNEL_MIGRATION} · primitives ${PRIMITIVES_VERSION}`;
+
+/**
+ * The one document `--json` prints, written synchronously for the same reason `say` is: a write to a
+ * pipe on Windows is asynchronous and `process.exit` does not wait for it.
+ */
+const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(envelope)}\n`);
 
 const usage = () =>
   [
@@ -135,6 +153,7 @@ const usage = () =>
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
+    '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, run, hook, init and serve do not take it.',
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
@@ -189,7 +208,10 @@ async function signIn(args: string[]): Promise<void> {
   const stopping = new AbortController();
   /* Ctrl+C ends the wait with one sentence rather than a stack. */
   process.on('SIGINT', () => stopping.abort());
-  const code = await login(host, { file: hostsPath(process.env), say, signal: stopping.signal, vault: parsed.values.vault });
+  /* THE SIX DIGITS GO TO STDERR EITHER WAY (§5.2 step 3), which is what makes this command work under
+     `--json` at all: the whole device flow is already on the sink the envelope does not use. */
+  const code = await login(host, { file: hostsPath(process.env), say: json ? json.say : say, signal: stopping.signal, vault: parsed.values.vault, answer: json?.answer });
+  if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives: exiting straight after several requests aborted Node 24
      on Windows, and a success must exit 0. */
   process.exitCode = code;
@@ -211,7 +233,8 @@ async function keysCommand(args: string[]): Promise<void> {
         return '';
       }
     },
-    say,
+    say: json ? json.say : say,
+    answer: json?.answer,
     spawn: spawnInherit,
     /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
     headers: async (host) => {
@@ -219,20 +242,29 @@ async function keysCommand(args: string[]): Promise<void> {
       return sessionHeaders(await positionOf(cwd), undefined, held?.host === host ? held : undefined);
     },
   });
+  if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog skills|tools|page|usecase|import|context|session`, over the real terminal, and the exit code the command decides. */
+/**
+ * `braindog skills|tools|page|usecase|import|context|session`, over the real terminal, and the exit
+ * code the command decides.
+ *
+ * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The eight commands below all take
+ * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
+ * body asks whether it was given.
+ */
 async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
     cwd,
     home: homedir(),
-    out: (line: string) => writeFileSync(1, `${line}\n`),
-    say,
+    out: json ? json.out : (line: string) => writeFileSync(1, `${line}\n`),
+    say: json ? json.say : say,
+    answer: json?.answer,
     /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
     headers: async (host: string) => {
       const held = readSession(sessionPath(process.env, cwd));
@@ -242,6 +274,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
     which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : await pageCommand(args, io);
+  if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -315,28 +348,77 @@ function install(args: string[]): void {
     'The MCP server is registered once per profile by Claude Code itself, and install does not run it:',
     `claude mcp add-json braindog '${JSON.stringify({ type: 'stdio', command: 'node', args: [cli, 'mcp', '--agent', 'claude'] })}' --scope user`,
   );
+  if (json) {
+    for (const line of lines) json.out(line);
+    emit(json.envelope(0));
+    return;
+  }
   process.stdout.write(`${lines.join('\n')}\n`);
 }
 
+/**
+ * The commands `--json` is offered on: every one but the six §4.5 excludes, and one verb below that
+ * behaves like them.
+ *
+ * THE SIX ARE EXCLUDED BECAUSE THEY HAVE NO ANSWER TO PUT IN AN ENVELOPE, not because the work was
+ * skipped. `mcp` is a transport and its stdout is the JSON-RPC protocol; `keys exec` and `run` hand
+ * stdout to a child process; `hook start` and `hook end` print a briefing to Claude Code, which reads
+ * text; `init` and `serve` pass a spawned self-host's streams straight through. Each of the six is
+ * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
+ * empty document.
+ */
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'import', 'context', 'session', 'install']);
+
 const [command, ...rest] = process.argv.slice(2);
+/* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
+   so no command's own `parseArgs` has to know a global exists. */
+const cut = takeJson(rest);
+/* `keys put` IS THE ONE VERB OF ITS COMMAND THAT HAS AN ANSWER: it deposits a key and reports which
+   credential row it became. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
+   so the flag is offered on the verb rather than on the command. */
+/* `usecase preview` IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
+   about `init` and `serve`: it spawns the self-host with `stdio: 'inherit'`, so the child owns this
+   process's stdout until Ctrl+C. Measured before this line existed, `usecase preview <file> --json`
+   left `BrainDog self-host listening on http://localhost:5870` on stdout and then the document beneath
+   it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
+   `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
+const noEnvelope = command === 'usecase' && rest[0] === 'preview';
+const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && rest[0] === 'put'));
+const args = takesJson ? cut.rest : rest;
+if (takesJson && cut.json) json = machine(say);
 try {
   /* FIRST, `48 §5.1`: a version is answered by this build alone, so it needs no host, no token and no
      hosts file, and it answers even when all three are missing. */
-  if (command === '--version' || command === '-v') process.stdout.write(`${version()}\n`);
-  else if (command === 'mcp') await mcp(rest);
-  else if (command === 'login') await signIn(rest);
+  if (command === '--version' || command === '-v') {
+    /* THE FOUR NUMBERS BY NAME, because the readable line joins them with a middle dot and a caller
+       comparing one of them against its own would be splitting a sentence to get it back. */
+    if (json) emit({ ok: true, value: { app: build(), format: FORMAT_VERSION, kernel: KERNEL_MIGRATION, primitives: PRIMITIVES_VERSION } });
+    else process.stdout.write(`${version()}\n`);
+  } else if (command === 'mcp') await mcp(rest);
+  else if (command === 'login') await signIn(args);
   /* LOCAL ONLY, AND IT OPENS NO SOCKET, so it needs none of the guards the others end with. */
-  else if (command === 'logout') process.exitCode = await logout(rest, { file: hostsPath(process.env), env: process.env, say });
-  else if (command === 'keys') await keysCommand(rest);
+  else if (command === 'logout') {
+    const code = await logout(args, { file: hostsPath(process.env), env: process.env, say: json ? json.say : say, answer: json?.answer });
+    if (json) emit(json.envelope(code));
+    process.exitCode = code;
+  } else if (command === 'keys') await keysCommand(args);
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
      into one environment variable, and adding a way to print one would undo the reason it exists. */
   else if (command === 'run') await keysCommand(['exec', ...rest]);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session') await agentCommand(command, rest);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
-  else if (command === 'install') install(rest);
+  else if (command === 'install') install(args);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
-  else if (command === 'help' || command === '--help' || command === '-h') process.stdout.write(`${usage()}\n`);
-  else if (command === undefined) stop(usage());
+  else if (command === 'help' || command === '--help' || command === '-h') {
+    /* `help` IS NOT ONE OF THE SIX §4.5 EXCLUDES, so it answers the flag rather than ignoring it.
+       Measured before this branch existed, `braindog help --json` printed the usage to stdout unchanged
+       and exited 0, which is the one outcome worse than refusing: a caller piping to a parser gets
+       eighty lines of prose and no sign the flag was dropped. */
+    if (json) {
+      for (const line of usage().split('\n')) json.out(line);
+      emit(json.envelope(0));
+    } else process.stdout.write(`${usage()}\n`);
+  } else if (command === undefined) stop(usage());
   /* A plain word is echoed, to catch a typo. Anything else could be a token pasted in the wrong place. */
   else stop(`braindog has no ${/^[a-z][a-z-]{0,31}$/.test(command) ? `command called ${command}` : 'such command'}.\n\n${usage()}`);
 } catch (e) {

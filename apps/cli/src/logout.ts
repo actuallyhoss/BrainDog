@@ -16,6 +16,7 @@
 import { parseArgs } from 'node:util';
 
 import { hostKey, readHosts, sameHost, saveHosts } from './http.ts';
+import type { Answering } from './json.ts';
 
 export type LogoutIo = {
   /** The hosts file the token is kept in. */
@@ -24,6 +25,13 @@ export type LogoutIo = {
   env: Record<string, string | undefined>;
   /** One line to stderr. */
   say: (line: string) => void;
+  /**
+   * Under `--json`, where the machine-readable half of the answer goes (`json.ts`).
+   *
+   * COUNTS, NEVER NAMES, exactly as the sentence does: the keys of the vault map are whatever a
+   * hand-written file put there, and a scope is not this command's to publish.
+   */
+  answer?: Answering | undefined;
 };
 
 /** `48 §4.4`. This command reaches nothing, so it is never 2 and never 3. */
@@ -137,6 +145,7 @@ export async function logout(args: string[], io: LogoutIo): Promise<number> {
   /* NOTHING TO REMOVE IS THE STATE THAT WAS ASKED FOR, so it is 0, and the file is not rewritten. */
   if (removed.length === 0 && !wasDefault) {
     io.say(`No login to ${key} is kept on this machine, so there was nothing to remove.`);
+    io.answer?.({ value: { host: key, tokens: 0, runners: 0, grants: 0, default_cleared: false } });
     return 0;
   }
 
@@ -150,5 +159,6 @@ export async function logout(args: string[], io: LogoutIo): Promise<number> {
 
   const what = removed.length === 0 ? 'no token was kept for it' : `${list(removed)} removed`;
   io.say(`signed out of ${key} · ${what}${wasDefault ? ' · no default host is set now' : ''}`);
+  io.answer?.({ value: { host: key, tokens, runners, grants, default_cleared: wasDefault } });
   return 0;
 }

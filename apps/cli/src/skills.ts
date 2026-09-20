@@ -27,6 +27,7 @@ import type { Brief, Client, Context } from '@braindog/client';
 import { refused, type Result } from '@braindog/ports';
 
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
+import { refuse, type Answering } from './json.ts';
 import { git } from './position.ts';
 
 type Env = Record<string, string | undefined>;
@@ -74,6 +75,13 @@ export type AgentIo = {
   say: (line: string) => void;
   /** The session headers for a host, naming the run this folder is in when it is in one. */
   headers: (host: string) => Promise<Record<string, string>>;
+  /**
+   * Under `--json`, where the machine-readable half of the answer goes (`json.ts`).
+   *
+   * OPTIONAL, because in human mode there is nobody to hand it to and every test that builds an
+   * `AgentIo` by hand would otherwise have to carry a sink it does not read.
+   */
+  answer?: Answering | undefined;
 };
 
 export type Connected = { to: Target; client: Client; context: Context; top: string | null };
@@ -93,7 +101,9 @@ export async function connect(host: string | undefined, io: AgentIo): Promise<Co
   const answer = await client.context();
   if (!answer.ok) {
     const code = refused(answer) ? answer.refusal.code : '';
-    io.say(code === 'UNREACHABLE' ? `${to.key} did not answer.` : refused(answer) ? answer.refusal.fix : `${to.key} did not give this folder's context.`);
+    /* The exit code stays the one this call has always returned: `context` is a read, so the third
+       arm is unreachable here and `refuse`'s conflict code would be a 2 nobody can produce. */
+    refuse(io, answer, code === 'UNREACHABLE' ? `${to.key} did not answer.` : refused(answer) ? answer.refusal.fix : `${to.key} did not give this folder's context.`);
     return code === 'UNREACHABLE' ? 3 : 1;
   }
   const top = await git(io.cwd, 'rev-parse', '--show-toplevel');

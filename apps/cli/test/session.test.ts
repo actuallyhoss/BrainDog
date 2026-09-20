@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { sessionDeclaration } from '@braindog/kernel';
 
 import { sessionPath, writeSession } from '../src/hooks.ts';
+import { machine } from '../src/json.ts';
 import { session, STATES } from '../src/session.ts';
 import type { AgentIo } from '../src/skills.ts';
 
@@ -113,15 +114,19 @@ function setup(t: After, base: string, o: { file?: boolean } = {}) {
   const out: string[] = [];
   const said: string[] = [];
   if (o.file !== false) writeSession(sessionPath(env, dir), { host: base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z' });
+  /* THE `--json` SINKS ARE ATTACHED TO EVERY TEST, not to a separate one, so a verb's machine-readable
+     answer is built on the same run as its lines and the token test at the bottom reads both. */
+  const m = machine((l) => void (said.push(l), printed.push(l)));
   const io: AgentIo = {
     env,
     cwd: dir,
     home: dir,
-    out: (l) => void (out.push(l), printed.push(l)),
-    say: (l) => void (said.push(l), printed.push(l)),
+    out: (l) => void (out.push(l), printed.push(l), m.out(l)),
+    say: m.say,
     headers: async () => ({}),
+    answer: m.answer,
   };
-  return { dir, env, io, out, said };
+  return { dir, env, io, out, said, envelope: m.envelope };
 }
 
 /* ── show ──────────────────────────────────────────────────────────────── */
@@ -350,6 +355,35 @@ test('AND THE SENTENCE A BAD --state GETS OFFERS THOSE SAME THREE, spelled from 
   assert.equal(h.said.length, 1);
   for (const state of STATES) assert.match(h.said[0] ?? '', new RegExp(`\\b${state}\\b`), `the refusal does not offer ${state}`);
   assert.deepEqual(host.seen, [], 'a state the command does not offer left the machine');
+});
+
+test('EVERY VERB ANSWERS A MACHINE, and the document names the run and nothing it was not asked for', async (t) => {
+  const host = await stub(t, {});
+
+  const shown = setup(t, host.base);
+  assert.equal(await session(['show'], shown.io), 0);
+  const a = shown.envelope(0) as { ok: true; value: { run: string; state: string | null; project: string | null } };
+  printed.push(JSON.stringify(a));
+  assert.equal(a.ok, true);
+  assert.equal(a.value.run, 'S7');
+  assert.equal(a.value.state, 'active');
+  assert.equal(a.value.project, 'Kiln');
+
+  /* WHAT WAS LEFT, NOT WHAT WAS TYPED. A next step may be anything somebody pasted, this one included,
+     and an envelope is read by the same logs a sentence is. */
+  const left = setup(t, host.base);
+  assert.equal(await session(['next', `run it again with ${TOKEN}`], left.io), 0);
+  const b = left.envelope(0) as { ok: true; value: Record<string, unknown> };
+  printed.push(JSON.stringify(b));
+  assert.deepEqual(b.value, { run: 'S7', left: 'next' });
+
+  /* A refusal decided on this machine is the `error` variant: a sentence, and no invented code. */
+  const bad = setup(t, host.base);
+  assert.equal(await session(['end', '--state', 'active'], bad.io), 1);
+  const c = bad.envelope(1) as { ok: false; error: { message: string } };
+  printed.push(JSON.stringify(c));
+  assert.equal(c.ok, false);
+  assert.match(c.error.message, /--state idle, handoff or done/);
 });
 
 test('THE TOKEN WAS NEVER PRINTED by any command above', () => {

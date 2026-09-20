@@ -23,9 +23,9 @@ import { parseArgs } from 'node:util';
 
 import { dogName, dogText, parseDog, type DogBlock, type DogPage } from '@braindog/dog';
 import { validateDeclaration, type Json } from '@braindog/kernel';
-import { refused } from '@braindog/ports';
 
-import { connect, fixOf, type AgentIo } from './skills.ts';
+import { refuse } from './json.ts';
+import { connect, type AgentIo } from './skills.ts';
 
 /** The keys `DogBlock` prints. Anything else on a live answer is a reading, a row count or a value the record computed, never declared. */
 const BLOCK_KEYS = ['kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'target', 'limit', 'empty', 'authored', 'body'] as const;
@@ -92,10 +92,7 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
 
   const answer = await at.client.page(slug);
-  if (!answer.ok) {
-    io.say(fixOf(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
-  }
+  if (!answer.ok) return refuse(io, answer);
   const dogPage = dogPageOf(answer.value);
   if (!dogPage) {
     io.say(`${slug} came back in a shape this build does not recognise as a page.`);
@@ -106,6 +103,8 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   const file = resolve(io.cwd, values.out ?? dogName(dogPage.page));
   writeFileSync(file, `${text}\n`);
   io.out(`${dogPage.page} written to ${file}.`);
+  /* ONE PAGE, ONE FILE, and those are the two facts a caller needs to open what was written. */
+  io.answer?.({ value: { page: dogPage.page, file } });
   return 0;
 }
 
@@ -141,11 +140,9 @@ async function push(args: string[], io: AgentIo): Promise<number> {
   if (typeof at === 'number') return at;
 
   const out = await at.client.call('setDeclaration', { body: rawBodyOf(parsed.value) });
-  if (!out.ok) {
-    io.say(fixOf(out));
-    return refused(out) && out.refusal.code === 'UNREACHABLE' ? 3 : 1;
-  }
+  if (!out.ok) return refuse(io, out);
   io.out(`${parsed.value.page} pushed to ${at.to.key}.`);
+  io.answer?.({ value: { page: parsed.value.page, host: at.to.key } });
   return 0;
 }
 
@@ -185,5 +182,6 @@ async function check(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   io.out(`${parsed.value.page} reads as a page. Nothing was sent.`);
+  io.answer?.({ value: { page: parsed.value.page, blocks: parsed.value.blocks.length } });
   return 0;
 }

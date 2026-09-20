@@ -21,6 +21,7 @@ import { refused } from '@braindog/ports';
 import { ago } from './brief.ts';
 import { readSession, sessionPath } from './hooks.ts';
 import { positionOf } from './position.ts';
+import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 /** `48 §4.4`: a refusal or a local failure is 1, and a host that did not answer is 3. */
@@ -84,19 +85,21 @@ const stopped = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}
 const openHere = (io: AgentIo): boolean => readSession(sessionPath(io.env, io.cwd)) !== null;
 
 /** The handoff, the one line when it lands, and the exit code. */
-async function send(at: Connected, args: Parameters<Client['handoff']>[0], io: AgentIo, line: string): Promise<number> {
+async function send(at: Connected, args: Parameters<Client['handoff']>[0], io: AgentIo, line: string, value: Record<string, unknown>): Promise<number> {
   const out = await at.client.handoff(args);
   if (out.ok) {
     io.out(line);
+    /* WHAT WAS LEFT, NOT WHAT WAS TYPED. The line itself is this file's one rule: a next step or a note
+       may be anything somebody pasted, and an envelope is read by the same logs a sentence is. */
+    io.answer?.({ value });
     return 0;
   }
   /* THE HOST'S FIX, NEVER AN EXCEPTION'S MESSAGE. An unreachable refusal carries one inside its fix, so
      that one case gets the fixed sentence `connect` uses. */
-  if (refused(out) && out.refusal.code === 'UNREACHABLE') {
-    io.say(`${at.to.key} did not answer.`);
-    return UNREACHABLE;
-  }
-  io.say(fixOf(out));
+  if (refused(out) && out.refusal.code === 'UNREACHABLE') return refuse(io, out, `${at.to.key} did not answer.`);
+  /* The exit code stays 1 for every other not-ok answer, `handoff`'s conflict included: this verb has
+     never returned 2 and nothing in the record declares a conflict on it. */
+  refuse(io, out, fixOf(out));
   return REFUSED;
 }
 
@@ -145,6 +148,17 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
     const named = others.slice(0, PER_LINE).map((r) => `${r.spoken} ${r.state ?? 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     io.out(`Also live here: ${named.join('; ')}.`);
   }
+  /* The same three facts the lines carry, unclipped: a caller that has to clip them can, and one that
+     wants to know whether HEAD has moved needs the handoff's own head rather than forty characters of it. */
+  io.answer?.({
+    value: {
+      run: c.session.spoken,
+      state: c.session.state,
+      project: c.project?.name ?? null,
+      handoff: c.handoff,
+      live: others,
+    },
+  });
   return 0;
 }
 
@@ -178,7 +192,7 @@ async function oneLine(verb: Line, rest: string[], io: AgentIo): Promise<number>
   }
   const said = text.trim();
   const body = verb === 'next' ? { next: said } : verb === 'tried' ? { tried: said } : { note: said };
-  return send(at, body, io, SAID[verb](at.context.session.spoken));
+  return send(at, body, io, SAID[verb](at.context.session.spoken), { run: at.context.session.spoken, left: verb });
 }
 
 /* ── end ───────────────────────────────────────────────────────────────── */
@@ -235,6 +249,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
     },
     io,
     ENDED[state](at.context.session.spoken),
+    { run: at.context.session.spoken, state },
   );
 }
 

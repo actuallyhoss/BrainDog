@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { hostKey, saveHosts } from '../src/http.ts';
+import { machine } from '../src/json.ts';
 import { changesHowItRuns, keys, planCommand, quoteForCmd, spawnInherit, variableOf, type KeysIo, type Spawner } from '../src/keys.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
@@ -111,6 +112,23 @@ test('PUT READS THE VALUE FROM STDIN, sends it once under the vault grant, and s
   assert.deepEqual(run.started, []);
   assert.match(run.said.join('\n'), /^deposited credentials#1 on .+ · version 1$/);
   nowhere(run.said, [value, grant]);
+});
+
+test('PUT --json ANSWERS WITH THE ROW IT BECAME AND NEITHER THE VALUE NOR THE GRANT', async (t) => {
+  const value = fakeValue();
+  const grant = fakeGrant();
+  const host = await stub(t, value);
+  const { file } = config(t, host.base, grant);
+  /* The whole document, not a field of it: a leak this test is looking for would arrive in a key
+     nobody thought to assert on. */
+  const m = machine(() => {});
+  const run = io(file, { stdin: `${value}\n` });
+  const shape: KeysIo = { ...run.io, say: (l) => void (run.said.push(l), m.say(l)), answer: m.answer };
+
+  assert.equal(await keys(['put', 'Kiln deploy'], shape), 0, run.said.join('\n'));
+  const doc = m.envelope(0) as { ok: true; value: Record<string, unknown> };
+  assert.deepEqual(doc, { ok: true, value: { credential: 'credentials#1', host: host.base, version: 1, rotated: false } });
+  nowhere([JSON.stringify(doc), ...run.said], [value, grant]);
 });
 
 test('PUT WITH NOTHING PIPED IN, OR AN EMPTY PIPE, SENDS NOTHING', async (t) => {

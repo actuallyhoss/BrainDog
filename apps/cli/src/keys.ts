@@ -29,6 +29,7 @@ import { win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { hostKey, inTheClear, readHosts } from './http.ts';
+import type { Answering } from './json.ts';
 
 /** A key in the clear. */
 type Plaintext = string & { readonly brand: 'Plaintext' };
@@ -47,6 +48,13 @@ export type KeysIo = {
   stdin: () => string | null;
   /** One line to stderr. */
   say: (line: string) => void;
+  /**
+   * Under `--json`, where the machine-readable half of the answer goes (`json.ts`).
+   *
+   * `put` ONLY. `exec` hands stdout to the command it starts, and an envelope printed into that
+   * stream would be indistinguishable from the command's own output.
+   */
+  answer?: Answering | undefined;
   /** The session headers for a host, naming the run this machine is in when it is in one. */
   headers: (host: string) => Promise<Record<string, string>>;
   /** How `exec` starts its command: `spawnInherit` on a real terminal. */
@@ -384,6 +392,10 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
         return REFUSED;
       }
       io.say(`${kept.rotated === true ? 'rotated' : 'deposited'} ${kept.credential} on ${door.key} · version ${String(kept.version)}`);
+      /* THE ROW IT BECAME, NEVER THE VALUE AND NEVER THE LABEL: the same facts the sentence carries,
+         and this is the one command in the tree with a plaintext in a variable two lines above the
+         line it prints. */
+      io.answer?.({ value: { credential: kept.credential, host: door.key, version: kept.version, rotated: kept.rotated === true } });
       return 0;
     }
     if (run === null) return REFUSED;

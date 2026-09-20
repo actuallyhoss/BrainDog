@@ -34,6 +34,7 @@ import { reachOf } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
 
 import { installFromCatalogue, reachLines, sdkVerb } from './catalogue.ts';
+import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
@@ -124,8 +125,7 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
     ...(skills.length === 0 ? {} : { skills }),
   });
   if (!answer.ok) {
-    io.say(saidWithCode(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+    return refuse(io, answer, saidWithCode(answer));
   }
   const got = answer.value as { file?: unknown; doc?: unknown };
   if (typeof got.file !== 'string' || typeof got.doc !== 'object' || got.doc === null) {
@@ -161,7 +161,7 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   }
   const shared = await readShared(text);
   if (!shared.ok) {
-    io.say(saidWithCode(shared));
+    refuse(io, shared, saidWithCode(shared));
     return 1;
   }
   const u = shared.value.usecase;
@@ -268,7 +268,7 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
   /* REFUSED HERE BEFORE ANYTHING IS SENT, by the door the record will read it through. */
   const shared = await readShared(read.text);
   if (!shared.ok) {
-    io.say(saidWithCode(shared));
+    refuse(io, shared, saidWithCode(shared));
     return 1;
   }
   return proposeFile(read.text, shared.value.usecase, values.host, io);
@@ -287,8 +287,7 @@ export async function proposeFile(text: string, u: { title: string; version: str
     body: { file: text },
   });
   if (!answer.ok) {
-    io.say(saidWithCode(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+    return refuse(io, answer, saidWithCode(answer));
   }
   const id = (answer.value as { id?: unknown }).id;
   if (typeof id !== 'string') {
@@ -325,8 +324,7 @@ async function arrangementOf(host: string | undefined, io: AgentIo): Promise<{ a
   if (typeof at === 'number') return at;
   const answer = await at.client.call<unknown>('arrangement', {});
   if (!answer.ok) {
-    io.say(saidWithCode(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+    return refuse(io, answer, saidWithCode(answer));
   }
   if (!isArrangement(answer.value)) {
     io.say('The record answered in a shape this build does not recognise as its arrangement.');
@@ -387,8 +385,7 @@ async function installOffered(given: string, host: string | undefined, io: Agent
   const title = offered?.usecase ?? idWords(id);
   const answer = await at.client.call<{ id: string }>('propose', { question: update ? `Update ${title} from ${update.from} to ${update.to}?` : `Set this BrainDog up for ${title}?`, body_kind: 'pack', body: { install: id } });
   if (!answer.ok) {
-    io.say(saidWithCode(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+    return refuse(io, answer, saidWithCode(answer));
   }
   const filed = (answer.value as { id?: unknown }).id;
   if (typeof filed !== 'string') {

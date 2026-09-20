@@ -76,6 +76,7 @@ import {
 import { refused, type Result } from '@braindog/ports';
 
 import { hostsPath } from './http.ts';
+import { refuse } from './json.ts';
 import type { AgentIo } from './skills.ts';
 import { proposeFile, readSource } from './usecase.ts';
 
@@ -179,7 +180,7 @@ async function create(args: string[], io: AgentIo, kind: EntryKind): Promise<num
   if (kind === 'usecase') {
     const built = starter(id, title, values.author ?? 'Your name');
     if (!built.ok) {
-      io.say(saidWithCode(built));
+      refuse(io, built, saidWithCode(built));
       return 1;
     }
     doc = built.value;
@@ -192,7 +193,7 @@ async function create(args: string[], io: AgentIo, kind: EntryKind): Promise<num
   const text = `${JSON.stringify(doc, null, 2)}\n`;
   const read = await readCatalogueFile(text);
   if (!read.ok) {
-    io.say(saidWithCode(read));
+    refuse(io, read, saidWithCode(read));
     return 1;
   }
   writeFileSync(file, text);
@@ -386,12 +387,12 @@ async function keyStatement(verb: 'rotate' | 'revoke', args: string[], io: Agent
   const [first, second] = keys as [AuthorKey, AuthorKey | undefined];
   const statement = verb === 'rotate' ? await rotateKey(first, second as AuthorKey) : await revokeKey(first, values.reason ?? '', values.successor ?? null);
   if (!statement.ok) {
-    io.say(saidWithCode(statement));
+    refuse(io, statement, saidWithCode(statement));
     return 1;
   }
   const added = await addKeyStatement(at.index, statement.value);
   if (!added.ok) {
-    io.say(saidWithCode(added));
+    refuse(io, added, saidWithCode(added));
     return 1;
   }
   mkdirSync(at.where, { recursive: true });
@@ -490,7 +491,7 @@ async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<nu
   }
   const out = await publishTo(at.index, source.text, at.read, new Date(), signer);
   if (!out.ok) {
-    io.say(saidWithCode(out));
+    refuse(io, out, saidWithCode(out));
     return 1;
   }
   const target = join(at.where, ...out.value.path.split('/'));
@@ -548,7 +549,7 @@ async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<
   }
   const read = await readCatalogueFile(source.text);
   if (!read.ok) {
-    io.say(`${given}: ${saidWithCode(read)}`);
+    refuse(io, read, `${given}: ${saidWithCode(read)}`);
     return 1;
   }
   if (read.value.kind !== kind) {
@@ -619,12 +620,12 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   const held = await verifyVersion(entry, chosen, text);
   if (!held.ok) {
-    io.say(saidWithCode(held));
+    refuse(io, held, saidWithCode(held));
     return 1;
   }
   const read = await readCatalogueFile(text, { kind: 'url', ref: at.where });
   if (!read.ok) {
-    io.say(saidWithCode(read));
+    refuse(io, read, saidWithCode(read));
     return 1;
   }
   if (read.value.kind !== kind) {
@@ -633,7 +634,7 @@ export async function installFromCatalogue(id: string, from: string, version: st
   }
   const matches = heldToEntry(entry, chosen.version, read.value);
   if (!matches.ok) {
-    io.say(saidWithCode(matches));
+    refuse(io, matches, saidWithCode(matches));
     return 1;
   }
   const statements = await verifiedStatements(at.index.keys);
@@ -670,8 +671,7 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
   if (typeof at === 'number') return at;
   const answer = await at.client.call<{ id: string }>('propose', { question, body_kind: 'pack', body: { install: id, doc } });
   if (!answer.ok) {
-    io.say(saidWithCode(answer));
-    return refused(answer) && answer.refusal.code === 'UNREACHABLE' ? 3 : 1;
+    return refuse(io, answer, saidWithCode(answer));
   }
   const filed = (answer.value as { id?: unknown }).id;
   if (typeof filed !== 'string') {
@@ -710,7 +710,7 @@ async function preview(args: string[], io: AgentIo): Promise<number> {
   const out = await publishTo(emptyCatalogue('Preview'), read.text, () => null);
   if (!out.ok) {
     rmSync(scratch, { recursive: true, force: true });
-    io.say(saidWithCode(out));
+    refuse(io, out, saidWithCode(out));
     return 1;
   }
   mkdirSync(join(catalogue, dirname(out.value.path)), { recursive: true });
