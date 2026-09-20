@@ -2353,10 +2353,11 @@
         <p class="hint">{copy.theKeyWhere}</p>
       </Section>
 
-      <!-- `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host
-           "has no PITR and does not serve `restore`". So the fact is stated where somebody would go
-           looking for the control, rather than the control being drawn and then refusing. -->
       <!--
+        THE SAME PARAGRAPH WAS HERE TWICE, one copy indented and one not, which is the defect
+        `deleteWhat` a few sections down has its own comment about: three lines, two of them the
+        same sentence. One copy, and it is the one that carries the Cloud half.
+
         `03 §6`: "PITR is Cloud-only and this is DOCUMENTED, NOT HIDDEN." `33 §9`: a self-host "has no
         PITR and does not serve `restore`". So the fact is stated where somebody would go looking for
         the control, rather than the control being drawn and then refusing.
@@ -2364,9 +2365,26 @@
         AND ON CLOUD IT IS A CONTROL. `53 §5.5(a)` puts it here by name — *"The owner, Settings →
         backups → restore to a time — `POST /api/restore { at }`"* — and this area held the sentence
         and not the button, which is the one thing a person comes to a backups screen to do.
+
+        AND ON A HOSTED RECORD THE BUTTON WAS AN APOLOGY. `apps/worker/src/index.ts` passes the
+        record no `snapshots` port, so `restore` answers `NOT_IN_THIS_BUILD` and `restoreToTime`'s
+        whole act was that refusal as a toast — under a sentence promising any point in thirty days,
+        four lines below the Kept section drawing the same refusal instead of a list. So the control
+        now follows the record's own answer, exactly as the count and the list above it do: it is
+        drawn where a restore is being demonstrated and not where one has been refused.
       -->
       <Section title={copy.restore}>
-        <p class="hint">{copiesFrom === 'live' ? copy.restoreLive : DEPLOYMENT.kind === 'self-host' ? copy.restoreSelfHost : copy.restoreCloud}</p>
+        <!-- FOUR ANSWERS AND THE RECORD'S OWN COMES FIRST. A refusal is a fact about this record,
+             so it outranks which host the build thinks it is on. -->
+        <p class="hint" role={copiesFrom === 'refused' ? 'status' : undefined}>
+          {copiesFrom === 'refused'
+            ? copy.restoreNotHere
+            : copiesFrom === 'live'
+              ? copy.restoreLive
+              : DEPLOYMENT.kind === 'self-host'
+                ? copy.restoreSelfHost
+                : copy.restoreCloud}
+        </p>
         {#if restoring}
           <div class="danger">
             <p class="danger-title">{copy.restoreConfirm(restoring)}</p>
@@ -2376,13 +2394,16 @@
             </div>
           </div>
         {/if}
-        {#if DEPLOYMENT.kind !== 'self-host' && copiesFrom !== 'live'}
+        <!-- AND `reading` IS NOT `sample` EITHER. This guard read `copiesFrom !== 'live'`, so on a
+             hosted record the control was drawn for the whole of the read and then taken away when
+             the refusal landed. A button that flashes is a button somebody presses. -->
+        {#if DEPLOYMENT.kind !== 'self-host' && copiesFrom === 'sample'}
           <ul class="facts">
-            <!-- WHAT IT COSTS, BEFORE THE PRESS. `53 §5.5`: a bookmark restore rewinds the database,
-                 so every write after the chosen instant is gone — and its own rollback is another
-                 point in time, valid for thirty days. `45 §5.6` makes it two phases for exactly that
-                 reason. A control this destructive that says nothing until afterwards is a control
-                 nobody should press. -->
+            <!-- WHAT IT COSTS, BEFORE THE PRESS. `53 §5.5`: a restore rewinds the record, so every
+                 write after the copy is gone, and what the record held is kept as a copy first, so
+                 the rewind is itself something to go back from. `45 §5.6` makes it two phases for
+                 exactly that reason. A control this destructive that says nothing until afterwards
+                 is a control nobody should press. -->
             <li><span class="fact-key">{copy.restoreLoses}</span><span class="fact-value">{copy.restoreLosesWhat}</span></li>
             <li><span class="fact-key">{copy.restoreBack}</span><span class="fact-value">{copy.restoreBackHow}</span></li>
           </ul>

@@ -1619,8 +1619,12 @@ export const copy = {
   /* ONE SENTENCE SAID BOTH HOSTS' POLICIES AND WAS RIGHT ON NEITHER: "nightly, at 03:00. The 30
      newest are kept." `53 §4` gives Cloud `17 3 * * *` UTC and *"the 30 newest dated keys plus
      `latest`"*; `49 §5.13` gives a self-host 02:00 UTC plus `hash(slug) mod 60` minutes and thirty
-     files. And Cloud's real promise is the bigger one — any point in thirty days — which the shared
-     sentence obscured by talking about the nightly copies. */
+     files.
+
+     THIS COMMENT USED TO END "and Cloud's real promise is the bigger one, any point in thirty
+     days", and that is the belief that put a restore control on a screen where nothing restores.
+     `apps/worker/src/index.ts` hands the record no `snapshots` port, so on Cloud the nightly copies
+     are all there is and the app cannot even list them. See `restoreCloud`. */
   /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
   suggestPages: 'Suggest new pages',
   suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer sits in the list below until you promote it.',
@@ -1712,7 +1716,18 @@ export const copy = {
   restoreLoses: 'What it costs',
   restoreLosesWhat: 'Every change made after the moment you pick. There is no way to bring them back except restoring forward again.',
   restoreBack: 'If it was wrong',
-  restoreBackHow: 'Restore to the instant just before. That is a point in time too, for thirty days.',
+  /**
+   * IT OFFERED AN INSTANT, AND THE ONLY ROLLBACK IN THE BUILD IS A COPY.
+   *
+   * It read *"Restore to the instant just before. That is a point in time too, for thirty days"*,
+   * which is `53 §5.5`'s rollback for a PITR bookmark. The one `restore` that exists is
+   * `packages/record/src/index.ts`: it calls `snapshots.take('before-restore')` before it replaces
+   * anything, so what the record held comes back as a copy in the same list, with a name. There is
+   * no instant to return to and no thirty-day clock on it: the copy is kept the way every other
+   * copy is, and in `apps/selfhost/src/snapshots.ts` taking a `before-restore` prunes nothing, so
+   * the copy being restored cannot be the one the take throws away.
+   */
+  restoreBackHow: 'What the record held is kept as a copy first, so going back is itself something you can go back from.',
   rowsAndSize: (rows: number, size: string) => `${rows.toLocaleString('en')} rows · ${size}`,
   snapshotNow: 'Back up now',
   theKey: 'The key',
@@ -1735,7 +1750,38 @@ export const copy = {
     'On a self-host it is the key file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
   restore: 'Going back',
   restoreSelfHost: 'This record is self-hosted, so going back means restoring one of the copies above by hand.',
-  restoreCloud: 'Any point in the last thirty days, not only the nightly copies.',
+  /**
+   * IT PROMISED A RESTORE TO ANY INSTANT, AND NOTHING IN THIS BUILD PERFORMS ONE.
+   *
+   * It read *"Any point in the last thirty days, not only the nightly copies"*, and the test beside
+   * it asserted `/thirty days/` on the strength of `53 §5.5`, so the document was checked against
+   * itself. Measured in the code: `apps/worker/src/index.ts` builds the hosted record with
+   * `createRecordApi({…})` and passes no `snapshots` port, so `snapshot`, `snapshots` and `restore`
+   * all answer `NOT_IN_THIS_BUILD` — which is what `packages/ports/src/index.ts` says the Worker
+   * does, in the port's own comment. The only bookmark the Worker reads is `getCurrentBookmark()`,
+   * filed in the nightly object's metadata for a restore path nobody has built.
+   *
+   * WHAT THE CLOUD REALLY HAS IS NIGHTS. `apps/worker/src/snapshots.ts` keeps thirty dated keys in
+   * R2 plus `latest`, written by the cron alone; `53 §5.5(b)` is the runbook for putting one back,
+   * and it is an operator with a bucket rather than anybody pressing anything here. So the sentence
+   * says a night, and says that the thing between two nights is not on offer.
+   */
+  restoreCloud: 'The Cloud takes a copy of the whole record every night, so going back means one of those nights and not a moment between two of them.',
+  /**
+   * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
+   *
+   * On a hosted record `snapshots()` comes back `NOT_IN_THIS_BUILD`, the Kept section above draws
+   * that refusal instead of a list, and this section went on drawing *"Any point in the last thirty
+   * days"* over a `Restore to a time` button whose one act is `restore` with an empty bookmark,
+   * answered by the same refusal as a toast. Two sentences on one screen, four lines apart, saying
+   * opposite things about whether this record can be recovered.
+   *
+   * IT DOES NOT REPEAT THE REFUSAL, which is already on the screen and already says to export.
+   * What it adds is the part the refusal leaves out: a copy is being kept, it is kept out of this
+   * app's reach (`53 §5.4`), and going back to one is a thing to ask for.
+   */
+  restoreNotHere:
+    'Nothing on this screen can put this record back to how it was. What is kept of it is kept where this app cannot reach it, so going back to a copy is asked for rather than pressed.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
   billing: 'Billing',

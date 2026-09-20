@@ -34,6 +34,12 @@ const AREA = readFileSync(
   'utf8',
 );
 
+/** The hosted record itself, because what Cloud can do is decided by what this file hands the record. */
+const WORKER = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'apps', 'worker', 'src', 'index.ts'),
+  'utf8',
+);
+
 test('THE HOST IS A FACT ABOUT THE RECORD, NOT A COMPILE-TIME CONSTANT', () => {
   /* `as const` on the value is what made every Cloud branch unreachable. The union is the honest
      type: a record is on one host or the other, and the screens branch on which. */
@@ -76,19 +82,70 @@ test('every branch on the host has two sides, and they say different things', ()
   }
 });
 
-test('AND THE CLOUD HALF SAYS WHAT `53 §5.5` PUTS THERE', () => {
+test('AND THE CLOUD HALF SAYS WHAT THE CLOUD DOES', () => {
   /* Unrendered on this seed, so nothing else can check it. Each of these is a sentence a person
      would read before pressing the most destructive control on the screen. */
-  assert.match(copy.restoreCloud, /thirty days/iu, 'Cloud restores to any point in thirty days and the sentence does not say so');
   assert.match(copy.restoreTo, /restore/iu);
   assert.match(copy.findTheMoment, /moment|time/iu);
-  /* `53 §5.5`: a bookmark restore rewinds the database, and its own rollback is another point in
-     time. Both halves, because a control that says only the first is a control nobody presses and a
-     control that says only the second is one they press too readily. */
+  /* `53 §5.5`: a restore rewinds the record, and what it held is kept first, so going back is
+     itself something to go back from. Both halves, because a control that says only the first is a
+     control nobody presses and a control that says only the second is one they press too readily. */
   assert.match(copy.restoreLosesWhat, /after the moment you pick/iu);
-  assert.match(copy.restoreBackHow, /thirty days/iu);
+  assert.match(copy.restoreBackHow, /kept as a copy/iu);
   /* And Cloud keeps thirty PLUS `latest` — `53 §4` — which the shared sentence used to hide. */
   assert.match(copy.keptCloud(SNAPSHOTS_KEPT), /latest/iu);
+});
+
+/**
+ * THE CLOUD HALF PROMISED A RESTORE NOTHING IN THIS BUILD PERFORMS, AND THIS FILE ASSERTED THE PROMISE.
+ *
+ * `restoreCloud` read *"Any point in the last thirty days, not only the nightly copies"* and two
+ * assertions above matched `/thirty days/` on the strength of `53 §5.5`, so the test encoded the
+ * document instead of measuring the code. What the code does: `apps/worker/src/index.ts` builds its
+ * record with `createRecordApi({…})` and hands it no `snapshots` port, so `snapshot`, `snapshots`
+ * and `restore` all answer `NOT_IN_THIS_BUILD` — `packages/ports/src/index.ts` says so in the port's
+ * own comment and `NO_RESTORE` in `packages/record/src/index.ts` is the sentence that comes back.
+ * The only bookmark the Worker reads is `getCurrentBookmark()`, written into the nightly object's
+ * metadata; nothing anywhere restores from one.
+ *
+ * SO WHAT CLOUD HAS IS THIRTY NIGHTS IN R2 AND NO DOOR TO THEM. `apps/worker/src/snapshots.ts`
+ * keeps `KEEP = 30` dated keys plus `latest`, written by the cron and read by nobody in the app,
+ * and `copyAsked` answers `GET /api/snapshots/<id>` with the list's own refusal. A hosted record
+ * has no instant to go back to and no copy to download, and the screen offered a button for both.
+ */
+test('and the Cloud half promises nothing the Worker cannot do', () => {
+  const opened = WORKER.indexOf('createRecordApi({');
+  assert.ok(opened > 0, 'the Worker no longer builds its record here, so this premise needs measuring again');
+  const built = WORKER.slice(opened, WORKER.indexOf('\n      });', opened));
+  assert.ok(built.length > 200, 'the call to createRecordApi was not found whole');
+  assert.doesNotMatch(built, /\bsnapshots:/u, 'the Worker hands the record a snapshots port now: re-read what Cloud can do before trusting these sentences');
+
+  for (const [key, line] of [
+    ['restoreCloud', copy.restoreCloud],
+    ['restoreBackHow', copy.restoreBackHow],
+    ['restoreNotHere', copy.restoreNotHere],
+  ] as const) {
+    assert.equal(typeof line, 'string', `${key} is gone`);
+    assert.doesNotMatch(line, /thirty days|30 days|any point/iu, `${key} promises a window this build does not serve`);
+  }
+  /* WHAT IS TRUE INSTEAD, in each of the two places. The nightly copy is real and the restore is
+     not, so the Cloud sentence is about nights, and a record whose own answer was a refusal is told
+     that going back is asked for rather than pressed. */
+  assert.match(copy.restoreCloud, /night/iu, 'the Cloud sentence no longer says what a copy is');
+  assert.match(copy.restoreNotHere, /cannot reach|asked for/iu, 'the refused sentence does not say where the copies are or what to do');
+
+  /**
+   * AND THE CONTROL IS NOT DRAWN OVER A REFUSAL, which is what the Kept section immediately above
+   * already does. `restoreToTime` calls `restore` with an empty bookmark; on a hosted record that
+   * comes back `NOT_IN_THIS_BUILD` as a toast, so the button's whole act was an apology. The guard
+   * is the sample alone rather than `!== 'live'`, because `reading` is the state the screen is in
+   * before the record has answered and a control that flashes is one somebody presses.
+   */
+  const at = AREA.indexOf('<Section title={copy.restore}>');
+  assert.ok(at > 0, 'the going-back section is gone');
+  const section = AREA.slice(at, AREA.indexOf('</Section>', at));
+  assert.match(section, /copy\.restoreNotHere/u, 'a record that keeps no copies is told nothing about going back');
+  assert.match(section, /DEPLOYMENT\.kind !== 'self-host' && copiesFrom === 'sample'/u, 'the restore control is drawn where the record refused it');
 });
 
 test('and the self-host half says what the record it is on actually does', () => {
