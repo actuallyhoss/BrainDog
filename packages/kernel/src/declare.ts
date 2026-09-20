@@ -21,7 +21,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from '@braindog/where';
 
-import { FIELD_TYPES, coerce, isCurrencyCode, measure, range, type FieldDecl, type Json } from './coerce.ts';
+import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
@@ -2696,6 +2696,53 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
     const ceiling = CEILING[type];
     if (ceiling !== undefined && hi !== undefined && hi > ceiling)
       return bad('OUT_OF_BOUNDS', `${said}'s max is ${hi} bytes, above a ${type}'s ceiling of ${ceiling}. A max lowers the ceiling and never raises it.`, at);
+    /* A DEFAULT IS A VALUE THE RECORD WILL STORE, SO THE THING THAT STORES VALUES READS IT.
+       `index.ts` runs every default through `coerce` when a row is created, so a `money` field
+       defaulted to a bare number refuses every create that leaves it out. That is the net, and it
+       catches the value at the wrong moment and tells the wrong person: the author of the
+       declaration is the one who can fix it, and they are here. Same `coerce`, so the two moments
+       cannot disagree about what the record can store.
+
+       K2 FIRST. JSON null, the empty string and the empty list are one state, absent, and every
+       type refuses all three as a value. A default that is absent is no default rather than a bad
+       one, so there is nothing here to say about it. */
+    if (f.default !== undefined && !isAbsent(f.default as Json)) {
+      /* A LIST CARRIES ITS ELEMENT'S TYPE AND NOT ITS OWN. `list<money>` is a `list`, and reading
+         `f.type` where the element's kind is wanted is the bug this file keeps finding. */
+      const kind = type === 'list' ? String(f.of ?? 'text') : type;
+      /* A DERIVED FIELD IS COMPUTED, AND THE WRITE PATH REFUSES EVERY WRITE TO IT. Its default is
+         read by nobody: the author wrote two instructions and one of them does nothing. Before the
+         value is looked at, because which of the two to delete is the only useful thing to say. */
+      if (f.derived === true)
+        return bad(
+          'DECLARATION_INVALID',
+          `${said} is derived and carries a default. The record computes a derived field and refuses every write to it, so nothing ever reads the default. Drop the default, or drop derived.`,
+          at,
+        );
+      /* TWO KINDS INSTALL CANNOT FULLY ANSWER FOR, and neither is waved through. A `secret` default
+         is refused outright below, by the rule that only the vault door writes one, so coercing it
+         here would answer with the wrong sentence. A `ref` is coerced with a lookup that says every
+         row exists, because whether `people#41` has been written yet is the create path's question
+         and refusing it here would refuse a correct declaration; the shape and the declared
+         register are answerable at install, and they are answered. */
+      if (kind !== 'secret') {
+        const held = coerce(f as unknown as FieldDecl, f.default, { refId: () => 'install' });
+        if (!held.ok)
+          return bad(held.refusal.code, `${said} has a default the record cannot store. ${held.refusal.fix}`, at, held.refusal.allowed);
+        /* MEMBERSHIP IS NOT COERCION. `coerce` reads an enum value as text and leaves the list to
+           the write path, which is why a default naming a value the field has not got installed
+           clean and then went into the row unread: the create path fills a default without ever
+           reaching the check that would have caught it. */
+        if (kind === 'enum') {
+          const values = Array.isArray(f.values) ? (f.values as string[]) : [];
+          const chosen = (Array.isArray(held.value) ? held.value : [held.value]).map(String);
+          const unknown = chosen.find((v) => !values.includes(v));
+          if (unknown !== undefined)
+            return bad('ENUM_VALUE_UNKNOWN', `${said} defaults to ${unknown}, and the field has no such value.`, at, values);
+        }
+      }
+    }
+
     /* A DEFAULT OUTSIDE ITS OWN BOUNDS refuses every create that leaves the field out, which is the
        one fact worth hearing at install rather than at the first write. */
     const size = f.default === undefined || (lo === undefined && hi === undefined) ? null : measure(type, f.default as Json);

@@ -1323,7 +1323,7 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
       found.push(`${rel} declares a constant named after ISO 4217. Membership is Intl.supportedValuesOf('currency') by 02 §3 rule 1, and a hand-typed copy of the standard is wrong the day the standard moves: the last one was missing XCG. Derive from Intl and subtract what you do not want, with a reason beside each.`);
 
     const held = new Set<string>();
-    for (const m of text.matchAll(/['"]([A-Z]{3})['"]/gu)) if (TENDER.has(m[1])) held.add(m[1]);
+    for (const [, code] of text.matchAll(/['"]([A-Z]{3})['"]/gu)) if (code !== undefined && TENDER.has(code)) held.add(code);
     if (held.size >= MANY && !LIST_ALLOWED.has(rel))
       found.push(`${rel} quotes ${held.size} real currency codes, which is a list of what currencies there are. Take membership from Intl.supportedValuesOf('currency'), or name this file above with what the list is for if Intl cannot answer it.`);
   }

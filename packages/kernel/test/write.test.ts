@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { codeOf, conflicted, fixOf } from '@braindog/ports';
 
-import { openRecord, type Entry, type Kernel, type RegisterDecl } from '../src/index.ts';
+import { checksum, jcs, openRecord, type Entry, type Kernel, type RegisterDecl } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -650,7 +650,41 @@ const created = async (field: Record<string, unknown>) => {
   return { out, held: row?.fields as Record<string, unknown> | undefined };
 };
 
-test('A DEFAULT THE RECORD COULD NOT STORE IS REFUSED, and not written to the row unread', async () => {
+/**
+ * The same register, installed the way a build with no such check would have stored it.
+ *
+ * THIS REACHES AROUND `install` ON PURPOSE, WHICH THE HELPER ABOVE SAYS NEVER TO DO, and the
+ * exception is the whole point of the test. `declare.ts` refuses a bad default at install now, so
+ * the create-time check below it cannot be reached by any caller and a test that went through the
+ * front door would be testing the lint twice and the net never. The state it defends is a record
+ * whose declaration row was written before the lint existed, and the only way to make that state
+ * is to write the row. The checksum is recomputed so the row is the one an older build would have
+ * left, not a corrupt one.
+ */
+const older = async (field: Record<string, unknown>) => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  const clean = declaring({ type: 'text' });
+  const out = await k.install([{ id: 'register.defaults', kind: 'register' as const, body: clean as never }]);
+  assert.ok(out.ok, fixOf(out));
+
+  const body = jcs(declaring(field) as unknown as Parameters<typeof jcs>[0]);
+  sql.exec(
+    'UPDATE declaration SET body = ?, checksum = ? WHERE id = ? AND superseded_at IS NULL',
+    body,
+    await checksum(body),
+    'register.defaults',
+  );
+
+  const reopened = await openRecord(sql, clock);
+  const made = reopened.create('defaults', { who: 'Ada' }, { actor: 'p_1' });
+  const row = made.ok ? reopened.get((made as never as { value: Entry }).value.id) : null;
+  sql.close();
+  return { out: made, held: row?.fields as Record<string, unknown> | undefined };
+};
+
+test('A DEFAULT THE RECORD COULD NOT STORE IS REFUSED AT INSTALL, and the author hears it rather than the first person to add a row', async () => {
   /* EVERY ONE OF THESE WAS A ROW. A declaration is the one writer that reached `fields` without
      passing step 3, so a `url` default of `javascript:` landed in a row the page then drew as a
      link, a `money` default of a bare number landed with no currency at all, and an `instant`
@@ -671,7 +705,26 @@ test('A DEFAULT THE RECORD COULD NOT STORE IS REFUSED, and not written to the ro
     ['a key typed into a text field', { type: 'text', default: 'sk_live_abcdefghijklmnopqrstuvwx' }],
   ];
   for (const [said, field] of REFUSED) {
-    const { out, held } = await created(field);
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW));
+    const out = await k.install([{ id: 'register.defaults', kind: 'register' as const, body: declaring(field) as never }]);
+    assert.equal(codeOf(out), 'VALUE_MALFORMED', `${said}: the declaration installed`);
+    assert.match(fixOf(out), /default/u, `${said}: the sentence does not say a default is the thing to fix`);
+    sql.close();
+  }
+});
+
+test('AND THE CREATE STILL REFUSES ONE, for a declaration installed before that check existed', async () => {
+  /* DEFENCE IN DEPTH AND NOT A SECOND OPINION. The lint above is where an author is told, and it
+     only helps declarations installed after it. Every record installed before today holds rows the
+     lint never saw, and the create is the last place a value the record cannot store can be
+     stopped before it is in a column. Two of the eleven are enough to hold the path open: one
+     shape the coercion refuses and one the row would otherwise have taken silently. */
+  for (const [said, field] of [
+    ['money as a bare number', { type: 'money', default: 4800 }],
+    ['a url that is not https', { type: 'url', default: 'javascript:alert(1)' }],
+  ] as const) {
+    const { out, held } = await older(field as Record<string, unknown>);
     assert.equal(codeOf(out), 'VALUE_MALFORMED', `${said}: the create was accepted`);
     assert.equal(held, undefined, `${said}: a refused create left a row behind`);
   }
