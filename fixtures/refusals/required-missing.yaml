@@ -3,3 +3,11 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     what
 fix:    Send the field the register requires.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "party", "type": "text" }
+    ]
+  }
+write: { "register": "obligations", "patch": { "party": "Northwind" } }

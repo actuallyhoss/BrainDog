@@ -1,5 +1,27 @@
 code:   DIALECT_KIND_UNKNOWN
 via:    render
 raises: packages/render/src/parse.ts
-at:     blocks[0].kind
-fix:    Name one of the sixteen kinds.
+fix:    Name a kind the dialect has.
+document: |
+  ```nonsense | Cash on hand
+  Cash | GBP 28,320.00
+  ```
+
+# NO `at:`, AND THAT IS THE FINDING. A fence is not refused, it DEGRADES: `parse()` answers with the
+# `Degraded` envelope at `packages/render/src/parse.ts:59-68`, whose whole shape is
+# `{ type, code, fix, raw, info, start, end }`. There is no `at`, so this fixture's old
+# `at: blocks[0].kind` named a key nothing here can carry, and `40 §6`'s table promises the same
+# path for both render codes. Adding one is a change to a published MIT package's envelope, and
+# that is a decision rather than a repair.
+#
+# THE ADDRESS IS NOT MISSING, IT IS A SPAN. `start` and `end` are byte offsets into the document, so
+# the surface CAN say where the fault is; what it cannot say is which structural path the fault sits
+# on, because a degraded fence never becomes a block and so never has an index among blocks.
+#
+# The fix sentence carries no count. It said "sixteen" while `KINDS` held twenty-nine, which is what
+# a number typed into prose beside an enumeration always does.
+
+# `fix:` here is the reader's one-line summary, not the sentence the envelope emits. The real one is
+# `"nonsense" is not one of the twenty-nine kinds. The block is shown as you wrote it.`, built from
+# the word the author typed, so nothing static can hold the two to each other. The runner asserts
+# what is true of every fix: exactly one degradation, the code this fixture names, and a sentence.

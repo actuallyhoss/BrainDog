@@ -1,5 +1,30 @@
 code:   DIALECT_ARITY
 via:    render
 raises: packages/render/src/parse.ts
-at:     blocks[0].rows[2]
 fix:    Give the row the cells its kind takes.
+document: |
+  ```stat | Cash on hand
+  Cash | GBP 28,320.00 | last month | 18 20 19 24
+  Runway | 7 months | at this burn | 9 8 8 7
+  Owed to us | GBP 4,100.00 | three invoices | 2 3 3 4 | chased twice
+  ```
+
+# NO `at:`, AND THAT IS THE FINDING, TWICE OVER. A fence is not refused, it DEGRADES: `parse()`
+# answers with the `Degraded` envelope at `packages/render/src/parse.ts:59-68`, whose whole shape is
+# `{ type, code, fix, raw, info, start, end }`. There is no `at`, so this fixture's old
+# `at: blocks[0].rows[2]` named a key nothing here can carry.
+#
+# AND THE ROW INDEX IS UNREACHABLE EVEN IF THE ENVELOPE GREW ONE. The third row above is the wide
+# one, and the degradation is still whole-fence: `readRows` returns `over` as a SENTENCE about the
+# offending line and no index, and the parse loop then does `i = close; continue;`, so the rows are
+# dropped and the fence never becomes a block to be row two OF. So `blocks[0].rows[2]` is not one
+# missing field but two, and adding either is a change to a published MIT package's envelope, which
+# is a decision rather than a repair.
+#
+# What the surface does carry is `start` and `end`, byte offsets into the document. That is an
+# address of a different kind: a span of source rather than a path into a structure.
+
+# `fix:` here is the reader's one-line summary, not the sentence the envelope emits. The real one
+# quotes the offending line back, so nothing static can hold the two to each other. The runner
+# asserts what is true of every fix: exactly one degradation, the code this fixture names, and a
+# sentence.

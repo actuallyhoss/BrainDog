@@ -3,3 +3,16 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     state
 fix:    Send one of the values the enum declares.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "state": "state", "done": ["paid"],
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "state", "type": "enum", "values": ["open", "paid"],
+        "transitions": { "open": { "to": ["paid"] }, "paid": { "to": [] } } }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41", "state": "open" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "state": "nonsense" } }

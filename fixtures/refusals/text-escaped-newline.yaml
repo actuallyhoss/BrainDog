@@ -3,3 +3,14 @@ via:    write
 raises: packages/kernel/src/coerce.ts
 at:     what
 fix:    Send a real newline.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "party", "type": "text" }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "what": "Paid on Tuesday\\nchased twice" } }

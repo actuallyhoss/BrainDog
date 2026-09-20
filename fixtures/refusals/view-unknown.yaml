@@ -2,6 +2,19 @@ code:   VIEW_UNKNOWN
 via:    rpc
 raises: packages/kernel/src/index.ts
 at:     id
-found:  overdue
-wanted: a view this list holds
 fix:    Name a view this list has, or save it first.
+
+# NO `found:` AND NO `wanted:`, AND THAT IS THE FINDING. `Refusal` at
+# `packages/ports/src/index.ts:329-369` is `{ code, fix, at?, allowed?, retry_after? }`, and `no()`
+# takes `Omit<Refusal, 'code' | 'fix'>`, so those two words cannot be attached to a refusal anywhere
+# in the tree. This was the only fixture of the hundred and fifteen that claimed them, and a runner
+# asserting `found` when a fixture carries it (`52 §5.3` step 2) would have had nothing to read.
+#
+# WHAT THIS REFUSAL ACTUALLY CARRIES INSTEAD IS `allowed:`. Both emitters
+# (`packages/kernel/src/index.ts:5090` and `:5112`) answer with the view names the register does
+# have, which is what `wanted: a view this list holds` was reaching for and is strictly more use: it
+# names them. There is no fixture key for it, because `40 §6`'s header admits `found:` and
+# `wanted:` and not `allowed:`, so the claim is dropped rather than restated.
+#
+# Adding `found`/`wanted` to `Refusal` is a change to the envelope every surface answers with, and
+# that is a decision rather than a repair.

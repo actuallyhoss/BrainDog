@@ -3,3 +3,19 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     ref
 fix:    Open the row that already holds it.
+declare: {
+    "id": "people", "name": "People", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "ref", "type": "text", "unique": true }
+    ]
+  }
+rows: [
+    { "what": "Ada Lovelace", "ref": "ada@example.com" }
+  ]
+write: { "register": "people", "patch": { "what": "Ada L.", "ref": "ada@example.com" } }
+
+# ALREADY_KNOWN AND UNIQUE_VIOLATION ARE ONE SITE AND TWO SENTENCES
+# (`packages/kernel/src/index.ts:2214-2229`). The clashing row is LIVE here, so it has a number a
+# person can say and the refusal says it. When the clashing row has no number the same site answers
+# UNIQUE_VIOLATION, which is the other fixture and the other half of this branch.

@@ -3,3 +3,14 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     ref
 fix:    Add a new field instead of changing this one.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "ref", "type": "text", "immutable": true }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41", "ref": "INV-41" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "ref": "INV-42" } }

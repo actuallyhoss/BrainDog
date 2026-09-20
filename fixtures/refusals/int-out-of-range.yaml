@@ -3,3 +3,14 @@ via:    write
 raises: packages/kernel/src/coerce.ts
 at:     count
 fix:    Send a whole number this record can hold exactly.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "count", "type": "int" }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "count": 9007199254740993 } }

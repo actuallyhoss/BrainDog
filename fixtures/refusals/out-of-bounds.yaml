@@ -3,3 +3,14 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     amount
 fix:    Send a value between the declared bounds.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "amount", "type": "money", "min": 0, "max": 100000 }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "amount": { "amount": 999999999, "currency": "GBP" } } }

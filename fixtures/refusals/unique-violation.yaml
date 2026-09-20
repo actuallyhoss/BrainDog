@@ -3,3 +3,20 @@ via:    write
 raises: packages/kernel/src/index.ts
 at:     ref
 fix:    Give the row a value nothing else holds.
+declare: {
+    "id": "readings", "name": "Readings", "title": "at", "series": true,
+    "fields": [
+      { "id": "at", "type": "instant", "required": true },
+      { "id": "ref", "type": "text", "unique": true }
+    ]
+  }
+rows: [
+    { "at": "2026-09-05T12:00:00.000Z", "ref": "meter-7" }
+  ]
+write: { "register": "readings", "patch": { "at": "2026-09-05T13:00:00.000Z", "ref": "meter-7" } }
+
+# THE REGISTER IS A SERIES, AND THAT IS WHAT MAKES THIS CODE REACHABLE RATHER THAN A SYNONYM.
+# One site raises this and ALREADY_KNOWN both (`packages/kernel/src/index.ts:2214-2229`) and picks
+# by whether the clashing row has a number: `clash.seq === null` is this code, because there is no
+# "#41 already has that" sentence to write about a row nobody can address. A series register's rows
+# carry no number, so this is the shape that reaches the other half of the branch.

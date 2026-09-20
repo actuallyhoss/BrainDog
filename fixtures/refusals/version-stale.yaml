@@ -3,3 +3,25 @@ via:     write
 raises:  packages/kernel/src/index.ts
 derived: clash
 fix:     Read the row again and re-apply the change.
+declare: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "party", "type": "text" }
+    ]
+  }
+rows: [
+    { "what": "Invoice 41" },
+    { "seq": 1, "party": "Northwind" }
+  ]
+write: { "register": "obligations", "seq": 1, "patch": { "what": "Invoice 41, paid" }, "version": 1 }
+
+# NO `at:`, AND `derived:` IS WHY. A race is not a refusal: `packages/kernel/src/index.ts:2008`
+# answers `clash(version, current, actor)`, whose envelope is `{ version, current, actor }` with no
+# `code` and no address, and `codeOf` in `packages/ports/src/index.ts` is what reads it as this
+# code. The runner asserts on the conflict arm and not on `.refusal`, which is the one case of the
+# fifteen where a test written the ordinary way throws instead of failing.
+#
+# THE SECOND ROW ENTRY IS AN UPDATE, which is what makes the version below stale rather than
+# imaginary. It carries `seq`, so the runner applies it to the row that already exists instead of
+# creating a second one, and the row is at version 2 by the time the write sends 1.
