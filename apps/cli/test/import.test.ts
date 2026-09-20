@@ -404,6 +404,125 @@ test('applied with a setup, organisations point at the rows, a poll is filed onc
   assert.equal(again.tally.organisations!.unchanged, 2);
 });
 
+/**
+ * THE POLL HALF OF THE GUARD THAT STOPS A SECOND RUN ASKING AGAIN, WHICH NOTHING HELD UNTIL THIS TEST.
+ *
+ * `src/import.ts` says of a Decide read that refuses that "the run stops asking, files no poll, and says which read
+ * failed". `import-at-scale.test.ts` drives the first and the third of those three. Measured on 2026-09-21: dropping
+ * `decide === null ? [] :` from the loop over `plan.polls` fails this test and nothing else in the package, and before
+ * this test was written it failed nothing at all, which is 231 green in the audit's run and 233 in this tree. What it
+ * does instead is file a pack he had already approved a second time, because a refused read leaves `installs` empty and
+ * `installs.has(pack)` is then false for every poll in the plan. The duplicate lands under the one condition that makes
+ * a duplicate worst, which is that he has already answered the first copy.
+ */
+test('A DECIDE READ THAT REFUSES FILES NO POLL, as well as asking nothing, and says which read it could not make', async () => {
+  const setup = syntheticSetup() as unknown as Setup;
+  const mem = memoryRecord(ALL);
+  const first = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), mem.door, { dryRun: false });
+  assert.deepEqual(first.polls, { filed: 1, before: 0 });
+  assert.equal(first.asked, 1);
+  assert.equal(mem.asked.length, 2, 'the question and the pack, each filed once');
+
+  /* THE SAME CREDENTIAL GOING STALE ONE READ LATER, which is the ordinary way this happens: the rows are written by
+     then, so the refusal cannot be thrown, and carrying on with two empty sets is the bug being held shut here. */
+  const blind: Door = { ...mem.door, governance: async () => ({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' } }) };
+  mem.writes.length = 0;
+  const again = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), blind, { dryRun: false });
+  assert.deepEqual(again.polls, { filed: 0, before: 0 }, 'a poll was filed on a run that never read what it had filed before');
+  assert.equal(again.asked, 0);
+  assert.equal(again.alreadyAsked, 0, 'nothing was read, so nothing may be reported as found');
+  assert.deepEqual(mem.writes.filter((w) => w === 'propose'), [], 'the run proposed something with no idea what it had proposed before');
+  assert.equal(mem.asked.length, 2, 'a pack he has already been offered was offered again');
+  assert.deepEqual(again.refused, [{ label: 'What this record has already been asked', register: 'Decide', fix: 'This record does not know that credential. (UNAUTHORIZED)' }]);
+
+  /* AND THE LINE HE READS SAYS NOTHING WAS FILED, rather than leaving the poll count out of a report that still names
+     the list: the plan has a poll in it either way, so the sentence is printed either way. */
+  const lines = said(again, { dryRun: false, file: 'export.json' });
+  assert.ok(lines.includes('Polls: 0 filed on Decide for you to approve, 0 filed before.'), lines.join('\n'));
+});
+
+/**
+ * THE RECORD'S OWN ANSWER TO A PACK IT ALREADY HOLDS IS NOT A REFUSAL HE NEEDS TO READ, and neither arm of the
+ * condition that sorts those apart had a test. `TRANSITION_ILLEGAL` back from `propose` means the pack is installed and
+ * nothing newer was offered, which is a poll filed before; any other code is something he can act on and has to be said
+ * with the poll named. Measured on 2026-09-21: deleting the `TRANSITION_ILLEGAL` arm fails this test and nothing else in
+ * the package, printing a poll that was already running as a refusal, and deleting the `else` beside it fails this test
+ * and nothing else either, leaving a refusal a person can act on printed nowhere at all.
+ */
+test('A POLL THE RECORD SAYS IS ALREADY INSTALLED IS COUNTED AS FILED BEFORE, and any other refusal is said with the poll named', async () => {
+  const setup = syntheticSetup() as unknown as Setup;
+  /* ONLY THE PACK IS REFUSED, so the ordinary question beside it still goes through and this measures one thing. */
+  const packRefusal = (code: string, fix: string) => {
+    const mem = memoryRecord(ALL);
+    const door: Door = { ...mem.door, propose: async (args) => (args.body_kind === 'pack' ? { ok: false, refusal: { code, fix } } : mem.door.propose(args)) };
+    return { mem, door };
+  };
+
+  const held = packRefusal('TRANSITION_ILLEGAL', 'That pack is already installed at this version or newer.');
+  const already = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), held.door, { dryRun: false });
+  assert.deepEqual(already.polls, { filed: 0, before: 1 });
+  assert.deepEqual(already.refused, [], 'the record answering that it already holds the pack was read to him as a refusal');
+  assert.equal(already.asked, 1, 'the question beside the pack was not filed');
+
+  const wrong = packRefusal('OUT_OF_BOUNDS', 'A pack declares at most eight readings.');
+  const spelled = await applyPlan(planLegacyTool(syntheticExport(), TODAY, setup), wrong.door, { dryRun: false });
+  assert.deepEqual(spelled.polls, { filed: 0, before: 0 }, 'a poll the record would not take was counted as one it already had');
+  assert.deepEqual(spelled.refused, [{ label: 'lanternly', register: 'Decide', fix: 'A pack declares at most eight readings. (OUT_OF_BOUNDS)' }]);
+});
+
+/**
+ * A CATEGORY HE MADE HIMSELF IS NOT AN EXAMPLE ROW, AND THE FIX MUST NOT SEND HIM TO A BUTTON THAT CANNOT HELP.
+ *
+ * `legacy.test.ts` measures the planted arm, against a row tagged `example`, and this is the other one. Pressing
+ * Clear the examples on Home deletes only the examples nobody has changed, so telling him to press it about a category
+ * he wrote himself leaves the ledger rows uncategorised with no way forward at all. Measured on 2026-09-21: collapsing
+ * the ternary to its planted arm leaves this the only test in the package that notices.
+ *
+ * THE PLAN IS BUILT HERE AND NOT READ FROM THE EXPORT, because `legacy-export.ts` carries no money categories at
+ * all: `planLegacyTool(syntheticExport(), TODAY)` plans zero `categories` rows, so a clash cannot be staged from it.
+ */
+test('A CATEGORY OF HIS OWN UNDER THE SAME NAME IS SAID AS A RENAME, not as examples to clear', async () => {
+  const clashing: Plan = {
+    taken: '2026-09-15',
+    rev: 1,
+    rows: [
+      { register: 'categories', key: `${KEY_PREFIX}category:1`, label: 'Groceries', fields: { name: 'Groceries', direction: 'out', state: 'live' } },
+      {
+        register: 'transactions',
+        key: `${KEY_PREFIX}txn:1`,
+        label: 'MARKET STREET GROCER',
+        fields: { what: 'MARKET STREET GROCER', amount: { amount: -4210, currency: 'USD' }, at: '2026-09-14', direction: 'out', category: { $ref: `${KEY_PREFIX}category:1` } },
+      },
+    ],
+    asks: [],
+    polls: [],
+    skipped: [],
+    changed: [],
+  };
+
+  const his = memoryRecord(ALL);
+  const mine = await his.door.create({ register: 'categories', fields: { name: 'Groceries', direction: 'out', state: 'live' } });
+  assert.equal(mine.ok, true, 'the category standing in his record would not write');
+  const report = await applyPlan(clashing, his.door, { dryRun: false });
+  assert.deepEqual(
+    report.clashes.map((c) => [c.label, c.rows]),
+    [['Groceries', 1]],
+  );
+  assert.match(report.clashes[0]!.fix, /Rename one of the two/u);
+  assert.doesNotMatch(report.clashes[0]!.fix, /Clear the examples/u, 'he was sent to a button that deletes only the examples nobody has changed');
+
+  /* AND THE SAME NAME TAGGED `example` IS THE OTHER ARM, held here too so the two cannot drift into one sentence. */
+  const planted = memoryRecord(ALL);
+  await planted.door.create({ register: 'categories', fields: { name: 'Groceries', direction: 'out', state: 'live', tags: ['example'] } });
+  const again = await applyPlan(clashing, planted.door, { dryRun: false });
+  assert.match(again.clashes[0]!.fix, /Clear the examples/u);
+
+  /* THE LEDGER ROW STILL ARRIVES, uncategorised: money that moved is worth more than the slice it belongs in. */
+  const moved = his.rows.find((r) => r.register === 'transactions')!;
+  assert.equal(moved.fields.what, 'MARKET STREET GROCER');
+  assert.equal(moved.fields.category, undefined);
+});
+
 test('a dry run says each row that would change and the fields that would', async () => {
   const mem = memoryRecord(ALL);
   await applyPlan(plan(), mem.door, { dryRun: false });
@@ -433,6 +552,45 @@ test('a record without the founder and agents lists is told what to install, and
   const lines = said(report, { dryRun: false, file: 'export.json' });
   assert.equal(lines[0], 'Read, and wrote nothing: export.json, exported 2026-09-15.');
   assert.match(lines[1]!, /^This BrainDog has no Datapoints, Learnings, Skills, Tools and Keys \(the index only\) lists, so nothing was written\. Install Solo founder and Agents on this BrainDog first, then run the import again\.$/u);
+});
+
+/**
+ * A HOST THAT STOPPED ANSWERING IS NOT A RECORD SHORT OF ITS LISTS, AND NINE PLACES IN `applyPlan` TURN ON THAT.
+ *
+ * Measured on 2026-09-21, by making `unreachable()` answer false for everything: not one test in this package failed,
+ * 233 passing and 3 skipped over 236, so every one of those nine arms was carried by nothing. The one above is where it costs
+ * the most. A host that stops answering refuses every `schema` read, and without the throw that reads as a record
+ * holding none of the lists, so the run prints the sentence the test above pins, telling him to install Solo founder
+ * and Agents into a record that already has them, and exits 1 instead of the 3 that means run the import again.
+ *
+ * THIS HOLDS TWO OF THE NINE, the schema read and the first write. The seven left are the page read inside `readAll`,
+ * the row update, the second pass, the retire update, the Decide read, and the two `propose` calls, and reaching those
+ * means a door that answers for a while and then stops, which belongs beside `refuseListAfter` in
+ * `import-at-scale.test.ts` rather than on a door that answers everything in one page.
+ */
+test('A HOST THAT STOPS ANSWERING IS THROWN, not reported as a record short of its lists', async () => {
+  const gone = { ok: false as const, refusal: { code: 'UNREACHABLE', fix: 'nowhere did not answer.' } };
+
+  /**
+   * WHICH CLASS THREW IS THE WHOLE ASSERTION, because `run` in `src/import.ts` branches on exactly that: only
+   * `e instanceof Unreachable` becomes the line saying to run the import again and the exit 3 that means so, and any
+   * other error is rethrown and the command dies with a stack trace. `Unreachable` carries no message, so there is
+   * nothing for a regex to match the way `import-at-scale.test.ts` matches `PartlyRead`, and the class is not exported.
+   * Measured on 2026-09-21: with `Error` as the expected class here, replacing the throw at the schema read with
+   * `new TypeError(...)` left this test green over all 28 in the file, and the behaviour the test is named for was gone.
+   */
+  const stopped = (e: unknown) => e instanceof Error && e.constructor.name === 'Unreachable';
+
+  const shut = memoryRecord(ALL);
+  const dead: Door = { ...shut.door, schema: async () => gone };
+  await assert.rejects(() => applyPlan(plan(), dead, { dryRun: false }), stopped, 'a host that stopped answering was reported as a record with no lists');
+  assert.deepEqual(shut.writes, []);
+
+  /* AND ONE THAT STOPS AT THE FIRST WRITE, where `missing` is not the wrong answer but a refusal line for every row is:
+     the report would name five projects the record refused, and the record refused nothing. */
+  const half = memoryRecord(ALL);
+  const mid: Door = { ...half.door, create: async () => gone };
+  await assert.rejects(() => applyPlan(plan(), mid, { dryRun: false }), stopped, 'a write to a host that had stopped answering was reported as the record refusing the row');
 });
 
 test('A RECORD STILL ON money-core 1.1.0 KEEPS ITS INSTALMENT WALL, having no Instalments list for it to have moved to', async () => {
