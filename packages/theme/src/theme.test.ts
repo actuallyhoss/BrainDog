@@ -17,8 +17,8 @@ import {
   solveL,
   toHex,
 } from './color.ts';
-import { HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
-import { ACCENTS } from './record.ts';
+import { ALPHA, ALPHA_SEED, HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
+import { ACCENTS, recordTheme } from './record.ts';
 import {
   BRAND_RED,
   hueGap,
@@ -321,7 +321,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 99 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 104 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -331,8 +331,8 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 99 rows per scheme, counted here and no
    * passing check cannot report that the check stopped running.
    *
    * SO THE NUMBER IS COUNTED RATHER THAN COPIED. 90 was never implemented and therefore has no
-   * authority; the arithmetic below is the seventeen checks as they are written, and it lands on
-   * 99. The table is spelled out per letter so that a change to any one check has to be argued for
+   * authority; the arithmetic below is the eighteen checks as they are written, and it lands on
+   * 104. The table is spelled out per letter so that a change to any one check has to be argued for
    * here, in the same commit, instead of quietly moving a total.
    */
   const PER_CHECK: Record<string, number> = {
@@ -351,9 +351,10 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 99 rows per scheme, counted here and no
     O: 1, //  one row for the palette: every value is shaped like a colour
     P: 1, //  one row for the palette: no value holds a banned token
     Q: 3, //  the control fill against its own label, at rest and on hover and on press
+    R: 5, //  the accent fill against the five surfaces it can be painted on
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 99, 'the per-letter table no longer sums to the number in 39 §6.1');
+  assert.equal(PER_SCHEME, 104, 'the per-letter table no longer sums to the number the checks report');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -372,7 +373,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 99 rows per scheme, counted here and no
 
   /* THE POINT OF ALL OF IT: a letter that goes missing is now visible in the output. */
   const spoke = new Set(whole.map((f) => f.check));
-  for (const letter of 'ABCDEFGHIJKLMNOPQ')
+  for (const letter of 'ABCDEFGHIJKLMNOPQR')
     assert.ok(spoke.has(letter), `check ${letter} said nothing at all, so nothing can tell it apart from a deleted check`);
 });
 
@@ -575,17 +576,19 @@ test('A SUGGESTED ACCENT CAN BE SEEN AGAINST THE SURFACE IT IS PAINTED ON, IN BO
    * `ACCENTS`' OWN NOTE SAID THE WINDOW HAD BEEN WORKED THROUGH, AND ONLY HALF OF IT HAD.
    *
    * The sentence was "dark enough to hold a 3:1 boundary against cream", and cream is the LIGHT
-   * scheme. Nobody measured the other one. `--accent` is painted as an opaque fill or a border of
-   * its own colour in fourteen declarations across eleven rules, the checked switch track among
-   * them (`controls.css` sets `background` and `border-color` to it in one rule), so SC 1.4.11
-   * asks 3:1 of the fill itself against whichever surface it lands on. Measured on the record
+   * scheme. Nobody measured the other one. `--accent` is painted as an opaque colour a reader has
+   * to see against a surface in 20 declarations, 14 of them a control's own fill or a border in
+   * the accent's own colour, the checked switch track among them (`controls.css` sets `background`
+   * and `border-color` to it in one rule), so SC 1.4.11 asks 3:1 of the fill itself against
+   * whichever surface it lands on. `ACCENTS`' own note carries the recount. Measured on the record
    * ladder before this test existed, against the worst of the five surfaces over both profiles and
    * both schemes: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47. Four of the five suggestions the
    * product offers a customer produced a checked switch, a selected tile and a chosen cell that
    * are invisible in the dark scheme, and every one of them was accepted by `recordTheme` with
-   * zero refusals, because no check in this package measures `accent` against a surface at all:
-   * check D reads `edge` and `accent-edge`, check B reads `accent-text`, check Q reads the accent
-   * against its own label, and the fill itself is measured by nothing.
+   * zero refusals, because no check in this package measured `accent` against a surface at all:
+   * check D read `edge` and `accent-edge`, check B read `accent-text`, check Q read the accent
+   * against its own label, and the fill itself was measured by nothing. Check R is that
+   * measurement, and the test below is the one that holds it for a colour nobody wrote down.
    *
    * THE HOUSE ACCENT IS IN THE LIST BECAUSE IT IS THE PROOF THE WINDOW EXISTS. #D72065 measures
    * 3.04 at its worst, which is the whole of the headroom there is: one colour has to clear 3:1
@@ -610,15 +613,77 @@ test('A SUGGESTED ACCENT CAN BE SEEN AGAINST THE SURFACE IT IS PAINTED ON, IN BO
   };
 
   /* The house seed's own neutral hue for the house accent, and `recordTheme`'s default of 110 for
-     the suggestions, because that is the ladder each is actually solved against. */
+     the suggestions, because that is the ladder each is actually solved against.
+
+     AND THE ALPHA ACCENT, WHICH IS THE ONE ACCENT IN THIS TREE NOBODY TYPED. `ALPHA_SEED` moves the
+     house hue to whatever `nextAccentHue` scores farthest (`environment.ts` calls it DETERMINISTIC
+     AND COMPUTED, NOT PINNED, so that improving the scorer moves it), and `alpha.brain.dog` is
+     painted with the result. A list of written-down constants cannot hold a value that is derived:
+     it measured 3.140 the day this line was added, 0.14 above the floor, and the next change to the
+     scorer is free to spend that without anybody reading a diff of colours. */
   const cases: [string, string, number][] = [
     ['the house accent', HOUSE.schemes.light.accent, HOUSE_SEED.neutralHue as number],
+    ['the alpha accent', ALPHA.schemes.light.accent, ALPHA_SEED.neutralHue as number],
     ...ACCENTS.map((a) => [a.name, a.hex, 110] as [string, string, number]),
   ];
   for (const [name, accent, neutralHue] of cases) {
     const { worst, where } = worstFill(accent, neutralHue);
     assert.ok(worst >= 3, `${name} (${accent}) is ${worst.toFixed(2)}:1 as a fill, ${where}. A component boundary needs 3:1.`);
   }
+});
+
+test('AND THE VALIDATOR REFUSES ONE, because a floor asserted over five constants is a fact about five constants', () => {
+  /**
+   * THE FIVE SUGGESTIONS WERE MOVED AND `recordTheme` WAS LEFT EXACTLY AS IT WAS FOUND.
+   *
+   * Measured the day after that shipped, before check R existed: `recordTheme('#1B4FA8')`,
+   * `('#8A3E7A')`, `('#0F6C77')` and `('#2F6F4E')` each came back `ok: true` with an empty refusal
+   * list, at 1.92, 2.15, 2.41 and 2.47 against `house dark s3`. Those are the same four ratios the
+   * suggestion list was rewritten to escape. The test above held the five colours somebody had
+   * already fixed by hand; nothing held a sixth colour, and the reachable surface is not the five:
+   * `apply()` in `apps/web/src/lib/accent.ts` is exported and takes any hex, and `restore()`
+   * re-applies whatever the preference holds without re-deriving it from the list.
+   *
+   * SO THE FLOOR MOVED INTO THE VALIDATOR AND THIS TEST WATCHES IT FROM OUTSIDE. `recordTheme` is
+   * the door every customer colour comes through, and it is the answer that has to change, not a
+   * list of literals.
+   */
+  for (const [name, hex, was, way] of [
+    ['Ink blue', '#1B4FA8', '1.92:1 in the dark', 'lighter'],
+    ['Plum', '#8A3E7A', '2.15:1 in the dark', 'lighter'],
+    ['Teal', '#0F6C77', '2.41:1 in the dark', 'lighter'],
+    ['Moss', '#2F6F4E', '2.47:1 in the dark', 'lighter'],
+    /* AND ONE FROM THE OTHER SIDE OF THE WINDOW, because a direction asserted only over colours
+       that are all too dark is not a direction. This colour is the first thing in this file that
+       fails check R and nothing else: `recordTheme('#7FD4FF')` comes back with ten sentences, all
+       of them R's, at 1.38:1 against `house light sunk`. Measured: with the `>` in check R's own
+       `goLighter` line flipped to `<`, the four above still refuse, still carry the code and still
+       name a way to move, and the whole suite stayed green at 52 passes. So a `/lighter|darker/`
+       match accepted advice that walks the colour further into the surface it vanished against,
+       which is the one instruction this refusal exists to give. */
+    ['a pale sky blue', '#7FD4FF', '1.38:1 in the light', 'darker'],
+  ] as const) {
+    const got = recordTheme(hex);
+    assert.equal(got.ok, false, `${name} (${hex}) measures ${was} as a fill and was accepted anyway`);
+    if (got.ok) continue;
+    assert.ok(got.codes.includes('CONTRAST_FLOOR'), `${name} was refused without a code a caller can switch on`);
+    /* AND THE SENTENCE HAS TO NAME THE MOVE, AND NAME IT THE RIGHT WAY ROUND, which is the whole
+       reason this one is allowed to refuse at all. Every other refusal in `checks.ts` instructs a
+       theme author; this one is read by somebody holding a colour picker, so "a lighter shade" is
+       the difference between a refusal and a dead end, and the wrong one of the two is worse than
+       silence. A colour outside the window is outside it on one side only, so every fill sentence
+       a single colour produces has to point the same way. */
+    const fill = got.refusals.filter((s) => s.includes('as a fill'));
+    assert.ok(fill.length > 0, `${name}'s refusal never mentions the fill: ${got.refusals.join(' | ')}`);
+    for (const said of fill)
+      assert.ok(said.includes(`Pick a ${way} shade`), `${name} needs a ${way} shade and its refusal says otherwise: ${said}`);
+  }
+
+  /* AND EVERYTHING THIS PRODUCT ACTUALLY PAINTS STILL GOES IN. A check that refuses the shipped
+     palettes is a check that will be deleted by the first person it inconveniences. */
+  for (const a of ACCENTS) assert.equal(recordTheme(a.hex).ok, true, `${a.name} is a suggestion this product offers`);
+  assert.equal(recordTheme(HOUSE.schemes.light.accent).ok, true, 'the house accent was refused by its own package');
+  assert.equal(recordTheme(ALPHA.schemes.light.accent).ok, true, 'the alpha accent was refused');
 });
 
 /* ── the grammar's own rule ──────────────────────────────────────────────── */

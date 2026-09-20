@@ -55,6 +55,13 @@ export type RecordTheme = {
  * front of it: a contrast floor is "text would not be readable", an inseparable intent is "two of
  * the four meanings would look the same". The author's sentences stay, for the surface that has an
  * author on it.
+ *
+ * CHECK R IS THE ONE EXCEPTION, AND IT IS THE REASON R IS ALLOWED TO REFUSE. Its sentence is
+ * "pick a lighter shade of the same colour", and a lighter shade of their own colour is exactly
+ * what the person at the picker has in front of them. It is the only refusal in the set whose
+ * instruction is aimed at the customer rather than at a theme author, which is why the alternative
+ * of quietly solving the accent up the lightness axis was rejected: a refusal nobody can act on is
+ * worse than a colour made visible behind their back, and this one can be acted on.
  */
 export function recordTheme(
   accent: string,
@@ -142,15 +149,32 @@ export function recordTheme(
  *
  * AND THE WINDOW HAS TWO SIDES, WHICH THIS NOTE USED TO GIVE ONE OF. It said "light enough for a
  * white label at 4.5:1, dark enough to hold a 3:1 boundary against cream", and cream is the LIGHT
- * scheme. The dark one was never measured. `--accent` is painted as an opaque fill or a border of
- * its own colour in fourteen declarations across eleven rules in the app, the checked switch track
- * among them, so SC 1.4.11 asks 3:1 of the fill against the surface under it, in both schemes.
- * Against the worst of the five surfaces over both profiles and both schemes, the old five
- * measured: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47, Ochre 3.33. Four of the five produced
- * a checked switch and a selected tile that vanish in the dark, and `recordTheme` accepted every
- * one of them with no refusal, because nothing in this package measures `accent` against a surface
- * at all: check D reads `edge` and `accent-edge`, check B reads `accent-text`, check Q reads the
- * accent against its own label, and the fill itself is measured by nothing.
+ * scheme. The dark one was never measured. SC 1.4.11 asks 3:1 of the fill against the surface
+ * under it, in both schemes. Against the worst of the five surfaces over both profiles and both
+ * schemes, the old five measured: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47, Ochre 3.33. Four
+ * of the five produced a checked switch and a selected tile that vanish in the dark, and
+ * `recordTheme` accepted every one of them with no refusal, because nothing in this package
+ * measured `accent` against a surface at all: check D read `edge` and `accent-edge`, check B read
+ * `accent-text`, check Q read the accent against its own label, and the fill itself was measured
+ * by nothing. Check R is that measurement, and it refuses.
+ *
+ * AND THE "FOURTEEN DECLARATIONS ACROSS ELEVEN RULES" THIS NOTE USED TO GIVE IS A NARROWER COUNT
+ * THAN IT READS, SO HERE IS THE RANGE. `grep -rn "var(--accent)" apps/web/src` finds 28 hits.
+ * Two are prose in a comment and one is a 22-percent `color-mix`, which leaves 25 places the token
+ * is painted; five of those are a chart `stroke`. So 20 declarations paint the accent as an opaque
+ * colour a reader has to see against a surface, and they divide like this: 14 are a control's own
+ * fill or a border in the accent's colour, and those 14 sit in 11 rules because three rules set
+ * `background` and `border-color` together, which is the number the old sentence gave. Five more
+ * are drawn around or under something rather than as a control's own fill, and reading each one
+ * rather than grouping it by file: three are `outline`s (the focused grid row in `blocks.css`, the
+ * block cursor band and the block being dragged in `p/[slug]`), one is the `lines` legend's own
+ * key line, a 2px rule 14px wide in `blocks-charts.css` and not an axis, and one is the palette row
+ * head's underline on `:focus-within`. All five are borders of the accent's own colour on any plain
+ * reading of the words. The twentieth is `accent-color: var(--accent)` on the forecast range, a
+ * fill the browser paints, and it was on the wrong side of the count: it is the one site that can
+ * carry no border of ours at all, which makes it the case check R exists for.
+ * Every direction the number moves is the safe one, so the argument for the floor was stronger
+ * than the sentence making it.
  *
  * SO FOUR OF THEM CAME UP THE LIGHTNESS AXIS AND NOTHING ELSE MOVED. Same hue, same chroma, the
  * least L that clears 3.15:1 at its worst: Moss 0.490 to 0.550 (#41815F), Ink blue 0.448 to

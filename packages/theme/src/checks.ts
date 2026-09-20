@@ -1,6 +1,6 @@
 /**
- * The validator. Seventeen checks, 28 §4.4 and 39 §6.1: A to H are 13 §2.4's, I to P are 28's
- * additions, and Q is this file's own.
+ * The validator. Eighteen checks, 28 §4.4 and 39 §6.1: A to H are 13 §2.4's, I to P are 28's
+ * additions, and Q and R are this file's own.
  * Runs at install, in CI, and live in the theme editor. A failing theme is refused, naming the pair.
  *
  * TWO POLICIES, NOT THREE, AND THE HEADER SAID THREE FOR AS LONG AS THERE WERE TWO. A breached floor
@@ -338,6 +338,80 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         fix: `theme: ${role} is ${r2(c)}:1 against its own label in ${scheme}. A control needs 4.5:1 in every state, not only at rest.`,
       });
     else out.push({ check: 'Q', scheme, level: 'pass', measured: r2(c) });
+  }
+
+  /* R · THE ACCENT ITSELF, AS A FILL, AGAINST EVERY SURFACE IT CAN BE PAINTED ON.
+     Nothing in this package measured it. Check D reads `edge` and `accent-edge`, check B reads
+     `accent-text`, check Q reads the accent against its own label, and the fill was measured by
+     nothing, so a colour that disappears into the page was accepted with no refusal at all. The
+     four suggested accents this product offered until recently measured 1.92, 2.15, 2.41 and 2.47
+     against `house dark s3` and every one of them was accepted: a checked switch, a selected tile
+     and a chosen cell that a reader in the dark scheme cannot see.
+
+     THE FLOOR IS FLAT 3 AND NOT `floors.edge`, WHICH WOULD REFUSE THE HOUSE THEME. SC 1.4.11 asks
+     3:1 of a component boundary and the high-contrast profile raises `edge` to 4.5; measured, the
+     house accent is 3.311:1 on `high-contrast dark s3` and the alpha accent 3.425, so asking 4.5
+     here would refuse both palettes this package ships, in the profile whose own note says that if
+     its floor fails the validator is wrong. It is the same argument check B already makes about
+     `intentText`: forcing a higher ratio onto a HUE walks it off the lightness axis rather than
+     making it clearer, and high contrast is a property of ink on surface and of boundaries.
+
+     AND IT IS THE REST STATE, WHICH WAS THE OTHER THING MEASURED BEFORE IT WAS SCOPED. Adding
+     `accent-hover` and `accent-press` at the same floor refuses every palette in the tree: house
+     2.450 and 2.008, alpha 2.530 and 2.029, all four on dark `s3`. Hover and press are solved in
+     the generator to step AWAY from the label, which is deliberately toward the ground, so a 3:1
+     floor on them is a floor no colour can stand on. The rest state is what establishes the shape.
+
+     SO IT REFUSES, AND THAT IS A DECISION RATHER THAN THE CHEAPEST BRANCH. The alternative is to
+     solve the accent up the lightness axis the way `accent-edge` and the hover states are solved,
+     and it was rejected for two measured reasons. The first is that the accent is the one value in
+     a theme that a customer chose by eye: the settings screen shows the hex as a swatch and the
+     generator returns it unchanged, so solving it means somebody picks one colour, is told it was
+     applied, and is shown another. A control that reports success and paints something else is
+     this codebase's signature defect, and it would be landing on the one screen whose entire
+     subject is visible change. The second is that this refusal is ACTIONABLE, which is what the
+     usual objection turns on. Every other refusal in this file instructs a theme author, and
+     `record.ts` carries codes precisely because a customer cannot move a hue or lower a chroma.
+     This one asks for the single thing the person at the picker is already holding: a lighter or
+     darker shade of their own colour, and the sentence says which.
+
+     WHAT THE REFUSAL COSTS, COUNTED RATHER THAN GUESSED. A surface is solved from the ladder and
+     the neutral hue and never from the accent, so for a given ladder the band is a fixed luminance
+     window: clear of `house dark s3`, which is the lightest dark surface, and clear of
+     `house light sunk`, which is the darkest light one. On the house ladder that is relative
+     luminance 0.1617 to 0.2442, and 2,780,570 of the 16,777,216 sRGB colours are inside it, so
+     this refuses roughly five colours in six. That is the price of a fill a reader can see in both
+     schemes at once, and it belongs here rather than in the surprise of whoever meets it.
+
+     AND IT IS NOT REDUNDANT WITH `accent-edge`, WHICH IS THE OBJECTION THAT LOOKS STRONGEST. The
+     generator does solve a 3:1 boundary in the accent's hue and check D proves it, so a filled
+     control that draws that border is legal whatever the accent. Six sites in the app throw the
+     boundary away: three rules set `background` and `border-color` both to `var(--accent)` (the
+     checked switch track in `controls.css`, the ticked list marker in `blocks.css`, the checked
+     filter box on the register page), and three paint a borderless accent fill (the net-series
+     swatch and the drag-and-drop indicator, plus `accent-color: var(--accent)` on the forecast
+     range, which the browser fills and which can carry no border of ours at all). */
+  for (const surface of SURFACES) {
+    const got = contrast(rgb(p.accent), rgb(p[surface]));
+    if (got < 3) {
+      /* WHICH WAY TO MOVE IS A MEASUREMENT AND NOT A GUESS. Two colours are close because their
+         luminances are close, so the accent gains contrast by going further the way it already
+         leans: lighter when it is the lighter of the two, darker when it is the darker. In the
+         dark scheme that is always lighter and in the light scheme always darker, but reading it
+         off the pair means the sentence stays true if a ladder ever changes. */
+      const goLighter = relLuminance(rgb(p.accent)) > relLuminance(rgb(p[surface]));
+      out.push({
+        check: 'R',
+        scheme,
+        level: 'refuse',
+        code: 'CONTRAST_FLOOR',
+        measured: r2(got),
+        /* THE ACCENT, BECAUSE THE ACCENT IS THE ONLY THING HERE ANYBODY CHOSE. The surfaces are
+           the product's own ladder and a record does not get to move them. */
+        at: at('accent'),
+        fix: `theme: the accent is ${r2(got)}:1 as a fill against ${surface} in ${scheme}. A filled control needs 3:1 or it is not there. Pick a ${goLighter ? 'lighter' : 'darker'} shade of the same colour.`,
+      });
+    } else out.push({ check: 'R', scheme, level: 'pass', measured: r2(got) });
   }
 
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to

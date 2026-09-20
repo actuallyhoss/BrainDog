@@ -15,14 +15,24 @@
  * AND IT IS REFUSED RATHER THAN APPROXIMATED. A colour that cannot meet the floors comes back as
  * the sentences it failed, so a person picking one is told why rather than shown a screen they
  * cannot read.
+ *
+ * AND THE FLOORS NOW INCLUDE THE ONE THIS MODULE IS MOST EXPOSED TO. `apply` takes any hex, and
+ * `restore` re-applies whatever the preference holds without re-deriving it from `ACCENTS`, so the
+ * reachable set was never the five swatches. Until check R the accent's own fill was measured by
+ * nothing: four of the colours this product used to suggest measured between 1.92:1 and 2.47:1
+ * against the raised dark surface and `recordTheme` accepted every one, which is a checked switch
+ * nobody can see. A refusal from here names a lighter or darker shade of the same colour, because
+ * that is the one move the person holding the picker can make.
  */
 
 import { ACCENTS, recordTheme } from '@braindog/theme';
 
 import * as pref from './pref.ts';
 
-/* Re-exported so a screen picking a colour imports one module rather than two, and so the six live
-   where every other colour literal in this product lives. */
+/* Re-exported so a screen picking a colour imports one module rather than two, and so the five live
+   where every other colour literal in this product lives. `ACCENTS.length` is 5 and has been since
+   Brick was removed for being the house colour under another name; the settings screen's own "six
+   swatches" is right for a different reason, which is that the sixth control is House. */
 export { ACCENTS };
 
 let sheet: CSSStyleSheet | null = null;
