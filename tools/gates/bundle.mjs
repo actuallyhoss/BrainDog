@@ -124,7 +124,17 @@ try {
    a change to a route. The first version of this check walked only the app, so the first kernel
    commit after it went straight through a green bundle row again. */
 const dirs = [join(APP, 'src')];
-for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes: true }))
+/* AND IT IS ALLOWED NOT TO BE THERE, which the sibling walk over `apps/` has said since it was
+   written and this one did not: a bare `readdir` of a directory that does not exist throws ENOENT
+   out of the gate, and a gate that dies is a gate whose other twelve rows nobody sees. It is the
+   same fault `3eb5fdcd` fixed one function down, left in the line above it.
+
+   SILENCE IS HONEST HERE AND IT IS NOT HONEST THERE, which is why this is a `catch` and the
+   shells list is a finding. This list feeds a STALENESS comparison: no packages means no package
+   source that could be newer than the build, and an empty list says exactly that. The shells list
+   feeds a CONTENT check, where finding nothing to read and reporting that everything read clean
+   are the same green row. */
+for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes: true }).catch(() => []))
   if (pkg.isDirectory()) dirs.push(join(process.cwd(), 'packages', pkg.name, 'src'));
 
 /* `src` AND NOT THE PACKAGE. A package's `test/` is not compiled into anything the browser
