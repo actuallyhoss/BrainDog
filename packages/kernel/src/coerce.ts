@@ -106,6 +106,37 @@ function overCap(type: keyof typeof TEXT_CAPS, value: string, at: string): Coerc
 const INT_STRING = /^-?\d+$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const CURRENCY = /^[A-Za-z]{3}$/;
+
+/**
+ * ISO 4217'S ACTIVE LIST, AS THE RUNTIME HOLDS IT, READ ONCE.
+ *
+ * `34 §3` writes the money literal as `currency ":" iso4217`, not as three letters, and three
+ * letters was the whole test until this existed. So `GPB` — one transposition away from `GBP` —
+ * coerced, wrote and stored, and so did `XYZ` and `VAT`. A bad currency does not break the row it
+ * is on; it breaks every FIGURE over that register, permanently, because `sum` cannot add two
+ * currencies and no FX rate can ever be found for a currency that does not exist. The reading
+ * comes back `met: null`, which is a target that has quietly stopped being evaluated, and nothing
+ * on the screen says why.
+ *
+ * NO PACKAGE SHIPS A CURRENCY TABLE. `34 §3` and `02 §3` both say it in those words, and
+ * `exponentOf` already reads each exponent from the same `Intl` data — a record cannot be allowed
+ * to know that `KWD` has three decimals and not know that `KWD` is a currency.
+ * `packages/record/src/index.ts:722` already builds its table from `Intl.supportedValuesOf` at
+ * module scope in a package the Worker imports, which is the standing proof the API is available
+ * under workerd. Cached here for the same reason it is cached there: it is called once per money
+ * value written.
+ */
+const CURRENCIES: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+
+/**
+ * Whether an UPPER-CASE three-letter code is one ISO 4217 actually assigns.
+ *
+ * The case matters to every caller: `gbp` is a real currency sent in the wrong case, and the
+ * record's promise is to store it as `GBP`. So membership is tested on the upper-cased code, never
+ * on what arrived. `declare.ts`'s `isCur` upper-cases by grammar instead, requiring `[A-Z]{3}` of a
+ * declaration's own text, and then asks this.
+ */
+export const isCurrencyCode = (code: string): boolean => CURRENCIES.has(code);
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const GRANT = /^g_[0-9A-HJKMNP-TV-Z]{26}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -335,7 +366,16 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       const currency = raw.currency;
       if (typeof currency !== 'string' || !CURRENCY.test(currency))
         return malformed(`${at}.currency takes a three-letter code, and every money value carries its own.`);
-      return good({ amount, currency: currency.toUpperCase() });
+      /* THE MEMBERSHIP TEST RUNS ON THE UPPER-CASED CODE, and the order is the whole subtlety: a
+         caller sending `gbp` is sending a real currency in the wrong case, and this path has always
+         stored it as `GBP`. Testing membership before normalising would refuse them. */
+      const code = currency.toUpperCase();
+      /* A SEPARATE SENTENCE FROM THE SHAPE REFUSAL ABOVE, because they send the caller to different
+         places: `POUNDS` is not a code at all, and `GPB` is a code for nothing. Telling the second
+         caller to send three letters would be telling them they already did. */
+      if (!isCurrencyCode(code))
+        return bad('CURRENCY_UNKNOWN', `${at}.currency is ${code}, and ISO 4217 assigns no such currency. Money in a currency that does not exist can never be added up or converted, so the figure over it stops being a number.`, at);
+      return good({ amount, currency: code });
     }
 
     case 'quantity': {

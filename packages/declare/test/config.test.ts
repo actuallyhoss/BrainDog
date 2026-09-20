@@ -106,7 +106,10 @@ test('EVERY PLACEHOLDER NAMES A DECLARED SETTING WITH A DEFAULT, and a money set
   const bare = refusal(await normalise(DOC({ config: { heading: { type: 'text' }, days: { type: 'text', default: '7' }, strict: { type: 'bool', default: false } } })));
   assert.deepEqual([bare.code, bare.at], ['REQUIRED_MISSING', 'config.heading.default']);
 
-  const money = DOC({ config: { heading: { type: 'money', default: { amount: 500, currency: 'XTS' } }, days: { type: 'text', default: '7' }, strict: { type: 'bool', default: false } } });
+  /* A REAL CURRENCY, because this case is about a money setting standing where text was wanted and
+     not about the currency. It said `XTS`, ISO 4217's reserved testing code, which `money` now
+     refuses as `CURRENCY_UNKNOWN` before the placeholder is ever looked at. */
+  const money = DOC({ config: { heading: { type: 'money', default: { amount: 500, currency: 'GBP' } }, days: { type: 'text', default: '7' }, strict: { type: 'bool', default: false } } });
   (money.declarations[0] as { name: string }).name = 'Fee of {{config:heading}}';
   assert.equal(refusal(await normalise(money)).code, 'VALUE_MALFORMED');
 });

@@ -27,7 +27,7 @@ import {
   type PackSource,
   unresolvedFault,
 } from '@braindog/declare';
-import { isDuplicate, matchLiterals, normalise as normaliseText, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
+import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
@@ -723,6 +723,24 @@ const CURRENCIES: CurrencyTable = Object.fromEntries(
   Intl.supportedValuesOf('currency').map((code) => [code, { exponent: exponentOf(code) }]),
 );
 
+/**
+ * `43 §4.5`'s `day`, in the shape the kernel's seam asks for.
+ *
+ * TWO ADAPTATIONS, AND NEITHER IS A GRAMMAR. `parseDate` answers `undefined` where the seam says
+ * `null`, and it THROWS `DATE_FORMAT_INVALID` for a format `§4.3`'s token rules do not admit — no
+ * year, two month tokens, a variable-width token run into a digit. `declare` refuses all three at
+ * install, which is where an author should hear about them, and the kernel's own contract at this
+ * point is that nothing throws: a coercion that raised mid-ingest would take a whole arrival down
+ * over one field, where answering `null` costs that field and keeps the message and its bytes.
+ */
+const readDay = (text: string, format: string): string | null => {
+  try {
+    return parseDate(text, format) ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export async function createRecordApi(deps: RecordDeps) {
   const opened = await openRecord(deps.sql, deps.clock, {
     ...(deps.delivers === undefined ? {} : { delivers: deps.delivers }),
@@ -751,6 +769,12 @@ export async function createRecordApi(deps: RecordDeps) {
        forms read the body exactly as it arrived, and a zero-width space inside `EGP` walks past
        every anchor while the message still reads correctly on screen (`§8`). */
     normalise: normaliseText,
+    /* AND `§4.5`'s `day`, which is the same token grammar as `dates` answering the other question:
+       `dates` finds every day in a slice of an email, and this reads the one day a `map:` field of a
+       JSON answer holds. Without this line a record reads the four formats `ingest.ts` names out of
+       the token set the grammar allows, so a connector's page dated `29.08.2026` — `§9.3`'s own
+       worked example — files for review saying it could not make sense of the date. */
+    day: readDay,
   });
   /* A use case installed before `speaks` existed reads as declaring it (`speaks.ts`). */
   const kernel = backfillSpeaks(opened, deps.sql);

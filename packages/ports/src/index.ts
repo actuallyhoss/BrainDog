@@ -246,10 +246,16 @@ const GRAMMAR = [
   'REF_UNKNOWN',
 ] as const;
 
-/** Write path — 18. */
+/** Write path — 19. */
 const WRITE = [
   'REGISTER_UNKNOWN', 'FIELD_UNKNOWN', 'ROW_LOCKED', 'HUMAN_ONLY', 'TEXT_JSON_QUOTED',
   'TEXT_ESCAPED_NEWLINE', 'INT_OUT_OF_RANGE', 'VALUE_MALFORMED', 'REQUIRED_MISSING', 'ENUM_VALUE_UNKNOWN',
+  /* THREE LETTERS IS A SHAPE AND NOT A CURRENCY, and the two were one test until `GPB` reached a
+     row. It is its own code beside `ENUM_VALUE_UNKNOWN` and not folded into `VALUE_MALFORMED`
+     because the two send a caller somewhere different: `POUNDS` is a typo in the SHAPE, and `GPB`
+     is a typo in a real-looking code that no rate will ever exist for, so every figure over that
+     register stops being a number and any target on it stops being evaluated. */
+  'CURRENCY_UNKNOWN',
   'OUT_OF_BOUNDS', 'IMMUTABLE_FIELD', 'UNIQUE_VIOLATION', 'ALREADY_KNOWN', 'REF_REGISTER_MISMATCH',
   'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
 ] as const;

@@ -624,7 +624,7 @@ the caller's bug; refusing names it.
 
 ### The codes
 
-One hundred and twenty-five, counted, in nine families — 54 pack and declaration · 14 grammar · 18 write path · 8 auth and
+One hundred and twenty-six, counted, in nine families — 54 pack and declaration · 14 grammar · 19 write path · 8 auth and
 vault · 8 format and lifecycle · 2 dialect · 5 spark · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
@@ -795,6 +795,7 @@ any row is written".*
 | `VALUE_MALFORMED` | step 3 — a value outside its type's shape that cannot be coerced, an unresolvable id or spoken reference, a non-grant `secret`, an erase subject under three characters; at install too, for a seed (41, 42) | `value-malformed` |
 | `REQUIRED_MISSING` | step 4 | `required-missing` |
 | `ENUM_VALUE_UNKNOWN` | step 4 | `enum-value-unknown` |
+| `CURRENCY_UNKNOWN` | step 3 — a `money` value whose currency is three letters and is not one `Intl.supportedValuesOf('currency')` lists. Its own code and not `VALUE_MALFORMED`, because the shape is right and the damage is elsewhere: no rate can ever exist for a code that does not, so every figure over that register falls to `value: null` and any target on it stops being evaluated (34 §52) | `currency-unknown` |
 | `OUT_OF_BOUNDS` | step 4, `min:`/`max:` — both bounds named | `out-of-bounds` |
 | `IMMUTABLE_FIELD` | step 4, `immutable:` on a changed field; also a derived, retired or kernel-written field (41) | `immutable-field` |
 | `UNIQUE_VIOLATION` | step 4, `unique:` on a series row, or from the index as the backstop — driver messages are never parsed (41) | `unique-violation` |

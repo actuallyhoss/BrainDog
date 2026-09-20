@@ -1,0 +1,5 @@
+code:   CURRENCY_UNKNOWN
+via:    write
+raises: packages/kernel/src/coerce.ts
+at:     fields.amount
+fix:    Send the currency as an ISO 4217 code in upper case, such as GBP rather than GPB.

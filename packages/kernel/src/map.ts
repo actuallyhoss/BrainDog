@@ -228,8 +228,35 @@ export function parseAnswer(body: string, cap = 2_000_000): unknown {
   }
 }
 
-/** One mapped row: what was read, and which fields were not read cleanly. */
-export type RowRead = { fields: Record<string, Json>; missed: string[]; soft: string[] };
+/**
+ * One mapped row: what was read, and which fields were not read cleanly.
+ *
+ * `outcome` IS THE ANSWER AND THE THREE LISTS ARE VIEWS OF IT. `mapField` has always distinguished a field
+ * the answer did not carry from a field it carried in a shape the row could not read, and `43 §5.1` step 9
+ * ranks them apart — *"`receipt.fields` is the worst outcome per field over rows, on the severity
+ * `invalid > ambiguous > missing > defaulted > chosen > exact`"* — but this type had nowhere to put the
+ * difference, so both arrived at the receipt as the single word `missing`. A person told a date was missing
+ * writes to the provider to ask for a field that was in every message; told it was invalid, they look at
+ * the format that changed.
+ *
+ * `missed` STAYS THE WHOLE LIST OF FIELDS THAT WERE NOT WRITTEN, and `invalid` is the subset of it that was
+ * sent and unreadable. That is deliberate rather than tidy: `extract.ts` and `ingest.ts` decide a row's
+ * confidence by whether `missed` is empty, and `§5.1` step 7 puts `missing`, `ambiguous` and `invalid` all
+ * at `needs-review`, so narrowing `missed` here would quietly promote an invalid-only row to `exact` in two
+ * callers at once. They should be moved onto `outcome`, which says the true word per field; until they are,
+ * the list they read must keep meaning what it meant.
+ */
+export type RowRead = {
+  fields: Record<string, Json>;
+  /** Every field not written: absent and unreadable alike, which is what a caller checks for emptiness. */
+  missed: string[];
+  /** Every field written from a `chose or defaulted` reading, which is `43 §5.1` step 7's `proposed`. */
+  soft: string[];
+  /** The subset of `missed` that was sent and could not be read. Never holds a field `missed` does not. */
+  invalid: string[];
+  /** The outcome per field, in `mapField`'s own words, for a receipt that ranks them by `§5.1` step 9. */
+  outcome: Record<string, Mapped['outcome']>;
+};
 
 /**
  * A whole row, by its `map:`, over one parsed answer.
@@ -250,14 +277,24 @@ export function readRow(
   const fields: Record<string, Json> = {};
   const missed: string[] = [];
   const soft: string[] = [];
+  const invalid: string[] = [];
+  const outcome: Record<string, Mapped['outcome']> = {};
 
   for (const [field, mapping] of Object.entries(map)) {
     const got = mapField(deps, mapping, root, arrivedAt, typeOf(field));
+    outcome[field] = got.outcome;
     /* A FIELD THAT READ NOTHING IS NAMED AND NOT WRITTEN AS `null`. A null in a row is a value
        somebody could act on; a name in `missed` is the row saying it could not be read. */
-    if (got.value === null) { missed.push(field); continue; }
+    if (got.value === null) {
+      missed.push(field);
+      /* AND IT IS NAMED WITH THE WORD IT EARNED. Both words are `needs-review` by `43 §5.1` step 7, so
+         no wrong row was ever written by collapsing them; what was lost is the only part a person acts
+         on. See the note above `INVALID` at the top of this file. */
+      if (got.outcome === 'invalid') invalid.push(field);
+      continue;
+    }
     fields[field] = got.value;
     if (got.outcome !== 'exact') soft.push(field);
   }
-  return { fields, missed, soft };
+  return { fields, missed, soft, invalid, outcome };
 }

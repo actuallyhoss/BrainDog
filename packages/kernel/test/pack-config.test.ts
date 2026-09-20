@@ -49,14 +49,18 @@ test('THE SIX TYPES ARE ACCEPTED, AND EACH DEFAULT IS COERCED AS A FIELD OF THAT
       heading: { type: 'text', default: 'Sample invoices', label: 'Heading' },
       cadence: { type: 'enum', values: ['weekly', 'monthly'], default: 'monthly' },
       strict: { type: 'bool', default: 'true' },
-      late_fee: { type: 'money', default: { amount: 1250, currency: 'xts' } },
+      late_fee: { type: 'money', default: { amount: 1250, currency: 'gbp' } },
       starts: { type: 'day', default: '2026-01-05' },
       grace: { type: 'duration', default: 86400, note: 'How long before a reminder.' },
       no_default: { type: 'text' },
     }),
   );
   assert.equal(read.strict?.default, true);
-  assert.deepEqual(read.late_fee?.default, { amount: 1250, currency: 'XTS' });
+  /* The point of this line is the case: a default is coerced as a field of its type would be, so a
+     lower-case code comes back upper-case. It said `xts`, which is ISO 4217's own reserved testing
+     code and therefore not a currency `Intl.supportedValuesOf` lists, and `money` now holds a code
+     to the list rather than to three letters. */
+  assert.deepEqual(read.late_fee?.default, { amount: 1250, currency: 'GBP' });
   assert.deepEqual(read.cadence?.values, ['weekly', 'monthly']);
   assert.equal(read.no_default?.default, undefined);
   assert.deepEqual(value(readConfig(undefined)), {});

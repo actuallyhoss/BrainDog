@@ -118,6 +118,72 @@ FAMILIES.forEach(([name], i) => {
     findings.push(`${name}: the table lists ${tableSizes[i]} and REFUSAL_CODES declares ${declaredSizes[i]}`);
 });
 
+/**
+ * A spelled-out whole number, 0 to 999, or `undefined` for anything this cannot read.
+ *
+ * ONLY THE RANGE THE SENTENCE CAN OCCUPY. There are a hundred and twenty-six refusal codes and
+ * `30 §6` is the only caller, so three digits is the whole requirement and a general English
+ * number grammar would be the same mistake in the other direction.
+ *
+ * `and` IS OPTIONAL AND `-` IS NOT LOAD-BEARING. Both `One hundred and twenty-six` and
+ * `One hundred twenty six` read as 126, because the point is to read what a person wrote in a
+ * document rather than to hold them to a house style in a sentence nobody reformats on purpose.
+ */
+function words(said) {
+  const UNITS = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+    ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+    eighteen: 18, nineteen: 19 };
+  const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+
+  const parts = said.toLowerCase().replace(/-/gu, ' ').split(/\s+/u).filter((w) => w.length > 0 && w !== 'and');
+  let total = 0;
+  let seen = false;
+  for (let at = 0; at < parts.length; at++) {
+    const word = parts[at];
+    if (parts[at + 1] === 'hundred') {
+      const many = UNITS[word];
+      if (many === undefined || many === 0) return undefined;
+      total += many * 100;
+      seen = true;
+      at++;
+      continue;
+    }
+    if (word === 'hundred') {
+      /* A bare `Hundred`, which the old table also accepted. */
+      if (seen) return undefined;
+      total += 100;
+      seen = true;
+      continue;
+    }
+    if (TENS[word] !== undefined) {
+      total += TENS[word];
+      seen = true;
+      continue;
+    }
+    if (UNITS[word] !== undefined) {
+      total += UNITS[word];
+      seen = true;
+      continue;
+    }
+    return undefined;
+  }
+  return seen ? total : undefined;
+}
+
+/**
+ * THE PARSER IS TESTED ON EVERY RUN, which is the condition for replacing a table with code in a
+ * gate. A gate that silently mis-reads a number is worse than one that cannot read it: the old
+ * table failed loudly and this could fail quietly, so it does not get to.
+ */
+for (const [text, want] of [['Ninety', 90], ['Ninety-nine', 99], ['One hundred', 100], ['Hundred', 100],
+  ['One hundred and twelve', 112], ['One hundred and fifteen', 115], ['One hundred and seventeen', 117],
+  ['One hundred and twenty-two', 122], ['One hundred and twenty-five', 125], ['One hundred and twenty-six', 126],
+  ['One hundred and thirty', 130], ['Two hundred and one', 201], ['One hundred twenty six', 126],
+  ['Eleventy-one', undefined], ['', undefined], ['Refusals', undefined]]) {
+  const got = words(text);
+  if (got !== want) findings.push(`this gate's own number reader is wrong: it reads "${text}" as ${got} and not ${want}`);
+}
+
 /* ── 3 · the sentence that counts ───────────────────────────────────────── */
 
 /* ONE LINE, BECAUSE THE SENTENCE IS NOT. It wraps in the document, and a regex anchored to a line
@@ -128,14 +194,20 @@ const flat = section.replace(/\s+/gu, ' ');
    capitalised, optionally hyphenated word — which reads `Ninety-nine` and cannot read `One hundred
    and twelve`. The moment the list passed a hundred the gate reported the sentence MISSING rather
    than the count wrong, which is the least useful thing it could have said about the change that
-   was happening. The words are still a table rather than a parser: a spelled-out total is prose a
-   person reads, and five entries is cheaper than an English number grammar nobody will test. */
+   was happening.
+
+   THE WORDS WERE THEN A LOOKUP TABLE, and the argument for it was that five entries is cheaper
+   than an English number grammar nobody will test. Eleven entries later, every single code added
+   to this repository has cost somebody a second red gate and a one-line edit to a table of
+   spellings — and the failure it gives them says `this gate cannot read as a number`, which
+   sounds like a defect in their change and is not. A gate that manufactures work is a gate people
+   route around. `words()` below reads the range this sentence can plausibly occupy, it is tested
+   by `spelled()` beneath it on every run, and it costs nothing per code from here on. */
 const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families — (\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) spark · (\d+) connector · (\d+) host and client/.exec(flat);
 if (!counted) {
   findings.push("30 §6's counting sentence is not where this gate looks for it");
 } else {
-  const WORDS = { Ninety: 90, 'Ninety-nine': 99, 'One hundred': 100, Hundred: 100, 'One hundred and twelve': 112, 'One hundred and fifteen': 115, 'One hundred and seventeen': 117, 'One hundred and twenty-two': 122, 'One hundred and twenty-three': 123, 'One hundred and twenty-four': 124, 'One hundred and twenty-five': 125 };
-  const said = WORDS[counted[1]];
+  const said = words(counted[1]);
   if (said === undefined) findings.push(`30 §6 counts them as "${counted[1]}", which this gate cannot read as a number`);
   else if (said !== table.length) findings.push(`30 §6 says ${counted[1]} (${said}) and its table lists ${table.length}`);
   counted.slice(2).map(Number).forEach((n, i) => {

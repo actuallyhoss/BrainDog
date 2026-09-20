@@ -82,6 +82,54 @@ test('a money value with no currency is refused, because two currencies do not a
   assert.match(refuse(f('money'), { amount: 4800, currency: 'POUNDS' }).fix, /three-letter code/);
 });
 
+test('A CURRENCY THAT DOES NOT EXIST IS REFUSED, because no rate can ever be found for it', () => {
+  /* `34 §3`: `money = "{" "amount" ":" integer "," "currency" ":" iso4217 "}" ;` — iso4217, not
+     three letters. Three letters was the whole test, so `GPB` (the typo for `GBP`) installed,
+     wrote and stored, and it is the round-trip bug this file exists for: the row looks right in a
+     log and the figure over it stops being a number, for ever, because no FX rate can exist for a
+     currency that does not exist. */
+  const typo = refuse(f('money'), { amount: 420_000, currency: 'GPB' });
+  assert.equal(typo.code, 'CURRENCY_UNKNOWN');
+  /* The sentence names what the caller sent, because the whole value of catching this is that the
+     person reading the refusal sees GPB beside GBP and fixes the keystroke. */
+  assert.match(typo.fix, /GPB/);
+
+  /* The one proved to reach SQLite today, with a metric over it answering `met: null`. */
+  assert.equal(refuse(f('money'), { amount: 5, currency: 'XYZ' }).code, 'CURRENCY_UNKNOWN');
+
+  /* THE MEMBERSHIP TEST RUNS AFTER `.toUpperCase()`, NOT BEFORE. A caller sending `gbp` is sending
+     a real currency in the wrong case, and this file already promised to store it as `GBP` (the
+     money test above). Checking membership against the raw string would refuse every lower-case
+     caller the record accepts today, which is why this line is deliberately a duplicate. */
+  assert.deepEqual(take(f('money'), { amount: 4800, currency: 'gbp' }), { amount: 4800, currency: 'GBP' });
+
+  /* The two codes whose exponent is not two. They are the reason a currency list and an exponent
+     reader have to be the same list: a record cannot know KWD has three decimals and not know KWD
+     is a currency. */
+  assert.deepEqual(take(f('money'), { amount: 4800, currency: 'KWD' }), { amount: 4800, currency: 'KWD' });
+  assert.deepEqual(take(f('money'), { amount: 129_900, currency: 'JPY' }), { amount: 129_900, currency: 'JPY' });
+
+  /* THE SHAPE REFUSAL AND THE MEMBERSHIP REFUSAL ARE DIFFERENT SENTENCES AND BOTH MUST EXIST.
+     `POUNDS` is not a three-letter code at all, and telling its caller that a currency is unknown
+     would send them looking for a currency called POUNDS. */
+  const shape = refuse(f('money'), { amount: 4800, currency: 'POUNDS' });
+  assert.notEqual(shape.code, 'CURRENCY_UNKNOWN');
+  assert.match(shape.fix, /three-letter code/);
+});
+
+test('the list of currencies is the runtime\'s own, and no package ships one', () => {
+  /* `34 §3` and `02 §3` both say it in those words: **no package ships a currency table**.
+     `packages/record/src/index.ts:722` already calls `Intl.supportedValuesOf('currency')` at module
+     scope in a package the Worker imports, which is the standing proof the API is there under
+     workerd and the answer to the one objection this refusal attracts.
+
+     This loop is green today and green after a correct fix. It goes red the moment somebody
+     implements the membership test as a hard-coded literal, because their list will be shorter than
+     the runtime's and it will be wrong the first time ISO 4217 changes. */
+  for (const code of Intl.supportedValuesOf('currency'))
+    assert.deepEqual(take(f('money'), { amount: 1, currency: code }), { amount: 1, currency: code });
+});
+
 test('the key is `amount`, and a value calling it `minor` is told so by name', () => {
   assert.match(refuse(f('money'), { minor: 4800, currency: 'GBP' }).fix, /called amount/);
 });

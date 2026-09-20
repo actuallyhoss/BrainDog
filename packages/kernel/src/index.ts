@@ -696,6 +696,25 @@ export type RecordOptions = {
    * Absent, the body is read exactly as it arrived.
    */
   normalise?: IngestDeps['normalise'];
+  /**
+   * `43 §4.5`'s `day`, read by `@braindog/extract`'s `parseDate`, when the caller wired it: the one
+   * day a `map:` field holds under its declared `format`.
+   *
+   * THE EIGHTH VALUE ACROSS THIS SEAM, AND THE ONE `dates` DID NOT COVER. `dates` is the same grammar
+   * answering a different question — every day in a slice of an email, so `nth:` has something to
+   * count — and a `map:` entry reads one field of a JSON answer that is supposed to be a day. The
+   * shapes say so: `string[]` against `string | null`, which is why one could not stand in for the
+   * other and why the `map:` path stayed on the kernel's four formats after `dates` landed.
+   *
+   * THAT GAP HAD STOPPED BEING LOUD, which is what made it worth closing rather than noting. While
+   * `declare` answered `NOT_IN_THIS_BUILD` for a format the grammar admits and the build could not
+   * read, a `format: DD.MM.YYYY` never installed. That refusal was retired once `dates` was wired,
+   * on the reasoning that a record now reaches the grammar — true of the text path and not of this
+   * one — so from then until now such a declaration installed clean and read every date as `invalid`.
+   *
+   * Absent, the kernel's own four-format table, unchanged, so a kernel used bare behaves as it did.
+   */
+  day?: IngestDeps['day'];
 };
 
 /* A SORTED PAGE'S CURSOR: `~` then the order it belongs to, the last row's value under each sort key and its id, as
@@ -3040,6 +3059,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     dates: opts.dates,
     duplicate: opts.duplicate,
     normalise: opts.normalise,
+    /* AND `43 §4.5`'s `day` for a `map:` field, when one was wired. Absent is the kernel's own four
+       formats, unchanged. */
+    day: opts.day,
   });
 
   const pullDeps = (): PullDeps => ({
@@ -3765,7 +3787,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       ctx: { maxRows?: number; rows?: ExtractDeps['rows'] } = {},
     ): Extraction =>
       extractPull(
-        { schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null), exponent: exponentOf, day, rows: ctx.rows },
+        /* `day` COMES THE SAME WAY `rows` DOES, and for the same reason one rank down: `43 §4.3`'s
+           date grammar is a token set this package has no business holding, so a record that has one
+           hands it in and a kernel without one keeps its four formats. Without this a connector's
+           page read dates by a different grammar than the same record's email did. */
+        { schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null), exponent: exponentOf, day: opts.day ?? day, rows: ctx.rows },
         decl,
         raw,
         ctx,

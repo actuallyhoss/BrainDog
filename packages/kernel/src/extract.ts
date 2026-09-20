@@ -157,10 +157,15 @@ export function extractPull(
     const got = readRow({ exponent: deps.exponent, day: deps.day }, map, element, raw.ts, typeOf);
 
     /* THE OUTCOME PER FIELD, which is what a person reads when a row is in front of them: not
-       *this row is proposed* but *this row is proposed because nobody sent a currency*. */
+       *this row is proposed* but *this row is proposed because nobody sent a currency*.
+
+       AND IN `readRow`'s OWN WORDS RATHER THAN REBUILT FROM ITS LISTS. This wrote the literal
+       `'missing'` over every field in `missed`, which holds the absent ones and the unreadable ones
+       alike, so a page whose date format had changed reported that the provider had stopped sending
+       a date. `mapField` had the right word all along and two layers threw it away; `43 §5.1` step 9
+       ranks `invalid` above `missing` precisely because they are not the same news. */
     const outcome: Record<string, string> = {};
-    for (const field of got.missed) outcome[field] = 'missing';
-    for (const field of got.soft) outcome[field] = 'defaulted';
+    for (const [field, word] of Object.entries(got.outcome)) if (word !== 'exact') outcome[field] = word;
 
     const confidence = worse(
       got.missed.length ? 'needs-review' : got.soft.length ? 'proposed' : 'exact',

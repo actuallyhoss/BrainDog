@@ -302,6 +302,27 @@ export type IngestDeps = {
    */
   dates?: ((text: string, format: string) => string[]) | undefined;
   /**
+   * `43 §4.5`'s `day`, when the record handed it down: the ONE day a `map:` field's value holds under
+   * `format`, or `null`.
+   *
+   * THE SAME GRAMMAR AS `dates` AND A DIFFERENT QUESTION, which is why it is an eighth value across the
+   * seam and not a use of the seventh. `dates` scans a slice of an email for every day in it, so `nth:`
+   * has something to count; this reads one field of a JSON answer that is supposed to BE a day. Their
+   * return types say it: `string[]` against `string | null`.
+   *
+   * ABSENT IS `day()` BELOW, four formats keyed by name, which is what a kernel used bare has always
+   * read and must keep reading. Wired, `43 §9.3`'s other three rows — `D/M/YY`, `DD.MM.YYYY` and
+   * `DDMMYYYY` — are read too. Until this existed there was no way for a caller to supply one: `dates`
+   * reached the `extract:` text path only, so the `map:` path was still on the four while `declare`
+   * had already stopped refusing the rest.
+   *
+   * IT MUST NOT THROW. `map.ts` promises *"NOTHING HERE THROWS"* at this point, and
+   * `@braindog/extract`'s `parseDate` raises `DATE_FORMAT_INVALID` for a format the grammar does not
+   * admit, so whoever wires it catches that and answers `null`. A format that bad is `declare`'s to
+   * refuse at install; arriving here it costs one field, not the whole arrival.
+   */
+  day?: ((text: string, format: string) => string | null) | undefined;
+  /**
    * `43 §5.7`'s `isDuplicate`, when the record handed it down: whether two rows are one event.
    *
    * THE HALF SQL CANNOT ANSWER. `existingRow` narrows on the `on:` fields and the day window, which
@@ -674,6 +695,16 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     const text = deps.normalise === undefined ? body : deps.normalise(body);
     const extracted: Record<string, unknown> = {};
     const missed: string[] = [];
+    /**
+     * The subset of `missed` the message DID carry and this build could not read (`43 §4.5`).
+     *
+     * ONLY A `map:` CAN FILL THIS. The `extract:` branch below reads a form over free text, where a
+     * form that matches nothing has found nothing — there is no value there to be unreadable, which is
+     * why `FieldOutcome` on that path has no `invalid` member at all. A `map:` reads a named path out
+     * of a JSON answer, so `{"date": "29.08.2026"}` is a field that was sent and a field we could not
+     * read, and those are two different sentences to put in front of a person.
+     */
+    const invalid: string[] = [];
 
     /* THE OUTCOME PER FIELD, not only the value — `43 §5.1` step 7 files a row by the worst of them
        and this loop used to keep the value alone. */
@@ -690,10 +721,14 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
          So a mapped row under a route is typed by nothing, exactly as it was before routes could be
          written at all, rather than by whichever target happened to be listed first. */
       const fields = (typeof matched.writes.register === 'string' ? deps.schemaOf(matched.writes.register)?.fields : undefined) ?? {};
-      const got = readRow({ exponent: exponentOf, day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
+      const got = readRow({ exponent: exponentOf, day: deps.day ?? day }, matched.map, parseAnswer(body), at, (field) => fields[field]?.type);
       Object.assign(extracted, got.fields);
       missed.push(...got.missed);
       soft.push(...got.soft);
+      /* AND WHICH OF THE MISSED ONES WERE SENT. `readRow` keeps them apart and this is where the
+         distinction has to survive, because `missed` alone cannot tell the reason sentence below
+         whether to send a person to the provider or to the format. */
+      invalid.push(...got.invalid);
     } else {
       for (const [field, form] of Object.entries(matched.extract ?? {})) {
         const got = resolve(deps, form, text);
@@ -763,8 +798,27 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       /* THE REASON NAMES FIELD IDS AND NOTHING OUT OF THE PAYLOAD — `43 §6`'s leak rule. The middle
          arm is new with the combinators: "files at ${ceiling}" was the only explanation this could
          give, and it is a false one when the ceiling is `exact` and a field defaulted. */
+      /**
+       * A FIELD THE MESSAGE NEVER SENT AND A FIELD IT SENT UNREADABLY ARE TWO SENTENCES.
+       *
+       * `43 §5.1` step 9 ranks them apart (`invalid > ambiguous > missing > …`) and they send a person
+       * to two different places: an absent field is a question for whoever sends the message, and an
+       * unreadable one is almost always a format that changed at their end and can be fixed here. Both
+       * were named by one clause that said *could not read*, which is true of only one of them.
+       *
+       * THE ABSENT CLAUSE IS WORD FOR WORD WHAT IT WAS. Only the unreadable fields are lifted out of
+       * it, so a message with nothing but absent fields reads exactly as it read before and no
+       * receipt already in a record changes meaning.
+       */
+      const absent = missed.filter((field) => !invalid.includes(field));
+      const clauses = [
+        absent.length ? `${matched.ingest} could not read ${absent.join(', ')} out of this one.` : '',
+        invalid.length
+          ? `${matched.ingest} found ${invalid.join(', ')} in this one and could not make sense of ${invalid.length === 1 ? 'it' : 'them'}, so the format may have changed.`
+          : '',
+      ].filter((clause) => clause !== '');
       const reason = missed.length
-        ? `${matched.ingest} could not read ${missed.join(', ')} out of this one.`
+        ? clauses.join(' ')
         : soft.length
           ? `${matched.ingest} chose or defaulted ${soft.join(', ')} rather than reading them, so what it read is proposed rather than written.`
           : `${matched.ingest} files at ${ceiling}, so what it read is proposed rather than written.`;
@@ -1524,7 +1578,15 @@ const FORMATS: Record<string, RegExp> = {
  * not finished.
  */
 export function day(text: string, format: string): string | null {
-  const re = FORMATS[format];
+  /* `Object.hasOwn` AND NOT A TRUTHY LOOKUP, which is the same rule `43 §4.4` states for a path: *"a
+     key is looked up with `Object.hasOwn`, so `__proto__` and `constructor` reach nothing."* It
+     matters here for the same reason it matters there. `FORMATS['__proto__']` is `Object.prototype`,
+     which is truthy, so the guard below did not fire and the next line called `.exec` on it — a
+     `TypeError` out of the middle of an ingest, where `map.ts` promises *"NOTHING HERE THROWS"*. A
+     `map:` entry's `format` is not checked at install at all (`declare.ts`'s `mappingFault` reads
+     `path`, `type`, `from`, a money currency and an enum's values, and lets `format` through as
+     written), so the string reaching this line is whatever a declaration said. */
+  const re = Object.hasOwn(FORMATS, format) ? FORMATS[format] : undefined;
   if (!re) return null;
   const m = re.exec(text);
   if (!m) return null;

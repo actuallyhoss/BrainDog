@@ -118,6 +118,35 @@ test('THE FIGURE IS THE SUM OF THE ROWS THE SAME PREDICATE LISTS', async () => {
   sql.close();
 });
 
+test('A MISTYPED CURRENCY IS REFUSED AT THE WRITE, so the figure over it stays a number', async () => {
+  /* `34 §3`: `money = "{" "amount" ":" integer "," "currency" ":" iso4217 "}" ;`
+     The write path checked three letters and nothing else, so `GPB` — one transposition away from
+     `GBP` — was stored. It is the worst kind of bad row, because it does not break the row, it
+     breaks the FIGURE: `sum` cannot add GBP to GPB, no FX rate can ever exist for a currency that
+     does not exist, and the reading comes back `value: null`, `unit: null`, `parts: [...]`,
+     `met: null`. `met: null` is a target that has silently stopped being evaluated, and nothing on
+     the screen says why. Measured before the fix, against this exact register:
+
+       FIGURE BEFORE THE TYPO: {"value":720000,"unit":"GBP","met":false}
+       GPB 4200.00 -> accepted
+       FIGURE AFTER  THE TYPO: {"value":null,"unit":null,"parts":[…],"met":null} */
+  const { k, sql } = await record();
+
+  const wrote = k.create(
+    'obligations',
+    { what: 'Invoice 52', party: 'Halden', direction: 'owed_to_me', amount: { amount: 420_000, currency: 'GPB' }, due: day(-3), state: 'open' },
+    { actor: 'p_1' },
+  );
+  assert.equal(refusal(wrote).code, 'CURRENCY_UNKNOWN');
+
+  const read = value<Reading>(k.metric(OVERDUE));
+  assert.equal(read.value, 720_000, 'one typo turned the figure into null');
+  assert.equal(read.unit, 'GBP');
+  assert.equal(read.parts, undefined, 'the figure split itself by currency over a currency that does not exist');
+  assert.equal(read.met, false, 'met went null, so the target stopped being evaluated');
+  sql.close();
+});
+
 test('the six aggregations this build reads', async () => {
   const { k, sql } = await record();
   const of = (v: MetricDecl['value']) => value<Reading>(k.metric({ ...OVERDUE, value: v, where: undefined, target: { gte: 0 } }));

@@ -21,7 +21,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from '@braindog/where';
 
-import { FIELD_TYPES, coerce, measure, range, type FieldDecl, type Json } from './coerce.ts';
+import { FIELD_TYPES, coerce, isCurrencyCode, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, type PullDecl } from './pull.ts';
@@ -1777,9 +1777,16 @@ const ARGUMENTS: Record<string, readonly string[]> = {
  * `42 §4.2`'s `Cur`, SPELLED ONCE. `mappingFault` tested it inline and a form needs the same test,
  * and a second copy of a three-character grammar is how the path grammar, `MATCH_FIELDS` and `Json`
  * each drifted. Upper case, because `Cur` is and `02 §3` is.
+ *
+ * AND THE GRAMMAR IS NOT THE CHECK. `34 §3` writes the currency as `iso4217`, not as three letters,
+ * and this is the install-time twin of the write-path defect `coerce.ts` had: it validates a
+ * connector's declared fallback currency rather than row data, so `currency: 'GPB'` installed
+ * clean and then stamped a currency that does not exist onto every row the connector ever mapped.
+ * `isCurrencyCode` is the same membership test the write path uses, from the same `Intl` list, so
+ * the two doors into the record cannot disagree about what a currency is.
  */
 const CUR = /^[A-Z]{3}$/u;
-const isCur = (v: unknown): boolean => typeof v === 'string' && CUR.test(v);
+const isCur = (v: unknown): boolean => typeof v === 'string' && CUR.test(v) && isCurrencyCode(v);
 
 const ENUM_LITERALS = 64;
 const LITERAL_BYTES = 200;
@@ -1980,7 +1987,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
     if (only === 'money' && 'currency' in args && !isCur(args.currency))
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: three upper-case letters, EGP or USD.`,
+        `${at}.money's currency is ${JSON.stringify(args.currency ?? null)}, and it is the code to fall back on when the text names none: an ISO 4217 code in upper case, EGP or USD.`,
         `${at}.money.currency`,
       );
 
@@ -2130,7 +2137,7 @@ function mappingFault(entry: unknown, at: string): Refusal | null {
   if (e.from !== undefined && e.from !== 'epoch_s' && e.from !== 'epoch_ms')
     return bad('DECLARATION_INVALID', `${at}'s from is epoch_s or epoch_ms.`, `${at}.from`, ['epoch_s', 'epoch_ms']);
   if (e.type === 'money' && !Array.isArray(e.path) && !isCur(e.currency))
-    return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with a three-letter code.`, `${at}.currency`);
+    return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with an ISO 4217 code in upper case.`, `${at}.currency`);
   if (e.type === 'enum' && (!Array.isArray(e.values) || e.values.length === 0 || e.values.some((v) => typeof v !== 'string')))
     return bad('DECLARATION_INVALID', `${at} is an enum, so it lists its values.`, `${at}.values`);
   return null;
