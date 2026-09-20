@@ -44,6 +44,9 @@ import { copyAsked, copyRefusal, drained, inward, isRecordId, servesAccount, ser
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
+import { fleetFailure, nightlyWalk } from './nightly.ts';
+import { workerSigner } from './sign.ts';
+import { dumpOf, r2Snapshots, type Dump } from './snapshots.ts';
 import { serveWorkerKeys, serveWorkerVault, servesKeys, servesVault, type KeyDeps } from './vault.ts';
 
 /** Why an owner cannot invite anybody here: an invitation is spent by signing in, and sign-in needs its secret. */
@@ -105,6 +108,19 @@ type Env = {
   PUBLIC_HOST?: string;
   /** The built web shell, `wrangler.jsonc`'s `assets`, which holds the bundled catalogue Spark reads (`catalogue.ts`). */
   ASSETS?: Fetcher;
+  /**
+   * Where the nightly copies go: `<record>/snapshots/nightly-<date>.brainl` and `latest.brainl` (`51 §5.12`).
+   *
+   * OPTIONAL, AND AN ABSENT BINDING IS A LOUD CRON RATHER THAN A QUIET ONE. A deployment without the
+   * bucket keeps no copies, which is a fact the operator has to be able to read: `scheduled()` throws
+   * one sentence, the cron invocation is marked failed, and nothing pretends a backup happened.
+   */
+  BLOBS?: R2Bucket;
+  /**
+   * The age recipient the cloud copy is sealed to (`12 §8`, `53 §5.4`). Named and unusable is a refusal:
+   * `snapshots.ts` will not write a plaintext copy for a deployment that believes its copies are sealed.
+   */
+  AGE_RECIPIENT?: string;
 };
 
 /** A `Result`'s refusal, for an RPC that hands back only the part a caller acts on. */
@@ -189,11 +205,19 @@ export class Record$ extends DurableObject<Env> {
     let api!: RecordApi;
     /* SPARK'S MODEL: the endpoint the deployment names, called with the person's own vault key, or none (`spark.ts`). */
     const sparkModel = workerSparkModel(this.env, () => api);
+    const sql = storageSql(this.ctx.storage);
     await this.ctx.blockConcurrencyWhile(async () => {
       api = await createRecordApi({
-        sql: storageSql(this.ctx.storage),
+        sql,
         clock: { now: () => Date.now() },
         scheduler: this.#alarm,
+        /**
+         * WHAT SIGNS AN EXPORTED `.brain`, AND IT WAS MISSING. Measured before this line existed: a
+         * hosted export carried the `dog_sig` header with no row under it, and `checkBrainl` refuses
+         * an unsigned file outright, so every file this Worker wrote was one nothing would import.
+         * The self-host has passed a signer since `49 §5.22`; the Worker never did.
+         */
+        sign: workerSigner(sql, () => keyStoreOf(this.env.KEK), () => api.kernel.identity()?.id ?? null),
         /* WHAT THIS DEPLOYMENT IS, because the record cannot know. `/api/version` answers `33 §4`'s
            six keys and two of them are facts about the host: which build is serving, and whether
            there is a Spark behind it. An empty `BRAINDOG_BUILD` becomes `null` rather than `""` —
@@ -333,6 +357,30 @@ export class Record$ extends DurableObject<Env> {
     if (this.#gone) return [];
     const api = await this.#record();
     return api.kernel.leaseOutbox(DELIVERS, n);
+  }
+
+  /**
+   * The whole record as a `.brain`, for the nightly copy. `51 §5.12` steps 3 and 4, in one call.
+   *
+   * THE OBJECT DUMPS AND SIGNS, AND THE WORKER WRITES IT DOWN. The record performs no I/O, which is
+   * the same seam `lease` above draws for the outbox: the object holds the rows and the signing key,
+   * the Worker holds the bucket. An R2 put from inside here would give the record a reason to hold a
+   * binding, and `ADR-062` is the argument for why it must not.
+   *
+   * THE BOOKMARK IS TAKEN IN THE SAME CALL as the dump rather than before it, so the point-in-time
+   * the copy is paired with is a moment this object was already at, and not one a round trip ago.
+   * A deployment whose storage has no bookmarks answers `null`, and the copy is still a copy.
+   */
+  async dump(at: string): Promise<Dump> {
+    if (this.#gone) throw new Error(DELETED.fix);
+    const api = await this.#record();
+    let bookmark: string | undefined;
+    try {
+      bookmark = await this.ctx.storage.getCurrentBookmark();
+    } catch {
+      /* PITR is not on every deployment, and a copy without a bookmark is still a copy. */
+    }
+    return dumpOf(api, at, bookmark);
   }
 
   /**
@@ -647,6 +695,34 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().knows(record);
   }
 
+  /**
+   * Every record on this deployment that is still open, a page at a time. `51 §5.12` step 1.
+   *
+   * THE CURSOR IS THE LAST ID AND NOT AN OFFSET. A keyset page is stable while the walk runs: a
+   * record provisioned at 03:18 shifts every offset after it by one, and an `OFFSET` walk would
+   * skip the record that moved across the page boundary and never say which one.
+   *
+   * IT READS `dir_record` DIRECTLY, AND THAT IS A SEAM THIS FILE SHOULD NOT HOLD FOR LONG.
+   * `createDirectory` in `packages/record/src/directory.ts` owns every other query against these
+   * tables and has no `listRecords`; adding one there was not possible in the change that needed it.
+   * The SQL below is the whole of the duplication, it is over the same storage the Directory writes,
+   * and it belongs in `createDirectory` the moment that file can be edited.
+   */
+  listRecords(cursor?: string, limit = 500): { ids: string[]; cursor?: string } {
+    /* THE MIGRATION FIRST. `dir_record` is made by `createDirectory`, so a Directory object whose
+       first ever call was this one would read a table that does not exist yet. */
+    this.#directory();
+    const rows = storageSql(this.ctx.storage).all<{ id: string }>(
+      'SELECT id FROM dir_record WHERE closed_at IS NULL AND id > ? ORDER BY id LIMIT ?',
+      cursor ?? '',
+      limit,
+    );
+    const ids = rows.map((r) => r.id);
+    /* A FULL PAGE MEANS THERE MAY BE MORE, and a short one means there is not. Asking for one extra
+       row to be sure would be a second answer to "how big is a page" for one saved round trip a night. */
+    return ids.length === limit ? { ids, cursor: ids[ids.length - 1] ?? '' } : { ids };
+  }
+
   /** Which record this name means, or `null` if it means none. The hop, and the whole of it. */
   resolve(slug: string): { record: string; slug: string } | null {
     return this.#directory().resolve(slug);
@@ -892,7 +968,55 @@ export default {
   async queue(batch: MessageBatch<{ record: string }>, env: Env): Promise<void> {
     await consume(batch.messages, (id) => drainOutbox(env, id));
   },
+
+  /**
+   * The cron fired: the nightly walk, one copy per record. `53 §5.1`, `51 §5.12`.
+   *
+   * AN ABSENT BUCKET THROWS RATHER THAN RETURNS. A `scheduled()` that quietly did nothing on a
+   * deployment with no `BLOBS` binding is the exact failure this whole path exists to prevent: the
+   * cron shows green every night, and the absence of copies is found by the person who needed one.
+   * Throwing marks the invocation failed, which is a red row in the dashboard and a line in the tail.
+   *
+   * WHAT IS NOT HERE YET IS 53 §5.1's OTHER FOUR STEPS: the KEK re-wrap, the erasure reconcile, the
+   * billing ladder and the ops record's `log` note. They belong in `ops.ts` beside this call and
+   * need `opsReport` and `rewrapKeys`, which this build does not have. The backup is the step the
+   * record cannot survive without, so it is the step that landed first.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await nightly(env);
+  },
 };
+
+/** The walk, wired to the Directory, the objects and the bucket. Exported from nowhere: the cron is its one caller. */
+async function nightly(env: Env): Promise<void> {
+  if (!env.BLOBS)
+    throw new Error('The nightly copy did not run: this deployment has no BLOBS binding, so there is nowhere to put one.');
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  const copies = r2Snapshots(env.BLOBS, { recipient: env.AGE_RECIPIENT ?? '' });
+  /* ONE INSTANT FOR THE WHOLE WALK, so every copy taken tonight is filed under tonight's date even
+     when the walk crosses midnight UTC. Two dates in one run would leave a day with two copies and
+     the next with none, and the retention count would be counting nights that are not nights. */
+  const at = new Date().toISOString();
+  /* THE TALLY IS SAID AND NOT RETURNED. `53 §5.1` step 5 is a person reading the closing line the
+     morning after; the ops record's `log` note needs a record to write it to, which is `ops.ts`'s
+     half of this and not built. Nothing else reads the numbers yet. */
+  const walked = await nightlyWalk({
+    records: async (cursor) => directory.listRecords(cursor),
+    snapshot: async (record) => copies.take(record, await env.RECORD.get(env.RECORD.idFromName(record)).dump(at)),
+    say: (line) => {
+      console.log(line);
+    },
+    moan: (line) => {
+      console.error(line);
+    },
+    now: () => Date.now(),
+  });
+  /* AND A NIGHT THAT COPIED NOTHING MAKES THE INVOCATION ITSELF RED. Every per-record failure is
+     already in the tail, but a tail is read by somebody who is already worried; a failed cron run
+     is what tells them to be. */
+  const fleet = fleetFailure(walked);
+  if (fleet) throw new Error(fleet);
+}
 
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);

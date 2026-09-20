@@ -110,9 +110,13 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
      more key than that path has ever needed. */
   assert.match(source, /keyOpener\(api, this\.env\.KEK\)/, 'the alarm reads KEK some other way than through keyOpener');
   assert.match(source, /keyStoreOf\(this\.env\.KEK\)/, 'the connector runner reads KEK some other way than through keyStoreOf');
+  /* AND THE SIGNER IS THE SIXTH READER, added with the nightly copy. It takes the store as a
+     callback rather than a value so that a `KEK` which is bound and malformed is one failed export
+     with a sentence, and not every record on the deployment refusing to open. */
+  assert.match(source, /workerSigner\(sql, \(\) => keyStoreOf\(this\.env\.KEK\)/, 'the export signer reads KEK some other way');
   assert.equal(
     (source.match(/env\.KEK\b/g) ?? []).length,
-    6,
-    'something other than the two doors, the half they share, provisioning, the alarm and the connector runner reads KEK',
+    7,
+    'something other than the two doors, the half they share, provisioning, the alarm, the connector runner and the export signer reads KEK',
   );
 });

@@ -153,17 +153,20 @@
            { "from": "Record$", "to": "Record" }, { "from": "Directory$", "to": "Directory" } ] } */
   ],
 
-  /* THE NIGHTLY WALK IS NOT WIRED YET AND SO ITS TRIGGER IS NOT EITHER. 51 §4.6 carries
-     `"triggers": { "crons": ["17 3 * * *"] }` and 53 §5.1 is the procedure it runs, but
-     `src/index.ts` exports no `scheduled()` handler — a cron pointed at a Worker with no handler
-     is a nightly invocation that does nothing, on both environments, and nothing says so. It goes
-     in the same commit as `scheduled()`.
+  /* THE NIGHTLY WALK, 53 §5.1, AND ITS TRIGGER ARRIVED IN ONE CHANGE, which is what the note that
+     stood here asked for: a cron pointed at a Worker with no `scheduled()` is a nightly invocation
+     that does nothing and says nothing. `src/index.ts` exports one now, over `src/nightly.ts` and
+     `src/snapshots.ts`, and it throws when `BLOBS` is unbound rather than returning quietly.
 
-     WHEN IT DOES: leave it here at the top level rather than per-environment. Inheritable means
-     both environments run the walk, and that is the point — 53 §9 wants the drills rehearsed, and
-     a backup path that has only ever run in production is a backup path nobody has watched fail.
-     Alpha writes to its own R2 bucket, so the two nightly runs cannot touch each other.
-     "triggers": { "crons": ["17 3 * * *"] }, */
+     IT IS AT THE TOP LEVEL RATHER THAN PER-ENVIRONMENT. Inheritable means both environments run the
+     walk, and that is the point: 53 §9 wants the drills rehearsed, and a backup path that has only
+     ever run in production is a backup path nobody has watched fail. Alpha writes to its own R2
+     bucket, so the two nightly runs cannot touch each other.
+
+     BEFORE THE NEXT DEPLOY, THE TWO BUCKETS BELOW HAVE TO EXIST. Binding a bucket that does not
+     exist fails the deploy: `wrangler r2 bucket create braindog-blobs` and
+     `wrangler r2 bucket create braindog-blobs-alpha`, once each, on the account. */
+  "triggers": { "crons": ["17 3 * * *"] },
 
   /* ===========================================================================================
      THE TWO ENVIRONMENTS.
@@ -303,16 +306,20 @@
 
       /* Outbound email. The record never holds the credential: ADR-062 puts every credential in
          the host. The sending domain is verified in the dashboard, once, per 51 A3. */
-      "send_email": [{ "name": "EMAIL" }]
+      "send_email": [{ "name": "EMAIL" }],
+
+      /* THE NIGHTLY COPIES GO HERE, one prefix per record (`<record>/snapshots/`), which is also
+         what 51 §5.13 step 3 pages over when a customer is deleted. The bucket must exist before
+         this deploy: `wrangler r2 bucket create braindog-blobs-alpha`. */
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-alpha" }]
 
       /* ---------------------------------------------------------------------------------------
          THE REST OF 51 §4.6, DRAFTED AND NOT ACTIVE. Each block below binds a resource the code
-         does not yet read (`src/index.ts`'s `Env` has four members). Binding a resource that does
-         not exist fails the deploy, so these are uncommented in the commit that first reads them,
-         together with the account resource named beside each. Names carry the environment for the
-         same reason the queue does — every one of these namespaces is account-global.
+         does not yet read. Binding a resource that does not exist fails the deploy, so these are
+         uncommented in the commit that first reads them, together with the account resource named
+         beside each. Names carry the environment for the same reason the queue does — every one of
+         these namespaces is account-global.
 
-         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-alpha" }],
          "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry_alpha" }],
@@ -382,10 +389,15 @@
         ]
       },
 
-      "send_email": [{ "name": "EMAIL" }]
+      "send_email": [{ "name": "EMAIL" }],
+
+      /* REPEATED IN FULL, because `r2_buckets` is not inheritable and an omitted non-inheritable
+         key is EMPTY rather than inherited: production would deploy, come up with no bucket, and
+         the first sign of it would be `scheduled()` throwing at 03:17. The bucket must exist before
+         this deploy: `wrangler r2 bucket create braindog-blobs`. */
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }]
 
       /* The same drafted blocks as alpha, without the suffix:
-         "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }],
          "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],

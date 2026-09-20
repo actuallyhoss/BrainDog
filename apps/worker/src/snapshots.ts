@@ -1,0 +1,219 @@
+/**
+ * The hosted record's copies, in R2: `33 §1` port 9 for the Worker, as `apps/selfhost/src/snapshots.ts`
+ * is for a machine with a disk.
+ *
+ * THE SAME ANSWER TO "WHAT IS A BACKUP" AS THE SELF-HOST'S, and where the two differ it is because
+ * the platform left no choice. A self-host copies the live file with `VACUUM INTO` and keeps the six
+ * `local` tables, because it is backing up an instance. A Durable Object has no file to copy and no
+ * `VACUUM INTO`, so the cloud copy is the `.brain` the kernel already writes: the same export, the
+ * same three sections that travel, the same manifest, the same Ed25519 signature over it, and the
+ * same thirty kept. What a customer can restore from either one is the same record.
+ *
+ * WHY THE EXPORT AND NOT THE PAGES. The task that asked for this called it a `.dog` export, and a
+ * `.dog` is one page's source, one page to one file (`packages/dog/src/index.ts`). A record is a
+ * `.brain`, and `03-DOG-FORMAT` §1 spends a paragraph on the rename. A nightly copy of the pages
+ * would leave out every row the business is made of.
+ *
+ * THE RECORD MAKES NO OUTBOUND CALL AND THIS FILE IS PART OF WHY. The Durable Object hands back the
+ * bytes it dumped; the put, the list and the prune happen in the Worker with the Worker's binding,
+ * the way `deliver.ts` does the outbox's I/O. And nothing here imports `cloudflare:`: R2 arrives as
+ * the five methods below and not one more, so every rule worth testing runs in a bare Node process.
+ *
+ * SEALING IS A SEAM AND NOT A DEFAULT. `53 §5.4` wants the cloud copy sealed to `AGE_RECIPIENT`
+ * with `age-encryption`, which this build does not have and cannot add here. So the rule is the one
+ * that cannot go quietly wrong: a deployment that names a recipient and hands no sealer gets a
+ * refusal, never a plaintext object under a name ending `.age`.
+ */
+
+import { fixOf, type Result } from '@braindog/ports';
+
+/** How many dated copies are kept. Thirty, because `apps/selfhost/src/snapshots.ts` keeps thirty (`53 §5.4`). */
+export const KEEP = 30;
+
+/**
+ * `51 §5.12` step 3's ceiling, in bytes.
+ *
+ * IT IS A REFUSAL AND NOT A TRUNCATION. Above the ceiling the night's copy fails loudly, with a
+ * sentence naming what to do, and the other records still get theirs.
+ *
+ * AND IT IS CHECKED LATER THAN IT SOUNDS, WHICH IS WORTH KNOWING BEFORE ANYBODY RELIES ON IT. The
+ * kernel signs inside `export`, so by the time `take` measures, the Durable Object has already
+ * built and signed the whole file and shipped it over RPC. What this stops is the Worker adding
+ * the encode and the put body on top of a string it is already holding; it does NOT stop an
+ * out-of-memory inside the object, and nothing here can until the dump streams (`51 §10`).
+ */
+export const CEILING = 40 * 1024 * 1024;
+
+/** Unsealed, which is all this build can write. The sealed copy is `.brainl.age` (`03 §5`). */
+const PLAIN = '.brainl';
+const SEALED = '.brainl.age';
+
+/** The pointer a restore reaches for without having to know what last night was called. */
+export const LATEST = `latest${PLAIN}`;
+
+/** Where one record's copies live. Deletion is one prefix, which is what `51 §5.13` step 3 pages over. */
+export const prefixOf = (record: string): string => `${record}/snapshots/`;
+
+/** One night's key. The date sorts, so the newest is the last name in the listing. */
+export const snapshotKey = (record: string, at: string, ext: string = PLAIN): string =>
+  `${prefixOf(record)}nightly-${at.slice(0, 10)}${ext}`;
+
+/** A dated copy, as against `latest`: `nightly-2026-09-20`. */
+const DATED = /^nightly-(\d{4}-\d{2}-\d{2})\.brainl(?:\.age)?$/u;
+
+/**
+ * The five methods this needs from `R2Bucket`, and not one more.
+ *
+ * NAMED STRUCTURALLY SO THE RULES CAN BE TESTED. `@cloudflare/workers-types` is not in the test
+ * tsconfig's `types`, deliberately: a module that can only be typechecked with the platform's
+ * globals is a module whose tests have to run on the platform.
+ */
+export type Blobs = {
+  put(key: string, value: string | Uint8Array, options?: { customMetadata?: Record<string, string> }): Promise<unknown>;
+  get(key: string): Promise<{ size: number; text(): Promise<string> } | null>;
+  list(options?: { prefix?: string; cursor?: string }): Promise<{ objects: { key: string; size: number }[]; truncated: boolean; cursor?: string }>;
+  delete(keys: string | string[]): Promise<void>;
+};
+
+/** What the kernel dumped, ready to be written. `rows` is counted here so the metadata is not a second count. */
+export type Dump = { text: string; rows: number; at: string; bookmark?: string | undefined };
+
+/** What one night left behind. */
+export type Kept = { key: string; bytes: number; rows: number; at: string };
+
+/** A copy in the bucket, in the shape `33 §1` port 9 lists them. */
+export type Copy = { id: string; at: string; bytes: number };
+
+/** Turns the plaintext file into the bytes that are stored. Absent, nothing is sealed. */
+export type Seal = (file: Uint8Array) => Promise<Uint8Array>;
+
+/**
+ * A record's dump, exported and counted.
+ *
+ * `redactGrants: false` BECAUSE THIS IS A BACKUP AND NOT A HANDOVER. A redacted export drops the
+ * sealed bytes of every vault grant, and a copy restored from one would come back with the vault
+ * empty and nothing saying which credentials used to be in it. The bytes travel as ciphertext
+ * wrapped under a KEK the bucket does not hold, which is the same protection they have at rest.
+ *
+ * `actor: 'system'` because the walk is not a person, and the `export` event the kernel writes is
+ * the answer to "did anything leave" (`12 §6`). It is written to the record and left out of the
+ * file on purpose, so the copy does not grow by one row a night on a record nobody touched.
+ * Measured on a fresh record: two dumps back to back are 114 lines and 88 counted rows each, and
+ * they differ in exactly one field, the signature's `signedAt` (see `sign.ts`). The copies are not
+ * byte-identical, and nothing here should be written as though they were.
+ */
+export async function dumpOf(
+  api: { kernel: { export(opts: { redactGrants?: boolean; actor?: string }): Promise<Result<string[]>> } },
+  at: string,
+  bookmark?: string | undefined,
+): Promise<Dump> {
+  const out = await api.kernel.export({ redactGrants: false, actor: 'system' });
+  if (!out.ok) throw new Error(`the record would not export: ${fixOf(out)}`);
+  /* A ROW IS A LINE THAT IS NOT A HEADER. `#dogl <n>` and every `#table` line describe the file;
+     what is counted here is what `customMetadata.rows` promises, which is rows of record. */
+  const rows = out.value.reduce((n, line) => (line.startsWith('#') ? n : n + 1), 0);
+  return { text: out.value.join('\n'), rows, at, ...(bookmark === undefined ? {} : { bookmark }) };
+}
+
+/**
+ * The copies one bucket holds, for every record on this deployment.
+ *
+ * `take` IS THE WHOLE OF THE NIGHTLY WRITE and it throws on every failure. Nothing here catches its
+ * own error: the caller counts the failure, names the record and says so in the line the morning
+ * check reads. A `take` that returned quietly after a refused put would leave yesterday's `latest`
+ * in place and a list that looks healthy, which is the one bug in this file nobody would notice
+ * until they needed the copy.
+ */
+export function r2Snapshots(blobs: Blobs, o: { recipient?: string | undefined; seal?: Seal | undefined } = {}) {
+  const ext = o.seal ? SEALED : PLAIN;
+  const latest = `latest${ext}`;
+
+  /**
+   * Everything under one record's prefix, paged, with the key each object actually has.
+   *
+   * THE KEY IS CARRIED AND NEVER REBUILT, and that is this function's whole reason for existing
+   * apart from `list`. `prune` used to reconstruct a key from the parsed date plus the extension
+   * this build would write TODAY, which is the same string only while the extension never changes.
+   * Measured across one: thirty plaintext nights then eight sealed ones left thirty-eight dated
+   * objects, because every delete named a `.brainl.age` that had never been written and R2 takes a
+   * delete of an absent key without complaint. Retention stopped and nothing said so, and the
+   * objects that survived were the UNSEALED ones, in a bucket somebody had just sealed.
+   */
+  const held = async (record: string): Promise<{ key: string; name: string; copy?: Copy }[]> => {
+    const prefix = prefixOf(record);
+    const all: { key: string; name: string; copy?: Copy }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await blobs.list({ prefix, ...(cursor === undefined ? {} : { cursor }) });
+      for (const object of page.objects) {
+        const name = object.key.slice(prefix.length);
+        const dated = DATED.exec(name);
+        /* THE DATE IN THE KEY IS THE DAY AND NOT THE INSTANT, and the instant is in the object's own
+           `customMetadata.at`. Listing with metadata is a second R2 option per page for a field
+           nothing on this path reads, so the day is what the list carries. */
+        const copy = dated
+          ? { id: name.slice(0, name.indexOf('.')), at: `${dated[1] ?? ''}T00:00:00.000Z`, bytes: object.size }
+          : undefined;
+        all.push({ key: object.key, name, ...(copy ? { copy } : {}) });
+      }
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor !== undefined);
+    return all;
+  };
+
+  const dated = (all: { copy?: Copy }[]): Copy[] =>
+    all.flatMap((o) => (o.copy ? [o.copy] : [])).sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+
+  const list = async (record: string): Promise<Copy[]> => dated(await held(record));
+
+  const prune = async (record: string, keep = KEEP): Promise<void> => {
+    const all = await held(record);
+    const old = new Set(dated(all).slice(keep).map((copy) => copy.id));
+    /* A DATED COPY PAST THE THIRTIETH, plus any pointer that is not the one this build writes.
+       `latest` is outside the count on purpose: it is a pointer at one of the dated copies, so
+       counting it would throw away a night every month. But a pointer under the OTHER extension is
+       a leftover rather than a pointer, and leaving it is how an unsealed copy of a whole record
+       outlives the day sealing was turned on. */
+    const doomed = all
+      .filter((o) => (o.copy ? old.has(o.copy.id) : (o.name === `latest${PLAIN}` || o.name === `latest${SEALED}`) && o.name !== latest))
+      .map((o) => o.key);
+    if (doomed.length > 0) await blobs.delete(doomed);
+  };
+
+  return {
+    list,
+    prune,
+
+    async take(record: string, dump: Dump): Promise<Kept> {
+      const file = new TextEncoder().encode(dump.text);
+      if (file.length > CEILING)
+        throw new Error(
+          `snapshot over 40 MiB: this record dumped ${String(file.length)} bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).`,
+        );
+
+      /* A NAMED RECIPIENT AND NO SEALER IS A REFUSAL. The alternative is a plaintext copy of every
+         row a record holds, vault ciphertext included, sitting in a bucket the operator believed
+         was sealed to a key they keep outside Cloudflare. */
+      if (o.recipient && !o.seal)
+        throw new Error(
+          `${record} was not copied: this build names an age recipient and cannot seal to it, and an unsealed copy of a whole record is not the fallback. Add the sealer or clear AGE_RECIPIENT.`,
+        );
+
+      const body = o.seal ? await o.seal(file) : file;
+      const key = snapshotKey(record, dump.at, ext);
+      const meta = {
+        rows: String(dump.rows),
+        bytes: String(file.length),
+        at: dump.at,
+        ...(dump.bookmark === undefined ? {} : { bookmark: dump.bookmark }),
+      };
+
+      /* THE DATED KEY FIRST AND `latest` SECOND. If the second put fails, `latest` still points at a
+         copy that opens; the other order leaves the pointer naming an object nobody finished. */
+      await blobs.put(key, body, { customMetadata: meta });
+      await blobs.put(`${prefixOf(record)}${latest}`, body, { customMetadata: meta });
+      await prune(record);
+      return { key, bytes: file.length, rows: dump.rows, at: dump.at };
+    },
+  };
+}
