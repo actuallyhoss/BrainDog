@@ -32,8 +32,20 @@
  * than returning a document, which is what a caller with a bad spec has to see (`packages/seed/test/rates.test.ts`).
  */
 
-/** The most currencies one poll fills, the record's `POLL_MAPS_MOST` (`packages/kernel/src/declare.ts`). A
-    twenty-first map is refused by `install`, which is after the owner has already approved the call out. */
+/**
+ * The most currencies one poll fills, the record's `POLL_MAPS_MOST` (`packages/kernel/src/declare.ts`). A
+ * twenty-first map is refused by `install`, which is after the owner has already approved the call out.
+ *
+ * IT IS A HAND COPY BECAUSE THE NUMBER IS NOT ON THE KERNEL'S SURFACE, which was checked rather than assumed.
+ * `seed` depends on `@braindog/kernel`, but that package exports one entry point, `src/index.ts`, and
+ * `POLL_MAPS_MOST` is not among the names it re-exports from `declare.ts`; reaching past it with
+ * `../../kernel/src/declare.ts` is the cross-package relative import `tools/gates/graph.mjs` exists to refuse.
+ * So the copy stays, and what holds it is the kernel's own answer rather than a second literal:
+ * `packages/seed/test/rates.test.ts` builds a declaration of this many maps and one more, and runs the record's
+ * `validateDeclaration` over both. Measured while writing it: at 19 the test goes red because the record takes a
+ * map this file would refuse, and at 21 because the record refuses one this file would build. What the file held
+ * before checked neither, because `normalise` is the pack reader and the ceiling is the kernel's.
+ */
 export const RATES_CURRENCIES_MOST = 20;
 
 export type RatesSpec = {

@@ -21,6 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { normalise } from '@braindog/declare';
+import { validateDeclaration } from '@braindog/kernel';
 
 import { ratesPollPack, RATES_CURRENCIES_MOST, type RatesSpec } from '../src/packs/rates-poll.ts';
 
@@ -71,10 +72,40 @@ test('A POLL THAT COULD NEVER WRITE A RATE IS NOT BUILT, so nobody is asked to a
   for (const base of ['', 'us', 'DOLLAR']) assert.throws(() => ratesPollPack({ ...SPEC, base }), /currency code/u, `built a pack based on ${JSON.stringify(base)}`);
 });
 
+/**
+ * The one declaration a rates pack holds, as `install` would hold it, with its map padded past what the builder
+ * will build. The padding is a clone of a real map with another currency on it, so a refusal is about how MANY maps
+ * there are and never about a map this test wrote badly: at twenty nothing is padded and the builder's own twenty
+ * are what the record reads, and at twenty-one those same twenty carry one clone of the first.
+ */
+const declaredAt = async (maps: number): Promise<Parameters<typeof validateDeclaration>[0]> => {
+  const doc = ratesPollPack({ ...SPEC, rates: many(Math.min(maps, RATES_CURRENCIES_MOST)) });
+  const map = mapOf(doc);
+  while (map.length < maps) map.push({ ...structuredClone(map[0]!), base: { value: `XY${map.length}` } });
+  const out = await normalise(doc, { kind: 'local' });
+  assert.ok(out.ok, `a pack of ${maps} maps would not normalise, so nothing here reached the record's own check`);
+  return out.value.declarations[0] as Parameters<typeof validateDeclaration>[0];
+};
+
 test('AND ONE PAST WHAT THE RECORD TAKES IS REFUSED HERE, not by `install` after the owner has approved it', async () => {
-  assert.equal(RATES_CURRENCIES_MOST, 20);
   const doc = ratesPollPack({ ...SPEC, rates: many(RATES_CURRENCIES_MOST) });
   assert.equal(mapOf(doc).length, RATES_CURRENCIES_MOST);
   assert.equal((await normalise(doc, { kind: 'local' })).ok, true);
-  assert.throws(() => ratesPollPack({ ...SPEC, rates: many(RATES_CURRENCIES_MOST + 1) }), /20/u);
+  assert.throws(() => ratesPollPack({ ...SPEC, rates: many(RATES_CURRENCIES_MOST + 1) }), new RegExp(`fills ${RATES_CURRENCIES_MOST} currencies`, 'u'));
+});
+
+test('AND THE NUMBER IS THE RECORD’S NUMBER, asked of the record rather than copied from it', async () => {
+  /* `RATES_CURRENCIES_MOST` IS A HAND COPY OF THE KERNEL'S `POLL_MAPS_MOST`, and it has to be: the kernel's only
+     entry point is `packages/kernel/src/index.ts` and it does not export that constant, so `seed` cannot import
+     the number even though it depends on the package. What it can import is the check, `validateDeclaration`,
+     which is the same `validate` `install` runs, so the copy is held against the record's own answer instead of
+     against a second literal.
+     WHAT THIS FILE HELD BEFORE WAS NOTHING, which is worth saying because it looked like a guard.
+     `assert.equal((await normalise(doc)).ok, true)` on twenty maps was measured to stay green at twenty-five:
+     `normalise` is `@braindog/declare`'s pack reader and the map ceiling is the kernel's, so no number of maps
+     was ever checked here, in either direction. */
+  assert.equal(validateDeclaration(await declaredAt(RATES_CURRENCIES_MOST)), null, 'the record refuses a map the builder will happily build');
+  const past = validateDeclaration(await declaredAt(RATES_CURRENCIES_MOST + 1));
+  assert.equal(past?.code, 'DECLARATION_INVALID', 'the record takes more maps than this file says it does');
+  assert.match(past!.fix, new RegExp(`1 to ${RATES_CURRENCIES_MOST} maps`, 'u'), `the record's own sentence: ${past!.fix}`);
 });

@@ -12,12 +12,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
+import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Arrived, type Declaration, type Kernel } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, installSeed } from '../src/index.ts';
-import { MONEY_INGESTS, nightOf } from '../src/modules/money.ts';
+import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, installSeed } from '../src/index.ts';
+import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, nightOf } from '../src/modules/money.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -62,6 +63,117 @@ const reading = (k: Kernel, id: string): number | null => {
   return out.value.value;
 };
 
+/* ── an upgrade a record that already holds the pack can take ────────────── */
+
+/**
+ * The real door: `normalise`, `plan`, `install`, over a kernel, the way the record installs a pack.
+ *
+ * NOT `k.install(declarations)`, WHICH IS THE OTHER DOOR AND ANSWERS A DIFFERENT QUESTION. A bare
+ * install writes declarations; `plan` is what compares a pack with what a record already holds, and
+ * `REQUIRED_ON_POPULATED` lives on that comparison and nowhere else. A test that took the short way
+ * in would have installed 1.3.0 over 1.2.0 without noticing that no customer can.
+ */
+const hostFor = (k: Kernel): Host => ({
+  count: (register) => k.count(register),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
+  retire: (ids) => k.retire(ids),
+  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+  remember: (row) => k.rememberPack(row),
+  forget: (id) => k.forgetPack(id),
+  claimed: (pack) => k.packClaims(pack),
+});
+
+const stateOf = (k: Kernel): Installed => ({
+  format: 1,
+  primitives: 1,
+  record_version: k.version(),
+  packs: k.packs(),
+  declarations: k.declarations() as Installed['declarations'],
+  rows: k.census(),
+  config: k.packSettings(),
+});
+
+type Landed = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+
+const said = (out: Landed): string => (out.ok ? '' : `${out.refusal?.code} at ${out.refusal?.at}: ${out.refusal?.fix}`);
+
+async function put(k: Kernel, doc: unknown): Promise<Landed> {
+  const read = await normalise(doc, { kind: 'local' });
+  assert.ok(read.ok, sayOf(read));
+  const pack = read.value as Pack;
+  const diff = await plan(pack, stateOf(k));
+  return (await install(pack, diff, hostFor(k), diff.planHash)) as Landed;
+}
+
+const document = (id: string): Record<string, unknown> => firstPartyDocument(id, { seeds: [] })!;
+
+/**
+ * money-core's `snapshots` as 1.2.0 declared it: `on` as the title, and no `what` at all.
+ *
+ * BUILT BY TAKING THE FIELD BACK OUT RATHER THAN BY PASTING AN OLD BODY, so the two documents differ
+ * in exactly the one thing this test is about. Everything else the version added is left in place:
+ * `accounts.last4` and `owed-by-you` are additions no record refuses, and including them in the
+ * older document keeps the diff down to the field whose requirement is the question.
+ */
+function asTwelve(doc: Record<string, unknown>): Record<string, unknown> {
+  const declarations = (doc.declarations as Record<string, unknown>[]).map((d) =>
+    d.register !== 'snapshots'
+      ? d
+      : {
+          ...d,
+          title: 'on',
+          mobile: (d.mobile as string[]).map((f) => (f === 'what' ? 'on' : f)),
+          fields: (d.fields as Record<string, unknown>[]).filter((f) => f.id !== 'what'),
+        },
+  );
+  return { ...doc, version: '1.2.0', declarations };
+}
+
+test('money-core 1.3.0 INSTALLS OVER 1.2.0 ON A RECORD THAT ALREADY HOLDS A SNAPSHOT, which is the upgrade every such record is offered', async () => {
+  /**
+   * A REQUIRED FIELD ADDED TO A POPULATED LIST IS REFUSED AT THE DOOR, and `snapshots.what` was one.
+   *
+   * `declare`'s `unreadable` records a `required: true` with no `default` where the installed body
+   * had neither, and `install` answers `REQUIRED_ON_POPULATED`: *"Ship a default or a fill rule."*
+   * So a person on 1.2.0 with one night in the register could not take 1.3.0, and the sentence they
+   * would have seen names a field they have never heard of on a list a nightly job writes.
+   *
+   * AND THE THREE REPAIRS THE REFUSAL OFFERS WERE WEIGHED AND TWO OF THEM ARE NOT REACHABLE HERE.
+   * A `default` is one stored constant, so every night before the upgrade would be named the same
+   * thing, which is worse than unnamed. A fill rule does not clear the refusal at all: `unreadable`
+   * looks at `default` and nothing else, and a rule runs after an install that never happens; the
+   * only template `fill` could write is `{{on}}`, the STORED day, so the upgraded rows would read
+   * `2026-08-04` under a list whose new rows read `4 Aug 2026`. `derived: true` is the kernel's own
+   * flag, *set by nothing today*, and it refuses every write, so the seed could not fill it either.
+   * What is left is the honest one: the title is optional, the nightly writer always names the
+   * night, and a night written before 1.3.0 keeps the date it has always had.
+   */
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  for (const id of ['portfolio', 'people']) assert.ok((await put(k, document(id))).ok, id);
+
+  const twelve = await put(k, asTwelve(document('money-core')));
+  assert.ok(twelve.ok, `1.2.0 did not install: ${said(twelve)}`);
+
+  const night = k.create('snapshots', { on: '2026-08-04', cash: { amount: 985_000, currency: 'GBP' }, taken: 'nightly' } as never, { actor: 'p_test' });
+  assert.ok(night.ok, sayOf(night));
+  assert.equal(k.count('snapshots'), 1);
+
+  const three = await put(k, document('money-core'));
+  assert.ok(three.ok, `a record on 1.2.0 with one snapshot cannot take 1.3.0: ${said(three)}`);
+
+  /* AND THE NIGHT THAT WAS THERE IS STILL THERE, which is the other half of the upgrade: a field
+     added to a populated list may not cost a row. */
+  assert.equal(k.count('snapshots'), 1);
+  assert.equal(k.get('snapshots#1')!.fields.on, '2026-08-04');
+
+  /* AND A NIGHT WRITTEN AFTER THE UPGRADE CARRIES ITS NAME, so the field is worth having. */
+  const named = k.create('snapshots', { what: nightOf('2026-08-05'), on: '2026-08-05', cash: { amount: 1, currency: 'GBP' }, taken: 'nightly' } as never, { actor: 'p_test' });
+  assert.ok(named.ok, sayOf(named));
+  assert.equal(k.get('snapshots#2')!.fields.what, '5 Aug 2026');
+});
+
 test('A CATEGORY IS A ROW AND A SECOND OF THE SAME NAME IS REFUSED, naming the row that already holds it', async () => {
   const k = await seeded();
   assert.equal(k.count('categories'), CATEGORIES.length);
@@ -75,18 +187,73 @@ test('A REPEATING ITEM IS COUNTED AT ITS MONTHLY SHARE, and the naive sum of the
   const k = await seeded();
   assert.equal(k.count('recurring'), RECURRING_ITEMS.length);
 
-  const live = RECURRING_ITEMS.filter((r) => r.state === 'live' && r.direction === 'out');
-  const share = live.reduce((n, r) => n + minor(r.amount) * (LOOKUPS.per_month![String(r.every)] ?? 0), 0);
-  assert.equal(reading(k, 'recurring-out-month'), Math.round(share));
+  /* READ OVER `obligations` BECAUSE THAT IS WHERE THE FIGURE READS TODAY, and the point this test
+     makes is about the FACTOR rather than about the list: a yearly insurance counted whole is
+     twelve times what leaves in a month. It survives the list changing, which it may. */
+  const factor = (o: { repeats?: unknown }): number => LOOKUPS.per_month![String(o.repeats)] ?? 0;
+  const live = OBLIGATIONS.filter((o) => o.state !== 'written_off' && o.direction === 'owed_by_me' && factor(o) > 0);
+  const share = live.reduce((n, o) => n + Math.round(minor(o.amount) * factor(o)), 0);
+  assert.equal(reading(k, 'every-month-out'), share);
 
-  /* THE SAME ROWS ADDED WITHOUT THE FACTOR, which is what a figure that forgot `every` would say. The
-     yearly insurance and the quarterly VAT are the whole of the gap, and it is most of the number. */
-  const naive = live.reduce((n, r) => n + minor(r.amount), 0);
+  /* THE SAME ROWS ADDED WITHOUT THE FACTOR, which is what a figure that forgot the frequency would
+     say. The yearly and the quarterly rows are the whole of the gap, and it is most of the number. */
+  const naive = live.reduce((n, o) => n + minor(o.amount), 0);
   assert.ok(naive > share * 1.5, `the naive sum is ${naive} against ${share}, so the sample no longer shows the mistake`);
 
   /* THE OTHER DIRECTION READS TOO, because a page that can only say what leaves is half a page. */
-  const incoming = RECURRING_ITEMS.filter((r) => r.state === 'live' && r.direction === 'in');
-  assert.equal(reading(k, 'recurring-in-month'), incoming.reduce((n, r) => n + minor(r.amount) * (LOOKUPS.per_month![String(r.every)] ?? 0), 0));
+  const incoming = OBLIGATIONS.filter((o) => o.state !== 'written_off' && o.direction === 'owed_to_me' && factor(o) > 0);
+  assert.ok(incoming.length > 0, 'the sample holds no repeating income, so the other direction proves nothing');
+  assert.equal(reading(k, 'every-month-in'), incoming.reduce((n, o) => n + Math.round(minor(o.amount) * factor(o)), 0));
+});
+
+test('ONE FIGURE ANSWERS WHAT GOES OUT EVERY MONTH, where two used to and they disagreed', async () => {
+  /**
+   * TWO FIGURES OVER TWO LISTS ANSWERED THIS, AND THEY DISAGREED ON THE SHIPPED SAMPLE.
+   *
+   * `every-month-out` summed `obligations` where `repeats` is monthly, quarterly or yearly, at
+   * `per_month`, and read 1041616. `recurring-out-month` summed `recurring` where the state is live
+   * and the direction is out, at the same factors, and read 919633. Both were on his screen, the
+   * first on Overview as "Every month" and the second on Ledger as "Repeating, out", and two
+   * numbers that should agree and do not is worse than one number missing, because a reader has no
+   * way to tell which is the record's answer. THAT IS WHAT THIS TEST HOLDS: one figure per answer.
+   *
+   * WHICH LIST IT READS IS A SEPARATE QUESTION AND IT IS NOT SETTLED HERE. The case for `recurring`
+   * is good and is written out at the declaration: the importer writes that list, `next_due` moves
+   * as each one goes out, and `ends` says when it stops, so a real imported record has the better
+   * data there. It was pointed at `recurring` and pointed back, because no use case seeds that list
+   * and all three figures then answered zero on every demo record, and reseeding is blocked on
+   * `recurring.category` being a ref where `obligations.category` is a closed enum, with no seed row
+   * anywhere writing a ref. The decision is in `loop/BACKLOG.md`. This test asserts the dedupe,
+   * which is settled, and deliberately does not assert the source, which is not.
+   */
+  const k = await seeded();
+
+  const share = (m: { value: unknown }): boolean => JSON.stringify(m.value).includes('per_month');
+  const monthly = Object.values(MONEY_METRICS).filter(share);
+  assert.deepEqual(
+    monthly.map((m) => m.metric).sort(),
+    ['every-month-by-category', 'every-month-in', 'every-month-out'],
+    'two figures are summing monthly shares over two different lists',
+  );
+  /* ONE LIST BETWEEN THEM, WHICHEVER IT IS. This is the assertion that would have caught the
+     original defect, and it survives the source question being reopened either way. */
+  assert.equal(new Set(monthly.map((m) => m.source)).size, 1, 'the monthly figures read more than one list again');
+
+  const factor = (r: { repeats?: unknown }): number => LOOKUPS.per_month![String(r.repeats)] ?? 0;
+  /* ROUNDED PER ROW AND THEN SUMMED, WHICH IS NOT THE SAME AS SUMMING AND ROUNDING ONCE. Measured:
+     summing first gives 1041617 against the figure's 1041616, one penny out. A yearly amount at a
+     twelfth rarely divides, so every row carries a fraction and the order the rounding happens in
+     decides where the penny lands. The figure rounds each share, so the test does too. */
+  const monthlyOut = OBLIGATIONS.filter((o) => o.state !== 'written_off' && o.direction === 'owed_by_me' && factor(o) > 0)
+    .reduce((n, o) => n + Math.round(minor(o.amount) * factor(o)), 0);
+  assert.ok(monthlyOut > 0, 'the sample holds no repeating cost, so this proves nothing');
+  assert.equal(reading(k, 'every-month-out'), monthlyOut);
+
+  /* AND THE PARTS ARE THE WHOLE, which is what the Overview draws beside it: every live repeating
+     cost in the sample carries a category, so the grouped figure adds up to the ungrouped one. */
+  const grouped = k.metric(METRICS['every-month-by-category'] as never);
+  assert.ok(grouped.ok, sayOf(grouped));
+  assert.equal(grouped.value.groups?.reduce((n, g) => n + (g.value ?? 0), 0), Math.round(monthlyOut));
 });
 
 test('A PLAN IS THE SUM OF ITS PARTS, so what is left cannot disagree with the rows it is left of', async () => {
@@ -200,7 +367,9 @@ test('THE WHOLE BOOK YOU OWE IS A FIGURE NOW, and it is the receivable one with 
 
 /* ── a bank message becomes a row ────────────────────────────────────────── */
 
-const INGESTS: Declaration[] = Object.values(MONEY_INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+/** The patterns as a record installs them, which is the same map `ingestDeclarations()` walks. */
+const ingests = (): Declaration[] =>
+  Object.values(MONEY_INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
 
 const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
 const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
@@ -216,7 +385,7 @@ const arrived = (out: unknown): Arrived => {
 
 test('A FORWARDED BANK MESSAGE BECOMES A LEDGER ROW, in both directions and with no model in it', async () => {
   const k = await seeded();
-  assert.ok((await k.install(INGESTS)).ok, 'the patterns do not install');
+  assert.ok((await k.install(ingests())).ok, 'the patterns do not install');
   const before = k.count('transactions');
 
   const out = arrived(forward(k, CHARGE, 'sms-1'));
@@ -249,7 +418,7 @@ test('A FORWARDED BANK MESSAGE BECOMES A LEDGER ROW, in both directions and with
 
 test('AND AN ARRIVAL NOBODY UNDERSTANDS IS STILL STORED, which is the rule these patterns may not weaken', async () => {
   const k = await seeded();
-  assert.ok((await k.install(INGESTS)).ok);
+  assert.ok((await k.install(ingests())).ok);
   const before = k.count('transactions');
 
   /* A THIRD WORDING, from a bank nothing here has a pattern for. It is not dropped and it is not
@@ -275,33 +444,100 @@ test('AND AN ARRIVAL NOBODY UNDERSTANDS IS STILL STORED, which is the rule these
   assert.equal(k.count('transactions'), before, 'an account nothing matched still wrote a row');
 });
 
-test('A MESSAGE THAT NAMES BOTH VERBS IS CLAIMED BY THE FIRST PATTERN, which is what splitting on the verb does not prevent', async () => {
+test('A MESSAGE THAT NAMES BOTH VERBS IS CLAIMED BY NEITHER PATTERN, because a sign nothing decides may not be written at exact', async () => {
   const k = await seeded();
-  assert.ok((await k.install(INGESTS)).ok);
+  assert.ok((await k.install(ingests())).ok);
   const before = k.count('transactions');
 
   /**
-   * MEASURED, BECAUSE THE DECLARATION READS AS THOUGH THE TWO PATTERNS WERE EXCLUSIVE AND THEY ARE NOT.
+   * MEASURED, AND IT WAS THE WORST OUTCOME THIS LAYER HAS.
    *
-   * `bank-card-out` wants `debited` and `bank-card-in` wants `credited`, and a body carrying both
-   * satisfies both `match:` clauses. `arrive` takes the first that matches, which is the order
-   * `MONEY_INGESTS` is written in, so such a message is filed as a payment OUT at `exact` and the
-   * credit half is never read. No bank alert in the sample names both verbs; a statement digest
-   * that did would be filed one way round with no sign that the other was possible. This is here so
-   * that a wording which makes it possible is a test going red rather than a wrong row in the book.
+   * `bank-card-out` wanted `debited` and `bank-card-in` wanted `credited`, and a body carrying both
+   * satisfied both `match:` clauses. `arrive` takes the first that matches, which is the order
+   * `MONEY_INGESTS` is written in, so a statement digest naming both was filed as a payment OUT at
+   * `exact` and the credit half was never read. A wrong sign at `exact` is worse than no row,
+   * because `exact` is the one confidence nothing downstream doubts: no suggestion is opened, no
+   * reason is stored against the arrival, and the ledger looks ordinary.
+   *
+   * SO EACH PATTERN NOW REFUSES THE OTHER'S VERB, and a message that names both matches nothing. It
+   * lands where the Monzo wording lands — `untriaged`, bytes and all, on a screen a person reads —
+   * which is also where `arrive` counts it towards the three arrivals that earn a drafted pattern.
+   * Nothing is guessed, and the declared ORDER of the two stops deciding anything at all.
    */
   const both = arrived(forward(k, 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26, and credited GBP 1.00 from NILE REALTY on 18/09/26.', 'sms-both'));
-  assert.equal(both.state, 'matched');
-  assert.equal(both.ingest, 'bank-card-out', 'the arm that claims a two-verb message changed');
-  assert.equal(both.confidence, 'exact');
-  assert.equal(k.count('transactions'), before + 1, 'both arms wrote, so one movement became two rows');
-  assert.equal(k.get(both.wrote[0]!)!.fields.direction, 'out');
-  assert.deepEqual(Object.keys(MONEY_INGESTS), ['bank-card-out', 'bank-card-in'], 'the declared order is what decides this, so it is part of the assertion');
+  assert.equal(both.state, 'untriaged');
+  assert.equal(both.ingest, null, 'an arm still claims a message that says two things');
+  assert.equal(k.count('transactions'), before, 'an ambiguous message wrote a row');
+
+  /* AND EACH VERB ON ITS OWN IS STILL A STRAIGHT READ, which is what exclusivity may not cost. */
+  assert.equal(arrived(forward(k, CHARGE, 'sms-out')).ingest, 'bank-card-out');
+  assert.equal(arrived(forward(k, CREDIT, 'sms-in')).ingest, 'bank-card-in');
+});
+
+test('AN ALERT IN A CURRENCY THAT IS NOT STERLING IS READ, because the amount is anchored on the verb and not on a currency code', async () => {
+  /**
+   * MEASURED ON A RECORD: `MOVEMENT` ANCHORED THE AMOUNT ON THE LITERAL `GBP`.
+   *
+   * An anchor that is nowhere in the text yields no slices at all, so an alert reading
+   * `debited EGP 42.99` read NO amount and the arrival went to `review` saying
+   * *"bank-card-out could not read amount, on out of this one"* over a message that plainly carried
+   * both. He banks in EGP, USD and GBP, so two of the three currencies he holds were unreadable and
+   * the third was readable only by accident of the pack having been written in sterling.
+   *
+   * THE VERB IS THE ANCHOR NOW, which each pattern's `match:` has already guaranteed is in the body,
+   * so the slice starts at the figure whatever currency it is in.
+   */
+  const k = await seeded();
+  assert.ok((await k.install(ingests())).ok, 'the patterns do not install');
+  const before = k.count('transactions');
+
+  const out = arrived(forward(k, 'HSBC: Your card ending 4471 was debited EGP 42.99 at FENWICK CLOUD on 29/08/26.', 'sms-egp'));
+  assert.equal(out.state, 'matched', out.reason ?? '');
+  assert.equal(out.confidence, 'exact');
+  assert.equal(k.count('transactions'), before + 1);
+
+  const row = k.get(out.wrote[0]!)!;
+  assert.equal((row.fields.amount as { amount: number }).amount, 4_299, 'the figure beside a foreign code was not read');
+  assert.equal(row.fields.on, '2026-08-29');
+  assert.equal(row.fields.what, 'FENWICK CLOUD');
+
+  /**
+   * AND THE CODE ON THE ROW IS THE DECLARED ONE HERE, WHICH IS AS CLOSE AS A BARE RECORD GETS.
+   *
+   * `money.currency` is the code to fall back on when the text names none, and on a real record
+   * `@braindog/record` injects `scanMoney` from `@braindog/extract`, where a code printed beside the
+   * figure WINS over the declared one because it is the one that moved the money. A bare kernel has
+   * no such reader wired and falls back every time. This package may not depend on
+   * `@braindog/extract` — `tools/gates/graph.mjs` holds that edge, same as the dedupe test below —
+   * so what is asserted here is the half that is provable from here: the figure is read at all, and
+   * no pattern anchors on a code again.
+   */
+  assert.equal((row.fields.amount as { currency: string }).currency, 'GBP', 'a bare record read something other than the declared fallback');
+  const forms = Object.values(MONEY_INGESTS).flatMap((body) =>
+    Object.entries(body.extract ?? {}).map(([field, form]) => [`${body.ingest}.${field}`, (form as { money?: { after?: string; currency?: string } }).money] as const),
+  );
+  const monies = forms.filter(([, money]) => money);
+  assert.equal(monies.length, 2, 'the two patterns no longer read one amount each');
+  for (const [where, money] of monies)
+    assert.ok(!/^[A-Z]{3}$/u.test((money!.after ?? '').trim()), `${where} anchors on a currency code, so an alert in any other currency reads nothing`);
+  assert.equal(new Set(monies.map(([, money]) => money!.currency)).size, 1, 'the two patterns fall back on two different currencies');
+
+  /**
+   * AND THE HOME CURRENCY SETTING STILL HAS NO DEFAULT, which is the other half of the same choice.
+   *
+   * A default of `GBP` was tried here, because the fallback above and the setting are both about
+   * what currency this record is in, and it was measured wrong: `founder-poll.test.ts` holds a
+   * record with an Egyptian account and a dollar account and asserts Cash now reads `null` until
+   * somebody chooses, and with the default in place it read 2808560. A figure converted at a rate
+   * nobody asked for is indistinguishable from one a person chose, so the question stays open until
+   * it is answered and the patterns keep a fallback of their own.
+   */
+  assert.equal((MONEY_HOME_SETTING.home_currency as { default?: string }).default, undefined);
 });
 
 test('THE SAME BYTES TWICE ARE ONE ROW, and the same movement in two wordings is what the near key is for', async () => {
   const k = await seeded();
-  assert.ok((await k.install(INGESTS)).ok);
+  assert.ok((await k.install(ingests())).ok);
   const before = k.count('transactions');
 
   assert.equal(arrived(forward(k, CHARGE, 'sms-1')).state, 'matched');

@@ -746,7 +746,34 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
     fields: [
       /* THE NIGHT, SPELLED THE WAY A DAY IS SPELLED ON SCREEN. It repeats `on`, and the repetition is the
          point: `on` is the day the arithmetic sorts and filters by, and this is the one a person types. */
-      { id: 'what', label: 'Night', type: 'text', required: true, search: true },
+      /**
+       * NOT REQUIRED, AND IT WAS, AND THAT STRANDED EVERY RECORD THAT ALREADY HELD A SNAPSHOT.
+       *
+       * Driven through `normalise`, `plan` and `install`: money-core 1.2.0, one night written, then
+       * 1.3.0 →
+       *
+       *     REQUIRED_ON_POPULATED at register.snapshots.fields.what.required
+       *     "register.snapshots.what is required and 1 rows were written before it. Ship a default
+       *      or a fill rule."
+       *
+       * `declare`'s `unreadable` records a `required: true` with no `default` where the installed
+       * body had neither, and `install` answers before anything is staged. So a person on 1.2.0
+       * could not take the upgrade at all, and the sentence names a field they have never heard of.
+       *
+       * AND THE TWO REPAIRS THE SENTENCE OFFERS WERE BOTH MEASURED AND NEITHER IS REACHABLE HERE. A
+       * `default` is one stored constant, so every night before the upgrade would be called the
+       * same thing, which is worse than a night with no name. A FILL RULE DOES NOT CLEAR THE
+       * REFUSAL: `unreadable` looks at `default` and nothing else, and a rule runs after an install
+       * that never happens; even if it ran, the only template `fill` reaches is `{{on}}`, the
+       * STORED day, so the old rows would read `2026-08-04` in a list whose new rows read
+       * `4 Aug 2026` — one list, two spellings of one title. `derived: true` is the kernel's own
+       * flag, set by nothing today, and it refuses every write, so the seed could not fill it.
+       *
+       * SO THE NIGHT IS NAMED BY WHOEVER WRITES IT, and every writer here does. `on` is required
+       * and unique, so a row with no name is still exactly one night and still sorts and filters;
+       * what it loses is being findable by name, which is what it had before 1.3.0 anyway.
+       */
+      { id: 'what', label: 'Night', type: 'text', search: true },
       { id: 'on', label: 'Date', type: 'day', unique: true, required: true },
       { id: 'cash', label: 'Cash', type: 'money', required: true },
       { id: 'owed_to_me', label: 'Owed to you', type: 'money' },
@@ -760,10 +787,52 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
   },
 };
 
-/** The Money setting a record adds every currency up in. Read each time a figure is, so a change holds at once. */
+/**
+ * The Money setting a record adds every currency up in. Read each time a figure is, so a change holds at once.
+ *
+ * AND IT DELIBERATELY HAS NO DEFAULT, WHICH A DEFAULT OF `GBP` WAS TRIED AGAINST AND MEASURED.
+ * `founder-poll.test.ts` holds a record with one account in Egyptian pounds and one in dollars and
+ * asserts that Cash now reads `null` until somebody chooses; with sterling defaulted in, the same
+ * record answered 2808560. That is the whole argument: an unanswered question must read as
+ * unanswered, because a figure converted at a rate nobody asked for looks exactly like a figure a
+ * person chose, and this one is the number he decides against. Sterling being the pack's own
+ * spelling of money, the shipped sample's currency and the app installer's chosen value does not
+ * make it this record's answer.
+ */
 export const MONEY_HOME_SETTING = {
   home_currency: { type: 'text', label: 'Home currency', note: 'The currency money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
 } as const;
+
+/**
+ * The code an arrival pattern falls back on when the message names none, written once for both.
+ *
+ * NOT THE SETTING ABOVE, FOR THE PARAGRAPH ABOVE: the setting is allowed to be unanswered and this
+ * is not, because `money.currency` is required of the form and a pattern with no code reads no
+ * money at all. It is a FALLBACK either way, never an override: wherever `@braindog/record` has
+ * wired `scanMoney`, a code the bank prints beside the figure wins over this one, so what this
+ * decides is only what an alert that prints a bare number is read as. Sterling, because the bank
+ * these two patterns are written against is his British one and prints one.
+ */
+const HOME_CURRENCY = 'GBP';
+
+/**
+ * THE WAY THE BANK HE FORWARDS FROM WRITES A DAY, and it is a declaration rather than a sniff.
+ *
+ * `29/08/26` AND `08/29/26` ARE BOTH REAL DAYS and nothing in either string says which, so `43 §4.3`
+ * makes the format part of the pattern: an extractor that decided by looking at the numbers would be
+ * right most of the time and wrong about every date before the thirteenth. A payment filed five
+ * months out is a row that still looks ordinary, which is why there is no guessing arm.
+ *
+ * AND IT BELONGS IN A SETTING RATHER THAN HERE, because which way a bank writes a date is a fact
+ * about his bank and not about the record: he banks in three currencies and more than one country.
+ * The form for that is `{{config:bank_day_format}}` beside `home_currency` above, and it is not
+ * reachable this batch: a setting is filled only where a PACK is planned and installed
+ * (`declare`'s `filledWith`), and `installSeed` hands its ingest declarations to `kernel.install`
+ * unfilled, so a placeholder would be refused at the door with `FIELD_UNKNOWN`. Measured, before
+ * this line was reverted to a constant. The one line that unblocks it is `ingestDeclarations()` in
+ * `packages/seed/src/index.ts` running `fillConfig` over these settings' values.
+ */
+const BANK_DAY_FORMAT = 'DD/MM/YY';
 
 /**
  * THE TARGETS A PERSON CHANGES LATER, AS SETTINGS OF MONEY. A figure's target was fixed the day Money went in, so somebody
@@ -876,8 +945,36 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* WHAT GOES OUT EVERY MONTH WITHOUT ANYBODY DECIDING AGAIN: each repeating cost at its monthly
-     share, so a yearly insurance is a twelfth and a quarterly VAT bill is a third. */
+  /**
+   * WHAT GOES OUT EVERY MONTH WITHOUT ANYBODY DECIDING AGAIN: each repeating cost at its monthly
+   * share, so a yearly insurance is a twelfth and a quarterly VAT bill is a third.
+   *
+   * THERE WERE TWO FIGURES FOR THIS AND THEY DISAGREED ON THE SHIPPED SAMPLE. Measured: this one
+   * read 1041616 off `obligations.repeats` while `recurring-out-month` read 919633 off `recurring`,
+   * the first on Overview as *Every month* and the second on Ledger as *Repeating, out*, two clicks
+   * apart. Two figures that should agree and do not is worse than one figure missing, because
+   * nothing on either screen says which of them the record means. The duplicate pair is gone and
+   * this is the one answer.
+   *
+   * IT READS `obligations`, AND THAT IS A HOLDING POSITION RATHER THAN A VERDICT. The argument for
+   * `recurring` is good: an obligation carrying `repeats` is one dated amount wearing a frequency,
+   * a repeating item has `next_due` that moves and `ends` that stops it, and the importer writes
+   * that list, so a real imported record has the better data in `recurring`. It was pointed there
+   * and then pointed back, because a SEEDED record has the opposite problem and the switch was
+   * measured to cost more than it bought: no use case seeds `recurring`, so all three of these
+   * figures answered zero on every demo record, and they cannot simply be reseeded because
+   * `recurring.category` is a ref to the categories register while `obligations.category` is a
+   * closed enum, no seed row anywhere writes a ref, and `usecase-install.test.ts` rightly refuses a
+   * bill with no category. Moving the figures is a one-line change; moving the seeds behind them
+   * needs ref resolution in the installer and a decision about which of the two shapes a category
+   * really is. That decision is recorded in `loop/BACKLOG.md` and is not a thing to settle inside
+   * an unrelated repair.
+   *
+   * THE IDS STAY, and that is deliberate: `MONEY_TARGET_SETTINGS` holds a person's ceiling under
+   * this name, the personal use case overrides its target under this name, and the Overview's
+   * series names it. Changing what a figure reads is a change to the figure; changing its id is a
+   * change to everything pointing at it.
+   */
   'every-month-out': {
     metric: 'every-month-out',
     name: 'Every month',
@@ -1130,34 +1227,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   },
 
   /* ── what comes round ────────────────────────────────────────────────────
-     Each repeating item at its monthly share, the way `every-month-out` reads `obligations.repeats`.
-     Paused and ended items are left out: a figure about what leaves every month is about what leaves. */
-
-  'recurring-out-month': {
-    metric: 'recurring-out-month',
-    name: 'Repeating, out',
-    source: 'register.recurring',
-    where: 'state is live, direction is out',
-    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
-    lookups: { per_month: LOOKUPS.per_month! },
-    format: 'money.GBP',
-    target: { lte: 1_500_000 },
-    window: '30d',
-    compare: 'none',
-  },
-
-  'recurring-in-month': {
-    metric: 'recurring-in-month',
-    name: 'Repeating, in',
-    source: 'register.recurring',
-    where: 'state is live, direction is in',
-    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
-    lookups: { per_month: LOOKUPS.per_month! },
-    format: 'money.GBP',
-    target: { gte: 0 },
-    window: '30d',
-    compare: 'none',
-  },
+     `recurring-out-month` and `recurring-in-month` WERE HERE AND THEY ARE GONE, because they were a
+     second name for `every-month-out` and `every-month-in` over the same rows. They were written
+     when those two read `obligations.repeats`, as the pair that read the list a repeating item
+     actually lives in; the two readings disagreed by 121983 on the shipped sample, and the repair
+     was for one of the pair to stop existing rather than for both to keep answering. The surviving
+     ids are the ones the pages, the target settings and the personal use case already name. */
 
   /* ── paid in parts ───────────────────────────────────────────────────────
      What is left of every plan, and what falls due inside the month. Both are sums of the rows, never
@@ -1315,17 +1390,36 @@ const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
 /**
  * The day, the amount and the account, which are the same three reads in either direction.
  *
- * THE AMOUNT IS ANCHORED AND THE REASON IS IN THE SAMPLE: an unanchored `{ money: { currency: 'GBP' } }`
+ * THE AMOUNT IS ANCHORED AND THE REASON IS IN THE SAMPLE: an unanchored `{ money: { currency } }`
  * over *"Your card ending 4471 was debited GBP 42.99"* reads the card digits as forty-four pounds
  * seventy-one, because `4471` is a number and the declared currency is a fallback that would dress it
- * as one. Anchoring on the code the bank prints beside the figure is what makes the first candidate
- * the right one.
+ * as one. Something has to sit between the digits and the figure, and the first candidate after it
+ * is the right one.
+ *
+ * AND IT WAS THE LITERAL `GBP`, ON A PACK WHOSE HOME CURRENCY IS A SETTING. Measured on a record:
+ * an alert reading *"debited EGP 42.99 at FENWICK CLOUD on 2026-08-29"* came back
+ * `review — bank-card-out could not read amount, on out of this one`, because an anchor that is
+ * nowhere in the text yields no slices at all and `DD/MM/YY` reads no ISO day. He banks in EGP, USD
+ * and GBP, so two of the three currencies he holds were unreadable and the third was only readable
+ * by accident of the pack having been written in it.
+ *
+ * SO THE ANCHOR IS THE VERB, which each pattern's `match:` has already guaranteed is in the body,
+ * and the declared code is a FALLBACK and never an override. `scanMoney` takes the code the bank
+ * prints beside the figure whenever there is one, *because it is the one that moved the money*, and
+ * falls back to the declared code only when the text names none. So the same alert now comes back
+ * `matched` at `exact` with `EGP 42.99` on it, and a sterling alert reads sterling.
+ *
+ * AND THE FALLBACK IS THE ONE NAMED CONSTANT `HOME_CURRENCY` ABOVE, shared by both patterns rather
+ * than typed once in each, so the two cannot drift apart. It is NOT read off `MONEY_HOME_SETTING`,
+ * and that is the paragraph above `HOME_CURRENCY`: the setting is allowed to stand unanswered and a
+ * pattern with no code reads no money at all, so the two questions have to be answered separately.
  */
-const MOVEMENT = {
-  on: { date: { format: 'DD/MM/YY', after: ' on ' } },
-  amount: { money: { after: 'GBP', currency: 'GBP' } },
-  account: { lookup: { register: 'accounts', by: 'last4', after: 'ending ' } },
-} as const;
+const movement = (verb: 'debited' | 'credited') =>
+  ({
+    on: { date: { format: BANK_DAY_FORMAT, after: ' on ' } },
+    amount: { money: { after: `${verb} `, currency: HOME_CURRENCY } },
+    account: { lookup: { register: 'accounts', by: 'last4', after: 'ending ' } },
+  }) as const;
 
 /**
  * The alerts that recognise themselves and are not movements.
@@ -1356,21 +1450,39 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     ingest: 'bank-card-out',
     pack: 'money-core',
     channel: 'email',
-    /* THE VERB IS PART OF THE MATCH, so the `enum` below cannot miss. `contains` is case-folded
-       (`where`'s own `fold`), so the capitals a bank uses are not part of the declaration.
-
-       IT DOES NOT MAKE THE TWO PATTERNS EXCLUSIVE, WHICH WAS MEASURED RATHER THAN ASSUMED: a body
-       naming both verbs matches both, and `arrive` takes the first declared, which is this one, and
-       writes `direction: out` at `exact`. A real alert names one verb, so the sample is silent about
-       it; `A MESSAGE THAT NAMES BOTH VERBS IS CLAIMED BY THE FIRST PATTERN` in `test/money.test.ts`
-       is where the behaviour is written down, so a third wording that carries both is a change
-       somebody sees rather than a row filed the wrong way round. */
-    match: { all: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'card ending' }] },
+    /**
+     * THE VERB IS PART OF THE MATCH, so the `enum` below cannot miss. `contains` is case-folded
+     * (`where`'s own `fold`), so the capitals a bank uses are not part of the declaration.
+     *
+     * AND THE OTHER VERB IS PART OF IT TOO, BECAUSE SPLITTING ON ONE DID NOT MAKE THE TWO PATTERNS
+     * EXCLUSIVE. Measured: a body carrying `debited`, `credited` and `card ending` satisfied both
+     * `match:` clauses, `arrive` took the first declared, which is this one, and the arrival was
+     * written as a payment OUT at `exact` with the credit half never read. A wrong sign at `exact`
+     * is the worst outcome this layer has: `exact` is the confidence that opens no suggestion,
+     * stores no reason and puts the row straight in the book, so nothing downstream doubts it and
+     * the ledger looks ordinary.
+     *
+     * `none:` IS WHAT MAKES THEM EXCLUSIVE, and a message naming both now matches neither. It lands
+     * `untriaged`, which is where a wording nothing recognises already lands: the bytes are stored,
+     * a person sees it, and the third such arrival earns a drafted pattern. What goes with it is
+     * that the ORDER these two are declared in stops deciding anything.
+     *
+     * AND THE `none` GROUP IS NESTED INSIDE THE `all` LIST RATHER THAN WRITTEN BESIDE IT, which
+     * reads like a style choice and is not. `where`'s `quantifierOf` is `'all' in g ? 'all' : 'any'
+     * in g ? 'any' : 'none'` and `childrenOf` matches it, so a group carrying TWO quantifier keys
+     * is read as the first one and the rest of the object is dropped without a word. Measured:
+     * written as `{ all: [...], none: [...] }` this pattern still claimed a message naming both
+     * verbs, at `exact`, because only the `all` leg was ever evaluated. `compile` does not refuse
+     * the shape either, so nothing anywhere says so. One quantifier per object, always.
+     */
+    match: {
+      all: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'card ending' }, { none: [{ field: 'body', contains: 'credited' }] }],
+    },
     skip: NOT_A_MOVEMENT,
     extract: {
       what: MERCHANT_OUT,
       direction: { enum: { map: { debited: 'out' } } },
-      ...MOVEMENT,
+      ...movement('debited'),
     },
     writes: { register: 'transactions', confidence: 'exact' },
     dedupe: SAME_MOVEMENT,
@@ -1380,12 +1492,16 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
     ingest: 'bank-card-in',
     pack: 'money-core',
     channel: 'email',
-    match: { all: [{ field: 'body', contains: 'credited' }, { field: 'body', contains: 'card ending' }] },
+    /* AND THE SAME EXCLUSION FROM THE OTHER SIDE. Both arms carry it, because one arm refusing the
+       other's verb would only move which of the two claims an ambiguous message. */
+    match: {
+      all: [{ field: 'body', contains: 'credited' }, { field: 'body', contains: 'card ending' }, { none: [{ field: 'body', contains: 'debited' }] }],
+    },
     skip: NOT_A_MOVEMENT,
     extract: {
       what: MERCHANT_IN,
       direction: { enum: { map: { credited: 'in' } } },
-      ...MOVEMENT,
+      ...movement('credited'),
     },
     writes: { register: 'transactions', confidence: 'exact' },
     dedupe: SAME_MOVEMENT,
@@ -1664,7 +1780,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         cells: [
           { metric: 'spent-30d', label: 'Spent' },
           { metric: 'received-30d', label: 'Received' },
-          { metric: 'recurring-out-month', label: 'Repeating, out', note: '{{recurring-in-month}} coming in' },
+          /* THE SAME FIGURE OVERVIEW LEADS WITH, under the word this page uses for it. Two tiles
+             two clicks apart that mean one thing now read one number, which is what they did not. */
+          { metric: 'every-month-out', label: 'Repeating, out', note: '{{every-month-in}} coming in' },
           { metric: 'txn-uncategorised', label: 'Without a category' },
         ],
       },

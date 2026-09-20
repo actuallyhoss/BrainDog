@@ -27,7 +27,7 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, snapshotRows } from './modules/money.ts';
+export { ACCOUNTS, CATEGORIES, INSTALLMENTS, MONEY_INGESTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, nightOf, snapshotRows, type SeedIngest } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
@@ -39,6 +39,7 @@ import {
   CATEGORIES,
   INSTALLMENTS,
   MONEY_HOME_SETTING,
+  MONEY_INGESTS,
   MONEY_METRICS,
   MONEY_PAGES,
   MONEY_REGISTERS,
@@ -48,6 +49,7 @@ import {
   SNAPSHOTS,
   TRANSACTIONS,
   targetConfigOf,
+  type SeedIngest,
 } from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
@@ -202,6 +204,21 @@ export const RULES: Record<string, SeedRule> = { ...MONEY_RULES, ...PORTFOLIO_RU
 export const ruleDeclarations = (): Declaration[] =>
   Object.values(RULES).map((body) => ({ id: `rule.${body.rule}`, kind: 'rule' as const, body: body as never }));
 
+/**
+ * How a forwarded message becomes a row: the patterns the modules ship with.
+ *
+ * DECLARED, VALID, TESTED, AND INSTALLED BY NOTHING, which is the hole this closes. `MONEY_INGESTS`
+ * was read only by `test/money.test.ts`, which installs it by hand before it forwards anything, so
+ * every assertion there held while the record `installSeed` actually opens carried no pattern at
+ * all. Measured on a seeded record before this line: nought declarations of kind `ingest`, and an
+ * HSBC charge alert posted at the arrival path was stored, hashed, left `untriaged` and wrote
+ * nothing, which is correct behaviour and an empty ledger beside a full inbox.
+ */
+export const INGESTS: Record<string, SeedIngest> = { ...MONEY_INGESTS };
+
+export const ingestDeclarations = (): Declaration[] =>
+  Object.values(INGESTS).map((body) => ({ id: `ingest.${body.ingest}`, kind: 'ingest' as const, body: body as never }));
+
 export const metricDeclarations = (): Declaration[] =>
   Object.values(METRICS).map((body) => ({ id: `metric.${body.metric}`, kind: 'metric' as const, body: body as never }));
 
@@ -269,6 +286,10 @@ export function packDocument(): Record<string, unknown> {
       ...Object.values(PAGES),
       ...Object.values(METRICS),
       ...Object.values(RULES),
+      /* A PATTERN IS SPREAD AS IT STANDS, where a register had to be respelled: `normalise` reads a
+         declaration's kind off its FIRST key, and `MONEY_INGESTS` already writes `ingest:` first,
+         so the document form and the stored form of an ingest are the same object. */
+      ...Object.values(INGESTS),
     ],
     /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later, and the currency it adds up in. */
     config: { ...MONEY_HOME_SETTING, ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]) },
@@ -380,7 +401,17 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 
   /* THE PROJECT TEMPLATE WAITS FOR THE AGENTS PACK, because its "Runs on" blocks read the pack's
      registers, and a page requiring a register the record does not hold yet is refused. */
-  const installed = await kernel.install([...declarations(), ...pageDeclarations().filter((d) => d.id !== 'page.project'), ...metricDeclarations()]);
+  /* AND THE ARRIVAL PATTERNS GO IN WITH THE LISTS THEY READ AND WRITE. `writes.register` is checked
+     for its grammar at install and never resolved, so a pattern installs happily into a record with
+     no `transactions` in it and says nothing until the first message lands. Putting it in the batch
+     that declares `transactions` and `accounts` is what keeps the first forwarded alert from being
+     the test of whether the register was there. */
+  const installed = await kernel.install([
+    ...declarations(),
+    ...pageDeclarations().filter((d) => d.id !== 'page.project'),
+    ...metricDeclarations(),
+    ...ingestDeclarations(),
+  ]);
   if (!installed.ok) return installed as Result<Seeded>;
   const agents = await installAgentsPack(kernel, actor);
   if (!agents.ok) return agents as unknown as Result<Seeded>;

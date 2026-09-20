@@ -52,7 +52,17 @@ async function put(k: Kernel, doc: unknown): Promise<unknown> {
 }
 
 type Body = Record<string, unknown>;
-const idOf = (d: Body): string => (d.rule ? `rule.${d.rule}` : d.register ? `register.${d.register}` : d.page ? `page.${d.page}` : `metric.${d.metric}`);
+/* AN INGEST IS A DECLARATION TOO, and this helper did not know it. Ingests only joined the pack
+   documents this week; before that every declaration was a rule, a register, a page or a metric, so
+   the last arm was a safe default. With two ingests in money-core both answered `metric.undefined`,
+   the duplicate check below read 83 distinct ids against 84 declarations and reported "a
+   declaration is in two packs" about two declarations that are in one pack and are not the same. */
+const idOf = (d: Body): string =>
+  d.rule ? `rule.${d.rule}`
+    : d.register ? `register.${d.register}`
+      : d.page ? `page.${d.page}`
+        : d.ingest ? `ingest.${d.ingest}`
+          : `metric.${d.metric}`;
 const byId = (list: readonly Body[]): [string, string][] => list.map((d) => [idOf(d), JSON.stringify(d)] as [string, string]).sort((a, b) => a[0].localeCompare(b[0]));
 
 /* ── each one ───────────────────────────────────────────────────────────── */
