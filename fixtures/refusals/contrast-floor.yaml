@@ -1,5 +1,5 @@
 code:   CONTRAST_FLOOR
 via:    install
 raises: packages/theme/src/checks.ts
-at:     roles.dark.ink
-fix:    Move the role further from the ground.
+at:     theme.midnight.roles.dark.faint
+fix:    Move faint further from the ground.

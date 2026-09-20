@@ -32,8 +32,9 @@ import {
   INTENT_HUE,
   parseColour,
   type Built,
+  type Palette,
 } from './build.ts';
-import { checkElevation, checkScheme, refusals, validate } from './checks.ts';
+import { checkElevation, checkForcedColors, checkScheme, refusals, validate } from './checks.ts';
 import { toCSS, forcedColors } from './css.ts';
 
 /* THE CLASSES THE RENDERER ACTUALLY EMITS, handed in rather than imported: the theme package
@@ -403,6 +404,87 @@ test('and a near-white surface giving up almost all of its chroma does NOT fail'
   // almost no chroma to have. As a fraction that reads as a catastrophe; as an amount it is 0.010.
   assert.deepEqual(refusals(checkScheme(HOUSE, 'light')).filter((f) => f.check === 'J'), []);
   assert.ok((HOUSE.clipped.light.s3 ?? 0) > 0, 'the fixture must actually clip there for this to mean anything');
+});
+
+/* ── the address the check already knew ──────────────────────────────────── */
+
+/**
+ * `39 §6.2` gives all four theme codes an `at` and `checks.ts` carried none, so three fixtures named
+ * an address the validator had no concept of. Every one of these checks knows the token at the
+ * moment it fails and was flattening it into a sentence.
+ *
+ * THE RULE IS 39 §6.2'S: the address is `theme.<id>.roles.<scheme>.<the role the fix moves>`, which
+ * is a real path into the document a theme author sends (`declare.ts`'s `themeBody` reads `seed`
+ * and `roles`), and a check with no such token carries none rather than inventing one.
+ */
+const ADDRESS = /^theme\.[a-z0-9-]+\.roles\.(dark|light)\.[a-z0-9-]+$/;
+
+test('A CONTRAST FLOOR POINTS AT THE ROLE THAT MOVES, not at the ground it sits on', () => {
+  const broken: Built = {
+    ...HOUSE,
+    schemes: { ...HOUSE.schemes, dark: { ...HOUSE.schemes.dark, ink: HOUSE.schemes.dark.bg } },
+  };
+  const found = refusals(checkScheme(broken, 'dark')).filter((f) => f.check === 'A');
+  assert.ok(found.length > 0, 'ink painted onto the page was not refused');
+  assert.deepEqual([...new Set(found.map((f) => f.at))], [`theme.${HOUSE.id}.roles.dark.ink`]);
+});
+
+test('AN INSEPARABLE PAIR POINTS AT THE FIRST OF IT, because one `at` cannot hold two', () => {
+  const built = build({ ...HOUSE.seed }, HOUSE_PROFILE, 'twins');
+  const twinned: Built = {
+    ...built,
+    schemes: { ...built.schemes, dark: { ...built.schemes.dark, info: built.schemes.dark.danger } },
+  };
+  const found = refusals(checkScheme(twinned, 'dark')).filter((f) => f.check === 'F');
+  assert.ok(found.length > 0, 'two intents of one hue passed the separability check');
+  assert.deepEqual([...new Set(found.map((f) => f.at))], ['theme.twins.roles.dark.danger']);
+});
+
+test('A LADDER THAT TURNS BACK POINTS AT THE RUNG IT TURNS AT', () => {
+  const flat: Built = {
+    ...HOUSE,
+    schemes: { ...HOUSE.schemes, dark: { ...HOUSE.schemes.dark, s2: HOUSE.schemes.dark.s1 } },
+  };
+  const found = refusals(checkScheme(flat, 'dark')).filter((f) => f.check === 'H');
+  assert.equal(found.length, 1, 'a ladder that stops climbing produced the wrong number of findings');
+  assert.equal(found[0]?.at, `theme.${HOUSE.id}.roles.dark.s2`);
+});
+
+test('AND THE TWO CHECKS WITH NOWHERE TO POINT CARRY NO ADDRESS AT ALL', () => {
+  /* Elevation is generated and the dialect has no `shadow` or `elevation` key (39 §13 D9), so I is
+     about a ladder the caller never sent. L is about the stylesheet as a whole document. `41 §6`
+     makes carrying none legal, and inventing one here is what the fixture format used to compel. */
+  const inverted: Built = {
+    ...HOUSE,
+    elevation: {
+      ...HOUSE.elevation,
+      light: ['0 1px 2px rgb(0 0 0 / 0.9)', '0 2px 4px rgb(0 0 0 / 0.5)', '0 4px 8px rgb(0 0 0 / 0.01)'],
+    },
+  };
+  const ladder = refusals(checkElevation(inverted));
+  assert.ok(ladder.length > 0, 'the inverted ladder was not refused');
+  for (const f of ladder) assert.equal(f.at, undefined, 'check I addressed a key the dialect has not got');
+  for (const f of refusals(checkForcedColors(''))) assert.equal(f.at, undefined, 'check L addressed a role');
+});
+
+test('AND NO CHECK OVER A PALETTE FLATTENS ITS TOKEN AWAY', () => {
+  /* Every role in turn painted the colour of the page, which is the cheapest way to make a check
+     fail without choosing which check. Whatever refuses must say where. */
+  const roles = Object.keys(HOUSE.schemes.dark);
+  const provoked = new Set<string>();
+  for (const role of roles) {
+    const broken: Built = {
+      ...HOUSE,
+      schemes: { ...HOUSE.schemes, dark: { ...HOUSE.schemes.dark, [role]: HOUSE.schemes.dark.bg } as Palette },
+    };
+    for (const f of refusals(checkScheme(broken, 'dark'))) {
+      provoked.add(f.check);
+      assert.match(f.at ?? '', ADDRESS, `check ${f.check} refused over ${role} and pointed at nothing`);
+      assert.ok(f.at?.includes(`.roles.${f.scheme}.`), `${f.at} names a scheme the finding is not about`);
+      assert.ok(roles.includes(f.at?.split('.').pop() ?? ''), `${f.at} is not a role of the palette`);
+    }
+  }
+  assert.ok(provoked.size >= 4, `only ${[...provoked].join(', ')} were provoked, which is too few to mean much`);
 });
 
 /* ── a suggested colour is a suggestion ──────────────────────────────────── */

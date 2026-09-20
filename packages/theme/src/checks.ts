@@ -28,7 +28,35 @@ export type Finding = {
   fix?: string;
   code?: 'CONTRAST_FLOOR' | 'INTENT_INSEPARABLE' | 'THEME_LADDER_ORDER' | 'THEME_VALUE_INVALID';
   measured?: number;
+  /**
+   * WHERE, AS AN ADDRESS AND NOT AS A SENTENCE — `theme.<id>.roles.<scheme>.<role>`, 39 §6.2.
+   *
+   * Every check below knows the token at the moment it fails: which scheme, which role, which rung.
+   * It was writing that into `fix` and throwing the path away, so three fixtures named an `at` the
+   * validator had no concept of and could not be satisfied. The path is a real one into the
+   * document a theme author sends — `declare.ts`'s `themeBody` reads `seed` and `roles`, and
+   * `roles.<scheme>.<role>` is a colour per role per scheme — so it points at a line somebody can
+   * go and change, which is the whole use of an `at` (41 §6).
+   *
+   * THE ROLE THE FIX MOVES, NOT THE PAIR. A contrast finding is about two tokens and only one of
+   * them is being asked to move: the ground is the ground. Where the two are genuinely symmetric —
+   * the ring's two tones, two intents that cannot be told apart — it is the first of the pair in
+   * the order the check reads them, which is arbitrary once and then deterministic for ever,
+   * rather than arbitrary per run. `fix` names both either way.
+   *
+   * AND IT IS OPTIONAL, BECAUSE TWO CHECKS HAVE NOWHERE TO POINT. `checkElevation` refuses a ladder
+   * the dialect has no key for at all (39 §13 D9: elevation is generated, there is no `shadow` or
+   * `elevation` in a theme), and `checkForcedColors` is about the stylesheet as a whole document.
+   * A refusal with nothing to point at carries none (41 §6); inventing one is what the fixture
+   * format used to compel, and 531e500 is the cleanup after nine authors did it.
+   *
+   * A PASS CARRIES NONE EITHER. An address is where to make a change and a pass asks for none.
+   */
+  at?: string;
 };
+
+/** 39 §6.2's address. `roles` and not `schemes`: the former is the dialect's key, the latter ours. */
+const address = (id: string, scheme: Scheme, role: string) => `theme.${id}.roles.${scheme}.${role}`;
 
 const rgb = (s: string) => fromHex(s);
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -37,6 +65,7 @@ const HEX = /^#[0-9A-F]{6}$/;
 const BANNED = ['url(', 'image(', 'element(', 'attr(', 'var(', '\\'];
 
 function pairsAgainstSurfaces(
+  id: string,
   p: Palette,
   roles: readonly string[],
   floor: number,
@@ -54,6 +83,10 @@ function pairsAgainstSurfaces(
           level: 'refuse',
           code: 'CONTRAST_FLOOR',
           measured: r2(got),
+          /* THE ROLE AND NOT THE SURFACE. The sentence names both and the address names the one the
+             sentence tells you to move; a reader sent to `bg` would repaint the page to fix a
+             caption. */
+          at: address(id, scheme, role),
           fix: `theme: the pair (${role} on ${surface}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${role} further from the ground.`,
         });
     }
@@ -63,6 +96,7 @@ function pairsAgainstSurfaces(
 export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   const p = built.schemes[scheme];
   const out: Finding[] = [];
+  const at = (role: string) => address(built.id, scheme, role);
 
   /* THE FLOORS ARE THE PROFILE'S, and they used to be literals here. `HIGH_CONTRAST_PROFILE` raises
      every one of them — ink to [16, 12.5, 9.5, 7], `edge` to 4.5, intent text to 5 — and this file
@@ -78,7 +112,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      rule rather than here. Including it at the ramp's own floor made C strictly dominated by A: a
      fifth check that could not produce a finding A had not already produced. */
   for (const [i, ink] of INKS.entries())
-    if (ink !== 'faint') out.push(...pairsAgainstSurfaces(p, [ink], floors.ink[i] ?? 4.5, 'A', scheme));
+    if (ink !== 'faint') out.push(...pairsAgainstSurfaces(built.id, p, [ink], floors.ink[i] ?? 4.5, 'A', scheme));
 
   /* B · accent as text x every surface, at the INTENT-TEXT floor rather than the ink ramp's.
      `accent-text` is a hue used as text, which is what an intent is, and the high-contrast profile's
@@ -86,19 +120,18 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      drives it so far down the lightness axis that it bottoms out against the sRGB gamut. High
      contrast is a property of ink on surface and of boundaries; forcing it onto the hues makes them
      less distinguishable, not more. */
-  out.push(...pairsAgainstSurfaces(p, ['accent-text'], floors.intentText, 'B', scheme));
+  out.push(...pairsAgainstSurfaces(built.id, p, ['accent-text'], floors.intentText, 'B', scheme));
 
   /* C · faint at the large-text floor. The usage half — no faint below 24px — is a css-rules rule. */
-  out.push(...pairsAgainstSurfaces(p, ['faint'], 3, 'C', scheme));
+  out.push(...pairsAgainstSurfaces(built.id, p, ['faint'], 3, 'C', scheme));
 
   /* D · the load-bearing boundaries and the four -fill roles.
      `accent-edge` belongs here and not in a check of its own: it is the visual boundary of a filled
      control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
      the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
-  out.push(...pairsAgainstSurfaces(p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
-  out.push(
-    ...pairsAgainstSurfaces(p, ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill'], floors.intentFill, 'D', scheme),
-  );
+  out.push(...pairsAgainstSurfaces(built.id, p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
+  const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill'];
+  out.push(...pairsAgainstSurfaces(built.id, p, fills, floors.intentFill, 'D', scheme));
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
   const ringTones = contrast(rgb(p['focus-in']), rgb(p['focus-out']));
@@ -109,20 +142,26 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       level: 'refuse',
       code: 'CONTRAST_FLOOR',
       measured: r2(ringTones),
+      /* THE FIRST OF A SYMMETRIC PAIR. Either tone can move and the sentence says so, so the
+         address is the one the check reads first rather than a coin toss at run time. */
+      at: at('focus-in'),
       fix: `theme: the two focus-ring tones are ${r2(ringTones)}:1 apart in ${scheme}. They need 9:1, or the ring vanishes on one surface.`,
     });
-  out.push(...pairsAgainstSurfaces(p, ['focus-in'], 3, 'E', scheme));
+  out.push(...pairsAgainstSurfaces(built.id, p, ['focus-in'], 3, 'E', scheme));
 
   /* F · intent x intent, delta-E 2000 after Brettel at severity 1.0, all three deficiencies.
      >= 20 passes; 10-20 passes recorded `band: glyph`; below 10 is refused. The band is a pass and
      not a warning because the house theme itself sits in it (39 D6). */
-  const intents: [string, string][] = [
-    ['good', p.earn],
-    ['warn', p.warn],
-    ['bad', p.danger],
+  /* THE WORD AND THE ROLE, where this held the word and the hex. A reader is shown "good and bad"
+     and a theme file has no `good` in it, so the finding needs both: the word for the sentence and
+     the role for the address. Reading the hex through the role at the point of use costs nothing. */
+  const intents: [string, Role][] = [
+    ['good', 'earn'],
+    ['warn', 'warn'],
+    ['bad', 'danger'],
     // `info` has a generated role of its own here, and the seed file says why: the accent is the
     // mark, the mark is red, and `danger` is anchored at 27.
-    ['info', p.info],
+    ['info', 'info'],
   ];
   let worstF = Infinity;
   for (let i = 0; i < intents.length; i++)
@@ -132,7 +171,11 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
          and a pale tint of a hue is far from it by that measure and indistinguishable on a screen.
          `danger` and `info` at 25.1° and 29.3° measure 41–46 apart on all three deficiencies and
          are the exact pair the generator's own note says this rule was added for. */
-      const gap = hueGap(rgbToLch(rgb(intents[i]![1])).H, rgbToLch(rgb(intents[j]![1])).H);
+      const gap = hueGap(rgbToLch(rgb(p[intents[i]![1]])).H, rgbToLch(rgb(p[intents[j]![1]])).H);
+      /* THE FIRST OF THE PAIR, 39 §6.2. Two intents nobody can tell apart is a fault in the set and
+         either one can move — the sentence says exactly that — so a single `at` cannot be the whole
+         truth here. It can still be useful: read in the fixed order earn · warn · danger · info it
+         is the same address every run, and it lands the reader inside the four roles at issue. */
       if (gap < HUE_FLOOR)
         out.push({
           check: 'F',
@@ -140,10 +183,11 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           level: 'refuse',
           code: 'INTENT_INSEPARABLE',
           measured: r2(gap),
+          at: at(intents[i]![1]),
           fix: `theme: ${intents[i]![0]} and ${intents[j]![0]} are ${r2(gap)}° of hue apart, and four intents need at least ${HUE_FLOOR}°. Delta-E counts lightness, so a pale tint of a hue measures far from it and reads as the same colour.`,
         });
       for (const d of DEFS) {
-        const de = separation(rgb(intents[i]![1]), rgb(intents[j]![1]), d);
+        const de = separation(rgb(p[intents[i]![1]]), rgb(p[intents[j]![1]]), d);
         worstF = Math.min(worstF, de);
         if (de < 10)
           out.push({
@@ -152,6 +196,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
             level: 'refuse',
             code: 'INTENT_INSEPARABLE',
             measured: r2(de),
+            at: at(intents[i]![1]),
             fix: `theme: ${intents[i]![0]} and ${intents[j]![0]} are delta-E ${r2(de)} apart to a ${d}ope. Four intents need at least 10. Move one hue, or lower the chroma of the other.`,
           });
       }
@@ -159,7 +204,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   out.push({ check: 'F', scheme, level: 'pass', measured: r2(worstF) });
 
   /* G · intent as text x every surface */
-  out.push(...pairsAgainstSurfaces(p, INTENTS, floors.intentText, 'G', scheme));
+  out.push(...pairsAgainstSurfaces(built.id, p, INTENTS, floors.intentText, 'G', scheme));
 
   /* H · the surface ladder is monotonic in RELATIVE LUMINANCE, not in L*.
      Ascending in BOTH schemes: `sunk` is always the lowest surface and `s3` always the raised one.
@@ -173,6 +218,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_LADDER_ORDER',
+        /* THE LATER RUNG, 39 §6.2. A ladder is out of order at a place, and the place is the step
+           that failed to climb; the sentence already names it. */
+        at: at(SURFACES[i]!),
         fix: `theme: the surface ladder turns back on itself at ${SURFACES[i]} in ${scheme}. Surfaces must only go one way.`,
       });
   }
@@ -185,6 +233,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_VALUE_INVALID',
+        at: at(role),
         fix: `theme: ${role} is "${value}", which is not a colour this dialect accepts.`,
       });
     /* J · HOW MUCH THE GAMUT MAPPER HAD TO TAKE OFF, which is the only form of this question that
@@ -204,6 +253,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'refuse',
         code: 'THEME_VALUE_INVALID',
+        at: at(role),
         fix: `theme: ${role} gave up ${(built.clipped?.[scheme]?.[role as Role] ?? 0).toFixed(3)} of chroma to the sRGB gamut, so ${value} is not the colour it was solved as.`,
       });
     for (const b of BANNED)
@@ -213,6 +263,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           scheme,
           level: 'refuse',
           code: 'THEME_VALUE_INVALID',
+          at: at(role),
           fix: `theme: ${role} contains "${b}", which a token value may never hold.`,
         });
   }
@@ -231,6 +282,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         level: 'refuse',
         code: 'CONTRAST_FLOOR',
         measured: r2(c),
+        at: at(role),
         fix: `theme: ${role} is ${r2(c)}:1 against its own label in ${scheme}. A control needs 4.5:1 in every state, not only at rest.`,
       });
     else out.push({ check: 'Q', scheme, level: 'pass', measured: r2(c) });
@@ -251,6 +303,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         level: 'refuse',
         code: 'CONTRAST_FLOOR',
         measured: r2(dL),
+        /* THE LINK, because the link is what moves. `ink` and `danger` are what a link is measured
+           against and neither is free to shift to make room for it (39 §6.3). */
+        at: at('accent-text'),
         fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
       });
   }
@@ -263,6 +318,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       scheme,
       level: 'warn',
       measured: r2(dLine),
+      at: at('line'),
       fix: `theme: line and edge are ${r2(dLine)} apart in ${scheme}. A decorative hairline and a load-bearing boundary should not look the same.`,
     });
 
@@ -276,6 +332,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         scheme,
         level: 'warn',
         measured: lc,
+        at: at(role),
         fix: `theme: ${role} on bg passes WCAG at ${r2(w)}:1 but scores Lc ${lc} under APCA. Advisory only.`,
       });
   }
@@ -295,6 +352,12 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
  * THE FIRST ALPHA OF EACH LEVEL, because a level is one or two shadows and the first is the near
  * one that carries the step. A ladder is monotone in what a reader perceives as depth, and depth
  * here is darkness.
+ *
+ * AND NO `at`, WHICH IS THE ONE PLACE IN THIS FILE THE ANSWER IS GENUINELY NOTHING. Every other
+ * check reads a role out of `roles.<scheme>`, a key a theme author writes; elevation is generated
+ * from the profile and the dialect has no `shadow` or `elevation` key at all (39 §13 D9). An
+ * address here would be a path into a document nobody sent, and `41 §6` says a refusal with
+ * nothing to point at carries none.
  */
 export function checkElevation(built: Built): Finding[] {
   const out: Finding[] = [];
@@ -322,7 +385,12 @@ export function checkElevation(built: Built): Finding[] {
   return out;
 }
 
-/** L · forced-colors survival, asserted over the emitted CSS text, not over a rendered page. */
+/**
+ * L · forced-colors survival, asserted over the emitted CSS text, not over a rendered page.
+ *
+ * NO `at` EITHER, for the second reason: this is about the stylesheet as a whole document rather
+ * than about any token in it. There is no role to name and no `<id>` to root a path on.
+ */
 export function checkForcedColors(css: string): Finding[] {
   const has = css.includes('forced-colors: active') && css.includes('CanvasText');
   return has

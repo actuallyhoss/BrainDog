@@ -1,5 +1,5 @@
 code:   INTENT_INSEPARABLE
 via:    install
 raises: packages/theme/src/checks.ts
-at:     seed.accent
+at:     theme.midnight.roles.dark.earn
 fix:    Move one hue, or lower the chroma of the other.
