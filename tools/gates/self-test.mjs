@@ -240,6 +240,18 @@ const CASES = [
      refuse and the query returns exactly the row the bypass wrote. */
   { gate: 'spark-actor', expect: /spark wrote \w+, in the seed record/, findings: 1 },
 
+  /* THE ONE GATE THAT STANDS A HOST UP, and the fixture is a miniature of the whole arrangement for
+     the reason `spark-actor`'s is: what is under test is the gate as CI runs it, which here means an
+     onboarding, an install, a command that talks over a socket and a record that can say no. The
+     seeded violation is that last part and only that part: `things.name` is at most eight characters
+     on the fixture's record, and the planner emits `Lanternly`, which is nine.
+
+     TWO PLANNED ROWS AND ONE FINDING. `Tidepool` is eight and goes in, so a count of one is what
+     proves the gate reads refusals rather than counting the rows it planned; a count of two would
+     mean it had gone red about the import as a whole. The fixture's own command reads the list
+     before it writes, as the real one does, so running it twice adds nothing and the idempotency
+     check does not fire a second finding nobody seeded. */
+  { gate: 'import', expect: /record refused/, findings: 1 },
   { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
 
   /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the
