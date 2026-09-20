@@ -145,11 +145,19 @@ function titled(register: string, said: string): number | null {
  * row is renamed, and a declared metric says `thing is Kiln`; the record stores neither. A value that
  * resolves to no row is passed through unchanged, so the record compares it and matches nothing,
  * which is what the mock answered for a row that does not exist.
+ *
+ * AND A LIST ASKS IN ITS ELEMENT TYPE, which is what `of` is for. `skills.because` is a `list<ref>`
+ * into `learnings`: the sample holds the row numbers and the record holds the ULIDs, so
+ * `because:has:4` asked the record for the text `4` and answered no rows, for ever, which is the
+ * answer a filter gives when it is working. `remote.test.ts` asks the record itself for the two
+ * skills the seed's own rows say cite learnings#4. The enum half of this is the same rule and the
+ * seed declares no `list<enum>`, so nothing here measures it.
  */
 function valueOf(register: string, field: string, said: string, refs: Refs): string {
   const f = REGISTERS[register]?.fields.find((x) => x.id === field);
-  if (f?.type === 'enum') return declaredValue(register, field, said);
-  if (f?.type === 'ref' && f.to) {
+  const type = f?.type === 'list' ? f.of : f?.type;
+  if (type === 'enum') return declaredValue(register, field, said);
+  if (type === 'ref' && f?.to) {
     const seq = /^\d+$/u.test(said) ? Number(said) : titled(f.to, said);
     return (seq === null ? undefined : refs.get(f.to)?.idOf.get(seq)) ?? said;
   }
@@ -173,10 +181,20 @@ function declares(register: string, field: string, word: string): boolean {
  *
  * A LONE WORD THE FIELD DOES NOT HOLD MAY BE THE QUESTION ABOUT ABSENCE: `is empty`, `is set`, and
  * their negations, in the order `where.ts` checks them, declared values first.
+ *
+ * `has` AND `lacks` KEEP THEIR OWN WORDS, AND THEY USED TO FALL TO THE LAST LINE AND BECOME `is`.
+ * Both engines refuse that by name, "repos is a list, which cannot be asked is", so the one chip
+ * shape a list field can be asked in was the one shape that reached the sample and not the record:
+ * measured over every element of every list in the seed, thirty questions where the sample answered
+ * rows and the record answered a refusal. They are read here beside `before` and `after` rather than
+ * below the question about absence, because their value is an element and not a word about the
+ * field: `repos has empty` asks for an element spelled `empty`, which is what the sample's own
+ * sentence asks for too.
  */
 function leafOf(register: string, f: Filter, refs: Refs): Tree {
   const one = f.values[0] ?? '';
   if (f.op === 'before' || f.op === 'after') return { field: f.field, [f.op]: one };
+  if (f.op === 'has' || f.op === 'lacks') return { field: f.field, [f.op]: valueOf(register, f.field, one, refs) };
 
   const negated = f.op === 'not-in';
   const single = f.op !== 'in' && f.op !== 'not-in' ? true : f.values.length === 1;

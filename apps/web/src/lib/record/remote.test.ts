@@ -147,6 +147,50 @@ test('A REF IN THE ADDRESS IS A NUMBER OR A NAME, AND THE RECORD GETS THE ROW’
   assert.deepEqual(treeOf(register, [chip(f.id, 'in', '9999')], '', refs), { field: f.id, is: '9999' }, 'no such row is passed through');
 });
 
+test('THE TWO LIST OPERATORS KEEP THE RECORD’S OWN TWO WORDS, and both arrived as `is`', async () => {
+  const { refs } = await seeded;
+  /* `things.repos` IS THE FIELD BOTH SIDES WERE MEASURED ON. `repos has portage` answers one row on
+     the record and on the sample; `repos is portage` is refused by both engines by name — *"repos is
+     a list, which cannot be asked \"is\""* — so the chip that the sample runs could not be asked of
+     the record at all. */
+  assert.deepEqual(treeOf('things', [chip('repos', 'has', 'portage')], '', refs), { field: 'repos', has: 'portage' });
+  assert.deepEqual(treeOf('things', [chip('repos', 'lacks', 'portage')], '', refs), { field: 'repos', lacks: 'portage' });
+});
+
+/**
+ * AN ELEMENT OF A LIST OF REFS IS THE TARGET ROW’S ULID, the same reconciliation a ref FIELD's value
+ * has always had, and this one is held against the RECORD ALONE rather than against the sample.
+ *
+ * `skills.because` is a `list<ref>` into `learnings`, and the sample cannot be asked about it at all:
+ * the sentence dialect wants a ref by its title, every `learnings` title in the seed contains a
+ * comma, and a comma separates clauses — so `because has <lesson>` comes back as two refusals. The
+ * numbers are therefore read off the seed's own rows, which is the one source both sides were built
+ * from, and the record is asked the question the address actually carries: a row number.
+ */
+test('A LIST OF REFS IS ASKED IN THE IDS THE RECORD STORES, and the address carries a number', async () => {
+  const { k, refs } = await seeded;
+  /* `skills` IS NOT ON `ORDER`'S WALK, which stops at `session`, so this register's ref targets are
+     mapped here. Without `learnings` in the map there is no ULID to send and the number would go
+     through unchanged, which is the failure this test would then be unable to see. */
+  const withLearnings: Refs = new Map([...refs, ['learnings', refMapOf('learnings', rowsOf(k, 'learnings'))]]);
+  const ulid = withLearnings.get('learnings')?.idOf.get(4);
+  assert.ok(ulid, 'learnings#4 has no ULID in the map');
+  assert.deepEqual(treeOf('skills', [chip('because', 'has', '4')], '', withLearnings), { field: 'because', has: ulid });
+
+  const all = (ROWS.skills ?? []).map((e) => e.seq).sort(bySeq);
+  const held = (ROWS.skills ?? [])
+    .filter((e) => Array.isArray(e.fields.because) && (e.fields.because as unknown[]).includes(4))
+    .map((e) => e.seq)
+    .sort(bySeq);
+  assert.deepEqual(held, [1, 4], 'the seed no longer has exactly skills#1 and #4 citing learnings#4');
+  assert.deepEqual(fromRecord(k, withLearnings, 'skills', [chip('because', 'has', '4')]), held);
+  assert.deepEqual(
+    fromRecord(k, withLearnings, 'skills', [chip('because', 'lacks', '4')]),
+    all.filter((seq) => !held.includes(seq)),
+    'a row citing nothing lacks everything',
+  );
+});
+
 test('THE SEARCH BOX IS EVERY WORD, EACH IN ANY SEARCHABLE FIELD, beside the chips', async () => {
   const { refs } = await seeded;
   const tree = treeOf('obligations', [chip('state', 'in', 'open')], 'Kiln. deposit', refs);
@@ -238,6 +282,32 @@ test('EVERY REF ANSWERS THE SAME ROWS FROM BOTH, by number and by name', async (
       }
     }
   assert.ok(cases.length > 20, `only ${cases.length} ref questions`);
+  assert.deepEqual(differences(k, refs, cases), []);
+});
+
+/**
+ * EVERY ELEMENT OF EVERY LIST, HELD AND LACKED, because a chip carrying a list operator is the one
+ * chip shape that reached the sample and not the record.
+ *
+ * `has` and `lacks` fell through to `is`, which a list refuses: the record answered a REFUSAL where
+ * the sample answered rows, so this differential is the whole defect in one line. The elements are
+ * the seed's own, read off the rows rather than typed, so a list field a pack adds is asked about
+ * here the day its rows arrive.
+ */
+test('EVERY ELEMENT OF EVERY LIST ANSWERS THE SAME ROWS FROM BOTH, held and lacked', async () => {
+  const { k, refs } = await seeded;
+  const cases: [string, Filter[]][] = [];
+  for (const register of ORDER)
+    for (const f of REGISTERS[register]?.fields ?? []) {
+      if (f.type !== 'list') continue;
+      const elements = new Set<string>();
+      for (const e of ROWS[register] ?? []) {
+        const held = e.fields[f.id];
+        if (Array.isArray(held)) for (const v of held as unknown[]) elements.add(String(v));
+      }
+      for (const v of elements) cases.push([register, [chip(f.id, 'has', v)]], [register, [chip(f.id, 'lacks', v)]]);
+    }
+  assert.ok(cases.length > 25, `only ${cases.length} list questions, so the seed lost its lists`);
   assert.deepEqual(differences(k, refs, cases), []);
 });
 

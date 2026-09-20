@@ -735,11 +735,28 @@ export const copy = {
    * sentence nobody checked. A single function over an array of clause objects was that sentence.
    *
    * `filterClause` takes the field's label, not its id: the caller knows the register.
+   *
+   * `has` AND `lacks` ARE THE TWO WORDS A LIST TAKES, AND BOTH CAME OUT AS `is`. A view saved on
+   * `repos:lacks:portage` read "Repositories is portage", the opposite of the filter its rows were
+   * drawn under, and `repos:has:portage` read that same line, an equality over a test for
+   * membership. Measured against the compiler the chips actually run on, the line was worse than
+   * the wrong words: `Repositories is portage` comes back "repos is a list, which cannot be asked
+   * is", so the sentence on screen was one the record refuses by name. The four operators this
+   * function knew were the four `whereOf` knew before the same two words were added to it, which is
+   * why they were missing together and why `filter-clause.test.ts` now round-trips every clause
+   * this function prints back through `compile`.
+   *
+   * ONE VALUE FOR THOSE TWO, and that is the grammar's rule rather than a narrowing chosen here.
+   * The operator looks for a single element inside a list, so `whereOf` sends `values[0]` and
+   * `where.ts` types the clause `values: [string]`. Joining the rest on ` or ` would print a
+   * sentence that compiles clean and looks for an element literally called `urgent or soon`.
    */
   filterClause: (label: string, values: readonly string[], op = 'in'): string =>
     op === 'before' || op === 'after'
       ? `${label} ${op} ${values.join(' or ')}`
-      : `${label} is ${op === 'not-in' ? 'not ' : ''}${values.join(' or ')}`,
+      : op === 'has' || op === 'lacks'
+        ? `${label} ${op} ${values[0] ?? ''}`
+        : `${label} is ${op === 'not-in' ? 'not ' : ''}${values.join(' or ')}`,
   /* Every clause after the first starts lower-case when it starts with an ordinary word, so "Due"
      joins the sentence and "VAT number" keeps its capitals. */
   filterReads: (clauses: readonly string[]): string => {
