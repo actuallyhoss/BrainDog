@@ -606,6 +606,37 @@ function bind(value: unknown, type: string): string | number | null {
 }
 
 /**
+ * WHICH ELEMENT OF A LIST COUNTS AS THE VALUE, AND SQLITE'S `=` IS NOT THE EVALUATOR'S `===`.
+ *
+ * `json_each` reads a JSON `true` out as the integer 1 and a JSON `false` as 0, so the one-line
+ * `WHERE value = ?` of `34 §1.2` matched a row holding `[true, false]` when the number 1 was bound,
+ * while `38 §5.5`'s `eq`, which `evaluate` renders as `===`, did not. One row, two answers, from
+ * the two halves of one grammar, which is the failure this package exists to prevent.
+ *
+ * SO THE ELEMENT'S JSON TYPE IS PART OF THE COMPARISON. `json_each.type` is the one thing left in
+ * SQLite that still knows a `true` from a 1 and a 2 from a `"2"` once the value has been read out,
+ * and knowing those two apart is the whole of what `===` knows here.
+ *
+ * A BOOLEAN IS COMPARED BY ITS TYPE ALONE, because the JSON types are spelled `true` and `false`
+ * and there is nothing else to ask. `bind` is not on this path for one: it answers `null` for a
+ * boolean under every type but `bool`, so `{field: tags, has: true}` was `VALUE_MALFORMED` and
+ * `list<bool>` was a field a register may declare (`38 §4.3`) and nobody could ask about. The
+ * literal is bound rather than written into the string, by `compile`'s own rule below.
+ *
+ * `null` IS NOT ONE. `34 §1.1` gives `scalar` as a string, a number, a boolean, a money, a
+ * quantity, a ref, a day or an instant, and `34 §1.3` makes a JSON `null` a spelling of missing,
+ * so a list holding one holds nothing there. The refusal is the caller's answer, and `evaluate`
+ * answers false for a predicate `compile` refuses, so both renderings match nothing.
+ */
+const elementSql = (value: unknown, put: (v: string | number) => string): string | null => {
+  if (typeof value === 'boolean') return `json_each.type = ${put(value ? 'true' : 'false')}`;
+  const bound = bind(value, 'text');
+  if (bound === null) return null;
+  const kind = typeof bound === 'number' ? "IN ('integer', 'real')" : "= 'text'";
+  return `json_each.value = ${put(bound)} AND json_each.type ${kind}`;
+};
+
+/**
  * Compile a predicate against a register into SQL and bound parameters.
  *
  * NOTHING IS INLINED. Every value is a bound parameter and every identifier has already matched
@@ -1129,8 +1160,8 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            stopping there would have changed nothing a caller could observe. Before `bind`, as the
            `is` arm does it, so the refusal names the value somebody wrote. */
         if (!checkEnum(value)) return '';
-        const bound = bind(value, 'text');
-        if (bound === null) {
+        const element = elementSql(value, put);
+        if (element === null) {
           bad.push(refuse('VALUE_MALFORMED', `${field} ${op} takes one value to look for in the list.`, field));
           return '';
         }
@@ -1140,8 +1171,20 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
            carries whatever the other record held, and the `.brain` reader writes `fields` without
            coercing it, which is exactly the case the `empty`/`present` branch above is written for.
            A scalar is not a list, so it holds nothing: `'[]'` is the honest substitute. */
-        const list = `CASE WHEN json_valid(json_extract(fields, '${jsonPath(field)}')) AND json_type(json_extract(fields, '${jsonPath(field)}')) = 'array' THEN json_extract(fields, '${jsonPath(field)}') ELSE '[]' END`;
-        const exists = `EXISTS (SELECT 1 FROM json_each(${list}) WHERE value = ${put(bound)})`;
+        /* AND THE GUARD ASKS THE DOCUMENT WHAT IS AT THE PATH, rather than re-reading what came
+           out of it. It asked `json_valid(json_extract(…))`, and the TEXT `["urgent"]` is valid
+           JSON, so an imported row holding the characters of a list was unwrapped into one and
+           `tags has urgent` matched it, where `evaluate`'s `Array.isArray` did not. `json_extract`
+           hands back the same string for a stored array and for a stored string of one, so no
+           question asked of its result can tell them apart; the two-argument `json_type` is asked
+           of `fields` and the path, which is the question `Array.isArray` answers. It is also the
+           guard the kernel already writes for its own `json_each` scans (`kernel/src/index.ts`),
+           so this is one spelling arriving where two were rather than a new one.
+           THE VALUE ITSELF READS THROUGH `path`, which is `fieldSqlIn`, for `31 §2`'s reason: a
+           field expression spelled a second time here is a second expression to keep in step with
+           the index and the `ORDER BY`, and this copy knew neither of the helper's two exceptions. */
+        const list = `CASE WHEN json_type(fields, '${jsonPath(field)}') = 'array' THEN ${path} ELSE '[]' END`;
+        const exists = `EXISTS (SELECT 1 FROM json_each(${list}) WHERE ${element})`;
         return op === 'has' ? `(${exists})` : `(NOT ${exists})`;
       }
 

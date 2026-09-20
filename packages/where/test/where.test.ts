@@ -653,24 +653,31 @@ const ODD: Fielded[] = [
   { id: 'bare', fields: { what: 'Bare' } },
 ];
 
-const oddSql = (where: Predicate | undefined): string[] => {
+/* THEY TAKE THEIR ROWS, because a second set asks the same questions of elements that are not
+   strings and a third asks them of a string that looks like a list. One fixture per story and one
+   pair of helpers over all of them: copying these six lines a third time is how two of the copies
+   come to seed different tables. */
+const fieldedSql = (rows: Fielded[], where: Predicate | undefined): string[] => {
   const c = compile(where, SCHEMA);
   assert.deepEqual(c.bad, [], c.bad[0]?.fix);
   const d = new DatabaseSync(':memory:');
   d.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, fields TEXT, deleted_at TEXT)');
-  for (const row of ODD)
+  for (const row of rows)
     d.prepare('INSERT INTO entry (id, register, fields, deleted_at) VALUES (?, ?, ?, NULL)').run(row.id, 'obligations', JSON.stringify(row.fields));
   const out = d.prepare(`SELECT id FROM entry WHERE ${c.sql} ORDER BY id`).all(...(c.params as never[])) as { id: string }[];
   d.close();
   return out.map((r) => r.id);
 };
 
-const oddBoth = (where: Predicate | undefined): string[] => {
-  const sql = oddSql(where);
-  const js = ODD.filter((r) => evaluate(where, r.fields, SCHEMA)).map((r) => r.id).sort();
+const fieldedBoth = (rows: Fielded[], where: Predicate | undefined): string[] => {
+  const sql = fieldedSql(rows, where);
+  const js = rows.filter((r) => evaluate(where, r.fields, SCHEMA)).map((r) => r.id).sort();
   assert.deepEqual(js, sql, `the two renderings disagree: SQL ${sql.join(',')} vs JS ${js.join(',')}`);
   return sql;
 };
+
+const oddSql = (where: Predicate | undefined): string[] => fieldedSql(ODD, where);
+const oddBoth = (where: Predicate | undefined): string[] => fieldedBoth(ODD, where);
 
 test('A `has` ON A ROW HOLDING A SCALAR DOES NOT TAKE THE QUERY DOWN WITH IT', () => {
   /* `json_each` RAISES on a bare string, so one imported row holding `tags: 'urgent'` made the whole
@@ -681,6 +688,119 @@ test('A `has` ON A ROW HOLDING A SCALAR DOES NOT TAKE THE QUERY DOWN WITH IT', (
 
 test('and `lacks` counts it as holding nothing, rather than as an error', () => {
   assert.deepEqual(oddBoth({ field: 'tags', lacks: 'urgent' }), ['bare', 'imported']);
+});
+
+/* ── a list of things that are not strings ──────────────────────────────── */
+
+/**
+ * ONE LIST FIELD AND FIVE KINDS OF ELEMENT, because `list<T>` is eleven types and this was one.
+ *
+ * `38 §4.3` gives `T` as one of `text int decimal duration enum ref bool day instant url email`, so
+ * a list of numbers and a list of booleans are as ordinary a field as a list of words, and `34 §1.1`
+ * puts `boolean` in `scalar`, which is what `has:` and `lacks:` take. Every test above holds
+ * strings, and the two renderings compare by different means: SQL by `=` over `json_each.value`,
+ * the evaluator by `===`. Those two agree about text and disagreed about everything else.
+ *
+ * THE MIXED ROW IS NOT A FIELD ANYBODY CAN DECLARE AND IT IS STILL A ROW SOMEBODY HAS. A
+ * declaration names one `of:` and `coerce` holds every element to it, so no write makes a mixed
+ * list; the `.brain` reader writes `fields` without coercing, which is the door the imported scalar
+ * above came through.
+ */
+const KINDS: Fielded[] = [
+  { id: 'bools', fields: { what: 'Bools', tags: [true, false] } },
+  { id: 'ints', fields: { what: 'Ints', tags: [1, 2, 3] } },
+  { id: 'mixed', fields: { what: 'Mixed', tags: ['2', 2, true, null] } },
+  { id: 'nulls', fields: { what: 'Nulls', tags: [null] } },
+  { id: 'words', fields: { what: 'Words', tags: ['1', '2'] } },
+];
+
+const kindsBoth = (where: Predicate | undefined): string[] => fieldedBoth(KINDS, where);
+
+test('A LIST OF NUMBERS IS ASKED IN NUMBERS, and `has: 1` matched a list holding `true`', () => {
+  /* `json_each` reads a JSON `true` out as the integer 1 and a JSON `false` as 0, so `value = ?`
+     with 1 bound matched the row holding `[true, false]` while the evaluator's `1 === true` did
+     not. Measured before the repair: SQL `bools,ints,mixed` against JS `ints`. */
+  assert.deepEqual(kindsBoth({ field: 'tags', has: 2 }), ['ints', 'mixed']);
+  assert.deepEqual(kindsBoth({ field: 'tags', has: 1 }), ['ints']);
+  assert.deepEqual(kindsBoth({ field: 'tags', has: 0 }), []);
+  assert.deepEqual(kindsBoth({ field: 'tags', lacks: 2 }), ['bools', 'nulls', 'words']);
+});
+
+test('AND A LIST OF BOOLEANS COULD NOT BE ASKED AT ALL, though `list<bool>` is a field a register may declare', () => {
+  /* `bind(value, 'text')` takes a string or a number and answers `null` for a boolean, so
+     `{field: 'tags', has: true}` was `VALUE_MALFORMED` and the whole predicate compiled to `0 = 1`.
+     `38 §5.5`'s `eq` says a bool compares as a bool and names the binding it compares against: the
+     1 and the 0 that `json_extract` answers. */
+  assert.deepEqual(kindsBoth({ field: 'tags', has: true }), ['bools', 'mixed']);
+  assert.deepEqual(kindsBoth({ field: 'tags', has: false }), ['bools']);
+  assert.deepEqual(kindsBoth({ field: 'tags', lacks: true }), ['ints', 'nulls', 'words']);
+  assert.deepEqual(kindsBoth({ field: 'tags', lacks: false }), ['ints', 'mixed', 'nulls', 'words']);
+});
+
+test('and the two spellings of 2 are two values, in both renderings', () => {
+  /* A list of `int` holds the number and a list of `text` holds the characters, and one row here
+     holds both. `===` has always told them apart; SQLite tells them apart as well, because
+     `json_each.value` carries no affinity to convert one into the other. */
+  assert.deepEqual(kindsBoth({ field: 'tags', has: '2' }), ['mixed', 'words']);
+  assert.deepEqual(kindsBoth({ field: 'tags', has: 2 }), ['ints', 'mixed']);
+});
+
+test('and `null` is not a value a list can be asked about, because it is not a scalar', () => {
+  /* `34 §1.1` gives `scalar` as `string | number | boolean | money | quantity | ref-literal | day |
+     instant`, and `34 §1.3` makes a JSON `null` one of the four spellings of missing, so a list
+     holding one holds nothing there. Both renderings then match nothing: `evaluate` answers false
+     for a predicate `compile` refuses, which is the first thing it does. */
+  for (const op of ['has', 'lacks'] as const) {
+    const leaf = { field: 'tags', [op]: null };
+    const c = compile(leaf, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `${op} took a null`);
+    assert.deepEqual(c.params, []);
+    assert.deepEqual(KINDS.filter((r) => evaluate(leaf, r.fields, SCHEMA)).map((r) => r.id), []);
+  }
+});
+
+test('and the spoken form can ask about none of this, because it spells every operand as text', () => {
+  /* MEASURED RATHER THAN ASSUMED, and it is the gap the structured form above does not have:
+     `tags has 2` resolves to the STRING `'2'` and `tags has true` to the string `'true'`, so a
+     list of numbers and a list of booleans are unaskable in words. Both renderings agree that
+     nothing matches, so this is a question the sentence cannot put rather than two answers to one
+     question, and closing it needs the element type: `Schema.fields` carries `values` for a
+     `list<enum>` and nothing at all for the other ten `T` of `38 §4.3`, so `resolve` has nothing
+     to read. Recorded here so that the day it is closed, this test is the one that says so. */
+  const said = (text: string): Predicate | undefined => {
+    const out = parseWhere(text, SCHEMA, { nowMs: NOW });
+    assert.deepEqual(out.bad, [], out.bad[0]?.fix);
+    return out.predicate;
+  };
+  assert.deepEqual(said('tags has 2'), { field: 'tags', has: '2' });
+  assert.deepEqual(said('tags has true'), { field: 'tags', has: 'true' });
+  assert.deepEqual(kindsBoth(said('tags has 2')), ['mixed', 'words']);
+  assert.deepEqual(kindsBoth(said('tags has true')), []);
+});
+
+/** A row an import leaves behind, holding the CHARACTERS of a list where the list belongs. */
+const QUOTED: Fielded[] = [
+  { id: 'quoted', fields: { what: 'Quoted', tags: '["urgent"]' } },
+  { id: 'real', fields: { what: 'Real', tags: ['urgent'] } },
+];
+
+test('A STRING THAT LOOKS LIKE A LIST IS A STRING, and the guard read it as the list it resembles', () => {
+  /* The guard asked `json_valid(json_extract(fields, path))`, and the text `["urgent"]` IS valid
+     JSON, so a row holding the characters of a list was unwrapped into one: SQL answered
+     `quoted,real` where the evaluator's `Array.isArray` answered `real`. `json_extract` returns the
+     same string either way, so no question asked of its RESULT can tell the two apart. */
+  assert.deepEqual(fieldedBoth(QUOTED, { field: 'tags', has: 'urgent' }), ['real']);
+  assert.deepEqual(fieldedBoth(QUOTED, { field: 'tags', lacks: 'urgent' }), ['quoted']);
+});
+
+test('and the arm reads the field through the one helper, rather than spelling it a second time', () => {
+  /* `31 §2`'s rule, which `fieldSqlIn` exists to keep: the index, the filter and the `ORDER BY` are
+     the same string or the planner does not use the index. This arm wrote its own `json_extract`
+     three times over, which is a guard against nothing today and is the drift `fieldSql`'s own
+     paragraph describes: the two exceptions live in the helper, and a second spelling knows neither. */
+  const c = compile({ field: 'tags', has: 'urgent' }, SCHEMA);
+  assert.ok(c.sql.includes(fieldSqlIn(SCHEMA, 'tags')), c.sql);
+  assert.equal((c.sql.match(/json_extract/g) ?? []).length, 1, c.sql);
 });
 
 test('A BOOL WRITTEN EITHER WAY BINDS THE SAME', () => {

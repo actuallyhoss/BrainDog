@@ -79,7 +79,7 @@ rewrites it to an id at install (38 §13).
 | `matches` | *the register* (no `field:`) | `id IN (SELECT id FROM entry_fts WHERE register = ? AND entry_fts MATCH ?)` | whole-token, case-folded, diacritic-insensitive; over the register's `search:` fields; operand = one quoted phrase with `"` doubled, ≤ 200 bytes (`PATTERN_OVER_CAP`) |
 | `starts` / `ends` | text · url · email | `LIKE ? ESCAPE '\'` | `%` and `_` in the literal are escaped; ASCII case-insensitive; ≤ 40 bytes **after** escaping (`PATTERN_OVER_CAP`) |
 | `empty` / `present` | every type | `(expr IS NULL OR expr = '' OR expr = '[]')` / its negation | §1.3 defines missing; these are its three SQL spellings (38 §13 D2) |
-| `has` / `lacks` | `list<T>` | `EXISTS (SELECT 1 FROM json_each(expr) WHERE value = ?)` | `lacks` is `NOT EXISTS` and true on a missing list |
+| `has` / `lacks` | `list<T>` | `EXISTS (SELECT 1 FROM json_each(<guarded expr>) WHERE <element>)` | `lacks` is `NOT EXISTS` and true on a missing list. Two parts the one-line form left out, both of them load-bearing: the expression is guarded by `json_type(fields, '<path>') = 'array'`, falling back to `'[]'`, because a scalar is not a list and the **text** `["a"]` is valid JSON; and `<element>` compares `json_each.type` as well as `json_each.value`, because `json_each` reads a JSON `true` out as `1` and 38 §5.5's `eq` does not. `value = ?` alone is two answers to one row |
 | `near` | text · document | none — §1.8 | ranking, not filtering |
 
 `expr` is `json_extract(fields, '$.<id>')`, except `state`, which reads the mirrored column, and the kernel fields

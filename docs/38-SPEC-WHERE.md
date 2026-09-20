@@ -562,13 +562,25 @@ order. Every author value is a `?`. `bool` binds `1`/`0`; a `Temporal` binds its
 | `matches` | `id IN (SELECT id FROM entry_fts WHERE register = ? AND entry_fts MATCH ?)` | `[register, '"' + phrase.replaceAll('"', '""') + '"']` |
 | `empty` | `(E IS NULL OR E = '' OR E = '[]')` | `[]` |
 | `present` | `(E IS NOT NULL AND E <> '' AND E <> '[]')` | `[]` |
-| `has` | `EXISTS (SELECT 1 FROM json_each(E) WHERE value = ?)` | `[lit]` |
-| `lacks` | `NOT EXISTS (SELECT 1 FROM json_each(E) WHERE value = ?)` | `[lit]` |
+| `has` | `EXISTS (SELECT 1 FROM json_each(L) WHERE X)` | `[lit]` |
+| `lacks` | `NOT EXISTS (SELECT 1 FROM json_each(L) WHERE X)` | `[lit]` |
 | `near` | *(nothing emitted; the parent `all` skips it)* — `uses.vec = true` | `[]` |
 
 `escapeLike(s)` = `s.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')`. The `'\'` after
 `ESCAPE` is a compiler constant, not a value. `json_each(NULL)` yields no rows, so `has` is false and `lacks` true on a
 missing list, as the table of §5.5 says.
+
+`L` and `X` in the `has` and `lacks` rows, because a single `json_each(E) WHERE value = ?` is wrong in two
+separate ways and both of them were shipped:
+
+| | Is | Why the short form is not |
+|---|---|---|
+| `L`, the list | `CASE WHEN json_type(fields, '<path>') = 'array' THEN E ELSE '[]' END` | A scalar is not a list and holds nothing, and a row imported from elsewhere can hold the **text** `["urgent"]`, which is valid JSON. `json_extract` returns the same string for a stored array and for a stored string of one, so no question asked of its **result** separates them. The two-argument `json_type` asks the document what is at the path, which is the question `Array.isArray` answers in §5.5 |
+| `X`, the element | a string: `json_each.value = ? AND json_each.type = 'text'` · a number: `json_each.value = ? AND json_each.type IN ('integer', 'real')` · a boolean: `json_each.type = ?`, bound `'true'` or `'false'` | `json_each` reads a JSON `true` out as `1` and `false` as `0`, so `value = ?` with `1` bound matched a list holding `true`, where §5.5's `eq` (`===`) did not. `json_each.type` is the only thing left after the read that still tells a `true` from a `1` and a `2` from a `"2"`, which is the whole of what `===` knows here. A boolean has no separate value to compare, because the JSON types are spelled `true` and `false` |
+
+A `null` element is refused rather than compiled: §4.1's `scalar` does not admit one, and §1.3 makes a JSON `null` a
+spelling of missing, so a list holding one holds nothing there. `evaluate` answers false for any predicate `compile`
+refused, so both renderings match nothing and they agree.
 
 Money and quantity (`C`, `A` = the currency and amount expressions):
 
