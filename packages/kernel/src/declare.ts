@@ -2562,7 +2562,9 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *   `deadline` · `qualifies` · `unit`  which day a row is about, which field makes an amount
  *               readable, and how a `duration` is said. All three are drawn.
  *   `derived`   the kernel's own flag, set by nothing today, which refuses a write and skips
- *               validation when it is set.
+ *               validation when it is set. It rules out three keys that would ask a caller for
+ *               the value: `default`, `required` and `required_when`, each refused by name in
+ *               `fieldRules`, because the write path the three of them speak to never runs.
  *   `scope`     where a row applies; the write path holds a token to it, and `inScope` reads by it.
  *   `min` · `max`  bounds, in UTF-8 bytes on text and documents and by value on numbers.
  *   `required_when`  `{ field, is }`: required while another field of the row holds that value.
@@ -2670,6 +2672,26 @@ function fieldRules(id: string, fields: readonly Record<string, unknown>[], titl
     const at = String(f.id);
     const said = `${id}.${at}`;
     const type = String(f.type);
+
+    /* A DERIVED FIELD CANNOT ALSO BE ASKED FOR, and this is the same shape as `derived` beside a
+       `default`, which this file already refuses: two instructions, one of which does nothing.
+
+       IT IS DEAD RATHER THAN FATAL, WHICH IS WHY IT SURVIVED. `index.ts:2156` opens the required
+       sweep with `if (f.retired || f.derived) continue;`, so a derived field marked required is
+       skipped and every create installs and succeeds. Nothing refuses, nothing warns, and the key
+       sits in the declaration reading like a rule the record keeps. The author wrote it because
+       they believed the field had to be present, and the record will never tell them otherwise.
+
+       SAME SENTENCE SHAPE AS `secret` BELOW, because it is the same fact about who writes the
+       value: a create cannot supply it, so requiring it of a create says nothing. `required_when`
+       is named alongside `required` for the reason it is named alongside it there, that the sweep
+       which skips one skips the other, and a key that is conditionally dead is still dead. */
+    if (f.derived === true && (f.required === true || f.required_when !== undefined))
+      return bad(
+        'DECLARATION_INVALID',
+        `${said} is derived and ${f.required === true ? 'required' : 'required_when'}. The record computes a derived field and refuses every write to it, so no create could supply it and the requirement is never read. Drop the requirement, or drop derived.`,
+        at,
+      );
 
     for (const key of ['min', 'max'] as const) {
       const n = f[key];

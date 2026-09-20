@@ -140,3 +140,28 @@ test('A DERIVED FIELD WITH A DEFAULT IS TWO INSTRUCTIONS AND ONE OF THEM DOES NO
   assert.equal(linted(probe({ id: 'n', type: 'int', derived: true, default: null })), null);
   assert.equal(linted(probe({ id: 'note', type: 'text', derived: true, default: '' })), null);
 });
+
+test('AND A DERIVED FIELD THAT IS ALSO REQUIRED IS THE SAME TWO INSTRUCTIONS', () => {
+  /* The requirement is dead rather than fatal, which is why it outlived the default beside it:
+     `index.ts`'s required sweep opens with `if (f.retired || f.derived) continue;`, so the key is
+     skipped, every create succeeds, and nothing ever tells the author the rule they wrote is not
+     a rule the record keeps. */
+  assert.equal(linted(probe({ id: 'n', type: 'int', required: true })), null);
+  assert.equal(linted(probe({ id: 'n', type: 'int', derived: true, required: true })), 'DECLARATION_INVALID at n');
+
+  const said = fix(probe({ id: 'n', type: 'int', derived: true, required: true }));
+  assert.match(said, /probe\.n/, 'the field is named');
+  assert.match(said, /Drop the requirement, or drop derived/, 'and which half to delete');
+
+  /* CONDITIONALLY DEAD IS STILL DEAD. The same sweep skips `required_when` for the same reason,
+     so a derived field made required by another field's value is refused on the same grounds. */
+  const when = { field: 'what', is: 'yes' };
+  assert.equal(linted(probe({ id: 'n', type: 'int', required_when: when })), null, 'the condition is well formed');
+  assert.equal(linted(probe({ id: 'n', type: 'int', derived: true, required_when: when })), 'DECLARATION_INVALID at n');
+  assert.match(fix(probe({ id: 'n', type: 'int', derived: true, required_when: when })), /required_when/, 'the key written is the key named');
+
+  /* AND `required: false` DECLARES NOTHING, so there is nothing beside derived to refuse. This is
+     the same reading as K2 above: a key that says what the record already does is not a second
+     instruction. */
+  assert.equal(linted(probe({ id: 'n', type: 'int', derived: true, required: false })), null);
+});
