@@ -27,6 +27,6 @@ fix:    Nothing was filed; ask again.
 # AND THE SITE IS THE CONSTRUCTOR RATHER THAN A CALLER. Six sources outside the registry name this
 # code, four of them in `packages/spark/src`: `project.ts` builds every schema refusal that carries
 # an address, `call.ts` answers the two ways a reply is not JSON at all, `propose.ts` covers a body
-# kind the palette will not file, `jobs.ts` the tier-C result, and `packages/ports/src/inference.ts`
-# and `apps/worker/src/inference.ts` raise it from the adapter with `at: schema`. The runner drives
-# the palette, so the fixture names the file the palette refuses from.
+# kind the palette will not file, `jobs.ts` a pattern job whose answer carried no `ingest` body, and
+# `packages/ports/src/inference.ts` and `apps/worker/src/inference.ts` raise it from the adapter with
+# `at: schema`. The runner drives the palette, so the fixture names the file the palette refuses from.

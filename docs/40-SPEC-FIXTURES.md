@@ -395,13 +395,13 @@ found: currency                   # optional; asserted when present
 **`ask` is the ninth `via`, minted on September 21st 2026 for the four codes `packages/spark` arrived with.**
 Nothing above it could carry one. A spark refusal happens when a model ANSWERS: the input is a projection plus the
 model’s own reply, and the eight surfaces before it take a manifest, a predicate, a write, an rpc call, a `.brainl`, a
-document or a scheduled connector run. `refusal-fixtures.mjs` said so itself, four findings at a time, for as long as
+document or a scheduled connector run. `refusal-fixtures.mjs` reported it as four findings, one per code, for as long as
 `PROPOSAL_UNCITED`, `PROPOSAL_NO_ROWS`, `PROPOSAL_SCHEMA` and `SPARK_BUDGET_SPENT` sat in [30-BLUEPRINT](30-BLUEPRINT.md)
 §6 with no file on disk. The alternative was to enumerate those four somewhere else, and there is nowhere else: 30 §6 is
 the registry’s home, and this table is the one place a registered code’s input shape is written down.
 
 **A `via` with no runner is the normal state on this page rather than a concession made for this one.** None of the
-eight runners above exists either, which `loop/STATUS.md` §5 records: until one does, a fixture is an enumeration entry
+eight runners above exists either, which `loop/STATUS.md` §5 records of all of them: until one does, a fixture is an enumeration entry
 with a sentence attached, and the gate that reads this table owns the enumeration and not the behaviour. So the ninth
 row costs one row, and not adding it cost four codes a caller can already be handed and nothing enumerated. This gate
 needed no edit for it, which is the second time the table has grown a row without one; `pull` was the first, the day
