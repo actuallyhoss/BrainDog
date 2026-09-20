@@ -693,3 +693,128 @@ test('A REPEATING OBLIGATION AND A REPEATING ITEM ARE THE SAME MONEY HERE, so th
   assert.equal(twice, -9_822_400, 'and that is all but a hundredth of what the leg would add');
   assert.equal(both.total - twice, -97_200, 'what only the repeating list holds is the two plans no obligation carries');
 });
+
+/* ── the two blocks on the Ledger that read a list of their own ──────────── */
+
+/**
+ * A block of the Ledger page as the record draws it, found by the words over it.
+ *
+ * READ OFF THE DRAWN PAGE AND NOT OFF THE DECLARATION, because both facts below are a missing clause
+ * in a `where:` and a test carrying its own copy of the filter would ask its own question and pass
+ * while the screen answered something else.
+ */
+const drawn = (k: Kernel, slug: string, heading: string): { matched: number; rows: readonly { fields: Record<string, unknown> }[] } => {
+  const out = k.page(slug);
+  assert.ok(out.ok, `${slug}: ${sayOf(out)}`);
+  const block = (out.value as { blocks: readonly { heading?: string; matched: number; refusals: readonly unknown[]; rows: readonly { fields: Record<string, unknown> }[] }[] }).blocks.find(
+    (b) => b.heading === heading,
+  );
+  assert.ok(block, `${slug} draws a block headed ${heading}`);
+  assert.deepEqual(block.refusals, [], 'a block that refuses is a heading over a blank rectangle');
+  return { matched: block.matched, rows: block.rows };
+};
+
+test('A HEADING THAT SAYS PAY OVER TWO ROWS OF MONEY COMING IN, because the table beside the figure never got the clause the figure has', async () => {
+  const k = await seeded();
+  const table = drawn(k, 'ledger', 'Still to pay, in parts');
+
+  /* THE SHIPPED RECORD, MEASURED BEFORE THE CLAUSE: six open parts under the heading, four of the
+     proofing press leaving at GBP 1,875.00 and two of the Halden licence ARRIVING at GBP 2,400.00.
+     `installments-left` and `installments-due-30d` both read this list and both say `direction is
+     out`; the table under the same word never did. */
+  const open = INSTALLMENTS.filter((row) => row.state === 'open');
+  assert.equal(open.length, 6, 'the sample stopped having six open parts');
+  assert.equal(open.filter((row) => row.direction === 'in').length, 2, 'and two of them stopped being money coming in');
+
+  assert.equal(table.matched, 4, 'the table draws what is still to PAY, and a receipt is not one');
+  assert.deepEqual(
+    table.rows.map((r) => r.fields.direction),
+    ['out', 'out', 'out', 'out'],
+    'every row under a heading that says pay is money going out',
+  );
+  assert.deepEqual(
+    table.rows.map((r) => r.fields.what).filter((what) => String(what).startsWith('Halden')),
+    [],
+    'the Halden licence is money he is owed, and it was listed as money he owes',
+  );
+});
+
+/**
+ * WHAT `ends` COSTS THE SPLIT, AND WHY THE RECORDED REPAIR FOR IT IS NOT WRITTEN HERE.
+ *
+ * The finding this pins is real and its repair is not writable, which is three measurements and not
+ * an opinion. `loop/BACKLOG.md` records `ends is empty or ends after today`.
+ *
+ *   1. AS A SENTENCE IT IS A REFUSAL. Clauses are ANDed on the comma and `or` reads over the VALUES
+ *      of one field, so the record answers `VALUE_MALFORMED: empty is not a value ends can hold`.
+ *      The last four lines of this test are that answer, so nobody has to try it again.
+ *   2. AS A TREE IT IS A BLANK BLOCK. `{ any: [{ field: 'ends', empty: true }, { field: 'ends',
+ *      after: 'today' }] }` compiles and filters correctly in the kernel, and `apps/web`, which is a
+ *      synchronous mock over this package and draws the same seed pages, refuses a `where:` that is
+ *      not a string: `compile` hands back one refusal and no clauses and `matches` then answers false
+ *      for every row. Measured against that engine, the split would draw nought rows under its
+ *      heading and a refusal beside it, which is worse than the number it draws now.
+ *   3. AND `ends is empty` ALONE, THE ONE CLAUSE THE SENTENCE DOES SUPPORT, IS WORSE THAN NOTHING.
+ *      The importer skips a stream that ended before the export (`apps/cli/src/legacy.ts:916`) and
+ *      writes `ends` only when it is still ahead, so on the one real record every row carrying an
+ *      `ends` at all is a schedule that IS still running. That clause drops exactly those.
+ *
+ * So the repair belongs where the row is, not where the filter is: a rule over `recurring` with
+ * `when: 'state is live, ends before today'` and `then: [{ move: 'ended' }]` would be swept hourly by
+ * `rulesAboutTime` and would put every reader right at once. It is not written here because
+ * `test/names.test.ts` holds `RULE_NAMES` and `RULES` to the same keys, and `usecases/names.ts` is
+ * another agent's file this run.
+ *
+ * AND THE TILE IN THE SAME FINDING IS ALREADY OUT OF IT. "Repeating, out" reads `every-month-out`
+ * over `obligations`, which has no `ends` field at all: the two `recurring-*` figures the finding was
+ * written against stopped existing in `62511a98`, which deleted both and pointed the tile at
+ * `every-month-out` in the same hunk. THE HASH THIS COMMENT FIRST CARRIED, `d76cd016`, IS THE WRONG
+ * ONE and was corrected by reading the commits rather than the account of them: `git show d76cd016
+ * --stat -- packages/seed/src/modules/money.ts` is empty, so it changed no line of this module, and it
+ * is older than `29c58c9e`, the commit that wrote the finding down. One block on one screen still
+ * reads this list.
+ */
+test('A SCHEDULE THAT STOPPED IN MARCH IS STILL COUNTED EVERY MONTH, and the sentence that would drop it is not one this grammar can say', async () => {
+  const k = await seeded();
+
+  /* NOTHING IN THE TREE FLIPS `state` TO `ended` WHEN THAT DAY PASSES. `recurring-missed` is the only
+     rule over this list and it watches `next_due`; `rulesAboutTime` sweeps hourly and has no rule to
+     sweep for this. The sample hides it because its one stopped row was hand-set to `ended`, so the
+     shape a real record has is written here instead: the importer skips a stream that ended before
+     the export (`apps/cli/src/legacy.ts:916`) rather than ending the row it wrote last time. */
+  const stopped = k.create(
+    'recurring',
+    {
+      what: 'Tallow studio pass',
+      direction: 'out',
+      amount: { amount: 24_900, currency: 'GBP' },
+      every: 'monthly',
+      next_due: day(-184),
+      started: day(-600),
+      ends: day(-184),
+      state: 'live',
+    },
+    { actor: 'p_test' },
+  );
+  assert.ok(stopped.ok, sayOf(stopped));
+
+  const split = drawn(k, 'ledger', 'Every month, by what it is for');
+  const total = split.rows.reduce((n, r) => n + minor(r.fields.amount), 0);
+  /* MEASURED ON THE SHIPPED RECORD PLUS THAT ONE ROW: five rows and GBP 6,940.00 a month, where
+     GBP 6,691.00 of it repeats and GBP 249.00 stopped on 3 March. It is counted at its full monthly
+     share for ever, and so is every row like it. */
+  assert.equal(split.matched, 5, 'a red here is the repair landing and not a break: four rows means the stopped schedule is out');
+  assert.equal(total, 694_000, 'and GBP 6,691.00 here means the same thing, because GBP 249.00 of this total stopped on 3 March');
+  assert.ok(
+    split.rows.some((r) => r.fields.what === 'Tallow studio pass'),
+    'the split still draws a schedule whose end day is behind today',
+  );
+
+  /* AND THE REPAIR AS IT IS RECORDED IS A REFUSAL, which is why this test records a number rather
+     than repairing anything. `or` in this grammar is over the VALUES of one field, so the clause is
+     read as `ends is <the words empty or ends after today>`. */
+  const said = k.list({ register: 'recurring', where: 'state is live, direction is out, every is monthly, ends is empty or ends after today', limit: 50 });
+  assert.ok(refused(said), 'the recorded repair parses, and it must not');
+  assert.equal(said.refusal.code, 'VALUE_MALFORMED');
+  assert.match(String(said.refusal.fix), /empty is not a value ends can hold/);
+});

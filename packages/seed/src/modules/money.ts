@@ -1896,7 +1896,15 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         heading: 'Still to pay, in parts',
         span: 6,
         source: 'register.installments',
-        where: 'state is open',
+        /* `direction is out` WAS MISSING AND THE TABLE LISTED RECEIPTS UNDER THE WORD PAY. Measured on
+           the shipped record: six open parts drawn under this heading, four of the proofing press
+           going out at GBP 1,875.00 and two of the Halden licence coming IN at GBP 2,400.00, the two
+           of them drawn without the minus the outgoing rows wear because `sign:` reads the very field
+           the filter did not. Four rows is what is still to pay. Both figures over this list,
+           `installments-left` and `installments-due-30d`, already carry the clause, and the second one
+           carries a comment about the day it was added to a figure that had added a payment to a
+           receipt; the table under the same word was left out of that repair. */
+        where: 'state is open, direction is out',
         columns: [
           { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
           { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
