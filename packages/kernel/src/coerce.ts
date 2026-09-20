@@ -118,10 +118,18 @@ const CURRENCY = /^[A-Za-z]{3}$/;
  * comes back `met: null`, which is a target that has quietly stopped being evaluated, and nothing
  * on the screen says why.
  *
- * NO PACKAGE SHIPS A CURRENCY TABLE. `34 §3` and `02 §3` both say it in those words, and
- * `exponentOf` already reads each exponent from the same `Intl` data — a record cannot be allowed
- * to know that `KWD` has three decimals and not know that `KWD` is a currency.
- * `packages/record/src/index.ts:722` already builds its table from `Intl.supportedValuesOf` at
+ * THE RUNTIME'S LIST, NOT A LIST THIS REPOSITORY MAINTAINS. `Intl.supportedValuesOf('currency')` is
+ * ISO 4217's active tender as the runtime holds it, so the set grows and shrinks with the platform
+ * rather than with whoever last remembered to edit an array.
+ *
+ * IT IS NOT THE SAME LIST THE EXPONENT COMES FROM, AND THAT IS DELIBERATE (`02 §3` rule 1). This
+ * settles whether three letters are a currency; `exponentOf` settles how many minor digits it has,
+ * from a table at ISO's values, because `Intl`'s exponents are CLDR's and CLDR gives `IQD` 0 where
+ * ISO gives 3. The two lists differ at three codes, `CLF`, `UYI` and `UYW`, which are index and fund
+ * units rather than tender: the table knows how to DRAW them, because the renderer is public API and
+ * is handed codes nobody validated, and this refuses to STORE them. Narrow at the door, complete at
+ * the pen.
+ * `packages/record/src/index.ts` already builds its table from `Intl.supportedValuesOf` at
  * module scope in a package the Worker imports, which is the standing proof the API is available
  * under workerd. Cached here for the same reason it is cached there: it is called once per money
  * value written.

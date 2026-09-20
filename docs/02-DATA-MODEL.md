@@ -274,10 +274,31 @@ string. Every one of the sixteen types has one such shape, byte-exact; the list 
 Three rules, all enforced at the validator rather than by convention:
 
 1. **Divide by 100 only at the point of display.** A currency's exponent (JPY is 0, KWD is 3) is never
-   assumed to be 2 — and **no package ships a currency table**: the exponent comes from the runtime's own
-   `Intl.NumberFormat` currency data, cached per code, in the renderer and the kernel alike. `extract`
-   owns only a symbol → code map for detection and refuses an ambiguous bare `$`
-   ([34-GRAMMARS](34-GRAMMARS.md) §3). *(An earlier draft said "comes from a table".)*
+   assumed to be 2. It comes from a short table, held in the renderer and in the kernel alike, which
+   names every exponent that is not 2; a code the table does not name is read as 2, which is what most
+   currencies are and what every unknown one is.
+
+   **A table, and not the runtime's own currency data, which is the part worth knowing.** `Intl` carries CLDR, which is what a person
+   in that country expects to SEE; ISO 4217 carries the minor unit, which is what a record STORES. They
+   disagree on real currencies, and each disagreement is a hundred- or thousandfold error: CLDR gives
+   `IQD` 0 where ISO gives 3, and `MGA` 0 where ISO gives 2. So the table carries ISO's values, and
+   nothing in the exponent path calls `Intl` at all. The two copies are byte-identical, and they are two
+   copies rather than one module because `braindog-render` is the published block dialect and depends on
+   no `@braindog/*` package, while the kernel must not depend on a published renderer; a test compares
+   the UNION of their keys against ISO on every run, because agreement between two copies is not
+   correctness. **A third copy is not allowed**, and nothing in an app reads `maximumFractionDigits` for
+   itself: one did, and drew 1.5 Iraqi dinars as `IQD 0.002`.
+
+   **Knowing how to draw a code is not the same as accepting it**, and the two lists differ on purpose.
+   The table names three codes a record will not store: `CLF`, `UYI` and `UYW`, which are ISO 4217
+   index and fund units rather than tender. `Intl.supportedValuesOf('currency')` is the tender list, it
+   is what `CURRENCY_UNKNOWN` is checked against, and it omits all three. So a `money` value in `CLF` is
+   refused at the write, while `money(1_000_000, 'CLF')` still draws `CLF 100.0000` correctly, because
+   the renderer is public API and is handed codes nobody validated. Narrow at the door, complete at the
+   pen. `extract` owns only a symbol → code map
+   for detection and refuses an ambiguous bare `$` ([34-GRAMMARS](34-GRAMMARS.md) §3).
+   *(An earlier draft said "comes from a table"; the draft after it said no table is shipped, which was
+   wrong in the other direction and is what let the third copy in.)*
 2. **Two currencies are never added.** A metric summing a mixed-currency field is *refused at
    install*, not silently converted. A total across currencies must name its FX source and date.
 3. **An FX rate is a dated row**, not a live lookup. A figure that changes when you reload it is

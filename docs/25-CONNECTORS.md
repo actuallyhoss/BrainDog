@@ -189,7 +189,8 @@ The window is arithmetic, not a string the author formats: `since = max(start, w
 `until = min(since + max_span, end of the current grain)`, half-open; after a complete run
 `watermark = min(until, start of the current grain)`, so today is re-asked until it ends
 ([47-SPEC-CONNECT](47-SPEC-CONNECT.md) §13 D11). Connect calls `extract(decl, raw, ctx)` **once per page**,
-and `ctx` carries no currency table — the exponent comes from `Intl.NumberFormat`, and `extract` owns only a
+and `ctx` carries no currency table of its own: the exponent comes from the kernel's `exponentOf`
+([02-DATA-MODEL](02-DATA-MODEL.md) §3 rule 1), and `extract` owns only a
 symbol → code map ([02-DATA-MODEL](02-DATA-MODEL.md) §3). Dedupe and `on_conflict` are the record's, inside
 `applyPull`: an exact `dedupe: [id]` matches every named field (lint requires `index: true` on each), a
 `near` dedupe runs [43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §5.7's window query, and a hit goes by

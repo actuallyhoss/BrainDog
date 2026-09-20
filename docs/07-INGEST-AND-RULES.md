@@ -154,7 +154,8 @@ currency's exponent is 3; with two or more separators the last differing one is 
 that would need rounding is refused ([43-SPEC-EXTRACT](43-SPEC-EXTRACT.md) §13 D2). `money` declares no separator and needs none: the rule above reads `EUR 1.234,56` and
 `EUR 1.234.567,89` the European way without being told, which is the whole of what a declared one
 bought. The exponent comes from
-`Intl.NumberFormat`, cached per code — **no currency table is shipped anywhere**; `extract` owns only a
+**a table of every exponent that is not 2, at ISO 4217's values**, held in the kernel and the renderer
+alike, because CLDR and ISO disagree on real codes ([02-DATA-MODEL](02-DATA-MODEL.md) §3 rule 1); `extract` owns only a
 symbol → code map for detection (`€` → EUR, `E£` → EGP …) and refuses an ambiguous bare `$`
 ([02-DATA-MODEL](02-DATA-MODEL.md) §3).
 

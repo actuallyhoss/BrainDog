@@ -117,9 +117,12 @@ test('A CURRENCY THAT DOES NOT EXIST IS REFUSED, because no rate can ever be fou
   assert.match(shape.fix, /three-letter code/);
 });
 
-test('the list of currencies is the runtime\'s own, and no package ships one', () => {
-  /* `34 §3` and `02 §3` both say it in those words: **no package ships a currency table**.
-     `packages/record/src/index.ts:722` already calls `Intl.supportedValuesOf('currency')` at module
+test('the list of currencies is the runtime\'s own, and no package writes one out', () => {
+  /* `02 §3` rule 1: WHETHER three letters are a currency is the runtime's answer, and the repository
+     keeps no list of its own to go stale. That is a different question from HOW MANY minor digits the
+     code has, which does come from a table, at ISO 4217's values, because `Intl`'s exponents are
+     CLDR's and the two disagree (same rule, second paragraph). Membership here, exponent there.
+     `packages/record/src/index.ts` already calls `Intl.supportedValuesOf('currency')` at module
      scope in a package the Worker imports, which is the standing proof the API is there under
      workerd and the answer to the one objection this refusal attracts.
 

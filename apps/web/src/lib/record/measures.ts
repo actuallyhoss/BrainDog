@@ -14,7 +14,7 @@
  */
 
 import { MEASURE_BACK, measurePeriod, measureSeries, type MeasureSeries } from '@braindog/kernel';
-import { money, quantity } from 'braindog-render';
+import { exponentOf, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 
@@ -45,16 +45,33 @@ const readerZone = (): string => {
 /** `17 Sep`, as a person says a day. */
 export const dayLabel = (key: string): string => `${Number(key.slice(8, 10))} ${MONTHS[Number(key.slice(5, 7)) - 1] ?? ''}`;
 
-const isCurrency = (unit: string): boolean => /^[A-Z]{3}$/u.test(unit) && exponentOf(unit) >= 0;
+/**
+ * The codes a unit column may name, which is a question about ISO 4217's list and nothing to do
+ * with how many decimals a code takes.
+ *
+ * MEMBERSHIP AND EXPONENT ARE TWO QUESTIONS AND THIS FILE ANSWERED BOTH WITH ONE CALL. It asked
+ * `Intl.NumberFormat` for a currency's minor digits and read a throw as "not a currency", but
+ * `Intl.NumberFormat` accepts any three ASCII letters and answers 2 for a code it has never heard
+ * of, so the refusal never came and `VAT 1.50` was a spreadsheet's tax column drawn as money. The
+ * exponent it returned was CLDR's, which is what a person in that country expects to SEE, while
+ * `money()` divides by the minor unit a record STORES: the two disagree on real currencies, and
+ * `IQD 1.5` drew `IQD 0.002`. `02 §3` rule 1 settles it: the kernel and the renderer each hold the
+ * table, a third copy is not allowed, and nothing in an app reads `maximumFractionDigits` for
+ * itself. This file was the third copy.
+ *
+ * ONE LIST, THE SAME ONE THE RECORD USES. `Intl.supportedValuesOf('currency')` is what
+ * `coerce.ts`'s `isCurrencyCode` and `packages/record/src/index.ts` both build from, so a unit this
+ * screen draws as money is a unit the record would accept as money, and the exponent comes from
+ * `braindog-render` because that is the module that divides by it.
+ *
+ * THE TWO FUND CODES FALL OUT, AND THAT IS THE LIST BEING HONEST. `CLF` and `UYW` are ISO 4217
+ * index units rather than tender, CLDR's list omits them, and the record already refuses them with
+ * `CURRENCY_UNKNOWN`. A reading in one draws as a quantity now, which is the true thing to say
+ * about a figure the record could not store.
+ */
+const CURRENCIES: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
 
-/** A currency's minor digits, from `Intl`, or -1 for a code it does not know. */
-function exponentOf(currency: string): number {
-  try {
-    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    return -1;
-  }
-}
+const isCurrency = (unit: string): boolean => CURRENCIES.has(unit);
 
 /** One value as a figure: money in its currency, a quantity with its unit, or a plain number. */
 export function figureOf(value: number, unit: string): string {

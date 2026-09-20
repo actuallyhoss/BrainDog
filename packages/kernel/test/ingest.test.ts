@@ -9,6 +9,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { arrive, extractField, extractOutcome, ingestDay, openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
 import { EXPONENT, exponentOf } from '../src/ingest.ts';
@@ -1109,7 +1112,8 @@ test('AND AN INTEGER READS ITS OWN GROUPING', () => {
 
 test('THE CURRENCY’S OWN EXPONENT DECIDES BOTH THE GROUPING AND THE SCALE', () => {
   /* 07 §3: a lone separator followed by exactly three digits is grouping UNLESS the exponent is 3,
-     and the exponent comes from `Intl` — no currency table is shipped anywhere. Both were hard-coded
+     and the exponent comes from `EXPONENT`, at ISO 4217's values and not CLDR's (02 §3 rule 1).
+     Both were hard-coded
      at two, so `KWD 1.250` read as 125,000 fils (one thousand two hundred and fifty dinars) for one
      and a quarter, and `JPY 1250` read as 125,000 of a subunit the yen does not have. */
   const money = (currency: string, text: string) =>
@@ -1209,4 +1213,62 @@ test('THE MINOR UNIT IS ISO 4217’S, AND ONE TABLE SAYS IT', async () => {
     const cldr = new Intl.NumberFormat('en', { style: 'currency', currency: code }).resolvedOptions().maximumFractionDigits;
     assert.equal(EXPONENT[code], cldr, `${code} differs from CLDR and is not one of the overrides this file argues for`);
   }
+});
+
+/**
+ * Every source file in the tree, so a check can be about the tree and not about a list of files
+ * somebody remembered. The skipped names are outputs and caches, never authored.
+ */
+function* sources(dir: string): Generator<string> {
+  const SKIP = new Set(['node_modules', '.git', '.svelte-kit', '.wrangler', '.scratch', 'dist', 'coverage', 'shots']);
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP.has(entry.name) || entry.name.startsWith('build')) continue;
+      yield* sources(path);
+    } else if (/\.(?:m|c)?[jt]s$|\.svelte$/u.test(entry.name)) yield path;
+  }
+}
+
+test('NO FOURTH COPY: nothing outside the two tables works a currency exponent out for itself', () => {
+  /* A CHECK THAT ENUMERATES THE COPIES IT KNOWS ABOUT CANNOT SEE THE NEXT ONE, which is how this
+     survived. The drift check above compares the kernel's table with the renderer's, and a third
+     reader grew up in `apps/web/src/lib/record/measures.ts` where neither could see it: it asked
+     CLDR for the exponent, multiplied by it, and handed the result to `money()`, which divided by
+     ISO's. `IQD 1.5` drew `IQD 0.002`. `02 §3` rule 1 is the rule; this is the thing that holds it.
+
+     THE PATTERN IS NARROW ON PURPOSE AND MUST STAY NARROW. `maximumFractionDigits` appears all
+     over the tree as the OUTPUT option to `toLocaleString`, which is how a figure is drawn and is
+     nobody's business but the formatter's. What is forbidden is READING it back off
+     `resolvedOptions()`, because that is asking CLDR what a currency's minor unit is, and CLDR
+     answers a different question. Widening this to the bare identifier would flag fourteen
+     innocent lines and the gate would be turned off within a week. */
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const READS_CLDR = /resolvedOptions\(\)[\s\S]{0,40}?(?:maxi|mini)mumFractionDigits/u;
+
+  /* ONE ALLOWANCE, AND IT IS THIS FILE. After the fix there is exactly one legitimate reader in
+     the tree and it is the loop above, which reads CLDR in order to DISAGREE with it: the check
+     that every override in `EXPONENT` is argued for needs the answer it is overriding. The two
+     modules that hold the table do not appear here because they never call `Intl` at all. */
+  const CLDR_ALLOWED = ['packages/kernel/test/ingest.test.ts'];
+
+  /* AND NOBODY ELSE DECLARES THE FUNCTION EITHER, whatever they compute inside it. A copy that
+     hard-codes `KWD: 3` drifts exactly as the CLDR one did; the two modules named here are the two
+     `02 §3` rule 1 allows, and everyone else imports. Destructuring an import reads
+     `const { exponentOf` and does not match. */
+  const DECLARES = /(?:function|const|let|var)\s+exponentOf\b/u;
+  const DECLARE_ALLOWED = ['packages/kernel/src/ingest.ts', 'packages/render/src/format.ts'];
+
+  const found: string[] = [];
+  for (const path of sources(root)) {
+    /* POSIX SEPARATORS, because the allow-lists are written the way the repository is talked about
+       and half the people running this are on Windows. */
+    const rel = relative(root, path).split(sep).join('/');
+    const text = readFileSync(path, 'utf8');
+    if (READS_CLDR.test(text) && !CLDR_ALLOWED.includes(rel))
+      found.push(`${rel} reads a currency's minor unit off Intl.resolvedOptions(). That is CLDR, which says what a country expects to SEE; money() divides by what ISO 4217 says a record STORES, and they differ on IQD and MGA. Import exponentOf from 'braindog-render' (an app or the renderer) or from './ingest.ts' (inside the kernel).`);
+    if (DECLARES.test(text) && !DECLARE_ALLOWED.includes(rel))
+      found.push(`${rel} declares its own exponentOf. 02 §3 rule 1 allows two copies of that table, packages/kernel/src/ingest.ts and packages/render/src/format.ts, and no third. Import exponentOf from 'braindog-render' or from '@braindog/kernel' instead of writing one.`);
+  }
+  assert.deepEqual(found, [], `\n${found.join('\n')}\n`);
 });

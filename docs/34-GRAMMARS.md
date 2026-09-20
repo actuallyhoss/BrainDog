@@ -353,7 +353,7 @@ compares against it; the checksum in §5 is computed over it.
 | `document` | string | the dialect of §2, LF line endings |
 | `int` | integer | `|n| ≤ 2^53 − 1`, else `INT_OUT_OF_RANGE` |
 | `decimal` | number | ≤ 15 significant digits, else `VALUE_MALFORMED`; never money |
-| `money` | `{ "amount": 131624600, "currency": "EGP" }` | integer minor units; the key is `amount`, never `minor`; the exponent comes from `Intl.NumberFormat(undefined, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits`, cached per code — **no package ships a currency table**; `extract` holds only a symbol → code map for detection and refuses a bare `$` |
+| `money` | `{ "amount": 131624600, "currency": "EGP" }` | integer minor units; the key is `amount`, never `minor`; the exponent comes from `exponentOf`, **a table of every exponent that is not 2 at ISO 4217's values** held in the kernel and the renderer alike, a code it does not name being read as 2; it is not a CLDR read, because CLDR and ISO disagree on real codes and each disagreement is a hundred- or thousandfold error (02 §3 rule 1); `extract` holds only a symbol → code map for detection and refuses a bare `$` |
 | `quantity` | `{ "value": 1.4, "unit": "m" }` | two units are never added or compared |
 | `day` | `"2026-09-02"` | no time zone; renders at noon UTC |
 | `instant` | `"2026-09-02T14:03:11.000Z"` | RFC 3339, UTC, `Z`, millisecond precision; a malformed one is `VALUE_MALFORMED` |

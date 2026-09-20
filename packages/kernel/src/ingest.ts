@@ -1262,8 +1262,9 @@ function value(deps: IngestDeps, form: Extractor, anchored: string): Json | null
     /* AND THE THOUSANDS SEPARATOR IS DECLARED HERE TOO. `decimal` took one and `money` did not, so
        every European amount was read a thousand times too small — €1.234,56 became €1.23 — which is
        the worst possible place for that bug because the row still looks plausible. */
-    /* THE CURRENCY'S OWN EXPONENT, from `Intl` and cached — 07 §3, and no currency table is shipped
-       anywhere. It governs BOTH halves: a lone separator followed by three digits is grouping
+    /* THE CURRENCY'S OWN EXPONENT, from `EXPONENT` below and not from `Intl`. `02 §3` rule 1 has the
+       argument: `Intl` carries CLDR, which is what a country expects to SEE, and the table carries
+       ISO 4217's minor unit, which is what a record STORES. It governs BOTH halves: a lone separator followed by three digits is grouping
        *unless the exponent is 3*, so `KWD 1.250` is one and a quarter dinars rather than one
        thousand two hundred and fifty; and the scale is `10 ** exponent`, so `JPY 1250` is 1250 yen
        and not 125,000 of a subunit that does not exist. Both were hard-coded at two. */

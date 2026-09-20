@@ -705,11 +705,16 @@ export type RecordDeps = {
 const INVITES_OFF = 'This BrainDog has no sign-in switched on, so an invitation link would lead nowhere. Set up sign-in first.';
 
 /**
- * The currency table `43 §4.3`'s money is read against, from `Intl` rather than from shipped data.
+ * The currency table `43 §4.3`'s money is read against: the runtime for the codes, the kernel for the
+ * exponents.
  *
- * ONE SOURCE FOR THE CODES AND THE EXPONENTS. `Intl.supportedValuesOf('currency')` is ISO 4217's
- * active list as the runtime holds it, and `exponentOf` reads each exponent from the same place —
- * so a record cannot know that `KWD` has three decimals and not know that `KWD` is a currency.
+ * TWO SOURCES, AND THEY ANSWER TWO DIFFERENT QUESTIONS. `Intl.supportedValuesOf('currency')` is ISO
+ * 4217's active list as the runtime holds it, which settles whether three letters are a currency at
+ * all; `exponentOf` is the kernel's table, which settles how many minor digits it has. It would be
+ * tidier to ask one thing twice, and it would be wrong: `Intl`'s exponents are CLDR's, and CLDR gives
+ * `IQD` 0 minor digits where ISO gives 3, which is a thousandfold error in a stored amount (`02 §3`
+ * rule 1). A record still cannot know that `KWD` has three decimals without knowing `KWD` is a
+ * currency, because both answers are reached through this one table.
  * A LIST IS WHAT MAKES THE READING SAFE: without one, `VAT 500` and `EGP 500` are the same three
  * letters beside a number, which is why `ingest.ts` refused to read a currency out of a payload
  * at all until this existed.
