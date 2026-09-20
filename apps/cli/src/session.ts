@@ -36,12 +36,24 @@ const USAGE_SHOW = 'braindog session show takes --host and nothing else.';
 const USAGE_END = 'braindog session end takes --state, --next and --host, and nothing else.';
 const usageLine = (verb: Line): string => `braindog session ${verb} takes one line of text, in quotes, and --host.`;
 
-/** The three states a run may be left in. `active` is not one: `end` is how a run stops. */
-const STATES = ['idle', 'handoff', 'done'] as const;
+/**
+ * The three states a run may be left in. `active` is not one: `end` is how a run stops.
+ *
+ * A SUBSET OF THE REGISTER'S STATES ON PURPOSE, and not a copy of them. The declaration carries
+ * `active` and `abandoned` as well, and neither is something a person ends a session by choosing:
+ * `active` is where a run already is, and `abandoned` is what the twelve-hour sweep decides. So
+ * this list is a policy about what the command offers, which is why it is written here. The test
+ * beside it checks every member against the declaration, so the policy cannot drift into naming a
+ * state the record has not got.
+ */
+export const STATES = ['idle', 'handoff', 'done'] as const;
 type State = (typeof STATES)[number];
 const isState = (x: string): x is State => (STATES as readonly string[]).includes(x);
 
-const BAD_STATE = 'braindog session end takes --state idle, handoff or done.';
+/* SPELLED FROM THE LIST RATHER THAN BESIDE IT. The sentence and the list sat two lines apart and
+   said the same three words twice, so adding a fourth state would have been accepted by the guard
+   and denied by the usage line, which is the worst of the two outcomes. */
+const BAD_STATE = `braindog session end takes --state ${STATES.slice(0, -1).join(', ')} or ${STATES.at(-1)}.`;
 const NO_SESSION = 'No session is open in this folder. Start a Claude Code session here, or run braindog hook start.';
 const NO_RUN = 'The host has no open run for this folder. Start a session here and try again.';
 

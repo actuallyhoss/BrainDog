@@ -17,8 +17,10 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { sessionDeclaration } from '@braindog/kernel';
+
 import { sessionPath, writeSession } from '../src/hooks.ts';
-import { session } from '../src/session.ts';
+import { session, STATES } from '../src/session.ts';
 import type { AgentIo } from '../src/skills.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -319,6 +321,35 @@ test('NOTHING REACHES STDOUT ON ANY REFUSAL PATH, whoever refused', async (t) =>
   const missing = setup(t, host.base, { file: false });
   assert.equal(await session(['show'], missing.io), 1);
   assert.deepEqual(missing.out, []);
+});
+
+test('THE THREE STATES `end` OFFERS ARE THREE THE RECORD HAS, and the usage line says the same three', () => {
+  /**
+   * `--state` IS A POLICY OVER A DECLARATION, and until now nothing joined the two.
+   *
+   * The register declares five states and this command offers three of them, which is a choice
+   * rather than a copy: `active` is where a run already is, and `abandoned` is the twelve-hour
+   * sweep's word and not a person's. But a policy naming a value the record has not got refuses
+   * every `end` that takes it, at the host, after the request has left the machine, and the
+   * sentence the person reads would be about an enum they never typed.
+   */
+  const body = sessionDeclaration().body as unknown as { state: string; fields: { id: string; values?: string[] }[] };
+  const declared = body.fields.find((f) => f.id === body.state)?.values ?? [];
+  assert.ok(declared.length > STATES.length, 'the policy offers every declared state, so it is a copy and not a policy');
+  for (const state of STATES) assert.ok(declared.includes(state), `braindog session end offers --state ${state}, and the record has no such state`);
+
+});
+
+test('AND THE SENTENCE A BAD --state GETS OFFERS THOSE SAME THREE, spelled from the list', async (t) => {
+  /* The usage line used to be written out beside the list and say the same three words twice, so a
+     fourth state would have been accepted by the guard and denied by the sentence. Asserted through
+     the command rather than on the constant, because the sentence is what the person reads. */
+  const host = await stub(t, {});
+  const h = setup(t, host.base);
+  assert.equal(await session(['end', '--state', 'active'], h.io), 1);
+  assert.equal(h.said.length, 1);
+  for (const state of STATES) assert.match(h.said[0] ?? '', new RegExp(`\\b${state}\\b`), `the refusal does not offer ${state}`);
+  assert.deepEqual(host.seen, [], 'a state the command does not offer left the machine');
 });
 
 test('THE TOKEN WAS NEVER PRINTED by any command above', () => {
