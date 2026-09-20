@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { TOOLS } from '@braindog/mcp';
+import { TOOLS, tools, type McpSurface } from '@braindog/mcp';
 import { INSTRUCTIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
@@ -119,24 +119,65 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
   const closed = new Promise<number | null>((done) => child.on('close', (code) => done(code)));
 
   let n = 0;
-  const expect = (id: number | null) => new Promise<Rpc>((done) => waiting.set(id, done));
+  /**
+   * EVERY CALL WAITS UNDER A DEADLINE, BECAUSE `node --test` IMPOSES NONE OF ITS OWN. A reply that
+   * never came left its promise unsettled for ever: the runner sat with no output and the file had
+   * to be killed by hand, which is a hang and not a failure, and it says nothing about which call
+   * was lost. One test below now makes seventeen calls where the file once made one or two, so
+   * there are seventeen more ways to sit there.
+   *
+   * TEN SECONDS IS FOURTEEN TIMES THE SLOWEST CALL MEASURED HERE. Every call in this file was timed:
+   * the longest took 706 ms, the hung read that waits out its own 400 ms budget with the child's
+   * startup in front of it, and the rest came back in 330 to 410 ms. So this cannot fire on a slow
+   * machine, and when it does fire the child's stderr goes in the message, because a reply that
+   * never arrives is usually a child that died saying why.
+   */
+  const DEADLINE_MS = 10_000;
+  const expect = (id: number | null, what: string) =>
+    new Promise<Rpc>((done, fail) => {
+      const timer = setTimeout(
+        () => fail(new Error(`${what} was never answered, after ${DEADLINE_MS} ms. The child's stderr: ${err.trim() || 'nothing'}`)),
+        DEADLINE_MS,
+      );
+      /* `unref`, so a deadline still counting when the run is otherwise over does not hold it open. */
+      timer.unref();
+      waiting.set(id, (reply) => {
+        clearTimeout(timer);
+        done(reply);
+      });
+    });
   return {
     lines,
     ask(method: string, params?: Record<string, unknown>): Promise<Rpc> {
       const id = ++n;
-      const reply = expect(id);
+      const reply = expect(id, `${method} (id ${id})`);
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) })}\n`);
       return reply;
     },
     /** A raw line, and the reply that carries a null id. */
     raw(line: string): Promise<Rpc> {
-      const reply = expect(null);
+      const reply = expect(null, `the reply to a raw line (${line})`);
       child.stdin.write(`${line}\n`);
       return reply;
     },
+    /**
+     * AND THE EXIT WAITS UNDER THE SAME DEADLINE, because "it never exits" is the failure two tests
+     * in this file are about. A child that stops answering is one hang; a child that answers
+     * everything and then sits there on end of input is the other, and it was the one left open:
+     * with `child.stdin.end()` taken out, so that the child keeps waiting for a line that never
+     * comes, the file ran past 45 s and had to be killed, with no output naming the test. Under the
+     * deadline the same run fails in ten seconds and says which child and what it last said.
+     */
     async end() {
       child.stdin.end();
-      const code = await closed;
+      const never = new Promise<never>((_, fail) => {
+        const timer = setTimeout(
+          () => fail(new Error(`the child never exited after stdin ended, after ${DEADLINE_MS} ms. The child's stderr: ${err.trim() || 'nothing'}`)),
+          DEADLINE_MS,
+        );
+        timer.unref();
+      });
+      const code = await Promise.race([closed, never]);
       printed.push(out, err);
       return { code, out, err };
     },
@@ -161,7 +202,29 @@ test('initialize and tools/list answer without touching the host, and the list i
      with whatever is there. What the command has to get right is that the list it serves is the
      server's own list, and that every name on it answers, which is the test below this one. */
   const listed = await s.ask('tools/list');
-  assert.deepEqual(listed.result.tools.map((x: { name: string }) => x.name), TOOLS.map((t) => t.name));
+  /* THE NAMES OFF THE LIST ITSELF, NOT OFF THE MAP BELOW, because a `Map` keyed by name folds a
+     repeat away: a list that served one tool twice has seventeen entries and sixteen keys, and
+     comparing the keys calls that correct. A client renders what it was sent, not the set of it. */
+  const names = (listed.result.tools as { name: string }[]).map((t) => t.name);
+  const served = new Map((listed.result.tools as { name: string }[]).map((t) => [t.name, t]));
+  assert.deepEqual(names, TOOLS.map((t) => t.name), 'the pipe dropped a tool, added one, repeated one, or changed the order');
+
+  /**
+   * AND THE WHOLE TOOL, NOT THE NAMES ALONE, which is what this asserted until it was measured. A
+   * run that emptied every `description` and replaced every `inputSchema` with `{}` on the way
+   * through the pipe left the names assertion green: sixteen tools arrived, correctly named, and
+   * not one of them was callable, because a model chooses a tool by its description and fills it in
+   * from its schema. So each tool is compared whole against the declaration it was built from, and
+   * the read-only annotation with it, since that is what a client shows a person before it runs
+   * something. This goes red when the server adds a field to a listed tool, and that is right: a
+   * field that does not survive serialisation is a field the client never sees.
+   */
+  for (const tool of TOOLS)
+    assert.deepEqual(
+      served.get(tool.name),
+      { name: tool.name, description: tool.description, inputSchema: tool.input, ...(tool.writes ? {} : { annotations: { readOnlyHint: true } }) },
+      `${tool.name} did not survive the pipe as it was declared`,
+    );
 
   const { code, err } = await s.end();
   assert.equal(code, 0, err);
@@ -260,6 +323,31 @@ test('EVERY TOOL THE SERVER SERVES ANSWERS OVER STDIO, none of them advertised a
 });
 
 /**
+ * The same listing, built in this process over a surface that answers every method there is.
+ *
+ * A PROXY, NOT A STUB WRITTEN OUT MEMBER BY MEMBER, because the failure under test is a member
+ * nobody added. A hand-written stub goes stale on exactly the day the list of addresses did, and
+ * then the new resource is missing from both sides at once and the test stays green. Reaching any
+ * property here returns a method, so a member added to `McpSurface` tomorrow answers today, and
+ * what comes back is the set of addresses a client that routes everything is offered. It is given
+ * the same `ANSWERS` as the stub host in the test below, so the only thing that can differ between
+ * this list and the one that came over the pipe is which methods `apps/cli/src/surface.ts` and the
+ * client route, which is the whole question.
+ *
+ * The fallback carries `rows` against the day a method with no `ANSWERS` entry is reached. None is
+ * today, which was checked rather than assumed: the only one a listing can reach is `list`, for the
+ * skills register, and it asks only when `boot` names one, which this `ANSWERS` does not. Give
+ * `boot` a skills register and a bare `{}` here would throw on `value.rows` before any address came
+ * back.
+ */
+async function everyAddress(): Promise<string[]> {
+  const answer = (name: string) => async () => ({ ok: true, value: Object.hasOwn(ANSWERS, name) ? ANSWERS[name] : { rows: [] } });
+  const complete = new Proxy({}, { get: (_target, name) => (typeof name === 'string' ? answer(name) : undefined) });
+  const listing = await tools(complete as McpSurface<undefined>).resources(undefined);
+  return listing.map((r) => r.uri);
+}
+
+/**
  * AND EVERY RESOURCE WITH NO PARAMETER, for the same reason and with a sharper edge.
  *
  * A resource is listed only once it has been read, so a method the allow-list is missing does not
@@ -272,21 +360,17 @@ test('AND EVERY RESOURCE WITH NO PARAMETER IS LISTED, so none of them goes quiet
   const host = await stubHost(t, ANSWERS);
   const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
 
+  /* DERIVED, NOT TYPED OUT. This named ten addresses by hand, so the eleventh, landing behind an
+     optional member the command line does not route, would have been absent from every session and
+     absent from this test in the same breath, which is the failure the test exists to catch and the
+     way `braindog:actions` was missing in the first place. The tool half of this file has always
+     read its names off `TOOLS`; this half now reads its addresses off the same server. */
   const listed = await s.ask('resources/list');
   const uris = (listed.result.resources as { uri: string }[]).map((r) => r.uri);
-  for (const uri of [
-    'braindog:whoami',
-    'braindog:boot',
-    'braindog:context',
-    'braindog:sessions/live',
-    'braindog:digest/today',
-    'braindog:decisions',
-    'braindog:actions',
-    'braindog:arrangement',
-    'braindog:grammar/page',
-    'braindog:grammar/proposals',
-  ])
-    assert.ok(uris.includes(uri), `${uri} is not listed, so nothing over stdio can read it`);
+  const wanted = await everyAddress();
+  assert.ok(wanted.length > 0, 'the surface offered no address at all, so this proves nothing');
+  /* Sorted, because an address list is a set: what matters is that the pipe carried all of them. */
+  assert.deepEqual([...uris].sort(), [...wanted].sort(), 'stdio lists a different set of addresses than the server would offer');
 
   const { code, err } = await s.end();
   assert.equal(code, 0, err);

@@ -19,8 +19,8 @@ import { resolverOf } from './page-live.ts';
 import { PAGES } from './data.ts';
 import { toSegments, walkTables } from './blocks.ts';
 import { NOW, ROWS } from './data.ts';
-import { amountOf, currencyOf, drawn, homeOf, merge, symbolText, total } from './money.ts';
-import { fxNote, read, targetSaid, withFx, type MetricDecl } from './metrics.ts';
+import { BARE, amountOf, currencyOf, drawn, homeOf, merge, mixedFix, symbolText, total } from './money.ts';
+import { BARE as METRICS_BARE, currenciesRead, fxNote, read, targetSaid, withFx, type MetricDecl } from './metrics.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from './declared.ts';
 import { runway } from './forecast.ts';
@@ -55,12 +55,40 @@ test('MONEY AND A BARE NUMBER TOGETHER IS MIXED TOO', () => {
   // It means a field changed type under a record, or a caller summed two different fields. Reading
   // the bare ones as the currency of the others is the same failure wearing a different hat.
   const t = total([gbp(100), 250]);
-  assert.deepEqual(t.mixed, ['GBP']);
+  assert.deepEqual(t.mixed, ['GBP', BARE]);
   // And bare numbers alone are an ordinary total: a count of days is not money.
   const plain = total([1, 2, 3]);
   assert.equal(plain.amount, 6);
   assert.equal(plain.currency, null);
   assert.deepEqual(plain.mixed, []);
+});
+
+test('AND THE SENTENCE SAYS SO, in the words the other two summing sites use', () => {
+  /* `total()` saw the bare rows and refused over them, and then left them out of the set it hands
+     to `mixedFix`, so a column of one sterling row and one plain number printed *"these rows are in
+     GBP, and two currencies are never added"* — one currency named, two claimed, and nothing about
+     the rows that have no currency at all, which is the thing somebody has to go and fix.
+     `metrics.ts` puts `BARE` in the set for exactly this and says why (*"the marker has to read as
+     English there rather than as a currency code"*), `forecast.ts` does the same for the cash walk,
+     and the kernel writes `no unit` into the same sentence. This was the site that did not. */
+  const t = total([gbp(100), 250]);
+  assert.equal(mixedFix(t.mixed), 'these rows are in GBP and no currency, and two currencies are never added');
+
+  /* THE SAME TWO ROWS THROUGH `metrics.ts`, because one situation with two sentences is two
+     situations as far as a reader is concerned, and these two drifted apart without a word. */
+  const rows = [{ seq: 1, fields: { amount: gbp(100) } }, { seq: 2, fields: { amount: 250 } }] as unknown as Entry[];
+  assert.equal(mixedFix([...currenciesRead(rows, { sum: 'amount' })].sort()), mixedFix(t.mixed));
+  assert.equal(BARE, METRICS_BARE, 'the marker is spelled in two modules and the spellings have drifted');
+});
+
+test('and the remainder bucket carries the marker, and carries it only when a bare row is really in it', () => {
+  const carried = merge([total([gbp(100)]), total([250])]);
+  assert.deepEqual(carried.mixed, ['GBP', BARE]);
+  /* AND A MERGE OF TWO CURRENCIES IS NOT A ROW WITH NO CURRENCY. A mixed part reports `currency:
+     null` like a bare one does, so reading the marker off that alone would invent unitless rows
+     nobody has. */
+  const both = merge([total([gbp(100), eur(50)]), total([gbp(5)])]);
+  assert.deepEqual(both.mixed, ['EUR', 'GBP'], 'a mix of two currencies was reported as rows with no currency');
 });
 
 test('an empty total is zero of nothing, not zero of sterling', () => {

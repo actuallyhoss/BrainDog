@@ -33,11 +33,27 @@ export function amountOf(value: unknown): number | null {
 export const currencyOf = (value: unknown): string | null => (isMoney(value) ? value.currency : null);
 
 /**
+ * The mark in a mixed set for "and some of these rows carried no currency at all".
+ *
+ * SPELLED HERE AND NOT IMPORTED, because `metrics.ts` imports this module and a constant cannot
+ * travel back up that edge without an import cycle. `metrics.ts` declares the same string for its
+ * own set and `forecast.ts` reads it from there; `money.test.ts` asserts the two spellings are
+ * equal, so a change to either one fails rather than quietly giving one screen a different word.
+ *
+ * THE SECOND COPY IS NOT PERMANENT. The edge runs metrics to money, so the way out is for
+ * `metrics.ts` to delete its own line and re-export this one, and then the equality assertion has
+ * nothing left to guard. That file belonged to another change when this one was written.
+ */
+export const BARE = 'no currency';
+
+/**
  * A total, and what it is a total of.
  *
  * `mixed` non-empty is the refusal: the values were in more than one currency, so `amount` is not a
- * figure anybody should see. `currency` is `null` for a total of plain numbers, which is the
- * ordinary case for a count of days or a sum of hours.
+ * figure anybody should see. It holds the codes it saw and, when some of the rows carried no
+ * currency at all, `BARE` beside them, so the sentence names every kind of row that has to change.
+ * `currency` is `null` for a total of plain numbers, which is the ordinary case for a count of days
+ * or a sum of hours.
  */
 export type Total = { amount: number; currency: string | null; mixed: readonly string[]; n: number };
 
@@ -64,8 +80,14 @@ export function total(values: Iterable<unknown>): Total {
 
   /* MONEY AND BARE NUMBERS TOGETHER IS MIXED TOO. It means a field changed type under a record, or a
      caller summed two different fields — and quietly reading the bare ones as the currency of the
-     others is the same failure wearing a different hat. */
-  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen].sort() : [];
+     others is the same failure wearing a different hat.
+
+     AND THE BARE ROWS GO INTO THE SET, which they did not: this refused over them and then left them
+     out of the sentence, so a column of one sterling row and one plain number printed "these rows
+     are in GBP, and two currencies are never added" — one currency named, two claimed, and no word
+     for the rows somebody has to go and fix. `metrics.ts` and `forecast.ts` both mark theirs, and
+     the kernel writes `no unit` into the same sentence; this was the summing site that did not. */
+  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen, ...(bare ? [BARE] : [])].sort() : [];
   /* A MIXED TOTAL IS IN NO CURRENCY. Returning the first one seen would hand a caller that only
      checks `currency` a code to print beside a figure that is a sum of two — which is the exact
      failure, arrived at through the guard against it. */
@@ -94,11 +116,20 @@ export function merge(totals: readonly Total[]): Total {
   for (const t of totals) {
     amount += t.amount;
     n += t.n;
-    for (const c of t.mixed) seen.add(c);
+    /* THE MARKER IS NOT A CURRENCY, so it never joins the codes: `seen` is what a caller may print
+       beside a figure, and one code plus the marker would make a two-currency refusal out of a
+       total that is in one. */
+    for (const c of t.mixed) {
+      if (c === BARE) bare = true;
+      else seen.add(c);
+    }
     if (t.currency) seen.add(t.currency);
-    else if (t.n > 0) bare = true;
+    /* A PART WITH NO CODE IS BARE ONLY WHEN IT IS NOT ALREADY MIXED. A mixed part reports
+       `currency: null` exactly as a bare one does, so reading the marker off that alone invented
+       rows with no currency for a remainder that was two currencies and nothing else. */
+    else if (t.n > 0 && t.mixed.length === 0) bare = true;
   }
-  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen].sort() : [];
+  const mixed = seen.size > 1 || (bare && seen.size > 0) ? [...seen, ...(bare ? [BARE] : [])].sort() : [];
   return { amount, currency: mixed.length ? null : ([...seen][0] ?? null), mixed, n };
 }
 

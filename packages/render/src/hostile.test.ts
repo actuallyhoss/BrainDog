@@ -72,10 +72,12 @@ const ms = (run: () => void): number => {
  * the places it was written to watch. The assertion that every block comes back as a `block` is
  * what stops that from happening again quietly.
  *
- * `cards` takes the hostile heading out because a `cards` heading IS its column list, and `queue`
- * needs a `more` row that points somewhere real; both still carry `HOSTILE` in every free cell.
+ * Every free cell still holds `HOSTILE`. The cells that cannot are named in the rows themselves:
+ * `cards` reads its FIRST ROW as the column roles, so that row is roles, with the hostile text put
+ * in each role's label instead, where it is drawn; and a `queue`'s `more` row has to point
+ * somewhere that parses as a path or the block degrades before the anchor exists.
  */
-const SHAPES: Readonly<Record<string, { heading?: string; rows: string[][] }>> = {
+const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
   quote: { rows: [[HOSTILE, HOSTILE]] },
   gauge: { rows: [[HOSTILE, HOSTILE]] },
   section: { rows: [[HOSTILE, HOSTILE]] },
@@ -110,9 +112,11 @@ test('NO CELL BECOMES MARKUP, on any of the kinds there are', () => {
     const shape = SHAPES[kind];
     const row = Array.from({ length: Math.max(1, KINDS[kind as keyof typeof KINDS].cells || 5) }, () => HOSTILE).join(' | ');
     const body = shape ? shape.rows.map((r) => r.join(' | ')) : [row, row];
-    const blocks = parse(['```' + kind + ' | ' + (shape?.heading ?? HOSTILE), ...body, '```'].join('\n'), { page: true });
+    const blocks = parse(['```' + kind + ' | ' + HOSTILE, ...body, '```'].join('\n'), { page: true });
     /* The block must have REACHED ITS DRAWER. A degraded fence echoes the source, which carries the
-       cell's own words, so every assertion below passes on a block that was never drawn. */
+       cell's own words, so every assertion below passes on a block that was never drawn. And one
+       block, because no blocks at all would satisfy "none of them degraded" just as quietly. */
+    assert.equal(blocks.length, 1, `${kind} parsed to ${blocks.length} blocks`);
     const bad = blocks.find((b) => b.type !== 'block');
     assert.equal(bad, undefined, `${kind} degraded instead of drawing: ${bad && 'fix' in bad ? bad.fix : ''}`);
     const html = toHTML(blocks, {
