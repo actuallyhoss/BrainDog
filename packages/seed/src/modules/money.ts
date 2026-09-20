@@ -14,6 +14,8 @@
  * what the whole position was on a night nobody was looking.
  */
 
+import type { IngestDecl } from '@braindog/kernel';
+
 import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
 /* ── obligations ─────────────────────────────────────────────────────────── */
@@ -121,10 +123,12 @@ export const OBLIGATIONS: Fields[] = [
  * makes it honest. `liquid` says whether it counts as cash now: a card's balance is owed, not held.
  */
 export const ACCOUNTS: Fields[] = [
-  { name: 'Studio current account', kind: 'bank', balance: gbp(985_000), as_of: day(-1), liquid: true },
+  { name: 'Studio current account', kind: 'bank', balance: gbp(985_000), as_of: day(-1), liquid: true, last4: '2044' },
   /* NOT UPDATED FOR OVER A WEEK, so the page shows what an out-of-date balance looks like. */
-  { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true },
-  { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false },
+  { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true, last4: '7730' },
+  /* THE ONE A CARD ALERT NAMES. Four digits nothing else in the sample repeats, so the `lookup:` in
+     `MONEY_INGESTS` has exactly one row to find and the pattern's test is not passing by luck. */
+  { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false, last4: '4471' },
 ];
 
 /* ── categories ──────────────────────────────────────────────────────────── */
@@ -319,6 +323,36 @@ export const INSTALLMENTS: Fields[] = [
  * every obligation that had not been settled by then. A live record has no such history to show, and
  * its first snapshot is the night after Money is installed.
  */
+/**
+ * A stored day as the product prints one: `2026-08-04` becomes `4 Aug 2026`.
+ *
+ * THE SAME THREE PARTS `packages/render`'S `day()` JOINS, written again here rather than imported.
+ * `@braindog/seed` depends on the kernel, `ports`, `where` and `declare` and on nothing that draws,
+ * and `tools/gates/graph.mjs` is what holds that edge; a formatter is nine lines and a dependency
+ * from the seed to the renderer is a cycle waiting for somebody to close it. The two agreeing is
+ * what `A NIGHT IS NAMED THE WAY A DAY IS PRINTED` in `test/money.test.ts` asserts.
+ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * THE SHAPE IS CHECKED AND THE PARTS ARE NOT COUNTED, because counting them caught the wrong strings.
+ *
+ * Splitting on the dash and asking whether the three parts are `undefined` only rejects a string with
+ * no dashes in it. Measured, before this: `2026-08-xx` came back as `NaN Aug 2026` and `yyyy-08-04`
+ * as `4 Aug yyyy`, which is the `Invalid Date` on screen the guard below exists to stop, and
+ * `2026-08-` came back as `0 Aug 2026`, a night that is not a day of any month.
+ */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/u;
+
+export function nightOf(iso: string): string {
+  const said = iso.slice(0, 10);
+  const [year, month, dayOfMonth] = said.split('-');
+  const name = ISO_DAY.test(said) ? MONTHS[Number(month) - 1] : undefined;
+  /* A STRING THAT IS NOT A DAY COMES BACK AS IT WAS, because a title is what a person reads and
+     `Invalid Date` is worse than the eleven characters the caller already had. */
+  return name === undefined || year === undefined || dayOfMonth === undefined ? iso : `${Number(dayOfMonth)} ${name} ${year}`;
+}
+
 export function snapshotRows(days = 30): Fields[] {
   const walk = new Map(cashSeries(90).map((p) => [p.at, p.value]));
   const live = OBLIGATIONS.filter((o) => o.state !== 'written_off');
@@ -331,7 +365,7 @@ export function snapshotRows(days = 30): Fields[] {
     const cash = walk.get(at) ?? 0;
     const toMe = side('owed_to_me');
     const byMe = side('owed_by_me');
-    out.push({ on: at, cash: gbp(cash), owed_to_me: gbp(toMe), owed_by_me: gbp(byMe), net: gbp(cash + toMe - byMe), taken: 'nightly', note: '' });
+    out.push({ what: nightOf(at), on: at, cash: gbp(cash), owed_to_me: gbp(toMe), owed_by_me: gbp(byMe), net: gbp(cash + toMe - byMe), taken: 'nightly', note: '' });
   }
   return out;
 }
@@ -448,6 +482,16 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
       { id: 'balance', type: 'money', required: true },
       { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
       { id: 'liquid', label: 'Counts as cash', type: 'bool', default: true },
+      /**
+       * THE FOUR DIGITS A BANK MESSAGE NAMES THE ACCOUNT BY, and nothing else in this record could.
+       *
+       * `transactions.account` is a required ref, and the only thing an alert says about which account
+       * moved is *"your card ending 4471"*. Without this field the `lookup:` form in `MONEY_INGESTS`
+       * below has no `by:` to resolve against, so every forwarded message would land in `review` for a
+       * field the message plainly carried. NOT REQUIRED and not unique: a cash box has no digits, and
+       * two cards from one bank can share four.
+       */
+      { id: 'last4', label: 'Last four digits', type: 'text' },
     ],
   },
   /**
@@ -681,10 +725,28 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
     icon: 'history',
     one: 'snapshot',
     holds: 'what the money was on a night, so a figure can be compared with the day it was true',
-    title: 'on',
-    mobile: ['on', 'cash', 'net'],
+    /**
+     * THE TITLE IS THE NIGHT IN WORDS, AND IT WAS `on`, WHICH NOTHING COULD FIND.
+     *
+     * Every other register here declares `search: true` on its title and this one declared it on no field
+     * at all, so thirty rows sat in the record that no query could reach: `A REGISTER WHOSE TITLE IS NOT
+     * SEARCHABLE HOLDS ROWS NOBODY CAN FIND BY NAME` names the rule and this register was the one breaking it.
+     *
+     * AND `on` CANNOT BE THE SEARCHABLE ONE, WHICH WAS MEASURED RATHER THAN ARGUED. Declaring
+     * `search: true` on it turned `the projection is the kernel's, string for string` red at
+     * `snapshots#1`: the kernel indexes the stored value, `2026-08-04`, and the screen shows
+     * `4 Aug 2026`, so a person typing what they can see would have missed every row and a person
+     * typing the ISO day would have hit rows the browser said were not there. That is the
+     * browser-more-permissive-than-the-record split `find.ts` exists to end, so the answer is a text
+     * field holding the night the way every surface in the product already prints it.
+     */
+    title: 'what',
+    mobile: ['what', 'cash', 'net'],
     pack: 'money-core',
     fields: [
+      /* THE NIGHT, SPELLED THE WAY A DAY IS SPELLED ON SCREEN. It repeats `on`, and the repetition is the
+         point: `on` is the day the arithmetic sorts and filters by, and this is the one a person types. */
+      { id: 'what', label: 'Night', type: 'text', required: true, search: true },
       { id: 'on', label: 'Date', type: 'day', unique: true, required: true },
       { id: 'cash', label: 'Cash', type: 'money', required: true },
       { id: 'owed_to_me', label: 'Owed to you', type: 'money' },
@@ -962,6 +1024,35 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /**
+   * THE WHOLE BOOK YOU OWE, AND IT WAS THE ONE FIGURE OF THE FOUR A SNAPSHOT HOLDS THAT NOTHING COMPUTED.
+   *
+   * `snapshots` stores `cash`, `owed_to_me`, `owed_by_me` and `net` on one row, and three of the four
+   * had a figure behind them: `cash-now` reads the accounts, `owed-to-you` sums the receivable book,
+   * and the net is the arithmetic over both. The payable book had `overdue`, which is only the part
+   * already late — GBP 10,540 of a book several times that — so anything filling a snapshot had to
+   * add the register up itself, which is a second answer to a question the record is supposed to own.
+   *
+   * IT IS `owed-to-you`'S CLAUSE WITH THE DIRECTION TURNED ROUND, deliberately word for word: two
+   * figures over one register that disagree about which rows are still live is the defect, and they
+   * cannot disagree if they share `OPEN`.
+   */
+  'owed-by-you': {
+    metric: 'owed-by-you',
+    name: 'Owed by you',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed by me`,
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    /* A CEILING, AND THE RECORD INSISTS ON ONE: `METRIC_NEEDS_TARGET_OR_WINDOW` refuses a figure with
+       neither, in those words — *a number with no target is decoration*. GBP 60,000 is roughly what
+       is in the bank plus what is owed to you on this record; past that the book has stopped being a
+       supplier's credit and become a cash problem, which is the only reading of it worth a colour. */
+    target: { lte: 6_000_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'due-30d': {
     metric: 'due-30d',
     name: 'Due in 30 days',
@@ -1185,6 +1276,120 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     when: 'state is live, next_due before today',
     then: [{ notify: { say: '{{what}} was due {{ago:next_due}}, {{money:amount}}, and its next day has not moved.' } }],
     once_per: ['entry', 'next_due'],
+  },
+};
+
+/* ── how a bank message becomes a row ────────────────────────────────────── */
+
+/**
+ * A DECLARATION THE SEED HAD NONE OF, AND `/in/*` IS ABOUT TO MAKE THAT VISIBLE.
+ *
+ * Every `ingest:` in this tree was a poll — `packs/rates-poll.ts` and `usecases/founder-poll.ts`, both
+ * of them a URL the runner fetches on a clock. Nothing declared how to read a message somebody
+ * FORWARDS, so once the inbound route lands, every bank alert he sends arrives, is hashed, is stored,
+ * and sits `untriaged` for ever: correct behaviour, and an empty ledger beside a full inbox.
+ *
+ * AN ARRIVAL NOBODY UNDERSTANDS IS STILL STORED, and nothing here weakens that. `arrive` stores the
+ * raw before it looks for a pattern and stores it again when it finds none; these two only add the
+ * case where it does find one. A third wording, a second bank, or a message with no amount in it
+ * lands exactly where it lands today, which is somewhere a person can see it.
+ *
+ * TWO DECLARATIONS AND NOT ONE, because the merchant sits in a different place in each wording — *at*
+ * FENWICK CLOUD for a charge, *from* NILE REALTY for a payment in — and `first:` over both anchors
+ * would file the row at `proposed` the moment a message happened to carry both words, which writes
+ * NOTHING and opens a suggestion instead. `43 §5.3`: two arms yielding is `chosen`, and `chosen` is
+ * not `exact`. Splitting on the verb in `match:` keeps every field a straight read.
+ *
+ * AND THE VERB IS READ RATHER THAN ASSUMED. `direction` is required on `transactions` and the only
+ * form that could state a constant is `default:`, which files at `defaulted` and therefore at
+ * `proposed` — so the enum map holds the one word the `match:` has already guaranteed is in the body.
+ * A declaration that cannot say "this is a payment out" without an `enum` of one is a real limit of
+ * the closed vocabulary, and it is written here rather than discovered.
+ */
+export type SeedIngest = IngestDecl & { pack?: string };
+
+/** What a charge alert says money went to, and what a credit alert says it came from. */
+const MERCHANT_OUT = { text: { between: ['at ', ' on '] } } as const;
+const MERCHANT_IN = { text: { between: ['from ', ' on '] } } as const;
+
+/**
+ * The day, the amount and the account, which are the same three reads in either direction.
+ *
+ * THE AMOUNT IS ANCHORED AND THE REASON IS IN THE SAMPLE: an unanchored `{ money: { currency: 'GBP' } }`
+ * over *"Your card ending 4471 was debited GBP 42.99"* reads the card digits as forty-four pounds
+ * seventy-one, because `4471` is a number and the declared currency is a fallback that would dress it
+ * as one. Anchoring on the code the bank prints beside the figure is what makes the first candidate
+ * the right one.
+ */
+const MOVEMENT = {
+  on: { date: { format: 'DD/MM/YY', after: ' on ' } },
+  amount: { money: { after: 'GBP', currency: 'GBP' } },
+  account: { lookup: { register: 'accounts', by: 'last4', after: 'ending ' } },
+} as const;
+
+/**
+ * The alerts that recognise themselves and are not movements.
+ *
+ * `07 §2` NAMES A REFUND AND A PIN REMINDER IN THE SAME BREATH, and the reason is that both match a
+ * pattern written for a bank's alerts: a refund carries the charge wording and moves money the other
+ * way, and a PIN reminder carries the card digits and moves none. Skipped is not dropped — the bytes
+ * and the reason are both in `inbox_raw`, which is the only way a wrong skip is ever found.
+ */
+const NOT_A_MOVEMENT: SeedIngest['skip'] = [
+  { when: { field: 'body', contains: 'refund' }, reason: 'A refund is money coming back, and this pattern reads a charge.' },
+  { when: { field: 'body', contains: 'your pin' }, reason: 'A PIN reminder carries the card digits and moves no money.' },
+  { when: { field: 'body', contains: 'balance is' }, reason: 'A balance alert is a position, not a movement.' },
+];
+
+/**
+ * The same movement twice, in two wordings — `07 §2`'s reason for the near form.
+ *
+ * A BANK SENDS ONE PAYMENT AS AN SMS AND AGAIN IN A STATEMENT MAIL, and the two are not the same
+ * bytes, so the raw's own hash cannot catch it. Same account, same amount, the day within one either
+ * way, and the first twelve characters of the description equal: `FENWICK CLOUD LTD` and
+ * `FENWICK CLOUD` are one charge, and two rows for it is a month counted twice.
+ */
+const SAME_MOVEMENT: SeedIngest['dedupe'] = { near: { on: ['amount', 'account'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+
+export const MONEY_INGESTS: Record<string, SeedIngest> = {
+  'bank-card-out': {
+    ingest: 'bank-card-out',
+    pack: 'money-core',
+    channel: 'email',
+    /* THE VERB IS PART OF THE MATCH, so the `enum` below cannot miss. `contains` is case-folded
+       (`where`'s own `fold`), so the capitals a bank uses are not part of the declaration.
+
+       IT DOES NOT MAKE THE TWO PATTERNS EXCLUSIVE, WHICH WAS MEASURED RATHER THAN ASSUMED: a body
+       naming both verbs matches both, and `arrive` takes the first declared, which is this one, and
+       writes `direction: out` at `exact`. A real alert names one verb, so the sample is silent about
+       it; `A MESSAGE THAT NAMES BOTH VERBS IS CLAIMED BY THE FIRST PATTERN` in `test/money.test.ts`
+       is where the behaviour is written down, so a third wording that carries both is a change
+       somebody sees rather than a row filed the wrong way round. */
+    match: { all: [{ field: 'body', contains: 'debited' }, { field: 'body', contains: 'card ending' }] },
+    skip: NOT_A_MOVEMENT,
+    extract: {
+      what: MERCHANT_OUT,
+      direction: { enum: { map: { debited: 'out' } } },
+      ...MOVEMENT,
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
+  },
+  'bank-card-in': {
+    ingest: 'bank-card-in',
+    pack: 'money-core',
+    channel: 'email',
+    match: { all: [{ field: 'body', contains: 'credited' }, { field: 'body', contains: 'card ending' }] },
+    skip: NOT_A_MOVEMENT,
+    extract: {
+      what: MERCHANT_IN,
+      direction: { enum: { map: { credited: 'in' } } },
+      ...MOVEMENT,
+    },
+    writes: { register: 'transactions', confidence: 'exact' },
+    dedupe: SAME_MOVEMENT,
+    on_conflict: 'skip',
   },
 };
 
@@ -1521,9 +1726,13 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing repeats every month.',
       },
       {
+        /* SIX AND SIX, AND IT WAS SEVEN AND FIVE. Both of these are three-column tables, and
+           `floorFor` gives a table two twelfths a column: the five below was clamped UP to six in
+           silence, which pushed 7 + 6 past twelve, wrapped, and left the row above this pair four
+           twelfths short of the page. Two halves is the only pair of survivable spans that tiles. */
         kind: 'table',
         heading: 'Still to pay, in parts',
-        span: 7,
+        span: 6,
         source: 'register.installments',
         where: 'state is open',
         columns: [
@@ -1540,7 +1749,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            person reading a week of them can see which of the four moved. */
         kind: 'table',
         heading: 'Night by night',
-        span: 5,
+        span: 6,
         source: 'register.snapshots',
         columns: [
           { field: 'on', label: 'Date', width: '13ch' },

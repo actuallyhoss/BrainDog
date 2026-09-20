@@ -34,7 +34,8 @@ const KILN_NOTE = `\`\`\`chips
 
 # Kiln
 
-Earning · a variable type family, licensed direct. {{money:1840000 GBP}} since March 2024.
+Earning · a variable type family, licensed direct. {{money:1840000 GBP}} in the last twelve months, and
+earning since March 2024.
 
 ## 1 · Where the money comes from
 
@@ -112,10 +113,16 @@ export const THINGS: Fields[] = [
      path shapes are placed; Portage's repository is named bare, as its runs report it. */
   /* HOW EACH ONE IS GOING, WHAT IS NEXT AND HOW FAR ALONG, kept current by whoever works on it: a person, or the agent named
      on the row. Kiln waits on how it is licensed and Portage on where it sends from, so both are the ones that need a call. */
-  { name: 'Kiln', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
-  { name: 'Marlow & Co', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
-  { name: 'Portage', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
-  { name: 'Tallow', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
+  /* AND WHAT EACH ONE EARNED THE YEAR BEFORE, so the Overview's comparison is over four projects going four
+     different ways rather than one shape repeated. Kiln is up, because its own note dates the first tier rise
+     since launch to August and the italic to July. Marlow & Co is down, because the row's next step is chasing
+     an invoice whose terms ran out 38 days ago. Portage started in May of this year and has earned nothing
+     either year. Tallow earned in the year before and nothing since, which is what "park it or retire it"
+     looks like as a pair of numbers, and it is out of every figure below because it is out of play. */
+  { name: 'Kiln', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
+  { name: 'Marlow & Co', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
+  { name: 'Portage', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
+  { name: 'Tallow', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
 ];
 
 /**
@@ -148,7 +155,30 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
       { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], index: true, required: true },
-      { id: 'revenue', type: 'money' },
+      /**
+       * WHAT IT EARNS, OVER WHICH TWELVE MONTHS, AND WHAT THE TWELVE BEFORE THEM EARNED.
+       *
+       * `revenue` was one money field with no label and no period on it, and the page about the
+       * projects drew it nowhere: the Overview's eight blocks were a count, a split, cards, four
+       * tables and a fold, and not one of them a sum of money. He runs several businesses, and the
+       * page about how they are doing had no figure for how they are doing. Two things had to be
+       * settled before it could be drawn.
+       *
+       * WHICH TWELVE MONTHS, AND KILN'S OWN NOTE ANSWERS IT. The note heads its revenue chart
+       * "Revenue by channel, twelve months" and the three channels come to 11,200 + 5,300 + 1,900 =
+       * 18,400, which is `revenue` to the penny. So the field is a year, `since` is the day the
+       * project started earning rather than the start of the period, and the label says the period
+       * instead of leaving a reader to guess it from a chart inside a note.
+       *
+       * AND THE YEAR BEFORE IS A SECOND FIELD, BECAUSE THE ENGINE CANNOT WORK IT OUT. A figure's
+       * `compare:` reads the same predicate against a moved clock, and `kernel/src/metrics.ts`
+       * refuses to report a delta when the predicate does not mention time: "the predicate does not
+       * mention time, so the window moves nothing". `revenue` carries no date of its own, so a moved
+       * clock reads the same rows and the delta would be a structural zero dressed up as steady
+       * trading. Either the project states the year before, or there is no comparison to draw.
+       */
+      { id: 'revenue', label: 'Earned in a year', type: 'money' },
+      { id: 'earned_before', label: 'Earned the year before', type: 'money' },
       { id: 'since', type: 'day' },
       /* WHERE A PROJECT STANDS, in the words anybody working on it keeps current. The values are Work's thread health, so a
          project and a thread say "at risk" the same way. */
@@ -205,6 +235,68 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
   'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
 
+  /* ── what they earn ───────────────────────────────────────────────────────
+     OVER PROJECTS ALONE, AND THAT IS NOT A PREFERENCE. The Portfolio pack needs no other list, and
+     `first-party.test.ts` holds it to exactly that (`portfolio: []`), so a figure here sourced from
+     Money's ledger would make Portfolio install Money with it, and would leave an Overview that
+     cannot open on a record that keeps only projects. A figure over somebody else's register is
+     what `project-owed` and `project-cost` below are, and both of them are drawn on the PROJECT
+     page, where `projectTemplate` takes a figure out of a record that does not keep the list it
+     reads. The Overview has no such machinery, so what a project earns is the project's own
+     statement, read off the project's own row.
+
+     ONE CURRENCY, OR NO NUMBER. `format: 'money.GBP'` is the currency each reading is judged in. A
+     sum over rows in two currencies is converted at the record's own dated rates, or comes back as
+     one amount per currency with no total at all (`kernel/src/metrics.ts`); it is never the two
+     added together, which is the arithmetic the whole money type exists to refuse.
+
+     AND `compare: 'none'` ON ALL THREE, which is a statement and not an omission. The comparison
+     the engine offers is the same predicate against a moved clock, and these predicates name no
+     date, so a moved clock reads the same four rows: the delta would be structurally zero and the
+     tile would say steady about a business nobody measured. The year before is a field, and the
+     comparison is the diff below. */
+
+  'projects-earning': {
+    metric: 'projects-earning',
+    name: 'Earned in a year',
+    source: 'register.things',
+    where: LIVE,
+    value: { sum: 'revenue' },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '12m',
+    compare: 'none',
+  },
+
+  'projects-earning-before': {
+    metric: 'projects-earning-before',
+    name: 'Earned the year before',
+    source: 'register.things',
+    where: LIVE,
+    value: { sum: 'earned_before' },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '12m',
+    compare: 'none',
+  },
+
+  /* ONE FIGURE AND NOT A SUBTRACTION ON THE PAGE. A page that draws two tiles and subtracts them
+     has nowhere to refuse when the two are in different currencies: it would print the difference
+     between pence and cents. A `diff:` is read by the kernel's pair arithmetic, which converts both
+     halves into one currency at the record's rates or answers in parts and names the pair it has no
+     rate for. Its target is zero because the question the tile asks is whether the year is up on
+     the one before, and that is the only bound that is not somebody's guess. */
+  'projects-earning-change': {
+    metric: 'projects-earning-change',
+    name: 'Against the year before',
+    source: 'register.things',
+    where: LIVE,
+    value: { diff: { of: { sum: 'revenue' }, per: { sum: 'earned_before' } } },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '12m',
+    compare: 'none',
+  },
 
   /* ── the same three, narrowed by one ref ──────────────────────────────────
      PARAMETERISED, not copied. These were `kiln-open`, `kiln-owed` and `kiln-cost` with the name
@@ -360,6 +452,34 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No project is in play.',
       },
       {
+        /* WHAT EACH ONE EARNS, AS BARS, because the question a person asks of a portfolio after "what
+           needs me" is "which of these is carrying the others". A total says the studio earned
+           GBP 22,600 and hides that one project is 81 per cent of it. Two columns, so the bar is the
+           name against the money and nothing else. */
+        kind: 'bar',
+        heading: 'What each one earns',
+        span: 8,
+        source: 'register.things',
+        where: `${LIVE}, revenue is set`,
+        columns: [{ field: 'name' }, { field: 'revenue' }],
+        order: [{ field: 'revenue', dir: 'desc' }],
+        limit: 8,
+        empty: 'No project in play says what it earns. Put a year on one and it draws here.',
+      },
+      {
+        /* THE TWELVE-MONTH TOTAL AND WHAT IT IS UP ON, which is the pair. A year on its own is a
+           number nobody can act on: GBP 22,600 is good news or bad news only beside the year before
+           it. Both tiles are money and both name their currency, so neither can quietly become a
+           count. */
+        kind: 'stat',
+        heading: 'Earning',
+        span: 4,
+        cells: [
+          { metric: 'projects-earning', label: 'Earned in a year', note: '{{projects-earning-before}} the year before' },
+          { metric: 'projects-earning-change', label: 'Against that year' },
+        ],
+      },
+      {
         kind: 'cards',
         heading: 'In play',
         span: 12,
@@ -369,6 +489,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'name', as: 'title' },
           { field: 'progress', label: 'How far along', as: 'ring' },
           { field: 'health', label: 'Health', as: 'fact' },
+          /* NO LABEL, as the project page's first column carries none: a personal record renames
+             this field to "Money made" (`usecases/personal.ts`), and a label typed in here would
+             print "Earned in a year" over it and undo the rename on the one page that shows it per
+             project. */
+          { field: 'revenue', as: 'fact' },
           { field: 'next', label: 'Next step', as: 'fact' },
           { field: 'agent', label: 'Agent', as: 'who' },
         ],

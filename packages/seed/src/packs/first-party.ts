@@ -48,18 +48,26 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  * - portfolio 1.1.0: a project says how it is going, what is next, how far along it is and which agent holds it, with
  *   the Overview and the rule over them.
  * - portfolio 1.2.0: How they are going draws each part in its intent.
+ * - portfolio 1.3.0: a project says what it earned in a year and what it earned the year before, and the Overview draws
+ *   both: the twelve-month total beside the year before it, the difference, and a bar a project. One field added, so the
+ *   step is a minor one and nothing is taken away.
  * - money-core 1.1.0: the home currency is chosen from a list.
  * - money-core 1.2.0: the ledger arrives: transactions, categories, recurring items, instalments and snapshots, with
  *   the rules over them and the figures they carry. Five lists, so the step is a minor one and nothing is taken away.
+ * - money-core 1.3.0: a night can be found by the name it is shown under, the Ledger page tiles, an account says its
+ *   last four digits, and the whole book you owe is a figure. Snapshots gain a searchable text title, `accounts` gains
+ *   `last4`, the two three-column tables at the foot of Ledger are half and half instead of 7 and a 5 the clamp widened
+ *   to 6, and `owed-by-you` is the fourth of the four figures a snapshot holds. Two fields and one figure added and
+ *   nothing taken away, so the step is a minor one.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
  * - work 1.4.0: the Board says which cards an agent is on right now.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.2.0',
+  portfolio: '1.3.0',
   people: '1.0.0',
-  'money-core': '1.2.0',
+  'money-core': '1.3.0',
   estate: '1.1.0',
   work: '1.4.0',
 };
@@ -76,9 +84,20 @@ type Body = Record<string, unknown>;
  */
 const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], work: ['owner', 'thing'] };
 
-/** The id a declaration in a document is filed under: its kind's key. */
+/**
+ * The id a declaration in a document is filed under: its kind's key.
+ *
+ * `ingest` IS HERE BEFORE ANY INGEST IS, and deliberately. `MONEY_INGESTS` in `modules/money.ts`
+ * declares how a forwarded bank message becomes a ledger row, and the one thing left before it
+ * installs is an arm in `index.ts`'s declaration list. Without this line that arm would file every
+ * pattern under the empty string, so `firstPartyManifest(...).provides` would carry a nameless
+ * member and a record comparing two versions of the pack would see one declaration replace another.
+ * Five kinds reach a first-party document and this function knew four.
+ */
 const idOf = (d: Body): string =>
-  typeof d.rule === 'string'
+  typeof d.ingest === 'string'
+    ? `ingest.${d.ingest}`
+    : typeof d.rule === 'string'
     ? `rule.${d.rule}`
     : typeof d.register === 'string'
     ? `register.${d.register}`

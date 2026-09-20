@@ -19,6 +19,7 @@ import {
   ROWS as SEED_ROWS,
   REGISTERS as SEED_REGISTERS,
   METRICS as SEED_METRICS,
+  RULES as SEED_RULES,
   MONEY_HOME_SETTING,
   targetConfigOf,
   day,
@@ -130,15 +131,94 @@ function entriesOf(register: string): Entry[] {
   });
 }
 
+/**
+ * The ledger with `txn-categorise` run over it, because the seeded record runs it and the sample did not.
+ *
+ * TWENTY-SIX OF THE THIRTY-SIX TRANSACTIONS ARRIVE WITHOUT A CATEGORY, on purpose: `money.ts`'s
+ * `generatedTransactions` writes a merchant and no category so the record's one acting rule has
+ * something to act on. `installSeed` calls `applyRule` over every rule once the rows are in, and
+ * seventeen of those rows come back carrying the category whose `match` is the merchant the bank
+ * wrote. The sample skipped that pass, so `category:is:empty` answered 29 rows here against the
+ * record's 12, and `category:in:2` answered none against the record's three.
+ *
+ * THE MERCHANTS AND THE NUMBERS ARE NOT TYPED HERE. The link is read out of the rule's own
+ * declaration and the lookup is the categories register, so a category renamed or a merchant
+ * respelled in the seed moves both sides together, which is the only reason the comparison in
+ * `remote.test.ts` is worth anything.
+ *
+ * WHAT THIS MIRRORS IS THE EFFECT AND NOT THE ENGINE. The condition below is the rule's sentence,
+ * `state is cleared, transfer is false, category is empty`, written out: the kernel's own reader
+ * needs a schema and a `sql` to answer it, and a second sentence parser in the browser bundle would
+ * be a second answer to what a rule matches. If that sentence changes and this does not, the
+ * differential goes red on the next run, which is the check that keeps the two honest.
+ */
+function categorised(rows: Entry[], categories: Entry[]): Entry[] {
+  const step = SEED_RULES['txn-categorise']?.then.find((s) => 'link' in s) as
+    | { link: { field: string; to: { register: string; by: string; value: string } } }
+    | undefined;
+  if (!step) return rows;
+  const { field, to } = step.link;
+  const from = /\{\{(\w+)\}\}/.exec(to.value)?.[1];
+  if (!from) return rows;
+
+  /**
+   * EXACTLY ONE BEARER OR NONE, WHICH IS THE ENGINE'S RULE AND WAS NOT THIS MIRROR'S.
+   *
+   * `rules.ts` selects `LIMIT 2` and writes the link only when it found one row, because a rule that
+   * chose between two would choose the other one next week. Keeping the first category seen here
+   * disagreed the moment a second one bore a `match` already taken: a tenth category matching
+   * `FENWICK CLOUD` had the sample answer `category is empty` with 12 rows against the record's 15,
+   * and three of the differential tests went red over transactions #16, #23 and #29 with neither
+   * side holding a wrong row. A key bearing two categories is left out of the map entirely.
+   */
+  const seqOf = new Map<string, number>();
+  const contested = new Set<string>();
+  for (const c of categories) {
+    const key = String(c.fields[to.by] ?? '');
+    if (key === '') continue;
+    if (seqOf.has(key)) contested.add(key);
+    else seqOf.set(key, c.seq);
+  }
+  return rows.map((row) => {
+    const already = row.fields[field];
+    if (row.fields.state !== 'cleared' || row.fields.transfer !== false || (already !== undefined && already !== null && already !== '')) return row;
+    const key = String(row.fields[from] ?? '');
+    const seq = contested.has(key) ? undefined : seqOf.get(key);
+    return seq === undefined ? row : { ...row, fields: { ...row.fields, [field]: seq } };
+  });
+}
+
 export const THINGS: Entry[] = entriesOf('things');
 export const PEOPLE: Entry[] = entriesOf('people');
 export const OBLIGATIONS: Entry[] = entriesOf('obligations');
 export const SERVICES: Entry[] = entriesOf('services');
 export const TASKS: Entry[] = entriesOf('tasks');
+const CATEGORIES: Entry[] = entriesOf('categories');
 
+/**
+ * MONEY'S LEDGER WAS IN THE SEED AND NOT IN THIS INDEX, which is the whole of the bug.
+ *
+ * `money-core` landed six registers and the five that hold rows were written into `@braindog/seed`,
+ * installed into a real kernel and answered by the record. This map is what the in-browser sample
+ * reads, and it listed `obligations` and `accounts` alone — so `list('transactions', …)` returned
+ * nothing and the differential in `remote.test.ts`, which drives the same filter through both
+ * `where` implementations and compares row numbers, was asking the record about 95 rows and the
+ * sample about zero. Six tests reported it as `sample []  record [1,2,…]`, and every money filter
+ * the two compilers could have drifted apart on has been unwatched since.
+ *
+ * NOT A ROW IS WRITTEN HERE. `entriesOf` numbers `SEED_ROWS` by position, and `installSeed` writes
+ * the same array in the same order, so `seq` is the same number on both sides and a `party: 1` in a
+ * ledger row resolves to the same person. Typing a second ledger into this file is what would have
+ * broken the comparison.
+ */
 export const ROWS: Record<string, Entry[]> = {
   obligations: OBLIGATIONS,
   accounts: entriesOf('accounts'),
+  categories: CATEGORIES,
+  transactions: categorised(entriesOf('transactions'), CATEGORIES),
+  recurring: entriesOf('recurring'),
+  installments: entriesOf('installments'),
+  snapshots: entriesOf('snapshots'),
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
