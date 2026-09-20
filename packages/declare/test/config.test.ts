@@ -290,3 +290,80 @@ test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that d
   }
   assert.deepEqual([...FIRST_PARTY_LISTS].sort(), lists.sort());
 });
+
+/* ── where a setting reaches, and where it does not ─────────────────────── */
+
+test('AN EXAMPLE ROW READS A SETTING THE WAY A DECLARATION DOES, and is refused the same three ways', async () => {
+  const withSeed = (fields: Record<string, unknown>, over: Record<string, unknown> = {}) =>
+    DOC({ seeds: [{ register: 'samples', fields: { tags: ['example'], ...fields } }], ...over });
+
+  const unknown = refusal(await normalise(withSeed({ what: '{{config:nobody_declares_this}}' })));
+  assert.deepEqual([unknown.code, unknown.at], ['FIELD_UNKNOWN', 'seeds.samples.what']);
+
+  const bare = refusal(await normalise(withSeed({ what: '{{config:shade}}' }, { config: { ...DOC().config, shade: { type: 'text' } } })));
+  assert.deepEqual([bare.code, bare.at], ['REQUIRED_MISSING', 'config.shade.default']);
+
+  const money = refusal(
+    await normalise(withSeed({ what: 'Fee of {{config:fee}}' }, { config: { ...DOC().config, fee: { type: 'money', default: { amount: 500, currency: 'GBP' } } } })),
+  );
+  assert.deepEqual([money.code, money.at], ['VALUE_MALFORMED', 'seeds.samples.what']);
+
+  const note = refusal(
+    await normalise(DOC({ seeds: [{ register: 'samples', fields: { what: 'A sample', tags: ['example'] }, note: 'Made up in {{config:nobody_declares_this}}' }] })),
+  );
+  assert.deepEqual([note.code, note.at], ['FIELD_UNKNOWN', 'seeds.samples.note']);
+});
+
+test('THE SETTING IS WRITTEN INTO THE EXAMPLE ROW THE INSTALL PLANTS, the default and the chosen value alike', async () => {
+  const doc = DOC({ seeds: [{ register: 'samples', fields: { what: '{{config:heading}}', tags: ['example'] } }] });
+
+  const plain = await record();
+  value((await put(plain.k, doc)).applied);
+  const planted = value<{ rows: { fields: Record<string, unknown> }[] }>(plain.k.list({ register: 'samples' }));
+  assert.equal(planted.rows[0]?.fields.what, 'Sample invoices');
+  plain.sql.close();
+
+  const chosen = await record();
+  const pack = value<Pack>(await normalise(doc));
+  const diff = await plan(pack, { ...stateOf(chosen.k), config: { 'sample-ledger': { heading: 'Renamed samples' } } });
+  value(await install(pack, diff, hostFor(chosen.k), diff.planHash));
+  const renamed = value<{ rows: { fields: Record<string, unknown> }[] }>(chosen.k.list({ register: 'samples' }));
+  assert.equal(renamed.rows[0]?.fields.what, 'Renamed samples');
+  chosen.sql.close();
+});
+
+test('A SETTING FILLS AT ANY DEPTH IN A DECLARATION, and the manifest around it is not walked at all', async () => {
+  const { k, sql } = await record();
+  const doc = DOC({
+    summary: 'A made-up ledger for {{config:heading}}.',
+    declarations: [
+      ...DOC().declarations,
+      { page: 'samples', title: 'Samples', requires: ['register.samples'], blocks: [{ kind: 'table', span: 12, source: 'register.samples', heading: 'Due in {{config:days}} days' }] },
+    ],
+  });
+  const { diff, applied } = await put(k, doc);
+  value(applied);
+  const blocks = bodyOf(k, 'page.samples').blocks as Record<string, unknown>[];
+  assert.equal(blocks[0]?.heading, 'Due in 7 days', 'a placeholder three deep in a body was left standing');
+  /* THE MANIFEST IS NOT WALKED, so the summary a person reads on the install screen keeps its braces. */
+  assert.equal(diff.pack.summary, 'A made-up ledger for {{config:heading}}.');
+  sql.close();
+});
+
+/* MEASURED BEFORE THE RULE WAS WRITTEN: `normalise` accepted `note: '{{config:fee}}'` because the
+   placeholder was the whole string, `filledWith` then called `String()` on the money object it filled
+   with, and the row the install planted carried the note `[object Object]`. */
+test('A MONEY SETTING IS REFUSED IN AN EXAMPLE ROW’S NOTE, whole or not, because a note has no value to fill', async () => {
+  const money = { config: { ...DOC().config, fee: { type: 'money', default: { amount: 500, currency: 'GBP' } } } };
+  const fields = { what: 'A sample', tags: ['example'] };
+
+  const whole = refusal(await normalise(DOC({ ...money, seeds: [{ register: 'samples', fields, note: '{{config:fee}}' }] })));
+  assert.deepEqual([whole.code, whole.at], ['VALUE_MALFORMED', 'seeds.samples.note']);
+
+  const inside = refusal(await normalise(DOC({ ...money, seeds: [{ register: 'samples', fields, note: 'Paid {{config:fee}} on the day' }] })));
+  assert.deepEqual([inside.code, inside.at], ['VALUE_MALFORMED', 'seeds.samples.note']);
+
+  /* AND THE SAME PLACEHOLDER IN A FIELD IS STILL ALLOWED WHOLE, which is what a money value is for. */
+  const field = value<Pack>(await normalise(DOC({ ...money, seeds: [{ register: 'samples', fields: { ...fields, what: '{{config:fee}}' } }] })));
+  assert.equal(field.seeds[0]?.fields.what, '{{config:fee}}');
+});

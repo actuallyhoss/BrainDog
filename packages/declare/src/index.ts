@@ -460,31 +460,55 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     declarations.push({ kind, id: declId, body: stored, canonical });
   }
 
-  /* EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
-     install of a pack has no chosen values yet, so a placeholder with no default would reach the
-     kernel unfilled. A money value is an object, so it fills a whole value and never a piece of text. */
-  for (const d of declarations)
-    for (const read of configReads(d.body)) {
-      const where = `${d.id}.${read.at}`;
+  /**
+   * EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
+   * install of a pack has no chosen values yet, so a placeholder with no default would reach the
+   * kernel unfilled. A money value is an object, so it fills a whole value and never a piece of text.
+   *
+   * WRITTEN AS ONE FUNCTION BECAUSE A SEED IS READ BY IT TOO, and it was not. The loop below ran over
+   * the declarations alone, so an example row saying `{{config:nobody_declares_this}}` passed
+   * `normalise`, passed `plan` and was planted as a live row whose text read
+   * `Due {{config:nobody_declares_this}} and {{config:fee}}` — measured on a record here, with both
+   * braces in the stored field. The identical string in a declaration is refused at the door, by this
+   * check and again by the kernel's `validate`; a seed goes through the write path, which has no
+   * opinion about braces in a piece of text, so nothing anywhere caught it.
+   */
+  const placeholderFault = (subject: string, body: unknown, pathTo: (at: string) => string, asText = false): Result<Pack> | null => {
+    for (const read of configReads(body)) {
+      const where = pathTo(read.at);
+      /* A NOTE IS A LINE OF TEXT AND HAS NO VALUE TO FILL, so `whole` buys a money setting nothing
+         there. Driven before this line existed: `note: '{{config:fee}}'` was accepted, `filledWith`
+         called `String()` on the `{ amount, currency }` it filled with, and the planted row carried
+         the note `[object Object]`. */
+      const fillsWholeValue = read.whole && !asText;
       const setting = Object.hasOwn(settings.value, read.key) ? settings.value[read.key] : undefined;
       if (setting === undefined)
-        return no<Pack>('FIELD_UNKNOWN', `${d.id} reads the setting ${read.key}, and ${id} declares no setting by that name.`, {
+        return no<Pack>('FIELD_UNKNOWN', `${subject} reads the setting ${read.key}, and ${id} declares no setting by that name.`, {
           at: where,
           allowed: Object.keys(settings.value),
         });
       if (setting.default === undefined)
         return no<Pack>(
           'REQUIRED_MISSING',
-          `${d.id} reads the setting ${read.key}, so ${read.key} needs a default for the first install.`,
+          `${subject} reads the setting ${read.key}, so ${read.key} needs a default for the first install.`,
           { at: `config.${read.key}.default` },
         );
-      if (setting.type === 'money' && !read.whole)
+      if (setting.type === 'money' && !fillsWholeValue)
         return no<Pack>(
           'VALUE_MALFORMED',
-          `${where} puts the money setting ${read.key} inside longer text. A money setting fills a whole value on its own.`,
+          asText
+            ? `${where} reads the money setting ${read.key} into a line of text. A money setting fills a whole value on its own, and a note is text.`
+            : `${where} puts the money setting ${read.key} inside longer text. A money setting fills a whole value on its own.`,
           { at: where },
         );
     }
+    return null;
+  };
+
+  for (const d of declarations) {
+    const fault = placeholderFault(d.id, d.body, (at) => `${d.id}.${at}`);
+    if (fault) return fault;
+  }
 
   /* A FIGURE'S TARGET MAY NAME A SETTING IT IS HELD TO, read live (`liveTarget`): one this pack declares, a sum or a number. */
   for (const d of declarations) {
@@ -551,6 +575,14 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       return no<Pack>('SECRET_IN_PACK', `${seed.register}'s example row holds what looks like a credential in ${shapedSeed}, and a pack is a file people share.`, {
         at: `seeds.${seed.register}.${shapedSeed}`,
       });
+
+    /* AND ITS PLACEHOLDERS ARE READ LIKE A DECLARATION'S, both in the fields and in the note. */
+    const inFields = placeholderFault(`${seed.register}'s example row`, seed.fields, (at) => `seeds.${seed.register}.${at}`);
+    if (inFields) return inFields;
+    if (typeof seed.note === 'string') {
+      const inNote = placeholderFault(`${seed.register}'s example row`, seed.note, () => `seeds.${seed.register}.note`, true);
+      if (inNote) return inNote;
+    }
 
     seeds.push({
       register: seed.register,
@@ -950,7 +982,19 @@ function settingsFor(pack: Pack, installed: Installed): Diff['config'] {
   });
 }
 
-/** The pack with every `{{config:<key>}}` in its declarations filled from `config`. The same pack when there is nothing to fill. */
+/**
+ * The pack with every `{{config:<key>}}` in its declarations and its example rows filled from
+ * `config`. The same pack when there is nothing to fill.
+ *
+ * THE EXAMPLE ROWS WERE NOT FILLED, and that was the half of this that nothing checked. A seed
+ * carrying `{{config:heading}}` was planted with the braces in it: measured on a record here, the
+ * planted row's text read `{{config:heading}}` where the register's own name, filled from the same
+ * setting, read `Sample invoices`. A declaration that misses its fill is caught by the kernel's
+ * `validate`; a row is written through the write path, which reads it as text and stores it.
+ *
+ * THE CHECKSUM IS NOT TOUCHED, here or on the declarations: it identifies the file, and the file is
+ * what was written before anybody chose a value.
+ */
 function filledWith(pack: Pack, config: Diff['config']): Pack {
   const values = Object.fromEntries(config.filter((c) => c.from !== 'none').map((c) => [c.key, c.value]));
   if (Object.keys(values).length === 0) return pack;
@@ -959,7 +1003,15 @@ function filledWith(pack: Pack, config: Diff['config']): Pack {
     const body = fillConfig(d.body, values) as Record<string, Json>;
     return { ...d, body, canonical: canonicalise(body) ?? d.canonical };
   });
-  return { ...pack, declarations };
+  const seeds = pack.seeds.map((seed) => {
+    if (configReads(seed.fields).length === 0 && (seed.note === undefined || configReads(seed.note).length === 0)) return seed;
+    return {
+      ...seed,
+      fields: fillConfig(seed.fields, values) as Record<string, Json>,
+      ...(seed.note === undefined ? {} : { note: String(fillConfig(seed.note, values)) }),
+    };
+  });
+  return { ...pack, declarations, seeds };
 }
 
 /**
@@ -1465,7 +1517,9 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   const kept = diff.config.filter((c) => c.from === 'kept').map((c) => [c.key, c.value] as const);
   /* A LIST THAT ALREADY HOLDS ROWS HAS HAD ITS EXAMPLES. An uninstall keeps the rows, so installing the pack again used
      to plant the examples a second time beside the first ones; counted before anything is written. */
-  const planted = seedsFor(pack, diff.adds).filter((seed) => host.count(seed.register) === 0);
+  /* PLANTED FROM THE FILLED PACK, because `plan` counted its seeds off the filled one too: planting
+     from `pack` here wrote the example rows with their placeholders still in them. */
+  const planted = seedsFor(filled, diff.adds).filter((seed) => host.count(seed.register) === 0);
   try {
     return host.transaction((): Result<Applied> => {
       const put = staged.value();
