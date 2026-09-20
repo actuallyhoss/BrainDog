@@ -318,7 +318,26 @@
       /* THE NIGHTLY COPIES GO HERE, one prefix per record (`<record>/snapshots/`), which is also
          what 51 §5.13 step 3 pages over when a customer is deleted. The bucket must exist before
          this deploy: `wrangler r2 bucket create braindog-blobs-alpha`. */
-      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-alpha" }]
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs-alpha" }],
+
+      /* UNCOMMENTED IN THE COMMIT THAT FIRST READS IT, which is this one: `src/inference.ts` is the
+         `Inference` port of 33 §1 over `env.AI`, and `src/inference.ts` alone reads this binding.
+
+         THERE IS NO ACCOUNT RESOURCE TO CREATE FIRST, and that is what makes `ai` different from
+         every other block below. A queue, a bucket and a Secrets Store store all have to exist
+         before a deploy that names them, or the deploy fails. Workers AI is account-level: the
+         binding resolves as long as Workers AI is enabled on the account. The three preconditions
+         were established off this tree before the commit and are recorded here so the next reader
+         does not go looking: Workers AI enabled, credits on the account, `ai (write)` on the deploy
+         token. Nothing in this repository can check them, and no test here spends a neuron.
+
+         IT IS NOT INHERITABLE, so it is written out again in `production` below. An omitted
+         non-inheritable key is EMPTY rather than inherited — the same trap `r2_buckets` carries.
+
+         `AI_GATEWAY` above is the other half. It names the gateway the calls are routed through, so
+         neurons are counted and rate-limited per environment (12 §8), and `collectLog: false` in
+         `inference.ts` is what keeps the payloads out of the log (11 §3). */
+      "ai": { "binding": "AI" }
 
       /* ---------------------------------------------------------------------------------------
          THE REST OF 51 §4.6, DRAFTED AND NOT ACTIVE. Each block below binds a resource the code
@@ -327,7 +346,6 @@
          beside each. Names carry the environment for the same reason the queue does — every one of
          these namespaces is account-global.
 
-         "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry_alpha" }],
          "ratelimits": [
@@ -409,10 +427,16 @@
          key is EMPTY rather than inherited: production would deploy, come up with no bucket, and
          the first sign of it would be `scheduled()` throwing at 03:17. The bucket must exist before
          this deploy: `wrangler r2 bucket create braindog-blobs`. */
-      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }]
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "braindog-blobs" }],
+
+      /* REPEATED IN FULL, for the reason `r2_buckets` above is: `ai` is not inheritable, and an
+         omitted non-inheritable key is empty rather than inherited. Production without this line
+         deploys, comes up, and answers `ModelUnavailable` to the first ask Spark makes. The
+         argument for uncommenting it is in `alpha` above; there is no account resource to create
+         for it, unlike every block still commented below. */
+      "ai": { "binding": "AI" }
 
       /* The same drafted blocks as alpha, without the suffix:
-         "ai": { "binding": "AI" },
          "analytics_engine_datasets": [
            { "binding": "TELEMETRY", "dataset": "braindog_telemetry" }],
          "ratelimits": [

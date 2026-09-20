@@ -656,7 +656,7 @@ What is not claimed: no classifier detects injection. The `flagged` bit is a hig
 
 | Case | Expected |
 |---|---|
-| `triage` golden valid | `{ shape: 'email|hsbc.com.eg|HSBC: You have received EGP #,#.# from …', kind: 'money', actionable: true }` — `shape` equal for three fixtures differing only in digits |
+| `triage` golden valid | `{ shape: 'email|hsbc.com.eg|HSBC: You have received EGP #.# from …', kind: 'money', actionable: true }` — `shape` equal for three fixtures differing only in digits. The printed example said `#,#.#` until 2026-09-20, which the clause after it makes impossible: a thousands separator that survives the mask puts `1,200.50` and `99.00` in two shapes, so two receipts from one bank never reach the three a pattern needs. One number is one `#`. |
 | `triage` malformed JSON | `{ kind: 'other', actionable: true }`, `call.status = 'error'`, `code = 'PROPOSAL_SCHEMA'` |
 | `pattern` golden valid, three HSBC fixtures | `record.propose` called once with `body_kind 'pattern'`, `confidence 'needs-review'`, `samples` = the three ids; `citations.length = 3` |
 | `pattern` with `between: ["at ", " - "]` when no sample contains `" - "` | `PROPOSAL_UNCITED` at `extract.merchant.between[1]`; `propose` not called |

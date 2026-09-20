@@ -321,6 +321,15 @@ importers:
         specifier: workspace:*
         version: link:../theme
 
+  packages/spark:
+    dependencies:
+      '@braindog/ports':
+        specifier: workspace:*
+        version: link:../ports
+      '@braindog/where':
+        specifier: workspace:*
+        version: link:../where
+
   packages/theme: {}
 
   packages/where:
