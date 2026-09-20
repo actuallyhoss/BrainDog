@@ -262,6 +262,38 @@ const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'd
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
 const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session'] as const;
 const MEET = ['name', 'email', 'handle', 'where'] as const;
+/**
+ * A refusal on its way out of a transaction that has already written something.
+ *
+ * `transactionSync` commits on a returned value and rolls back on a throw (`33-CONTRACTS` §1), so a
+ * call that opens a row before it has finished checking has only one way to take that row back.
+ * This carries the refusal through the throw so the caller still answers with a sentence rather
+ * than a stack trace, which is the whole point of the kernel returning refusals in the first place.
+ *
+ * IT IS NOT A LICENCE TO CHECK LATE. Nearly every path here checks before it writes and needs none
+ * of this; `handoff` is the one that cannot, because the run it writes to is the run it may have to
+ * open to find.
+ */
+class Unwind extends Error {
+  /* A FIELD AND AN ASSIGNMENT, not a parameter property: `erasableSyntaxOnly` is on because Node
+     strips types rather than compiling them, and a parameter property is syntax that has to run. */
+  refusal: Result<never>;
+  constructor(refusal: Result<never>) {
+    super('refused');
+    this.refusal = refusal;
+  }
+}
+
+/** Runs a transaction that may unwind, and turns the unwinding back into the refusal it carries. */
+const unwound = <T>(fn: () => Result<T>): Result<T> => {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof Unwind) return e.refusal;
+    throw e;
+  }
+};
+
 /** How many entries `tried` and `notes` keep. The oldest goes first. */
 const KEPT = 50;
 /** The longest line a run carries, which is a note's ceiling. */
@@ -2751,31 +2783,50 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (Object.keys(lines).length === 0 && said.state === undefined)
         return no('REQUIRED_MISSING', 'A handoff carries at least one of next, tried, note, doing, state, branch or head.', { at: 'next' });
 
-      let run: Entry;
-      let by: Pick<WriteContext, 'actor' | 'principal' | 'session'>;
-      if (token) {
-        const hints: SessionHints = {
-          ...ctx.session,
-          ...(lines.doing === undefined ? {} : { doing: lines.doing }),
-          ...(lines.branch === undefined ? {} : { branch: lines.branch }),
-          ...(lines.head === undefined ? {} : { head: lines.head }),
-        };
-        const found = runFor(ctx, hints, 'opened: auto');
-        if (!found.ok) return tail(found as Result<never>);
-        run = found.value.run;
-        /* NAMED, so the write lands on the run it was found as: a run just opened may have no client id
-           or place for the ladder to find it by a second time. */
-        by = writerOf({ ...ctx, session: { ...hints, spoken: found.value.spoken } });
-      } else {
-        const named = kernel.get(String(said.session).trim());
-        if (!named || named.register !== SESSION)
-          return no('VALUE_MALFORMED', `${String(said.session)} is not a run. Runs are spoken ${PREFIX}1, ${PREFIX}2.`, { at: 'session' });
-        run = named;
-        by = writerOf(ctx);
-      }
-
-      return tail(
+      /**
+       * FINDING THE RUN IS PART OF THIS WRITE, NOT A PRELUDE TO IT.
+       *
+       * `runFor` opens a run when the caller has none, which writes a row, and every check after it
+       * belonged to a write that could still refuse. So a handoff the kernel turned down left a run
+       * behind: `handoff({ state: 'banana' })` from an agent with no run opened one, `active`, and
+       * then refused, and three retries of the one malformed call made three runs, each of them in
+       * the next briefing and each governed by the twelve-hour sweep. A bad state is only the
+       * cheapest way in; any refusal `update` can raise, a `next` over the field's byte ceiling
+       * included, did the same.
+       *
+       * THE KERNEL'S PROMISE IS THE ONE BEING KEPT HERE: a refusal is "a value returned from a
+       * transaction that never began to change anything". This is the one path that opened a row
+       * before the checks rather than after them, and the repair is to move the open inside.
+       *
+       * AND THE REFUSAL TRAVELS AS A THROW, because a throw is what rolls back. `transactionSync`
+       * commits on a returned value, so returning the refusal from here would commit the very run
+       * it was refusing.
+       */
+      return tail(unwound<Entry>(() =>
         kernel.transaction(() => {
+          let run: Entry;
+          let by: Pick<WriteContext, 'actor' | 'principal' | 'session'>;
+          if (token) {
+            const hints: SessionHints = {
+              ...ctx.session,
+              ...(lines.doing === undefined ? {} : { doing: lines.doing }),
+              ...(lines.branch === undefined ? {} : { branch: lines.branch }),
+              ...(lines.head === undefined ? {} : { head: lines.head }),
+            };
+            const found = runFor(ctx, hints, 'opened: auto');
+            if (!found.ok) throw new Unwind(found as Result<never>);
+            run = found.value.run;
+            /* NAMED, so the write lands on the run it was found as: a run just opened may have no client id
+               or place for the ladder to find it by a second time. */
+            by = writerOf({ ...ctx, session: { ...hints, spoken: found.value.spoken } });
+          } else {
+            const named = kernel.get(String(said.session).trim());
+            if (!named || named.register !== SESSION)
+              throw new Unwind(no('VALUE_MALFORMED', `${String(said.session)} is not a run. Runs are spoken ${PREFIX}1, ${PREFIX}2.`, { at: 'session' }));
+            run = named;
+            by = writerOf(ctx);
+          }
+
           const now = kernel.get(run.id) ?? run;
           const patch: Patch = {};
           for (const key of ['next', 'doing', 'branch', 'head'] as const) if (lines[key] !== undefined) patch[key] = lines[key];
@@ -2792,9 +2843,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              the same call is the one it leaves. */
           if (typeof said.state === 'string' && RUN.done.includes(said.state) && lines.next === undefined && now.fields.next !== undefined)
             patch.next = null;
-          return kernel.update(SESSION, now.id, patch, by);
+          const written = kernel.update(SESSION, now.id, patch, by);
+          if (!written.ok) throw new Unwind(written as Result<never>);
+          return written;
         }),
-      );
+      ));
     },
 
     /**

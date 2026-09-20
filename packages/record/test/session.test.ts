@@ -310,6 +310,21 @@ test('A STATE THE CALLER NAMED IS THE STATE IT GETS, and a quiet run only revive
   sql.close();
 });
 
+test('A REFUSED HANDOFF OPENS NO RUN, because the run it writes to is part of the write', async () => {
+  const { api, sql } = await record();
+  const said = agent({ ...HERE, client_id: 'c-1' });
+  /* THE CHEAPEST WAY IN IS A STATE NOBODY DECLARED, refused by the kernel inside the write. The run
+     this call had to open to have somewhere to write must go back with it, or three retries of one
+     malformed call leave three runs, each active and each in the next briefing. */
+  const bad = refusal(await api.handoff({ state: 'banana', next: 'Read the gate output' }, said));
+  assert.deepEqual([bad.code, bad.at], ['ENUM_VALUE_UNKNOWN', 'state']);
+  assert.deepEqual(value<{ rows: Entry[] }>(await api.list({ register: 'session' }, owner)).rows, []);
+  /* AND THE SAME CALL MADE WELL STILL OPENS ONE, so the rollback is not a refusal to work. */
+  assert.equal(value<Entry>(await api.handoff({ state: 'idle', next: 'Read the gate output' }, said)).state, 'idle');
+  assert.equal(value<{ rows: Entry[] }>(await api.list({ register: 'session' }, owner)).rows.length, 1);
+  sql.close();
+});
+
 /* ── whose run it is ─────────────────────────────────────────────────────── */
 
 /** Another token's call: `tok_2` of another person, or `tok_3`, the same person's narrower key. */
