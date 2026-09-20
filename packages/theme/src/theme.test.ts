@@ -28,6 +28,7 @@ import {
   build,
   buildScheme,
   HOUSE_PROFILE,
+  HIGH_CONTRAST_PROFILE,
   nextAccentHue,
   INTENT_HUE,
   parseColour,
@@ -567,6 +568,57 @@ test('no suggested accent is the house colour, and none is a duplicate of anothe
   const seen = new Set(ACCENTS.map((a) => a.hex.toUpperCase()));
   assert.equal(seen.size, ACCENTS.length, 'two suggested accents are the same colour');
   assert.ok(ACCENTS.length >= 4, 'too few suggestions to be a row of choices');
+});
+
+test('A SUGGESTED ACCENT CAN BE SEEN AGAINST THE SURFACE IT IS PAINTED ON, IN BOTH SCHEMES', () => {
+  /**
+   * `ACCENTS`' OWN NOTE SAID THE WINDOW HAD BEEN WORKED THROUGH, AND ONLY HALF OF IT HAD.
+   *
+   * The sentence was "dark enough to hold a 3:1 boundary against cream", and cream is the LIGHT
+   * scheme. Nobody measured the other one. `--accent` is painted as an opaque fill or a border of
+   * its own colour in fourteen declarations across eleven rules, the checked switch track among
+   * them (`controls.css` sets `background` and `border-color` to it in one rule), so SC 1.4.11
+   * asks 3:1 of the fill itself against whichever surface it lands on. Measured on the record
+   * ladder before this test existed, against the worst of the five surfaces over both profiles and
+   * both schemes: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47. Four of the five suggestions the
+   * product offers a customer produced a checked switch, a selected tile and a chosen cell that
+   * are invisible in the dark scheme, and every one of them was accepted by `recordTheme` with
+   * zero refusals, because no check in this package measures `accent` against a surface at all:
+   * check D reads `edge` and `accent-edge`, check B reads `accent-text`, check Q reads the accent
+   * against its own label, and the fill itself is measured by nothing.
+   *
+   * THE HOUSE ACCENT IS IN THE LIST BECAUSE IT IS THE PROOF THE WINDOW EXISTS. #D72065 measures
+   * 3.04 at its worst, which is the whole of the headroom there is: one colour has to clear 3:1
+   * against a near-black at L 0.244 and against a near-white at L 0.999, and the band that does
+   * both is narrow and centred near L 0.57. A suggestion under it is not a taste call.
+   */
+  const worstFill = (accent: string, neutralHue: number) => {
+    let worst = Infinity;
+    let where = '';
+    for (const profile of [HOUSE_PROFILE, HIGH_CONTRAST_PROFILE])
+      for (const scheme of ['dark', 'light'] as const) {
+        const p = buildScheme({ ...HOUSE_SEED, accent, neutralHue }, profile, scheme);
+        for (const surface of SURFACES) {
+          const got = contrast(parseColour(p.accent), parseColour(p[surface]));
+          if (got < worst) {
+            worst = got;
+            where = `${profile.id} ${scheme} on ${surface}`;
+          }
+        }
+      }
+    return { worst, where };
+  };
+
+  /* The house seed's own neutral hue for the house accent, and `recordTheme`'s default of 110 for
+     the suggestions, because that is the ladder each is actually solved against. */
+  const cases: [string, string, number][] = [
+    ['the house accent', HOUSE.schemes.light.accent, HOUSE_SEED.neutralHue as number],
+    ...ACCENTS.map((a) => [a.name, a.hex, 110] as [string, string, number]),
+  ];
+  for (const [name, accent, neutralHue] of cases) {
+    const { worst, where } = worstFill(accent, neutralHue);
+    assert.ok(worst >= 3, `${name} (${accent}) is ${worst.toFixed(2)}:1 as a fill, ${where}. A component boundary needs 3:1.`);
+  }
 });
 
 /* ── the grammar's own rule ──────────────────────────────────────────────── */

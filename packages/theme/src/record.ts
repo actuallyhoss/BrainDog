@@ -124,13 +124,40 @@ export function recordTheme(
 }
 
 /**
- * Six colours a record can be, as a starting point rather than a palette.
+ * Five colours a record can be, as a starting point rather than a palette. The heading said six
+ * and the list has held five since Brick was removed for being the house colour under another
+ * name; a count in a comment is the cheapest thing in a file to leave behind.
  *
  * THEY ARE SUGGESTIONS AND NOT THE SET. Any colour a customer supplies is solved and checked the
  * same way; these exist so somebody with no brand colour to hand is not staring at a colour picker
  * on their second minute. Each is chosen inside the same window the house seed's own note works
- * through — light enough for a white label at 4.5:1, dark enough to hold a 3:1 boundary against
- * cream — and each is far enough from the four intent hues to never be mistaken for a state.
+ * through.
+ *
+ * AND NONE OF THEM IS TWENTY DEGREES FROM EVERY INTENT, WHICH THIS NOTE USED TO CLAIM. Measured:
+ * Ink blue is 3.7 degrees from `info`'s anchor, Ochre 7.5 from `warn`, Moss 13.6 from `earn`, and
+ * `HUE_FLOOR` is 20. The sentence was wrong rather than the values: an accent is chrome and never
+ * a row's verdict, so the intent floor does not govern it, which is the same argument the house
+ * seed already makes about sitting 14 degrees from `info`. What keeps an accent off a state is
+ * that it never appears where a state appears, not the angle.
+ *
+ * AND THE WINDOW HAS TWO SIDES, WHICH THIS NOTE USED TO GIVE ONE OF. It said "light enough for a
+ * white label at 4.5:1, dark enough to hold a 3:1 boundary against cream", and cream is the LIGHT
+ * scheme. The dark one was never measured. `--accent` is painted as an opaque fill or a border of
+ * its own colour in fourteen declarations across eleven rules in the app, the checked switch track
+ * among them, so SC 1.4.11 asks 3:1 of the fill against the surface under it, in both schemes.
+ * Against the worst of the five surfaces over both profiles and both schemes, the old five
+ * measured: Ink blue 1.92, Plum 2.15, Teal 2.41, Moss 2.47, Ochre 3.33. Four of the five produced
+ * a checked switch and a selected tile that vanish in the dark, and `recordTheme` accepted every
+ * one of them with no refusal, because nothing in this package measures `accent` against a surface
+ * at all: check D reads `edge` and `accent-edge`, check B reads `accent-text`, check Q reads the
+ * accent against its own label, and the fill itself is measured by nothing.
+ *
+ * SO FOUR OF THEM CAME UP THE LIGHTNESS AXIS AND NOTHING ELSE MOVED. Same hue, same chroma, the
+ * least L that clears 3.15:1 at its worst: Moss 0.490 to 0.550 (#41815F), Ink blue 0.448 to
+ * 0.562 (#3C72CE), Plum 0.485 to 0.577 (#A75996), Teal 0.487 to 0.551 (#2B7F8A). Ochre was already inside and is untouched. The band that
+ * clears 3:1 against a near-black at L 0.244 and a near-white at L 0.999 at the same time is
+ * narrow and centred near L 0.57, which is where the house accent sits at 3.04 and why a
+ * suggestion falling out of it is arithmetic rather than taste.
  *
  * THEY LIVE HERE BECAUSE COLOUR LITERALS LIVE HERE. A component may name only the semantic layer,
  * and a gate greps for it: the moment a swatch list is written in a settings screen it is a second
@@ -150,9 +177,9 @@ export function recordTheme(
  * is not a suggestion; the House control beside them is how you choose it.
  */
 export const ACCENTS: readonly { name: string; hex: string }[] = [
-  { name: 'Moss', hex: '#2F6F4E' },
-  { name: 'Ink blue', hex: '#1B4FA8' },
-  { name: 'Plum', hex: '#8A3E7A' },
+  { name: 'Moss', hex: '#41815F' },
+  { name: 'Ink blue', hex: '#3C72CE' },
+  { name: 'Plum', hex: '#A75996' },
   { name: 'Ochre', hex: '#A86A16' },
-  { name: 'Teal', hex: '#0F6C77' },
+  { name: 'Teal', hex: '#2B7F8A' },
 ];
