@@ -219,6 +219,11 @@ const CASES = [
      codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two
      here, and only "one" is the right answer. */
   { gate: 'refusal-fixtures', expect: /and has no fixture/, findings: 1 },
+  /* `derived:` SAYS A CODE IS READ OFF AN ENVELOPE, and the one thing it must never become is a way
+     to quieten a fixture that never needed it. So the tree seeded for it claims the key on a code
+     whose own site constructs it, which is the branch that keeps the key narrow. The other four
+     branches are proved by mutation in the gate's own header. */
+  { gate: 'refusal-fixtures-derived', run: 'refusal-fixtures', expect: /derived from .*itself/, findings: 1 },
   /* ONE, and the fixture holds two flags so the count means something: one declared and never
      read, one declared and read. A gate that reported both would be counting flags rather than
      finding dead ones. */

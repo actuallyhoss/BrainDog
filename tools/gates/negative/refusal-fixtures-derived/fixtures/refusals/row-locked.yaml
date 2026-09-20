@@ -1,0 +1,5 @@
+code:    ROW_LOCKED
+via:     write
+raises:  packages/kernel/src/index.ts
+derived: clash
+fix:     Reopen the row before editing it.
