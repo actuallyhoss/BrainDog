@@ -464,6 +464,46 @@ test('AND A REGISTER THAT IS EXACTLY ONE READ IS A WHOLE ANSWER, not a slice of 
   sql.close();
 });
 
+test('AND ONE ROW PAST ONE READ IS A SLICE AND IS REFUSED, which is the side nothing was measuring', async () => {
+  /**
+   * THE CEILING WAS MEASURED FROM BELOW ONLY, AND ABOVE IT IS WHERE THE SUM GOES SHORT. The test
+   * above holds the comparison against being tightened, and the cost of tightening it is a refusal
+   * a reader can see and argue with. Loosening it costs a number instead, silently, and nothing was
+   * holding that side: `matched > READ_WHOLE` changed to `matched > READ_WHOLE + 1` in `pages.ts`
+   * left all 17 tests in this file green, and `apps/web/src/lib/record/page-live.test.ts`'s 25 and
+   * `block-kinds.test.ts`'s 4 green with them, 46 in three suites and not one of them the one that
+   * mattered. The reason is that those suites drive 3 rows, 200 rows and 301 rows: 200 tells `>`
+   * from `>=`, and nothing between 200 and 301 tells `> 200` from `> 201`.
+   *
+   * Measured under that mutation on this record: a `split` over 201 obligations drew 200 rows,
+   * answered `matched: 201`, and refused NOTHING, so the figure a reader saw was 200 of the 201
+   * amounts added together with nothing on the page to say a row had been left out of it. That is
+   * the defect the refusal exists for, one row in rather than a hundred and one.
+   *
+   * 201 IS THE ONLY COUNT THAT DISTINGUISHES THOSE TWO, the way 200 is the only one that
+   * distinguishes `>` from `>=`, so the row count here is exact for the same reason: 200 is a whole
+   * answer under either spelling and 202 is refused under either.
+   */
+  const { k, sql } = await record(
+    pageOf({ kind: 'split', heading: 'By state', source: 'register.obligations', columns: [{ field: 'state' }, { field: 'amount' }] }),
+  );
+  /* 3 rows come with the record above, so 198 more is one row past the ceiling and no more. */
+  for (let n = 0; n < 198; n += 1)
+    assert.ok(k.create('obligations', { what: `Row ${n}`, amount: gbp(100), due: day(1), state: 'open' }, { actor: 'p_1' }).ok);
+  assert.equal((k.list({ register: 'obligations' }) as { value: { matched: number } }).value.matched, 201);
+
+  const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: { code: string; fix: string }[] };
+  const said = split.refusals ?? [];
+  assert.equal(said.length, 1, `a split over 201 rows drew ${(split.rows ?? []).length} rows, matched ${split.matched}, and refused nothing`);
+  assert.equal(said[0]?.code, 'OUT_OF_BOUNDS');
+  /* BOTH NUMBERS IN THE SENTENCE, because "matched 201 where a block that adds up reads 200" is the
+     whole of what the author has to read to narrow the predicate. */
+  assert.match(String(said[0]?.fix), /201/u);
+  assert.match(String(said[0]?.fix), /200/u);
+  assert.equal((split.rows ?? []).length, 0, 'the block refused and handed back rows to add up anyway');
+  sql.close();
+});
+
 /* ── which register a page came out of ───────────────────────────────────── */
 
 const PROJECTS: Declaration = {
