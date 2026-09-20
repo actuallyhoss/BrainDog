@@ -483,6 +483,7 @@ type Figure = {
   value?: unknown;
   unit?: unknown;
   rows?: unknown;
+  held?: unknown;
   met?: unknown;
   delta?: unknown;
   parts?: unknown;
@@ -507,6 +508,18 @@ type Figure = {
  * last Tuesday's rate and the same figure at today's are different numbers, and an agent writing
  * either into a note should be able to say which. `rate_forward` is the case the kernel marks for
  * the same reason: no rate on or before the amount's day existed, so a later one stood in.
+ *
+ * AND A ZERO SAYS WHETHER THE LIST UNDER IT IS EMPTY. `rows` is what the predicate matched, and
+ * measured over a record with two obligations on it, both paid, `{"currency":"GBP","amount":0,
+ * "rows":0,"met":true}` was the answer for `overdue` there AND for `received-30d` over a ledger
+ * nobody has written a line in. The first is the good news the figure exists to deliver and the
+ * second is no news at all, and the two went out key for key the same. The kernel carries `held`
+ * for exactly that distinction and the whitelist here dropped it, so an agent asking how money
+ * stands was told its target was met on the strength of no data whatsoever. A person has a screen
+ * that says "Nothing in Obligations yet"; an agent has this payload and nothing else, which makes
+ * it the worse half of the same defect.
+ * `list_rows` rather than `held`, because the key travels without the field note beside it, and the
+ * product calls a register a list wherever a person can see one.
  */
 const figureOf = (answered: unknown): Record<string, unknown> => {
   const read = (isObject(answered) ? answered : {}) as Figure;
@@ -517,6 +530,7 @@ const figureOf = (answered: unknown): Record<string, unknown> => {
       ? { parts: read.parts, ...(missing.length > 0 ? { missing } : {}) }
       : { currency: read.unit ?? null, amount: read.value ?? null }),
     ...(typeof read.rows === 'number' ? { rows: read.rows } : {}),
+    ...(typeof read.held === 'number' ? { list_rows: read.held } : {}),
     ...(typeof fx.asOf === 'string' ? { rate_as_of: fx.asOf } : {}),
     ...(fx.forward === true ? { rate_forward: true } : {}),
     ...(typeof read.met === 'boolean' ? { met: read.met } : {}),

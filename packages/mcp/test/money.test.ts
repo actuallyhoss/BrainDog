@@ -126,8 +126,10 @@ test('SEVEN FIGURES IN ONE CALL, each the number the record already keeps and no
 
   const money = figures(await mcp.call('money', {}, owner));
   assert.deepEqual(Object.keys(money), ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue']);
-  /* The card is not cash, so 985,000 and not 861,000: the predicate is the pack's, read here and not rewritten. */
-  assert.deepEqual(money['cash-now'], { currency: 'GBP', amount: 985_000, rows: 1, met: true });
+  /* The card is not cash, so 985,000 and not 861,000: the predicate is the pack's, read here and not
+     rewritten. `rows: 1` of `list_rows: 2` is that predicate said as a count, and the pair is what
+     keeps a zero readable: one account of two matched, and both were typed in by somebody. */
+  assert.deepEqual(money['cash-now'], { currency: 'GBP', amount: 985_000, rows: 1, list_rows: 2, met: true });
   assert.equal(money['spent-30d']?.amount, 165_000, 'a pending payment was counted as spent');
   assert.equal(money['received-30d']?.amount, 240_000);
   assert.equal(money['late-in']?.amount, 480_000);
@@ -247,6 +249,33 @@ test('MOVEMENT COMES THROUGH ON A FIGURE THAT DECLARES A COMPARISON, because "sp
   assert.equal(money['spent-30d']?.delta, alone.value.delta);
   /* AND A FIGURE THAT DECLARES NO COMPARISON CARRIES NO KEY, rather than a null an agent has to read. */
   assert.equal('delta' in money['cash-now']!, false);
+  sql.close();
+});
+
+test('NOTHING OVERDUE OVER TWO INVOICES AND NOTHING OVERDUE OVER AN EMPTY LIST ARE TWO DIFFERENT ANSWERS, and only `list_rows` tells them apart', async () => {
+  /* AN AGENT CANNOT SEE THE SCREEN, so it has no second source for this distinction. The kernel
+     carries `held` beside `rows` precisely because `{"amount":0,"rows":0,"met":true}` was the same
+     payload for a predicate that matched nobody and a list nobody has written to yet, and the tool
+     relayed a whitelist that dropped it, so "you have nothing overdue, target met" went back for a
+     record with no obligations in it at all. Both halves are asserted in one call below: the same
+     answer holds two obligations that are paid and no transactions whatsoever. */
+  const { sql, api, mcp } = await studio();
+  assert.ok(api.kernel.create('obligations', { what: 'Invoice 41', amount: gbp(480_000), due: '2026-08-10', direction: 'owed_to_me', state: 'paid', settled: '2026-08-09' }, { actor: 'p_1' }).ok);
+  assert.ok(api.kernel.create('obligations', { what: 'Illustration', amount: gbp(135_000), due: '2026-09-15', direction: 'owed_by_me', state: 'paid', settled: '2026-09-14' }, { actor: 'p_1' }).ok);
+
+  const money = figures(await mcp.call('money', {}, owner));
+  /* Nothing overdue over two obligations is the good news the figure exists to deliver. */
+  assert.equal(money['overdue']?.rows, 0);
+  assert.equal(money['overdue']?.list_rows, 2, 'the tool dropped the count that makes a zero readable');
+  assert.equal(money['overdue']?.met, true);
+  /* Nothing received over a ledger nobody has written to is not news at all, and reads identically without this. */
+  assert.equal(money['received-30d']?.rows, 0);
+  assert.equal(money['received-30d']?.list_rows, 0);
+  assert.equal(money['received-30d']?.amount, money['overdue']?.amount, 'the two zeroes differ in the amount, so the test proves nothing');
+
+  /* THE NUMBER IS THE RECORD'S, like every other on this answer: the tool counts nothing itself. */
+  const alone = (await api.metric({ metric: 'overdue' }, owner)) as { ok: true; value: { held: number } };
+  assert.equal(money['overdue']?.list_rows, alone.value.held);
   sql.close();
 });
 

@@ -17,6 +17,7 @@ import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
 import { read as webRead, withFx, type MetricDecl as WebMetric } from './metrics.ts';
+import { tileOf } from './news-live.ts';
 import type { PageBlock } from './schema.ts';
 import { copy } from '../copy.ts';
 
@@ -341,6 +342,12 @@ test('A FIGURE GROUPED BY MONTH, BY WEEK AND BY A WORD HAS THE SAME PARTS IN BOT
     assert.equal(web.value, kernel.value.value, `${decl.metric}: the whole`);
     assert.deepEqual(web.groups, kernel.value.groups, `${decl.metric}: the parts`);
     assert.equal(web.current, kernel.value.current, `${decl.metric}: the bucket the clock is in`);
+    /* AND HOW MANY ROWS THE LIST HOLDS, which is the one field on a reading that nothing here held
+       the two engines to. It is what tells a zero that is an answer from a zero that is an empty
+       list, so an engine drifting on it does not draw a wrong number: it draws a tick on a record
+       with nothing in it. It is counted before the predicate runs, so a grouped figure's is the
+       same count as a plain one's, and both engines say so or one of them is wrong. */
+    assert.equal(web.held, kernel.value.held, `${decl.metric}: how many rows the list holds`);
   }
 });
 
@@ -541,4 +548,29 @@ test('WORKING: TRUE IS ANSWERED BY BOTH ENGINES, aligned with the rows and only 
   const { working: _off, ...unasked } = block;
   assert.equal(kernelBlock(deps, unasked as KernelBlock & PageBlock).working_now, undefined);
   assert.equal(webBlock(unasked as KernelBlock & PageBlock).working_now, undefined);
+});
+
+test('THE LIVE HOME TILE KEYS ITS VERDICT OFF WHAT THE LIST HOLDS, because the record answers that beside what the predicate matched', async () => {
+  /* HOME IS THE ONE SCREEN THAT READS A KERNEL READING WHOLE, over the wire, rather than the app's
+     own copy of the evaluator, which is why the tile is held to a real one here and not to a literal
+     a test wrote. Measured on the seed: nothing has been written off, so this predicate matches
+     nobody over a list of forty obligations. `rows: 0, held: 40` is an answer, and `rows: 0,
+     held: 0` is an empty list, which is not. Keying the tile off `rows` collapsed the two, so an
+     hour-old record drew a green tick on a figure computed from no data at all, and a record with
+     forty invoices and nothing overdue was denied the good news and the door to the filter. */
+  await seeded;
+  const decl = { metric: 'overdue', name: 'Overdue to pay', source: 'register.obligations', where: 'state is written off', value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 0 }, window: '30d', compare: 'none' };
+  const none = opened!.metric(decl as never);
+  assert.ok(none.ok, JSON.stringify(none));
+  assert.equal(none.value.rows, 0);
+  assert.equal(none.value.held, 40, 'the seed no longer holds forty obligations, so this reads a different case');
+  assert.equal(none.value.met, true);
+
+  const answered = tileOf('overdue', none.value as never);
+  assert.equal(answered.tone, 'good', 'nothing overdue over forty invoices is the good news the figure exists to deliver');
+  assert.ok(answered.href, 'the filter that produced the zero is a door, and the tile shut it');
+
+  const empty = tileOf('overdue', { ...none.value, held: 0 } as never);
+  assert.equal(empty.tone, undefined, 'a tick over a list nobody has written to');
+  assert.equal(empty.href, undefined, 'a door into a list with nothing behind it');
 });
