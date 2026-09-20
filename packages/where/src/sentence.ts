@@ -202,6 +202,17 @@ const INVERSE = { empty: 'present', present: 'empty' } as const;
  */
 const LISTED: Record<string, 'has' | 'lacks'> = { has: 'has', lacks: 'lacks' };
 
+/**
+ * The element types this grammar has no literal for.
+ *
+ * `34 §1.1` gives eighteen field types and four of them are compound values rather than words. They
+ * are named here rather than derived from "what `resolve` handles" because the two sets are not the
+ * same: `text`, `document`, `url` and `email` also fall past every branch of `resolve`, and for them
+ * the typed characters ARE the stored value. A list is the one place the difference shows, because
+ * `elementSql` binds anything at all and never asks what the element is.
+ */
+const COMPOUND = new Set(['money', 'quantity', 'file', 'json']);
+
 /** And the negation inverts, for the reason the one above it does. `has not` is `lacks`. */
 const OPPOSITE = { has: 'lacks', lacks: 'has' } as const;
 
@@ -404,6 +415,27 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
        * neither is text, which is what it always was.
        */
       const element = { ...decl, type: decl.values ? 'enum' : (decl.of ?? 'text') };
+
+      /* AND FOUR OF THE EIGHTEEN TYPES ARE NOT WORDS AT ALL, so they are refused rather than bound.
+         A money is `{ amount, currency }`, a quantity is `{ value, unit }`, a file is
+         `{ sha256, mime, bytes, name }` and a `json` is whatever was put there; none is stored as a
+         bare string and this grammar has no literal for any of them. `elementSql` binds whatever
+         `bind` will take, so `bag has GBP 10.00` over a `list<money>` compiled to real SQL
+         comparing those characters against an object — the same silent nothing the element type
+         above was added to stop, reached from the other end. The structured form is the way to ask
+         until the literal exists, and the refusal says so rather than leaving somebody to work out
+         why a filter that looks right returns an empty list. THE OPERATOR IT NAMES IS THE INVERTED
+         one where the sentence inverted, so the structured form it hands back means what was
+         asked: `lacks not` is `has`, and a refusal that teaches the opposite question teaches
+         nothing. */
+      if (COMPOUND.has(element.type)) {
+        bad.push({
+          code: 'VALUE_MALFORMED',
+          fix: `${sentence}: ${field} is a list of ${element.type}, and this grammar has no way to write one. Ask for it in the structured form, as {"field": "${field}", "${no ? OPPOSITE[asked] : asked}": <the ${element.type}>}.`,
+          at: field,
+        });
+        continue;
+      }
 
       /* A BOOLEAN ELEMENT IS A BOOLEAN AND NOT THE WORD. `resolve` hands back `'true'` because the
          SCALAR half wants a string — `bind(value, 'bool')` turns it into the 1 the column holds. A

@@ -466,6 +466,40 @@ test('A LIST OF SOMETHING OTHER THAN TEXT IS ASKED ABOUT IN THAT SOMETHING, not 
   assert.deepEqual(good('tags has urgent'), { field: 'tags', has: 'urgent' });
 });
 
+test('AND AN ELEMENT THE SENTENCE HAS NO LITERAL FOR IS REFUSED, not compiled into a text search', () => {
+  /**
+   * FOUR OF THE EIGHTEEN TYPES ARE NOT WORDS. A money is `{ amount, currency }`, a quantity is
+   * `{ value, unit }`, a file is `{ sha256, mime, bytes, name }` and a `json` is whatever was put
+   * there — none of them is stored as a bare string, and this grammar has no literal for any of
+   * them. Handed one, `has` used to bind the typed characters as text and compare them against a
+   * JSON element that is an object: it parsed, it compiled to real SQL, and it matched nothing, for
+   * ever. That is the same failure as the `list<ref>` one above, arrived at from the other end, and
+   * a refusal is the only honest answer while the literal does not exist.
+   *
+   * THE SCALAR HALF ALREADY REFUSED THESE, one layer down: `compile` answers
+   * `MONEY_LITERAL_NEEDS_CURRENCY` for `amount is GBP 960.00` because the string is not a money.
+   * The list half reached no such check, because `elementSql` binds anything `bind` will take.
+   */
+  const withField = (element: string): Schema => ({
+    ...OBLIGATIONS,
+    fields: { ...OBLIGATIONS.fields, bag: { type: 'list', of: element } },
+  });
+  for (const element of ['money', 'quantity', 'file', 'json']) {
+    const out = parseWhere('bag has GBP 10.00', withField(element), deps);
+    assert.equal(out.bad[0]?.code, 'VALUE_MALFORMED', `a list of ${element} was not refused`);
+    assert.match(out.bad[0]?.fix ?? '', new RegExp(element), `the refusal does not say it is a list of ${element}`);
+    assert.equal(out.predicate, undefined);
+  }
+
+  /* AND THE ONES THAT ARE WORDS STAY WORDS, which is what makes the line above a narrowing rather
+     than a ban on lists. `url` and `email` are stored as the characters somebody typed. */
+  for (const element of ['text', 'document', 'url', 'email'])
+    assert.deepEqual(parseWhere('bag has sam@client.example', withField(element), deps).predicate, {
+      field: 'bag',
+      has: 'sam@client.example',
+    });
+});
+
 test('AND THE TWO RENDERINGS AGREE OVER THE SAME ROWS, which is the only proof that matters', () => {
   /* A clause that compiles is not a clause that matches. `evaluate` walks the row in JavaScript and
      the SQL walks it in SQLite, and a coercion applied in one and not the other is the same bug
