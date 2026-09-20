@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyFilters, backlinks, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, readableFields, readBlock, search, spokenRow, toRows, unnamed } from './api.ts';
+import { applyFilters, backlinks, boot, columnsFor, currencyFor, dirOf, display, identityFor, isProse, labelOf, metric, seqWidth, packDiff, page, pages, readableFields, readBlock, search, spokenRow, toRows, unnamed } from './api.ts';
 import { amountOf } from './money.ts';
 import { toSegments } from './blocks.ts';
 import { declaredValue } from './where.ts';
@@ -1100,4 +1100,103 @@ test("Student's Assignments list shows the course of each by default", async () 
   const decl = ((useCase('student')?.pack?.declarations ?? []) as Record<string, unknown>[]).find((d) => d.register === 'assignments');
   assert.ok(decl);
   assert.deepEqual(columnsFor('assignments', decl as never).map((c) => c.field), ['seq', 'what', 'state', 'course', 'due']);
+});
+
+/* ── the rail, at the scale he actually keeps ────────────────────────────── */
+
+/**
+ * TWENTY-SIX PROJECTS PUT TWENTY-SIX LINKS IN THE RAIL, and nothing had ever counted them.
+ *
+ * `pages()` turns one declaration carrying `for:` into one page per row it admits, and `boot()`
+ * put every page carrying `nav` into the rail with no cap. Measured on a record at his scale
+ * (27 projects, 26 of them building or earning, 401 tasks, 91 credentials): 36 rail entries, 27 of
+ * them under Projects. Open tracks in the same function are capped at five under a comment saying
+ * why, and the same argument was never applied to the pages a template produces.
+ *
+ * `ROWS` IS A MUTABLE EXPORT and these tests put it back, the way `growth.test.ts` does: the thing
+ * under test is behaviour at a row count the seed does not have, and a fixture register would be a
+ * second record whose declaration could drift from the real one.
+ */
+const withProjects = (n: number, run: () => void) => {
+  const kept = ROWS.things!;
+  ROWS.things = Array.from(
+    { length: n },
+    (_, i) => ({ seq: i + 1, version: 1, fields: { name: `Project ${i + 1}`, lane: i % 2 ? 'building' : 'earning' } }) as unknown as Entry,
+  );
+  try {
+    run();
+  } finally {
+    ROWS.things = kept;
+  }
+};
+
+/** The rail entries one template produced: the pages about a row of `register`. */
+const railRows = (register: string) => {
+  const about = new Set(Object.entries(pages()).filter(([, p]) => p.identity?.register === register).map(([slug]) => `/p/${slug}`));
+  return boot().nav.filter((n) => about.has(n.href));
+};
+
+test('A RAIL IS NOT A LIST: twenty-six projects do not put twenty-six links in it', () => {
+  withProjects(26, () => {
+    assert.equal(Object.values(pages()).filter((p) => p.identity?.register === 'things').length, 26, 'the template did not expand');
+    const rail = railRows('things');
+    assert.ok(rail.length <= 5, `${rail.length} project links in the rail, and the open tracks beside them are capped at 5`);
+  });
+});
+
+test('and the projects past the cap are pages, still reachable, not pages that stopped existing', () => {
+  withProjects(26, () => {
+    const all = pages();
+    assert.ok(all['project-26'], 'the twenty-sixth project has no page');
+    assert.ok(page('project-26'), '/p/project-26 does not resolve');
+    /* THE LIST IS WHERE THEY LIVE, and it says how many: the rail draws Projects with its own count
+       out of `index.registers`, and `/p/portfolio` is the page that lists them. */
+    assert.equal(boot().index.registers.find((r) => r.id === 'things')?.count, 26);
+    assert.ok(boot().nav.some((n) => n.href === '/p/portfolio'), 'the Projects overview left the rail');
+  });
+});
+
+test('the cap takes nothing off the rail at the size the record is today', () => {
+  const now = boot().nav.map((n) => n.href);
+  for (const p of Object.values(pages())) if (p.nav && p.placed !== false) assert.ok(now.includes(`/p/${p.page}`), `/p/${p.page} fell out of the rail`);
+  assert.equal(railRows('things').length, (ROWS.things ?? []).filter((t) => t.fields.lane === 'building' || t.fields.lane === 'earning').length);
+});
+
+test('a page somebody wrote is never capped away by the rows of a register', () => {
+  const written = (): string[] => {
+    const templated = new Set(Object.entries(pages()).filter(([, p]) => p.identity).map(([slug]) => `/p/${slug}`));
+    return boot().nav.filter((n) => n.href.startsWith('/p/') && !templated.has(n.href)).map((n) => n.href).sort();
+  };
+  const before = written();
+  withProjects(26, () => assert.deepEqual(written(), before, 'growing a register moved the hand-written pages'));
+});
+
+/**
+ * A SECOND TEMPLATE OVER THE SAME LIST DREW NOTHING, WHICH IS NOT WHAT A CAP OF FIVE MEANS.
+ *
+ * One register can carry two templates under two headings, which is what a pack installing a second
+ * view of a list somebody already keeps produces. Counted per register, the first template spent
+ * the whole budget: measured with a `Clients` template over `things` beside the shipped `Projects`
+ * one at 26 projects, Projects drew 6 and Clients drew 0, where before the cap it drew 26. A
+ * heading a declaration asked for was not short, it was gone, and its rows were in the rail under
+ * no name at all.
+ *
+ * Counted per heading instead, so rows still cannot grow either heading past five, which is the
+ * thing the cap is for: what grows the rail here is somebody writing a second declaration, not the
+ * record filling up.
+ */
+test('two templates over one list are two capped headings, not one heading and nothing', () => {
+  withProjects(26, () => {
+    const kept = PAGES.client;
+    PAGES.client = { ...PAGES.project!, page: 'client', title: 'Client {{name}}', nav: { section: 'Clients', order: 10 } };
+    try {
+      const drawn = (section: string) => boot().nav.filter((n) => n.section === section).length;
+      assert.equal(drawn('Clients'), 5, 'the second template over the same list got no rail entry at all');
+      assert.equal(drawn('Projects'), 6, 'five projects and the overview somebody wrote');
+    } finally {
+      /* The shipped record declares no `client` page, so putting it back means taking it away. */
+      if (kept) PAGES.client = kept;
+      else delete PAGES.client;
+    }
+  });
 });

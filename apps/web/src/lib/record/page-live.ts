@@ -44,7 +44,7 @@ import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
 import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
-import type { PageBlock, PageDecl } from './schema.ts';
+import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
 import { labels, relabel } from '../voice.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -166,9 +166,6 @@ export type Opened =
   | { from: 'sample' }
   | { from: 'missing'; titles: string[] }
   | { from: 'refused'; fix: string };
-
-/** The kinds that add rows up, which a slice of the answer would add up wrong. */
-const REDUCES = new Set(['bar', 'chips', 'gauge', 'split']);
 
 /** What a scope cell reads for a row that applies to every project, as the sample says it. */
 const EVERYWHERE = 'Everywhere';
@@ -641,9 +638,21 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       return { ...shell, register, measures, shown: measures.length, total: measures.length };
     }
   }
-  /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer. */
+  /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer.
+     THE KERNEL REFUSES THIS NOW, at `packages/kernel/src/pages.ts`, and a refused block returned
+     above with the record's own sentence rather than this line, so on a current record the guard
+     below will not fire. It is kept because the record is a different deployment from this app: a
+     record on an older kernel still answers 200 rows of 301 with an empty `refusals`, which is the
+     case this guard was written for and the one it is still the only protection against. */
+  if (SUMS.has(kind) && got.length < matched) return cannot;
+  /* AND WHETHER THE BLOCK IS DRAWING A SLICE IS THE OTHER QUESTION, which is `REDUCES` and not
+     `SUMS`: a section adds nothing up and is still never showing a page of its answer, because the
+     count it draws is `total`. One variable answered both here and the section half was wrong.
+     Measured through `blockOf` on a section with 2 rows and `matched: 301`: `shown 2, total 301`,
+     which is the condition `/p/[slug]` prints "Showing 2 of 301" on, under a heading that draws no
+     row of its own and whose own count said 301. `api.ts` reads `REDUCES` for the same `shown` on
+     the sample and printed nothing, so one declaration drew two different pages. */
   const reduces = REDUCES.has(kind);
-  if (reduces && got.length < matched) return cannot;
 
   /* A BUDGET IS DRAWN AGAINST WHAT ITS FIGURE SPENT, which the record read beside the rows; without it there is no budget to draw. */
   const { spent, toward } = rest as { spent?: unknown; toward?: unknown };

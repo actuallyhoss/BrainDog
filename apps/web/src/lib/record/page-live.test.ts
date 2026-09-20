@@ -682,3 +682,54 @@ test('A LIVE ANSWER’S WORKING MARK IS THE RECORD’S, and a malformed one draw
      leaves the block unmarked: a dot on the wrong row says an agent is somewhere it is not. */
   for (const bad of ['yes', null, { 0: true }, [1, 0]]) assert.ok(!drawn(bad).some((c) => c.startsWith(WORKING_MARK)), JSON.stringify(bad));
 });
+
+test('A PROGRESS BLOCK SHORT OF ITS MATCH SAYS SO, and it was the one reducing kind this file left out', () => {
+  /**
+   * THE SAME LIST LIVED IN THREE FILES AND THEY DISAGREED, and `progress` was the live gap between
+   * two of them: the kernel caps a reducing block's rows at 200 and `progress` is in the kernel's
+   * set, while the copy here was four kinds long and left it out. Measured through the kernel on a
+   * record with 301 obligations, before either side was fixed: `progress rows 200 matched 301
+   * refusals []`, and this file drew the short answer without a word.
+   *
+   * THERE IS ONE LIST NOW, `SUMS` in `schema.ts`, and the kernel refuses before this guard is
+   * reached. The guard stays because the record is a different deployment from this app and an
+   * older kernel still answers a partial sum with no refusal in it.
+   */
+  const partial = { kind: 'progress', source: 'register.obligations', rows: [row(1, obligation)], matched: 3, refusals: [] };
+  assert.equal(blockOf(partial as never, new Map(), AT).cannot, liveWords.cannot);
+
+  /* AND A SECTION IS NOT ONE OF THEM, which is the other half of the disagreement. Its count is
+     `total`, so the number over it is right whatever came back with it, and a section in the same
+     set would refuse a heading over any register past a page. */
+  const section = { kind: 'section', heading: 'Bits', source: 'register.obligations', rows: [row(1, obligation)], matched: 301, refusals: [] };
+  assert.equal(blockOf(section as never, new Map(), AT).cannot, undefined);
+
+  /* AND WHEN THE KERNEL REFUSES IT FIRST, the record's own sentence is drawn rather than this
+     file's one line, which is the point of moving the rule into the kernel: it says how many rows
+     matched and what to narrow. */
+  const said = 'A progress adds up every row it matched, and obligations matched 301 where a block that adds up reads 200. Narrow it with where: until it matches 200 or fewer, or draw it as a list.';
+  const refused = blockOf({ kind: 'progress', source: 'register.obligations', rows: [], matched: 0, refusals: [{ code: 'OUT_OF_BOUNDS', fix: said }] } as never, new Map(), AT);
+  assert.equal(refused.cannot, undefined);
+  assert.deepEqual(refused.refusals, [said]);
+});
+
+test('AND A LIVE SECTION COUNTS THE WHOLE MATCH, because the sample does and the two drew the same page differently', () => {
+  /**
+   * TWO QUESTIONS WERE BEING ASKED OF ONE SET HERE, and only one of them is `SUMS`. The guard above
+   * asks "would this block add up a slice", which a section never does. `shown` asks "is this block
+   * drawing a slice at all", which `api.ts` answers for the sample with `REDUCES`, the set that has
+   * `section` in it, and this file answered with the narrower one.
+   *
+   * THE PAGE SAID IT TWICE, DIFFERENTLY, FOR THE SAME DECLARATION. `portfolio.ts` declares
+   * "Parked and finished" as a section over `register.things` with no `limit:`, so the kernel reads
+   * its default 50 and answers `matched` in full. Measured through `blockOf` with 2 rows against
+   * `matched: 301`: `shown 2, total 301`, and `/p/[slug]` prints its slice line whenever
+   * `total > shown`, so a heading that draws no row of its own carried "Showing 2 of 301" while the
+   * same heading on the sample carried nothing. The count a section does draw, `sectionRow`'s, is
+   * `total` in both, so the two numbers on screen contradicted each other.
+   */
+  const section = { kind: 'section', heading: 'Parked and finished', source: 'register.obligations', rows: [row(1, obligation), row(2, obligation)], matched: 301, refusals: [] };
+  const drawn = blockOf(section as never, new Map(), AT);
+  assert.equal(drawn.total, 301);
+  assert.equal(drawn.shown, 301, 'a section drew a slice line over rows it never draws');
+});

@@ -1678,12 +1678,28 @@ export const copy = {
   fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
   theSignatureNotHere: 'Every export and every backup is signed. The public half of the key that signs them is not shown here yet, so there is nothing on this screen to hand to somebody checking a copy.',
 
-  /* deletion — `02 §9`: browser session, re-authenticated, the slug typed */
-  /* `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on the screen — in the
-     section whose own comment condemns *"three lines, two of them the same sentence"*. This one
-     carries what `deleteWhat` does not: how long a change of mind lasts, and when the last copy is
-     gone (`53 §5.9`). */
-  deleteCosts: 'A final copy is kept for the rest of today, in case you change your mind within the hour. Within thirty days nothing of this record is left anywhere.',
+  /* deletion (`02 §9`): browser session, re-authenticated, the slug typed */
+  /* THE ONE LINE THAT INVITED A REVERSAL WAS THE LINE THE HOST REFUSES FOR EVER. This read *"A
+     final copy is kept for the rest of today, in case you change your mind within the hour. Within
+     thirty days nothing of this record is left anywhere."* Changing your mind here means making the
+     record again at the same name, and `Directory.prepare` (`apps/worker/src/index.ts`) answers a
+     slug whose claim reads `released` with *"was the name of another record and is never given out
+     again"*. Deleting burns the name, permanently, and neither sentence on the screen said so.
+
+     AND THE COPY IT PROMISED IS NOT TAKEN. `deleteRecord` (`packages/record/src/index.ts`) calls
+     `destroy()` and nothing else, and the Worker's `destroy` deletes the alarm, deletes every byte
+     and closes the names. The nightly R2 copy that landed this batch (`apps/worker/src/snapshots.ts`)
+     is the cron's and is read by nobody in the app: no `snapshots` port is handed to the record, so
+     restoring answers `NOT_IN_THIS_BUILD`. There is nothing here he can go back to.
+
+     WHAT `53 §5.9`'s DAY +30 IS DOING OFF THIS SCREEN. Pruning runs inside `take`, for records the
+     Directory still lists, and a deleted record is not listed, so this screen is not the place to
+     assert where the last byte is. What is left is the cost he can act on before he presses it.
+
+     `deleteWhat` carries "It cannot be undone" one line above this, in the section whose own comment
+     condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
+  deleteCosts:
+    'The name is given up for good, and no record here can use it again. Nothing is kept to go back to, so export a copy first if you want the rows.',
   typeSlug: (slug: string) => `Type ${slug} to confirm`,
 
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,

@@ -538,18 +538,48 @@ export type PackInfo = {
 };
 
 /**
- * The kinds that REDUCE, and are therefore handed the whole answer rather than a page of it.
+ * The kinds that ADD THEIR ROWS UP, and are therefore wrong when they are handed a page of the answer.
  *
- * `bar` groups and counts, `chips` groups and counts, `gauge` sums against a target: each one is
- * arithmetic over every row the predicate admitted, because a sum of the first page is a wrong
- * number rather than a short list. `limit:` cuts their GROUPS, never their rows.
+ * `bar` groups and counts, `chips` groups and counts, `gauge` sums against a target, `split` shares
+ * one total out between its groups, `progress` measures what was spent against what was budgeted:
+ * each one is arithmetic over every row the predicate admitted, because a sum of the first page is
+ * a wrong number rather than a short list. `limit:` cuts their GROUPS, never their rows.
  *
  * IT IS HERE, IN THE FILE THAT IMPORTS NOTHING, because two files need it and neither may import
- * the other: `blocks.ts` is where the three functions read `matched`, and `api.ts` is where the
- * count of what a block draws is computed. Those two disagreeing is a slice line saying "Showing 5
- * of 38" over a chart with all thirty-eight rows in it.
+ * the other: `api.ts` computes the count of what a block draws from the sample, and `page-live.ts`
+ * refuses a live answer that came back short. The second of those held a SECOND copy of the list
+ * until now, four kinds long, in the file whose whole job is refusing a partial sum: `progress` was
+ * in the kernel's set and not in that one, so the kernel capped a progress block's rows at 200 and
+ * the app drew the short answer without a word. Measured before the fix, through the kernel on a
+ * record with 301 obligations: `progress rows 200 matched 301 refusals []`.
+ *
+ * (The sentence here used to name `blocks.ts` as the second reader. It imports `Entry` from this
+ * file and nothing else, and reads `matched` off the block it was handed, so the copy it was said
+ * to be keeping in step with was not there.)
+ *
+ * `section` IS NOT ONE OF THESE AND IS IN `REDUCES` BELOW. The two questions are not the same
+ * question, and one set answering both is what let the three copies disagree.
  */
-export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'section', 'split']);
+export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'split']);
+
+/**
+ * `SUMS` and `section`: the kinds whose count on screen is the whole match rather than the page drawn.
+ *
+ * `api.ts` reads this for `shown` on the sample and `page-live.ts` reads it for `shown` on a live
+ * answer, and the two disagreeing is a slice line saying "Showing 5 of 38" over a chart with all
+ * thirty-eight rows in it. They did disagree about `section` until this set was read in both:
+ * measured through `blockOf` on a section with 2 rows and `matched: 301`, `shown 2, total 301`,
+ * which is what `/p/[slug]` prints "Showing 2 of 301" on, while the sample printed nothing.
+ *
+ * A SECTION IS HERE AND NOT IN `SUMS` BECAUSE IT ADDS NOTHING UP. `blocks.ts`'s `sectionRow` draws
+ * its count from `total` and says so in its own comment, so the number over a section is right
+ * however few rows came back with it. Measured on the same 301 obligations, a section drew its
+ * default 50 rows against `matched: 301` and was correct, so a section in `SUMS` would refuse a
+ * heading that had nothing to be wrong about. `packages/kernel/src/pages.ts` carries the same five
+ * for the same reason, and refuses there so that every consumer of the record gets the refusal and
+ * not only this one.
+ */
+export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

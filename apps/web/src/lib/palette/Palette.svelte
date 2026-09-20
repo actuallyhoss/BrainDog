@@ -535,10 +535,20 @@
          listed every one of them under their own heading, so an unprefixed query drew each matching
          page twice: once as a page and once as a record hit. The hits are what gets dropped rather
          than the pages, because `/` is the prefix somebody types to see pages and `#` is not, and
-         the total has to lose them with the rows or the count is about a list nobody is shown. */
+         the total has to lose them with the rows or the count is about a list nobody is shown.
+
+         ONCE IS NOT NONE, AND IT USED TO BE, FOR ANY PAGE THE RAIL DID NOT CARRY. This dropped
+         every hit of the kind, on the assumption that the branch above had listed all of them. The
+         rail is capped per register, so at a real size it carries some of a register's pages and
+         not the rest, and the ones it left out were then dropped here too: a page the record holds,
+         the search finds, and the palette shows nowhere. The palette is the one door that is
+         supposed to reach everything, so the test is now what was actually drawn rather than what
+         kind the hit is. `nav` is the same list the loop above iterates, so the two cannot drift. */
       const twice = prefix === null;
-      const asPages = found.groups.find((g) => g.kind === copy.pages)?.total ?? 0;
-      const kept = found.hits.filter((hit) => (prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`)) && !(twice && hit.kind === copy.pages));
+      const listed = new Set(nav.map((entry) => entry.href));
+      const dropped = (hit: { kind: string; href: string }): boolean => twice && hit.kind === copy.pages && listed.has(hit.href);
+      const asPages = found.hits.filter(dropped).length;
+      const kept = found.hits.filter((hit) => (prefix !== '@' || hit.href.startsWith(`/r/${PEOPLE}/`)) && !dropped(hit));
       /* THE TOTAL IS THE SCOPE'S, NOT THE RECORD'S. `@` narrows to one register, so the number the
          status line compares against has to be that register's count, read off the group `search()`
          already returns rather than recounted, so the two can never disagree. */

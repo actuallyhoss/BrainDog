@@ -498,15 +498,18 @@ test('and the delete control is the confirmation rather than a sentence about on
   assert.doesNotMatch(src, /toasts\.push\([^)]*Deleting a record asks you to type its name first/u, 'the toast still describes the safeguard');
   /* The slug is the record's own, not its display name: `deleteRecord({ slug })`. */
   assert.match(copy.typeSlug('the-studio'), /the-studio/u);
-  /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD. `53 §5.9`: no rollback, and by day +30 nothing
-     remains anywhere. */
-  /* `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen — two lines, the
+  /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD.
+     `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen — two lines, the
      same sentence, in the section whose own comment condemns exactly that. This one carries what
-     the other does not: how long a change of mind lasts, and when the last copy is gone. */
+     the other does not: what is given up, and that nothing is kept to go back to. */
   assert.doesNotMatch(copy.deleteCosts, /cannot be undone|no undo/iu, 'it repeats the line above it again');
   assert.match(copy.deleteWhat('The Studio'), /cannot be undone/iu);
-  assert.match(copy.deleteCosts, /thirty days|30 days/iu);
-  assert.match(copy.deleteCosts, /rest of today|same day/iu, '`53 §5.9`: a final copy exists so a same-day change of mind is answerable');
+  /* AND IT PROMISES NO WINDOW. It used to read "thirty days", off `53 §5.9`'s retention rule, and
+     that rule is about what the platform stops walking, not about a copy this screen can hand
+     back: there is no restore, so a number here reads as one. `settings/delete-costs.test.ts`
+     holds the other half, asserting the number is gone and staying gone. */
+  assert.doesNotMatch(copy.deleteCosts, /thirty days|30 days|rest of today|same day/iu, 'a window nothing can honour');
+  assert.match(copy.deleteCosts, /export/iu, 'the one thing that does answer a change of mind is the copy he takes first');
 });
 
 test('and the *Suggest new pages* switch that `19 §2` says the area exists for', () => {

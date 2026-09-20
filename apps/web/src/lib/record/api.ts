@@ -1354,17 +1354,75 @@ export const hueOf = (id: { register: string; seq: number } | undefined): number
 export const pages = (): Record<string, PageDecl> => resolvePages(PAGES);
 
 export function boot() {
-  const nav: NavEntry[] = Object.values(pages())
-    .filter((p) => p.nav && p.placed !== false)
-    .map((p) => ({
+  /* ONE RESOLUTION, READ TWICE. The rail below and the pen at the bottom of this function each
+     called `pages()`, and one resolution costs 0.48 ms at 26 projects against 0.05 ms on the
+     sample, measured here. Half of a millisecond is not the reason; two snapshots of the same set
+     inside one answer is, because a template expands against `ROWS` and the two lists a `boot`
+     hands the shell should not be able to disagree about what a page is. */
+  const resolved = Object.values(pages());
+
+  /**
+   * ONE PAGE PER ROW IS A PAGE RULE AND IT WAS ALSO THE RAIL'S, which nothing had ever counted.
+   *
+   * A declaration carrying `for:` becomes one page per row it admits, and every one of them
+   * carrying `nav` went into the rail. Measured on a record at his scale, 27 projects with 26 of
+   * them building or earning, 401 tasks and 91 credentials: 36 rail entries, 27 of them under
+   * Projects, against 13 entries on the sample. That is the argument written below for the open
+   * tracks, arriving at the other thing in this function that grows one entry per row, so it gets
+   * the same answer and the same number: a rail that grows without bound is a rail that stops
+   * being a rail.
+   *
+   * COUNTED PER REGISTER THE ROWS COME FROM AND PER HEADING THEY LAND UNDER, so a page somebody
+   * wrote is never pushed out of the rail by rows landing in a list. The five kept are the first
+   * five rows the template admits, which is already the order the rail draws them in, because
+   * `resolvePages` numbers each page's `nav.order` by its position in that same set.
+   *
+   * THE HEADING IS IN THE KEY BECAUSE ONE REGISTER CAN CARRY TWO TEMPLATES, which is what a pack
+   * installing a second view of a list somebody already keeps produces. Counted per register
+   * alone, the first template spent the whole budget and the second drew NOTHING: measured with a
+   * `Clients` template over `things` beside the shipped `Projects` one at 26 projects, Projects
+   * drew 6 and Clients drew 0, so a heading a declaration asked for was gone rather than short.
+   * Per heading, rows still cannot grow either one past five, which is what the cap is for; what
+   * adds a heading is somebody writing a declaration, not the record filling up.
+   *
+   * NOTHING IS HIDDEN BY THIS, which is the test the tracks cap passes too. `/p/<its own name>`
+   * still resolves, the Projects list in the rail carries the whole count beside its name, its row
+   * still answers the palette, and `/p/portfolio` is a page whose entire job is listing them with
+   * what each one needs. What goes is the standing offer to read 26 links every morning to find one.
+   *
+   * THE PALETTE IS THE ONE PLACE THAT DID NOT SURVIVE THIS UNTOUCHED, and it is not this file.
+   * `Palette.svelte` lists pages out of the rail rather than out of `pages()`, `/` never calls
+   * `search()` at all, and an unprefixed query throws away every page-kind hit as a duplicate of a
+   * rail row. Measured at 26 projects: typing `project 26` offers `/r/things/26` and no longer
+   * offers `/p/project-26`. Harmless at the size the sample is, because nothing here is capped
+   * until a register carries more than five rows a template admits, and it is the first thing to
+   * put right in that file before this rule reaches the rail a live record draws.
+   */
+  const RAIL_PAGES = 5;
+  const drawn = new Map<string, number>();
+  const nav: NavEntry[] = [];
+  for (const p of resolved) {
+    if (!p.nav || p.placed === false) continue;
+    /* `identity` is set by `resolvePages` on the pages a template produced and on no others, so
+       this counts pages about a row and leaves every declared page alone. The key is a JSON pair
+       rather than two strings joined, because a section is 40 bytes of somebody's own words and
+       any separator picked here is one they are allowed to type. */
+    const about = p.identity ? JSON.stringify([p.identity.register, p.nav.section]) : undefined;
+    if (about) {
+      const n = (drawn.get(about) ?? 0) + 1;
+      drawn.set(about, n);
+      if (n > RAIL_PAGES) continue;
+    }
+    nav.push({
       id: p.page,
       title: p.title,
       href: `/p/${p.page}`,
-      section: p.nav!.section,
-      order: p.nav!.order,
+      section: p.nav.section,
+      order: p.nav.order,
       icon: iconFor(p.icon, 'doc'),
       hue: hueOf(p.identity),
-    }));
+    });
+  }
 
   /* OPEN TRACKS IN THE RAIL, under their own heading. A track is a thing you are in the middle of,
      so the whole point is getting back into it — and a thread you have to go and find through a
@@ -1438,7 +1496,7 @@ export function boot() {
     },
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3). */
-    pen: Object.values(pages()).filter((p) => p.placed === false),
+    pen: resolved.filter((p) => p.placed === false),
     me: {
       person: 'you',
       level: 'owner' as const,

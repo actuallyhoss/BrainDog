@@ -2437,9 +2437,11 @@
       <Section title={copy.deleteRecord(RECORD)}>
         <div class="danger">
           <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
-          <!-- WHAT IT COSTS, BEFORE THE FIELD. `53 §5.9`: *"Rollback: none after step 2 … by day +30
-               nothing of the record remains anywhere"*, and a final snapshot exists only so that a
-               same-day "wait" is answerable. -->
+          <!-- WHAT IT COSTS, BEFORE THE FIELD, AND THE COST IS THE NAME. This line used to offer a
+               final copy and an hour to change his mind. `Directory.prepare` refuses a released
+               slug with *"is never given out again"*, so the reversal it invited is the exact one
+               the host has already decided against, and `destroy()` takes no copy on the way out.
+               `delete-costs.test.ts` holds both. -->
           <p class="danger-why">{copy.deleteCosts}</p>
           <label class="code-label" for="delete-slug">{copy.typeSlug(SLUG)}</label>
           <div class="code-row">
