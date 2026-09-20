@@ -2781,13 +2781,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           for (const key of ['next', 'doing', 'branch', 'head'] as const) if (lines[key] !== undefined) patch[key] = lines[key];
           if (lines.tried !== undefined) patch.tried = [...listOf(now.fields.tried), lines.tried].slice(-KEPT);
           if (lines.note !== undefined) patch.notes = [...listOf(now.fields.notes), lines.note].slice(-KEPT);
+          /* A STATE THE CALLER NAMED IS THE STATE IT GETS. Revival is for the call that names none: a token
+             writing a handoff is working again, so a run that had gone quiet comes back, the way an attach
+             revives one. A quiet run that asks to hand off must be able to, because `handoff` is exempt from
+             the twelve-hour sweep and `idle` is not. */
           if (typeof said.state === 'string') patch.state = said.state;
+          else if (token && REVIVED.includes(now.state ?? '')) patch.state = 'active';
           /* A FINISHED RUN LEAVES ITS OLD NEXT STEP BEHIND. The briefing hands the newest next step here to whoever
              starts, and a step the run has since finished sends them after work that is done. A next step named in
              the same call is the one it leaves. */
           if (typeof said.state === 'string' && RUN.done.includes(said.state) && lines.next === undefined && now.fields.next !== undefined)
             patch.next = null;
-          else if (token && REVIVED.includes(now.state ?? '')) patch.state = 'active';
           return kernel.update(SESSION, now.id, patch, by);
         }),
       );

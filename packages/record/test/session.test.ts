@@ -285,6 +285,31 @@ test('A RUN MARKED DONE LEAVES ITS OLD NEXT STEP BEHIND, so the next briefing do
   sql.close();
 });
 
+test('A STATE THE CALLER NAMED IS THE STATE IT GETS, and a quiet run only revives when no state was named', async () => {
+  const { api, sql } = await record();
+  const said = agent({ ...HERE, client_id: 'c-1' });
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, said));
+
+  /* A RUN THAT WENT QUIET CAN STILL HAND OFF. `handoff` is exempt from the twelve-hour sweep and `idle`
+     is not, so turning one into the other is not a smaller version of the same thing: it is the
+     difference between a run someone picks up and a run that is swept away. */
+  assert.equal(value<Entry>(await api.handoff({ state: 'idle' }, said)).state, 'idle');
+  assert.equal(value<Entry>(await api.handoff({ state: 'handoff' }, said)).state, 'handoff');
+
+  /* AND IT CAN STILL FINISH. A second run, so the first keeps its own history. */
+  const two = agent({ ...HERE, client_id: 'c-2' });
+  value(await api.attach({ source: 'startup', client_id: 'c-2' }, two));
+  assert.equal(value<Entry>(await api.handoff({ state: 'idle' }, two)).state, 'idle');
+  assert.equal(value<Entry>(await api.handoff({ state: 'done', note: 'Nothing came of it.' }, two)).state, 'done');
+
+  /* REVIVAL IS FOR THE CALL THAT NAMES NO STATE: a token writing a handoff is working again. */
+  const three = agent({ ...HERE, client_id: 'c-3' });
+  value(await api.attach({ source: 'startup', client_id: 'c-3' }, three));
+  value(await api.handoff({ state: 'idle' }, three));
+  assert.equal(value<Entry>(await api.handoff({ next: 'Read the gate output' }, three)).state, 'active');
+  sql.close();
+});
+
 /* ── whose run it is ─────────────────────────────────────────────────────── */
 
 /** Another token's call: `tok_2` of another person, or `tok_3`, the same person's narrower key. */
