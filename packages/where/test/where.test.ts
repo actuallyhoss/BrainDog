@@ -1362,6 +1362,32 @@ test('`{not: predicate}` SAYS HOW TO NEGATE, rather than that `undefined` is not
 
 /* ── a group that names two quantifiers ──────────────────────────────────── */
 
+test('AND A QUANTIFIER WRITTEN OUT AND LEFT EMPTY COUNTS AS NAMED, which is the boundary of that refusal', () => {
+  /**
+   * THE GUARD ASKS `k in node`, SO A KEY THAT IS PRESENT AND HOLDS `undefined` REFUSES. Before the
+   * refusal existed both of these compiled as the `all` leg, so this is a real change of answer
+   * and it should be somebody's decision rather than a side effect of how the guard was spelt.
+   *
+   * It is the right answer for three reasons. `quantifierOf` and `childrenOf` both read the shape
+   * with `in`, so a value check here would disagree with the two functions the guard exists to
+   * protect. The spec's invariant is about which keys a node has and not about what they hold.
+   * And JSON cannot carry `undefined`, so nothing arriving over the wire, out of a saved view or
+   * out of a pack file can reach this case at all: the only caller that can is TypeScript writing
+   * `{ all: xs, none: cond ? ys : undefined }`, and a sweep of the tree found no such site.
+   *
+   * This test exists so that if somebody later decides the opposite, they change it on purpose.
+   */
+  for (const empty of [undefined, null]) {
+    const c = compile({ all: [{ field: 'state', is: 'open' }], none: empty } as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `none: ${String(empty)} compiled instead of refusing`);
+    assert.match(c.bad[0]!.fix!, /all and none/u, 'the refusal does not name the key that was left empty');
+  }
+
+  /* AND THE KEY BEING ABSENT IS STILL THE ORDINARY CASE, so the line above is a boundary and not a
+     ban on one-quantifier groups. */
+  assert.deepEqual(compile({ all: [{ field: 'state', is: 'open' }] }, SCHEMA).bad, []);
+});
+
 test('A GROUP NAMING TWO QUANTIFIERS IS REFUSED, and it used to answer the first and drop the second', () => {
   /**
    * `Group` IS A UNION OF THREE ONE-KEY OBJECTS AND NOTHING CHECKED THAT IT WAS ONE.

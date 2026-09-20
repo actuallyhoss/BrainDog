@@ -714,6 +714,15 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
        * read. The fix line names the two words actually in the object rather than reciting the
        * three, because the reader's job is to delete one of their own.
        */
+      /* `in` AND NOT A VALUE CHECK, WHICH IS A DECISION AND NOT AN OVERSIGHT. A key written
+         explicitly and left `undefined` refuses, where before the guard it compiled as the other
+         leg. That is deliberate on three grounds: `quantifierOf` and `childrenOf` both read the
+         shape with `in`, so the guard agrees with the two readers it protects; the spec's
+         invariant is about which keys a node has, not what they hold; and JSON cannot carry
+         `undefined` at all, so no predicate arriving over the wire or out of a pack can reach it.
+         The one caller that could is TypeScript writing `{ all: xs, none: cond ? ys : undefined }`,
+         and a sweep of the tree found no such site. It is pinned by a test either way, because a
+         boundary nobody asserted is a boundary that moves the next time somebody refactors here. */
       const named = QUANTIFIERS.filter((k) => k in node);
       if (named.length > 1) {
         bad.push(
