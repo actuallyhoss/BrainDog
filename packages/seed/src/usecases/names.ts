@@ -48,6 +48,7 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'txn-categorise': 'Categorise what cleared',
   'installment-due-soon': 'Say when a part falls due',
   'recurring-missed': 'Catch a repeat that did not happen',
+  'recurring-ended': 'End a schedule on its last day',
 };
 
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */

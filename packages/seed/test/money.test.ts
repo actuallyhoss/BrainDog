@@ -632,7 +632,83 @@ test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the ba
      is two answers about the same thirty days, one block apart on one screen. */
   const bridge = (PAGES.money!.blocks as readonly { kind?: string; from?: unknown }[]).find((b) => b.kind === 'bridge');
   assert.ok(bridge, 'the money page draws a thirty-day bridge');
-  assert.deepEqual(bridge.from, from, 'the bridge walks the legs the walk above it walks');
+  assert.equal(bridge.from, from, 'the bridge and the walk are handed the ONE array, not two copies a deepEqual holds level');
+});
+
+/**
+ * EVERY BLOCK ON `/p/money` THAT SPEAKS ABOUT THE NEXT THIRTY DAYS, READ OFF THE DRAWN PAGE.
+ *
+ * THE DEFECT THIS IS WRITTEN AGAINST WAS TWO ANSWERS TO ONE QUESTION. `ca30d210` added the
+ * `installments` leg to the walk and to the bridge and left the two tiles above the bridge reading
+ * `obligations` alone, so the page said "Coming in, 30 days: GBP 9,090.00" in the hero and "Coming
+ * in: GBP 11,490.00" one block under it, and "Going out, 30 days: GBP 38,880.00" over "Going out:
+ * GBP 42,741.00". Its own commit message is the argument: two blocks on one screen disagreeing about
+ * the same month is worse than either number alone.
+ *
+ * AND THE TILES CANNOT BE MADE TO WALK, which is a fact about the shape and not a thing left undone.
+ * `MetricDecl.source` is one `register.<id>` and a `split` names one register too, so three of the
+ * four blocks below can only ever read `obligations` while the bridge reads three lists. What the
+ * page can do is stop saying the same words twice: the three narrow blocks say whose money they
+ * count, and this test holds each of them to the penny against the leg of the walk it is a part of.
+ *
+ * THE LEGS ARE NAMED HERE ON PURPOSE. A fourth leg added to `CASH_LEGS` turns this red, which is the
+ * moment somebody has to decide what the tiles say about it, rather than the moment the two figures
+ * quietly drift apart again.
+ */
+test('THE TILES, THE SPLIT AND THE BRIDGE ON `/p/money` ARE A PART AND A WHOLE, and no two of them answer one question twice', async () => {
+  const k = await seeded();
+
+  const stat = blockOf(k, 'money', 'Right now');
+  const tile = (metric: string) => {
+    const cell = stat.readings?.find((r) => r.metric === metric);
+    assert.ok(cell?.reading, `the hero draws ${metric}`);
+    assert.equal(cell.reading.unit, 'GBP');
+    return { value: cell.reading.value!, label: cell.label };
+  };
+  const owedIn = tile('in-30d');
+  const owedOut = tile('out-30d');
+
+  /* THE WORDS FIRST. `copy.bridgeIn` and `copy.bridgeOut` are "Coming in" and "Going out", and a
+     tile wearing those over a different number is the finding. These two say which list they read. */
+  assert.deepEqual(
+    [owedIn.label, owedOut.label],
+    ['Owed to you, 30 days', 'Owed by you, 30 days'],
+    'a tile that reads one register may not wear the words of the walk that reads three',
+  );
+
+  const bridge = blockOf(k, 'money', 'The next 30 days');
+  const steps = bridge.walk?.steps;
+  assert.ok(steps && steps.length > 0, 'the bridge draws its walk');
+  const sum = (of: (s: { source: string; delta: number }) => boolean) => steps.filter(of).reduce((n, s) => n + s.delta, 0);
+
+  /* THE THREE LISTS THAT HOLD A DATED AMOUNT ON THIS RECORD. `bridgeRows` sums the positive and the
+     negative steps of exactly this walk, so these two are the two figures a reader sees on it. */
+  assert.deepEqual([...new Set(steps.map((s) => s.source))].sort(), ['installments', 'obligations', 'services']);
+  const bridgeIn = sum((s) => s.delta > 0);
+  const bridgeOut = -sum((s) => s.delta < 0);
+  assert.equal(bridgeIn, 1_149_000, 'GBP 11,490.00 arrives inside thirty days on the shipped record');
+  assert.equal(bridgeOut, 4_274_100, 'and GBP 42,741.00 leaves');
+
+  /* EACH TILE IS ITS LEG OF THAT WALK, TO THE PENNY, and that is the whole claim the new words make. */
+  assert.equal(owedIn.value, sum((s) => s.source === 'obligations' && s.delta > 0), 'Owed to you is the obligations leg of the bridge');
+  assert.equal(owedOut.value, -sum((s) => s.source === 'obligations' && s.delta < 0), 'Owed by you is the obligations leg of the bridge');
+  assert.equal(owedIn.value, 909_000);
+  assert.equal(owedOut.value, 3_888_000);
+
+  /* AND THE SPLIT UNDER THEM IS THE OUT TILE BROKEN UP, never a third total. */
+  const split = blockOf(k, 'money', 'Where it goes, next 30 days');
+  assert.equal(
+    split.rows.reduce((n, r) => n + minor(r.fields.amount), 0),
+    owedOut.value,
+    'the categories under the bridge add to the tile over it',
+  );
+
+  /* WHAT THE THREE NARROW BLOCKS CANNOT REACH, MEASURED RATHER THAN IMPLIED: the parts of a plan,
+     which `installments-due-30d` does name, and GBP 111.00 of subscriptions, which no figure on this
+     page names at all. Naming that hole is the point of writing the arithmetic out. */
+  assert.equal(bridgeIn - owedIn.value, 240_000, 'one part of the Halden licence arrives inside the thirty days');
+  assert.equal(bridgeOut - owedOut.value - reading(k, 'installments-due-30d')!, 11_100, 'and GBP 111.00 of it is the subscriptions leg');
+  assert.equal(reading(k, 'installments-due-30d'), 375_000, 'two parts of the proofing press leave inside them');
 });
 
 /**
@@ -703,14 +779,26 @@ test('A REPEATING OBLIGATION AND A REPEATING ITEM ARE THE SAME MONEY HERE, so th
  * in a `where:` and a test carrying its own copy of the filter would ask its own question and pass
  * while the screen answered something else.
  */
-const drawn = (k: Kernel, slug: string, heading: string): { matched: number; rows: readonly { fields: Record<string, unknown> }[] } => {
+type DrawnBlock = {
+  heading?: string;
+  matched: number;
+  refusals: readonly unknown[];
+  rows: readonly { fields: Record<string, unknown> }[];
+  readings?: readonly { metric: string; label?: string; reading: { value: number | null; unit: string | null } | null }[];
+  walk?: { steps: readonly { source: string; delta: number; label: string }[] };
+};
+
+const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
   const out = k.page(slug);
   assert.ok(out.ok, `${slug}: ${sayOf(out)}`);
-  const block = (out.value as { blocks: readonly { heading?: string; matched: number; refusals: readonly unknown[]; rows: readonly { fields: Record<string, unknown> }[] }[] }).blocks.find(
-    (b) => b.heading === heading,
-  );
+  const block = (out.value as { blocks: readonly DrawnBlock[] }).blocks.find((b) => b.heading === heading);
   assert.ok(block, `${slug} draws a block headed ${heading}`);
   assert.deepEqual(block.refusals, [], 'a block that refuses is a heading over a blank rectangle');
+  return block;
+};
+
+const drawn = (k: Kernel, slug: string, heading: string): { matched: number; rows: readonly { fields: Record<string, unknown> }[] } => {
+  const block = blockOf(k, slug, heading);
   return { matched: block.matched, rows: block.rows };
 };
 
@@ -759,11 +847,11 @@ test('A HEADING THAT SAYS PAY OVER TWO ROWS OF MONEY COMING IN, because the tabl
  *      writes `ends` only when it is still ahead, so on the one real record every row carrying an
  *      `ends` at all is a schedule that IS still running. That clause drops exactly those.
  *
- * So the repair belongs where the row is, not where the filter is: a rule over `recurring` with
- * `when: 'state is live, ends before today'` and `then: [{ move: 'ended' }]` would be swept hourly by
- * `rulesAboutTime` and would put every reader right at once. It is not written here because
- * `test/names.test.ts` holds `RULE_NAMES` and `RULES` to the same keys, and `usecases/names.ts` is
- * another agent's file this run.
+ * SO THE REPAIR WENT WHERE THE ROW IS, AND IT IS `recurring-ended`: `when: 'state is live, ends
+ * before today'`, `then: [{ move: 'ended' }]`, swept hourly by `rulesAboutTime` because its `when:`
+ * names a relative day and it declares `once_per`. The test below drives that sweep over a clock
+ * that moves, rather than asserting the declaration exists: a rule that only ever fired on a write
+ * would be exactly the rule this list already had.
  *
  * AND THE TILE IN THE SAME FINDING IS ALREADY OUT OF IT. "Repeating, out" reads `every-month-out`
  * over `obligations`, which has no `ends` field at all: the two `recurring-*` figures the finding was
@@ -774,14 +862,20 @@ test('A HEADING THAT SAYS PAY OVER TWO ROWS OF MONEY COMING IN, because the tabl
  * is older than `29c58c9e`, the commit that wrote the finding down. One block on one screen still
  * reads this list.
  */
-test('A SCHEDULE THAT STOPPED IN MARCH IS STILL COUNTED EVERY MONTH, and the sentence that would drop it is not one this grammar can say', async () => {
-  const k = await seeded();
+test('A SCHEDULE ENDS ON ITS LAST DAY BECAUSE AN HOURLY SWEEP ENDS IT, and the sentence that would have dropped it from the filter is not one this grammar can say', async () => {
+  /* A CLOCK THAT MOVES, WHICH IS THE WHOLE TEST. A rule that fires when the row is written would
+     have caught nothing here: the row below is written while its end day is still ahead, exactly as
+     the importer writes one, and it is the PASSING of that day with nobody touching the row that
+     `rulesAboutTime` exists for. Every other test in this file opens the record at `NOW`. */
+  let now = NOW;
+  const k = await openRecord(openSqlite(), { now: () => now });
+  const installed = await installSeed(k);
+  assert.ok(installed.ok, sayOf(installed));
 
-  /* NOTHING IN THE TREE FLIPS `state` TO `ended` WHEN THAT DAY PASSES. `recurring-missed` is the only
-     rule over this list and it watches `next_due`; `rulesAboutTime` sweeps hourly and has no rule to
-     sweep for this. The sample hides it because its one stopped row was hand-set to `ended`, so the
-     shape a real record has is written here instead: the importer skips a stream that ended before
-     the export (`apps/cli/src/legacy.ts:916`) rather than ending the row it wrote last time. */
+  /* THE SAMPLE HIDES THE SHAPE because its one stopped row was hand-set to `ended`. This is the
+     shape a real record has: the importer writes `ends` only when it is ahead and skips a stream
+     that stopped before the export (`apps/cli/src/legacy.ts:916`), so what a record accumulates
+     is live rows whose end day goes past while nothing writes to them. */
   const stopped = k.create(
     'recurring',
     {
@@ -789,30 +883,67 @@ test('A SCHEDULE THAT STOPPED IN MARCH IS STILL COUNTED EVERY MONTH, and the sen
       direction: 'out',
       amount: { amount: 24_900, currency: 'GBP' },
       every: 'monthly',
-      next_due: day(-184),
+      next_due: day(3),
       started: day(-600),
-      ends: day(-184),
+      ends: day(3),
       state: 'live',
     },
     { actor: 'p_test' },
   );
   assert.ok(stopped.ok, sayOf(stopped));
+  const passId = (stopped.value as { id: string }).id;
+  const stateOfPass = () => (k.get(passId) as { fields: Record<string, unknown> }).fields.state;
 
-  const split = drawn(k, 'ledger', 'Every month, by what it is for');
-  const total = split.rows.reduce((n, r) => n + minor(r.fields.amount), 0);
-  /* MEASURED ON THE SHIPPED RECORD PLUS THAT ONE ROW: five rows and GBP 6,940.00 a month, where
-     GBP 6,691.00 of it repeats and GBP 249.00 stopped on 3 March. It is counted at its full monthly
-     share for ever, and so is every row like it. */
-  assert.equal(split.matched, 5, 'a red here is the repair landing and not a break: four rows means the stopped schedule is out');
-  assert.equal(total, 694_000, 'and GBP 6,691.00 here means the same thing, because GBP 249.00 of this total stopped on 3 March');
-  assert.ok(
-    split.rows.some((r) => r.fields.what === 'Tallow studio pass'),
-    'the split still draws a schedule whose end day is behind today',
+  const split = () => {
+    const block = drawn(k, 'ledger', 'Every month, by what it is for');
+    return { matched: block.matched, total: block.rows.reduce((n, r) => n + minor(r.fields.amount), 0), rows: block.rows };
+  };
+
+  /* MEASURED ON THE SHIPPED RECORD PLUS THAT ONE ROW: five rows and GBP 6,940.00 a month, of which
+     GBP 249.00 is the pass. While its day is ahead that is the right answer. */
+  assert.equal(split().matched, 5);
+  assert.equal(split().total, 694_000);
+
+  /* THE LAST DAY ITSELF, SWEPT, BECAUSE `before` IS EXCLUSIVE AND A SCHEDULE'S LAST DAY IS ITS OWN.
+     `ends` is `day(3)`, so this is the day the pass names as its last, and the payment on it is still
+     owed. Measured: the rule does not match, the row stays live, and no `once_per` marker is claimed,
+     which is why the sweep four days on below still fires. `ends before +1d` in place of `ends before
+     today` would end the schedule on the morning of a payment it still owes, and without this step
+     nothing in this test would have said so. */
+  now = NOW + 3 * 86_400_000;
+  k.purge();
+  assert.equal(stateOfPass(), 'live', 'a schedule is live on the last day it names');
+  assert.equal(split().matched, 5, 'and the split still counts it, because that month is still owed');
+
+  /* FOUR DAYS ON, WHICH IS THE DAY AFTER ITS LAST, AND NOBODY HAS TOUCHED THE ROW. This is the defect
+     as a record lives it: the split has no clause about `ends`, so on its own it goes on counting a
+     schedule that stopped, at its full monthly share, for ever. */
+  now = NOW + 4 * 86_400_000;
+  assert.equal(split().matched, 5, 'the split says nothing about `ends`, so the day passing changes nothing on its own');
+  assert.equal(split().total, 694_000);
+
+  /* THE HOURLY SWEEP, DRIVEN. `purge()` is `sweepRecord`, which calls `rulesAboutTime`, which reads
+     every rule whose `when:` names a relative day and which declares `once_per` — `recurring-ended`
+     is one — and applies it in bulk over its register. */
+  k.purge();
+
+  assert.equal(split().matched, 4, 'the stopped schedule is out of the split');
+  assert.equal(split().total, 669_100, 'GBP 6,691.00 a month, which is GBP 249.00 less than before the sweep');
+  assert.deepEqual(
+    split().rows.filter((r) => r.fields.what === 'Tallow studio pass'),
+    [],
+    'and it is out because the row moved, not because a filter learned to hide it',
   );
 
-  /* AND THE REPAIR AS IT IS RECORDED IS A REFUSAL, which is why this test records a number rather
-     than repairing anything. `or` in this grammar is over the VALUES of one field, so the clause is
-     read as `ends is <the words empty or ends after today>`. */
+  /* THE ROW ITSELF, because a split is a sum and a sum can be right for the wrong reason. `paused`
+     would pass every assertion above this one: the split reads `state is live` and would drop the row
+     either way, and the state the rule moves it to is only visible here. */
+  assert.ok(k.get(passId), 'the row is still there, ended rather than removed');
+  assert.equal(stateOfPass(), 'ended');
+
+  /* AND THE REPAIR AS IT WAS RECORDED IS STILL A REFUSAL, which is why the rule was written instead
+     of the filter. `or` in this grammar is over the VALUES of one field, so the clause is read as
+     `ends is <the words empty or ends after today>`. Pinned so nobody tries it again. */
   const said = k.list({ register: 'recurring', where: 'state is live, direction is out, every is monthly, ends is empty or ends after today', limit: 50 });
   assert.ok(refused(said), 'the recorded repair parses, and it must not');
   assert.equal(said.refusal.code, 'VALUE_MALFORMED');

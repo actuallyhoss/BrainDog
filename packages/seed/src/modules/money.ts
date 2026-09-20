@@ -919,11 +919,27 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* THE NEXT THIRTY DAYS, AND LATE MONEY IS STILL COMING. A calendar month shrinks to nothing on the
-     29th, and `before` is exclusive, so the month's last day could not be said anyway. */
+  /**
+   * THE NEXT THIRTY DAYS, AND LATE MONEY IS STILL COMING. A calendar month shrinks to nothing on the
+   * 29th, and `before` is exclusive, so the month's last day could not be said anyway.
+   *
+   * AND THESE TWO WERE CALLED "Coming in, 30 days" AND "Going out, 30 days", WHICH ARE THE BRIDGE'S
+   * OWN WORDS. Measured on the shipped record, drawn: the tile read GBP 9,090.00 coming in and the
+   * bridge two blocks under it read GBP 11,490.00; the tile read GBP 38,880.00 going out and the
+   * bridge read GBP 42,741.00. Same page, same thirty days, same three words, GBP 2,400.00 and
+   * GBP 3,861.00 apart, because a figure reads ONE register (`MetricDecl.source`) and the walk
+   * beside it reads three: the parts of a plan and the subscriptions are dated money no figure on
+   * this page can reach.
+   *
+   * SO THE TILE SAYS WHICH PART IT IS, rather than claiming a whole it cannot count. `Owed to you`
+   * and `Owed by you` are this predicate read out loud (`direction is owed to me`), and they are
+   * the words the register's own `owed-to-you` and `owed-by-you` figures already use. Measured
+   * again after the rename: the tile is the bridge's obligations leg to the penny, in and out, and
+   * `test/money.test.ts` reads both off the DRAWN page and holds them there.
+   */
   'in-30d': {
     metric: 'in-30d',
-    name: 'Coming in, 30 days',
+    name: 'Owed to you, 30 days',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before +31d`,
     value: { sum: 'amount' },
@@ -933,9 +949,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* THE OTHER SIDE OF `in-30d`, AND THE COMMENT ABOVE IT IS THIS ONE'S TOO. Its setting keeps the
+     older wording, "Most going out in 30 days", because a setting a person has already saved is
+     found by the words they saved it under. */
   'out-30d': {
     metric: 'out-30d',
-    name: 'Going out, 30 days',
+    name: 'Owed by you, 30 days',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before +31d`,
     value: { sum: 'amount' },
@@ -1352,6 +1371,48 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     then: [{ notify: { say: '{{what}} was due {{ago:next_due}}, {{money:amount}}, and its next day has not moved.' } }],
     once_per: ['entry', 'next_due'],
   },
+  /**
+   * A SCHEDULE WHOSE LAST DAY HAS GONE, MOVED RATHER THAN FILTERED AROUND.
+   *
+   * NOTHING IN THE TREE EVER FLIPPED `state` WHEN `ends` PASSED, and every reader of `recurring`
+   * paid for it. Measured on the shipped record plus one row shaped the way the importer writes
+   * them: "Every month, by what it is for" on `/p/ledger` counted a pass that stopped on 3 March
+   * 2026 at its full GBP 249.00 a month, for ever, inside a GBP 6,940.00 total.
+   *
+   * THE FILTER REPAIR CANNOT BE WRITTEN, WHICH IS THREE MEASUREMENTS AND NOT A PREFERENCE. Only the
+   * first of the three is an assertion in `test/money.test.ts`; the other two are read at the lines
+   * named here, and saying which is which is the difference between a measurement and a claim.
+   * `ends is empty or ends after today` is refused by the record, because `or` reads over the VALUES
+   * of one field and `empty` is not a value a day can hold. The same thing as a tree
+   * (`{ any: [...] }`) compiles in the kernel and is refused by the browser's mirror, which returns
+   * one refusal and no clauses for a `where:` that is not a string
+   * (`apps/web/src/lib/record/where.ts:533`), so the block would draw nought rows and a refusal. And
+   * `ends is empty` alone drops exactly the rows still running, because the importer skips a stream
+   * that ended before the export and so writes `ends` only when it is ahead
+   * (`apps/cli/src/legacy.ts:916`).
+   *
+   * SO THE REPAIR IS WHERE THE ROW IS. `rulesAboutTime` (`packages/kernel/src/index.ts:3475`) sweeps
+   * hourly every rule whose `when:` names a relative day and which declares `once_per`, so this one
+   * is re-read as time passes rather than only when somebody writes the row, and one `move` puts the
+   * split, the register page and every future reader right at once with no grammar change.
+   *
+   * IT ACTS INSTEAD OF ASKING, for the reason `installment-due-soon` tells instead of asking: a
+   * schedule that says it stopped in March has nothing left to decide, and a question whose answer
+   * is always the same is what must never fill the gate.
+   *
+   * `once_per: ['entry', 'ends']` IS ONCE A ROW PER END DAY. A person who reopens a schedule by
+   * hand and leaves the old `ends` behind it keeps their write, which is `32-PARITY` §3.2; one who
+   * moves `ends` forward is out of the filter anyway, and one who moves it to another past day is
+   * asking for it to end again and gets that.
+   */
+  'recurring-ended': {
+    rule: 'recurring-ended',
+    pack: 'money-core',
+    register: 'recurring',
+    when: 'state is live, ends before today',
+    then: [{ move: 'ended' }],
+    once_per: ['entry', 'ends'],
+  },
 };
 
 /* ── how a bank message becomes a row ────────────────────────────────────── */
@@ -1509,6 +1570,50 @@ export const MONEY_INGESTS: Record<string, SeedIngest> = {
   },
 };
 
+/**
+ * EVERY LIST ON THIS RECORD THAT HOLDS A DATED AMOUNT, WRITTEN ONCE.
+ *
+ * TWO BLOCKS ON `/p/money` WALK THESE, "Cash ahead" over 365 days and "The next 30 days" under it,
+ * and until this constant existed they walked two copies of the same array. That is not a tidiness
+ * argument: `ca30d210` had to add the `installments` leg twice, once to each copy, and its own
+ * message says why it did the second one as well as the first, that two blocks on one screen
+ * disagreeing by GBP 1,350.00 about the same month is worse than either number alone. The next leg
+ * anybody adds gets no such choice, because one array cannot drift from itself.
+ *
+ * `recurring` IS DELIBERATELY NOT HERE, and the argument is on the "Cash ahead" block below rather
+ * than copied up here, because that is where it was measured.
+ */
+const CASH_LEGS = [
+  {
+    register: 'obligations',
+    on: 'due',
+    amount: 'amount',
+    where: 'state is open or part',
+    incoming: { field: 'direction', is: 'owed_to_me' },
+    every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+  },
+  {
+    register: 'services',
+    on: 'renews',
+    amount: 'cost',
+    where: 'state is not cancelled',
+    every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+  },
+  {
+    register: 'installments',
+    on: 'due',
+    amount: 'amount',
+    /* `state is open` AND THE PAID PARTS STAY OUT, the way a settled obligation does: the money
+       already moved and Cash now is standing on the far side of it. */
+    where: 'state is open',
+    incoming: { field: 'direction', is: 'in' },
+    /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is already one
+       dated part, so a frequency over the top of it would charge the proofing press eight times
+       eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a payment, for exactly this
+       reason. */
+  },
+];
+
 export const MONEY_PAGES: Record<string, SeedPage> = {
   /**
    * THE HOUSE HOME, AS A DECLARED PAGE (`loop/research-spark.md` S13). A record with no use case draws the page called
@@ -1570,16 +1675,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     blocks: [
       {
         /* THE HERO, AND THREE FIGURES BESIDE IT. Cash now carries its twelve weeks as a line; the other
-           three are the next thirty days either way, and what goes out every month without anybody
-           deciding again. */
+           three are what is owed either way inside thirty days, and what goes out every month without
+           anybody deciding again.
+           THE TWO THIRTY-DAY TILES DO NOT WEAR THE BRIDGE'S WORDS, and `in-30d`'s comment has the
+           measurement: a figure reads one register, the bridge walks three, so a tile labelled
+           "Coming in, 30 days" over the bridge's "Coming in" was one screen giving two answers. */
         kind: 'stat',
         lead: true,
         heading: 'Right now',
         span: 12,
         cells: [
           { metric: 'cash-now', label: 'Cash now', trend: '12w', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
-          { metric: 'in-30d', label: 'Coming in, 30 days' },
-          { metric: 'out-30d', label: 'Going out, 30 days' },
+          { metric: 'in-30d', label: 'Owed to you, 30 days' },
+          { metric: 'out-30d', label: 'Owed by you, 30 days' },
           { metric: 'every-month-out', label: 'Every month' },
         ],
       },
@@ -1595,7 +1703,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         opening: { metric: 'cash-now' },
         recorded: 'cash-now',
         /**
-         * THE LEGS ARE THE LISTS THAT HOLD A DATED AMOUNT, and `installments` was not among them.
+         * THE LEGS ARE THE LISTS THAT HOLD A DATED AMOUNT (`CASH_LEGS`), and `installments` was not
+         * among them.
          *
          * Measured on the shipped record before the leg was added: six open parts, four of the
          * proofing press going out at GBP 1,875.00 and two of the Halden licence coming in at
@@ -1614,36 +1723,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
          * repeating cost really lives in is the seed question already parked in `loop/BACKLOG.md`,
          * and `test/money.test.ts` builds the leg and asserts the overlap so this stays a number.
          */
-        from: [
-          {
-            register: 'obligations',
-            on: 'due',
-            amount: 'amount',
-            where: 'state is open or part',
-            incoming: { field: 'direction', is: 'owed_to_me' },
-            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
-          },
-          {
-            register: 'services',
-            on: 'renews',
-            amount: 'cost',
-            where: 'state is not cancelled',
-            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
-          },
-          {
-            register: 'installments',
-            on: 'due',
-            amount: 'amount',
-            /* `state is open` AND THE PAID PARTS STAY OUT, the way a settled obligation does: the
-               money already moved and Cash now is standing on the far side of it. */
-            where: 'state is open',
-            incoming: { field: 'direction', is: 'in' },
-            /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is
-               already one dated part, so a frequency over the top of it would charge the proofing
-               press eight times eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a
-               payment, for exactly this reason. */
-          },
-        ],
+        from: CASH_LEGS,
         horizon: 365,
         knobs: ['horizon', 'late', 'spend', 'leave'],
         /* THE LATE KNOB MARKS HOW LATE MONEY HAS COME IN, and the chart says how many days are left when the
@@ -1654,45 +1734,32 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       },
       {
         /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
-           that lands. It walks the same legs as the table below, over a shorter horizon.
-           THE SAME LEGS MEANS THE SAME LEGS, WORD FOR WORD, and the instalments leg had to be added
-           here too: the two blocks sit one above the other on one screen, so a leg in the walk and
-           not in the bridge is two answers about the same thirty days, GBP 1,350.00 apart on this
-           record. `test/money.test.ts` compares the two arrays rather than trusting the reminder. */
+           that lands. It walks what the block above it walks, over a shorter horizon.
+           THE SAME LEGS MEANS THE SAME ARRAY NOW, not a second copy held level by a test. The two
+           blocks sit one above the other on one screen, so a leg in one and not the other is two
+           answers about the same thirty days, GBP 1,350.00 apart on this record, which is what
+           `ca30d210`'s own message was about. `test/money.test.ts` still asserts that both blocks
+           hand back the one array, because somebody pasting a copy back in is the thing `CASH_LEGS`
+           is defending against. */
         kind: 'bridge',
         heading: 'The next 30 days',
         span: 5,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
-        from: [
-          {
-            register: 'obligations',
-            on: 'due',
-            amount: 'amount',
-            where: 'state is open or part',
-            incoming: { field: 'direction', is: 'owed_to_me' },
-            every: { field: 'repeats', months: { monthly: 1, quarterly: 3, yearly: 12 } },
-          },
-          {
-            register: 'services',
-            on: 'renews',
-            amount: 'cost',
-            where: 'state is not cancelled',
-            every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
-          },
-          {
-            register: 'installments',
-            on: 'due',
-            amount: 'amount',
-            where: 'state is open',
-            incoming: { field: 'direction', is: 'in' },
-          },
-        ],
+        from: CASH_LEGS,
         horizon: 30,
         empty: 'Nothing dated in the next 30 days.',
       },
       {
-        /* WHERE THE NEXT THIRTY DAYS' SPENDING GOES, by what it is for. */
+        /* WHERE THE NEXT THIRTY DAYS' SPENDING GOES, by what it is for.
+           IT IS `out-30d` BROKEN UP AND NOTHING WIDER, which is worth saying under a bridge that
+           walks three lists: measured on the drawn page, these rows add to GBP 38,880.00, the same
+           figure the tile above shows, and the GBP 375.00 of instalment parts and GBP 111.00 of
+           subscriptions inside the same thirty days are in neither. A `split` reads one register,
+           so that is a limit of the block and not an omission in the filter.
+           THE HEADING IS NOT RENAMED WITH THE TILES ABOVE IT: seven places in two of `apps/web`'s
+           test files find this block by these exact words, four in `lib/record/api.test.ts` and
+           three in `lib/record/money.test.ts`, and that package belongs to another agent this run. */
         kind: 'split',
         heading: 'Where it goes, next 30 days',
         span: 7,
