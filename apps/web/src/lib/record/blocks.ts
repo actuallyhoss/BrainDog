@@ -257,6 +257,24 @@ function partsRows(block: BlockResult): string[] {
  * THE WALK IS THE ARITHMETIC, so the rows add up by construction: the end is the walk's last balance,
  * which is the start plus every movement it made. A walk with no movements still draws the start and
  * the end, because "nothing moves" is an answer about the next thirty days.
+ *
+ * WHICH IS WHY THE OUT ROW KEEPS ITS MINUS, next to a tile that has none over the same money.
+ * `/p/money` draws `Going out GBP −42,741.00` two blocks under `Owed by you, 30 days GBP 38,880.00`,
+ * and that was filed as one screen contradicting itself. Measured on the drawn page: the four rows
+ * are 33,850 now, 11,490 in, −42,741 out, 2,599 in thirty days, and 33,850 + 11,490 − 42,741 is
+ * 2,599 to the penny. Taking the minus off to match the tile was tried and measured too: the sum of
+ * the rows becomes 88,081 against an end still reading 2,599, `render/src/bridge.ts`'s own check
+ * answers "These rows do not add up: the start and the movements come to 88,081, and the end says
+ * 2,599", and `moveOf` reads the row as a movement UP, so the bars came back `start up up end` and
+ * the money leaving floated the same way as the money arriving. The sign is load-bearing twice.
+ *
+ * THE TILE IS RIGHT TO BE POSITIVE FOR THE OPPOSITE REASON, so this is a disagreement on purpose
+ * rather than a drift. A tile is not a term in a sum; it is one register's answer to how much is
+ * owed, and `Owed by you` carries the direction in the words, where a minus would read as owing less
+ * than nothing. Commit 491e7e05 renamed both thirty-day tiles off the bridge's words for the
+ * neighbouring failure, a tile saying `Going out, 30 days` over a figure GBP 3,861.00 short of the
+ * bridge's because a figure reads one register and this walk reads three. `blocks.test.ts` holds the
+ * pair so that neither side can move on its own.
  */
 function bridgeRows(block: BlockResult): string[] {
   const walk = block.walk;
