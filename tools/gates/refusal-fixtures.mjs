@@ -26,7 +26,7 @@
  *
  *     # fixtures/refusals/row-locked.yaml
  *     code:   ROW_LOCKED                          # UPPER_SNAKE; kebab-case of it is the file name
- *     via:    write                               # one of 40 §6's seven, the surface a runner drives
+ *     via:    write                               # one of 40 §6's nine, the surface a runner drives
  *     raises: packages/kernel/src/index.ts        # the file that CONSTRUCTS it, repo-relative
  *     derived: clash                              # optional; the code is read off this envelope, §6
  *     at:     lesson                              # the path the refusal carries (30 §6's `at`)
@@ -94,9 +94,9 @@
  * A DIFFERENT PREDICATE FROM `refusals.mjs`, ON PURPOSE, AND THEY AGREE. That gate matches the shape
  * of a refusal CONSTRUCTOR (`no(` `bad(` `refuse(` `at(`, `code:` and `new <Prefix>Error(`) because it
  * is hunting for codes outside the registry and has to see the call. This one asks the simpler
- * question: is the code written as a whole string literal anywhere in first-party source? Both are
- * at 115 on this tree, code for code, and the eleven with no fixture are exactly the eleven no line
- * constructs. Simpler is right here because the failure this gate guards against is a code somebody
+ * question: is the code written as a whole string literal anywhere in first-party source? Both print
+ * 119 on this tree, code for code, measured on September 21st 2026, and the seven with no fixture are
+ * exactly the seven no line constructs. Simpler is right here because the failure this gate guards against is a code somebody
  * NAMED and did not fixture, and a test that asserts on a code names it just as much as the line
  * that throws it.
  *
@@ -104,7 +104,7 @@
  * gate's 115 until 2026-09-20, and the two it could not see were `PULL_SHAPE_MISMATCH` and
  * `PULL_EXPECT_FAILED`: `@braindog/connect` raises by constructing, `throw new PullError('CODE', …)`
  * at eight sites, and a predicate that knew four call verbs and no constructor walked past all
- * eight. The narrow predicate learned the constructor form and both now print 115. That is the
+ * eight. The narrow predicate learned the constructor form and both printed 115 that day. That is the
  * second time the disagreement has found a raising shape nobody had written down, which is the
  * argument for keeping both rather than for making one of them authoritative.
  */
@@ -150,9 +150,11 @@ const registry = new Map(rows.map((r) => [r.code, r]));
 /**
  * `30 §6` names five and says "and the rest", handing the closed list to `40 §6`. So it is read from
  * there. A count is read from the enumeration that owns it (`34 §6`), and a `via` list copied into
- * a gate is a list that stops agreeing with the runners the day somebody adds another. Somebody did, on
- * September 20th 2026: `pull`, for the seven `PULL_` codes a scheduled connector run raises. This gate
- * needed no edit for it, which is the whole argument for reading the table.
+ * a gate is a list that stops agreeing with the runners the day somebody adds another. Somebody has now
+ * done it twice: `pull` on September 20th 2026, for the seven `PULL_` codes a scheduled connector run
+ * raises, and `ask` on the 21st, for the four codes `packages/spark` arrived with, which no runner above
+ * it drives because a spark refusal happens when a model answers. This gate needed no edit for either,
+ * which is the whole argument for reading the table.
  *
  * THE INPUT KEYS COME OFF THE SAME ROW. `40 §6`'s table gives each `via` the keys its fixtures may
  * carry, backticked and colon-suffixed (`pack:`, `predicate:`, `tamper:`), beside the nested names

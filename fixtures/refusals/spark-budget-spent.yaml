@@ -1,0 +1,22 @@
+code:   SPARK_BUDGET_SPENT
+via:    ask
+raises: packages/spark/src/propose.ts
+fix:    Add your own key, or wait.
+
+# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
+# refusal happens when a model answers and the input is a projection plus that reply, which none of
+# the eight runners drives. This code is the one of the four that refuses before the model is
+# reached, and it is still an `ask`: the surface is the palette, and the meter is its first step
+# (`46 §5.4` step 1). `40 §6` holds the row and the argument.
+#
+# NO `at:` AND ONLY THE IMPERATIVE HALF OF THE SENTENCE, both for that same reason. `spent()` at
+# `packages/spark/src/propose.ts:166` reads the tier and the month's count and answers `{ code, fix }`
+# with no address, because nothing in the ask is wrong; the month is spent. Its sentence is "Spark is
+# out of asks until <first of next month>. Add your own key, or wait.", and the date comes from
+# `core.resets()` at the moment of the call, so a fixture carrying it as a literal would be
+# asserting a month.
+#
+# AND IT IS THE METER RATHER THAN THE PER-CALL CEILING. `packages/ports/src/inference.ts` raises
+# this same code with `at: budget` when one call's own estimate is over its neuron ceiling, which is
+# a different subject with a different repair ("Raise the ceiling for this job, or send fewer
+# rows."). `30 §6` files the code as "an ask past `ask_cap` this month", and this is that site.

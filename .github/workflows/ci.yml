@@ -78,8 +78,22 @@ jobs:
       # `typecheck` is excluded because it is the step above — `run.mjs` runs it first, and running
       # `svelte-check` over `apps/web` twice in one job is a minute spent to learn nothing.
       #
-      # `bundle`, `keys`, `prefs`, `layout` and `a11y` all read `apps/web/build`, and this job does
-      # not build. Not building is deliberate: `bundle`'s staleness guard makes the build a
+      # `bundle`, `keys`, `prefs`, `layout`, `a11y`, `passkey` and `queue` all read `apps/web/build`,
+      # and this job does not build. **`passkey` and `queue` joined that list on 21 September and it
+      # is a correction, not a widening:** they read the build like the other five and USED TO EXIT 0
+      # when they did not find one, so every push counted two browser gates as passed that had never
+      # opened a browser. `d5bbe8d0` made them exit 3 and `77acdadc` moved the question to the
+      # runner, which reads a declared `needs` before it spawns anything, and the first push after
+      # that turned this step red. The red was right: the exclusion list was written against two
+      # gates that lied.
+      #
+      # `self-test` is excluded for the same reason at one remove. Five of its sixty-six seeded
+      # negatives are browser gates, so without a build it catches sixty-one and says so, and its own
+      # exit code is the failure rather than the runner's skip. The other sixty-one are worth having
+      # on every push, so the honest home for it is the job that builds; until then `gates.yml` is
+      # where all sixty-six are driven.
+      #
+      # Not building is deliberate. Not building is deliberate: `bundle`'s staleness guard makes the build a
       # PREREQUISITE rather than a step, so a job that builds must build everything the gates
       # measure — `build/`, the three variant records and the marketing site — and that is
       # `gates.yml`.
@@ -89,7 +103,7 @@ jobs:
       # is red under CI.
       # `deploy-parity` joins the excluded list for a different reason than the other five: they
       # need a build this job does not do, and it needs a LIVE HOST, which only `deploy.yml` has.
-      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,deploy-parity
+      - run: pnpm gates -- --except typecheck,bundle,keys,prefs,layout,a11y,passkey,queue,self-test,deploy-parity
 
   build:
     # A SECOND JOB RATHER THAN FIVE MORE STEPS, because it answers a different question and can

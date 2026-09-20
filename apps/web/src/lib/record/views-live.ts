@@ -285,8 +285,15 @@ export function viewReader(base: string, io?: Fetch): ViewReader {
       });
       /* A READ CANNOT CONFLICT, so the only `ok: false` a `list` answers with is a refusal. The
          client's `Result` carries the write shape too, and narrowing on the key rather than
-         asserting is what keeps a conflict from being read as a refusal with no `fix` on it. */
-      if (!out.ok) return { ok: false, refusal: 'refusal' in out ? (out.refusal as Said) : { code: 'CONFLICT', fix: liveWords.changed } };
+         asserting is what keeps a conflict from being read as a refusal with no `fix` on it.
+
+         AND THE UNREACHABLE ARM SAYS `INTERNAL` RATHER THAN A CODE OF ITS OWN. It said `CONFLICT`,
+         which is not a code anything else in this product raises: the record's conflict is
+         `VERSION_STALE`, and `CONFLICT` was a fifth invented code against the `refusals` gate's
+         budget of four, which is how CI went red on the first push in two days. `INTERNAL` is the
+         one the host already reserves for a state that cannot be reached and is deliberately not in
+         `30 §6`'s registry, which is exactly what this arm is. */
+      if (!out.ok) return { ok: false, refusal: 'refusal' in out ? (out.refusal as Said) : { code: 'INTERNAL', fix: liveWords.changed } };
       rows.push(...(out.value.rows as RecordRow[]));
       matched = out.value.matched;
       cursor = out.value.cursor;

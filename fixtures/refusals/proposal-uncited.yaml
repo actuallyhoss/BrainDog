@@ -1,0 +1,23 @@
+code:   PROPOSAL_UNCITED
+via:    ask
+raises: packages/spark/src/project.ts
+at:     "{{pct:-46.3}}"
+fix:    Name the path this figure comes from, or leave it out.
+
+# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, and not one of the
+# eight before it could carry a spark refusal. A `call:` seeds a record and invokes a method, and a
+# `pack:` is a manifest read offline; a spark refusal happens when a model ANSWERS, so the input is a
+# projection plus the reply that came back. `40 §6` gives the row its keys and `spark/test` as the
+# runner, which does not exist yet, in common with the other eight.
+#
+# THE `at` IS QUOTED BECAUSE THE VALUE IS BRACES, which unquoted YAML reads as a flow mapping. The
+# header parser in `refusal-fixtures.mjs` strips one layer of quotes, so the address is the
+# interpolation itself, which is what `packages/spark/src/project.ts:170` answers: `at: whole`, the
+# whole span and not a position inside it.
+#
+# AND THE VALUE IS MEASURED RATHER THAN CHOSEN. `packages/spark/test/cite.test.ts:68` calls
+# `cite('{{pct:-46.3}}', ALLOWED)` and asserts this code, because a computed percentage is the model
+# quoting its own arithmetic and no row holds the answer to compare it against (`46 §5.7` step 3).
+# The digit arm at line 135 addresses the same code differently, as the span around the bare digit,
+# so this fixture covers one of the two shapes and a second fixture cannot cover the other: one code
+# is one file.

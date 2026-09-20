@@ -1,0 +1,17 @@
+code:   PROPOSAL_NO_ROWS
+via:    ask
+raises: packages/spark/src/propose.ts
+fix:    A proposal names the rows behind it, or it is not filed.
+
+# `via: ask` IS THE NINTH SURFACE, MINTED FOR THESE FOUR ON SEPTEMBER 21ST 2026, because a spark
+# refusal happens when a model answers and the input is a projection plus that reply, which none of
+# the eight runners drives. `40 §6` holds the row and the argument.
+#
+# NO `at:`, AND THE SITE IS WHY. `packages/spark/src/propose.ts:434` answers this code with a
+# sentence and nothing else: the fault is that a filed body cites no row at all, so there is no
+# field, no span and no path to point at. `40 §6` has admitted a blank `at` since September 20th
+# 2026, and an invented address here would send a reader hunting for one bad figure in a proposal
+# whose whole text is uncited.
+#
+# THE SENTENCE IS THE EMITTER'S, VERBATIM, and it is also the `fix` `46 §6` states for this code.
+# The two agreed on the day this fixture was written, which is the only way to know they agree.

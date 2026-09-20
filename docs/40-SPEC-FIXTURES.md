@@ -375,7 +375,7 @@ What a required key bought was nine invented ones. Common keys:
 
 ```yaml
 code: FIELD_TYPE_UNKNOWN          # UPPER_SNAKE; kebab-case of it is the file name
-via:  lint                        # one of eight; the surface that raises it
+via:  lint                        # one of nine; the surface that raises it
 at:   declarations[0].fields[1].type   # the path 30 §6's Refusal carries, relative to the fixture's input
 found: currency                   # optional; asserted when present
 ```
@@ -390,6 +390,26 @@ found: currency                   # optional; asserted when present
 | `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dog_meta.format` · `record` · `migration[<n>]` | `record/test` — export the record, apply the verb, import |
 | `render` | 2 | `document:` | none, and that is measured: `packages/render/src/parse.ts`’s `Degraded` is `{ type, code, fix, raw, info, start, end }` and has no `at` at all. This column promised `blocks[<i>].rows[<j>]` and `blocks[<i>].kind`, and the row index is out of reach twice over, because a degraded fence never becomes a block. The address the surface does carry is `start` and `end`, a span of source bytes. Growing an `at` is a change to a published MIT package’s envelope, so it is a decision rather than a repair | `apps/web/test`, through `braindog-render` |
 | `pull` | 7 | `declare:` (one connector) · `grant:` (the stored credential, or none) · `answers:` (the provider’s replies, one per request the run makes) | the connector declaration, or the run’s lease: `fetch.auth.token_url` · `fetch.page[<n>]` · `fetch.page.from` · `object` · `lease` | `connect/test`, driving the scheduled run the way the Worker’s alarm does |
+| `ask` | 4 | `record:` (a seed record) · `ask:` (the question, trimmed and capped at 400 bytes) · `replies:` (the model’s answers, one per call the ask makes, verbatim) · `settings:` (`tier`, `model`, `ask_cap`, and the month’s asks, which is the meter) · `principal:` | the model’s reply: a span of its own text (`{{pct:-46.3}}`, `about 40%`), a path into the JSON the call pinned (`body_kind`, `schema`), or a path into a proposed `ingest` body; none for the meter, which refuses before any model is called | `spark/test`, driving the palette’s two passes against the inference double of `packages/spark/test/double.ts` |
+
+**`ask` is the ninth `via`, minted on September 21st 2026 for the four codes `packages/spark` arrived with.**
+Nothing above it could carry one. A spark refusal happens when a model ANSWERS: the input is a projection plus the
+model’s own reply, and the eight surfaces before it take a manifest, a predicate, a write, an rpc call, a `.brainl`, a
+document or a scheduled connector run. `refusal-fixtures.mjs` said so itself, four findings at a time, for as long as
+`PROPOSAL_UNCITED`, `PROPOSAL_NO_ROWS`, `PROPOSAL_SCHEMA` and `SPARK_BUDGET_SPENT` sat in [30-BLUEPRINT](30-BLUEPRINT.md)
+§6 with no file on disk. The alternative was to enumerate those four somewhere else, and there is nowhere else: 30 §6 is
+the registry’s home, and this table is the one place a registered code’s input shape is written down.
+
+**A `via` with no runner is the normal state on this page rather than a concession made for this one.** None of the
+eight runners above exists either, which `loop/STATUS.md` §5 records: until one does, a fixture is an enumeration entry
+with a sentence attached, and the gate that reads this table owns the enumeration and not the behaviour. So the ninth
+row costs one row, and not adding it cost four codes a caller can already be handed and nothing enumerated. This gate
+needed no edit for it, which is the second time the table has grown a row without one; `pull` was the first, the day
+before.
+
+`SPARK_BUDGET_SPENT` refuses before any model is called and is still an `ask`, because the surface is the palette and
+the meter is its first step (46 §5.4-1). The `via` names the surface a runner drives, not the moment inside it where
+the answer comes back.
 
 The `at` column was wrong for the `write` and `rpc` rows until 2026-09-20, and it did damage. It said
 `fields.<id>` and `args.<k>` and `headers.authorization`; the kernel emits the bare field id, with `[i]`
@@ -400,17 +420,25 @@ have driven them does not exist yet. A specification that nothing executes is a 
 wrong for months, which is the argument for building the runners in §6 rather than for writing this
 paragraph.
 
-**Specified, and not built: the "Input keys" column.** No fixture in the corpus carries a body. All 115 are the same
-five lines, and `pack:`, `installed:`, `facts:`, `rows:`, `write:`, `call:`, `tamper:` and `document:` describe input
-nothing has ever held. The column is the right design and it is what a runner would read, so it stays; it is marked
+**Specified, and not built: most of the "Input keys" column.** Counted on September 21st 2026: 17 of the 119 fixtures
+carry a body and the other 102 are the same four or five lines. Four of the keys are held, and by `write` and `render`
+fixtures only: `declare:` and `write:` by 15 each, `rows:` by 13, `document:` by 2. The rest describe input nothing has
+ever held, `pack:`, `installed:`, `facts:`, `call:`, `tamper:`, `register:`, `subject:`, `predicate:`, `grant:`,
+`answers:`, `record:`, `principal:` and `ask`’s three among them. This paragraph read *“no fixture in the corpus
+carries a body, all 115 are the same five lines”* until today, which was already wrong about 17 files when it was
+written: the same hand-counted-once failure the paragraph below it warns about, one screen further down the page. The column is the right design and it is what a runner would read, so it stays; it is marked
 here rather than quietly deleted, the same way `52 §5.1` is. Until a runner exists, a fixture is an enumeration entry
 with a sentence attached, and `refusal-fixtures.mjs` says so about itself: it owns the enumeration and not the
 behaviour.
 
 **`at` is optional.** `41 §6` always said so, the gate required it anyway, and nine fixtures invented an address
-because the format left no way to say there is none. Three of those nine are now blank, which is the true answer for
-a refusal about several tables at once, for one that carries `allowed:` instead, and for one derived from a conflict
-envelope that has no slot for an address at all.
+because the format left no way to say there is none. Eight of the 119 are blank today, counted on September 21st 2026:
+`IMPORT_NOT_EMPTY`, which is about several tables at once and says so in `fix`; `VERSION_STALE`, derived from a
+conflict envelope with no slot for an address; the two `DIALECT_` codes, whose surface degrades and carries a byte span
+instead; `PULL_ORIGIN_REFUSED` and `PULL_REQUEST_REFUSED`; and the two `ask` codes that refuse the whole answer rather
+than a place in it, `PROPOSAL_NO_ROWS` and `SPARK_BUDGET_SPENT`. `REGISTER_UNKNOWN` was named here as one of the three
+and is not blank any more: the kernel’s write path now answers `at: register`, which is where the caller wrote it, and
+the fixture carries that.
 
 **`derived:` says the code is read off an envelope rather than built.** Every fixture names in `raises:` the file
 that raises its code, and `refusal-fixtures` opens that file and looks for the code written in it. That question is
@@ -440,7 +468,7 @@ rather than picking whichever it walked into first. The value is one identifier;
 derives from an answer that does not carry one will need it, and the alternative is a fixture that points at the
 registry and proves nothing.
 
-115, counted: 27 + 20 + 7 + 15 + 30 + 7 + 2 + 7, against a registry of 126. The eleven without a fixture are the eleven
+119, counted: 27 + 20 + 7 + 15 + 30 + 7 + 2 + 7 + 4, against a registry of 126. The seven without a fixture are the seven
 no line of source names, which is the rule `refusal-fixtures` enforces and prints on every run. Do not hand-copy
 these numbers anywhere: the figures in this section were 75 against 112 for months after both had moved, and twelve
 fixtures were written wrong from the column beside them. The `lint`/`install` split follows each code's own message:
