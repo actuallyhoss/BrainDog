@@ -33,7 +33,7 @@
  * customer's file contains.
  */
 
-import type { Sql } from '@braindog/ports';
+import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
 import { SEAT_SESSION } from './migrations/0002_session.ts';
@@ -413,8 +413,13 @@ function unb64url(text: string): Uint8Array<ArrayBuffer> {
  */
 async function signatureOf(
   lines: readonly string[],
-): Promise<{ ok: true } | { ok: false; refusal: { code: string; fix: string } }> {
-  const no = (fix: string) => ({ ok: false as const, refusal: { code: 'SIGNATURE_INVALID', fix } });
+): Promise<{ ok: true } | { ok: false; refusal: Refusal }> {
+  /* `at` IS THE PART OF `dog_sig` AT FAULT, not the row. Four faults live in that one line and they
+     are four repairs (re-export, deploy a build that knows the algorithm, put back a header somebody
+     edited, get another copy), and a caller told only `dog_sig` has to read the sentence to
+     tell them apart. Where the fault is the row itself (missing, doubled, not JSON) there is no part
+     to name and `at` is the row. */
+  const no = (fix: string, at = 'dog_sig') => ({ ok: false as const, refusal: { code: 'SIGNATURE_INVALID', at, fix } });
 
   const rows = grouped(lines).get('dog_sig') ?? [];
   if (rows.length !== 1)
@@ -432,7 +437,8 @@ async function signatureOf(
   }
   if (!Array.isArray(row)) return no('The signature line is not a row. The file is damaged.');
   const [alg, keyId, publicKey, sig] = row as [unknown, unknown, unknown, unknown];
-  if (alg !== 'ed25519') return no(`This file is signed with ${String(alg)} and this build checks ed25519.`);
+  if (alg !== 'ed25519')
+    return no(`This file is signed with ${String(alg)} and this build checks ed25519.`, 'dog_sig.alg');
   if (typeof keyId !== 'string' || typeof publicKey !== 'string' || typeof sig !== 'string')
     return no('The signature line is missing its key or its signature.');
 
@@ -441,19 +447,23 @@ async function signatureOf(
      `SIGNATURE_INVALID`, because a file that names one key and carries another is a file whose
      header is a claim about a key nobody checked. */
   if ((await keyIdOf(key)) !== keyId)
-    return no('The key id in this file is not the id of the key beside it. The header has been edited.');
+    return no(
+      'The key id in this file is not the id of the key beside it. The header has been edited.',
+      'dog_sig.key_id',
+    );
 
   let held: Awaited<ReturnType<typeof crypto.subtle.importKey>>;
   try {
     held = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
   } catch {
-    return no('The public key in this file is not an Ed25519 key.');
+    return no('The public key in this file is not an Ed25519 key.', 'dog_sig.public_key');
   }
 
   const good = await crypto.subtle.verify('Ed25519', held, unb64url(sig), manifestBytes(lines));
   if (!good)
     return no(
       'The signature does not match this file. It was produced somewhere else, or a row has changed since it was written.',
+      'dog_sig.sig',
     );
   return { ok: true };
 }
@@ -471,7 +481,7 @@ async function signatureOf(
  */
 export async function checkBrainl(
   lines: readonly string[],
-): Promise<{ ok: true } | { ok: false; refusal: { code: string; fix: string } }> {
+): Promise<{ ok: true } | { ok: false; refusal: Refusal }> {
   /* THE FORMAT, FROM LINE ONE. `03 §11`: a file from a newer build is refused rather than read,
      because reading it means writing rows whose columns this build does not know into a record it
      then calls a complete copy. The `dog_meta` check inside the writer finds the same fact later,
@@ -497,6 +507,11 @@ export async function checkBrainl(
       ok: false,
       refusal: {
         code: 'FILE_MALFORMED',
+        /* `dogl` IS THE HEADER, AND IT IS WHAT IS WRONG. The fixture for this code said `record`,
+           which is where the file was going rather than what is damaged about it, and `40 §6` had
+           no address for this code at all. `#dogl` is a header of the same kind as `#table`, so it
+           addresses the same way `dog_sig` and `dog_manifest` do. */
+        at: 'dogl',
         fix: 'A .brainl file begins with `#dogl <version>`, and this one does not. Re-export it from the record it came from.',
       },
     };
@@ -504,13 +519,22 @@ export async function checkBrainl(
   if (!Number.isInteger(format) || format < 1)
     return {
       ok: false,
-      refusal: { code: 'FILE_MALFORMED', fix: `The first line does not name a format version. The file is damaged.` },
+      refusal: {
+        code: 'FILE_MALFORMED',
+        at: 'dogl',
+        fix: `The first line does not name a format version. The file is damaged.`,
+      },
     };
   if (format > FORMAT_VERSION)
     return {
       ok: false,
       refusal: {
         code: 'FORMAT_NEWER_THAN_READER',
+        /* THE FIRST LINE, NOT `dog_meta.format`. The fixture named the `dog_meta` row and this
+           check never reads it: the comparison is against the `#dogl` header, and a person sent to
+           `dog_meta` goes looking at a row that was not consulted. There is a `dog_meta.format`
+           check, further down the import, and it answers a different code. */
+        at: 'dogl',
         fix: `This file is format ${format} and this build reads ${FORMAT_VERSION}. Upgrade BrainDog, and it will open.`,
       },
     };
@@ -528,7 +552,12 @@ export async function checkBrainl(
 
   const where = sections(lines);
 
-  /* EVERY TABLE IN THE FILE, hashed the way the exporter hashed it: its rows joined by LF. */
+  /* EVERY TABLE IN THE FILE, hashed the way the exporter hashed it: its rows joined by LF.
+     EACH ARM BELOW CARRIES `dog_manifest.<table>`, WHICH `40 §6` HAS ALWAYS SPECIFIED AND NOTHING
+     HAS EVER PRODUCED. The table name was already in the sentence, so the fact was there and only a
+     caller reading English could reach it; a file is thousands of lines and `at` is the one field a
+     tool can branch on. The no-manifest arm above deliberately carries none: there is no manifest
+     to address, and naming a row that is not in the file is how the `fields.<id>` drift happened. */
   for (const [name, rows] of held) {
     if (UNHASHED.has(name)) continue;
     const claim = says.get(name);
@@ -537,6 +566,7 @@ export async function checkBrainl(
         ok: false,
         refusal: {
           code: 'CHECKSUM_MISMATCH',
+          at: `dog_manifest.${name}`,
           fix: `The file carries a ${name} table that its own manifest does not list. It has been edited since it was written.`,
         },
       };
@@ -546,6 +576,7 @@ export async function checkBrainl(
         ok: false,
         refusal: {
           code: 'CHECKSUM_MISMATCH',
+          at: `dog_manifest.${name}`,
           fix: `${name} does not match the checksum in the file's own manifest. The file is damaged or has been edited; re-export it from the record it came from.`,
         },
       };
@@ -556,6 +587,7 @@ export async function checkBrainl(
         ok: false,
         refusal: {
           code: 'CHECKSUM_MISMATCH',
+          at: `dog_manifest.${name}`,
           fix: `The manifest says ${name} has ${claim.rows} rows and the file carries ${rows.length}.`,
         },
       };
@@ -571,6 +603,7 @@ export async function checkBrainl(
       ok: false,
       refusal: {
         code: 'CHECKSUM_MISMATCH',
+        at: `dog_manifest.${name}`,
         fix: `The manifest lists ${name} with ${claim.rows} rows and the file does not carry it. A table has been removed since it was written.`,
       },
     };
@@ -598,7 +631,7 @@ export function importBrainl(
   sql: Sql,
   transaction: <T>(fn: () => T) => T,
   lines: Iterable<string>,
-): { ok: true; value: ImportReport } | { ok: false; refusal: { code: string; fix: string } } {
+): { ok: true; value: ImportReport } | { ok: false; refusal: Refusal } {
   const shapes = new Map(tables(sql).map((t) => [t.name, t]));
   /* MATERIALISED ONCE. `lines` is an `Iterable`, and a generator read twice is empty the second
      time — so the header scan below would have eaten a streamed file and left the import with
@@ -661,6 +694,10 @@ export function importBrainl(
       ok: false,
       refusal: {
         code: 'FILE_MALFORMED',
+        /* THE LINE THAT THREW KNOWS WHERE IT WAS, and only `BadLine` does. An adapter error from
+           further down is a row the record could not hold rather than a place in the file, so it
+           carries none rather than blaming whichever table was open at the time. */
+        ...(e instanceof BadLine && e.at !== undefined ? { at: e.at } : {}),
         fix:
           e instanceof BadLine
             ? `${e.message} The file is damaged; re-export it from the record it came from.`
@@ -710,7 +747,11 @@ export function importBrainl(
       if (table.name === 'dog_meta') {
         const [key, value] = values as [string, string];
         if (key === 'format' && Number(value) > readsFormat)
-          throw new BadLine(`This file is format ${value} and this build reads ${readsFormat}.`);
+          /* THE ROW THE `format-newer-than-reader` FIXTURE NAMED, and it answers a different code:
+             the sentence here is `FORMAT_NEWER_THAN_READER`'s, word for word, under
+             `FILE_MALFORMED`. Left as it stands because the repair is a code change with an HTTP
+             status behind it, and the address at least now says which row was read. */
+          throw new BadLine(`This file is format ${value} and this build reads ${readsFormat}.`, 'dog_meta.format');
       }
 
       /* AN EMPTY RECORD IS NOT AN EMPTY DATABASE. The migration seeds rows — the two counters, the
@@ -754,16 +795,26 @@ export function importBrainl(
 const SKIPPED = new Set(['dog_section', 'dog_manifest', 'dog_sig', 'migration']);
 
 /** Thrown when a row line is not a JSON array, so the transaction rolls back and the caller gets a sentence. */
-class BadLine extends Error {}
+/** A line of the file this reader cannot take, carrying where in the file it was. */
+class BadLine extends Error {
+  /* THE ADDRESS TRAVELS WITH THE THROW because the catch cannot recover it. By the time the error
+     reaches the boundary the loop has moved on, and a refusal that named the table the reader
+     happened to be holding would be right by accident and wrong the moment the throw moves. */
+  readonly at: string | undefined;
+  constructor(message: string, at?: string) {
+    super(message);
+    this.at = at;
+  }
+}
 
 function parseRow(line: string, table: string): unknown[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
   } catch {
-    throw new BadLine(`A row under #table ${table} is not JSON.`);
+    throw new BadLine(`A row under #table ${table} is not JSON.`, table);
   }
-  if (!Array.isArray(parsed)) throw new BadLine(`A row under #table ${table} is not an array of values.`);
+  if (!Array.isArray(parsed)) throw new BadLine(`A row under #table ${table} is not an array of values.`, table);
   return parsed;
 }
 

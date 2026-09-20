@@ -1,5 +1,5 @@
 code:   TEXT_ESCAPED_NEWLINE
 via:    write
 raises: packages/kernel/src/coerce.ts
-at:     fields.what
+at:     what
 fix:    Send a real newline.

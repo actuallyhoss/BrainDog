@@ -1,5 +1,5 @@
 code:   VALUE_MALFORMED
 via:    write
 raises: packages/kernel/src/coerce.ts
-at:     fields.amount
+at:     amount
 fix:    Send a value the field's type can hold.

@@ -1,5 +1,5 @@
 code:   SCHEMA_NEWER
 via:    import
 raises: packages/kernel/src/migrate.ts
-at:     migration[9]
+at:     migration[11]
 fix:    Deploy the newer build.

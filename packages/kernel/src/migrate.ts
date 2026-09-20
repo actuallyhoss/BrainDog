@@ -125,6 +125,11 @@ export async function applyMigrations(
     if (!at || row.version > MIGRATIONS.length) {
       const refusal: Refusal = {
         code: 'SCHEMA_NEWER',
+        /* THE LEDGER IS A LIST AND THIS IS ABOUT ONE ROW OF IT. `40 §6`'s import row specifies
+           `migration[<n>]` and nothing produced it, so the version was only ever in the sentence.
+           The operator's next move is to find the build that has this migration, and the index is
+           what they look it up by. */
+        at: `migration[${row.version}]`,
         fix: `This record was written by a build that knows migration ${row.version}; this one stops at ${MIGRATIONS.length}. Deploy the newer build.`,
       };
       return { result: { ok: false, refusal }, state: { applied: rows.map((r) => r.version), refusal } };
@@ -132,6 +137,10 @@ export async function applyMigrations(
     if (sums[row.version - 1] !== row.checksum) {
       const refusal: Refusal = {
         code: 'SCHEMA_MISMATCH',
+        /* Same address space as the arm above: one row of the ledger, named by its version. This is
+           the one an operator acts on with an editor, so pointing at the migration rather than at
+           the record is the difference between one file to read and ten. */
+        at: `migration[${row.version}]`,
         fix: `Migration ${row.version} (${at.slug}) is not the text that was applied to this record. Restore it and add a new migration instead.`,
       };
       return { result: { ok: false, refusal }, state: { applied: rows.map((r) => r.version), refusal } };

@@ -229,6 +229,26 @@ test('a record written by a newer build is refused, and says to deploy it', asyn
   sql.close();
 });
 
+test('AND BOTH LEDGER REFUSALS NAME THE MIGRATION THEY ARE ABOUT', async () => {
+  // The ledger is a list and a refusal about one row of it can say which row. Without an `at` the
+  // operator is told a migration disagrees and has to read the fix sentence to find out which one,
+  // which is prose where an address would do: `40 §6`'s import row has always specified
+  // `migration[<n>]` and nothing has ever produced it, because no runner drives these fixtures.
+  const changed = await open();
+  changed.sql.exec("UPDATE migration SET checksum = 'not the one that was applied' WHERE version = 3");
+  const mismatch = (await applyMigrations(changed.sql, changed.clock)).result;
+  assert.ok(refused(mismatch));
+  assert.equal(mismatch.refusal.at, 'migration[3]', 'SCHEMA_MISMATCH does not say which migration');
+  changed.sql.close();
+
+  const ahead = await open();
+  ahead.sql.exec("INSERT INTO migration (version, applied_at, checksum) VALUES (99, '2026-01-01T00:00:00.000Z', 'x')");
+  const newer = (await applyMigrations(ahead.sql, ahead.clock)).result;
+  assert.ok(refused(newer));
+  assert.equal(newer.refusal.at, 'migration[99]', 'SCHEMA_NEWER does not say which migration it lacks');
+  ahead.sql.close();
+});
+
 test('a mis-numbered migration is a defect, not a refusal', () => {
   // A refusal is for a RECORD that disagrees with the code, and an operator can act on it. A list
   // that disagrees with itself is the code being wrong, and nobody should deploy past it.

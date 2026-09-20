@@ -1,5 +1,5 @@
 code:   REQUIRED_MISSING
 via:    write
 raises: packages/kernel/src/index.ts
-at:     fields.what
+at:     what
 fix:    Send the field the register requires.

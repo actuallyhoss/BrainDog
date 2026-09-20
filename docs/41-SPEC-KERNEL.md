@@ -829,8 +829,13 @@ and hand the lines over ([03-DOG-FORMAT](03-DOG-FORMAT.md) §2, ADR-034).
 ## 6 · Refusals and errors
 
 Twenty-seven codes, all from [30-BLUEPRINT](30-BLUEPRINT.md) §6 plus the one this spec adds (`VALUE_MALFORMED`, §13 #13). `at` is
-`register.<reg>.<field>` for a field, `register.<reg>#<seq>` for a row, `id` for an unresolvable reference, the
-table name for the format codes. `fix` is one imperative sentence; the values in angle brackets are filled at write.
+the bare field id for a field, `amount` and not `register.obligations.amount`, and `<field>[i]` for one element of a
+`list` (§5's `list<T>` row). For a refusal about the call rather than about a field it is the argument's own name:
+`id`, `version`, `order`. It is optional, and a refusal with nothing to point at carries none, which is what the
+format codes do today. There is no `register.<reg>#<seq>` row form: no `at` the kernel emits contains a `#`. The one
+prefixed `at` in the tree, `register.tasks.thing` from `SCOPES_IN_USE`, is a declaration id joined to a field id
+rather than an address, and `declare.ts` likewise roots a declaration's own JSON paths at its id
+(`theme.brand.seed.accent`). `fix` is one imperative sentence; the values in angle brackets are filled at write.
 
 | Code | Where | Trigger | `fix` |
 |---|---|---|---|

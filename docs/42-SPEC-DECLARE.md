@@ -70,7 +70,10 @@ export function parsePack(files: { path: string; text: string }[], source?: Pack
 Error contract: every function returns `X | Refusal[]`; nothing throws across the package boundary. `install` and
 `uninstall` pass the kernel's `refusals` through, re-pathed. `Refusal` is the shape of 30 §6 / 33 §2 —
 `{ code, at, found?, wanted?, fix }` — and every `code` is one of 30 §6's, plus the five this spec adds (§13 D4). `at` is a
-JSON path into the merged pack (`declarations[3].fields[4].type`) or `<file>#<line>:<col>` for a text-level fault.
+path rooted on the declaration's own id, dotted, with `[i]` for a position in a list
+(`ingest.hsbc_sms.extract.due.date.format`, `theme.brand.seed.accent`, `ingest.hsbc_sms.extract.due.first[0].date.format`),
+or `<file>#<line>:<col>` for a text-level fault. Not a JSON index path: `declarations[3].fields[4].type` is a form this
+package has never emitted, and the twelve fixtures that copied it from here were wrong for as long as it stood.
 
 ---
 

@@ -1,5 +1,4 @@
 code:   VERSION_STALE
 via:    write
 raises: packages/ports/src/index.ts
-at:     version
 fix:    Read the row again and re-apply the change.

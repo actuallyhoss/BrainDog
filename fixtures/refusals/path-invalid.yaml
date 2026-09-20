@@ -1,5 +1,5 @@
 code:   PATH_INVALID
 via:    lint
 raises: packages/kernel/src/declare.ts
-at:     read.rows
+at:     ingest.hsbc_sms.fetch.read.rows
 fix:    Write the path as keys with an optional index.

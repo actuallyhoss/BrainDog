@@ -1,7 +1,7 @@
 # 40 · `packages/fixtures` — specification
 
-The text corpus every gate reads: eight reference pages, their row corpora, a pack corpus, seventy-five refusal
-fixtures and one seed manifest. Text only — the `.brain` is never committed; it is materialised at test time through
+The text corpus every gate reads: eight reference pages, their row corpora, a pack corpus, one refusal
+fixture per code the source names, and one seed manifest. Text only — the `.brain` is never committed; it is materialised at test time through
 the real write path with an injected `Clock` and a seeded RNG ([22-FRONTEND](22-FRONTEND.md) §10,
 [33-CONTRACTS](33-CONTRACTS.md) §9, [30-BLUEPRINT](30-BLUEPRINT.md) §12 row 3). Fifth in the build order, dependent
 on nothing, a devDependency everywhere ([31-STACK](31-STACK.md) §2).
@@ -102,7 +102,7 @@ packages/fixtures/
 │   ├── obligations-fx-60.json   generated — five currencies
 │   ├── fx-4.json  tasks-12.json  tracks-2.json  entities-3.json  plan_steps-6.json    hand-written
 │   └── writeup.md               the long write-up, LF — §4.3 page 6
-└── refusals/                    75 files, <kebab-code>.yaml — §6
+└── refusals/                    one file per code the source names, <kebab-code>.yaml — §6
 ```
 
 | Directory | Files | Rows or declarations |
@@ -110,7 +110,7 @@ packages/fixtures/
 | `pages/` | 8 | — |
 | `packs/` | 8 | 21 registers · 7 pages · 2 blocks · 7 metrics · 2 rules · 1 digest · 1 ingest |
 | `rows/` | 9 + `gen.mjs` | 5,107 rows |
-| `refusals/` | 75 | one per code of [30-BLUEPRINT](30-BLUEPRINT.md) §6 |
+| `refusals/` | one per code the source names | [30-BLUEPRINT](30-BLUEPRINT.md) §6; the live count is printed by `refusal-fixtures` |
 | root | `seed.json` | 9 records |
 
 Two files are code (`index.ts`, `gen.mjs`); everything else is data.
@@ -378,15 +378,39 @@ found: currency                   # optional; asserted when present
 
 | `via` | Codes | Input keys | `at` is a path into | Runner |
 |---|---|---|---|---|
-| `lint` | 22 | `pack:` — a whole manifest | the manifest | `declare/test` — the pack alone, offline |
-| `install` | 10 | `pack:` · `installed:` (active declaration bodies) · `facts:` (`rows`, `distinct` values per field, `format`, `primitives` — the numbers the code's message cites) | the manifest | `record/test`, composing `declare`'s plan and `theme`'s checks exactly as `planPack` does |
-| `where` | 10 | `register:` · `subject:` (`entry` \| `inbox_raw`) · `predicate:` | the predicate | `record/test` via `where/sql` |
-| `write` | 17 | `declare:` (one register) · `rows:` (prior rows, owner-written) · `write:` (`register` `seq?` `patch` `version?`) · `principal:` | `fields.<id>` · `version` · `register` · `state` | `record/test` via the kernel's `write` on a fresh materialised record |
-| `rpc` | 8 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `args.<k>` · `headers.authorization` | `record/test` |
-| `import` | 6 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dog_meta.format` · `record` · `migration[<n>]` | `record/test` — export the record, apply the verb, import |
+| `lint` | 27 | `pack:` — a whole manifest | the manifest | `declare/test` — the pack alone, offline |
+| `install` | 20 | `pack:` · `installed:` (active declaration bodies) · `facts:` (`rows`, `distinct` values per field, `format`, `primitives` — the numbers the code's message cites) | the manifest | `record/test`, composing `declare`'s plan and `theme`'s checks exactly as `planPack` does |
+| `where` | 7 | `register:` · `subject:` (`entry` \| `inbox_raw`) · `predicate:` | the predicate | `record/test` via `where/sql` |
+| `write` | 15 | `declare:` (one register) · `rows:` (prior rows, owner-written) · `write:` (`register` `seq?` `patch` `version?`) · `principal:` | `<id>` · `<id>[<i>]` · `version` · `register` · `state` | `record/test` via the kernel's `write` on a fresh materialised record |
+| `rpc` | 37 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `<k>` · `authorization` | `record/test` |
+| `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dog_meta.format` · `record` · `migration[<n>]` | `record/test` — export the record, apply the verb, import |
 | `render` | 2 | `document:` | `blocks[<i>].rows[<j>]` · `blocks[<i>].kind` | `apps/web/test`, through `braindog-render` |
 
-Seventy-five, counted: 22 + 10 + 10 + 17 + 8 + 6 + 2. The `lint`/`install` split follows each code's own message:
+The `at` column was wrong for the `write` and `rpc` rows until 2026-09-20, and it did damage. It said
+`fields.<id>` and `args.<k>` and `headers.authorization`; the kernel emits the bare field id, with `[i]`
+appended for a position in a list, and the rpc path emits the bare argument name. Twelve fixtures were
+written to this column and carried a prefix no refusal has ever contained. Nothing caught them, because
+`refusal-fixtures.mjs` owns the enumeration and not the behaviour, and the `via: write` runner that would
+have driven them does not exist yet. A specification that nothing executes is a specification that can be
+wrong for months, which is the argument for building the runners in §6 rather than for writing this
+paragraph.
+
+**Specified, and not built: the "Input keys" column.** No fixture in the corpus carries a body. All 115 are the same
+five lines, and `pack:`, `installed:`, `facts:`, `rows:`, `write:`, `call:`, `tamper:` and `document:` describe input
+nothing has ever held. The column is the right design and it is what a runner would read, so it stays; it is marked
+here rather than quietly deleted, the same way `52 §5.1` is. Until a runner exists, a fixture is an enumeration entry
+with a sentence attached, and `refusal-fixtures.mjs` says so about itself: it owns the enumeration and not the
+behaviour.
+
+**`at` is optional.** `41 §6` always said so, the gate required it anyway, and nine fixtures invented an address
+because the format left no way to say there is none. Three of those nine are now blank, which is the true answer for
+a refusal about several tables at once, for one that carries `allowed:` instead, and for one derived from a conflict
+envelope that has no slot for an address at all.
+
+115, counted: 27 + 20 + 7 + 15 + 37 + 7 + 2, against a registry of 126. The eleven without a fixture are the eleven
+no line of source names, which is the rule `refusal-fixtures` enforces and prints on every run. Do not hand-copy
+these numbers anywhere: the figures in this section were 75 against 112 for months after both had moved, and twelve
+fixtures were written wrong from the column beside them. The `lint`/`install` split follows each code's own message:
 a code that cites rows, installed packs or the record's versions needs a record and is `install`
 (`REQUIRED_ON_POPULATED` `ID_RENAMED` `DEPENDENCY_UNRESOLVED` `FORMAT_OUT_OF_RANGE` `FIELD_TYPE_CHANGED`
 `SEQ_PREFIX_TAKEN` `MIXED_CURRENCY` `GROUP_BY_CARDINALITY` `QUANTITY_MIXED_UNIT` `CONTRAST_FLOOR`); the other

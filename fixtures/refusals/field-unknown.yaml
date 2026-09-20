@@ -1,5 +1,5 @@
 code:   FIELD_UNKNOWN
 via:    write
 raises: packages/kernel/src/index.ts
-at:     fields.notes
+at:     notes
 fix:    Name a field the register declares.

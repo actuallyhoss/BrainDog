@@ -1,5 +1,5 @@
 code:   ALREADY_KNOWN
 via:    write
 raises: packages/kernel/src/index.ts
-at:     fields.ref
+at:     ref
 fix:    Open the row that already holds it.

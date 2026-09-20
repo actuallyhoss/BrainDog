@@ -587,7 +587,7 @@ there is one shape:
 ```
 Refusal {
   code:   'FIELD_TYPE_UNKNOWN'                    -- enumerated, stable, greppable
-  at:     'declarations[3].fields[4].type'        -- a path into the thing being validated
+  at:     'ingest.hsbc_sms.extract.due.date.format'  -- a path into the thing being validated
   found:  'currency'
   wanted: 'one of the sixteen value types'
   fix:    "Did you mean 'money'?"                 -- one sentence, imperative

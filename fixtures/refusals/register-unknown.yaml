@@ -1,5 +1,4 @@
 code:   REGISTER_UNKNOWN
 via:    write
 raises: packages/kernel/src/index.ts
-at:     register
 fix:    Install the pack that declares the register.

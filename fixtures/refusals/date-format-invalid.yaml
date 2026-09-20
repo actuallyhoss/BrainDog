@@ -1,5 +1,5 @@
 code:   DATE_FORMAT_INVALID
 via:    lint
 raises: packages/kernel/src/declare.ts
-at:     extract.due.date.format
+at:     ingest.hsbc_sms.extract.due.date.format
 fix:    Write the format with one year, one month and one day token.

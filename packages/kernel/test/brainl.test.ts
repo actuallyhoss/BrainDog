@@ -803,6 +803,86 @@ test('AND A FILE WITH NO SIGNATURE IS NOT IMPORTED', async () => {
   sql.close();
 });
 
+test('AN INTEGRITY REFUSAL NAMES THE LINE OF THE FILE IT IS ABOUT', async () => {
+  // A `.brainl` is thousands of lines and these refusals used to name none of them. The sentence
+  // already carried the table (`entry does not match the checksum`), so the fact was there and only
+  // a caller reading English could get at it. `40 §6` specifies `dog_manifest.<table>` and
+  // `dog_sig.<part>` for exactly this, and nothing had ever produced either, because the runner that
+  // would have driven the fixture does not exist. Where a fault is the whole file rather than a line
+  // in it there is still no `at`, and the two cases below that carry none are the reason to check.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+  const refusal = async (ls: string[]) => ((await checkBrainl(ls)) as { refusal: { code: string; at?: string } }).refusal;
+
+  // A ROW EDITED: the table is in scope at the hash comparison, so the address is too.
+  const row = rowIn(lines, 'entry', 'Halden');
+  const edited = [...lines.slice(0, row), lines[row]!.replace('48000', '4800'), ...lines.slice(row + 1)];
+  assert.deepEqual(await refusal(edited), {
+    ...(await refusal(edited)),
+    code: 'CHECKSUM_MISMATCH',
+    at: 'dog_manifest.entry',
+  });
+
+  // A TABLE REMOVED, and A TABLE THE MANIFEST DOES NOT LIST: the other two arms of the same loop.
+  const [from, to] = span(lines, 'entry');
+  assert.equal((await refusal([...lines.slice(0, from), ...lines.slice(to)])).at, 'dog_manifest.entry');
+  assert.equal((await refusal([...lines, '#table nowhere id,name', '["x","y"]'])).at, 'dog_manifest.nowhere');
+
+  // AND THE COUNT BESIDE THE HASH, which is the same table by another route.
+  const claim = rowIn(lines, 'dog_manifest', '"entry"');
+  const [name, rows, sha] = JSON.parse(lines[claim]!) as [string, number, string];
+  const lying = [...lines];
+  lying[claim] = JSON.stringify([name, rows + 1, sha]);
+  assert.equal((await refusal(lying)).at, 'dog_manifest.entry');
+
+  // NO MANIFEST AT ALL HAS NOWHERE TO POINT. There is no table named and no manifest to name it in,
+  // and inventing `dog_manifest.entry` here would send a person to a line that is not in the file.
+  const [mfrom, mto] = span(lines, 'dog_manifest');
+  const bare = await refusal([...lines.slice(0, mfrom), ...lines.slice(mto)]);
+  assert.equal(bare.code, 'CHECKSUM_MISMATCH');
+  assert.equal(bare.at, undefined, 'a file with no manifest was given a manifest address');
+
+  // AND THE HEADER LINE IS AN ADDRESS LIKE ANY OTHER. `#dogl` is a header of the same kind as
+  // `#table`, so the two refusals that are about it name it rather than naming the record, which is
+  // where the file was going and not what is wrong with it.
+  assert.deepEqual(
+    [(await refusal(['<!doctype html>'])).code, (await refusal(['<!doctype html>'])).at],
+    ['FILE_MALFORMED', 'dogl'],
+  );
+  assert.equal((await refusal(['#dogl nine', ...lines.slice(1)])).at, 'dogl');
+  const future = await refusal(['#dogl 9', ...lines.slice(1)]);
+  assert.deepEqual([future.code, future.at], ['FORMAT_NEWER_THAN_READER', 'dogl']);
+
+  sql.close();
+});
+
+test('AND A SIGNATURE REFUSAL NAMES THE PART OF dog_sig THAT IS WRONG', async () => {
+  // Four faults live in one line and they are four repairs: re-export, deploy a build that knows the
+  // algorithm, fix a header somebody edited, get another copy. Naming `dog_sig` alone would be true
+  // and useless; the part is what tells them apart.
+  const { k, sql } = await filled();
+  const lines = value<string[]>(await k.export());
+  const at = span(lines, 'dog_sig')[0] + 1;
+  const row = JSON.parse(lines[at]!) as [string, string, string, string];
+  const swap = (next: [string, string, string, string]) => [...lines.slice(0, at), JSON.stringify(next), ...lines.slice(at + 1)];
+  const where = async (ls: string[]) => ((await checkBrainl(ls)) as { refusal: { at?: string } }).refusal.at;
+
+  assert.equal(await where(swap([row[0], '0'.repeat(16), row[2], row[3]])), 'dog_sig.key_id');
+  assert.equal(await where(swap(['rsa', row[1], row[2], row[3]])), 'dog_sig.alg');
+
+  // THE KEY ITSELF, and the id has to be recomputed to match it or the id check answers first,
+  // which is the order the file wants, and the reason this case needs building rather than asserting.
+  const notAKey = 'bm90LWEta2V5';
+  assert.equal(await where(swap([row[0], await keyIdOf(unb64(notAKey)), notAKey, row[3]])), 'dog_sig.public_key');
+
+  assert.equal(await where(swap([row[0], row[1], row[2], b64url(new Uint8Array(64))])), 'dog_sig.sig');
+
+  // A MISSING OR DOUBLED ROW IS THE ROW, not a part of it: there is no one part to blame.
+  assert.equal(await where([...lines, lines[at]!]), 'dog_sig');
+
+  sql.close();
+});
+
 test('THE HEADER OF A SIGNATURE IS CHECKED, not taken', async () => {
   const { k, sql } = await filled();
   const lines = value<string[]>(await k.export());
