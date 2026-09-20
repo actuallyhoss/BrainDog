@@ -76,15 +76,20 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: fifteen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
   /* `research-agent-path` §1.5: the eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, and it is the one thing an agent could reach in Sam
-     Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison. */
+     Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison.
+
+     `money` IS THE SIXTEENTH, and it is one tool rather than seven because the seven figures behind
+     it are one question. An agent asking how money stands should not have to know that the answer
+     is `cash-now`, `received-30d`, `spent-30d`, `in-30d`, `out-30d`, `late-in` and `overdue`, nor
+     spend seven turns collecting them; `MONEY_FIGURES` is that list and the tool reads it. */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'money', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });

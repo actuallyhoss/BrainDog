@@ -103,35 +103,67 @@ test('EVERY ADVERTISED TOOL REACHES A METHOD, asked over the wire rather than re
   sql.close();
 });
 
+/**
+ * THE NARROWEST SURFACE THAT TYPE-CHECKS: the sixteen methods `McpSurface` requires and not one of
+ * the optional seven. What goes dark on it is exactly what a transport's own list has to carry.
+ */
+const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<CallContext> => ({
+  boot: (ctx) => api.boot(ctx),
+  version: (ctx) => api.version(ctx),
+  whoami: (ctx) => api.whoami(ctx),
+  schema: (args, ctx) => api.schema(args, ctx),
+  get: (args, ctx) => api.get(args as never, ctx),
+  list: (args, ctx) => api.list(args as never, ctx) as never,
+  search: (args, ctx) => api.search(args, ctx),
+  history: (args, ctx) => api.history(args, ctx),
+  governance: (args, ctx) => api.governance(args as never, ctx),
+  propose: (args, ctx) => api.propose(args as never, ctx),
+  create: (args, ctx) => api.create(args as never, ctx),
+  update: (args, ctx) => api.update(args as never, ctx),
+  pages: (ctx) => api.pages(ctx) as never,
+  page: (args, ctx) => api.page(args, ctx),
+  metric: (args, ctx) => api.metric(args, ctx),
+  digestToday: (args, ctx) => api.digestToday(args, ctx),
+});
+
 test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FOUR OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
-     missing from it is a tool that refuses for ever. The sixteen methods below are the ones
-     `McpSurface` requires, so this is the narrowest surface that type-checks, and what goes dark on
-     it is exactly what that list has to carry. `money` is not among them: it reads `metric`, which
-     every surface has, which is why it needed no name added anywhere to work over stdio. */
+     missing from it is a tool that refuses for ever. `money` is not among them: it reads `metric`,
+     which every surface has, which is why it needed no name added anywhere to work over stdio. */
   const { sql, api } = await record();
-  const narrow: McpSurface<CallContext> = {
-    boot: (ctx) => api.boot(ctx),
-    version: (ctx) => api.version(ctx),
-    whoami: (ctx) => api.whoami(ctx),
-    schema: (args, ctx) => api.schema(args, ctx),
-    get: (args, ctx) => api.get(args as never, ctx),
-    list: (args, ctx) => api.list(args as never, ctx) as never,
-    search: (args, ctx) => api.search(args, ctx),
-    history: (args, ctx) => api.history(args, ctx),
-    governance: (args, ctx) => api.governance(args as never, ctx),
-    propose: (args, ctx) => api.propose(args as never, ctx),
-    create: (args, ctx) => api.create(args as never, ctx),
-    update: (args, ctx) => api.update(args as never, ctx),
-    pages: (ctx) => api.pages(ctx) as never,
-    page: (args, ctx) => api.page(args, ctx),
-    metric: (args, ctx) => api.metric(args, ctx),
-    digestToday: (args, ctx) => api.digestToday(args, ctx),
-  };
+  const narrow = narrowOver(api);
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
   assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet']);
+  sql.close();
+});
+
+/** The addresses `resources/list` offers, which is only ever what it managed to read first. */
+async function listedOver<C>(surface: McpSurface<C>, ctx: C): Promise<string[]> {
+  const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'resources/list' }, surface, ctx)) as Reply;
+  assert.ok('result' in reply, JSON.stringify(reply));
+  return (reply.result as { resources: { uri: string }[] }).resources.map((r) => r.uri);
+}
+
+test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this list nobody had written down', async () => {
+  /* A RESOURCE IS LISTED ONLY ONCE IT HAS BEEN READ, so a surface with no member behind one does not
+     refuse anywhere an agent can see it: the address is simply absent and nothing says why. A tool
+     at least answers "not in this build" when it goes. That is how `braindog:actions` stayed
+     unreachable from the command line, with the name already in the client's table and in the
+     record's routes and only `LATER` short (`apps/cli/src/surface.ts`), and it is why the tool half
+     of this file above was not enough on its own. */
+  const { sql, api } = await record();
+  const whole = await listedOver(api, owner);
+  const narrow = await listedOver(narrowOver(api), owner);
+  assert.deepEqual(whole.filter((uri) => !narrow.includes(uri)), [
+    'braindog:context',
+    'braindog:sessions/live',
+    'braindog:actions',
+    'braindog:arrangement',
+    'braindog:grammar/page',
+    'braindog:grammar/proposals',
+  ]);
   sql.close();
 });
 

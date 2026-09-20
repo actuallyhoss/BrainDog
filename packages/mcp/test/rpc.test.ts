@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { handle, METHODS, VERSIONS, type Reply } from '../src/rpc.ts';
 import { INSTRUCTIONS } from '../src/instructions.ts';
-import { TOOLS } from '../src/index.ts';
+import { MONEY_FIGURES, TOOLS } from '../src/index.ts';
 import { stub, type Ctx } from './stub.ts';
 
 const ctx: Ctx = { who: 'agent' };
@@ -84,12 +84,12 @@ test('ping answers, and prompts are an empty list for now', async () => {
   assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
-test('tools/list is the fifteen, with the instructions again and the read-only ones marked', async () => {
+test('tools/list is the sixteen, with the instructions again and the read-only ones marked', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; inputSchema: { type: string }; annotations?: { readOnlyHint: boolean } }[]; instructions: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 15);
+  assert.equal(r.tools.length, 16);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, INSTRUCTIONS);
   assert.equal(r.ttlMs, 3_600_000);
@@ -111,6 +111,10 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['search', { q: 'invoice' }, ['search'], { q: 'invoice' }],
   ['history', { spoken: 'obligations#41' }, ['history'], { register: 'obligations', seq: 41 }],
   ['activity', { limit: 5 }, ['recentHistory'], { limit: 5 }],
+  /* SEVEN READS BEHIND ONE TOOL, one per figure in `MONEY_FIGURES`, which is why the method list is
+     `metric` seven times rather than a `money` of its own. Derived from the constant instead of
+     typed out: an eighth figure should extend this case, not quietly leave it asserting seven. */
+  ['money', {}, MONEY_FIGURES.map(() => 'metric'), { metric: MONEY_FIGURES[0] }],
   ['governance', { status: 'all' }, ['governance'], { status: 'all' }],
   ['propose', { question: 'Keep it?', body_kind: 'options', body: {} }, ['propose'], { question: 'Keep it?', body_kind: 'options', body: {} }],
   ['create', { register: 'obligations', fields: { what: 'a' } }, ['create'], { register: 'obligations', fields: { what: 'a' } }],
