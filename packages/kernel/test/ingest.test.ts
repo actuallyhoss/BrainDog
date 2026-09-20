@@ -1272,3 +1272,60 @@ test('NO FOURTH COPY: nothing outside the two tables works a currency exponent o
   }
   assert.deepEqual(found, [], `\n${found.join('\n')}\n`);
 });
+
+test('NO FOURTH LIST: nothing outside two named places decides for itself what a currency is', () => {
+  /* THE GUARD ABOVE IS HALF OF `02 §3` RULE 1, AND IT IS THE HALF THAT WAS EASY TO SEE. Rule 1
+     answers two questions, and they are not the same question. How many minor digits a code has is
+     the EXPONENT, held in two tables and guarded above. Whether three letters are a currency at all
+     is MEMBERSHIP, and the rule says it is `Intl.supportedValuesOf('currency')`, the runtime's
+     tender list.
+
+     NOTHING WAS GUARDING MEMBERSHIP, so a fourth list grew up in the web app: a constant called
+     `ISO_4217`, a hand-typed array of 155 codes, sitting beside a write path that validated against
+     `Intl`'s 162. It was seven codes short, and one of the seven was real: `XCG`, the Caribbean
+     guilder, which became tender in 2025. The record would accept an amount in it and the picker
+     could not offer one. The exponent guard could not see any of this: `currencies.ts` neither
+     reads `resolvedOptions()` nor declares `exponentOf`.
+
+     THE NAME IS THE LIE, WHICH IS WHY THE NAME IS WHAT IS CHECKED. A constant named after the
+     standard is a claim to BE the standard's list, and that claim cannot be true of anything typed
+     by hand: the standard moves and the file does not. A curated list is a different thing and is
+     allowed, as long as it is honest about being curated. `currencies.ts` now takes membership from
+     `Intl` and SUBTRACTS a handful of codes that are not money anybody keeps books in, each with
+     its reason, which can only ever fail to offer a code and can never admit one the write refuses.
+
+     AND A LONG LIST OF REAL CODES IS THE OTHER SHAPE, caught by counting rather than by name. The
+     threshold is deliberately well above the twelve `currencies.ts` legitimately holds, and the one
+     allowance below is a list of what a RATES SOURCE publishes, which is a question `Intl` cannot
+     answer and so cannot be derived. It carries no drift check and it will rot; it is named here so
+     that it rots in the open. */
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const CLAIMS_THE_STANDARD = /(?:function|const|let|var|type|interface)\s+(ISO_?4217\w*|ALL_CURRENCIES|CURRENCY_CODES)\b/u;
+
+  /* A LIST THIS LONG IS A LIST OF WHAT CURRENCIES THERE ARE, whatever it is called. Twenty rather
+     than twelve, so an ordered head of the dozen a person actually picks is never mistaken for one.
+     Tests are not exempt as a class: a test asserting on thirty codes is a test that will disagree
+     with the runtime one day, and it is better for it to say so here than to go red in a year with
+     no explanation. The two that do it are named, with what each is for. */
+  const MANY = 20;
+  const LIST_ALLOWED = new Map([
+    ['apps/web/src/lib/record/rates-form.ts', 'the currencies the ECB publishes, which Intl cannot answer'],
+    ['apps/web/test/measures-currency.test.ts', 'the drawing test, which asserts on a spread of codes on purpose'],
+  ]);
+
+  const TENDER = new Set(Intl.supportedValuesOf('currency'));
+  const found: string[] = [];
+  for (const path of sources(root)) {
+    const rel = relative(root, path).split(sep).join('/');
+    const text = readFileSync(path, 'utf8');
+
+    if (CLAIMS_THE_STANDARD.test(text))
+      found.push(`${rel} declares a constant named after ISO 4217. Membership is Intl.supportedValuesOf('currency') by 02 §3 rule 1, and a hand-typed copy of the standard is wrong the day the standard moves: the last one was missing XCG. Derive from Intl and subtract what you do not want, with a reason beside each.`);
+
+    const held = new Set<string>();
+    for (const m of text.matchAll(/['"]([A-Z]{3})['"]/gu)) if (TENDER.has(m[1])) held.add(m[1]);
+    if (held.size >= MANY && !LIST_ALLOWED.has(rel))
+      found.push(`${rel} quotes ${held.size} real currency codes, which is a list of what currencies there are. Take membership from Intl.supportedValuesOf('currency'), or name this file above with what the list is for if Intl cannot answer it.`);
+  }
+  assert.deepEqual(found, [], `\n${found.join('\n')}\n`);
+});

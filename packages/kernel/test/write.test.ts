@@ -629,3 +629,92 @@ test('A WRITE WITH NO OBJECT OF VALUES, OR A VERSION THAT IS NOT A NUMBER, IS RE
   assert.equal(k.get({ register: undefined, seq: undefined } as never), null);
   sql.close();
 });
+
+/* ── a default is a value, and it was the one value nothing checked ──────── */
+
+/**
+ * A register whose defaults are the shapes a declaration gets wrong.
+ *
+ * NOT ONE FIELD BUT A SPREAD, because the hole was in the step and not in a type: `merged[f.id] =
+ * f.default` ran before the loop that coerces, so every type was open at once and a fix that only
+ * closed `money` would read as if the rest had been checked all along.
+ */
+const declaring = (field: Record<string, unknown>): RegisterDecl =>
+  ({ id: 'defaults', name: 'Defaults', title: 'who', fields: [{ id: 'who', type: 'text' }, { id: 'v', ...field }] }) as unknown as RegisterDecl;
+
+const created = async (field: Record<string, unknown>) => {
+  const { k, sql } = await record([declaring(field)]);
+  const out = k.create('defaults', { who: 'Ada' }, { actor: 'p_1' });
+  const row = out.ok ? k.get((out as never as { value: Entry }).value.id) : null;
+  sql.close();
+  return { out, held: row?.fields as Record<string, unknown> | undefined };
+};
+
+test('A DEFAULT THE RECORD COULD NOT STORE IS REFUSED, and not written to the row unread', async () => {
+  /* EVERY ONE OF THESE WAS A ROW. A declaration is the one writer that reached `fields` without
+     passing step 3, so a `url` default of `javascript:` landed in a row the page then drew as a
+     link, a `money` default of a bare number landed with no currency at all, and an `instant`
+     naming no zone landed as an hour nobody can place. None of them is reachable from a caller:
+     the same values sent as a patch are refused, which is what made this an asymmetry rather than
+     a gap in the rules. */
+  const REFUSED: readonly (readonly [string, Record<string, unknown>])[] = [
+    ['money as a bare number', { type: 'money', default: 4800 }],
+    ['a url that is not https', { type: 'url', default: 'javascript:alert(1)' }],
+    ['an instant naming no zone', { type: 'instant', default: '2026-09-05T02:00:00' }],
+    ['a day that is no day', { type: 'day', default: '2026-13-99' }],
+    ['an int with a fraction', { type: 'int', default: 1.5 }],
+    ['a bool that is a word', { type: 'bool', default: 'yes' }],
+    ['an address with a space in it', { type: 'email', default: 'a b@c.com' }],
+    ['a list that is not a list', { type: 'list', of: 'int', default: 'not a list' }],
+    ['a list of the wrong thing', { type: 'list', of: 'int', default: ['a', 'b'] }],
+    ['a file that is not a file', { type: 'file', default: 'banana' }],
+    ['a key typed into a text field', { type: 'text', default: 'sk_live_abcdefghijklmnopqrstuvwx' }],
+  ];
+  for (const [said, field] of REFUSED) {
+    const { out, held } = await created(field);
+    assert.equal(codeOf(out), 'VALUE_MALFORMED', `${said}: the create was accepted`);
+    assert.equal(held, undefined, `${said}: a refused create left a row behind`);
+  }
+});
+
+test('A DEFAULT THE RECORD CAN STORE IS STORED THE WAY A CALLER’S VALUE IS, normalised and not verbatim', async () => {
+  /* THE OTHER HALF, AND THE QUIETER ONE: a default that coerces fine was still written raw, so the
+     same currency arrived as `gbp` from the declaration and `GBP` from a caller and the two rows
+     never matched a predicate together. Step 3 is where a value becomes the shape `02 §5` names,
+     and a default that skips it is a second shape in one column. */
+  const HELD: readonly (readonly [string, Record<string, unknown>, unknown])[] = [
+    ['a currency in the wrong case', { type: 'money', default: { amount: 4800, currency: 'gbp' } }, { amount: 4800, currency: 'GBP' }],
+    ['an amount sent as digits', { type: 'money', default: { amount: '4800', currency: 'GBP' } }, { amount: 4800, currency: 'GBP' }],
+    ['a whole number sent as text', { type: 'int', default: '5' }, 5],
+    ['an address in mixed case', { type: 'email', default: 'Ada@Example.COM' }, 'Ada@example.com'],
+  ];
+  for (const [said, field, want] of HELD) {
+    const { out, held } = await created(field);
+    assert.ok(out.ok, `${said}: ${fixOf(out)}`);
+    assert.deepEqual(held?.v, want, `${said}: the default was written the way it was typed`);
+  }
+});
+
+test('A DEFAULT OF NULL, THE EMPTY STRING OR THE EMPTY LIST IS ABSENT, which is the one state K2 gives them', async () => {
+  /* K2 IS THE KERNEL'S AND NOT THE PATCH LOOP'S. `isAbsent` sat inside the loop over what a caller
+     sent, so clearing a field removed the key and defaulting it to the same value added one: a row
+     that held `""` where every other row in the register held nothing, and a `present` predicate
+     that answered differently for two rows a person would call identical. */
+  for (const [said, field] of [
+    ['an empty text', { type: 'text', default: '' }],
+    ['an empty list', { type: 'list', of: 'text', default: [] }],
+    ['a null', { type: 'text', default: null }],
+  ] as const) {
+    const { out, held } = await created(field as Record<string, unknown>);
+    assert.ok(out.ok, `${said}: ${fixOf(out)}`);
+    assert.equal(held !== undefined && 'v' in held, false, `${said}: the row holds a key for a value that is absent`);
+  }
+});
+
+test('A REQUIRED FIELD WHOSE DEFAULT IS ABSENT IS STILL MISSING, and says so rather than looking filled', async () => {
+  /* THE CONSEQUENCE OF K2 ABOVE, and it is the right one: `required: true` with `default: ''` used
+     to pass the required check because the key was there, so the field a register said every row
+     must have was empty on every row that left it out. */
+  const { out } = await created({ type: 'text', required: true, default: '' });
+  assert.equal(codeOf(out), 'REQUIRED_MISSING');
+});

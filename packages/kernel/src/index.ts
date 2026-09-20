@@ -2018,11 +2018,40 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           at: key,
         });
 
+      const look = {
+        refId: (reg: string, seq: number) => bySeq(reg, seq)?.id ?? null,
+        grantExists: (id: string) => Boolean(sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)),
+      };
+
       /* Defaults first, and on a create only: a default is what a row starts as, not what it
-         returns to when somebody clears a field. */
+         returns to when somebody clears a field.
+
+         AND THROUGH STEP 3, LIKE EVERY OTHER VALUE, which this assigned straight into `merged` and
+         did not. A declaration was the one writer in the record that reached `fields` without being
+         coerced, so a `url` default of `javascript:` became a link on a page, a `money` default of a
+         bare number became an amount with no currency, and `gbp` from a declaration and `GBP` from a
+         caller sat in one column as two values that no predicate matched together. None of it was
+         reachable from a caller sending the same thing, which is what made it an asymmetry rather
+         than a rule: the fix is to delete the asymmetry, not to write the rule down.
+
+         K2 COMES WITH IT, AND IT IS TESTED BEFORE COERCION rather than after, which is where the
+         patch loop tests it too: `null` is absent, and every type refuses it as a value. `isAbsent`
+         used to live only inside that loop, so clearing a field removed the key and defaulting it to
+         the same value added one, and `""` was a fourth state beside the three the kernel says are
+         one. A default that is absent leaves the field absent, and a `required` field defaulted to
+         nothing is `REQUIRED_MISSING` rather than quietly filled. */
       if (!current)
-        for (const f of decl.fields)
-          if (f.default !== undefined && patch[f.id] === undefined && !f.derived) merged[f.id] = f.default;
+        for (const f of decl.fields) {
+          if (f.default === undefined || patch[f.id] !== undefined || f.derived) continue;
+          if (isAbsent(f.default)) continue;
+          const out = coerce(f, f.default, look);
+          /* THE SENTENCE NAMES THE DECLARATION, because `coerce` writes to whoever sent the value and
+             nobody sent this one. It refuses every create that leaves the field out, and the repair
+             is in the register rather than in the write. */
+          if (!out.ok)
+            return no<Entry>(out.refusal.code, `${register}.${f.id} has a default the record cannot store. ${out.refusal.fix}`, { at: f.id });
+          if (!isAbsent(out.value)) merged[f.id] = out.value;
+        }
 
       for (const [key, value] of Object.entries(patch)) {
         if (key === 'deleted_at') continue;
@@ -2059,10 +2088,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           continue;
         }
 
-        const out = coerce(field, value, {
-          refId: (reg, seq) => bySeq(reg, seq)?.id ?? null,
-          grantExists: (id) => Boolean(sql.one('SELECT 1 AS x FROM grant WHERE id = ?', id)),
-        });
+        const out = coerce(field, value, look);
         if (!out.ok) return { ok: false, refusal: out.refusal };
 
         /* AFTER COERCION, AND STRUCTURALLY. This compared the RAW patch value against the STORED

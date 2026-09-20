@@ -6,20 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COMMON_CURRENCIES, ISO_4217, OTHER_CURRENCIES, currencyChoices } from './currencies.ts';
 import { RATES_SOURCES, addressOf, currenciesIn, ratesFault, ratesIdOf, ratesProposal, rowsFor, type RatesDraft } from './rates-form.ts';
 
-test('THE PICKER OFFERS THE COMMON CURRENCIES FIRST, then every other ISO 4217 code once, in code order', () => {
-  assert.deepEqual(COMMON_CURRENCIES.slice(0, 4), ['EGP', 'USD', 'GBP', 'EUR']);
-  for (const c of COMMON_CURRENCIES) assert.ok((ISO_4217 as readonly string[]).includes(c), c);
-  assert.equal(new Set(ISO_4217).size, ISO_4217.length);
-  assert.deepEqual([...ISO_4217].sort(), [...ISO_4217]);
-  assert.equal(COMMON_CURRENCIES.length + OTHER_CURRENCIES.length, ISO_4217.length);
-  assert.equal(OTHER_CURRENCIES.includes('EGP'), false);
-  /* A code an agent wrote that the list lacks is still offered, so the picker draws what the setting holds. */
-  assert.equal(currencyChoices('xau').other[0], 'XAU');
-  assert.equal(currencyChoices('').other, OTHER_CURRENCIES);
-});
+/* The picker's own list moved to `currencies.test.ts` when it stopped being typed out and started coming from `Intl`:
+   the list a form offers is the list's invariant, not the form's. */
 
 test('THE CURRENCIES START AS THE ONES THE MONEY IS IN AND THE HOME ONE, less the base, at the address’s path', () => {
   const held = currenciesIn([
