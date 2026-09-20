@@ -23,7 +23,7 @@ import { no } from '@braindog/ports';
 import { compile, resolveDay, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
-import { convertMinor, rateFor } from './fx.ts';
+import { convertMinor, rateFor, rateIsStale } from './fx.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 
 export type Leg = {
@@ -47,7 +47,7 @@ export type Runway = {
   currency: string | null;
   mixed: readonly string[];
   /** Set when movements in another currency were converted into `currency`: the newest rate's day. */
-  converted?: { asOf: string; forward: boolean };
+  converted?: { asOf: string; forward: boolean; stale: boolean };
   /** Set when a home currency is chosen and a movement could not be converted into it: each pair, `USD to EGP`. */
   missing?: string[];
   steps: Step[];
@@ -306,13 +306,15 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
         continue;
       }
       m.step = { ...m.step, delta: convertMinor(m.step.delta, m.currency, into, r.rate) };
-      if (r.as_of > asOf) asOf = r.as_of;
+      /* THE OLDEST, not the newest: a runway is only as current as the stalest rate under it.
+         See `Across.converted` in `fx.ts` for why all three folds had this the wrong way round. */
+      if (asOf === '' || r.as_of < asOf) asOf = r.as_of;
       forward ||= r.forward;
     }
     if (missing.size === 0) {
       mixed = [];
       currency = into;
-      converted = { asOf, forward };
+      converted = { asOf, forward, stale: asOf !== '' && rateIsStale(asOf, new Date(deps.ctx.nowMs).toISOString().slice(0, 10)) };
     }
     if (missing.size)
       return {

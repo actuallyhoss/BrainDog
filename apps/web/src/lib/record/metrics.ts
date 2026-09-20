@@ -228,8 +228,8 @@ function figureOf(rows: Entry[], value: Value, fx: Fx): Figure {
   });
   const got = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null, kind);
   if (got.kind === 'one') return { value: got.amount, unit: got.currency };
-  if (got.kind === 'converted') return { value: got.amount, unit: got.currency, fx: { into: fx.into, home: fx.home, asOf: got.asOf, forward: got.forward, missing: [] } };
-  return { value: null, unit: null, parts: got.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: got.missing } };
+  if (got.kind === 'converted') return { value: got.amount, unit: got.currency, fx: { into: fx.into, home: fx.home, asOf: got.asOf, forward: got.forward, stale: got.stale, missing: [] } };
+  return { value: null, unit: null, parts: got.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: got.missing } };
 }
 
 /** The field an aggregation reads, whatever it multiplies it by. `id` for a count of rows. */
@@ -260,7 +260,7 @@ function pairOf(rows: Entry[], value: Extract<Value, { ratio: unknown } | { diff
       field === null ? null : aggregate(rows.filter((e) => currencyOf(e.fields[field]) === currency), agg);
     const parts = pairParts(currencies, ratio, (c) => ({ of: inCurrency(pair.of, ofField ?? perField, c), per: inCurrency(pair.per, perField ?? ofField, c) }));
     if (parts.length)
-      return { value: null, unit: null, parts, fx: fxOfPair(fx, of.fx, per.fx, false) ?? { into: fx.into, home: fx.home, asOf: null, forward: false, missing: [] } };
+      return { value: null, unit: null, parts, fx: fxOfPair(fx, of.fx, per.fx, false) ?? { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: [] } };
     return { value: null, unit: null };
   }
   const a = of.value;
@@ -295,6 +295,12 @@ export function fxNote(r: { parts?: readonly Part[] | undefined; fx?: FxRead | u
     /* ONE CURRENCY AND NO HOME CURRENCY IS NOT A PROBLEM TO REPORT: the amount is said in the currency it is in. */
     return r.parts.length > 1 ? copy.figureNoHome : null;
   }
+  /* A STALE RATE GETS ITS OWN SENTENCE, and it comes before `forward`. The footnote used to read
+     the same whether the rate was yesterday's or July's, which is the whole defect: a poll that
+     stopped because an action was paused or a key expired goes on converting, and a figure that
+     never changes tone is a figure he keeps acting on. `forward` is about one amount's day; stale
+     is about the whole figure, so stale wins when both are true. */
+  if (r.fx.asOf && r.fx.stale) return copy.figureConvertedStale(longDay(r.fx.asOf));
   if (r.fx.asOf) return (r.fx.forward ? copy.figureConvertedForward : copy.figureConverted)(longDay(r.fx.asOf));
   return null;
 }

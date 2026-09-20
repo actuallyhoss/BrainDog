@@ -28,7 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { compile, jsonPath, parseWhere, resolveDay, type Predicate, type Schema } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
-import { across, convertMinor, dayFieldOf, pairParts, rateFor, type Part, type Rate, type Reduce } from './fx.ts';
+import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct'] as const;
@@ -121,10 +121,13 @@ export type Group = {
  * How a money figure across currencies was read (`fx.ts`).
  *
  * `into` is the currency it was added up in, the home currency when the record has one (`home`), else the one the
- * figure declares. `asOf` is the newest rate a converted figure used, and `missing` each pair with no rate, which is
- * why a figure came back in `parts`.
+ * figure declares. `asOf` is the OLDEST rate a converted figure used, because a figure is only as current as the
+ * stalest rate behind it, and `missing` each pair with no rate, which is why a figure came back in `parts`.
+ *
+ * `stale` WHEN THAT OLDEST RATE IS OLDER THAN `RATE_STALE_DAYS`. A rate with no maximum age was the expensive kind
+ * of silence: a poll that quietly stopped went on converting at the old rate and the figure never changed tone.
  */
-export type FxRead = { into: string | null; home: string | null; asOf: string | null; forward: boolean; missing: string[] };
+export type FxRead = { into: string | null; home: string | null; asOf: string | null; forward: boolean; stale: boolean; missing: string[] };
 
 /** Named factor tables: a table's name, then each `by` value's factor. */
 export type Lookups = Record<string, Record<string, number>>;
@@ -179,6 +182,8 @@ export type TargetIn = {
   target: { lte: number } | { gte: number };
   asOf: string;
   forward: boolean;
+  /** Whether the rate that converted the bound is older than `RATE_STALE_DAYS`: a stale rate is a stale verdict. */
+  stale: boolean;
   /** The currency the target was set in, when it is not the one the figure declares: the home currency a person typed it in. */
   from?: string;
 };
@@ -205,7 +210,7 @@ export function targetFor(
 ): TargetIn | null {
   const from = targetCurrency(target, declared)!;
   const bound = 'lte' in target ? { lte: target.lte } : { gte: target.gte };
-  if (from === into) return { currency: into, target: bound, asOf: today, forward: false, from };
+  if (from === into) return { currency: into, target: bound, asOf: today, forward: false, stale: false, from };
   const got = targetInto(bound, from, into, rates, today);
   return got && from !== declared ? { ...got, from } : got;
 }
@@ -224,7 +229,7 @@ export function targetInto(
   const r = rateFor(rates, from, into, today);
   if (!r) return null;
   const bound = convertMinor('lte' in target ? target.lte : target.gte, from, into, r.rate);
-  return { currency: into, target: 'lte' in target ? { lte: bound } : { gte: bound }, asOf: r.as_of, forward: r.forward };
+  return { currency: into, target: 'lte' in target ? { lte: bound } : { gte: bound }, asOf: r.as_of, forward: r.forward, stale: rateIsStale(r.as_of, today.slice(0, 10)) };
 }
 
 const WINDOW = /^(\d{1,4})([dwm])$/;
@@ -723,7 +728,7 @@ function read(
       };
       const parts = pairParts(currencies, ratio, (c) => ({ of: inCurrency(pair.of, ofField ?? perField, c), per: inCurrency(pair.per, perField ?? ofField, c) }));
       const said = fxOfPair(fx, of.value.fx, per.value.fx, false);
-      if (parts.length) return ok({ value: null, unit: null, rows: of.value.rows, refusals: [], parts, ...(said ? { fx: said } : fx ? { fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: [] } } : {}) });
+      if (parts.length) return ok({ value: null, unit: null, rows: of.value.rows, refusals: [], parts, ...(said ? { fx: said } : fx ? { fx: { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: [] } } : {}) });
     }
     /* A HALF IN PARTS WITH NO CURRENCY BOTH HALVES ARE IN is not one number, and it says which currencies. */
     const split = of.value.parts ?? per.value.parts;
@@ -956,8 +961,8 @@ function aggregate(
       const said = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null, kind as Reduce);
       if (said.kind === 'one') return ok({ value: said.amount, unit: said.currency, rows, refusals: [] });
       if (said.kind === 'converted')
-        return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, missing: [] } });
-      return ok({ value: null, unit: null, rows, refusals: [], parts: said.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, missing: said.missing } });
+        return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } });
+      return ok({ value: null, unit: null, rows, refusals: [], parts: said.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: said.missing } });
     }
     if (groups.length > 1)
       /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
@@ -1011,15 +1016,18 @@ function moneyFieldOf(schema: Schema, agg: Aggregation): string | null {
  */
 export const rateUnit = (of: string | null, per: string | null): string | null => (of !== null && /^[A-Z]{3}$/u.test(of) && per === null ? of : null);
 
-/** How the two halves of a ratio or a diff were read across currencies, as one: the newest rate, and every pair missing. Exported for the browser's reader. */
+/** How the two halves of a ratio or a diff were read across currencies, as one: the OLDEST rate of the two, and every pair missing. Exported for the browser's reader. */
 export function fxOfPair(into: { into: string | null; home: string | null } | undefined, a: FxRead | undefined, b: FxRead | undefined, converted: boolean): FxRead | undefined {
   if (!a && !b) return undefined;
-  const asOf = converted ? ([a?.asOf, b?.asOf].filter((d): d is string => typeof d === 'string').sort().at(-1) ?? null) : null;
+  /* `.at(0)` AND NOT `.at(-1)`: a ratio of a figure converted today and one converted in July is
+     as old as the July half, and saying today made the stale half invisible. */
+  const asOf = converted ? ([a?.asOf, b?.asOf].filter((d): d is string => typeof d === 'string').sort().at(0) ?? null) : null;
   return {
     into: into?.into ?? a?.into ?? b?.into ?? null,
     home: into?.home ?? a?.home ?? b?.home ?? null,
     asOf,
     forward: converted && Boolean(a?.forward || b?.forward),
+    stale: converted && Boolean(a?.stale || b?.stale),
     missing: [...new Set([...(a?.missing ?? []), ...(b?.missing ?? [])])].sort(),
   };
 }

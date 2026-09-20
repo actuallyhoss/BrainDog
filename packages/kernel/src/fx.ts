@@ -28,13 +28,45 @@ export type Part = { currency: string; amount: number };
 export type Across =
   /** Every amount was already in `currency`, or there was only one currency and no other was asked for. */
   | { kind: 'one'; currency: string | null; amount: number }
-  /** Converted into `currency`; `asOf` is the newest rate used, `forward` when a rate after an amount's day stood in. */
-  | { kind: 'converted'; currency: string; amount: number; asOf: string; forward: boolean }
+  /**
+   * Converted into `currency`.
+   *
+   * `asOf` IS THE OLDEST RATE USED, not the newest. A figure is only as current as the stalest
+   * rate behind it, and reporting the newest actively concealed that: a total half converted at
+   * today's dollar and half at a two-month-old pound answered "as of today", which is true of the
+   * dollar and false of the figure. `rateFor`'s own via rule already said the right thing one
+   * function away ("the pair is only as recent as its older half") and the three places that
+   * folded rates together each said the opposite.
+   *
+   * `forward` when a rate AFTER an amount's day stood in; `stale` when the oldest is older than
+   * `RATE_STALE_DAYS` before the figure's day.
+   */
+  | { kind: 'converted'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean }
   /** Not added up: one part per currency, largest code order, and each pair with no rate as `EGP to USD`. */
   | { kind: 'parts'; parts: Part[]; missing: string[] };
 
 const CODE = /^[A-Z]{3}$/u;
 const DAY = /^\d{4}-\d{2}-\d{2}/u;
+
+/**
+ * How old a rate may be before a figure converted with it is marked stale.
+ *
+ * SEVEN, WHICH IS THE NUMBER THIS TREE ALREADY USES for the same question about a bank balance:
+ * `accounts` declares `stale: { field: 'as_of', after: '7d' }`. A published rate comes on
+ * weekdays, so a week covers a holiday without covering a poll that stopped.
+ *
+ * THE POINT IS THE TONE AND NOT THE REFUSAL. A rate with no maximum age is the expensive kind of
+ * silence: a poll that quietly stopped two months ago, because an action was paused or a key
+ * expired, goes on converting at the old rate, and the only signal is a footnote in the same ink
+ * as everything else. He holds EGP, where two months of drift is not a rounding error.
+ */
+export const RATE_STALE_DAYS = 7;
+
+const DAY_MS = 86_400_000;
+
+/** Whether `asOf` is more than `RATE_STALE_DAYS` before `day`. Both are `YYYY-MM-DD`. */
+export const rateIsStale = (asOf: string, day: string): boolean =>
+  Date.parse(`${day}T00:00:00Z`) - Date.parse(`${asOf}T00:00:00Z`) > RATE_STALE_DAYS * DAY_MS;
 
 /** The rates a list's rows hold. A row that is not a whole rate (a code, a code, a positive number and a day) is not one. */
 export function ratesFrom(rows: Iterable<Record<string, unknown>>): Rate[] {
@@ -125,6 +157,9 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
 
   const missing = new Set<string>();
   const converted: number[] = [];
+  /* THE OLDEST RATE USED, so the empty string cannot win the comparison the way it did when this
+     was the newest. A figure that converted nothing keeps `asOf` empty and reports `stale: false`,
+     which is what `one` and `parts` already mean. */
   let asOf = '';
   let forward = false;
   if (into !== null && convert)
@@ -139,10 +174,18 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
         continue;
       }
       converted.push(convertMinor(a.amount, a.currency, into, r.rate));
-      if (r.as_of > asOf) asOf = r.as_of;
+      if (asOf === '' || r.as_of < asOf) asOf = r.as_of;
       forward ||= r.forward;
     }
-  if (into !== null && convert && missing.size === 0) return { kind: 'converted', currency: into, amount: reduceOf(kind, converted) ?? 0, asOf, forward };
+  if (into !== null && convert && missing.size === 0)
+    return {
+      kind: 'converted',
+      currency: into,
+      amount: reduceOf(kind, converted) ?? 0,
+      asOf,
+      forward,
+      stale: asOf !== '' && rateIsStale(asOf, today.slice(0, 10)),
+    };
   return { kind: 'parts', parts: partsOf(amounts, kind), missing: [...missing].sort() };
 }
 

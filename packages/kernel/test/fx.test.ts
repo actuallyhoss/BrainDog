@@ -52,13 +52,18 @@ test('ACROSS: one currency is one amount, every rate converts, and one missing r
     { currency: 'USD', amount: 10_050, day: '2026-09-16' },
   ];
   assert.deepEqual(across(amounts.slice(1), 'USD', [], '2026-09-17'), { kind: 'one', currency: 'USD', amount: 350_050 });
-  /* Each amount at the rate as of its own day: 3,400 at 48 and 100.50 at 50. */
+  /* Each amount at the rate as of its own day: 3,400 at 48 and 100.50 at 50.
+     `asOf` IS THE OLDEST OF THE TWO RATES USED AND NOT THE NEWEST. It read the newest until
+     September 20th, which made a figure sound more current than it was: half of this one is
+     converted at the 1st and the answer said the 15th. A figure is only as current as the
+     stalest rate behind it, which is what `rateFor`'s via rule one function away already said. */
   assert.deepEqual(across(amounts, 'EGP', RATES, '2026-09-17'), {
     kind: 'converted',
     currency: 'EGP',
     amount: 5_000_000 + 16_320_000 + 502_500,
-    asOf: '2026-09-15',
+    asOf: '2026-09-01',
     forward: false,
+    stale: true,
   });
   assert.deepEqual(across([...amounts, { currency: 'GBP', amount: 100, day: null }], 'EGP', RATES, '2026-09-17'), {
     kind: 'parts',
@@ -172,7 +177,7 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
     { currency: 'EGP', amount: 5_200_000 },
     { currency: 'USD', amount: 350_050 },
   ]);
-  assert.deepEqual(bare.fx, { into: 'GBP', home: null, asOf: null, forward: false, missing: [] });
+  assert.deepEqual(bare.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
   const home = read(k, CASH);
@@ -189,7 +194,7 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
   assert.equal(converted.value, 5_200_000 + 16_320_000 + 502_500);
   assert.equal(converted.unit, 'EGP');
   assert.equal(converted.parts, undefined);
-  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
+  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, missing: [] });
   assert.equal(converted.met, null, 'the target is in sterling, the figure it declares, so a figure in pounds has no verdict');
 
   /* THE OTHER WAY ROUND, the same rows read in dollars through the inverse. */
@@ -237,7 +242,7 @@ test('A CASH WALK OVER TWO CURRENCIES names the rate it lacks, and walks in the 
   const walk = k.runway(0, legs, 30);
   assert.ok(walk.ok);
   assert.equal(walk.value.currency, 'EGP');
-  assert.deepEqual(walk.value.converted, { asOf: '2026-09-01', forward: false });
+  assert.deepEqual(walk.value.converted, { asOf: '2026-09-01', forward: false, stale: true });
   /* Every row is in the past, so each lands today, going out in pounds: 52,000 + 3,400 × 50 + 100.50 × 50. */
   assert.equal(walk.value.steps.at(-1)?.balance, -(5_200_000 + 17_000_000 + 502_500));
   sql.close();
@@ -298,7 +303,7 @@ test('AN AVERAGE, A LEAST AND A MOST ACROSS CURRENCIES are each currency’s own
     { currency: 'EGP', amount: 5_200_000 },
     { currency: 'USD', amount: 340_000 },
   ]);
-  assert.deepEqual(most.fx, { into: 'GBP', home: null, asOf: null, forward: false, missing: [] });
+  assert.deepEqual(most.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
   assert.deepEqual(of({ avg: 'balance' }).fx?.missing, ['USD to EGP']);
@@ -312,7 +317,7 @@ test('AN AVERAGE, A LEAST AND A MOST ACROSS CURRENCIES are each currency’s own
   assert.equal(avg.value, (5_200_000 + 16_320_000 + 502_500) / 3);
   assert.equal(avg.unit, 'EGP');
   assert.equal(avg.parts, undefined);
-  assert.deepEqual(avg.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
+  assert.deepEqual(avg.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, missing: [] });
   assert.equal(of({ min: 'balance' }).value, 502_500);
   assert.equal(of({ max: 'balance' }).value, 16_320_000);
   sql.close();
@@ -346,7 +351,7 @@ test('A RATIO AND A DIFF ACROSS CURRENCIES are one per currency with no rate, an
   assert.equal(converted.value, 5_200_000 + 16_320_000 + 502_500 - 502_500);
   assert.equal(converted.unit, 'EGP');
   assert.equal(converted.parts, undefined);
-  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-15', forward: false, missing: [] });
+  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, missing: [] });
   assert.equal(read(k, each).value, (5_200_000 + 16_320_000 + 502_500) / 3);
   sql.close();
 });
@@ -369,7 +374,7 @@ test('A TARGET IN THE DECLARED CURRENCY IS CONVERTED AT THE LATEST RATE, and jud
     assert.ok(k.create('fx', r, { actor: 'p_1' }).ok);
   const judged = read(k, cash);
   /* 100,000 pounds sterling at the latest rate, 64, is 6,400,000 Egyptian pounds. */
-  assert.deepEqual(judged.targetIn, { currency: 'EGP', target: { gte: 640_000_000 }, asOf: '2026-09-12', forward: false });
+  assert.deepEqual(judged.targetIn, { currency: 'EGP', target: { gte: 640_000_000 }, asOf: '2026-09-12', forward: false, stale: false });
   assert.equal(judged.met, false);
   assert.equal(read(k, { ...cash, target: { lte: 640_000_000 } }).met, true);
   sql.close();
@@ -485,4 +490,48 @@ test('AN OPENING THAT CONVERTS AND A BILL WITH NO RATE: the home walk draws what
   );
   assert.deepEqual(out.walkFx, { home: 'EGP', missing: ['GBP to EGP'] });
   sql.close();
+});
+
+/**
+ * A RATE HAD NO MAXIMUM AGE, which is the expensive kind of silence.
+ *
+ * `rateFor` takes the newest rate on or before the day and, failing that, the earliest after it,
+ * with no bound in either direction. So a poll that quietly stopped two months ago — a paused
+ * action, an expired key — went on converting at the old rate, and the only signal was a footnote
+ * printed in the same ink whether the rate was yesterday's or July's. He holds EGP, where two
+ * months of drift is not a rounding error.
+ *
+ * SEVEN DAYS, which is the number this tree already uses for the same question about a bank
+ * balance (`accounts` declares `stale: { field: 'as_of', after: '7d' }`). A published rate comes
+ * on weekdays, so a week covers a holiday without covering a poll that stopped.
+ */
+test('A FIGURE IS AS STALE AS THE OLDEST RATE UNDER IT, and it says so rather than reading current', () => {
+  const stale: Rate[] = [
+    { currency: 'USD', base: 'GBP', rate: 0.79, as_of: '2026-09-20' },
+    { currency: 'EGP', base: 'GBP', rate: 0.016, as_of: '2026-07-14' },
+  ];
+  const amounts = [
+    { currency: 'USD', amount: 100_00, day: '2026-09-20' },
+    { currency: 'EGP', amount: 50_000_00, day: '2026-09-20' },
+  ];
+
+  /* THE OLDEST AND NOT THE NEWEST. Reporting the newest was the part that concealed it: the
+     dollar half really is as of today, and saying so about the figure was false about the pound. */
+  assert.deepEqual(across(amounts, 'GBP', stale, '2026-09-20'), {
+    kind: 'converted', currency: 'GBP', amount: 87_900, asOf: '2026-07-14', forward: false, stale: true,
+  });
+
+  /* A WEEK IS NOT STALE AND EIGHT DAYS IS. The boundary is asserted from both sides, because a
+     bound nothing pins moves the first time somebody tidies the comparison. */
+  const at = (day: string): boolean => {
+    const out = across(amounts, 'GBP', [stale[0]!, { ...stale[1]!, as_of: day }], '2026-09-20');
+    assert.equal(out.kind, 'converted');
+    return out.kind === 'converted' ? out.stale : true;
+  };
+  assert.equal(at('2026-09-13'), false, 'seven days is not stale');
+  assert.equal(at('2026-09-12'), true, 'eight days is');
+
+  /* AND A FIGURE THAT CONVERTED NOTHING IS NOT STALE, because there is no rate behind it to age. */
+  const one = across([{ currency: 'GBP', amount: 500, day: '2026-09-20' }], 'GBP', stale, '2026-09-20');
+  assert.deepEqual(one, { kind: 'one', currency: 'GBP', amount: 500 });
 });

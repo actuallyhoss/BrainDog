@@ -379,8 +379,8 @@ test('A NOTE QUOTING A FIGURE THE RECORD SENT IN PARTS writes each amount', () =
 
 test('A TARGET TYPED IN THE HOME CURRENCY IS SAID AS TYPED, and one converted says from which', () => {
   const decl = { ...METRICS['out-30d']!, target: { lte: 2_000_000 } } as MetricDecl;
-  const typed = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, from: 'EGP' } });
-  const converted = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false } });
+  const typed = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false, from: 'EGP' } });
+  const converted = targetSaid(decl, { unit: 'EGP', targetIn: { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, stale: false } });
   assert.ok(typed.includes('20,000.00'), typed);
   assert.ok(!typed.includes('converted'), typed);
   assert.ok(converted.includes('GBP'), converted);

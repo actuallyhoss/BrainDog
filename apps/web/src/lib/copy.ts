@@ -1232,6 +1232,7 @@ export const copy = {
   figureNoRate: (pairs: string) => `Not added up yet: there is no rate from ${pairs}. Add one to Exchange rates.`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   figureConvertedForward: (day: string) => `Converted at rates as of ${day}, the first after some of these amounts.`,
+  figureConvertedStale: (day: string) => `Converted at rates as of ${day}. Update the rates for a current figure.`,
   /** A target declared in one currency, said in the one the figure was converted into. */
   targetConverted: (line: string, from: string) => `${line}, converted from ${from} at the latest rate`,
   blockNeedsOneCurrency: 'This needs its money in one currency, and it is in more than one.',

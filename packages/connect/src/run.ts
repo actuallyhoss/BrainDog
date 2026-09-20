@@ -157,7 +157,13 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
     error?: PullResult['error'],
   ): Promise<PullResult> => {
     const now = clock.now();
-    const points = outcome === 'ok' ? writeSeries(decl, buffer, tz) : [];
+    /* A BUCKET REFUSED FOR ITS CURRENCY IS A WARNING AND NOT A FAILURE. The run did what it was
+       asked and read what was there; what it will not do is add two currencies and label the
+       total with one of them. The warning names the day and the code it found, because the fix
+       is either the declaration's unit or the provider's filter and only he can say which. */
+    const wrote = outcome === 'ok' ? writeSeries(decl, buffer, tz) : { points: [], mixed: [] };
+    const points = wrote.points;
+    warnings.push(...wrote.mixed);
 
     let slot = payload.slot;
     let dueAt: string | null = null;

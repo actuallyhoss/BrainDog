@@ -537,7 +537,7 @@ export type { Answered } from './status.ts';
 export { probe, proveScopes } from './probe.ts';
 
 /* Extracted rows as bucketed readings — `08 §3`'s five kinds and their one reducer each. */
-export { writeSeries } from './series.ts';
+export { writeSeries, type SeriesWrite } from './series.ts';
 
 /* When a run is due, and what range of time it asks for (`47 §4.8`, `§5.1` step 3). */
 export { jitterSeconds, nextDue, rfc3339, startOfGrainMs, wallAt, wallClock, watermarkAfter, windowFor, zonedToMs } from './when.ts';

@@ -251,7 +251,7 @@ test('A SUM ACROSS TWO CURRENCIES IS NOT ADDED: it is one amount per currency, w
     { currency: 'EUR', amount: 100_000 },
     { currency: 'GBP', amount: 720_000 },
   ]);
-  assert.deepEqual(out.fx, { into: 'GBP', home: null, asOf: null, forward: false, missing: [] });
+  assert.deepEqual(out.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
   assert.equal(out.met, null, 'a verdict on no one number');
   sql.close();
 });
