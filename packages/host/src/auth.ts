@@ -451,9 +451,35 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
       return { flow, sid: sid ?? '', slug: text(body.slug) };
-    default:
+    /* THE TWO THAT ARE HANDLED BEFORE THIS AND NOT HERE. `methods` is answered above, and
+       `claim.mint` goes through `operated`, which checks the operator key first. Naming them is
+       what lets `default` be a type error rather than a 404. */
+    case 'methods':
+    case 'claim.mint':
       return null;
+    default:
+      return unhandled(flow);
   }
+}
+
+/**
+ * A flow this host has no case for, refused at compile time rather than at the door.
+ *
+ * `default: return null` MEANT "THIS BRAINDOG DOES NOT OFFER THAT WAY TO SIGN IN", which `serveAuth`
+ * answers with a 404. That is the right answer for a path nobody serves and the wrong one for a flow
+ * that is in `AUTH_ROUTES`, in `AuthCall` and in `AuthBodies` and was only missed in the switch
+ * above: the route exists, the Directory implements it, and the host answers as though neither did.
+ *
+ * MEASURED ON 2026-09-20 by adding a fourteenth flow to `AuthCall` and its body to `AuthBodies`.
+ * `pnpm -C packages/host typecheck` passed, and the new route answered 404. The parameter below is
+ * `never`, so the same edit now fails to compile, which is where a missing case belongs.
+ *
+ * IT STILL ANSWERS AT RUNTIME, because `serveAuth` reaches here through `route.flow as AuthFlow` and
+ * a cast proves nothing about what a string really is.
+ */
+function unhandled(flow: never): null {
+  void flow;
+  return null;
 }
 
 /** The Directory's answer as a response: the envelope, the status, the cookie, and `Retry-After` on a 429. */

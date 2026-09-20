@@ -27,6 +27,12 @@
  * throws its buffer away and starts the window again from page one. Register rows are idempotent
  * upserts keyed by their dedupe fields, so they resume mid-window and lose nothing.
  *
+ * A PAGE THE EXTRACTOR REFUSED IS NOT AN EMPTY PAGE (step 6.8). `43` answers zero rows and a
+ * `reason` for a body it will not read, and read here as an empty page that refusal completed the
+ * window and moved the watermark past rows nobody had seen. It goes to `review` with the body kept,
+ * which is what the run already did for a review-grade `expect:` and for the same reason: an empty
+ * page is a quiet Tuesday and a refused one is a person's afternoon.
+ *
  * AND THE PLAINTEXT GRANT NEVER LEAVES THIS FRAME. It is opened at step 2, passed down as an
  * argument, and goes out of scope when the function returns. No `PullResult`, no `applyPull`
  * argument and no event note has a field it could travel in — which is a claim the tests check by
@@ -354,12 +360,44 @@ export async function runPull(job: OutboxRow<'pull.fetch'>, deps: ConnectDeps): 
          never written. */
       const list = document ? listOf(json, at) : null;
 
-      /* 6.8 — one extraction per arrival, `n` rows for a pull (`43 §4.1`, `47 §13` D4). */
+      /* 6.8 — one extraction per arrival, `n` rows for a pull (`43 §4.1`, `47 §13` D4).
+         `maxRows` IS THE WHOLE RUN'S CAP AND NOT WHAT IS LEFT OF IT. `rows_per_run` is checked at
+         the top of this loop, which makes it a stop-AFTER cap: a page that takes the total past it
+         is accepted whole and the next page is the one that does not happen. Handing the extractor
+         the remainder contradicted that, and did it silently, because `43` keeps an over-cap page
+         RAW rather than truncating it (`07 §2`): with `rows_per_run: 3`, a second page of three
+         rows came back as `rows over cap (3; the cap is 1)`, zero rows, and the run went on to end
+         `ok` having written two of the five rows the provider sent. */
       const extraction = deps.extract(
         decl,
         { id: `${job.id}:${n}`, ts: rfc3339(clock.now()), channel: 'pull', headers: answered, body: text },
-        { currencies: deps.currencies, lookup: deps.lookup, now: clock.now(), tz, maxRows: rowsPerRun - rows },
+        { currencies: deps.currencies, lookup: deps.lookup, now: clock.now(), tz, maxRows: rowsPerRun },
       );
+
+      /* AN EXTRACTION THAT READ NOTHING AND SAID WHY IS A REFUSED PAGE AND NOT AN EMPTY ONE, and
+         the difference is a day of somebody's revenue. Both extractors a host injects answer zero
+         rows and a `reason` for a body they will not read: over the two-megabyte ceiling,
+         unparseable in the declared format, no list where the declaration says one is, no `map:`
+         to read it with, and more rows than the cap. Read here as an empty page, as it was, a
+         refused page took the 6.9 path below: written `matched` with a `null` body, so the rows
+         are gone AND there is nothing left to read them out of, the window completed, and the
+         watermark moved past a day that was only partly read. A `skipped` extraction is not this:
+         declining an arrival is the declaration's own intent and writes nothing on purpose.
+         THE PAGE IS KEPT FOR A PERSON, like a review-grade `expect`, and for the same reason. */
+      if (extraction.rows.length === 0 && extraction.reason !== undefined) {
+        await record.applyPull({
+          outbox: job.id,
+          n,
+          raw: { sha256, headers: answered, bytes: text.length, body: text, state: 'review', reason: extraction.reason },
+          rows: [],
+          cursor: payload.cursor,
+        });
+        throw new PullError('PULL_SHAPE_MISMATCH', `${at}.read`, {
+          found: extraction.reason,
+          wanted: 'a page the extractor could read',
+        });
+      }
+
       /* A ROW THE EXTRACTOR COULD NOT READ IS COUNTED AND NEVER WRITTEN. */
       needsReview += extraction.rows.filter((r) => r.confidence === 'needs-review').length;
 

@@ -1359,3 +1359,83 @@ test('`{not: predicate}` SAYS HOW TO NEGATE, rather than that `undefined` is not
   assert.match(c.bad[0]!.fix, /none/);
   assert.doesNotMatch(c.bad[0]!.fix, /undefined/);
 });
+
+/* ── a group that names two quantifiers ──────────────────────────────────── */
+
+test('A GROUP NAMING TWO QUANTIFIERS IS REFUSED, and it used to answer the first and drop the second', () => {
+  /**
+   * `Group` IS A UNION OF THREE ONE-KEY OBJECTS AND NOTHING CHECKED THAT IT WAS ONE.
+   *
+   * `quantifierOf` reads `'all' in g ? 'all' : 'any' in g ? 'any' : 'none'` and `childrenOf` reads
+   * the matching list, both of them taking the FIRST key they find. So `{ all: [...], none: [...] }`
+   * type-errors in TypeScript and arrives anyway, because the seven consumers of this grammar take
+   * a predicate off the wire: `packages/host` JSON-decodes `?where=`, a saved view is a row, a
+   * pack is a file from a stranger. Measured against this fixture before the refusal existed, with
+   * `all: state is open` and `none: n gt 2`:
+   *
+   *     compile  bad=[]  matched a, d, e
+   *     wanted            d, e
+   *
+   * Row `a` holds `n: 3`, so the `none` leg asked for it to be left out and it came back. A filter
+   * that looks like it narrowed twice and narrowed once is the failure this package's header opens
+   * with, and it is worse here than a wrong row: the reader cannot see the leg that was skipped.
+   *
+   * THE REPAIR IS REFUSAL RATHER THAN EVALUATING BOTH LEGS. Reading the shape as an implicit AND
+   * would be a new meaning for a predicate that is already stored in saved views, pack files and
+   * page filters, so a list somebody has been reading for months would silently start returning
+   * fewer rows on the day they upgraded. A filter whose meaning was ambiguous must not begin
+   * meaning something; it must say that it cannot be read, and name both words it found so the
+   * person who wrote it knows which one to delete.
+   */
+  const two = { all: [{ field: 'state', is: 'open' }], none: [{ field: 'n', gt: 2 }] } as unknown as Predicate;
+  const c = compile(two, SCHEMA);
+
+  /* THE MEASUREMENT IS IN THE MESSAGE, so the red run shows the dropped leg rather than only the
+     missing refusal: the ids below are what the compiled SQL actually returns. */
+  const matched = (): string => {
+    if (c.bad.length) return 'nothing, it was refused';
+    const d = db();
+    const out = d.prepare(`SELECT id FROM entry WHERE ${c.sql} ORDER BY id`).all(...(c.params as never[])) as { id: string }[];
+    d.close();
+    return out.map((r) => r.id).join(',');
+  };
+  assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `it compiled and matched ${matched()}, and the none leg asked to leave a out`);
+
+  /* AND THE REFUSAL NAMES BOTH WORDS. "A group takes one quantifier" without saying which two are
+     in the object leaves the reader to diff their own JSON against a grammar. */
+  assert.match(c.bad[0]!.fix, /all/);
+  assert.match(c.bad[0]!.fix, /none/);
+  assert.doesNotMatch(c.bad[0]!.fix, /any/, 'it names a quantifier that is not in the group');
+
+  /* EVERY PAIRING, because `quantifierOf` reads the three in an order and only one of the three
+     pairs puts the dropped leg second by accident. */
+  for (const pair of [
+    { all: [{ field: 'state', is: 'open' }], any: [{ field: 'n', gt: 2 }] },
+    { any: [{ field: 'state', is: 'open' }], none: [{ field: 'n', gt: 2 }] },
+    { all: [{ field: 'state', is: 'open' }], any: [{ field: 'n', gt: 2 }], none: [{ field: 'due', empty: true }] },
+  ]) {
+    const each = compile(pair as unknown as Predicate, SCHEMA);
+    assert.equal(each.bad[0]?.code, 'VALUE_MALFORMED', `${Object.keys(pair).join(' and ')} compiled`);
+  }
+
+  /* AND THE OTHER RENDERING ANSWERS `false` RATHER THAN THE FIRST LEG, which it gets by asking the
+     compiler rather than by repeating this check. A rule firing mid-write on a predicate the list
+     refuses to draw is the two-language failure in its most expensive form. */
+  for (const r of ROWS) assert.equal(evaluate(two, r.fields, SCHEMA, r), false);
+
+  /* A GROUP WITH ONE QUANTIFIER IS UNTOUCHED, including one holding a leaf whose FIELD is called
+     `any`. The check is about the group's own keys and a leaf is not a group. */
+  assert.deepEqual(both({ all: [{ field: 'state', is: 'open' }] }), ['a', 'd', 'e']);
+  assert.deepEqual(both({ none: [{ field: 'n', gt: 2 }] }), ['c', 'd', 'e']);
+});
+
+test('AND THE REFUSAL READS AS A SENTENCE WITH THREE KEYS IN THE OBJECT, not as a list joined by ands', () => {
+  /* `all and any and none` is a machine joining an array. The reader is being asked to delete one
+     of their own words, so the words have to arrive the way a person writes them down. */
+  const three = { all: [{ field: 'n', gt: 0 }], any: [{ field: 'n', gt: 1 }], none: [{ field: 'n', gt: 2 }] };
+  const c = compile(three as unknown as Predicate, SCHEMA);
+  assert.match(c.bad[0]!.fix, /names all, any and none\./);
+  /* AND THE STRUCTURED HALF STILL RECITES THE THREE, which is where a caller that wants the list
+     reads it rather than out of the sentence. */
+  assert.deepEqual(c.bad[0]!.allowed, ['all', 'any', 'none']);
+});

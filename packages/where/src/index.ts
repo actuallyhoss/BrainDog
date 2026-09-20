@@ -691,6 +691,41 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
 
     if (isGroup(node)) {
+      /**
+       * A GROUP THAT NAMES TWO QUANTIFIERS IS REFUSED, AND IT USED TO ANSWER THE FIRST ONE.
+       *
+       * `Group` is a union of three one-key objects, and nothing checked that an incoming object
+       * was one of them: `quantifierOf` and `childrenOf` each take the FIRST key they find, in the
+       * order `all any none`. Measured against the suite's own fixture, `{all: [state is open],
+       * none: [n gt 2]}` compiled with `bad=[]` and returned `a, d, e`; the `none` leg asked for
+       * `a` to be left out, because `a` holds `n: 3`, and `a` came back. The whole second leg was
+       * dropped in silence, which is worse than one wrong row: the SQL carries no trace of the
+       * question that was skipped, so the person reading the list cannot see what happened.
+       *
+       * TypeScript REJECTS THE SHAPE AND THAT IS NOT THE GUARD, because a predicate is a value off
+       * the wire on every one of the seven paths that read this grammar: `packages/host`
+       * JSON-decodes `?where=`, a saved view is a row somebody stored, a pack is a file from a
+       * stranger.
+       *
+       * IT IS A REFUSAL AND NOT A QUIET AND OF THE TWO LEGS. Reading the shape as an implicit `all`
+       * would give a new meaning to a predicate that is already sitting in saved views and pack
+       * files, so a list a person has read every morning for months would return fewer rows the day
+       * they upgraded, with nothing on screen to say why. An ambiguous filter must say it cannot be
+       * read. The fix line names the two words actually in the object rather than reciting the
+       * three, because the reader's job is to delete one of their own.
+       */
+      const named = QUANTIFIERS.filter((k) => k in node);
+      if (named.length > 1) {
+        bad.push(
+          refuse(
+            'VALUE_MALFORMED',
+            `A group asks one question of its children, and this one names ${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}. Keep one, and write the other as a group nested inside it.`,
+            'where',
+            QUANTIFIERS,
+          ),
+        );
+        return '';
+      }
       const q = quantifierOf(node);
       /* REFUSED WITHOUT DESCENDING, which is `38-SPEC-WHERE` §5.3's rule G1 word for word and also
          the only way the check is worth having: descending first is the `RangeError` it prevents. */

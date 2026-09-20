@@ -666,16 +666,27 @@ export async function serveApi(
    * three would buy a lower number in one gate and a product that answers differently depending on
    * where a customer runs it, which is the trade this file exists to refuse.
    */
-  let out: Result<unknown>;
+  /**
+   * THE STATUS AND THE BODY ARE INSIDE THE TRY TOO, because the two lines after it threw.
+   *
+   * The promise above was kept for the handler and for nothing that read its answer. Measured on
+   * 2026-09-20 by handing `serveApi` three answers a handler can really produce: `ok(1n)` came out
+   * as `TypeError: Do not know how to serialize a BigInt` from `json`, a value holding itself as
+   * `TypeError: Converting circular structure to JSON` from the same line, and a handler answering
+   * `undefined` as `TypeError: Cannot read properties of undefined (reading 'ok')` from
+   * `httpStatus`. All three escaped `serveApi` with no `Response` ever built, which is the hung
+   * socket this catch was written to end. A bigint is not a far-fetched value either: `Param`, what
+   * `@braindog/ports` says a driver may hand back, lists it.
+   */
   try {
-    out = await handler(args, ctx);
+    const out = await handler(args, ctx);
+    return json(httpStatus(out), out);
   } catch (e) {
     return json(500, {
       ok: false,
       refusal: { code: 'INTERNAL', fix: `${name} could not be answered: ${e instanceof Error ? e.message : String(e)}.` },
     });
   }
-  return json(httpStatus(out), out);
 }
 
 /**

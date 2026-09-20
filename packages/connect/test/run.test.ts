@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readRows, UNPARSEABLE } from '@braindog/extract';
+import { extract as extractReal, readRows, UNPARSEABLE, type Declaration, type ExtractCtx } from '@braindog/extract';
 import type { Clock, Http, HttpInit } from '@braindog/ports';
 
 import {
@@ -726,4 +726,137 @@ test('AND A FORTY-PAGE RUN FINISHES IN UNDER TWO SECONDS, which is the ceiling a
   );
 
   assert.ok(ms < 2_000, `a forty-page run took ${Math.round(ms)} ms, and §5.5 allows 2,000`);
+});
+
+/* ── A page nobody could read ────────────────────────────────────────────────────────────────── */
+
+/**
+ * `43`'s extractor, wired for real, because the two refusals below are ITS refusals and not a stub's.
+ *
+ * THE CASTS ARE THE PACKAGE BOUNDARY AND NOT A SHORTCUT. `IngestDecl`, `RawArrival` and the context
+ * are declared structurally in `index.ts` (`47 §13` D1) so that rank 14 takes no edge on `43`, so
+ * these are the same fields under two names and the compiler has no way of being told so.
+ */
+const realExtract: ExtractFn = (decl, raw, ctx) =>
+  extractReal(decl as unknown as Declaration, raw, ctx as unknown as ExtractCtx) as Extraction;
+
+/**
+ * The pipeline's refusal, measured rather than imagined.
+ *
+ * `extract` answers `{ rows: [], confidence: 'needs-review', reason }` for the three bodies it will
+ * not read: over the two-megabyte ceiling, unparseable in the declared format, and more rows than
+ * `ctx.maxRows` (`packages/extract/src/pipeline.ts` step 3, which keeps the page raw rather than
+ * truncating it). Running that shape through the real extractor needs a two-megabyte fixture, so
+ * one page of a run answers with it directly while the others extract normally.
+ */
+const refusingOn = (n: number, reason: string): ExtractFn => (decl, raw, ctx) =>
+  raw.id.endsWith(`:${n}`) ? { rows: [], confidence: 'needs-review', reason } : extract(decl, raw, ctx);
+
+test('the rows_per_run budget does not annihilate the page that crossed it', async () => {
+  /* THE CAP IS A STOP-AFTER CAP AND NOT A CEILING ON A PAGE. The loop checks it before a request,
+     so a page that takes the total past it is accepted whole and the NEXT page is the one that
+     does not happen. Handing the extractor the REMAINING budget contradicted that: the extractor
+     keeps an over-cap page raw rather than truncating it, so the page came back as zero rows with
+     a reason nothing read, and the run carried on and ended `ok` two rows short of what it read. */
+  const seen: Call[] = [];
+  const { deps, wrote } = depsOf(
+    provider(
+      [
+        { body: { items: [row('2026-01-19T10:00:00Z', 1), row('2026-01-19T11:00:00Z', 2)] } },
+        { body: { items: [row('2026-01-19T12:00:00Z', 3), row('2026-01-19T13:00:00Z', 4), row('2026-01-19T14:00:00Z', 5)] } },
+        { body: { items: [] } },
+      ],
+      seen,
+    ),
+    { extract: realExtract },
+  );
+  const decl = registerDecl({ read: { format: 'json', rows: 'items' }, limits: { rows_per_run: 3 } });
+  const out = await runPull(jobOf(decl), deps);
+
+  assert.equal(
+    wrote.pages.reduce((n, p) => n + p.rows.length, 0),
+    5,
+    'a page the provider sent reached the record as nothing',
+  );
+  assert.equal(out.outcome, 'partial');
+  assert.equal(seen.length, 2, 'the run asked for a third page after its budget was spent');
+  assert.deepEqual(out.cursor.window?.page, { kind: 'page_number', value: 3 });
+  assert.equal(out.cursor.window?.rows, 5);
+  assert.equal(out.cursor.watermark, null);
+});
+
+test('a page the extractor refused is kept for a person, and the window does not complete', async () => {
+  const body = { items: [row('2026-01-19T10:00:00Z', 1), row('2026-01-19T11:00:00Z', 2)] };
+  const { deps, wrote } = depsOf(provider([{ body }]), { extract: realExtract });
+  const decl = registerDecl({
+    read: { format: 'json', rows: 'items' },
+    page: { kind: 'none' },
+    limits: { rows_per_run: 1 },
+  });
+  const out = await runPull(jobOf(decl), deps);
+
+  /* A PAGE THE EXTRACTOR WOULD NOT READ IS NOT AN EMPTY PAGE, and the difference is a day of
+     somebody's revenue. Written as `matched` with a `null` body, as it was, the rows are gone and
+     there is nothing left to read them out of; the run said `ok` and moved the watermark past them. */
+  assert.equal(out.outcome, 'review');
+  assert.equal(out.error?.code, 'PULL_SHAPE_MISMATCH');
+  assert.match(String(out.error?.found), /rows over cap/u);
+  assert.equal(wrote.pages[0]?.raw.state, 'review');
+  assert.equal(wrote.pages[0]?.raw.body, JSON.stringify(body), 'the body a person has to look at was thrown away');
+  assert.equal(out.rows, 0);
+  assert.equal(out.cursor.watermark, null);
+  assert.equal(out.cursor.window, undefined);
+  assert.equal(wrote.ack?.state, 'done');
+});
+
+test('one refused page in a window stops the whole window writing, series included', async () => {
+  /* THIS IS THE EXPENSIVE ONE. Page two holds the rest of the eighteenth; refused, dropped and
+     never counted, the run reduced page one alone and wrote the day as though it were whole. A
+     gap is visible on a chart and an understated total is not (`08 §3`, `25 §8`). */
+  const { deps, wrote } = depsOf(
+    provider([
+      { body: { items: [row('2026-01-18T10:00:00Z', 100), row('2026-01-18T20:00:00Z', 250)] } },
+      { body: { items: [row('2026-01-18T22:00:00Z', 900)] } },
+      { body: { items: [] } },
+    ]),
+    { extract: refusingOn(2, 'body too large (2100000 bytes; the cap is 2000000)') },
+  );
+  const out = await runPull(jobOf(seriesDecl()), deps);
+
+  assert.equal(out.outcome, 'review');
+  assert.equal(out.points, 0);
+  assert.deepEqual(wrote.ack?.result?.points, []);
+  assert.equal(out.error?.at, 'fetch.page[2].read');
+  assert.equal(out.cursor.watermark, null, 'the watermark moved past a day that was never read whole');
+});
+
+/**
+ * A `skip:` rule firing, which is zero rows and a `skipped` and never a `reason` (`43 §5.2` step 3).
+ */
+const skippingOn = (n: number, skipped: string): ExtractFn => (decl, raw, ctx) =>
+  raw.id.endsWith(`:${n}`) ? { rows: [], confidence: 'exact', skipped } : extract(decl, raw, ctx);
+
+test('an arrival the declaration declined is an ordinary page, and the run still ends ok', async () => {
+  /* A DECLARED SKIP IS NOT A REFUSED PAGE, and the only thing holding them apart is which field
+     6.8 reads. Both answer zero rows; a refusal says `reason` and a skip says `skipped`, because
+     declining an arrival is the declaration's own intent. Widening that test to `reason ?? skipped`
+     was tried here against the three tests above and all thirty-three still passed, so a connector
+     with one `skip:` rule would have gone to `review` on every run, stopped its window on the first
+     refund it was told to ignore, and never moved its watermark again. */
+  const { deps, wrote } = depsOf(
+    provider([
+      { body: { items: [row('2026-01-19T10:00:00Z', 1), row('2026-01-19T11:00:00Z', 2)] } },
+      { body: { items: [row('2026-01-19T12:00:00Z', 3)] } },
+      { body: { items: [] } },
+    ]),
+    { extract: skippingOn(2, 'a refund, and this connector reads charges') },
+  );
+  const out = await runPull(jobOf(registerDecl()), deps);
+
+  assert.equal(out.outcome, 'ok');
+  assert.equal(out.pages, 3, 'the window stopped on a page the declaration had asked it to skip');
+  assert.equal(out.rows, 2);
+  assert.equal(wrote.pages[1]?.raw.state, 'matched');
+  assert.equal(wrote.pages[1]?.raw.body, null, 'a skipped page kept a body nobody has to look at');
+  assert.equal(wrote.ack?.state, 'done');
 });

@@ -56,15 +56,38 @@ async function host() {
   return { api, sql, call, handlers };
 }
 
-test('EVERY ROUTE IN THE TABLE IS WIRED, which is the whole reason the table is data', async () => {
-  // `handlersFor` throws if the two ever disagree, so this asserts the shape it produced rather than
-  // re-checking the check. What it adds is the sentence: a route nobody can read about is a route
-  // nobody calls.
-  const { handlers, sql } = await host();
-  assert.equal(Object.keys(handlers).length, ROUTES.length);
-  for (const route of ROUTES) assert.ok(handlers[route.name], `${route.name} is declared and not wired`);
+test('EVERY ROUTE IN THE TABLE IS WIRED TO THE METHOD OF ITS OWN NAME, which is the whole reason the table is data', async () => {
+  /* TWO OF THE THREE ASSERTIONS HERE COULD NOT FAIL, and the comment under them said so in as many
+     words: `handlersFor` throws if the table and the wiring disagree in either direction, so
+     `Object.keys(handlers).length === ROUTES.length` and `handlers[route.name]` were re-checking a
+     check that had already run, and no edit to this package could have made either one red.
+
+     WHAT `handlersFor` DOES NOT CHECK IS WHICH METHOD A NAME REACHES. It is a hundred lines of
+     `name: (a, ctx) => api.name(a, ctx)` written by hand, and a copied line that left `api.pages`
+     under `page` would satisfy every guard in the file and answer the wrong question in
+     production. So the handlers are driven against a record that records which method each one
+     called. Proved red on 2026-09-20 by wiring `page` to `api.pages` in `src/index.ts`: this test
+     failed and every other test in this file still passed. */
+  let called: string | null = null;
+  const recording = new Proxy(
+    {},
+    {
+      get: (_target, key) => async () => {
+        called = String(key);
+        return ok(null);
+      },
+    },
+  );
+  const handlers = handlersFor(recording as never);
+
+  for (const route of ROUTES) {
+    called = null;
+    await handlers[route.name]!({}, owner);
+    assert.equal(called, route.name, `${route.name} is wired to ${called}`);
+  }
+
+  /* A route nobody can read about is a route nobody calls. */
   assert.ok(ROUTES.every((r) => r.what.length > 20), 'a route with no sentence is a route nobody can call');
-  sql.close();
 });
 
 test('a read is a GET with its arguments in the query string, and a predicate survives the trip', async () => {

@@ -404,6 +404,43 @@ const unreachable = (why: string): Refusal => ({
   fix: `The record could not be reached: ${why}`,
 });
 
+/**
+ * Whether a parsed body is an answer at all, in one place for both doors.
+ *
+ * THE SHAPE IS CHECKED, not assumed. A proxy that returns its own error page with a 200 would
+ * otherwise arrive as a successful call whose value is an HTML string, and the first thing that
+ * reads a field off it fails somewhere unrelated.
+ *
+ * THAT ARGUMENT HELD FOR AN HTML PAGE AND FAILED FOR A JSON ONE, because the check under it asked
+ * whether `ok` was present and never what it was. Measured on 2026-09-20 by handing this client
+ * canned bodies through its injected `fetch`: `502 {"ok":1,"error":"upstream"}` came back as
+ * `{ ok: 1 }`, and every caller in this repository writes `if (out.ok)`, so a gateway error read as
+ * a success whose `value` was `undefined`. `200 {"ok":true}` did the same. So `ok` has to BE a
+ * boolean, and a success has to carry the key it promises.
+ *
+ * `null` IS A VALUE AND ABSENT IS NOT, which is why this is `Object.hasOwn` and not a truth test.
+ * `revokeGrant` answers `Result<null>`, and refusing that would refuse the record's own answer.
+ *
+ * AND IT IS ONE FUNCTION BECAUSE THERE ARE TWO DOORS. `call` and `keyDoor` had these checks written
+ * out twice, so the first three were repaired twice or they were not repaired at all.
+ */
+const answered = <T>(status: number, body: unknown): Result<T> => {
+  if (body === null || typeof body !== 'object' || !('ok' in body) || typeof (body as { ok: unknown }).ok !== 'boolean')
+    return { ok: false, refusal: unreachable(`${status} with an answer this client does not recognise`) };
+
+  /* AND A NOT-OK ANSWER HAS TO BE ONE OF THE TWO. There are three arms and only two of them are
+     failures; an `{ ok: false }` carrying neither a refusal nor a conflict would reach a caller
+     that reads `.refusal.fix` off it and fail somewhere unrelated, with a 422 in the log and a
+     `TypeError` on the screen. */
+  if (body.ok === false && !('refusal' in body) && !('conflict' in body))
+    return { ok: false, refusal: unreachable(`${status} with a failure carrying neither a refusal nor a conflict`) };
+
+  if (body.ok === true && !Object.hasOwn(body, 'value'))
+    return { ok: false, refusal: unreachable(`${status} with a success carrying no value`) };
+
+  return body as Result<T>;
+};
+
 /** `putKey`: the row the key is on, and which version of its grant this made. Never anything sealed. */
 export type KeyPut = { credential: string; label: string; version: number; rotated: boolean };
 
@@ -479,20 +516,7 @@ export function createClient(options: ClientOptions) {
       return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
     }
 
-    /* THE SHAPE IS CHECKED, not assumed. A proxy that returns its own error page with a 200 would
-       otherwise arrive as a successful call whose value is an HTML string, and the first thing that
-       reads a field off it fails somewhere unrelated. */
-    if (body === null || typeof body !== 'object' || !('ok' in body))
-      return { ok: false, refusal: unreachable(`${res.status} with an answer this client does not recognise`) };
-
-    /* AND A NOT-OK ANSWER HAS TO BE ONE OF THE TWO. There are three arms and only two of them are
-       failures; an `{ ok: false }` carrying neither a refusal nor a conflict would reach a caller
-       that reads `.refusal.fix` off it and fail somewhere unrelated, with a 422 in the log and a
-       `TypeError` on the screen. */
-    if (body.ok === false && !('refusal' in body) && !('conflict' in body))
-      return { ok: false, refusal: unreachable(`${res.status} with a failure carrying neither a refusal nor a conflict`) };
-
-    return body as Result<T>;
+    return answered<T>(res.status, body);
   }
 
   /**
@@ -523,11 +547,7 @@ export function createClient(options: ClientOptions) {
     } catch {
       return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
     }
-    if (body === null || typeof body !== 'object' || !('ok' in body))
-      return { ok: false, refusal: unreachable(`${res.status} with an answer this client does not recognise`) };
-    if (body.ok === false && !('refusal' in body) && !('conflict' in body))
-      return { ok: false, refusal: unreachable(`${res.status} with a failure carrying neither a refusal nor a conflict`) };
-    return body as Result<T>;
+    return answered<T>(res.status, body);
   }
 
   return {

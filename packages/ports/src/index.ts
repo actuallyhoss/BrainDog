@@ -408,13 +408,26 @@ export const codeOf = <T>(r: Result<T>): string =>
  * assertion. They should not have to know which of the two failures they are holding, and before
  * this existed every one of them reached for `.refusal.fix` and would have printed `undefined` the
  * day a conflict reached it.
+ *
+ * AND THE THIRD ARM, a not-ok answer carrying neither, is the one that used to come back empty.
+ *
+ * `packages/host/src/connector.ts:127` is `if (!wrote.ok) throw new Error(fixOf(wrote))`, and
+ * `runPull` writes that message onto the run as `error.fix`, so an `{ ok: false }` with no reason
+ * became `new Error('')` and the run event a person reads ended at the colon: `balance stopped at
+ * page 1: ` and nothing after it. The shape is not hypothetical here. `packages/host/src/index.ts`
+ * gives it its own 500 arm in `httpStatus`, and the client mints `UNREACHABLE` for exactly that
+ * body arriving over the wire, so both boundaries already expect to meet one.
+ *
+ * An OK answer still has no sentence, because there is nothing wrong to say.
  */
 export const fixOf = <T>(r: Result<T>): string =>
   refused(r)
     ? r.refusal.fix
     : conflicted(r)
       ? `${r.conflict.actor} changed this since you read it. It is at version ${r.conflict.version} now. Read it again and re-apply.`
-      : '';
+      : r.ok
+        ? ''
+        : 'That did not go through, and the answer came back without saying why. Try it once more, and if it fails the same way this is a bug in the record rather than anything you sent.';
 export const no = <T>(code: string, fix: string, extra: Omit<Refusal, 'code' | 'fix'> = {}): Result<T> => ({
   ok: false,
   refusal: { code, fix, ...extra },

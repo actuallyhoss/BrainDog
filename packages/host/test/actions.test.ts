@@ -64,7 +64,15 @@ test('IT SENDS TO A DECLARED ORIGIN with the key as a bearer, and follows no red
   const net = wire(new Response('balance 120'));
   const answer = await sendAction({ origins: declaring(ORIGIN), openKey, send: net.send })(request());
 
-  assert.deepEqual(answer, { status: 200, body: 'balance 120', bytes: 11, ms: answer.ms, requests: 1 });
+  /* `ms` IS PULLED OUT RATHER THAN COMPARED WITH ITSELF. This read `{ …, ms: answer.ms, … }`, so the
+     expected side carried whatever the actual side did and that field asserted nothing: the same
+     line passed with `ms` at a float, at `NaN`, or at a string. Checked on 2026-09-20 by making
+     `src/actions.ts` answer `ms: (Date.now() - started) + 0.5`, which the old line accepted and this
+     one refuses. What can be known about an elapsed time nobody controls is that it is a whole
+     number of milliseconds, which is what `Date.now()` twice makes it. */
+  const { ms, ...rest } = answer as { ms: number } & Record<string, unknown>;
+  assert.deepEqual(rest, { status: 200, body: 'balance 120', bytes: 11, requests: 1 });
+  assert.ok(Number.isInteger(ms), `the call was timed as ${JSON.stringify(ms)}`);
   assert.equal(net.calls[0]?.init.redirect, 'manual');
   assert.ok(net.calls[0]?.init.signal, 'the request had no timeout');
   assert.equal(new Headers(net.calls[0]?.init.headers).get('authorization'), `Bearer ${FAKE}`);
