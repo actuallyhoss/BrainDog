@@ -29,6 +29,8 @@ const OBLIGATIONS: RegisterDecl = {
     { id: 'ref', type: 'text', unique: true },
     { id: 'party', type: 'text' },
     { id: 'tags', type: 'list', of: 'text' },
+    { id: 'chased', type: 'list', of: 'enum', values: ['email', 'phone', 'letter'] },
+    { id: 'instalments', type: 'list', of: 'money' },
     { id: 'opened', type: 'day', immutable: true },
     {
       id: 'state',
@@ -147,6 +149,40 @@ test('a refusal says what was wrong and what may be sent instead', async () => {
   const noRegister = refusal(k.create('atlantis', { what: 'x' }, { actor: 'p_1' }));
   assert.equal(noRegister.code, 'REGISTER_UNKNOWN');
   assert.ok(noRegister.allowed?.includes('obligations'));
+  sql.close();
+});
+
+test('A LIST OF ENUMS CHECKS EVERY ELEMENT, because a list is not a place a value the field has not got can hide', async () => {
+  /* The membership test keyed off the field's own type, so it fired for `enum` and never for
+     `list<enum>`, whose type is `list`. Every element went in unchecked: a register declaring three
+     ways it chases a debt accepted a fourth that nothing had ever declared, and the row read back
+     clean. Coercion does not catch it either, by design, because only the write path can list the
+     values in the refusal. */
+  const { k, sql } = await record();
+  value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
+
+  const bad = refusal(k.update('obligations', 'obligations#1', { chased: ['email', 'carrier_pigeon'] }, { actor: 'p_1' }));
+  assert.equal(bad.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(bad.allowed, ['email', 'phone', 'letter']);
+  assert.equal(bad.at, 'chased[1]', 'a refusal that names the field and not the element sends a person to read the whole list');
+  assert.ok(bad.fix.includes('carrier_pigeon'), 'the refusal does not say which value it will not take');
+  assert.equal(k.get('obligations#1')?.fields.chased, undefined, 'one bad element wrote the good ones anyway');
+
+  value<Entry>(k.update('obligations', 'obligations#1', { chased: ['letter', 'email'] }, { actor: 'p_1' }));
+  assert.deepEqual(k.get('obligations#1')?.fields.chased, ['letter', 'email']);
+  sql.close();
+});
+
+test('AND AN EMPTY LIST OF ENUMS IS AN ABSENT FIELD, not a list with nothing wrong in it', async () => {
+  // K2 (34 §1.3): null, the empty string and the empty list are one state. Checking membership must
+  // not turn the clearing of a field into a refusal, and must not read a cleared field as a value.
+  const { k, sql } = await record();
+  value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open', chased: ['phone'] }, { actor: 'p_1' }));
+  for (const cleared of [[], null]) {
+    value<Entry>(k.update('obligations', 'obligations#1', { chased: cleared as never }, { actor: 'p_1' }));
+    assert.equal(k.get('obligations#1')?.fields.chased, undefined, `${JSON.stringify(cleared)} did not clear the field`);
+    value<Entry>(k.update('obligations', 'obligations#1', { chased: ['phone'] }, { actor: 'p_1' }));
+  }
   sql.close();
 });
 
@@ -511,6 +547,28 @@ test('AND A MONEY FIELD IS ON THE REDACTION LIST WITHOUT ASKING', async () => {
 
   // And the number is nowhere in the ledger, which is the whole point.
   assert.equal(sql.all("SELECT 1 FROM event WHERE to_v LIKE '%90000%' OR from_v LIKE '%90000%'").length, 0);
+  sql.close();
+});
+
+test('AND A LIST OF MONEY IS MONEY, so writing the amounts as a list is not a way round the redaction', async () => {
+  /* The list that decides this read the field's own type, so a `money` field was kept out of the
+     ledger and a `list<money>` field wrote every amount into it. An audit log is read by everybody
+     who can read the record, so that is the disclosure the mechanism exists to prevent, reached by
+     declaring the field the other way. */
+  const { k, sql } = await record();
+  const made = value<Entry>(
+    k.create('obligations', { what: 'a', state: 'open', instalments: [{ amount: 45_000, currency: 'GBP' }, { amount: 45_000, currency: 'GBP' }] }, { actor: 'p_1' }),
+  );
+  assert.equal((k.history(made.id)[0]!.to as Record<string, unknown>).instalments, '--redacted--');
+
+  value<Entry>(k.update('obligations', 'obligations#1', { instalments: [{ amount: 90_000, currency: 'GBP' }] }, { actor: 'p_1' }));
+  const changed = k.history(made.id).at(-1)!;
+  assert.equal(changed.field, 'instalments', 'which field changed is not recorded');
+  assert.equal(changed.from, '--redacted--');
+  assert.equal(changed.to, '--redacted--');
+
+  assert.equal(sql.all("SELECT 1 FROM event WHERE to_v LIKE '%45000%' OR from_v LIKE '%45000%'").length, 0, 'an amount reached the ledger inside a list');
+  assert.equal(sql.all("SELECT 1 FROM event WHERE to_v LIKE '%90000%' OR from_v LIKE '%90000%'").length, 0, 'an amount reached the ledger inside a list');
   sql.close();
 });
 

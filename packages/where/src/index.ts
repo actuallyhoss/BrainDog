@@ -809,9 +809,16 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     };
 
     /* An enum value outside the declared set is the failure that motivated the whole evaluator:
-       `state is not done` on a register with no `done` was true of every row. */
+       `state is not done` on a register with no `done` was true of every row.
+       A `list<enum>` IS AN ENUM HERE, AND `values` IS HOW THE SCHEMA SAYS SO. This read
+       `decl.type`, which is `list` and not `enum` for a `list<enum>`, so a literal the field
+       cannot hold was never compared against anything. `Schema.fields` carries no `of`, it never
+       has, and it does not need one: `values` means an enum's values and a plain list declares
+       none, so a list that declares them is a `list<enum>` and nothing else is. Keying off the
+       marker the schema already carries beats adding a key every builder would have to remember
+       to set, which is the same forgetting this line is a case of. */
     const checkEnum = (v: unknown): boolean => {
-      if (decl.type !== 'enum' || !decl.values) return true;
+      if ((decl.type !== 'enum' && decl.type !== 'list') || !decl.values) return true;
       if (typeof v === 'string' && decl.values.includes(v)) return true;
       bad.push(refuse('ENUM_VALUE_UNKNOWN', `${field} has no value ${String(v)}.`, field, decl.values));
       return false;
@@ -1115,6 +1122,13 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
 
       case 'has':
       case 'lacks': {
+        /* AND THE CHECK HAS TO BE CALLED FROM HERE, which is the half that was actually load
+           bearing. `operatorAllowed` refuses `is`, `not`, `in` and `not_in` on a list, so the two
+           arms that already ask `checkEnum` are the two a `list<enum>` can never reach; these are
+           the only operators it admits, and neither asked. Teaching `checkEnum` about lists and
+           stopping there would have changed nothing a caller could observe. Before `bind`, as the
+           `is` arm does it, so the refusal names the value somebody wrote. */
+        if (!checkEnum(value)) return '';
         const bound = bind(value, 'text');
         if (bound === null) {
           bad.push(refuse('VALUE_MALFORMED', `${field} ${op} takes one value to look for in the list.`, field));

@@ -777,7 +777,7 @@ any row is written".*
 | `RELATIVE_LITERAL_UNKNOWN` | a temporal literal outside the anchors and offsets, §7 | `relative-literal-unknown` |
 | `RELATIVE_UNIT_FOR_DAY` | an `h` or minute offset against a `day` field, §7 — raised by `declare` on a `remind:`, which the compiler cannot reach, so the fixture has a producer (38) | `relative-unit-for-day` |
 | `EXTRACTOR_UNKNOWN` | an `extract:` form key outside the thirteen, 34 §3 (43) | `extractor-unknown` |
-| `DATE_FORMAT_INVALID` | a `date` form's `format:` outside its token rules, 34 §3 (43) | `date-format-invalid` |
+| `DATE_FORMAT_INVALID` | a `format:` outside its token rules, on a `date` extractor form or on a `map:` day, 34 §3 (43) | `date-format-invalid` |
 | `PATH_INVALID` | a response path outside the one `Path` grammar that serves `map`, `read`, `probe`, `expect` and `page.from`, 25 §3 (43) | `path-invalid` |
 | `REF_UNKNOWN` | a `ref` written by name against a register that holds no row of that name — `thing is Kiln`, 34 §1.1's spoken form. **It is not `VALUE_MALFORMED`**, though that row already reads "an unresolvable id or spoken reference", and the test is not whether the sentences read alike but whether a caller has to tell them apart: `declare` lints every rule's `when:` and survives this refusal and no other, because a name that resolves to nothing today may be written tomorrow while a grammar fault is a fault whenever it is read. Merge them and the exemption swallows a real shape error and installs a rule that fires on nothing, in silence, for ever. Nor is it `REF_REGISTER_MISMATCH`, which resolves to a row of the wrong register — repoint that one; this one has nothing to point at (53) | `ref-unknown` |
 

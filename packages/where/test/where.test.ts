@@ -31,6 +31,8 @@ const SCHEMA: Schema = {
     open: { type: 'bool' },
     state: { type: 'enum', values: ['open', 'part', 'paid', 'written_off'] },
     tags: { type: 'list' },
+    /* A `list<enum>`, which the schema tells apart from a plain list by declaring `values`. */
+    chased: { type: 'list', values: ['email', 'phone', 'letter'] },
     /* Stored to the second, which is the whole subject of the instant test below. */
     at: { type: 'instant' },
   },
@@ -344,6 +346,23 @@ test('a value the enum does not have is refused — the failure that motivated t
   assert.deepEqual(c.bad[0]?.allowed, ['open', 'part', 'paid', 'written_off']);
   // And inside a list, every value is checked, not only the first.
   assert.equal(compile({ field: 'state', in: ['open', 'done'] }, SCHEMA).bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
+});
+
+test('AND A LIST OF ENUMS IS AN ENUM, so has and lacks are refused a value the field cannot hold', () => {
+  /* The same failure one type along, and worse, because it is unreachable by the operators that
+     were guarded: `is` and `in` are refused on a list, so the only two a `list<enum>` admits were
+     the two that never asked. `chased has urgnet` compiled clean and matched nothing, for ever,
+     which is the answer a filter gives when it is working. */
+  for (const leaf of [{ field: 'chased', has: 'urgnet' }, { field: 'chased', lacks: 'urgnet' }] as const) {
+    const c = compile(leaf, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'ENUM_VALUE_UNKNOWN', `${'has' in leaf ? 'has' : 'lacks'} took a value the field has not got`);
+    assert.deepEqual(c.bad[0]?.allowed, ['email', 'phone', 'letter']);
+    assert.equal(c.bad[0]?.at, 'chased');
+  }
+
+  // A value the field does have still compiles, and a list that declares no values is unaffected.
+  assert.equal(compile({ field: 'chased', has: 'phone' }, SCHEMA).bad.length, 0);
+  assert.equal(compile({ field: 'tags', has: 'anything at all' }, SCHEMA).bad.length, 0);
 });
 
 /* THE CODE IS `MATCH_OP_UNSUPPORTED` IN ALL FIVE, and it moved here because it was never this

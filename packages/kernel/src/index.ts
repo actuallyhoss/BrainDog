@@ -2138,11 +2138,34 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             return no<Entry>('REQUIRED_MISSING', `${register} needs ${f.id} when ${when.field} is ${String(when.is)}.`, { at: f.id });
         }
 
-        if (value !== undefined && f.type === 'enum' && !f.values?.includes(String(value)))
-          return no<Entry>('ENUM_VALUE_UNKNOWN', `${f.id} has no value ${String(value)}.`, {
-            at: f.id,
-            allowed: f.values ?? [],
-          });
+        /* MEMBERSHIP IS THE WRITE PATH'S, AND A `list<enum>` IS STILL AN ENUM. This keyed off the
+           field's own type, which is `list` and not `enum` for a `list<enum>`, so not one element
+           was ever compared against `values:`. A register declaring the three ways it chases a
+           debt stored a fourth, and the row read back clean. Nothing else was going to catch it:
+           `coerce` recurses into the list and its `enum` case deliberately skips membership,
+           because only here can the refusal carry the values a caller may send instead.
+
+           NAMED BY ELEMENT, the way `coerce` names one, `chased[1]` and not `chased`. A field
+           holding five values, one of them wrong, refused by the field's name alone sends a person
+           to read all five; and a bracketed `at:` already reaches callers from this same write,
+           because a malformed element returns `coerce`'s own refusal untouched.
+
+           ONE BAD ELEMENT REFUSES THE WHOLE WRITE, as every other check in this loop does and as
+           `coerce`'s list case already does on the first element it cannot read. A write that
+           stored the good half of a list would be a partial write, which this path has no shape
+           for: the version, the events and the row all move together or none of them does.
+
+           AN EMPTY LIST NEVER REACHES HERE. K2 (`34 §1.3`) makes it absent, so the loop above
+           deleted the key and `value` is `undefined`, which is what the field being unset means. */
+        if (value !== undefined && (f.type === 'enum' || (f.type === 'list' && f.of === 'enum'))) {
+          const held = Array.isArray(value) ? value : [value];
+          const at = held.findIndex((one) => !f.values?.includes(String(one)));
+          if (at !== -1)
+            return no<Entry>('ENUM_VALUE_UNKNOWN', `${f.id} has no value ${String(held[at])}.`, {
+              at: f.type === 'list' ? `${f.id}[${at}]` : f.id,
+              allowed: f.values ?? [],
+            });
+        }
 
         /* THE BOUNDS, on what this write set: the bytes of a text, the value of a number. */
         if (value !== undefined && (f.min !== undefined || f.max !== undefined) && (!current || touched.includes(f.id))) {
@@ -2640,7 +2663,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   const REDACTED = '--redacted--';
   const redacts = (register: string, field: string): boolean => {
     const decl = registers.get(register)?.fields.find((f) => f.id === field);
-    return decl ? decl.type === 'secret' || decl.type === 'money' || decl.redact === true : false;
+    if (!decl) return false;
+    /* A `list<T>` IS A T FOR THIS, AND THE ELEMENT TYPE IS WHAT IS ASKED. This read the field's own
+       type, which is `list` and not `money` for a `list<money>`, so an amount written as a list went
+       into the ledger in full while the same amount written as a scalar did not: the disclosure
+       above, reached by declaring the field the other way. `declare.ts`'s `kind` is the idiom, so a
+       seventeenth type does not have to remember this line exists.
+
+       `redact:` STAYS ON THE FIELD. It is a flag somebody put on this declaration, not a property of
+       what the field holds, so unwrapping `of` would be reading it off the wrong thing. */
+    const kind = decl.type === 'list' ? decl.of : decl.type;
+    return kind === 'secret' || kind === 'money' || decl.redact === true;
   };
   const shown = (register: string, field: string, value: Json | undefined): Json | undefined =>
     value === undefined ? undefined : redacts(register, field) ? REDACTED : value;

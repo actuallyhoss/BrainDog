@@ -90,6 +90,16 @@ export const indexName = (kind: 'i' | 'u' | 'k', register: string, field?: strin
 /** A money value is an object, so it takes TWO indexes: one per half. Likewise a quantity. */
 const PARTS: Record<string, string[]> = { money: ['amount', 'currency'], quantity: ['value', 'unit'] };
 
+/**
+ * What the record stores as more than one value, and therefore cannot compare as one.
+ *
+ * SEPARATE FROM `PARTS`, BECAUSE THEY ANSWER DIFFERENT QUESTIONS. `PARTS` names the two types that
+ * index in halves, which is about `indexesFor`. This names every type whose stored value is a JSON
+ * object or array, which is about what the write path's clash check may bind as a SQLite parameter.
+ * The `unique:` guard asked `PARTS` and so only ever covered two of the five.
+ */
+const COMPOSITE = new Set(['money', 'quantity', 'list', 'file', 'json']);
+
 type FieldLike = {
   id: string;
   type: string;
@@ -2136,6 +2146,43 @@ function mappingFault(entry: unknown, at: string): Refusal | null {
   }
   if (e.from !== undefined && e.from !== 'epoch_s' && e.from !== 'epoch_ms')
     return bad('DECLARATION_INVALID', `${at}'s from is epoch_s or epoch_ms.`, `${at}.from`, ['epoch_s', 'epoch_ms']);
+
+  /**
+   * `format` WAS AN ACCEPTED KEY THAT NOTHING LOOKED AT, WHICH IS `extractorFault`'s `date:` DEFECT ONE
+   * BLOCK OVER.
+   *
+   * `MAPPING_KEYS` admits `format` and this function checked `path`, `type`, `from`, a money currency
+   * and an enum's values, so the format itself reached the write path unread. `map.ts` hands it to
+   * `MapDeps.day`, and a reader answers `null` for a format it cannot compile, which is also what it
+   * answers for a value with no date in it. So `{ path: 'x', type: 'day', format: 'banana' }` installed
+   * clean, matched arrivals, wrote rows, and left the day empty on every one of them for as long as the
+   * pack was installed, with nothing refused and nothing logged. `43 §13 D13` puts the check at install,
+   * where the author is still looking at what they typed, and `dateFormatFault` is the reader the `date:`
+   * extractor already uses. One grammar and not two: the whole point of that work was that a second date
+   * reader drifts from the first, and a third would drift from both.
+   *
+   * AND `format` IS ONLY EVER READ ON A `day` THAT NAMES NO `from`. `43 §4.5` gives it to `day` alone:
+   * `instant` reads RFC 3339 or an epoch through `from:`, and no other type in `MAP_TYPES` looks at it.
+   * A `format` on a `money` or a `text` is a rule the author wrote, believed and never got, which is the
+   * same silence one step out, and it is refused for the reason `readFault` refuses a `delimiter` on a
+   * read that is not CSV: the author can see both keys at once and can see which has to go. A `day` that
+   * names both is the sharper of the two, because `map.ts` takes the `from:` branch and returns before it
+   * reads `format`, so the author wrote two ways to read one value and was told which won by nothing.
+   */
+  if (e.format !== undefined) {
+    if (e.type !== 'day')
+      return bad('DECLARATION_INVALID', `${at} is ${e.type} and says format, which only a day reads.`, `${at}.format`);
+    if (e.from !== undefined)
+      return bad('DECLARATION_INVALID', `${at} reads its day from ${String(e.from)}, so its format reads nothing. Keep one of the two.`, `${at}.format`);
+    const fault = typeof e.format === 'string' ? dateFormatFault(e.format) : 'is not text';
+    if (fault !== null)
+      return bad(
+        'DATE_FORMAT_INVALID',
+        `${at}'s format ${typeof e.format === 'string' ? `${e.format} ` : ''}${fault}. Write it with one year, one month and one day token: YYYY or YY, MM or M, DD or D.`,
+        `${at}.format`,
+      );
+  }
+
   if (e.type === 'money' && !Array.isArray(e.path) && !isCur(e.currency))
     return bad('DECLARATION_INVALID', `${at} is money, so it reads [amount, currency] or says currency: with an ISO 4217 code in upper case.`, `${at}.currency`);
   if (e.type === 'enum' && (!Array.isArray(e.values) || e.values.length === 0 || e.values.some((v) => typeof v !== 'string')))
@@ -2551,7 +2598,13 @@ const VALUE_LABEL_BYTES = 64;
  * must mean one value.
  */
 function labelsFault(id: string, f: FieldLike, labels: unknown): Refusal | null {
-  if (f.type !== 'enum')
+  /* A `list<enum>` IS AN ENUM HERE FOR THE SAME REASON IT IS ONE WHERE `values` IS ENFORCED. This
+     opened on `f.type !== 'enum'`, and once the `values` check learned to read through `of` the two
+     halves of one field contradicted each other: the declaration was told its values were real and
+     its labels were not. The labels are drawn from the same list by the same readers, so they are
+     admitted by the same test. The membership loop below needs no change, because it reads `f.values`
+     and never `f.type`: the values sit on the field whichever way the field reaches them. */
+  if (f.type !== 'enum' && !(f.type === 'list' && f.of === 'enum'))
     return bad('DECLARATION_INVALID', `${id}.${f.id} is a ${f.type}, and labels: names the values of an enum.`, f.id);
   if (labels === null || typeof labels !== 'object' || Array.isArray(labels))
     return bad('DECLARATION_INVALID', `${id}.${f.id}'s labels are each value and the words a person reads for it, like { owed_to_me: Money in }.`, f.id);
@@ -3119,9 +3172,29 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
       );
     /* AN ENUM WITH NO VALUES IS A FIELD THAT REFUSES EVERYTHING. `02 §1`: an enum is *"a string in
        `values`"*, so with no `values` every write to it fails coercion — after the pack installed
-       and the form drew a control with nothing in it. */
-    if (f.type === 'enum' && (!Array.isArray(f.values) || f.values.length === 0))
-      return bad('DECLARATION_INVALID', `${id}.${f.id} is an enum and lists no values, so nothing could ever be written to it.`, f.id);
+       and the form drew a control with nothing in it.
+
+       AND A `list<enum>` IS AN ENUM BY EVERY RULE THAT READS ONE. This branch tested `type === 'enum'`
+       and nothing else, so `{ type: 'list', of: 'enum' }` with no `values` installed: `coerce.ts`'s
+       `list` case coerces each element as a field of type `of`, and the write path checks membership
+       against the same `values` the element type would have used. With none declared, the control drew
+       empty and every write to it was refused, which is the defect above reached through `of`. The
+       check is the element type's, so it is asked of the element type. */
+    const enumeral = f.type === 'enum' || (f.type === 'list' && f.of === 'enum');
+    if (enumeral && (!Array.isArray(f.values) || f.values.length === 0))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}.${f.id} is ${f.type === 'list' ? 'a list of enum' : 'an enum'} and lists no values, so nothing could ever be written to it.`,
+        f.id,
+      );
+    /* AND EACH VALUE IS TEXT, WHICH `mappingFault` HAS ALWAYS REQUIRED AND THIS COPY DID NOT. Both
+       ends of the record compare an enum by string: `coerce`'s enum case refuses a value that is not
+       one, and the write path's membership check compares `String(one)` against this list. So a value
+       declared as the number `1` is reachable only by a caller who sends the text `"1"`, and never by
+       one who sends the number the declaration showed them. One rule about an enum's values, spelled
+       the same in both places, rather than two that disagree until somebody finds the other door. */
+    if (enumeral && (f.values as readonly unknown[]).some((v) => typeof v !== 'string'))
+      return bad('DECLARATION_INVALID', `${id}.${f.id} lists a value that is not text, and an enum is compared as text.`, f.id);
 
     /* `state` IS RESERVED WHETHER OR NOT THE BODY POINTS AT IT (`34 §4`, `02 §1`). This branch used
        to live below, behind `body.state` naming the field, so `{ id: state, type: text }` with no
@@ -3298,13 +3371,28 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
      UNIQUE came out of `indexesFor` as an ordinary index wearing the `entry_u_` name. The rule the
      declaration made was enforced nowhere, and the write path's clash check then bound the whole
      object as a parameter and threw a raw TypeError out of `create`, across the boundary this
-     package promises nothing throws over. Refused at the declaration, where a sentence fits. */
+     package promises nothing throws over. Refused at the declaration, where a sentence fits.
+
+     AND THE GUARD ASKED THE WRONG LIST. `PARTS` names the two types that index in halves, which is
+     not the set of types the clash check cannot bind. Driven against a real `create`, one register
+     per row, `{ type: 'list', of: 'text', unique: true }`, `{ type: 'file', unique: true }` and a
+     `json` holding an object or an array each installed clean and then threw
+     `TypeError: Provided value cannot be bound to SQLite parameter 2` out of `create`: the identical
+     failure above, reached through a type nobody had added to the guard. `json` is the worst of the
+     three and not the mildest, because its shape is not declared, so the rule holds for a row that
+     happens to carry a string and takes the write path down on the next row that carries an object,
+     which is a rule that passes whatever test is written for it. Nor is there a repair that keeps
+     the key: `json_extract` over a composite returns its JSON text, so even a bindable comparison
+     would not be the comparison the author declared. The answer is the same as it was for `money`,
+     and it is the same sentence: carry what you mean by *the same one* in a text field. */
   for (const raw of fields) {
     const f = raw as unknown as FieldLike;
-    if (f.unique && PARTS[f.type])
+    if (f.unique && COMPOSITE.has(f.type))
       return bad(
         'DECLARATION_INVALID',
-        `${id}.${f.id} is a ${f.type}, which the record stores in two halves — so it cannot be unique. Make a text field that carries what you mean by "the same one".`,
+        PARTS[f.type]
+          ? `${id}.${f.id} is a ${f.type}, which the record stores in two halves, so it cannot be unique. Make a text field that carries what you mean by "the same one".`
+          : `${id}.${f.id} is a ${f.type}, which the record stores as more than one value, so it cannot be unique. Make a text field that carries what you mean by "the same one".`,
         f.id,
       );
   }

@@ -21,7 +21,7 @@ import { fixOf, type Result } from '@braindog/ports';
 
 import { mapField, readRow, type MapDeps, type Mapping } from '../src/map.ts';
 import { day, exponentOf } from '../src/ingest.ts';
-import { openRecord, type Declaration, type ExtractDecl } from '../src/index.ts';
+import { openRecord, validateDeclaration, type Declaration, type ExtractDecl } from '../src/index.ts';
 /* `43 §4.3`'s token grammar, reached the way `@braindog/record` reaches it and not the way the kernel
    could: `extract` is rank 9 to this package's 7, so `src/` may not import it and a test may, because
    a test is where the two ends of an injection seam are proved to agree (`31 §2`, and the precedent of
@@ -186,13 +186,18 @@ test('and a record that wired nothing says it could not read it, rather than pre
 });
 
 test('a format that names a property of Object.prototype is invalid, and not an exception', () => {
-  /* `declare` DOES NOT CHECK A `map:` DAY'S FORMAT AT ALL — `mappingFault` validates `path`, `type`,
-     `from`, a money currency and an enum's values, and lets `format` through whatever it says. So
-     `format` is attacker-shaped input by the time it reaches the reader, and the bare reader looked it
+  /* `declare` DID NOT CHECK A `map:` DAY'S FORMAT AT ALL: `mappingFault` validated `path`, `type`,
+     `from`, a money currency and an enum's values, and let `format` through whatever it said. So
+     `format` was attacker-shaped input by the time it reached the reader, and the bare reader looked it
      up in a plain object literal: `FORMATS['__proto__']` is `Object.prototype`, which is truthy, so the
      guard for an unknown format did not fire and the next line called `.exec` on it. That is a
      `TypeError` out of the middle of an ingest, which `map.ts`'s header forbids: *"NOTHING HERE
-     THROWS."* An unreadable format costs one field. */
+     THROWS."* An unreadable format costs one field.
+
+     THE INSTALL-TIME CHECK BELOW NOW REFUSES ALL FOUR OF THESE, and this case stays anyway. The two
+     answers are not the same answer: install decides whether a declaration may exist, and `map.ts`
+     decides what a running ingest does with one that reached it another way. A reader whose safety
+     depends on a validator upstream is a reader that breaks the first time something skips it. */
   for (const format of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
     assert.deepEqual(read({ path: 'd', type: 'day', format }, { d: '2026-08-29' }), { value: null, outcome: 'invalid' });
     assert.deepEqual(mapField(wired, { path: 'd', type: 'day', format }, { d: '2026-08-29' }, TS), { value: null, outcome: 'invalid' });
@@ -407,4 +412,63 @@ test('an arrival with nothing but absent fields reads exactly as it read before'
      already sitting in a record meaning what it meant when it was written. */
   const raw = await polled({ day: wiredDay }, JSON.stringify({ data: {} }));
   assert.equal(raw?.reason, 'invoices could not read ref, when out of this one.');
+});
+
+/* ------------------------------------------------------------------------------------------------ */
+/* And the same format, an install earlier                                                             */
+/* ------------------------------------------------------------------------------------------------ */
+
+/**
+ * EVERY CASE ABOVE IS A ROW THAT SHOULD NEVER HAVE BEEN WRITTEN, because the declaration that wrote it
+ * should not have installed.
+ *
+ * `map.ts` is right to answer `invalid` rather than throw: its header says *"NOTHING HERE THROWS."* But
+ * `invalid` is the answer for a value the provider sent in a shape nobody could read, and a format the
+ * grammar does not admit is not that. It is the author's own typing, wrong at the moment they wrote it,
+ * and it costs the same field on every row for as long as the pack is installed. `43 §13 D13` puts the
+ * check at install, where the author is still looking at what they typed, and `extractorFault` has run
+ * it on the `date:` extractor since the same work. `mappingFault` never did.
+ */
+const mapping = (when: unknown): { code: string; at: string | undefined } | null => {
+  const body = { ...(DATED_POLL.body as Record<string, unknown>), map: { ref: { path: 'data.ref', type: 'text' }, when } };
+  const said = validateDeclaration({ id: 'ingest.invoices', kind: 'ingest', body } as Declaration);
+  return said === null ? null : { code: said.code, at: said.at };
+};
+
+test('A DAY WHOSE FORMAT NOTHING COULD READ IS REFUSED AT INSTALL, NOT LEFT TO EMPTY EVERY ROW', () => {
+  /* The three `43 §9.3` names, plus a word with no token in it and a format that is not text at all.
+     Each installed clean before this, matched arrivals, wrote rows, and left the day null on all of them. */
+  for (const format of ['banana', 'DD/MM', 'MMM DD YYYY', 'DMYYYY', '', 42]) {
+    const said = mapping({ path: 'data.date', type: 'day', format });
+    assert.equal(said?.code, 'DATE_FORMAT_INVALID', `${JSON.stringify(format)} installed`);
+    assert.equal(said?.at, 'ingest.invoices.map.when.format');
+  }
+  /* And the seven the grammar does admit still install, including the three no bare kernel can read:
+     what a build reads is a deploy, and what the grammar admits is the declaration. */
+  for (const [, format] of SPEC_9_3) assert.equal(mapping({ path: 'data.date', type: 'day', format }), null, format);
+  /* A day that names no format takes `YYYY-MM-DD` by `43 §4.5` and is not an author who forgot one. */
+  assert.equal(mapping({ path: 'data.date', type: 'day' }), null);
+});
+
+test('AND A FORMAT ON A MAPPING THAT NEVER READS ONE IS REFUSED TOO, BECAUSE A DEAD KEY IS THE SAME SILENCE', () => {
+  /* `43 §4.5` gives `format` to `day` alone. `instant` reads RFC 3339 or an epoch through `from:`, and
+     `map.ts` looks at `mapping.format` in exactly one branch. So a format written anywhere else is a
+     rule the author wrote, believed, and never got. `readFault` already answers this shape for a
+     `delimiter` on a read that is not CSV. */
+  for (const type of ['text', 'int', 'decimal', 'instant', 'bool', 'url', 'json'])
+    assert.deepEqual(
+      mapping({ path: 'data.date', type, format: 'YYYY-MM-DD' }),
+      { code: 'DECLARATION_INVALID', at: 'ingest.invoices.map.when.format' },
+      `${type} accepted a format it never reads`,
+    );
+  assert.equal(mapping({ path: 'data.amount', type: 'money', currency: 'GBP', format: 'YYYY-MM-DD' })?.code, 'DECLARATION_INVALID');
+
+  /* THE SHARPEST OF THEM IS A DAY THAT NAMES BOTH. `map.ts` takes the `from:` branch and returns before
+     it ever reads `format`, so an author who wrote two ways to read one value got the one they did not
+     write second, and nothing said which had won. */
+  assert.deepEqual(
+    mapping({ path: 'data.date', type: 'day', from: 'epoch_s', format: 'DD/MM/YYYY' }),
+    { code: 'DECLARATION_INVALID', at: 'ingest.invoices.map.when.format' },
+  );
+  assert.equal(mapping({ path: 'data.date', type: 'day', from: 'epoch_s' }), null, 'an epoch day with no format is legal');
 });

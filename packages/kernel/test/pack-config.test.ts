@@ -99,6 +99,129 @@ test('THE REST OF THE SHAPE IS CHECKED: the map, the names, the keys, an enum, a
   assert.equal(refusal(configValue('strict', { type: 'bool' }, 'maybe')).at, 'config.strict');
 });
 
+/**
+ * AND THE SAME RULE ON THE OTHER DECLARATION SURFACE, WHICH DID NOT HOLD IT.
+ *
+ * The line above asserts a setting declared `enum` with no `values` is refused, because a setting nobody
+ * can choose a value for is a control drawn empty. A register field is the same rule written twice in one
+ * file, and the field copy tested `type === 'enum'` only. `list` carries its element type in `of`, so
+ * `{ type: 'list', of: 'enum' }` is an enum by every rule that matters to a reader: `coerce.ts` coerces
+ * each element as a field of type `of`, and the write path checks membership against the same `values`.
+ * With none declared it installed, drew a control with nothing in it, and refused every write to it for
+ * as long as the pack was there.
+ */
+/** One register, one ordinary field and one under test, through the real validator. */
+const field = (held: Record<string, unknown>) =>
+  validateDeclaration({
+    id: 'register.samples',
+    kind: 'register',
+    body: { id: 'samples', name: 'Samples', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'chased', ...held }] },
+  } as Declaration);
+
+test('AN ENUM LISTS ITS VALUES WHETHER IT IS ONE FIELD OR A LIST OF THEM', () => {
+  assert.equal(field({ type: 'enum' })?.code, 'DECLARATION_INVALID', 'the check that already held');
+  assert.equal(field({ type: 'enum', values: [] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'list', of: 'enum' })?.code, 'DECLARATION_INVALID', 'a list of enum installed with nothing to choose from');
+  assert.equal(field({ type: 'list', of: 'enum', values: [] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'list', of: 'enum' })?.at, 'chased');
+
+  /* And neither a list of enum that does declare them nor a list of anything else is touched. */
+  assert.equal(field({ type: 'list', of: 'enum', values: ['email', 'phone', 'letter'] }), null);
+  assert.equal(field({ type: 'list', of: 'text' }), null);
+  assert.equal(field({ type: 'enum', values: ['open', 'closed'] }), null);
+});
+
+/**
+ * AND THE OTHER HALF OF THE SAME FIELD, WHICH THE FIX ABOVE PUT INTO CONTRADICTION.
+ *
+ * `labelsFault` opens on `f.type !== 'enum'`, so once `{ type: 'list', of: 'enum' }` had its `values`
+ * enforced at install and at write, the same declaration was told its values were real and its labels
+ * were not: *"is a list, and labels: names the values of an enum"*. One field, one `values` list, two
+ * answers about whether it is an enum. A rule that holds through `of` for one key and not for the next
+ * is worse than one that holds for neither, because the author has already been told the first half is
+ * right. The membership check below it reads `f.values` and nothing else, so it needs no change: the
+ * values live on the field whichever way the field reaches them.
+ */
+test('AND THE WORDS A PERSON READS FOR THEM, WHETHER THE ENUM IS ONE FIELD OR A LIST OF THEM', () => {
+  assert.equal(field({ type: 'list', of: 'enum', values: ['email', 'phone'], labels: { email: 'Email' } }), null);
+  assert.equal(field({ type: 'enum', values: ['email', 'phone'], labels: { email: 'Email' } }), null, 'the case that already held');
+
+  /* A label for a value the field does not declare is still ENUM_VALUE_UNKNOWN, reached through `of`. */
+  const stray = field({ type: 'list', of: 'enum', values: ['email'], labels: { post: 'Post' } });
+  assert.equal(stray?.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(stray?.allowed, ['email']);
+  /* And so is a label that reads as another value once case and underscores are folded. */
+  assert.equal(field({ type: 'list', of: 'enum', values: ['owed_to_me', 'paid'], labels: { paid: 'Owed to me' } })?.code, 'DECLARATION_INVALID');
+
+  /* A list of anything else still has no values to label, and is still refused. */
+  assert.equal(field({ type: 'list', of: 'text', labels: { a: 'A' } })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'text', labels: { a: 'A' } })?.code, 'DECLARATION_INVALID');
+});
+
+/**
+ * A `unique:` THE WRITE PATH COULD NOT BIND, WHICH IS THE GUARD ABOVE IT REACHED THROUGH ANOTHER TYPE.
+ *
+ * `declare.ts` already refuses `unique:` on `money` and `quantity`, and the comment over that loop says
+ * exactly why: the write path's clash check binds the field's value as a SQLite parameter, and an object
+ * is not a value SQLite takes, so it *"threw a raw TypeError out of `create`, across the boundary this
+ * package promises nothing throws over"*. The guard was written as `PARTS[f.type]`, and `PARTS` holds
+ * the two types that index in halves. It is not a list of the types that are objects. Driven against a
+ * real `create`, one register per row:
+ *
+ *     { type: 'list', of: 'text', unique: true }   THREW  TypeError: Provided value cannot be bound ...
+ *     { type: 'json', unique: true }  with { a: 1 } THREW  the same
+ *     { type: 'json', unique: true }  with [1, 2]   THREW  the same
+ *     { type: 'file', unique: true }               THREW  the same
+ *     { type: 'json', unique: true }  with 'plain'  wrote clean
+ *     { type: 'money', unique: true }              refused at install, which is the guard working
+ *
+ * `json` IS THE WORST OF THE THREE AND NOT THE MILDEST. A `json` field's shape is not declared, so the
+ * rule holds for a row that happens to carry a string and takes the write path down for the next row
+ * that carries an object. A rule that is enforced or not by what a caller sent is worse than one that
+ * never works, because it passes whatever test is written for it. And there is no repair that keeps the
+ * key: `json_extract` over a composite returns its JSON text, so even a bindable comparison would not be
+ * the comparison the author declared.
+ */
+test('A UNIQUE ON A TYPE THE ROW CANNOT COMPARE IS REFUSED AT INSTALL, NOT THROWN AT THE FIRST WRITE', () => {
+  for (const held of [
+    { type: 'list', of: 'text', unique: true },
+    { type: 'list', of: 'enum', values: ['a', 'b'], unique: true },
+    { type: 'json', unique: true },
+    { type: 'file', unique: true },
+  ]) {
+    const said = field(held);
+    assert.equal(said?.code, 'DECLARATION_INVALID', `${held.type} took a unique the write path cannot bind`);
+    assert.equal(said?.at, 'chased');
+  }
+  /* The two the guard already held. */
+  assert.equal(field({ type: 'money', unique: true })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'quantity', unique: true })?.code, 'DECLARATION_INVALID');
+  /* And every type the record stores as one value keeps its unique, which is what the key is for. */
+  for (const type of ['text', 'int', 'decimal', 'day', 'instant', 'duration', 'url', 'email', 'ref', 'bool'])
+    assert.equal(field({ type, unique: true }), null, `${type} lost a unique it could keep`);
+  /* An index is not a unique: nothing here is bound, so nothing here throws. */
+  assert.equal(field({ type: 'list', of: 'text', index: true }), null);
+});
+
+/**
+ * ONE RULE ABOUT AN ENUM'S VALUES, NOT TWO THAT DISAGREE.
+ *
+ * `mappingFault` refuses a `map:` enum whose `values` are not all strings; the field copy checked only
+ * that the list was non-empty, so `{ type: 'enum', values: [1, 2] }` installed. Both ends of the record
+ * compare an enum by string: `coerce`'s enum case refuses anything that is not a string, and the write
+ * path's membership check compares `String(one)` against `f.values`, so a declared `1` is reachable only
+ * by a caller who sends the text `"1"` and never by one who sends the number the declaration shows them.
+ * Two copies of one rule that disagree is the shape this file keeps paying for, so they are made to
+ * agree rather than left to be found again through the other door.
+ */
+test('AN ENUM DECLARES ITS VALUES AS TEXT, AND THE MAP AND FIELD COPIES OF THAT RULE AGREE', () => {
+  assert.equal(field({ type: 'enum', values: [1, 2] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'enum', values: ['open', 2] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'list', of: 'enum', values: [1] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'enum', values: [null] })?.code, 'DECLARATION_INVALID');
+  assert.equal(field({ type: 'enum', values: ['1', '2'] }), null, 'the text a caller can actually send');
+});
+
 /* ── the placeholder ────────────────────────────────────────────────────── */
 
 test('A WHOLE PLACEHOLDER BECOMES THE TYPED VALUE, AND ONE INSIDE TEXT BECOMES ITS TEXT', () => {
