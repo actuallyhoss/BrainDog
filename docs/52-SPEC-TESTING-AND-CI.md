@@ -120,69 +120,117 @@ No npm token exists anywhere ([31-STACK](31-STACK.md) §6).
 
 ## 3 · Files
 
-The fewest that hold. One gate per file; a shared `lib.mjs` of three functions; one budgets file; one runner.
+The fewest that hold. One gate per file; a shared `lib.mjs`; one budgets file; one runner.
 
 ```
 tools/
 ├── gates/
-│   ├── run.mjs                 the runner: discovers *.mjs here, times each, prints one line per gate (§4), exits per §6
-│   ├── lib.mjs                 budgets() · files(glob, root) · line(result) — the only shared code, ~40 lines
+│   ├── run.mjs                 the runner: an ordered array, `spawnSync` per gate, the exit code read (§5.1)
+│   ├── self-test.mjs           runs each grep gate against tools/gates/negative/<gate> (§9)
+│   ├── lib.mjs                 budgets() · budget() · keyPaths() · skipDir · MAY_REFUSE · readiness()
+│   ├── record.mjs              NOT a gate: the self-host in memory with the seed installed, served on
+│   │                           127.0.0.1 so the browser gates read a real record; imported by six of them
+│   ├── routes.mjs              NOT a gate: `routesOf`, the route list derived from the route directory
 │   ├── budgets.json            every number a gate asserts (§4)
-│   ├── clean-room.txt          the predecessor's identifiers, one per line — maintained by the owner alone
-│   ├── negative/<gate>/…       one seeded violation per gate (§9)
-│   ├── graph.mjs               licence-closure.mjs   clean-room.mjs        no-declarations-in-kernel.mjs
-│   ├── closed-lists.mjs        event-kinds.mjs       refusal-fixtures.mjs  router-groups.mjs
-│   ├── spark-actor.mjs         mcp-budget.mjs        secret-grep.mjs       telemetry-allowlist.mjs
-│   ├── shot-allowlist.mjs      conformance-count.mjs compat-date.mjs       deploy-parity.mjs
-│   ├── grant-note.mjs          harness-constants.mjs css-rules.mjs
-│   └── self-test.mjs           runs every gate against tools/gates/negative/<gate> (§9)
+│   ├── negative/<gate>/…       fifty-nine seeded violations, several per grep gate (§9)
+│   ├── test/needs.test.mjs     the runner's prerequisite check, driven against a tree with no build
+│   ├── clean-room.mjs   stack.mjs       nul-bytes.mjs         graph.mjs        secret-grep.mjs
+│   ├── event-kinds.mjs  router-groups.mjs  guards.mjs         closed-lists.mjs spark-actor.mjs
+│   ├── import.mjs       refusals.mjs    refusal-fixtures.mjs  flags.mjs        em-dash.mjs
+│   ├── no-declarations-in-kernel.mjs    css-rules.mjs         colour-grep.mjs  dead-copy.mjs
+│   └── bundle.mjs       prefs.mjs       keys.mjs              layout.mjs       a11y.mjs
+│                        passkey.mjs     queue.mjs             deploy-parity.mjs
 └── release.mjs                 `pnpm release` (§5.6)
 
-packages/ports/src/conformance/ cases.ts (CASES, runConformance) · reference.json — owned by 37 §3
-packages/ports/test/results/<host>.json   written by each host's conformance run; read by conformance-count; git-ignored
-packages/kernel/test/           materialise.ts (40 §5.3) · roundtrip.test.ts (§5.3)
+packages/skin/scripts/theme.mjs         `theme`, a registered gate that is not a file in tools/gates
+fixtures/refusals/<code>.yaml           the refusal corpus, one file per code (40 §6); read by `refusal-fixtures`
+fixtures/corpus.ts                      the one reader the `via` runners share, and the only code they share
+packages/ports/src/conformance/         cases.ts (CASES, runConformance) · reference.json — owned by 37 §3
+packages/kernel/test/                   materialise.ts (40 §5.3) · refusals-write.test.ts, the `write` runner
 packages/<pkg>/test/**/*.test.ts        node --test; packages/where/test/seeds/<seed>.json (§4)
-packages/{declare,record}/test/ the `via` runners of the refusal fixtures (40 §6): lint · install · where · write · rpc · import
-
-apps/web/test/
-├── env.ts                      HOST · PORT · BASE · slugFor(page, dir) — the ONE module a harness literal lives in (50 §3)
-├── unit/*.test.ts              50 §9's twelve unit cases
-└── e2e/
-    ├── matrix.ts               FIXTURES = PAGES.map(p => p.id) · WIDTHS · SCHEMES · DIRS; forEachConfig(fn)
-    ├── setup.ts                globalSetup: materialises the eight pages' records twice (locale en, ar) into a scratch dir
-    ├── playwright.config.ts    four projects {light,dark} × {ltr,rtl}; webServer = `braindog dev` over the scratch dir; chromium
-    ├── targets  row-centre  field-height  contrast  focus  screenshot-mode  motion  bundle  a11y-tree     .spec.ts
-    └── shell  grid-contract  page-render  draft-survives-load  no-model  job-view  keys-sheet  vault-screen   .spec.ts
-
-apps/worker/test/               vitest + @cloudflare/vitest-plugin: conformance.test.ts · boot-probe.test.ts (phase 5)
-.github/workflows/              ci.yml · gates.yml · deploy.yml · release.yml · gate1.yml (§2)
+apps/web/test/                          refusals-render.test.ts, the `render` runner · measures-currency.test.ts
+apps/worker/test/*.test.ts              vitest + @cloudflare/vitest-plugin; twenty-eight files
+.github/workflows/                      ci.yml · gates.yml · deploy.yml · codeql.yml · tag.yml (§2)
 ```
 
-Nineteen script gates, seventeen Playwright specs (50 §9's sixteen plus `vault-screen`), two Durable Object test
-files. Each script gate, its inputs, its assertion, its failure line's `what`, and its runtime budget:
+**Twenty-seven script gates, and no Playwright spec at all.** This section said nineteen gates and
+seventeen specs, and both numbers described a tree that was never built.
+`ls tools/gates/*.mjs | grep -vE '/(run|lib|self-test|record|routes)\.mjs$' | wc -l` is 27. The five
+excluded are the two runners and the three modules another file in this directory imports, which is
+the rule `run.mjs` derives rather than lists: *a file another file in this directory imports is a
+library, and the two runners are the two runners*. `run.mjs`'s ordered array holds thirty entries,
+those twenty-seven plus `typecheck` (`pnpm -r run typecheck`), `theme`
+(`packages/skin/scripts/theme.mjs --check`) and `self-test` itself, counted with
+`grep -cE "^  \['[a-z0-9-]+'," tools/gates/run.mjs`.
+`find apps packages -name '*.spec.ts' -not -path '*/node_modules/*' | wc -l` is 0, and
+`find . -name 'playwright.config*' -not -path '*/node_modules/*'` finds nothing: `@playwright/test`
+is a root devDependency that six gates IMPORT: `grep -n "@playwright/test" tools/gates/*.mjs` prints
+seven lines, and six of them are `import { chromium }` in `a11y` `keys` `layout` `passkey` `prefs` and
+`queue` while the seventh is a sentence about them inside `refusal-fixtures.mjs`. Those same six are
+`record.mjs`'s importers. So every browser assertion in this tree is a gate rather than a spec, and the `apps/web/test/e2e/`
+matrix this section used to draw does not exist. `apps/worker/test/` holds twenty-eight Vitest files
+rather than two (`ls apps/worker/test/*.test.ts | wc -l`). **§2, §5.4, §9 and §10 still describe that
+matrix as though it ran**, down to `test:browser`, `test:do`, `release.yml` and `gate1.yml`, none of
+which is in `package.json` or `.github/workflows/` (`ls .github/workflows/` gives `ci.yml` `gates.yml`
+`deploy.yml` `codeql.yml` `tag.yml`). Those four section numbers are the output of
+`grep -n 'test:browser\|test:do\|release\.yml\|gate1\.yml' docs/52-SPEC-TESTING-AND-CI.md` read
+against the `^## ` headings, and not a list somebody remembered, because the first draft of this
+paragraph named three and missed §9's negative-project fixture. Correcting them is a separate pass,
+and whoever takes it should decide whether the matrix is being built or being dropped rather than
+editing the prose twice.
 
-| Gate | Inputs | Asserts | `what` on failure | ms |
-|---|---|---|---|---|
-| `graph` | every `package.json`; every `src/**` import specifier | acyclic; every workspace edge points down 31 §2's order; no undeclared or cross-package relative import; `packages/**` free of `node:` `cloudflare:` `process` `Buffer` `__dirname` bare `fetch` | `import points up the order` · `undeclared import` · `runtime import under packages/` | 300 |
-| `licence-closure` | `npm pack --dry-run --json` of `packages/render`, `apps/cli`; their `dist/` | 31 §4 rule 8, all six clauses | `tarball entry outside the allow-list` · `built ESM names @braindog/` · `LICENSE does not start with …` | 3,000 |
-| `clean-room` | every tracked text file except `docs/`, `BUILD.md`, the list itself | no identifier from `clean-room.txt`, whole-word, case-insensitive | `predecessor identifier` | 500 |
-| `no-declarations-in-kernel` | `packages/kernel/**` | one `INSERT INTO declaration`, id `register.session`; no `.yaml`; no other declaration body | `kernel declares <kind.id>` | 100 |
-| `closed-lists` | 34 §6's table; 30 §1's SQL block; `src/migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source | `list <name>: <source> has n, owner says m` | 400 |
-| `event-kinds` | `event.kind` CHECK in the migration; 30 §2's table and prose; `EVENT_KINDS` | forty, in all four | `event kinds: <source> counts n` | 100 |
-| `refusal-fixtures` | 30 §6's five tables; `packages/fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name = code | `code without fixture` · `fixture without code` | 100 |
-| `router-groups` | each host's route table (49 §4.7's `Route[]`; 51 §4); `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route has a group; no INTERNAL route; VAULT is cookie-only; ADMIN admits no token principal; `METHOD_GROUPS` keys = 30 §5's six less INTERNAL plus 48's three token methods; every browser-only method is in 44's `REFUSED` | `route without group` · `internal method routed` · `bearer reaches <group>` | 200 |
-| `spark-actor` | the `corpus` record (40 §4.1), materialised | 30 §3's query returns 0 | `spark wrote <kind>` | 2,000 |
-| `mcp-budget` | 44's `tools/list` and `instructions` over the stub `api` of 44 §3 (`index-24.json`); `record_index` and a default `list` page over `corpus` | 10 §4's five budgets, counted by 44 §5.8's `tokenBudget`; `budgets.mcp` equals 44's `BUDGETS` | `tools/list is n tokens` · `<tool> description is n tokens` · `BUDGETS differs from budgets.mcp` | 2,000 |
-| `secret-grep` | `packages/**`, `apps/**` sources | no plaintext source reaches a sink (log, telemetry, push, prompt template); the `Plaintext` brand appears in the two hosts' vault steps only (49 §5 step 9; 51 §5) | `plaintext reaches <sink>` | 500 |
-| `telemetry-allowlist` | 51 §5.18's one `writeDataPoint` call and §4.3's blob tuple; 08 §5's blob table | `writeDataPoint(` once under `apps/**`; the tuple's positions name only 08 §5's six columns; no field-shaped argument | `blob not on the list` · `writeDataPoint called twice` | 200 |
-| `shot-allowlist` | `apps/web/src/**` markup literals; `apps/web/src/lib/shot-allowlist.json` | the committed list equals the extraction, both ways (ADR-050) | `allow-list stale: +n −m` | 500 |
-| `conformance-count` | `packages/ports/test/results/*.json`; `CASES`; `reference.json` | every host's `ran` = `CASES.length − skipped`; equal across hosts; every skip printed with its reason; every trace equals the reference; `provisional: false` once `apps/worker` exists (37 §9.4) | `host <h> ran n of m` · `trace differs at case <id>` · `reference still provisional` | 100 |
-| `compat-date` | `apps/worker/wrangler.jsonc` | `compatibility_date ≥ budgets.worker.compatDateFloor` | `compatibility_date <d> below floor` | 20 |
-| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of live `/` and `/_app/version.json` equal the build's; `/.well-known/braindog-build` `app` equals `BRAINDOG_BUILD` | `live <path> differs` · `live app tuple is <x>` | 70,000 |
-| `grant-note` | the `corpus` record, materialised — it seeds two grants (40 §4.1) | no `grant.*` event note contains its grant's `label` or `opens` (12 §8) | `grant note leaks <label\|opens>` | 2,000 |
-| `harness-constants` | `apps/web/test/**` except `env.ts` | no `localhost`, `127.0.0.1`, `:<4 digits>`, `http(s)://` literal | `harness literal outside env.ts` | 50 |
-| `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2; the dead-class report | one `what` per rule, §5.2 | 1,500 |
-| `em-dash` | `packages/*/src/**`, `apps/*/src/**`, `.ts` and `.svelte`, tests excluded; comments blanked in all three dialects (`/* */`, `//`, `<!-- -->`) and in the SQL nested inside a literal | `LOOP.md`'s "no em dashes in anything a stranger reads": no U+2014 with a space on each side. One that stands alone, opens a line or closes one is a glyph (an empty cell, a rule under a heading, a signature) and is not punctuation | `<n> em dash(es) used as punctuation in prose a stranger reads` | 220 |
+**Eight gates this section tabulated have never been written**: `licence-closure`, `mcp-budget`,
+`telemetry-allowlist`, `shot-allowlist`, `conformance-count`, `compat-date`, `grant-note` and
+`harness-constants`. None is a file in `tools/gates/` and none is an entry in `run.mjs`'s array.
+**§5.2 still specifies all eight as the steps of a gate that runs, and only `mcp-budget`'s block says
+otherwise** (*"Not a gate today. The budget is held by `packages/mcp/test/budget.test.ts`"*): a reader
+who arrives at §5.2's `licence-closure` is handed `needs: ['pack-build']`, a prerequisite `run.mjs`
+declines to declare until the gate that wants it exists (`tools/gates/run.mjs:313`). Marking the other
+seven in §5.2 belongs with the pass above rather than here. They are not in the table below, because a
+table of gates is read as a list of what runs.
+
+The table lost two columns it had no source for. **`ms`**: `budgets.json` holds no per-gate runtime
+budget and never has, and `run.mjs` neither times a gate nor asserts anything about how long one
+took, so nineteen numbers were being maintained against nothing. **`what` on failure**: §5's opening,
+above §5.1 and not §4 as the old tree listing said, already
+records that every gate prints its own two-space-indented sentence and that `run.mjs` reads the exit
+code rather than the stream, so a column of failure strings here is a fourth copy of a sentence the
+gate owns. What stands in its place is the prerequisite, which is a declaration a gate really makes
+(`export const needs`) and which the runner really reads (`grep -rn "export const needs"
+tools/gates/*.mjs`). The rows are the twenty-seven plus `theme`, in `run.mjs`'s order, which is
+load-bearing; `typecheck` and `self-test` are the array's other two entries and are §5.1's subject
+rather than this table's.
+
+| Gate | Reads | Asserts | Needs |
+|---|---|---|---|
+| `clean-room` | every text file under the root, skipping `node_modules` `.svelte-kit` `build` `dist` `.git` `shots` `docs` `loop` | no whole-word, case-insensitive hit on the seven identifiers of the inline `TRIPWIRES` list; an empty list is itself red, because a tripwire with no wire reports green over a repository nobody checked | — |
+| `stack` | `packages/*` and `src/` sources | 31 §1's banned surface: no `node:` or `cloudflare:` import, no bare `fetch`, no `Buffer`. A signature is not a call, so the port interface passes | — |
+| `nul-bytes` | every tracked text file, as bytes rather than as syntax | no C0 control byte below 0x20 other than tab, newline and carriage return, and no DEL. Two files carried one and typechecked clean | — |
+| `graph` | every `package.json`; every `src/**` import specifier | acyclic; every workspace edge points down 31 §2's order; no undeclared import and no relative import that climbs out of its own package | — |
+| `secret-grep` | `packages/**` and `apps/**` sources | no plaintext source reaches a sink (a log, telemetry, a push, a prompt template); the `Plaintext` brand appears only at the two hosts' vault boundaries | — |
+| `event-kinds` | the migration's CHECK; 30 §1's CHECK; 30 §2's table and its prose; `EVENT_KINDS` | all five sources say the same number and the same members. Four of the five are not code, which is why it is a gate and not a test | — |
+| `router-groups` | each host's route table; `METHOD_GROUPS`; 30 §5's groups; 44 §2's `REFUSED` | every route declares a group; no INTERNAL method is routed; VAULT is cookie-only; ADMIN admits no token principal | — |
+| `guards` | `ROUTES` in `packages/host`; the guard each handler in `packages/record` actually calls | the group the table publishes and the check the record applies agree. It found `members` routed ADMIN and guarded `read`, on an answer carrying every colleague's email | — |
+| `closed-lists` | 34 §6's table; 30 §1's SQL block; `migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source, for the twenty-three lists the DDL refuses in a `CHECK` | — |
+| `spark-actor` | the seed, materialised through the real write path, then offered the four writes a model may not make | 30 §3's query returns zero rows. It makes the writes before it queries, because the seed writes no `spark` event and the filter would otherwise filter nothing | — |
+| `import` | a self-host, onboarded, with the founder, agents and estate packs installed | `braindog import legacy` over HTTP lands every planned row in the record. The command's own tests drive an in-memory fake door and a stub server answering ok to everything | — |
+| `refusals` | the refusal registry, the `RefusalCode` union, and every `raises:` in the tree | the registry, the type and the code say the same list, and a registered code no code path emits is named | — |
+| `refusal-fixtures` | 30 §6's code tables; `fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name equals code, and every `via` is one of 40 §6's nine. It owns the enumeration; the runners of §5.3 own the behaviour | — |
+| `flags` | the flag list and every read of it | six questions, of which the load-bearing one is whether the flag is read at all; `budgets.flags` caps a flag at ninety days and two call sites | — |
+| `no-declarations-in-kernel` | `packages/kernel/**` | one `INSERT INTO declaration`, id `register.session`; no `.yaml`; no other declaration body | — |
+| `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2, one `what` per rule, plus the dead-class report that never goes red | — |
+| `colour-grep` | the same trees, outside the token file | the colour a class computed in TypeScript, an inline SVG `fill` or a data file smuggles past `css-rules`. 22 §7 gate 2, and the one that actually fires | — |
+| `dead-copy` | `copy.ts` and every file that reads it | no key defined and referenced nowhere. Measured on the day it was written: 212 keys, 26 of them rendered by nothing | — |
+| `em-dash` | `packages/*/src/**` and `apps/*/src/**`, `.ts` and `.svelte`, plus the published README; comments blanked in all three dialects | `LOOP.md`'s no em dashes in anything a stranger reads: no U+2014 with a space on each side. One that stands alone, opens a line or closes one is a glyph and is not punctuation | — |
+| `theme` | the shipped themes and the emitted stylesheet (`packages/skin/scripts/theme.mjs --check`) | the committed stylesheet is byte-equal to the one the tokens generate | — |
+| `bundle` | the entry chunk and everything statically reachable from it, compressed at `brotliQuality` | `budgets.bundle`: measured from the entry graph and not from the total of `build/`, so adding a screen cannot move it | `web-build` |
+| `prefs` | every preference control, driven in a real browser against a real record | each preference changes what it says it changes. The Text setting shipped inert for the life of the build, because the old browser matrix was widths, schemes and directions and no other preference was an axis of it | — |
+| `keys` | the keymap registry, the `?` sheet and every printed `<kbd>` | every key the product prints is bound to something. It had drifted three ways, found by a sweep of 379 clicked controls rather than by a gate | `web-build` |
+| `layout` | every route, at both sides of every width the stylesheets themselves declare | nothing overflows sideways. The widths are read out of the CSS, so a `@media (width < 900px)` is checked at 899 and at 900, which is where responsive bugs live | `web-build` |
+| `a11y` | axe-core over every route of five build roots (`apps/web/build`, the three variant builds, `apps/site/build`), both schemes, two widths | no unnamed control, no heading level skipped, no `aria-*` that names nothing, no contrast under the floor. It declares no `needs` on purpose: each root is skipped by name, so a tree with only the site built still gets a real audit | — |
+| `passkey` | a real browser against a real record, on its own ephemeral port | the ceremony end to end: arrive signed out, come in by the server key, add a passkey, sign out, come back in with it | `web-build` |
+| `queue` | `/p/agents` in a real browser, on its own ephemeral port | pressing an option lands on its gate, highlighted and unchosen; pressing the count of what is left lands on Decide | `web-build` |
+| `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of the live `/` and `/_app/version.json` equal the build's; `/.well-known/braindog-build` carries this run's `app` tuple. The one gate that measures something outside this repository | `host` `web-build` |
 
 ## 4 · Data structures
 
@@ -237,13 +285,24 @@ PAGES[i].id        // 'empty' | 'twelve' | 'five-hundred' | 'five-thousand' | 'c
 PAGES[i].record    // a key of SEED.records — the record a page is rendered from
 PAGES[i].expect    // { blocks, rows, cap, degraded, empty[] } — the non-vacuous assertions of §5.4
 SEED.records.corpus   // every pack, two seeded grants — the record spark-actor, grant-note and brain-roundtrip run over (40 §9)
-REFUSALS           // kebab code → path; seventy-five files
+REFUSALS           // kebab code → path; a hundred and nineteen files (`ls fixtures/refusals/*.yaml | wc -l`)
 ```
 
-A refusal fixture (40 §6) carries `code`, `via` (one of the values 40 §6’s table names, which is the closed list; `pull` was the eighth, added
-September 20th 2026), `at`,
-optional `found`, and the input keys its `via` names; its runner is the test file 40 §6's table assigns
-(`declare/test`, `record/test`, `apps/web/test`).
+A refusal fixture (40 §6) carries `code`, `via` (one of the values 40 §6's table names, which is the
+closed list), `at`, optional `found`, and the input keys its `via` names; its runner is the test file
+40 §6's table assigns (`declare/test`, `record/test`, `apps/web/test`, `connect/test`, `spark/test`).
+
+**There are nine `via` values, not eight.** `ask` is the ninth, minted on September 21st 2026 for the
+four codes `packages/spark` arrived with, and its row is in 40 §6; `pull` was the eighth, the day
+before. Counted from the corpus rather than from either document:
+`grep -rhoE '^via: *[a-z]+' fixtures/refusals/*.yaml | sed 's/via: *//' | sort -u` prints
+`ask import install lint pull render rpc where write`, and the same pipe into `wc -l` prints 9. The
+fixtures split 27 `lint`, 20 `install`, 7 `where`, 15 `write`, 30 `rpc`, 7 `import`, 2 `render`,
+7 `pull`, 4 `ask`, which is the hundred and nineteen above (`| sort | uniq -c`). The corpus also
+lives at `fixtures/refusals/`, not `packages/fixtures/refusals/`: there is no `packages/fixtures`
+package, and `graph` prints it as the one unbuilt row of 31 §2 (*1 of 31 §2's rows are unbuilt
+(fixtures)*), so the `PAGES`, `SEED` and `PACKS` imports above are specification and not a
+description of the tree. `packages/seed` is what the tests actually read.
 
 **The budgets file** — every number a gate asserts, in one place. A *count* is never here: a count is read from the
 enumeration that owns it ([34-GRAMMARS](34-GRAMMARS.md) §6).
@@ -388,7 +447,7 @@ sentence must all say the same number; `EVENT_KINDS` in `packages/kernel` must e
 **`refusal-fixtures`** (30 §6; ADR-057)
 
 1. Parse the five code tables of 30 §6: `{ code, fixture }` rows; assert `fixture === kebab(code)`.
-2. `ls packages/fixtures/refusals/*.yaml` → names.
+2. `ls fixtures/refusals/*.yaml` → names. There is no `packages/fixtures` package; see §4.
 3. Set difference both ways: a code without a fixture, a fixture without a code — each a red line.
 4. The closed code list `declare` exports ([42-SPEC-DECLARE](42-SPEC-DECLARE.md) §2) equals the table's codes.
 5. Whether a fixture *produces* its code is the `via` runners of §5.3: the script owns the enumeration, the tests own
@@ -542,8 +601,9 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
 `packages/kernel/test/refusals-write.test.ts`; both discover the corpus themselves and assert their family's size,
 so a new fixture cannot arrive undriven. The write runner sits beside the kernel rather than in `record/test`
 because all fifteen of its `raises:` name kernel files, and a runner a layer above the raiser goes green the day
-the layer between starts answering for itself. `lint`, `install`, `where`, `rpc`, `import` and `pull` are not built,
-and until one is, its fixtures are headers nothing drives
+the layer between starts answering for itself. **Seven of the nine are not built**: `lint`, `install`,
+`where`, `rpc`, `import`, `pull` and `ask`. This sentence named six and left `ask` out, which is the
+same error §4 held. Until a runner is built, its fixtures are headers nothing drives
 
 1. For each `REFUSALS` entry with this runner's `via`: build the input its keys describe (40 §6's table), run the
    surface (`lint(pack, null)`; `plan`; `where/sql`'s `compile`; the kernel's `write` on a fresh materialised record;
@@ -609,10 +669,10 @@ sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place 
 | Unit | `node --test` | `packages/*/test` | ~150 cases; each ≤ 50 ms | ≤ 30 s | `ci.yml` |
 | Property | `node --test` + fast-check | `packages/where/test` · `packages/render/test` | 1,000 predicate runs + 1,000 fuzz strings + every seed | ≤ 20 s | `ci.yml` |
 | Conformance | `node --test` (Node); Vitest (DO) | `packages/ports/src/conformance` | thirty-two cases, equal `ran` per host | ≤ 10 s Node; ≤ 4 min DO | `ci.yml` |
-| Fixtures | `node --test` | `packages/fixtures/test` · `kernel/test` · `declare/test` · `record/test` | 9 materialisations (`five-thousand` ≤ 10 s, 40 §7); 75 refusals; round-trip; determinism | ≤ 40 s | `ci.yml` |
-| Gates | `node tools/gates/run.mjs` | `tools/gates` | 19 scripts + 19 negatives | ≤ 5 min | `gates.yml` |
-| Browser | Playwright 1.62.1 | `apps/web/test/e2e` | 17 specs × 128 (+128 coarse for two) | ≤ 10 min | `ci.yml` |
-| Durable Object | Vitest 4.1.11 + plugin 1.1.2 | `apps/worker/test` | conformance + boot-probe | ≤ 4 min | `ci.yml` (phase 5) |
+| Fixtures | `node --test` | `fixtures/` · `kernel/test` · `declare/test` · `record/test` | 9 materialisations (`five-thousand` ≤ 10 s, 40 §7); 119 refusal fixtures, two of the nine `via` runners built; round-trip; determinism | ≤ 40 s | `ci.yml` |
+| Gates | `node tools/gates/run.mjs` | `tools/gates` | 27 scripts + 59 negative fixtures (§3) | ≤ 5 min | `gates.yml` |
+| Browser | Playwright 1.62.1, imported by six gates | `tools/gates` | no spec files; the browser work is `layout` `a11y` `keys` `prefs` `passkey` `queue` (§3) | nineteen minutes, which is a comment in `run.mjs` and the only figure that exists: nothing times a gate. That comment says *the two browser gates*, and was written when there were two, so the number survives it and the count does not | `gates.yml` |
+| Durable Object | Vitest 4.1.11 + plugin 1.1.2 | `apps/worker/test` | twenty-eight files (§3), and neither `conformance.test.ts` nor `boot-probe.test.ts` is one of them: `ls apps/worker/test/` names neither, so this row asked for two files that have never existed | ≤ 4 min | `ci.yml` (phase 5) |
 | Deploy | `deploy-parity` | `tools/gates` | 3 fetches, ≤ 6 attempts | ≤ 2 min | `deploy.yml` |
 
 ### 5.6 · Publishing ([31-STACK](31-STACK.md) §6; ADR-042)
@@ -697,7 +757,7 @@ exists (§10).
 | Installs | `pnpm install --frozen-lockfile` in every job; `minimumReleaseAge: 1440` and `linkWorkspacePackages: false` in `pnpm-workspace.yaml` (31 §3) — a package under 24 h old never installs, a typo'd internal name fails loudly |
 | The deploy | `deploy-parity` runs after every `wrangler deploy`, in the same job, and a red parity fails the deploy run — a green deploy serving a stale asset has happened three times before (30 §14) |
 | What a gate may read | the repository, `build/`, and the live host named by `DEPLOY_HOST`. No gate reads a secret; `deploy-parity` fetches unauthenticated routes only |
-| What a test may hold | fixtures are synthetic: no real payee, credential, email or amount; `clean-room` and `secret-grep` run over `packages/fixtures/**` too |
+| What a test may hold | fixtures are synthetic: no real payee, credential, email or amount; `clean-room` walks `fixtures/**` too. `secret-grep` does NOT: it loops over `packages` and `apps` only, and its own comment claims `packages/fixtures/**` is in scope, which is a directory this tree has never had. The refusal corpus at `fixtures/refusals/` is therefore unscanned by that gate, and the fix belongs in `secret-grep.mjs` rather than here |
 | Logs | a gate's line carries a path, a count, a hash, a code — never a field value or a body (35 §2). `deploy-parity` prints hashes, not HTML |
 | Provenance | npm provenance is automatic under trusted publishing; `release.yml` step 8 verifies the version landed, and a consumer may verify the attestation against this repository and `release.yml` |
 
