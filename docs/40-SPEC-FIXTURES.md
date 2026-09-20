@@ -375,7 +375,7 @@ What a required key bought was nine invented ones. Common keys:
 
 ```yaml
 code: FIELD_TYPE_UNKNOWN          # UPPER_SNAKE; kebab-case of it is the file name
-via:  lint                        # one of seven — the surface that raises it
+via:  lint                        # one of eight; the surface that raises it
 at:   declarations[0].fields[1].type   # the path 30 §6's Refusal carries, relative to the fixture's input
 found: currency                   # optional; asserted when present
 ```
@@ -386,9 +386,10 @@ found: currency                   # optional; asserted when present
 | `install` | 20 | `pack:` · `installed:` (active declaration bodies) · `facts:` (`rows`, `distinct` values per field, `format`, `primitives` — the numbers the code's message cites) | the manifest | `record/test`, composing `declare`'s plan and `theme`'s checks exactly as `planPack` does |
 | `where` | 7 | `register:` · `subject:` (`entry` \| `inbox_raw`) · `predicate:` | the predicate | `record/test` via `where/sql` |
 | `write` | 15 | `declare:` (one register) · `rows:` (prior rows, owner-written) · `write:` (`register` `seq?` `patch` `version?`) · `principal:` | `<id>` · `<id>[<i>]` · `version` · `register` · `state` | `record/test` via the kernel's `write` on a fresh materialised record |
-| `rpc` | 37 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `<k>` · `authorization` | `record/test` |
+| `rpc` | 30 | `record:` (a seed record) · `call:` (`method` `args`) or `calls:` (a sequence, for `PLAN_STALE`) · `principal:` | `principal` · `<k>` · `authorization` | `record/test` |
 | `import` | 7 | `record:` · `tamper:` — `sig` · `row` · `format` · `not-empty` · `migration-text` · `migration-ahead`, one per code | `dog_sig.sig` · `dog_manifest.<table>` · `dog_meta.format` · `record` · `migration[<n>]` | `record/test` — export the record, apply the verb, import |
 | `render` | 2 | `document:` | `blocks[<i>].rows[<j>]` · `blocks[<i>].kind` | `apps/web/test`, through `braindog-render` |
+| `pull` | 7 | `declare:` (one connector) · `grant:` (the stored credential, or none) · `answers:` (the provider’s replies, one per request the run makes) | the connector declaration, or the run’s lease: `fetch.auth.token_url` · `fetch.page[<n>]` · `fetch.page.from` · `object` · `lease` | `connect/test`, driving the scheduled run the way the Worker’s alarm does |
 
 The `at` column was wrong for the `write` and `rpc` rows until 2026-09-20, and it did damage. It said
 `fields.<id>` and `args.<k>` and `headers.authorization`; the kernel emits the bare field id, with `[i]`
@@ -439,14 +440,16 @@ rather than picking whichever it walked into first. The value is one identifier;
 derives from an answer that does not carry one will need it, and the alternative is a fixture that points at the
 registry and proves nothing.
 
-115, counted: 27 + 20 + 7 + 15 + 37 + 7 + 2, against a registry of 126. The eleven without a fixture are the eleven
+115, counted: 27 + 20 + 7 + 15 + 30 + 7 + 2 + 7, against a registry of 126. The eleven without a fixture are the eleven
 no line of source names, which is the rule `refusal-fixtures` enforces and prints on every run. Do not hand-copy
 these numbers anywhere: the figures in this section were 75 against 112 for months after both had moved, and twelve
 fixtures were written wrong from the column beside them. The `lint`/`install` split follows each code's own message:
 a code that cites rows, installed packs or the record's versions needs a record and is `install`
 (`REQUIRED_ON_POPULATED` `ID_RENAMED` `DEPENDENCY_UNRESOLVED` `FORMAT_OUT_OF_RANGE` `FIELD_TYPE_CHANGED`
 `SEQ_PREFIX_TAKEN` `MIXED_CURRENCY` `GROUP_BY_CARDINALITY` `QUANTITY_MIXED_UNIT` `CONTRAST_FLOOR`); the other
-twenty-two of 04 §5's thirty-three lint offline; `PLAN_STALE` is `rpc`. Two examples:
+twenty-two of 04 §5's thirty-three lint offline; `PLAN_STALE` is `rpc`. The seven `PULL_` codes are `pull`, added on
+September 20th 2026: they are raised inside a scheduled connector run and written onto that run’s ack, and
+nothing a `call:` can express reaches one, so `rpc` was never true of them. Two examples:
 
 ```yaml
 # refusals/row-locked.yaml

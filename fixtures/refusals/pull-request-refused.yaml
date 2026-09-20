@@ -1,5 +1,5 @@
 code:   PULL_REQUEST_REFUSED
-via:    rpc
+via:    pull
 raises: packages/host/src/actions.ts
 fix:    Check what the provider answered; this action does not expect that answer.
 
@@ -10,11 +10,9 @@ fix:    Check what the provider answered; this action does not expect that answe
 # a field the envelope has no room for. Adding one is a change to `ActionAnswer`, and that is a
 # decision rather than a repair.
 
-# `via: rpc` IS NOT TRUE, AND THAT IS THE FINDING. No RPC call can reach this code. `40 §6`'s
-# `rpc` runner seeds a record and makes a `call:`, and a `PULL_` code is raised inside a scheduled
-# connector run, by the runner the Worker's alarm and the self-host's timer drive. The refusal is
-# written onto that run's ack as `result.error` and is never handed back to a caller, so nothing a
-# `call:` can express reaches it. The honest value is an eighth `via`, `pull`, driven from
-# `connect/test`. A fixture cannot mint one: `40 §6`'s table is the registry this value is checked
-# against, and five documents outside this directory count the `via`s as seven. That is a
-# vocabulary change and a decision rather than a repair.
+# `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
+# which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
+# `PULL_` code is raised inside a scheduled connector run, by the runner the Worker's alarm and the
+# self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
+# can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,
+# and the counts there moved with it: `rpc` 37 to 30, `pull` 7, still 115.

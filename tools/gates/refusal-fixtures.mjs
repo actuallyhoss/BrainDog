@@ -145,12 +145,14 @@ for (const row of rows)
 
 const registry = new Map(rows.map((r) => [r.code, r]));
 
-/* ── 2 · the seven `via`s, counted from the spec that owns them ──────────── */
+/* ── 2 · the `via`s, counted from the spec that owns them ──────────── */
 
 /**
  * `30 §6` names five and says "and the rest", handing the closed list to `40 §6`. So it is read from
  * there. A count is read from the enumeration that owns it (`34 §6`), and a `via` list copied into
- * a gate is a list that stops agreeing with the runners the day somebody adds an eighth.
+ * a gate is a list that stops agreeing with the runners the day somebody adds another. Somebody did, on
+ * September 20th 2026: `pull`, for the seven `PULL_` codes a scheduled connector run raises. This gate
+ * needed no edit for it, which is the whole argument for reading the table.
  *
  * THE INPUT KEYS COME OFF THE SAME ROW. `40 §6`'s table gives each `via` the keys its fixtures may
  * carry, backticked and colon-suffixed (`pack:`, `predicate:`, `tamper:`), beside the nested names
