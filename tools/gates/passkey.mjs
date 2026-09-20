@@ -33,8 +33,9 @@
  * measures a screen reads the record as its owner. Here that would answer the question before it is
  * asked, so this gate forwards with `bearer: false` and the only way in is the one on screen.
  *
- * NO BUILD, NO RUN: it reports that it looked at nothing and exits 0, like the other browser gates, so
- * `pnpm gates` stays useful on a fresh checkout. A skip is printed, never passed off as a pass.
+ * NO BUILD, NO RUN: it reports that it looked at nothing and exits 3, which `run.mjs` counts as a skip
+ * and not as a pass, so `pnpm gates` stays useful on a fresh checkout without the ceremony going green
+ * on a run that never opened a browser.
  */
 
 import { createReadStream } from 'node:fs';
@@ -64,9 +65,13 @@ const TYPES = {
   '.json': 'application/json',
 };
 
+/* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
+   gate that passed: a fresh checkout reported the passkey ceremony green having never opened a
+   browser. A skip is the one thing the runner can be red about under CI, where the build always
+   happened, so a skip there says the build did not and the ceremony went untested. */
 if (!(await stat(ROOT).catch(() => null))?.isDirectory()) {
-  console.log('passkey: apps/web/build is not there, so nothing was driven. Build it with pnpm --filter @braindog/web build.');
-  process.exit(0);
+  console.log('  passkey: no apps/web/build to drive, so nothing was driven. Run `pnpm --filter @braindog/web build` first.');
+  process.exit(3);
 }
 
 /** Every way this run fell short, said in the order it happened. */

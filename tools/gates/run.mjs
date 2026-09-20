@@ -109,8 +109,8 @@ const GATES = [
      unrendered, including the five that define the words the product is built out of. */
   ['dead-copy', ['node', [join(here, 'dead-copy.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
-  // Needs a build. Both report and exit 0 when there is not one, so `pnpm gates` is useful on a
-  // fresh checkout; CI builds first, and then they are real gates.
+  // Needs a build. It exits 3 when there is not one, which is a skip here and not a pass, so
+  // `pnpm gates` is useful on a fresh checkout; CI builds first, and then it is a real gate.
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],
   /* A PREFERENCE THAT CHANGES NOTHING IS A CONTROL THAT LIES (`25 §1`'s `series` class). The Text
      setting shipped inert for the life of the build because the 128-configuration matrix is widths,
@@ -249,12 +249,16 @@ const failed = [];
 /**
  * Gates that could not run — exit 3, which is a skip and not a pass.
  *
- * THREE OF THESE PRINTED GREEN WITH NO BUILD. `bundle`, `layout` and `a11y` exited 0 when there was
+ * FIVE OF THESE PRINTED GREEN WITH NO BUILD. `bundle`, `layout` and `a11y` exited 0 when there was
  * nothing to measure, so `pnpm gates` on a fresh checkout reported every gate passed with three of
- * them having examined nothing — the same silence `self-test.mjs` exists to break, one level up.
+ * them having examined nothing, the same silence `self-test.mjs` exists to break, one level up.
+ * `passkey` and `queue` were written afterwards and copied the habit back in, each saying in its own
+ * header that it printed a skip and never passed one off as a pass while exiting 0 to say the
+ * opposite. A gate is a skip because of the number it exits with, not because of the sentence above
+ * it, so the number is the only part of that claim this runner can read.
  *
  * UNDER `CI` A SKIP IS RED, because CI builds first: a skip there means the build did not happen and
- * the three gates that look at the shipped product were not among the ones that ran.
+ * the gates that look at the shipped product were not among the ones that ran.
  */
 const skipped = [];
 

@@ -98,7 +98,7 @@ try {
   /* EXIT 3 IS A SKIP, NOT A PASS. Exiting 0 with no build made `pnpm gates` report ten gates
      passed on a fresh checkout while three of them had examined nothing — the same silence the
      self-test exists to break, one level up. The runner names a skip and is red under CI. */
-  console.log('  bundle: no build to measure — run `pnpm --filter @braindog/web build` first');
+  console.log('  bundle: no build to measure, so nothing was measured. Run `pnpm --filter @braindog/web build` first.');
   process.exit(3);
 }
 
@@ -130,7 +130,7 @@ for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes
 const newest = (await Promise.all(dirs.map((d) => newestSource(d)))).reduce((a, b) => (a.when >= b.when ? a : b));
 if (newest.when > built) {
   console.log(
-    `  bundle: the build is older than ${relative(APP, newest.at)} — run \`pnpm --filter @braindog/web build\` first`,
+    `  bundle: the build is older than ${relative(APP, newest.at)}, so it is not this code. Run \`pnpm --filter @braindog/web build\` first.`,
   );
   process.exit(3);
 }

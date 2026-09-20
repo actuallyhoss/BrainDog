@@ -178,10 +178,10 @@ test('OPENING A GRANT HANDS BACK SEALED BYTES AND THE KEY THAT WRAPS THEM, both 
      code and this assertion carried a literal U+2016 — three bytes of UTF-8 — so the test agreed
      with the bug. The first cross-host restore would have failed as an `OperationError`,
      indistinguishable from a wrong key. */
-  assert.equal(out.aad, `${ID}${made.id}1`);
+  assert.equal(out.aad, `${ID}\x1f${made.id}\x1f1`);
   assert.equal([...new TextEncoder().encode(out.aad)].filter((b) => b === 0x1f).length, 2, '12 §6: two separators, one byte each');
   const rotated = value<GrantRow>(k.bindGrant({ ...STRIPE, id: made.id, ciphertext: b(30), nonce: b(40) }, 'p_1'));
-  assert.equal(value<SealedGrant>(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1')).aad, `${ID}${made.id}2`);
+  assert.equal(value<SealedGrant>(k.openGrant({ id: made.id, kek_id: 'kek_2f' }, 'p_1')).aad, `${ID}\x1f${made.id}\x1f2`);
   assert.equal(rotated.version, 2);
   sql.close();
 });
@@ -350,7 +350,7 @@ test('A GRANT TRAVELS IN A `.brain` FILE, SEALED, and comes back as itself', asy
   assert.equal(there.hint, 'a 64-character token');
   const sealed = value<SealedGrant>(k.openGrant({ id: there.id, kek_id: 'kek_2f' }, 'p_1'));
   assert.deepEqual(Array.from(sealed.ciphertext), Array.from(b(10)), 'the sealed bytes did not survive the file');
-  assert.equal(sealed.aad, `${ID}${there.id}1`, 'the AAD names a different record than the file said');
+  assert.equal(sealed.aad, `${ID}\x1f${there.id}\x1f1`, 'the AAD names a different record than the file said');
   sql.close();
   source.sql.close();
 });

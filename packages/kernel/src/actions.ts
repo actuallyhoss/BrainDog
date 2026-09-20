@@ -201,7 +201,7 @@ export type ActionDeps = {
  * the same one every time, which is what makes a gap somebody asks about a gap with a reason.
  */
 export function actionJitterMs(recordId: string, pack: string | null, action: string, everyMs: number): number {
-  return jitterMs(recordId, `${pack ?? ''}${action}`, everyMs);
+  return jitterMs(recordId, `\x1f${pack ?? ''}\x1f${action}`, everyMs);
 }
 
 /* ── firing a row ───────────────────────────────────────────────────────── */

@@ -1,5 +1,6 @@
 /**
- * No tracked text file carries a raw NUL byte (0x00).
+ * No tracked text file carries a raw C0 control byte: NUL and its fifteen neighbours, everything
+ * below 0x20 that is not tab, newline or carriage return, plus DEL.
  *
  *   node tools/gates/nul-bytes.mjs
  *
@@ -15,6 +16,25 @@
  * a source file that picks one up silently stops diffing and stops merging — the tool that is
  * supposed to show every other change in the file goes quiet about this one.
  *
+ * AND NUL WAS NEVER THE ONLY ONE. This gate scanned for 0x00 alone for months, and the paragraph
+ * above describes the general defect precisely without noticing that it is general: a byte written
+ * raw where an escape was meant. The escape does not have to be the NUL one for that to happen,
+ * and eight more had already landed.
+ *
+ * THREE WERE A WORD-BOUNDARY ESCAPE THAT LOST ITS BACKSLASH and left a literal BACKSPACE behind.
+ * The loop's own instructions named a scratch directory under TEMP that no shell would resolve; a
+ * research note named the repository it was about with two separators missing; and, with a straight
+ * face, a comment in `clean-room.mjs` explaining what a regex word boundary does had eaten the
+ * boundary. All three read correctly to a human eye, which is the whole of the problem.
+ *
+ * FIVE WERE DELIBERATE AND STILL WRONG TO WRITE RAW: a UNIT SEPARATOR keying a hash in `actions.ts`
+ * and `pull.ts`, and six occurrences in `vault.test.ts` asserting on what that hash is built from.
+ * Correct behaviour, in a byte no reader can see and no careless copy survives. They are escapes
+ * now and the behaviour is identical, which is exactly why there was never a reason to write them
+ * raw.
+ *
+ * So the rule is every C0 control except the three that are real whitespace, and DEL with them.
+ *
  * SO THIS IS A RAW BYTE SCAN, not a parse. It reads every tracked-looking file as bytes, skips the
  * ones that are genuinely binary by extension, and is red on the first NUL in anything left —
  * naming the file, the byte offset, and the text around it so the reader can tell at a glance
@@ -29,6 +49,21 @@ import { fileURLToPath } from 'node:url';
 import { skipDir } from './lib.mjs';
 
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+
+/**
+ * TAB, NEWLINE AND CARRIAGE RETURN ARE THE ONLY CONTROLS A SOURCE FILE HAS ANY BUSINESS HOLDING.
+ * Vertical tab and form feed are not exceptions: they are legal whitespace to a compiler and
+ * invisible to a reader, which is the whole of what makes this class of defect expensive.
+ */
+const ALLOWED = new Set([0x09, 0x0a, 0x0d]);
+const forbidden = (byte) => (byte < 0x20 && !ALLOWED.has(byte)) || byte === 0x7f;
+
+/** What to call the byte in the finding, so the reader is not left converting hex in their head. */
+const NAMES = {
+  0x00: 'NUL', 0x07: 'BEL', 0x08: 'BACKSPACE', 0x0b: 'VERTICAL TAB', 0x0c: 'FORM FEED',
+  0x1b: 'ESCAPE', 0x1f: 'UNIT SEPARATOR', 0x7f: 'DEL',
+};
+const nameOf = (byte) => NAMES[byte] ?? `control byte 0x${byte.toString(16).padStart(2, '0')}`;
 
 /**
  * Extensions that are binary by construction, so a NUL inside one is the format and not a defect.
@@ -107,22 +142,25 @@ for (const file of walk(root)) {
   const buf = readFileSync(file);
   const rel = relative(root, file).replace(/\\/g, '/');
 
-  /* EVERY OCCURRENCE, NOT THE FIRST. A file with two stray NUL bytes reported as having one would
-     cost a second run to find the other, which is the same argument `stack.mjs` makes for itself. */
-  let at = buf.indexOf(0);
-  while (at !== -1) {
+  /* EVERY OCCURRENCE, NOT THE FIRST. A file with two stray control bytes reported as having one
+     would cost a second run to find the other, which is the same argument `stack.mjs` makes for
+     itself. Three of the five real findings were in one class and two files, so a gate that stopped
+     at the first would have taken three runs to say what one said. */
+  for (let at = 0; at < buf.length; at++) {
+    if (!forbidden(buf[at])) continue;
     findings.push({
       where: `${rel}:${lineOf(buf, at)}`,
       offset: at,
+      what: nameOf(buf[at]),
       excerpt: excerptAround(buf, at),
     });
-    at = buf.indexOf(0, at + 1);
   }
 }
 
 if (findings.length) {
   console.log('');
-  for (const f of findings) console.log(`  ${f.where}  a NUL byte at offset ${f.offset}\n      …${f.excerpt}…\n`);
+  for (const f of findings)
+    console.log(`  ${f.where}  a raw ${f.what} at offset ${f.offset}\n      …${f.excerpt}…\n`);
 }
 console.log(`  nul-bytes: ${scanned} file(s), ${findings.length} finding(s)`);
 if (findings.length) process.exitCode = 1;

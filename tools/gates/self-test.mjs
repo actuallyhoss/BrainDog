@@ -91,7 +91,15 @@ const CASES = [
      does not survive being typed through an editing tool — the same reason the gate's own header
      insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
      literal, the shape of both real defects this gate was written for. */
-  { gate: 'nul-bytes', expect: /a NUL byte at offset/, findings: 1 },
+  { gate: 'nul-bytes', expect: /a raw NUL at offset/, findings: 1 },
+
+  /* AND THE CLASS THAT SHIPPED MORE OFTEN THAN NUL DID. The gate read 0x00 alone for months while
+     its own header described the general defect, and widening it to every C0 control turned up
+     nine bytes the tree had been carrying, three of them a word-boundary escape that had lost its
+     backslash. One seeded case per class is not the standard here, but one seeded case for the
+     ONLY class a gate used to see would leave the whole widening untested, which is the state this
+     fixture is here to end. */
+  { gate: 'nul-bytes-backspace', run: 'nul-bytes', expect: /a raw BACKSPACE at offset/, findings: 1 },
 
   /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
      gate with one check under test and two that have never been asked to fire — and this one's
@@ -422,7 +430,76 @@ function budgetsAreRead() {
   console.log(`  budgets: all ${keyPaths().length} numbers are read by a gate`);
 }
 
+/**
+ * AND NO GATE REPORTS A PASS IT DID NOT EARN.
+ *
+ * TWO GATES SHIPPED A SKIP THAT WAS A GREEN TICK. `passkey.mjs` and `queue.mjs` each found no
+ * `apps/web/build`, printed a sentence saying nothing had been driven, and then exited 0, which
+ * `run.mjs` counts as a gate that passed. Both carried a header paragraph claiming that a skip was
+ * printed and never passed off as a pass, so the false claim and the code contradicting it sat
+ * forty lines apart in one file and the file read as though it had been thought about. A fresh
+ * checkout reported the passkey ceremony and the queue green having opened no browser at all.
+ *
+ * THE RULE IS THE LITERAL AND NOT THE BEHAVIOUR, because the literal is enough. A gate that
+ * genuinely passes exits 0 by falling off the end with `process.exitCode` unset, and nothing here
+ * needs to say so out loud. An explicit `process.exit(0)` in a gate is therefore always an early
+ * return, and an early return that reports a pass is the whole of this defect. One grep over the
+ * directory catches it before a single gate has run.
+ *
+ * WHY NOT TEACH `run.mjs` TO NOTICE, which is the obvious place for it? Because the runner cannot
+ * see what a gate said. It spawns each one with `stdio: "inherit"`, so the lines go straight to the
+ * terminal and the runner holds none of them; to judge a gate by its output it would first have to
+ * capture the stream, and `spawnSync` cannot capture and stream at the same time. The version that
+ * works is an async `spawn` with a tee, and the cheap version of that turns a nineteen-minute
+ * browser gate into nineteen minutes of silence followed by a dump. That is a rewrite of the runner
+ * and a worse terminal, to catch a defect a grep catches for nothing.
+ *
+ * IT DOES NOT REPLACE `52 §5.1`, which specifies a runner that reads each gate's declared `needs`
+ * and checks them itself, so a gate never gets the chance to mis-report an unmet one. That design
+ * is the better one and it is not built. This is the guard for the tree that exists.
+ *
+ * A COMMENT MAY DISCUSS THE DEFECT WITHOUT SPELLING IT, and the ones that do already say "exited
+ * 0" rather than writing the call. The grep reads comments too, on purpose: a directory where the
+ * forbidden line can hide inside a block comment is a directory where the rule is advisory.
+ */
+function noSilentPass() {
+  const EXIT_ZERO = [/process\.exit\(\s*0\s*\)/u, /process\.exitCode\s*=\s*0\b/u];
+
+  /* THE TWO RUNNERS ARE NOT GATES, which is the exemption `run.mjs` makes by the same two names. An
+     aggregator that finishes with nothing to report is entitled to say so out loud; a gate is not,
+     because a gate saying so is a claim about something it measured. */
+  const RUNNERS = new Set(['run.mjs', 'self-test.mjs']);
+
+  /* AND THE ONE REGISTERED GATE THAT DOES NOT LIVE HERE. `run.mjs`'s `theme` entry runs
+     `packages/skin/scripts/theme.mjs --check`, so a rule that read only this directory would leave
+     the single gate outside it uncovered, which is the shape of hole this file exists to close. */
+  const FILES = [
+    ...readdirSync(here)
+      .filter((f) => f.endsWith('.mjs') && !RUNNERS.has(f))
+      .map((f) => ({ name: f, at: join(here, f) })),
+    { name: 'packages/skin/scripts/theme.mjs', at: join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs') },
+  ];
+
+  const offenders = FILES.flatMap(({ name, at }) =>
+    readFileSync(at, 'utf8')
+      .split(String.fromCharCode(10))
+      .flatMap((line, i) => (EXIT_ZERO.some((re) => re.test(line)) ? [`${name}:${i + 1}`] : [])),
+  );
+
+  if (offenders.length) {
+    console.error(`  silent-pass: ${offenders.length} gate line(s) exit 0 on purpose: ${offenders.join(', ')}.`);
+    console.error('      A gate that passed exits 0 by falling off the end, so an explicit one is an early');
+    console.error('      return, and an early return that reports a pass is a gate nobody can tell apart');
+    console.error('      from a gate that worked. Exit 3, which run.mjs reads as a skip and never as a pass.');
+    failed.push('silent-pass');
+    return;
+  }
+  ran++;
+  console.log(`  silent-pass: none of ${FILES.length} gate files exits 0 on purpose`);
+}
+
 budgetsAreRead();
+noSilentPass();
 
 console.log(
   failed.length === 0

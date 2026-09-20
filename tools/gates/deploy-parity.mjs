@@ -74,16 +74,18 @@ try {
 }
 
 /* THE PREREQUISITES, NAMED IN THE SKIP so the sentence that arrives says what to do about it
-   (52 §278, printed verbatim). `BRAINDOG_BUILD` is not in this condition: a deploy always sets it,
-   and a run that has the host and the build without it should say so as a finding rather than
-   disappear as a skip. */
-if (!host || !local) {
-  console.log(
-    JSON.stringify({
-      gate: 'deploy-parity',
-      skip: 'needs DEPLOY_HOST and apps/web/build — run: pnpm --filter ./apps/web build',
-    }),
-  );
+   (52 §4). `BRAINDOG_BUILD` is not in this condition: a deploy always sets it, and a run that has
+   the host and the build without it should say so as a finding rather than disappear as a skip.
+
+   ONLY THE ONES ACTUALLY ABSENT ARE NAMED. The line was a constant reading 'needs DEPLOY_HOST and
+   apps/web/build', and on a developer's machine the build is usually there and the variable never
+   is: the sentence sent a person off to rebuild what they had already built, to fix something else.
+   A skip is worth printing only if the next thing the reader does is the thing that removes it. */
+const want = [];
+if (!host) want.push('DEPLOY_HOST to name the host to compare against');
+if (!local) want.push('a local build, from `pnpm --filter @braindog/web build`');
+if (want.length > 0) {
+  console.log(`  deploy-parity: nothing was compared, because this needs ${want.join(' and ')}.`);
   process.exit(3);
 }
 

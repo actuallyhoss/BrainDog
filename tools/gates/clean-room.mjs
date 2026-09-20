@@ -66,7 +66,7 @@ for (const file of files) {
      was not — and a paste is exactly where a case changes: an identifier renamed on the way in is
      the ordinary shape of a port, not an exotic one. 52 §5.2 says whole-word and case-insensitive;
      this was neither. Whole-word is not applied because several tripwires contain a `.` or a `-`,
-     which `` treats as a boundary — they are already distinctive enough to be narrow. */
+     which `\b` treats as a boundary. They are already distinctive enough to be narrow. */
   for (const needle of TRIPWIRES)
     if (text.toLowerCase().includes(needle.toLowerCase())) findings.push({ rel, needle });
 }

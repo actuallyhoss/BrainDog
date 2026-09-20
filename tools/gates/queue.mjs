@@ -48,8 +48,9 @@
  * otherwise; anything else, a bare link or a `tabindex` on inert text, would be a control a keyboard
  * user can reach and a screen reader announces, that does nothing when pressed.
  *
- * NO BUILD, NO RUN. It reports that it looked at nothing and exits 0, like the other browser gates,
- * so `pnpm gates` stays useful on a fresh checkout. A skip is printed, never passed off as a pass.
+ * NO BUILD, NO RUN. It reports that it looked at nothing and exits 3, which `run.mjs` counts as a
+ * skip and not as a pass, so `pnpm gates` stays useful on a fresh checkout without the queue going
+ * green on a run that never pressed an option.
  * Every shortfall this gate finds goes into one list and is printed together at the end: it does not
  * throw on the first one, for the same reason `a11y.mjs` and `passkey.mjs` do not.
  *
@@ -74,9 +75,13 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 
+/* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
+   gate that passed: a fresh checkout reported the queue driven green having never pressed anything.
+   A skip is the one thing the runner can be red about under CI, where the build always happened, so
+   a skip there says the build did not and no option was ever pressed. */
 if (!(await stat(ROOT).catch(() => null))?.isDirectory()) {
-  console.log('queue: apps/web/build is not there, so nothing was driven. Build it with pnpm --filter @braindog/web build.');
-  process.exit(0);
+  console.log('  queue: no apps/web/build to drive, so nothing was driven. Run `pnpm --filter @braindog/web build` first.');
+  process.exit(3);
 }
 
 /** Every way this run fell short, said in the order it happened. Collected, never thrown on first. */

@@ -275,7 +275,7 @@ is printed by a gate.
 
 ```jsonc
 {"gate":"graph","ok":true,"ms":41}
-{"gate":"deploy-parity","skip":"needs DEPLOY_HOST and apps/web/build — run: pnpm --filter ./apps/web build"}
+{"gate":"deploy-parity","skip":"needs DEPLOY_HOST to name the host to compare against"}
 {"gate":"closed-lists","ok":false,"ms":118,
  "what":"list Schedule kinds: migration CHECK has 9, owner 30 §1 says 10",
  "expected":"digest reminder rule retry purge rotate pull analyse score snapshot",
@@ -287,9 +287,26 @@ Invariants: exactly one of `ok` or `skip`; a red line carries all four of `what`
 `where` is `path:line` or a URL; the runner's last line is
 `{"summary":true,"ok":n,"red":m,"skipped":k,"ms":t}`.
 
+A skip names only the prerequisites that are actually absent. The line above was a constant reading
+`needs DEPLOY_HOST and apps/web/build`, and locally the build is usually present and the variable never is, so it
+sent a reader off to rebuild what they had already built. A skip earns its line only when the next thing the
+reader does is the thing that removes it.
+
+**What the tree prints instead.** Not this. Every gate in `tools/gates/` writes a two-space-indented sentence
+opening with its own name, and `run.mjs` spawns each one with `stdio: 'inherit'` and reads the EXIT CODE rather
+than the stream, so nothing parses the line and the JSON buys nothing today while costing the one format a person
+in a terminal cannot read at a glance. `deploy-parity` was the only gate still emitting JSON, and only for its
+skip: its own red and green lines were already prose, so the JSON was not even consistent within one file. The
+prose is now uniform. Whoever wants the machine-readable stream back should add it as a second, opt-in channel
+(`--json`) rather than by taking the readable one away, and should change this section when they do.
+
 ## 5 · Algorithms
 
 ### 5.1 · The runner — `tools/gates/run.mjs`
+
+**Specified, and not built.** The algorithm below describes a runner that imports each gate and checks its
+declared prerequisites itself. `tools/gates/run.mjs` does not do this and never has. Read it as the design to
+move towards, not as a description of the tree.
 
 1. List `tools/gates/*.mjs` minus `run.mjs`, `lib.mjs`, `self-test.mjs`; apply `--only`.
 2. For each file, in name order: `import()` it; read `export const needs: string[]` (`'web-build'`, `'pack-build'`,
@@ -298,6 +315,17 @@ Invariants: exactly one of `ok` or `skip`; a red line carries all four of `what`
 4. Print the result line (§4). A thrown error is a red line with `what: 'gate crashed: <message>'`.
 5. Exit `0` if nothing is red and every skip is allowed (locally: all; under `CI=true`: only `--allow-skip`);
    `1` if any gate is red; `2` if a gate crashed or a skip is disallowed (§6).
+
+**What the runner does instead.** It holds a hard-coded ordered array of gates, `spawnSync`s each one as a
+subprocess with `stdio: 'inherit'`, and reads the EXIT CODE: `3` is a skip, anything else non-zero is red. It
+never imports a gate, so no gate exports `needs`, so every gate checks its own prerequisites and is trusted to
+report an unmet one honestly. That trust is the weakness step 2 removes, and it has been broken twice: `passkey`
+and `queue` each found no build and exited `0`, which is a pass. `self-test.mjs` now greps this directory for an
+explicit `process.exit(0)` because the runner cannot see what a gate said, only what it returned.
+
+The array is not the fiction. It carries the ORDER, which is load-bearing, and entries that are not files in
+this directory, like `theme`. What is missing is step 2. Whoever builds it should keep the array and add the
+prerequisite declaration to it, and should rewrite this section when they do.
 
 ### 5.2 · Source and artefact gates — one script each
 
@@ -609,10 +637,16 @@ reports the same five facts through `assert`'s `message`: `what — expected X, 
 
 | Exit | Meaning | Who exits with it |
 |---|---|---|
-| `0` | every gate green; every skip allowed and printed | `run.mjs` |
-| `1` | at least one gate red | `run.mjs`; `node --test`; `playwright test`; `vitest run` |
-| `2` | a gate crashed, a skip was disallowed under `CI=true`, or `budgets.json` has a key nothing reads | `run.mjs`, `self-test.mjs` |
-| `3` | the live host was unreachable after every attempt | `deploy-parity` (mirrors the CLI's `3 unreachable`, 33 §5) |
+| `0` | every gate green; every skip printed, and allowed where it was printed | `run.mjs` |
+| `1` | at least one gate red, a gate crashed, or a skip was disallowed under `CI=true` | `run.mjs`; `self-test.mjs`; `node --test`; `playwright test`; `vitest run` |
+| `2` | the run was asked for something it cannot do: a gate name matching nothing, an empty selection, a flag with no value | `run.mjs` |
+| `3` | a gate could not run, because a prerequisite of its own is absent and it therefore measured nothing | any gate with a prerequisite; `run.mjs` reads it as a skip and never as a pass |
+
+Exit `3` is the skip, and this table said otherwise for as long as it has existed: it read *"the live host was
+unreachable after every attempt"*, owned by `deploy-parity` alone, two lines above a **Skips** paragraph
+describing the real meaning. Ten gates exit `3`, all of them for an absent prerequisite, and an unreachable host
+in `deploy-parity` is a finding like any other and exits `1`. The CLI's own `3 unreachable` (33 §5) is a
+different number in a different program and the two do not mirror each other.
 
 **A red gate is never skipped.** There is no `skip`, `only`, `retry` or `allow-failure` on a gate. A red gate is
 one of three things, and the third is the only one that touches the gate: the code is wrong — fix the code; the
@@ -620,9 +654,10 @@ gate is wrong — fix the gate and add the case that exposed it to `negative/`; 
 document first, cite the change in the commit that changes the gate, and update `budgets.json` in the same commit.
 A gate deleted without a design amendment is a review finding ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §1).
 
-**Skips.** A skip is a missing prerequisite, never a failing assertion; it names the command that removes it; under
-`CI=true` an unlisted skip is exit `2`. A conformance skip (`requires` unmet) is printed by `conformance-count` with
-its reason — attributed, never silent (33 §3).
+**Skips.** A skip is a missing prerequisite, never a failing assertion; it names the command that removes it, and
+names only the prerequisites actually absent; under `CI=true` an unlisted skip is red and `run.mjs` exits `1`.
+A conformance skip (`requires` unmet) is printed by `conformance-count` with its reason, attributed and never
+silent (33 §3).
 
 ## 7 · Performance budget
 

@@ -70,14 +70,14 @@ export type Fired = { ingest: string; outbox: string | null; nextMs: number | nu
 /**
  * A stable offset, from the record and the ingest.
  *
- * FNV-1a over `<record><ingest>`, modulo a window of a tenth of the interval clamped between
+ * FNV-1a over `<record>\x1f<ingest>`, modulo a window of a tenth of the interval clamped between
  * thirty seconds and fifteen minutes. It is arithmetic rather than a hash library because the value
  * only has to be well spread and the same every time — and "the same every time" is the whole
  * requirement, because a gap somebody asks about has to have a reason.
  */
 export function jitterMs(recordId: string, ingest: string, everyMs: number): number {
   let h = 0x811c9dc5;
-  for (const ch of `${recordId}${ingest}`) {
+  for (const ch of `${recordId}\x1f${ingest}`) {
     h ^= ch.codePointAt(0)!;
     h = Math.imul(h, 0x01000193) >>> 0;
   }
