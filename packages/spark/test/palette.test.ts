@@ -334,6 +334,10 @@ test('the rows the model reads are printed one to a line, with money spelled out
   await spark.propose('what is still open', OWNER);
   const prompt = inference.seen[1]?.messages[1]?.content ?? '';
   assert.match(prompt, /obligations#7 \| Office rent \| what: Office rent · amount: EGP 5,005\.00 · due: 2026-11-04/u);
+  /* AND THE OPEN COUNT IS STILL PRINTED WHERE THE PROJECTION CARRIED ONE. `indexLines` learned to omit the clause for a host
+     bridging `project` over `list`, which cannot count non-terminal rows; nothing asserted the other half, so omitting it
+     always left all 63 of this package's tests green. The record's own projection does know the figure. */
+  assert.match(prompt, /obligations \(3 rows, 2 open\): what:text · amount:money · due:day · state:enum/u);
 });
 
 test('a projection too big for the prompt loses rows from the end, and the fold says so', async () => {

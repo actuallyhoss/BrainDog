@@ -114,7 +114,18 @@ export type ProjectQuery = {
 };
 
 export type ProjectionField = { id: string; type: string };
-export type ProjectionRegister = { id: string; rows: number; open: number; fields: ProjectionField[] };
+
+/**
+ * One register in the index.
+ *
+ * `open` IS OPTIONAL AND `45 §4.4` HAS IT REQUIRED, and the difference is a host that has not got the record's `project` yet.
+ * It is the count of non-terminal rows, which the record's own projection knows from the register's `done:` states and its
+ * own row counts; a host bridging this port over `list` can only get it by listing every register and counting, which is a
+ * scan per register on the index call. Nothing here computes with it: `indexLines` prints it for the model and that is all,
+ * so a projection that does not know the figure omits it and the line is printed without the clause. A zero would have been
+ * a figure in a prompt that nothing measured, which is the one thing `cite` exists to stop on the way back.
+ */
+export type ProjectionRegister = { id: string; rows: number; open?: number; fields: ProjectionField[] };
 export type Projection = {
   rows: ProjectionRow[];
   index: { registers: ProjectionRegister[]; open_questions: string[] };

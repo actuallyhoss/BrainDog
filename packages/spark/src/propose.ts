@@ -89,10 +89,19 @@ export const canon = (value: unknown): string => {
   return JSON.stringify(value) ?? 'null';
 };
 
-/** `%INDEX%`: one line per register, `id (n rows, n open): field:type · field:type`. */
+/**
+ * `%INDEX%`: one line per register, `id (n rows, n open): field:type · field:type`.
+ *
+ * THE OPEN COUNT IS PRINTED ONLY WHERE THE PROJECTION CARRIED ONE. A host bridging `project` over the record's `list` cannot
+ * count non-terminal rows without a scan per register (`types.ts`, `ProjectionRegister`), and `${undefined} open` printed a
+ * prompt line reading `tasks (2 rows, undefined open)`, which is worse than saying nothing and is what this measured.
+ */
 export const indexLines = (registers: readonly ProjectionRegister[]): string =>
   registers
-    .map((r) => `${r.id} (${r.rows} rows, ${r.open} open): ${r.fields.map((f) => `${f.id}:${f.type}`).join(' · ')}`)
+    .map(
+      (r) =>
+        `${r.id} (${r.rows} rows${r.open === undefined ? '' : `, ${r.open} open`}): ${r.fields.map((f) => `${f.id}:${f.type}`).join(' · ')}`,
+    )
     .join('\n');
 
 /**

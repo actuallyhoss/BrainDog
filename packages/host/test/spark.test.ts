@@ -1,6 +1,12 @@
 /**
  * Spark's model at an endpoint (`src/spark.ts`): what is sent, what is read back, and that a failing endpoint leaves Spark's
  * own rules to speak. The endpoint is a test double and every key is an obviously fake value; nothing leaves the machine.
+ *
+ * AND THE TWO PORTS THE THIRTEENTH PACKAGE ASKS A HOST FOR, driven against a real record. `createSpark` is imported by a
+ * relative path because `packages/host` does not depend on `@braindog/spark` and must not: `46 §5.1` has the host import the
+ * package dynamically and only when `SPARK_ENDPOINT` is set, so the edge belongs to the app, which is where the one wiring
+ * line goes. A test may reach across (this file already reaches `kernel/test/sqlite.ts`), and `tools/gates/graph.mjs` reads
+ * `src/**` alone, so nothing here weakens the boundary it is standing in for.
  */
 
 import { test } from 'node:test';
@@ -8,7 +14,18 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { answerOf, endpointModel, SPARK_INSTRUCTIONS, SPARK_PLAN_INSTRUCTIONS } from '../src/spark.ts';
+import {
+  answerOf,
+  endpointInference,
+  endpointModel,
+  sparkFromEnv,
+  sparkInferenceOf,
+  sparkModelOf,
+  sparkRecord,
+  SPARK_INSTRUCTIONS,
+  SPARK_PLAN_INSTRUCTIONS,
+} from '../src/spark.ts';
+import { createSpark } from '../../spark/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const FAKE_KEY = 'fake-key-for-tests-only';
@@ -80,5 +97,233 @@ test('A RECORD WITH AN ENDPOINT SAYS WHICH MODEL IS BEHIND SPARK, and does not a
   assert.deepEqual(out.value.filed, []);
   const reading = (await api.spark({}, owner)) as { ok: boolean; value: { model: string } };
   assert.equal(reading.value.model, 'endpoint');
+  sql.close();
+});
+
+/* ── the two ports `@braindog/spark` asks a host for ─────────────────────── */
+
+const usedCompletion = (content: string, usage: { prompt_tokens: number; completion_tokens: number }) =>
+  new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }], usage }), { status: 200 });
+
+test('THE SAME ENDPOINT IS THE PACKAGE\'S Inference PORT, asked with a schema and read back with the provider\'s own token counts', async () => {
+  const net = endpoint(() => usedCompletion('{"registers":["tasks"],"where":null,"q":"open"}', { prompt_tokens: 812, completion_tokens: 19 }));
+  const inference = endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'small', key: async () => FAKE_KEY, send: net.send });
+  const schema = { type: 'object', required: ['registers'], properties: { registers: { type: 'array' } } };
+  const reply = await inference.complete({
+    model: 'glm-5.3-flash',
+    messages: [{ role: 'system', content: 'You are Spark.' }, { role: 'user', content: 'Which tasks are open?' }],
+    maxTokens: 200,
+    jsonSchema: schema,
+  });
+  assert.equal(reply.text, '{"registers":["tasks"],"where":null,"q":"open"}');
+  /* THE METER BILLS WHAT THE PROVIDER COUNTED and never the local estimate (`46 §4.1`). */
+  assert.deepEqual(reply.usage, { in: 812, out: 19 });
+
+  const body = JSON.parse(String(net.sent[0]!.init.body)) as {
+    model: string;
+    max_tokens: number;
+    response_format: { type: string; json_schema: { name: string; schema: unknown; strict: boolean } };
+    messages: { role: string; content: string }[];
+  };
+  /* THE SHORT NAME IS THE PACKAGE'S AND THE PROVIDER ID IS THE HOST'S (`46 §2`): this endpoint answers with `small`. */
+  assert.equal(body.model, 'small');
+  assert.equal(body.max_tokens, 200);
+  assert.equal(body.response_format.type, 'json_schema');
+  assert.deepEqual(body.response_format.json_schema.schema, schema);
+  assert.equal(body.response_format.json_schema.strict, true);
+  assert.deepEqual(body.messages.map((m) => m.role), ['system', 'user']);
+  assert.equal((net.sent[0]!.init.headers as Record<string, string>).authorization, `Bearer ${FAKE_KEY}`);
+  assert.ok(!String(net.sent[0]!.init.body).includes(FAKE_KEY), 'the key went into what the model reads');
+
+  /* A PROVIDER THAT DID NOT ANSWER THROWS, which is what `core.run` reads as `UNREACHABLE`. */
+  const down = endpoint(() => new Response('', { status: 503 }));
+  await assert.rejects(
+    endpointInference({ url: 'http://localhost:9/v1/chat/completions', send: down.send }).complete({ model: 'glm-5.3-flash', messages: [], maxTokens: 10, jsonSchema: {} }),
+    /answered 503/u,
+  );
+});
+
+const TASKS = {
+  id: 'register.tasks',
+  kind: 'register' as const,
+  body: {
+    id: 'tasks',
+    name: 'Tasks',
+    title: 'what',
+    /* A REGISTER IS SEARCHED ON THE FIELDS IT NAMES AND NOT ON ITS TITLE. Measured while writing the keyword test below: with
+       no `search:` line, `api.search({ q: 'Invoice' })` answered an empty list for a row whose title is `Invoice Acme`. */
+    search: ['what'],
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'amount', type: 'money' },
+      { id: 'due', type: 'day' },
+      { id: 'state', type: 'enum', values: ['open', 'done'] },
+    ],
+    state: 'state',
+    done: ['done'],
+  } as never,
+};
+
+test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE, over the host\'s two adapters and nothing else', async () => {
+  const sql = openSqlite();
+  const own = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await api.kernel.install([TASKS])).ok);
+  for (const fields of [
+    { what: 'Invoice Acme', amount: { amount: 500500, currency: 'EGP' }, due: '2026-10-01', state: 'open' },
+    { what: 'Invoice Beta', amount: { amount: 120000, currency: 'EGP' }, due: '2026-10-08', state: 'open' },
+  ])
+    assert.ok((await api.create({ register: 'tasks', fields }, owner)).ok, 'the row was not written');
+
+  const answers = [
+    '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}',
+    '{"text":"Two tasks are open and {{ref:tasks#1}} falls due first.","body_kind":"rowset","body":{"register":"tasks","rows":[{"what":"Chase {{ref:tasks#1}}"}]},"flagged":false}',
+  ];
+  const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 700, completion_tokens: 60 }));
+
+  const spark = createSpark({
+    sql: own,
+    clock,
+    inference: endpointInference({ url: 'http://localhost:11434/v1/chat/completions', model: 'small', send: net.send }),
+    record: sparkRecord(api),
+  });
+
+  const out = await spark.propose('Which tasks are open?', owner);
+  assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
+  assert.equal(out.value.body_kind, 'rowset');
+  assert.deepEqual(out.value.citations, ['tasks#1']);
+  assert.match(String(out.value.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
+  /* THE FOLD'S LAST LINE IS THE VAULT, REFUSED, on every ask (`46 §4.2`). */
+  assert.deepEqual(out.value.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
+  assert.deepEqual(out.value.read.at(0), { register: 'tasks', rows: 2, predicate: '{"field":"state","is":"open"}' });
+
+  /* THE QUESTION IS ON DECIDE, IN THE REAL RECORD, FILED AS SPARK. */
+  const boot = (await api.boot(owner)) as { ok: boolean; value: { waiting: { id: string; question: string }[] } };
+  assert.ok(boot.ok);
+  assert.equal(boot.value.waiting.length, 1);
+  assert.equal(boot.value.waiting[0]!.id, out.value.filed);
+  const queue = (await api.governance({ limit: 5 }, owner)) as { ok: boolean; value: { id: string; body_kind: string; opened_by: string }[] };
+  assert.ok(queue.ok);
+  assert.equal(queue.value[0]!.body_kind, 'rowset');
+  assert.equal(queue.value[0]!.opened_by, 'spark');
+
+  /* AND THE RECORD'S OWN SPARK HAS NO MODEL: this proposal came from the package's engine, not from the rules. */
+  const reading = (await api.spark({}, owner)) as { ok: boolean; value: { model: string | null } };
+  assert.equal(reading.value.model, null);
+
+  /* TWO CALLS, TWO ROWS IN SPARK'S OWN METER (`46 §4.1`), and the endpoint answered both. */
+  const metered = own.all<{ kind: string; status: string; model: string }>('SELECT kind, status, model FROM call ORDER BY rowid');
+  assert.deepEqual(metered.map((row) => `${row.kind}:${row.status}:${row.model}`), ['read:ok:glm-5.3-flash', 'propose:ok:glm-5.3-flash']);
+  assert.equal(net.sent.length, 2);
+
+  /* WHAT THE MODEL WAS SHOWN OF THE INDEX carries no open count, because a host reading the record through `list` cannot
+     count non-terminal rows and a zero printed for an unknown is a figure in a prompt that nothing measured. */
+  const drafting = JSON.parse(String(net.sent[0]!.init.body)) as { messages: { content: string }[] };
+  assert.match(drafting.messages[1]!.content, /tasks \(2 rows\): what:text · amount:money · due:day · state:enum/u);
+  assert.ok(!drafting.messages[1]!.content.includes('grant'), 'the vault register reached the prompt');
+
+  sql.close();
+  own.close();
+});
+
+test('A PREDICATE THE GRAMMAR REFUSES FALLS BACK ON THE RECORD\'S OWN SEARCH, which is the bridge\'s other read', async () => {
+  const sql = openSqlite();
+  const own = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await api.kernel.install([TASKS])).ok);
+  assert.ok((await api.create({ register: 'tasks', fields: { what: 'Invoice Acme', state: 'open' } }, owner)).ok);
+  assert.ok((await api.create({ register: 'tasks', fields: { what: 'Ring the bank', state: 'open' } }, owner)).ok);
+
+  /* A FIELD THE REGISTER HAS NOT GOT: the package drops the predicate and keeps the keywords (`46 §5.4` step 5). */
+  const answers = [
+    '{"registers":["tasks"],"where":{"field":"nope","is":"x"},"q":"Invoice"}',
+    '{"text":"One task mentions it: {{ref:tasks#1}}.","body_kind":"query","body":{},"flagged":false}',
+  ];
+  const net = endpoint(() => usedCompletion(answers.shift() ?? '{}', { prompt_tokens: 300, completion_tokens: 20 }));
+  const spark = createSpark({
+    sql: own,
+    clock,
+    inference: endpointInference({ url: 'http://localhost:11434/v1/chat/completions', send: net.send }),
+    record: sparkRecord(api),
+  });
+
+  const reading = await spark.read('Anything about the invoice?', owner);
+  assert.ok(reading.ok, `refused: ${JSON.stringify(reading)}`);
+  assert.equal(reading.value.predicate, null, 'an ungrammatical predicate reached the record');
+  assert.equal(reading.value.q, 'Invoice');
+  assert.deepEqual(reading.value.rows.map((row) => row.spoken), ['tasks#1']);
+  assert.equal(reading.value.rows[0]!.summary, 'tasks#1 | Invoice Acme | open');
+  assert.deepEqual(reading.value.read.at(0), { register: 'tasks', rows: 1, predicate: 'all' });
+
+  const out = await spark.propose('Anything about the invoice?', owner, undefined, reading.value.ask_id);
+  assert.ok(out.ok, `refused: ${JSON.stringify(out)}`);
+  /* A `query` IS THE ANSWER AND NOT A QUESTION: nothing is filed, and the verbs are the view's. */
+  assert.equal(out.value.body_kind, 'query');
+  assert.equal(out.value.filed, null);
+  assert.deepEqual(out.value.verbs, ['edit', 'save', 'open']);
+  const waiting = (await api.boot(owner)) as { ok: boolean; value: { waiting: unknown[] } };
+  assert.deepEqual(waiting.value.waiting, []);
+  sql.close();
+  own.close();
+});
+
+test('NO ENDPOINT MEANS NEITHER PORT IS BUILT, so a keyless host keeps drafting with the rules', async () => {
+  const net = endpoint(() => completion('{"drafts":[]}'));
+  const deps = { grants: () => [], openKey: null, send: net.send };
+  assert.equal(sparkFromEnv({}), undefined);
+  assert.equal(sparkModelOf(sparkFromEnv({}), deps), undefined);
+  assert.equal(sparkInferenceOf(sparkFromEnv({}), deps), undefined);
+  /* AND AN ENDPOINT WITH NO KEY ANYWHERE IS STILL NO MODEL on a host that cannot open the vault (`sparkModelOf`'s rule). */
+  const configured = sparkFromEnv({ SPARK_ENDPOINT: 'http://localhost:11434/v1/chat/completions' }, { operatorKey: false });
+  assert.equal(sparkInferenceOf(configured, deps), undefined);
+  assert.ok(sparkInferenceOf(configured, { ...deps, openKey: async () => null }) !== undefined);
+  assert.equal(net.sent.length, 0);
+});
+
+/**
+ * A register that holds a key and a body of prose, which the bridge is supposed to carry neither of.
+ *
+ * THE KERNEL ALREADY REFUSES A SECRET AS A TITLE (`declare.ts`, "a secret says where a key is sealed, not what the row is
+ * called"), so `summaryOf` cannot print one by reading `decl.title`. What is left to prove is the two drops themselves, and
+ * they were the one claim in `sparkRecord` with nothing behind it: `list` hands back the document's whole prose, measured
+ * below, and the projection is what a prompt is built from.
+ */
+const KEYS = {
+  id: 'register.credentials',
+  kind: 'register' as const,
+  body: {
+    id: 'credentials',
+    name: 'Keys',
+    title: 'label',
+    fields: [
+      { id: 'label', type: 'text', required: true },
+      { id: 'opens', type: 'text' },
+      { id: 'notes', type: 'document' },
+      { id: 'value', type: 'secret' },
+    ],
+  } as never,
+};
+
+test('A SECRET AND A DOCUMENT REACH NEITHER THE ROWS NOR THE INDEX, so neither can reach a prompt', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 8, 21, 9));
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await api.kernel.install([KEYS])).ok);
+  const prose = 'The rotation runbook, at length, and a long way past what a token cap would carry.';
+  assert.ok((await api.create({ register: 'credentials', fields: { label: 'Stripe', opens: 'api.stripe.test', notes: prose } }, owner)).ok);
+
+  /* WHAT THE RECORD'S OWN `list` HANDS BACK, measured: the document's whole body is in the row, so the drop is this bridge's. */
+  const listed = (await api.list({ register: 'credentials', limit: 5 }, owner)) as { ok: boolean; value: { rows: { fields: Record<string, unknown> }[] } };
+  assert.equal(listed.value.rows[0]!.fields['notes'], prose);
+
+  const projected = await sparkRecord(api).project({ registers: ['credentials'], budget: { tokens: 6000 } }, owner);
+  assert.ok(projected.ok);
+  assert.deepEqual(projected.value.rows[0]!.fields, { label: 'Stripe', opens: 'api.stripe.test' });
+  assert.equal(projected.value.rows[0]!.summary, 'credentials#1 | Stripe');
+  const shown = projected.value.index.registers.find((r) => r.id === 'credentials');
+  assert.deepEqual(shown!.fields.map((f) => f.id), ['label', 'opens']);
+  assert.ok(!JSON.stringify(projected.value).includes('runbook'), 'the document reached the projection');
   sql.close();
 });
