@@ -100,6 +100,17 @@ const findings = [];
  */
 const notChecked = [];
 
+/**
+ * How many of the three word-for-word list comparisons actually ran: the kinds table, the
+ * extractors and the combinators.
+ *
+ * IT LIVES UP HERE BECAUSE TWO BLOCKS FAR APART FEED IT, and until now only one of them did. The
+ * green line said "N of 2" while the gate made three such comparisons, so the kinds table moved no
+ * number whether it ran or not, which is the condition the comment at the bottom of this file was
+ * written to end.
+ */
+let readLists = 0;
+
 const blueprint = read('docs/30-BLUEPRINT.md');
 const migration = read('packages/kernel/src/migrations/0001_kernel.ts');
 
@@ -368,17 +379,29 @@ function kindsInReadme() {
 function named(drawn, declared, what) {
   for (const k of declared) if (!drawn.has(k)) findings.push(`${what} does not name the kind "${k}"`);
   for (const k of drawn) if (!declared.has(k)) findings.push(`${what} names "${k}", which kinds.ts does not declare`);
+  readLists++;
 }
 
-let kindTotal;
-try {
-  kindTotal = realKindCount();
-} catch {
-  kindTotal = undefined;
-}
+/**
+ * ASKED FOR BY NAME, THE WAY THE EXTRACTORS BLOCK BELOW ASKS, and for the reason written out there:
+ * an absent package is excused by name, and a file that is here and cannot be read is a finding.
+ *
+ * A BARE CATCH MAPPED BOTH ONTO ONE SENTENCE, AND THE SENTENCE WAS ABOUT THE WRONG THING.
+ * `realKindCount` already returns `undefined` when the TABLE markers have moved, so the only thing
+ * the catch ever caught was `read` failing to find the file at all. Aimed at a tree without
+ * `packages/render` (this gate's own negative fixtures are small trees that carry only the files
+ * their case needs) it reported that the TABLE was not where this gate looks, and sent a reader to
+ * inspect a file that was never there. It also swallowed anything else thrown from that line, which
+ * is the failure the extractors block was repaired for.
+ */
+const kindsAt = join(root, 'packages', 'render', 'src', 'kinds.ts');
+const haveKinds = existsSync(kindsAt);
+const kindTotal = haveKinds ? realKindCount() : undefined;
 
 let spelledOut = 0;
-if (kindTotal === undefined) {
+if (!haveKinds) {
+  notChecked.push('the count and the list of the block kinds, for want of packages/render/src/kinds.ts');
+} else if (kindTotal === undefined) {
   findings.push("packages/render/src/kinds.ts's TABLE is not where this gate looks for it");
 } else {
   for (const rel of proseFiles(root)) {
@@ -416,7 +439,15 @@ if (kindTotal === undefined) {
      `agents`, `split`, `bridge`, `series`, `lines`, `progress`, `forecast` and `sparkline` exist.
      A number is one character to keep in step and a list is one line per member, so the list is
      the one that goes stale, which is the argument for reading it rather than counting it. */
-  named(kindsInReadme(), kindsDeclared(), 'packages/render/README.md’s kinds table');
+  /* AND THIS ONE IS ASKED FOR BY NAME TOO. `kinds.ts` being present says nothing about the README
+     beside it, and an unguarded read here threw out of the whole gate, taking the three checks that
+     have nothing to do with `packages/render` down with it. That is exactly what the comment above
+     `kindsDeclared` promises will not happen. */
+  if (existsSync(join(root, 'packages', 'render', 'README.md'))) {
+    named(kindsInReadme(), kindsDeclared(), 'packages/render/README.md’s kinds table');
+  } else {
+    notChecked.push('the kinds table of packages/render/README.md against kinds.ts, for want of the README');
+  }
 }
 
 /**
@@ -453,8 +484,6 @@ if (kindTotal === undefined) {
  * ever meant to be excused.
  */
 const extractorsAt = join(root, 'packages', 'extract', 'src', 'extractors.ts');
-/** The two read lists, extractors and combinators, that were actually compared. */
-let readLists = 0;
 if (!existsSync(extractorsAt)) {
   notChecked.push('the ten extractors and the three combinators of 34 §6, for want of packages/extract/src/extractors.ts');
 } else {
@@ -498,7 +527,7 @@ if (findings.length === 0) {
      looked exactly like a passing one. */
   console.log(
     `  closed-lists: ${said.size} CHECKs agree across the document and the DDL, ${counted} counted lists add up, ` +
-      `${spelledOut} spelled-out kind counts agree, and ${readLists} of 2 word-for-word lists match`,
+      `${spelledOut} spelled-out kind counts agree, and ${readLists} of 3 word-for-word lists match`,
   );
   for (const what of notChecked) console.log(`  closed-lists: NOT checked, ${what}`);
 } else {
