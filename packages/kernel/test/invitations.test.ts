@@ -154,7 +154,14 @@ test('WHAT AN INVITATION MAY SAY: an address, a level, and nobody already on the
   assert.equal(refusal(await k.createInvitation('p_ada', { email: 'not an address', level: 'read' })).code, 'VALUE_MALFORMED');
   assert.equal(refusal(await k.createInvitation('p_ada', { email: 'bea@example.com', level: 'boss' as never })).code, 'ENUM_VALUE_UNKNOWN');
   assert.equal(refusal(await k.createInvitation('p_ada', { email: 'bea@example.com' })).code, 'REQUIRED_MISSING');
-  assert.equal(refusal(await k.createInvitation('p_ada', { email: 'bea@example.com', registers: { nope: 'read' } })).code, 'REGISTER_UNKNOWN');
+  const gone = refusal(await k.createInvitation('p_ada', { email: 'bea@example.com', registers: { nope: 'read' } }));
+  assert.equal(gone.code, 'REGISTER_UNKNOWN');
+  /* `at` IS A PATH INTO WHAT THE CALLER SENT, the same as `email` and `level` two lines up. This
+     branch passed the unknown slug, which addresses no key of the payload. */
+  assert.equal(gone.at, 'registers.nope');
+  const level = refusal(await k.createInvitation('p_ada', { email: 'bea@example.com', registers: { notes: 'boss' as never } }));
+  assert.equal(level.code, 'ENUM_VALUE_UNKNOWN');
+  assert.equal(level.at, 'registers.notes');
   assert.equal(refusal(await k.createInvitation('p_ada', { email: 'ADA@example.com', level: 'read' })).code, 'ALREADY_KNOWN');
   assert.deepEqual(k.listInvitations(), [], 'a refused invitation left a row');
 

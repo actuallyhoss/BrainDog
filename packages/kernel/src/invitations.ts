@@ -98,10 +98,15 @@ export function mintInvitation(deps: InviteDeps, by: string, args: InviteArgs, s
     return no<Invited>('ENUM_VALUE_UNKNOWN', `${String(args.level)} is not a level.`, { at: 'level', allowed: LEVELS });
   if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0)
     return no<Invited>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register.', { at: 'level' });
+  /* `at` IS A PATH INTO WHAT THE CALLER SENT, and `registers` is an object keyed by slug, so the
+     entry that is wrong is at `registers.<slug>`. Both branches passed the bare slug, which names a
+     value rather than a place: no payload has a top-level `nope` key, and a screen given `nope` has
+     nothing to put the message on. The slug is already in `fix`, where it belongs. */
   for (const [register, level] of Object.entries(args.registers ?? {})) {
-    if (!deps.hasRegister(register)) return no<Invited>('REGISTER_UNKNOWN', `There is no register called ${register}.`, { at: register });
+    const at = `registers.${register}`;
+    if (!deps.hasRegister(register)) return no<Invited>('REGISTER_UNKNOWN', `There is no register called ${register}.`, { at });
     if (!(LEVELS as readonly string[]).includes(level))
-      return no<Invited>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at: register, allowed: LEVELS });
+      return no<Invited>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at, allowed: LEVELS });
   }
 
   const record = deps.recordId();

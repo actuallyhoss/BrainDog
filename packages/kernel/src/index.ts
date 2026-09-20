@@ -1887,10 +1887,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     w: WriteContext,
   ): Result<{ entry: Entry; grant: GrantRow }> {
     const decl = registers.get(args.register);
-    if (!decl) return no('REGISTER_UNKNOWN', `There is no register called ${args.register}.`, { allowed: [...registers.keys()] });
+    if (!decl) return no('REGISTER_UNKNOWN', `There is no register called ${args.register}.`, { at: 'register', allowed: [...registers.keys()] });
     const sealable = decl.fields.filter((f) => f.type === 'secret' && !f.retired).map((f) => f.id);
     if (!sealable.includes(args.field))
-      return no('FIELD_UNKNOWN', `${args.register} has no secret field called ${args.field}.`, { at: args.field, allowed: sealable });
+      /* `field` AND NOT THE FIELD'S NAME. `at` addresses a place in what the caller sent, which is
+         what lets a screen put the message on the control that carries the bad value. This passed
+         the value, so a client had nothing to bind it to and a reader could not tell an address
+         from a datum. The name is already in the sentence. */
+      return no('FIELD_UNKNOWN', `${args.register} has no secret field called ${args.field}.`, { at: 'field', allowed: sealable });
 
     let bound: GrantRow | undefined;
     const bind = (actor: string, held: string | null): Result<GrantRow> => {
@@ -1963,6 +1967,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const decl = registers.get(register);
       if (!decl)
         return no<Entry>('REGISTER_UNKNOWN', `There is no register called ${register}.`, {
+          at: 'register',
           allowed: [...registers.keys()],
         });
 

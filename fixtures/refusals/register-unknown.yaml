@@ -1,4 +1,16 @@
 code:   REGISTER_UNKNOWN
 via:    write
 raises: packages/kernel/src/index.ts
+at:     register
 fix:    Install the pack that declares the register.
+# WHAT `at` MEANS WHEN THIS CODE CARRIES ONE, because two conventions were live inside the kernel
+# and a person reading a refusal could not tell them apart. `at` is a path into the input the caller
+# sent, and nothing else: `register`, `body.register`, `from`, `source`, `sends[0]`,
+# `registers.<slug>`. It is never the unknown register's own slug. A slug is a value, the thing that
+# was wrong; `fix` already names it, and a screen handed a value has no field to put the message on.
+# `invitations.ts` and `members.ts` passed the slug and now pass `registers.<slug>`, which is
+# literally where the caller wrote it.
+# THE WRITE PATH ANSWERED WITH `allowed:` AND NO `at` AT ALL, which is how this fixture came to
+# have none. That was the third convention: not the input path, not the slug, nothing. The register
+# is an argument the caller passed by that name, so `register` is where it is, and the two sites in
+# `index.ts` say so now.

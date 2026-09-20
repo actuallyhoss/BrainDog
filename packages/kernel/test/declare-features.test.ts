@@ -359,7 +359,9 @@ test('AND A REFUSED DEPOSIT SEALS NOTHING AND OPENS NO RUN', async () => {
   assert.equal(count('entry', "register = 'session'"), 0, 'a refused deposit opened a run');
   assert.equal(count('entry', "register = 'credentials'"), 0);
 
-  assert.equal(said(k.depositGrant({ register: 'credentials', field: 'label', fields: INDEX, grant: SEALED }, OWNER)), 'FIELD_UNKNOWN at label');
+  /* `at field` AND NOT `at label`. `at` addresses a place in what the caller sent, so it is the
+     argument's name and never the value that argument held. The name is in the sentence already. */
+  assert.equal(said(k.depositGrant({ register: 'credentials', field: 'label', fields: INDEX, grant: SEALED }, OWNER)), 'FIELD_UNKNOWN at field');
   assert.equal(refusal(k.depositGrant({ register: 'keys', field: 'value', grant: SEALED }, OWNER)).code, 'REGISTER_UNKNOWN');
   sql.close();
 });

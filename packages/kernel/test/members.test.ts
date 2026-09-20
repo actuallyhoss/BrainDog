@@ -649,15 +649,21 @@ test('a level that is not on the ladder is refused, and the refusal says which a
      per-register branch too, which carries its own copy of the refusal and its own `allowed`. */
   const scoped = refusal(invite(deps, 'system', { person: 'p_a', registers: { payroll: 'admin' as Level } }));
   assert.equal(scoped.code, 'ENUM_VALUE_UNKNOWN');
-  assert.equal(scoped.at, 'payroll');
+  assert.equal(scoped.at, 'registers.payroll');
   assert.deepEqual([...(scoped.allowed ?? [])], [...LEVELS], 'the register branch refuses without saying what it would take');
 });
 
-test('a register that does not exist is refused by name', async () => {
+test('a register that does not exist is refused by name, and `at` is where in the input it was said', async () => {
+  /* `at` ADDRESSES THE INPUT, NOT THE VALUE. Everywhere else in the kernel `at` is a path into what
+     the caller sent — `level`, `email`, `body.register`, `sends[0]` — which is what lets a screen
+     put the refusal on the control that carries it. This branch passed the unknown slug itself, so
+     `at: 'ledger'` pointed at no key of any payload, and a caller could not tell an address from a
+     value. The slug is already in `fix`; the address is `registers.<slug>`, which is literally
+     where the caller wrote it. */
   const { deps } = await record();
   const said = refusal(invite(deps, 'system', { person: 'p_a', level: 'read', registers: { ledger: 'read' } }));
   assert.equal(said.code, 'REGISTER_UNKNOWN');
-  assert.equal(said.at, 'ledger');
+  assert.equal(said.at, 'registers.ledger');
   assert.match(said.fix, /ledger/u, 'the refusal does not name the register it is about');
 });
 

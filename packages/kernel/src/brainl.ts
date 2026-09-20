@@ -747,11 +747,19 @@ export function importBrainl(
       if (table.name === 'dog_meta') {
         const [key, value] = values as [string, string];
         if (key === 'format' && Number(value) > readsFormat)
-          /* THE ROW THE `format-newer-than-reader` FIXTURE NAMED, and it answers a different code:
-             the sentence here is `FORMAT_NEWER_THAN_READER`'s, word for word, under
-             `FILE_MALFORMED`. Left as it stands because the repair is a code change with an HTTP
-             status behind it, and the address at least now says which row was read. */
-          throw new BadLine(`This file is format ${value} and this build reads ${readsFormat}.`, 'dog_meta.format');
+          /* THE ROW THE `format-newer-than-reader` FIXTURE NAMED, and it answers a different code
+             ON PURPOSE. A file that is genuinely from a newer build says so on line one and is
+             refused there, `FORMAT_NEWER_THAN_READER`, repair: upgrade. Getting past line one and
+             then meeting a `dog_meta.format` row above the reader means the file's two statements
+             of its own format DISAGREE, which is damage rather than newness, and no upgrade fixes
+             it. The sentence used to be `FORMAT_NEWER_THAN_READER`'s word for word, so a person
+             holding this refusal was told to upgrade a build that was never behind. The code stays
+             `FILE_MALFORMED`; the words are now about the file in front of them. The catch below
+             adds "The file is damaged; re-export it from the record it came from." */
+          throw new BadLine(
+            `This file's first line and its dog_meta format row disagree: the row says format ${value}, and this build reads ${readsFormat}.`,
+            'dog_meta.format',
+          );
       }
 
       /* AN EMPTY RECORD IS NOT AN EMPTY DATABASE. The migration seeds rows — the two counters, the

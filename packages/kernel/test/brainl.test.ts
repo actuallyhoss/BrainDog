@@ -699,6 +699,39 @@ test('A FILE FROM A NEWER BUILD IS REFUSED ON LINE ONE, before anything is parse
   sql.close();
 });
 
+test('A dog_meta FORMAT ROW AHEAD OF THE READER IS REFUSED IN ITS OWN WORDS, not in the other code’s', async () => {
+  /* TWO CODES MAY NOT SHARE A SENTENCE. A file whose `#dogl` header is ahead of this build is
+     `FORMAT_NEWER_THAN_READER` and the repair is an upgrade. Getting past that line and then
+     finding a `dog_meta.format` row ahead of the reader is a DIFFERENT fact: the file's two
+     statements of its own format disagree, so it is damaged rather than new, and the repair is
+     another copy. The sentence here was `FORMAT_NEWER_THAN_READER`'s word for word, which left a
+     person holding a 422 that told them to upgrade a build that was never behind. */
+  const source = await filled();
+  const lines = value<string[]>(await source.k.export());
+  const at = rowIn(lines, 'dog_meta', '"format"');
+  const [key] = JSON.parse(lines[at]!) as [string, string];
+  assert.equal(key, 'format', 'the dog_meta row found was not the format row');
+  const ahead = await signBrainl(reseal([...lines.slice(0, at), JSON.stringify([key, '9']), ...lines.slice(at + 1)]), SIGNER);
+
+  const sql = openSqlite();
+  const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
+  const out = (await target.import(ahead)) as { ok: boolean; refusal?: { code: string; at?: string; fix: string } };
+  assert.equal(out.ok, false, 'a file whose dog_meta format row is ahead of the reader was imported');
+  assert.equal(out.refusal?.code, 'FILE_MALFORMED');
+  assert.equal(out.refusal?.at, 'dog_meta.format');
+
+  const upgrade = await checkBrainl(['#dogl 9', ...lines.slice(1)]);
+  const borrowed = upgrade.ok === false ? upgrade.refusal.fix.slice(0, upgrade.refusal.fix.indexOf('.') + 1) : '';
+  assert.equal(borrowed, 'This file is format 9 and this build reads 1.', 'the other code no longer says this');
+  assert.ok(!(out.refusal?.fix ?? '').includes(borrowed), `FILE_MALFORMED is carrying FORMAT_NEWER_THAN_READER's sentence: ${out.refusal?.fix}`);
+  assert.doesNotMatch(out.refusal?.fix ?? '', /[Uu]pgrade/, 'a damaged file was answered with an upgrade');
+  assert.match(out.refusal?.fix ?? '', /dog_meta/, 'the refusal does not name the row that is wrong');
+  assert.match(out.refusal?.fix ?? '', /re-export/i, 'the refusal does not say what to do');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')?.n, 0, 'a refused import left rows behind');
+  sql.close();
+  source.sql.close();
+});
+
 test('AN EMPTY TABLE IS STILL A TABLE, and a file that grew one does not open', async () => {
   // The hash of a table with no rows is the hash of the empty string, and a reader that skipped
   // headers with nothing under them would let somebody empty a table without moving a single hash.

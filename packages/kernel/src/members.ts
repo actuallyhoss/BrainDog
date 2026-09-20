@@ -199,11 +199,15 @@ export function invite(
       at: 'level',
     });
 
+  /* `at` IS A PATH INTO WHAT THE CALLER SENT, and `registers` is an object keyed by slug, so the
+     entry that is wrong is at `registers.<slug>`. Both branches passed the bare slug, which names a
+     value rather than a place: no payload has a top-level `ledger` key, and a screen given `ledger`
+     has nothing to put the message on. The slug is already in `fix`, where it belongs. */
   for (const [register, level] of Object.entries(args.registers ?? {})) {
-    if (!deps.hasRegister(register))
-      return no<Member>('REGISTER_UNKNOWN', `There is no register called ${register}.`, { at: register });
+    const at = `registers.${register}`;
+    if (!deps.hasRegister(register)) return no<Member>('REGISTER_UNKNOWN', `There is no register called ${register}.`, { at });
     if (!(LEVELS as readonly string[]).includes(level))
-      return no<Member>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at: register, allowed: LEVELS });
+      return no<Member>('ENUM_VALUE_UNKNOWN', `${String(level)} is not a level.`, { at, allowed: LEVELS });
   }
 
   /**
