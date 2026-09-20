@@ -285,11 +285,11 @@ test('and a sum whose format disagrees with its rows is said in the rows’ curr
 });
 
 test('A BAR OVER TWO CURRENCIES IS ONE BAR A CURRENCY, each under its code', () => {
-  const block = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
+  const block = page('money')?.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for');
   assert.ok(block, 'the bar is gone; this test is about the bar');
 
   withEuro('obligations', 'amount', overduePayable, () => {
-    const again = page('money')?.blocks.find((b) => b.heading === 'Where it goes, next 30 days');
+    const again = page('money')?.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for');
     const segments = toSegments(again!);
     const charts = segments.filter((seg) => 'rows' in seg) as { rows: { cells: string[] }[] }[];
     assert.equal(charts.length, 2, 'one chart a currency');
@@ -301,7 +301,7 @@ test('A BAR OVER TWO CURRENCIES IS ONE BAR A CURRENCY, each under its code', () 
     /* AND ONE CHART, CONVERTED, once there is a home currency and a rate. */
     const back = withFx(() => ({ home: 'GBP', rates: [{ currency: 'EUR', base: 'GBP', rate: 0.855, as_of: '2020-01-01' }] }));
     try {
-      const one = toSegments(page('money')!.blocks.find((b) => b.heading === 'Where it goes, next 30 days')!);
+      const one = toSegments(page('money')!.blocks.find((b) => b.heading === 'Owed by you, 30 days, by what it is for')!);
       assert.equal(one.filter((seg) => 'rows' in seg).length, 1);
       assert.ok(JSON.stringify(one).includes(copy.figureConverted('1 Jan 2020')));
     } finally {

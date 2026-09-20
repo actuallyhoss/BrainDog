@@ -255,7 +255,7 @@ test('THE DEMO SAVES IN THE TAB AND SAYS NOTHING WAS SAVED; RESET PUTS THE DEFAU
   const s = sample(() => AT);
   const saved = value(await s.setConfig('money-core', { most_days_late: 7, most_out_30d: { amount: 100_000, currency: 'GBP' } }));
   assert.deepEqual(saved.changed, ['most_out_30d', 'most_days_late']);
-  assert.equal(saved.said, copy.notWritten(words.changed(['Most going out in 30 days', 'Most days money in may be late'])));
+  assert.equal(saved.said, copy.notWritten(words.changed(['Most owed by you in 30 days', 'Most days money in may be late'])));
   assert.equal(value(await s.config('money-core')).values.most_days_late, 7);
   assert.ok(!isDefault(saved.config.most_days_late!, saved.values.most_days_late));
 

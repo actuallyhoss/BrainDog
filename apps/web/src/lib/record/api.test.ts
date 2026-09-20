@@ -344,7 +344,7 @@ test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
   // exists, and the figure is wrong by however many rows did not fit — with nothing on screen that
   // says so, because a total is one line either way.
   withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Where it goes, next 30 days');
+    const block = barOf('money', 'Owed by you, 30 days, by what it is for');
     assert.ok(block, 'the bar is gone; this test is about the bar');
     assert.ok(block.matched.length > 50, `only ${block.matched.length} rows matched, so the cut was never reached`);
     const truth = block.matched.reduce((a, e) => a + (amountOf(e.fields.amount) ?? 0), 0);
@@ -357,7 +357,7 @@ test('A BAR ADDS UP THE ANSWER, NOT THE FIRST PAGE OF IT', () => {
 
 test('the rows it DRAWS are still cut, because that half was never the bug', () => {
   withExtra(80, 100_000, () => {
-    const block = barOf('money', 'Where it goes, next 30 days');
+    const block = barOf('money', 'Owed by you, 30 days, by what it is for');
     assert.ok(block);
     assert.ok(block.entries.length <= (block.limit ?? 50), 'the reading cap stopped applying');
     assert.ok(block.matched.length > block.entries.length, 'nothing was cut, so nothing is being tested');
@@ -423,7 +423,7 @@ test('chips count every matching row, and the counts add to the matched total', 
 test('when there are more groups than fit, the rest is CARRIED, not dropped', () => {
   // The other way to get a wrong total: cut the bars instead of the rows and the figure is short by
   // the tail. A named remainder keeps the sum whole and says out loud that there is more.
-  const block = barOf('money', 'Where it goes, next 30 days');
+  const block = barOf('money', 'Owed by you, 30 days, by what it is for');
   assert.ok(block);
   const rowsOf = (b: typeof block) =>
     toSegments(b).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
@@ -973,7 +973,7 @@ test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out
 });
 
 test('A SPLIT GROUPS BY WHAT THE MONEY IS FOR, in the words the screen shows', () => {
-  const block = barOf('money', 'Where it goes, next 30 days');
+  const block = barOf('money', 'Owed by you, 30 days, by what it is for');
   assert.ok(block);
   const labels = rowsOfBlock(block).map((r) => r.cells[0]);
   assert.ok(labels.includes('Tax'), `no tax group in ${labels.join(', ')}`);

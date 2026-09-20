@@ -28,7 +28,11 @@ const numbers = (where: string | null, empty: string, line: string) => {
 
 export const FOUNDER = {
   usecase: 'founder',
-  version: '1.3.1',
+  /* 1.3.2 BECAUSE THE TWO THIRTY-DAY TILES ON BOTH DASHBOARDS ARE RENAMED, and a record is offered a
+     use case's change only when its version goes up: 1.3.1 was itself the wording of these same tiles
+     (`fbf260e6`), so leaving the number alone would mean every record that took that one keeps the
+     words it corrected. Nothing here declares a field or a register, so there is nothing to refuse. */
+  version: '1.3.2',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -136,13 +140,26 @@ export const FOUNDER = {
         requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
         blocks: [
           {
+            /**
+             * THE TWO THIRTY-DAY TILES CARRY THE FIGURES' OWN NAMES, which is `491e7e05` arriving here.
+             *
+             * BOTH READ ONE REGISTER AND ONE DIRECTION (`direction is owed by me`, and its opposite), so
+             * "Going out, 30 days" claimed a whole they cannot count. Measured where it could be seen: on
+             * `/p/money` those words over `out-30d` read GBP 38,880.00 above a walk over three lists
+             * reading GBP 42,741.00 of the same thirty days, GBP 3,861.00 apart on one screen.
+             *
+             * THIS PAGE DRAWS NO WALK, SO NOTHING ON IT CONTRADICTED, which is how the old words survived
+             * that rename and is not a reason to keep them. A founder's record installs money-core too,
+             * so the same figure is read here and on `/p/money`, and two names for one figure is a
+             * question about which of them is the real number.
+             */
             kind: 'stat',
             heading: '{{config:voice_right_now}}',
             span: 12,
             cells: [
               { metric: 'cash-now', label: 'Cash now' },
-              { metric: 'in-30d', label: 'Coming in, 30 days' },
-              { metric: 'out-30d', label: 'Going out, 30 days' },
+              { metric: 'in-30d', label: 'Owed to you, 30 days' },
+              { metric: 'out-30d', label: 'Owed by you, 30 days' },
               { metric: 'datapoints-30d', label: 'Reported, 30 days' },
             ],
           },
@@ -196,10 +213,13 @@ export const FOUNDER = {
             heading: 'Across your organisations',
             lead: true,
             span: 12,
+            /* THE THIRTY-DAY TILES, IN THE FIGURES' OWN WORDS, and the argument is on Overview's stat
+               block above: they read one register and one direction, so the bridge's words over them
+               were a claim about money they cannot reach. */
             cells: [
               { metric: 'cash-now', label: 'Cash now', trend: '30d' },
-              { metric: 'in-30d', label: 'Coming in, 30 days' },
-              { metric: 'out-30d', label: 'Going out, 30 days' },
+              { metric: 'in-30d', label: 'Owed to you, 30 days' },
+              { metric: 'out-30d', label: 'Owed by you, 30 days' },
             ],
           },
           {

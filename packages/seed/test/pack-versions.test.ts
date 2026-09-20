@@ -35,7 +35,10 @@ const DECLARED: Record<string, string> = {
   'portfolio@1.3.0': 'b43e0664aa176905',
   'money-core@1.1.0': '5cb37a57b9de3499',
   'money-core@1.2.0': '4f42a8e447293eaf',
-  'money-core@1.3.0': '16b20c1f9d41aef4',
+  /* SET AGAIN RATHER THAN RAISED, because 1.3.0 is not released: this version's split heading and the
+     words on the `most_out_30d` box changed, and both are copy a record reads rather than anything it
+     could refuse. The rule above is the whole argument for which of the two moves this is. */
+  'money-core@1.3.0': '4b0b669c35680e7f',
   'work@1.1.0': 'b49e051fe7c26ac5',
   'work@1.2.0': '49a30d2ef8c1d672',
   'work@1.3.0': 'fb82e66d80644e3d',

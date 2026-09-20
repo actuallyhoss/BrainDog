@@ -841,7 +841,11 @@ const BANK_DAY_FORMAT = 'DD/MM/YY';
  * is read, so a change holds the figure to it at once. The default is the figure's own target, or the use case's.
  */
 export const MONEY_TARGET_SETTINGS: Readonly<Record<string, { setting: string; type: 'money' | 'number'; label: string }>> = {
-  'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most going out in 30 days' },
+  /* `most_out_30d` IS THE KEY AND THE WORDS ARE ONLY WORDS, so this label follows its figure. See the
+     comment on `out-30d` itself: the claim that renaming it would lose a saved ceiling was measured
+     and is false, `test/money.test.ts` holds it, and the ceiling caps what is OWED inside the thirty
+     days rather than everything that leaves. */
+  'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most owed by you in 30 days' },
   'every-month-out': { setting: 'most_out_every_month', type: 'money', label: 'Most going out every month' },
   'every-month-by-category': { setting: 'most_on_one_category', type: 'money', label: 'Most a month on one category' },
   'due-30d': { setting: 'most_due_30d', type: 'money', label: 'Most due in 30 days' },
@@ -949,9 +953,17 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* THE OTHER SIDE OF `in-30d`, AND THE COMMENT ABOVE IT IS THIS ONE'S TOO. Its setting keeps the
-     older wording, "Most going out in 30 days", because a setting a person has already saved is
-     found by the words they saved it under. */
+  /**
+   * THE OTHER SIDE OF `in-30d`, AND THE COMMENT ABOVE IT IS THIS ONE'S TOO.
+   *
+   * ITS CEILING WAS LEFT READING "Most going out in 30 days" BECAUSE A SETTING WAS SAID TO BE FOUND BY
+   * THE WORDS IT WAS SAVED UNDER, AND IT IS NOT. A saved value is written under `most_out_30d`, the
+   * key this figure names in `target.setting`, and the label is text the settings screen prints beside
+   * the box: `packConfig` reads the values by key and takes the words from whichever manifest the
+   * record last installed. Measured through the real door, `normalise`, `plan`, `install`, on a record
+   * holding a GBP 1,110.00 ceiling: the sum survives the label changing under it, both ways. So the
+   * words follow the figure, and `test/money.test.ts` keeps that a measurement rather than a memory.
+   */
   'out-30d': {
     metric: 'out-30d',
     name: 'Owed by you, 30 days',
@@ -1751,17 +1763,21 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing dated in the next 30 days.',
       },
       {
-        /* WHERE THE NEXT THIRTY DAYS' SPENDING GOES, by what it is for.
+        /* WHERE THE MONEY OWED INSIDE THIRTY DAYS GOES, by what it is for.
            IT IS `out-30d` BROKEN UP AND NOTHING WIDER, which is worth saying under a bridge that
            walks three lists: measured on the drawn page, these rows add to GBP 38,880.00, the same
            figure the tile above shows, and the GBP 375.00 of instalment parts and GBP 111.00 of
            subscriptions inside the same thirty days are in neither. A `split` reads one register,
            so that is a limit of the block and not an omission in the filter.
-           THE HEADING IS NOT RENAMED WITH THE TILES ABOVE IT: seven places in two of `apps/web`'s
-           test files find this block by these exact words, four in `lib/record/api.test.ts` and
-           three in `lib/record/money.test.ts`, and that package belongs to another agent this run. */
+           SO THE HEADING WEARS THE TILE'S WORDS AND NOT THE BRIDGE'S, which is `491e7e05`'s rename
+           reaching the third block that spoke about these same thirty days. "Where it goes, next 30
+           days" claimed the whole of what leaves, over rows that are one register and one direction,
+           and it sat between a tile reading GBP 38,880.00 and a bridge reading GBP 42,741.00 while
+           naming neither of them. THE DAYS STAY IN THE WORDS, because `owed-by-you` and `owed-to-you`
+           are this same predicate with no date at all and are called exactly "Owed by you" and "Owed
+           to you" (Home draws the second one): without the days this heading claims that book. */
         kind: 'split',
-        heading: 'Where it goes, next 30 days',
+        heading: 'Owed by you, 30 days, by what it is for',
         span: 7,
         source: 'register.obligations',
         where: 'state is open or part, direction is owed by me, due before +31d',

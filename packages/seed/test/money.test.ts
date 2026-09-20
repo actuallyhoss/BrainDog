@@ -18,7 +18,8 @@ import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
 import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, installSeed } from '../src/index.ts';
-import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, nightOf } from '../src/modules/money.ts';
+import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
+import { USE_CASES } from '../src/usecases/index.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -696,7 +697,7 @@ test('THE TILES, THE SPLIT AND THE BRIDGE ON `/p/money` ARE A PART AND A WHOLE, 
   assert.equal(owedOut.value, 3_888_000);
 
   /* AND THE SPLIT UNDER THEM IS THE OUT TILE BROKEN UP, never a third total. */
-  const split = blockOf(k, 'money', 'Where it goes, next 30 days');
+  const split = blockOf(k, 'money', 'Owed by you, 30 days, by what it is for');
   assert.equal(
     split.rows.reduce((n, r) => n + minor(r.fields.amount), 0),
     owedOut.value,
@@ -709,6 +710,88 @@ test('THE TILES, THE SPLIT AND THE BRIDGE ON `/p/money` ARE A PART AND A WHOLE, 
   assert.equal(bridgeIn - owedIn.value, 240_000, 'one part of the Halden licence arrives inside the thirty days');
   assert.equal(bridgeOut - owedOut.value - reading(k, 'installments-due-30d')!, 11_100, 'and GBP 111.00 of it is the subscriptions leg');
   assert.equal(reading(k, 'installments-due-30d'), 375_000, 'two parts of the proofing press leave inside them');
+});
+
+/**
+ * EVERY CELL ON EVERY DECLARED PAGE THAT READS `in-30d` OR `out-30d`, HELD TO THE FIGURE'S OWN NAME.
+ *
+ * THE TWO TILES ON `/p/money` WERE RENAMED BY `491e7e05` AND THREE MORE PLACES WERE LEFT SAYING THE
+ * OLD THING, found afterwards by grepping rather than by anything going red, which is the gap this
+ * closes. Both of the founder's dashboards put "Going out, 30 days" over `out-30d`, which is the
+ * bridge's words over a figure that reads one predicate (`direction is owed by me`), and neither of
+ * those pages draws a walk, so nothing on them could contradict and nothing did. A label nobody can
+ * see is wrong is the kind that survives a rename.
+ *
+ * SO THE GUARD IS OVER THE DECLARATIONS RATHER THAN OVER ONE PAGE: `MONEY_PAGES`, and every use
+ * case's own pages, which is where all three of the ones that were left live. No use case renames
+ * either figure today, which is why the house name is the whole of the expectation; the day one does,
+ * this is where the label and the name have to be brought back together on purpose.
+ */
+test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever the page is declared', () => {
+  type Cell = { metric?: unknown; label?: unknown };
+  type Page = { page?: unknown; blocks?: { cells?: Cell[] }[] };
+  const nameOf = (metric: string): string => String((METRICS[metric] as { name?: unknown } | undefined)?.name);
+  const cells: { where: string; metric: string; label: string }[] = [];
+  const walk = (where: string, pages: readonly Page[]) => {
+    for (const p of pages)
+      for (const b of p.blocks ?? [])
+        for (const c of b.cells ?? [])
+          if (c.metric === 'in-30d' || c.metric === 'out-30d') cells.push({ where: `${where} /${String(p.page)}`, metric: c.metric, label: String(c.label) });
+  };
+  walk('money-core', Object.values(PAGES) as readonly Page[]);
+  for (const u of USE_CASES) walk(u.usecase, ((u.pack?.declarations ?? []) as Page[]).filter((d) => d.page !== undefined));
+
+  /* THE COUNT IS ASSERTED BECAUSE A SWEEP THAT FINDS NOTHING PASSES EVERY LOOP BELOW IT. Six today:
+     the two tiles on `/p/money`, and two on each of the founder's Overview and Dashboard. */
+  assert.ok(cells.length >= 6, `only ${cells.length} cells read these two figures, so the sweep found the wrong declarations`);
+  const founder = cells.filter((c) => c.where.startsWith('founder '));
+  assert.equal(founder.length, 4, 'the two founder dashboards are not both in the sweep');
+  for (const c of cells) assert.equal(c.label, nameOf(c.metric), `${c.where} labels ${c.metric} "${c.label}" where the figure is called "${nameOf(c.metric)}"`);
+
+  /* AND THE CEILING ON `out-30d` IS WORDED FOR THE SAME FIGURE, because a person reading "Most going
+     out in 30 days" over a box that caps what is OWED sets it against money the figure never counts.
+     The test above it proves the rename costs nobody their saved sum. */
+  assert.equal(MONEY_TARGET_SETTINGS['out-30d']?.label, 'Most owed by you in 30 days');
+});
+
+/**
+ * A SETTING IS FOUND BY ITS KEY AND NOT BY ITS LABEL, WHICH IS THE OPPOSITE OF WHAT WAS WRITTEN DOWN.
+ *
+ * `491e7e05` LEFT THE `out-30d` CEILING CALLED "Most going out in 30 days" and gave the reason as
+ * "a setting a person has already saved is found by the words they saved it under". The record does
+ * not work that way. A saved value is written under `most_out_30d`, the key the figure names in
+ * `target.setting`, and the label is text the settings screen prints beside the box: `packConfig`
+ * reads the values by key and the manifest supplies the words over them.
+ *
+ * MEASURED HERE RATHER THAN READ OFF THE CODE, both because the claim it corrects was also read off
+ * the code and because the door matters: `normalise`, `plan`, `install`, the way a record that
+ * already holds money-core is offered a new version of it. A ceiling of GBP 1,110.00 is saved, the
+ * pack is installed again with the old wording back on that one setting, and the ceiling is still
+ * there afterwards under the new words. So renaming the label costs nobody their sum, and the reason
+ * the old wording was kept was not a reason.
+ */
+test('RENAMING A SETTING LABEL KEEPS THE CEILING A PERSON SAVED, because the key is the identity and the label is only words', async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  for (const id of ['portfolio', 'people']) assert.ok((await put(k, document(id))).ok, id);
+  assert.ok((await put(k, document('money-core'))).ok, 'money-core did not install');
+
+  const ceiling = { amount: 111_000, currency: 'GBP' };
+  const saved = k.setPackConfig('money-core', { most_out_30d: ceiling }, { actor: 'p_test' });
+  assert.ok(saved.ok, sayOf(saved));
+  assert.deepEqual(saved.value.changed, ['most_out_30d']);
+
+  const doc = document('money-core');
+  const config = { ...(doc.config as Record<string, Record<string, unknown>>) };
+  const now = String(config.most_out_30d?.label);
+  assert.notEqual(now, 'Most going out in 30 days', 'the label is still the old wording, so this test changes nothing');
+  config.most_out_30d = { ...config.most_out_30d!, label: 'Most going out in 30 days' };
+  const back = await put(k, { ...doc, version: '1.4.0', config });
+  assert.ok(back.ok, `the relabelled pack did not install: ${said(back)}`);
+
+  const read = k.packConfig('money-core');
+  assert.ok(read.ok, sayOf(read));
+  assert.deepEqual(read.value.values.most_out_30d, ceiling, 'a label change took the saved ceiling with it');
+  assert.equal(read.value.config.most_out_30d?.label, 'Most going out in 30 days', 'the words over the box are the ones the manifest brought');
 });
 
 /**
