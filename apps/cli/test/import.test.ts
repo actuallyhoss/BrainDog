@@ -1,6 +1,13 @@
 /**
  * `braindog import legacy`: the mapping of a synthetic export, and the import applied twice to a record kept in
  * memory, which must update and never add a second row. Every value is made up (`legacy-export.ts`).
+ *
+ * WHAT `memoryRecord` CANNOT HOLD, SAID HERE SO NOBODY READS THESE AS THE WHOLE STORY. It accepts any field on any
+ * register, so the mapping is checked against the real declarations by `tools/gates/import.mjs` and not here; and its
+ * `list` and `governance` answer every row in one page whatever limit or cursor they are given, so neither of the two
+ * paging failures found on 2026-09-20 could fail a test in this file. Those are measured against the kernel in
+ * `import-at-scale.test.ts`. What is left here is the planner, the report and the command's own refusals, which is
+ * what a fake door can honestly be asked about.
  */
 
 import { test } from 'node:test';

@@ -10,6 +10,10 @@
  * `client_id`, a question in its body), each list is read once before writing, and a row found by its key is updated
  * only in the fields that differ. A question already asked is never asked again, answered or not.
  *
+ * AND THAT CLAIM IS ONLY AS GOOD AS THOSE TWO READS BEING COMPLETE, so both of them page to the end and neither treats
+ * a refusal as an empty answer: a row this import did not see is a row it writes again. See `PartlyRead` and
+ * `readDecide`, each of which was measured adding duplicates before it was written.
+ *
  * IT SAYS WHAT IT DID. Added, updated and unchanged by list, each row that changes with the fields that change, the
  * questions asked, everything left out with its reason, and every row the record refused with the record's own sentence.
  * `--dry-run` reads and reports and writes nothing.
@@ -23,7 +27,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { refused, type Result } from '@braindog/ports';
+import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
 import { pollPack } from '@braindog/seed/usecases/founder-poll';
@@ -46,7 +50,7 @@ export type Door = {
   list: (args: { register: string; limit?: number; cursor?: string | null }) => Promise<Result<{ rows: unknown[]; cursor: string | null }>>;
   create: (args: { register: string; fields: Record<string, unknown>; note?: string }) => Promise<Result<unknown>>;
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
-  governance: (args: { register?: string; status?: string; limit?: number }) => Promise<Result<unknown>>;
+  governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
   propose: (args: { question: string; body_kind: 'options' | 'pack'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
 };
 
@@ -107,7 +111,36 @@ const keyOf = (register: string, fields: Record<string, unknown>): string | null
 
 class Unreachable extends Error {}
 
-/** Every row of one list, page by page. */
+/**
+ * A LIST THIS IMPORT COULD NOT READ TO THE END, which is a different thing from a list with nothing in it.
+ *
+ * `readAll` used to break out of its loop on any refusal but `UNREACHABLE` and hand back the pages it already had.
+ * Everything below then read the rows it never saw as absent and wrote them again, and the whole of "re-running
+ * updates, it never adds a second row" rests on this one read having seen every row. Measured against the kernel over
+ * an in-memory record (`test/import-at-scale.test.ts`): 620 rows imported, the bearer going stale after page one the
+ * way a self-host answers a credential it no longer knows, and the second run reported 500 unchanged and 120 added,
+ * leaving 740 rows where 620 had been. No refusal was printed, because nothing had refused a write.
+ *
+ * SO IT IS THROWN, AND IT IS THROWN BEFORE ANY WRITE. Every list is read in full before the first row is sent, so a
+ * read that stopped part way ends the run with the record untouched and the person told to run it again.
+ */
+class PartlyRead extends Error {
+  register: string;
+  fix: string;
+  constructor(register: string, fix: string) {
+    super(`${register}: ${fix}`);
+    this.register = register;
+    this.fix = fix;
+  }
+}
+
+/**
+ * Every row of one list, page by page.
+ *
+ * THE PAGE BUDGET IS A REFUSAL AND NOT A `break`, for the same reason: the record pages a list at 500 rows, so a
+ * thousand pages is half a million rows in one list, and a run that reached it would have been carrying on with an
+ * answer that was missing everything past it.
+ */
 async function readAll(door: Door, register: string): Promise<Row[]> {
   const out: Row[] = [];
   let cursor: string | null = null;
@@ -115,13 +148,56 @@ async function readAll(door: Door, register: string): Promise<Row[]> {
     const got = await door.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
     if (!got.ok) {
       if (unreachable(got)) throw new Unreachable();
-      break;
+      throw new PartlyRead(NAMES[register] ?? register, fixOf(got));
     }
     for (const r of got.value.rows) if (isObj(r) && typeof r.id === 'string' && isObj(r.fields)) out.push(r as unknown as Row);
     cursor = got.value.cursor;
-    if (cursor === null) break;
+    if (cursor === null) return out;
   }
-  return out;
+  throw new PartlyRead(NAMES[register] ?? register, `This list is longer than an import reads in one run (${String(out.length)} rows and more).`);
+}
+
+/** The keys of every question already asked, and every pack already offered or installed. */
+type Decide = { asked: Set<string>; installs: Set<string> };
+
+/** The most rows one governance read answers with: the record clamps it there (`packages/kernel/src/govern.ts`). */
+const DECIDE_PAGE = 200;
+
+/**
+ * Everything on Decide, A PAGE AT A TIME, because the question this read answers is "has he already been asked this".
+ *
+ * ONE READ OF 200 WAS THE WHOLE OF IT, AND THE CEILING IS A LIFETIME ONE: every draft Spark filed, every pack offered
+ * and every question answered is still a row in the suggestion table, and the read is `status: 'all'` because a
+ * question he has ANSWERED is exactly the one that must not come back. His record holds 49 today. Measured against
+ * the kernel (`test/import-at-scale.test.ts`): with 200 suggestions in the table a re-import asks nothing, and with
+ * 201 the import's own question, which is the oldest row of them, falls off the end of the first page and is asked a
+ * second time. So the answer he already gave is thrown away and the question arrives again, on the one screen he is
+ * asked to act on.
+ *
+ * THE CURSOR IS THE ID OF THE LAST ROW OF THE PAGE ABOVE, and a page shorter than the limit is the last one, which is
+ * the contract `packages/record/test/paging.test.ts` holds the record to.
+ */
+async function readDecide(door: Door): Promise<Result<Decide>> {
+  const asked = new Set<string>();
+  const installs = new Set<string>();
+  let cursor: string | undefined;
+  for (let pages = 0; pages < 1000; pages++) {
+    const got = await door.governance({ register: 'suggestion', status: 'all', limit: DECIDE_PAGE, ...(cursor === undefined ? {} : { cursor }) });
+    if (!got.ok) return got;
+    if (!Array.isArray(got.value)) return ok({ asked, installs });
+    for (const s of got.value)
+      if (isObj(s) && isObj(s.body)) {
+        if (typeof s.body.from === 'string') asked.add(s.body.from);
+        if (typeof s.body.install === 'string') installs.add(s.body.install);
+      }
+    if (got.value.length < DECIDE_PAGE) return ok({ asked, installs });
+    const last = got.value.at(-1);
+    /* A PAGE OF THE LIMIT AND NO ID TO PAGE ON is a read that cannot be finished, and carrying on with what it has is
+       the bug this function was written for. */
+    if (!isObj(last) || typeof last.id !== 'string') return no('VALUE_MALFORMED', 'A page of Decide came back with no id to read the next page from.', { at: 'cursor' });
+    cursor = last.id;
+  }
+  return no('OUT_OF_BOUNDS', `Decide holds more than ${String(DECIDE_PAGE * 1000)} rows, which is more than an import reads in one run.`);
 }
 
 /**
@@ -257,19 +333,27 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     else report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
   }
 
-  const asked = new Set<string>();
-  const installs = new Set<string>();
+  /**
+   * WHAT DECIDE ALREADY HOLDS, AND ASKING NOTHING WHEN THAT CANNOT BE READ.
+   *
+   * A refusal here used to leave both sets empty and carry on, which reads as "nothing has ever been asked" and files
+   * the whole plan's questions again. It cannot be thrown the way a partial list read is: the rows are already
+   * written by this point, and an exception would take the report with it. Asking again is the harm, so the run
+   * stops asking, files no poll, and says which read failed under "Refused by the record".
+   */
+  let decide: Decide | null = { asked: new Set(), installs: new Set() };
   if (plan.asks.length > 0 || plan.polls.length > 0) {
-    const got = await door.governance({ register: 'suggestion', status: 'all', limit: 200 });
-    if (!got.ok && unreachable(got)) throw new Unreachable();
-    if (got.ok && Array.isArray(got.value))
-      for (const s of got.value)
-        if (isObj(s) && isObj(s.body)) {
-          if (typeof s.body.from === 'string') asked.add(s.body.from);
-          if (typeof s.body.install === 'string') installs.add(s.body.install);
-        }
+    const got = await readDecide(door);
+    if (got.ok) decide = got.value;
+    else if (unreachable(got)) throw new Unreachable();
+    else {
+      report.refused.push({ label: 'What this record has already been asked', register: 'Decide', fix: fixOf(got) });
+      decide = null;
+    }
   }
-  if (plan.asks.length > 0) {
+  const asked = decide?.asked ?? new Set<string>();
+  const installs = decide?.installs ?? new Set<string>();
+  if (decide !== null && plan.asks.length > 0) {
     for (const ask of plan.asks) {
       if (asked.has(ask.key)) {
         report.alreadyAsked++;
@@ -290,7 +374,7 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
   }
 
   /* A POLL IS A PACK TO INSTALL, filed once. Its project and organisation are the rows this import wrote or found. */
-  for (const poll of plan.polls) {
+  for (const poll of decide === null ? [] : plan.polls) {
     const pack = `poll-${poll.id}`;
     if (installs.has(pack)) {
       report.polls.before++;
@@ -484,6 +568,14 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
     if (e instanceof Unreachable) {
       io.say(`${to.key} stopped answering part way. Run the import again: rows already written are found and not added twice.`);
       return 3;
+    }
+    /* NOTHING WAS WRITTEN, AND THAT IS THE POINT OF SAYING SO. Every list is read before the first row is sent, so a
+       read that stopped part way leaves the record exactly as it was. An import that carried on would be working from
+       a list it had only half seen, and would add a second copy of every row it did not reach. */
+    if (e instanceof PartlyRead) {
+      io.say(`${to.key} answered part of ${e.register} and then refused: ${e.fix}`);
+      io.say('Nothing was written. An import that cannot read a list to the end cannot tell what is already there, and would write those rows a second time.');
+      return 1;
     }
     throw e;
   }
