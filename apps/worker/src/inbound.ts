@@ -122,6 +122,23 @@ const secret = (): string => {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
+/**
+ * How recent an owner's last sign-in must be to move where a record's mail arrives: `12 §6`.
+ *
+ * THE KERNEL'S OWN FIFTEEN MINUTES, TO THE MILLISECOND. `FRESH` in `packages/record/src/index.ts` guards
+ * the four doors whose answer the browser that asked cannot take back: the vault gate and `deviceApprove`
+ * hand out something that then works from anywhere, and `restore` and `deleteRecord` throw away what
+ * nobody can put back. A forwarding address is both at once. `FRESH` is not exported, and exporting it to
+ * be read once here would put a number the kernel decides into this file's import list; the value is in
+ * `12 §6` and both copies cite it. If the two ever disagree, the kernel is right.
+ *
+ * AND THE CLOCK IS THE WALL CLOCK, not an injected one. `provedAt` is epoch milliseconds stamped on a
+ * session row by the Directory's own `Date.now()` (`sessionContext` in `packages/host/src/auth.ts`), so
+ * the only clock that can be compared with it is the same one; a fifth key on `InboundDoor` that no
+ * deployment would ever set differently is a seam for a test and not for a caller.
+ */
+const FRESH = 15 * 60_000;
+
 /** The SHA-256 of a token, in hex: the only half of it that ever leaves this file. */
 const digest = async (token: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -129,10 +146,11 @@ const digest = async (token: string): Promise<string> =>
 /**
  * Mint the record's forwarding address, or take it away.
  *
- * THE ORDER: the path, the method, a bearer, the page, the level, and only then the write. It is
- * `serveKeys`'s order for `serveKeys`'s reasons, and the two share nothing else: this door takes no
+ * THE ORDER: the path, the method, a bearer, the page, the level, the proof, and only then the write. It
+ * is `serveKeys`'s order for `serveKeys`'s reasons, and the two share nothing else: this door takes no
  * body at all, and the record it acts on is the one the session named, so there is no argument here
- * to get wrong and no way to name somebody else's record.
+ * to get wrong and no way to name somebody else's record. The proof is last of the six because it is the
+ * only one whose remedy is an action rather than a correction: `FRESH` above says what it costs.
  *
  * AN OWNER AND NOTHING BELOW IT. The address is where a bank's mail lands, so whoever can change it
  * can redirect a record's incoming statements: that is the owner's decision in the same way the
@@ -175,6 +193,22 @@ export async function serveInbound(request: Request, door: InboundDoor, ctx: Cal
   if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
     return refusal(403, { code: 'LEVEL_REQUIRED', fix: 'Only an owner of this record can change where its mail arrives.', at: 'principal' });
   if (ctx.credentialed === false) return refusal(403, NO_MINT_SESSION);
+
+  /* AND A PROOF IN THE LAST FIFTEEN MINUTES, WHICH IS THE RUNG THIS DOOR WAS MISSING. Every other
+     owner-only door in this tree that hands out something working from anywhere asks for one, in the same
+     words and the same order: the vault gate, `deviceApprove`, `restore` and `deleteRecord`, all in
+     `packages/record/src/index.ts`. A cookie is thirty days of standing access, and this door hands out a
+     live credential and revokes the previous one in the same call, so without this a stranger at an open
+     laptop takes a record's bank mail and stops it arriving without proving they are anybody.
+
+     BOTH DOORS, BECAUSE BOTH ARE LOSSES, and the revocation is the worse of the two: it is a bank's mail
+     silently not arriving. Asking for a proof to mint and not to revoke would make the damaging call the
+     cheap one.
+
+     AND ABSENT IS NOT STALE. `provedAt` reaches a context only from a session row, so undefined is a
+     caller with no session at all, which `credentialed` a line above has already had its say about. */
+  if (ctx.provedAt !== undefined && Date.now() - ctx.provedAt > FRESH)
+    return refusal(403, { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to change where this record takes its mail.', at: 'principal' });
 
   /* REVOCATION IS THE SAME WRITE WITH NOTHING IN IT, and it answers no value: there is nothing to
      show, and the record now takes no forwarded mail at all until somebody mints again. */

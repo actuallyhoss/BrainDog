@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Refusal, Result } from '@braindog/ports';
 import { serveIngest, type IngestArrival } from '@braindog/host';
+import { sessionContext } from '@braindog/host/auth';
 import type { CallContext } from '@braindog/record';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 
@@ -724,4 +725,259 @@ test('A WRITE THE DIRECTORY REFUSES IS NOT AN ADDRESS ANYBODY WAS SHOWN', async 
   assert.equal(JSON.parse(body).refusal.code, 'OUT_OF_BOUNDS');
   assert.equal(/[A-Za-z0-9_-]{43}/u.test(JSON.parse(body).refusal.fix ?? ''), false, 'the refusal quoted something token-shaped back');
   assert.equal(body.includes('token'), false, 'a refused mint answered a token anyway');
+});
+
+/**
+ * THE RUNG EVERY OTHER SECRET-HANDING DOOR IN THIS TREE HAS, AND THIS ONE DID NOT.
+ *
+ * `packages/record/src/index.ts` asks for a proof under fifteen minutes old in four places, and all four
+ * are doors whose answer the browser that asked cannot take back: the vault gate at `:1068` and
+ * `deviceApprove` at `:3717` hand out something that then works from anywhere, and `restore` at `:3862`
+ * and `deleteRecord` at `:3914` throw away what nobody can put back. Each spends a
+ * sentence on the same reason, and the vault's is the shortest: a cookie is thirty days of standing
+ * access, and the vault is the one place a laptop left open on a desk should not be enough. A forwarding
+ * address is that kind of answer twice over. Minting one hands out a live credential, and minting again
+ * is how the previous one is revoked, so a stranger at somebody's open laptop could both take the mail
+ * and stop it arriving without ever proving they are the owner.
+ *
+ * SO THE SHAPE IS COPIED AND NOT INVENTED: `provedAt` absent passes, older than fifteen minutes is
+ * `NEEDS_BROWSER_SESSION` at `principal`, and it is decided after the owner check so that somebody who is
+ * not an owner is told that instead. The one difference is the clock, which is `Date.now()` here rather
+ * than an injected one, for the reason the constant's comment in `inbound.ts` gives.
+ *
+ * BOTH DOORS, BECAUSE BOTH ARE LOSSES. Revoking is the half that makes a bank's mail silently stop
+ * arriving, and a door that asked for a proof to mint and not to revoke would be a door where the
+ * damaging call is the cheap one.
+ *
+ * WATCHED FAIL FIRST AND THEN BY MUTATION, on 2026-09-21. Written against the door as it stood, this test
+ * failed with `200 !== 403` at the mint, which is a stale owner minting a live mail address. With the line
+ * in place and its condition prefixed `false &&`, it fails there again and `EVERY ANSWER THE MINT DOOR
+ * GIVES` fails on the sixth status it expects, while the other 173 tests in this package pass.
+ */
+test('A PROOF OLDER THAN FIFTEEN MINUTES MINTS NOTHING AND REVOKES NOTHING', async () => {
+  const { d, record } = studio();
+  const { door, wrote } = mintDoor(d, record);
+  const refusalOf = async (res: Response): Promise<{ code: string; at?: string }> => ((await res.json()) as { refusal: { code: string; at?: string } }).refusal;
+
+  /* FIFTEEN MINUTES AND A MILLISECOND, and the boundary itself is deliberately not asserted: the door
+     reads its own `Date.now()` after this line runs, so a proof stamped exactly fifteen minutes ago is a
+     coin toss about how long the two statements took and a test nobody can trust when it fails. */
+  const stale = { ...OWNER, provedAt: Date.now() - 15 * 60_000 - 1 };
+  for (const which of ['mint', 'revoke']) {
+    const res = await serveInbound(mintAsk(which), door, stale);
+    assert.equal(res.status, 403, which);
+    const said = await refusalOf(res);
+    assert.equal(said.code, 'NEEDS_BROWSER_SESSION', which);
+    assert.equal(said.at, 'principal', which);
+  }
+  /* AND NEITHER REFUSAL WAS A WRITE. A stale proof that rotated the address on its way to saying no
+     would have revoked a working one, which is the one outcome worse than minting. */
+  assert.deepEqual(wrote, [], 'a stale proof reached the Directory');
+
+  /* AND A COLLEAGUE WITH A STALE PROOF IS TOLD THE LEVEL AND NOT THE PROOF, which is the whole of what
+     the check's POSITION decides, and the one claim the paragraph above this test made without testing:
+     measured on 2026-09-21 by lifting the line above the level check, with this assertion not yet
+     written, and all 26 tests in the file stayed green while a `decide` colleague was sent off to sign
+     in again for a door that signing in again does not open. `LEVEL_REQUIRED` is the remedy they
+     actually have, which is to ask an owner. With the assertion here that mutation fails on this line. */
+  const colleague = await serveInbound(mintAsk('mint'), door, {
+    principal: { kind: 'person', id: 'p_01J8ZC0000000000000000000C', level: 'decide' },
+    provedAt: 0,
+  });
+  assert.equal(colleague.status, 403);
+  assert.equal((await refusalOf(colleague)).code, 'LEVEL_REQUIRED', 'the proof is decided before the level, so a colleague is told to prove something that will not help');
+  assert.equal(d.recordFor('0'.repeat(64)), null);
+
+  /* A PROOF FROM A MINUTE AGO IS A PERSON WHO IS STILL THERE. */
+  const fresh = await serveInbound(mintAsk('mint'), door, { ...OWNER, provedAt: Date.now() - 60_000 });
+  assert.equal(fresh.status, 200, 'a proof a minute old was refused, so the window is not fifteen minutes');
+
+  /* AND A CONTEXT THAT CARRIES NO PROOF AT ALL STILL MINTS, which is the kernel's own `!== undefined`
+     rather than a looser reading of it: `provedAt` is set only from a session row, so absent is a host
+     that cannot say when anybody proved anything, and refusing it here would close the door on a caller
+     `credentialed` already covers. Every other test in this section is that case. */
+  assert.equal((await serveInbound(mintAsk('mint'), door, OWNER)).status, 200);
+
+  /* AND THE GATE IS NOT DEAD CODE ON THE HOSTED WORKER, which is the half a test of the door alone cannot
+     see: a check against a field nothing ever sets refuses nobody, and every case above sets it by hand.
+     So the context is built by the function the Worker itself builds one with. `doorOf` answers a session
+     door with `sessionContext(out.body, held)` (`session.ts:67`), whose only source for `provedAt` is the
+     session row's `authed_at`, which rotation never moves. */
+  const session = sessionContext({ person: 'p_01J8ZC0000000000000000000B', email: 'ada@example.com', record, provedAt: 1 }, { level: 'owner', registers: null, levels: {} });
+  assert.equal(session.provedAt, 1, 'a session context carries no proof, so the door above refuses nobody');
+  assert.equal((await serveInbound(mintAsk('mint'), door, session as CallContext)).status, 403, 'a session last proved in 1970 minted an address');
+});
+
+/**
+ * `nostore.test.ts` STATES THIS RULE FOR THE WHOLE WORKER AND CAN SEE ONE FILE OF IT.
+ *
+ * That test reads `src/index.ts` by name and asserts that every `new Response` in it carries
+ * `cache-control`, because `33 §4` asks for `no-store` on all of `/api/*` and `route()` hands back what it
+ * is given. `/api/inbound/*` is answered in a second file, which that test cannot see and its own comment
+ * does not know exists, so the rule reached this door by nobody checking. It matters more here than
+ * anywhere else it holds: the body of a 200 is the only copy of a live credential, the path names no
+ * record, and a shared cache keyed on it would hand one person's forwarding address to the next.
+ *
+ * DRIVEN AT EVERY STATUS RATHER THAN READ, because what the rule is about is the answers and not the
+ * source: reading the text proves one constructor sets a header, and a branch that returned a bare
+ * `Response` somewhere else would read as fine. The text is then checked for the one thing driving cannot
+ * show, that there is a single place in the file where a `Response` is made at all.
+ */
+test('EVERY ANSWER THE MINT DOOR GIVES CARRIES no-store, AT EVERY STATUS IT HAS', async () => {
+  const { d, record } = studio();
+  const { door } = mintDoor(d, record);
+  const reader: CallContext = { principal: { kind: 'person', id: 'p_01J8ZC0000000000000000000C', level: 'read' } };
+
+  const answers = [
+    await serveInbound(mintAsk('show'), door, OWNER),
+    await serveInbound(mintAsk('mint', { method: 'GET' }), door, OWNER),
+    await serveInbound(mintAsk('mint', { bearer: 'Bearer rec_01J8ZC0000000000000000000A.not-a-secret' }), door, OWNER),
+    await serveInbound(mintAsk('mint', { origin: 'https://evil.example' }), door, OWNER),
+    await serveInbound(mintAsk('mint'), door, reader),
+    await serveInbound(mintAsk('mint'), door, { ...OWNER, provedAt: 0 }),
+    await serveInbound(mintAsk('revoke'), door, OWNER),
+    await serveInbound(mintAsk('mint'), door, OWNER),
+  ];
+  /* THE LIST IS ASSERTED AS WELL AS THE HEADERS. A refusal that moved would otherwise quietly leave one
+     of these eight cases unvisited and the loop below would keep passing over seven. */
+  assert.deepEqual(
+    answers.map((r) => r.status),
+    [404, 405, 403, 403, 403, 403, 200, 200],
+  );
+
+  /* AND THE 422, WHICH NEEDS A RECORD THE DIRECTORY REFUSES and therefore its own directory: closing the
+     one above would leave every case after it refused for the wrong reason. */
+  const closed = studio();
+  value(closed.d.close(closed.record));
+  answers.push(await serveInbound(mintAsk('mint'), mintDoor(closed.d, closed.record).door, OWNER));
+  assert.equal(answers[answers.length - 1]?.status, 422);
+
+  for (const res of answers) {
+    assert.equal(res.headers.get('cache-control'), 'no-store', `${res.status} is cacheable`);
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff', String(res.status));
+    assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8', String(res.status));
+  }
+
+  /* AND ONE PLACE IN THE FILE MAKES A `Response` AT ALL, which is what makes one list of headers cover
+     every answer above and the ones nobody has written yet. `nostore.test.ts` asserts the same property
+     of `index.ts` by naming its `json` helper. */
+  const src = readFileSync(fileURLToPath(new URL('../src/inbound.ts', import.meta.url)), 'utf8');
+  assert.equal([...src.matchAll(/new Response\(/gu)].length, 1, 'inbound.ts builds a Response outside reply(), where the headers above do not reach');
+});
+
+/* ── the loop, through the only surface a deployed Worker has ─────────────── */
+
+/**
+ * The methods `Directory$` declares, read out of the class in `index.ts`.
+ *
+ * A STUB CAN CALL WHAT THE CLASS DECLARES AND NOTHING ELSE, which is the single fact that kept this
+ * surface at 404 with both halves of it finished and green. `createDirectory` had `recordFor` and
+ * `inbound$`; `Directory$` passed on only the first; a `Directory` is reachable from nowhere but inside
+ * its own Durable Object. Every test above this line that held a `Directory` in its hand stepped over the
+ * boundary production has to cross, which is how 203 lines of new test passed over a shut door.
+ *
+ * IT IS A NARROWER SET THAN THE DIRECTORY'S, AND THE ASSERTIONS SAY SO. `person$`, `provision`, `claimed`
+ * and `bad` are real methods of `createDirectory` that this class keeps to itself, each one reached only
+ * from inside `prepare` and `nameRecord`, so a set holding any of them would be the wrong object read and
+ * every conclusion below it worthless. `resolve` is deliberately not in that list: the class does pass
+ * that one on, which is why a guess at what a Durable Object exposes is no substitute for reading it.
+ */
+function stubSurface(): ReadonlySet<string> {
+  const from = SOURCE.indexOf('export class Directory$');
+  /* THE CLOSING BRACE IN COLUMN ONE, AND THE LINE ENDING IS NOT ASSUMED. A checkout with CRLF endings
+     matched no `\n}\n` at all and failed as "no Directory$ class", which is a sentence about the wrong
+     thing: measured on 2026-09-21 by rewriting the file through a tool that translates newlines. */
+  const to = from + (/\r?\n\}\r?\n/u.exec(SOURCE.slice(from))?.index ?? -1);
+  assert.ok(from > 0, 'index.ts declares no Directory$ class, so this read the wrong file');
+  assert.ok(to > from, 'the Directory$ class has no closing brace in column one, so this read past the end of it');
+  /* AT ONE INDENT AND NOWHERE ELSE. A method of the class is two spaces in; a name matched deeper would be
+     a call inside a body, which is the opposite of what a stub can reach. */
+  const names = new Set([...SOURCE.slice(from, to).matchAll(/^ {2}(?:async )?([A-Za-z][\w$]*)\(/gmu)].map((m) => m[1] as string));
+  names.delete('constructor');
+  assert.ok(names.size > 8, `Directory$ declares ${names.size} methods, so the class body was not read`);
+  for (const absent of ['person$', 'provision', 'claimed', 'bad'])
+    assert.equal(names.has(absent), false, `${absent} reads as a method of Directory$, so this is not that class`);
+  return names;
+}
+
+/**
+ * A stub over `Directory$`: what the class declares, and a throw for what it does not.
+ *
+ * WHAT THE PLATFORM DOES WITH A CALL THE CLASS HAS NOT GOT IS `is not a function`, and `nameRecord`'s own
+ * comment in `index.ts` records this tree paying for it once already: `name` was the stub's own property,
+ * so every `/auth/provision` made a record, answered 500, and left the Directory naming nothing. So a name
+ * outside the set throws here instead of reaching the real object.
+ *
+ * AND THE CLASS'S RETURN SHAPES AND NOT THE DIRECTORY'S. `Directory$.inbound$` unwraps the `Result` into
+ * `Refusal | null` before it crosses the boundary, so a test wired to the `Result` would be driving a
+ * shape no deployment ever sees.
+ */
+function asStub(
+  d: Directory,
+  surface: ReadonlySet<string>,
+): { knows(rec: string): boolean; recordFor(hash: string): string | null; inbound$(rec: string, hash: string | null): Refusal | null } {
+  const over = <T>(method: string, f: () => T): T => {
+    if (!surface.has(method)) throw new TypeError(`directory.${method} is not a function: Directory$ declares no ${method}`);
+    return f();
+  };
+  return {
+    knows: (rec) => over('knows', () => d.knows(rec)),
+    recordFor: (hash) => over('recordFor', () => d.recordFor(hash)),
+    inbound$: (rec, hash) =>
+      over('inbound$', () => {
+        const out = d.inbound$(rec, hash);
+        return out.ok ? null : refused(out);
+      }),
+  };
+}
+
+/**
+ * Mint, then post a forwarded message to the address that came back, over nothing but RPC.
+ *
+ * THIS IS THE LOOP THAT WAS OPEN, and the reason it stayed open through two commits that each closed half
+ * of it: the door could resolve a digest, the Directory could store one, the mint could ask for one, and
+ * the one call that joined them was not on the class. Driven by the auditor on 2026-09-21: state A, the
+ * only state a deployed Worker could be in, was 404 with no row and `recordFor` answering `null` for every
+ * digest for ever.
+ *
+ * MEASURED BY MUTATION ON 2026-09-21. With `inbound$` deleted from `Directory$` the mint below dies on
+ * `Directory$ declares no inbound$`, which is the bare 500 a hosted mint would have answered, and the
+ * whole rest of this file stays green: `THE WORKER HAS A DOOR THAT MINTS AN ADDRESS` keeps passing,
+ * because the `inbound$(` it greps for is the CALL in `mailAddress` and not the method on the class.
+ */
+test('AN ADDRESS MINTED OVER THE RPC SURFACE A DEPLOYED WORKER HAS TAKES MAIL AT ONCE', async () => {
+  const surface = stubSurface();
+  const { d, record } = studio();
+  const directory = asStub(d, surface);
+
+  /* THE MINT'S HALF, WIRED AS `mailAddress` WIRES IT: the record is the one the session resolved to, and
+     the `Refusal | null` the class answers becomes the `Result` this door speaks in. */
+  const door: InboundDoor = {
+    origins: new Set([ORIGIN]),
+    registers: async (hash) => {
+      const stop = await directory.inbound$(record, hash);
+      return stop === null ? { ok: true as const, value: null } : { ok: false as const, refusal: stop };
+    },
+  };
+  const token = await minted(await serveInbound(mintAsk('mint'), door, OWNER));
+
+  /* AND THE ARRIVAL'S, WIRED AS `arrivals` WIRES IT: `recordFor` and then `knows`, two calls to the same
+     object, and no other part of the Directory reachable from here at all. */
+  const { door: arrival, seen } = mailDoor({ recordFor: (h) => directory.recordFor(h), knows: (r) => directory.knows(r) });
+  const delivered = await serveIngest(mail(token), arrival);
+
+  assert.equal(delivered.status, 202, 'a message to an address minted over RPC reached nothing');
+  assert.equal(await delivered.text(), '');
+  assert.equal(seen.looked[0], await sha256(token), 'the door looked up something other than the digest of the address it was given');
+  assert.equal(seen.arrives[0]?.[0], record, 'the message reached no record or the wrong one');
+  assert.equal(seen.arrives[0]?.[1].channel, 'email');
+  assert.equal(seen.arrives[0]?.[1].body, MESSAGE, 'the whole message is the body, headers included');
+
+  /* AND REVOKING OVER THE SAME SURFACE SHUTS IT AGAIN, which is the other write the class had to carry. */
+  assert.equal((await serveInbound(mintAsk('revoke'), door, OWNER)).status, 200);
+  assert.equal((await serveIngest(mail(token), arrival)).status, 404, 'a revoked address still takes mail through the real surface');
+
+  /* THE FACADE IS LOAD-BEARING, asserted rather than assumed: a method the class does not declare throws
+     the way the platform throws at a stub, and that throw is what the 404 above was made of. */
+  assert.throws(() => asStub(d, new Set(['knows'])).inbound$(record, TOKEN_SHA), /Directory\$ declares no inbound\$/u);
 });
