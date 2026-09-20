@@ -168,6 +168,35 @@ test('and it is said on a stat block too, which returns before every other check
   });
 });
 
+test('A STAT CELL WITH A PARAMETER NARROWS WHAT IT HOLDS, and the tile could not tell a new project from a settled one', () => {
+  /* This is the screen the field was added for. A `stat` cell names `open-what:<name>`, `readBlock`
+     fills the parameter into the declaration, and `held` was counted over the whole register
+     afterwards, so a name with no row of its own came back as `rows: 0, held: 3`. Zero matched out
+     of three held reads as "everything here is settled", which on a project page that has never had
+     a row is the opposite of what the reader needs to be told. */
+  return record({
+    id: 'metric.open-what',
+    kind: 'metric',
+    body: {
+      metric: 'open-what',
+      name: 'Open, one item',
+      source: 'register.obligations',
+      where: 'state is open, what is {{it}}',
+      value: { count: 'what' },
+      format: 'int',
+      target: { lte: 9 },
+      window: '30d',
+      compare: 'none',
+    } as never,
+  }, pageOf({ kind: 'stat', cells: [{ metric: 'open-what:Nowhere' }, { metric: 'open-what:Small' }] })).then(({ k, sql }) => {
+    const got = blocks(k.page('invoicing'))[0] as { readings?: { metric: string; reading: { rows: number; held: number } | null }[] };
+    const held = Object.fromEntries((got.readings ?? []).map((r) => [r.metric, [r.reading?.rows, r.reading?.held]]));
+    assert.deepEqual(held['open-what:Nowhere'], [0, 0], 'a name with no row of its own holds nothing');
+    assert.deepEqual(held['open-what:Small'], [1, 1], 'the one row of that name is both matched and held');
+    sql.close();
+  });
+});
+
 /* ── `order:` ────────────────────────────────────────────────────────────── */
 
 test('A BLOCK SORTS ITS QUERY, and the kernel could not be asked to sort at all', () => {

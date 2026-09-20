@@ -18,6 +18,7 @@ import { fixOf } from '@braindog/ports';
 import {
   evaluateMetric,
   deltaFrom,
+  fill,
   meets,
   openRecord,
   snapshot,
@@ -254,6 +255,143 @@ test('AN EMPTY REGISTER AND AN EMPTY MATCH ARE TWO DIFFERENT ZEROES, and a readi
   const after = value<Reading>(k.metric(OVERDUE));
   assert.equal(after.rows, 2, 'the deleted row was never one the predicate matched');
   assert.equal(after.held, 4, 'a deleted row is not held by anybody');
+  sql.close();
+});
+
+test('A PARAMETERISED FIGURE HOLDS ITS PARAMETER, and it held the whole register instead', async () => {
+  /* `held` was added so a tile can tell "nothing matched" from "nothing is there", and a project
+     page is the screen that needs it most: it is the one most likely to be new and empty. A cell
+     reading `party-owed:Fenwick` goes through `fill(decl, null, param)`, which puts the name into
+     the predicate, and `held` was a bare `count(*)` over the register. Measured against this seed
+     before the repair, with five obligations and nothing at all for Fenwick:
+
+       party-owed:Fenwick   {"rows":0,"held":5}
+
+     Five held and none matched is "nothing is owed by Fenwick", so the tile would have drawn a
+     settled account for a party with no invoice in the record. A parameter is not a filter over the
+     register, it is WHICH register the figure is about, so the rows it admits are the scope. */
+  const { k, sql } = await record();
+  const template: MetricDecl = {
+    metric: 'party-owed',
+    name: 'Owed, one party',
+    source: 'register.obligations',
+    where: 'state is open or part, party is {{it}}',
+    value: { count: 'id' },
+    target: { lte: 5 },
+    window: '30d',
+    compare: 'none',
+    format: 'int',
+  };
+  const read = (param: string) => value<Reading>(k.metric(fill(template, null, param) as MetricDecl));
+
+  const fresh = read('Fenwick');
+  assert.equal(fresh.rows, 0, 'Fenwick has no obligations at all');
+  assert.equal(fresh.held, 0, 'a party with no rows holds none, and the whole register is not its scope');
+
+  /* AND THE FILTER STILL DECIDES THE FIGURE INSIDE THE PARAMETER'S ROWS. Ravensworth has two
+     obligations, one open and one paid, so the two numbers have to differ: `held` is the two the
+     parameter admits and `rows` is the one the rest of the predicate kept. */
+  const busy = read('Ravensworth');
+  assert.equal(busy.rows, 1, 'one of Ravensworth two obligations is still open');
+  assert.equal(busy.held, 2, 'the parameter narrows the scope and the rest of the predicate does not');
+  assert.notEqual(fresh.held, busy.held, 'the two zeroes are one zero again for a parameterised figure');
+
+  /* A FIGURE WITH NO PARAMETER IS UNCHANGED: its scope is still the register. */
+  assert.equal(value<Reading>(k.metric(OVERDUE)).held, 5, 'an unparameterised figure still holds the register');
+  sql.close();
+});
+
+test('AND THE PARAMETER IS A PROJECT BY NAME, which is the shape every shipped one has', async () => {
+  /* The three parameterised figures in the seed (`project-owed`, `project-cost`, `project-open`) all
+     say `thing is {{it}}` over a REF, so the name has to be resolved against the register it points
+     at before either the figure or its scope can be counted. Both go through one `predicateOf` with
+     one `refByTitle`, which is why the clause set aside as `within` cannot resolve to a different
+     row than the same clause inside `where` did. Measured here rather than argued: a project with
+     one lease reads `held: 1` and a project with none reads `held: 0`, out of three leases. */
+  const { k, sql } = await record();
+  assert.ok(
+    (
+      await k.install([
+        { id: 'register.things', kind: 'register', body: { id: 'things', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } },
+        {
+          id: 'register.leases',
+          kind: 'register',
+          body: {
+            id: 'leases',
+            name: 'Leases',
+            title: 'what',
+            fields: [
+              { id: 'what', type: 'text', required: true },
+              { id: 'state', type: 'enum', values: ['live', 'ended'], index: true },
+              { id: 'thing', type: 'ref', to: 'things', index: true },
+            ],
+          },
+        },
+      ] as never)
+    ).ok,
+  );
+  const kiln = value<{ id: string }>(k.create('things', { name: 'Kiln' }, { actor: 'p_1' }));
+  assert.ok(k.create('things', { name: 'Atlantis' }, { actor: 'p_1' }).ok);
+  for (const row of [
+    { what: 'Studio', state: 'live', thing: kiln.id },
+    { what: 'Store', state: 'ended', thing: kiln.id },
+    { what: 'Desk', state: 'live' },
+  ])
+    assert.ok(k.create('leases', row, { actor: 'p_1' }).ok);
+
+  const template: MetricDecl = {
+    metric: 'project-leases',
+    name: 'Leases, one project',
+    source: 'register.leases',
+    where: 'state is live, thing is {{it}}',
+    value: { count: 'id' },
+    target: { lte: 9 },
+    window: '30d',
+    compare: 'none',
+    format: 'int',
+  };
+  const read = (param: string) => value<Reading>(k.metric(fill(template, null, param) as MetricDecl));
+
+  const kilns = read('Kiln');
+  assert.equal(kilns.rows, 1, 'one of Kiln two leases is live');
+  assert.equal(kilns.held, 2, 'the ref clause was resolved for the scope as well as for the figure');
+
+  const fresh = read('Atlantis');
+  assert.equal(fresh.rows, 0);
+  assert.equal(fresh.held, 0, 'a project with no lease holds none of the three in the register');
+  sql.close();
+});
+
+test('AND A PREDICATE WRITTEN AS JSON NARROWS UNDER AN `all` AND NOWHERE ELSE', async () => {
+  /* Every parameterised figure the seed ships writes its `where` as a SENTENCE, so the tree form of
+     `scopeOf` had no test behind it at all: both branches of it, the `all` conjunct filter and the
+     `any`/`none` refusal to narrow, survived being deleted with all 988 kernel tests still green.
+     `declare` reads both forms of a predicate, so a pack may write a parameterised figure as JSON,
+     and the two branches decide opposite things.
+
+     UNDER A CONJUNCTION THE PARAMETER IS THE SCOPE, and under a disjunction it is not: a parameter
+     inside an `any` widens the rows and one inside a `none` inverts them, so neither cuts out a
+     slice to count and `held` stays the register it always was. Narrowing on a disjunct would put
+     `held` UNDER `rows`, which is a reading that contradicts itself. */
+  const { k, sql } = await record();
+  const base = { name: 'Held', source: 'register.obligations', value: { count: 'id' }, target: { lte: 9 }, window: '30d', compare: 'none', format: 'int' } as const;
+  const held = (metric: string, where: unknown, param: string) =>
+    value<Reading>(k.metric(fill({ ...base, metric, where } as MetricDecl, null, param) as MetricDecl));
+
+  /* Ravensworth holds two of the five obligations and one of them is open. */
+  const conjoined = held('by-party', { all: [{ field: 'state', is: 'open' }, { field: 'party', is: '{{it}}' }] }, 'Ravensworth');
+  assert.equal(conjoined.rows, 1, 'one of Ravensworth two obligations is open');
+  assert.equal(conjoined.held, 2, 'a tree-form parameter narrows the scope to its own rows');
+
+  /* Halden holds one, and one other obligation is paid, so the disjunction matches two of five. */
+  const widened = held('paid-or-party', { any: [{ field: 'state', is: 'paid' }, { field: 'party', is: '{{it}}' }] }, 'Halden');
+  assert.equal(widened.rows, 2, 'the paid one and Halden own one');
+  assert.equal(widened.held, 5, 'a parameter under an `any` is not a scope, so the register is still what is held');
+
+  const inverted = held('not-party', { none: [{ field: 'party', is: '{{it}}' }] }, 'Halden');
+  assert.equal(inverted.rows, 4, 'the four obligations that are not Halden own');
+  assert.equal(inverted.held, 5, 'a parameter under a `none` is not a scope either');
+  for (const r of [conjoined, widened, inverted]) assert.ok(r.held >= r.rows, 'a reading that holds fewer rows than it matched contradicts itself');
   sql.close();
 });
 

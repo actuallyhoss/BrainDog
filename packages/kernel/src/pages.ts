@@ -1669,12 +1669,59 @@ export const slugify = (text: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+/** The one placeholder a parameter fills, spelled once so `scopeOf` and `fill` cannot disagree about it. */
+const PARAM = '{{it}}';
+
+/**
+ * The clauses of a filter that a parameter fills, and nothing else: the figure's scope.
+ *
+ * A PARAMETER IS NOT A FILTER OVER A REGISTER, IT IS WHICH REGISTER THE FIGURE IS ABOUT. That is the
+ * whole distinction `Reading.held` was added to draw, and it was lost here: `project-owed:Kiln` fills
+ * `thing is {{it}}` into a predicate that also says `state is open`, and the count of rows the
+ * predicate chose from was then taken over every obligation in the record. Measured on the shipped
+ * seed, a brand-new project answered `rows: 0, held: 38`, which a tile reads as *nothing is overdue*
+ * on the screen most likely to be new and empty.
+ *
+ * SO THE DECISION IS MADE HERE, WHERE THE PARAMETER IS KNOWN, and not in the evaluator, which is
+ * handed a filled predicate with no way left to tell which clause carried the name. Every reader that
+ * fills a parameter goes through `fill`, so `packages/record`'s `metric` call gets the same answer the
+ * page runner does without a second copy of this rule.
+ *
+ * A COMMA IS WHAT SEPARATES A SENTENCE'S CLAUSES, exactly as `parseWhere` splits it, so the clauses
+ * kept here are the clauses that grammar would have built. A JSON predicate is the same idea one
+ * level down: the conjuncts of a top-level `all`, or a lone leaf.
+ *
+ * AND ONLY UNDER A CONJUNCTION. A parameter inside an `any` or a `none` does not cut the register
+ * down, it widens or inverts it, so there is no slice to count and this answers nothing, which leaves
+ * `held` the whole register it has always been. Narrowing on a disjunct would be a smaller number
+ * than the truth, and a `held` under `rows` is a reading that contradicts itself.
+ */
+function scopeOf(where: unknown): Predicate | string | undefined {
+  if (typeof where === 'string') {
+    const kept = where.split(',').filter((clause) => clause.includes(PARAM));
+    return kept.length === 0 ? undefined : kept.join(',');
+  }
+  if (where === null || typeof where !== 'object' || Array.isArray(where)) return undefined;
+  const node = where as Record<string, unknown>;
+  if (Array.isArray(node.all)) {
+    const kept = node.all.filter((child) => JSON.stringify(child ?? null).includes(PARAM));
+    return kept.length === 0 ? undefined : ({ all: kept } as Predicate);
+  }
+  if ('any' in node || 'none' in node) return undefined;
+  return JSON.stringify(node).includes(PARAM) ? (where as Predicate) : undefined;
+}
+
 /**
  * `{{field}}` filled from one row, everywhere in the document.
  *
  * A STRING PASS OVER THE WHOLE DOCUMENT, deliberately: the placeholder appears in a title, in a
  * predicate, in a heading, in an empty state and in a metric id, and a substitution that walked only
  * the fields somebody remembered is a substitution that leaves `{{name}}` on a screen.
+ *
+ * A PARAMETER ALSO SETS `within` ON WHAT IT FILLS, and only a parameter: the clauses it landed in are
+ * the figure's scope rather than its filter, and `evaluateMetric` counts `held` inside them. It is
+ * written before the substitution runs so the name inside it is escaped by the same pass as the name
+ * inside `where`, which is the only way the two can be guaranteed to compile to the same rows.
  */
 export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
   /* ESCAPED THE WAY JSON ESCAPES, not by replacing the one character somebody remembered. A title
@@ -1683,7 +1730,11 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
      unlistable. `JSON.stringify` of the value, minus its quotes, is the escaping the format already
      has, and it covers the ones nobody thinks of. */
   const escaped = (value: string): string => JSON.stringify(value).slice(1, -1);
-  const text = JSON.stringify(doc).replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
+  /* A DOCUMENT WITH A PARAMETERISED `where` IS A METRIC TEMPLATE, which is the only document a
+     parameter is ever handed: a page template is filled from a ROW and carries no top-level `where`
+     of its own. So the key is added on that shape and nowhere else. */
+  const scope = param === undefined || doc === null || typeof doc !== 'object' || Array.isArray(doc) ? undefined : scopeOf((doc as { where?: unknown }).where);
+  const text = JSON.stringify(scope === undefined ? doc : { ...(doc as object), within: scope }).replace(/\{\{(\w+)\}\}/g, (whole, key: string) => {
     if (key === 'it') return param === undefined ? whole : escaped(param);
     /* A ROW'S SPOKEN ID, spelled as the ladder writes a run's `project` (`things#1`), so a template page
        finds its runs by `project is {{spoken}}`. A register with its own prefix would need its

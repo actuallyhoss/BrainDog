@@ -100,6 +100,30 @@ export type MetricDecl = {
   group_by?: string | undefined;
   /** `day` · `week` · `month` · `quarter` · `year`, and only beside a date `group_by`. */
   bucket?: Bucket | undefined;
+  /**
+   * THE CLAUSES A PARAMETER FILLED, WHICH ARE SCOPE AND NOT FILTER, and what `held` counts.
+   *
+   * NOBODY SHOULD DECLARE THIS. A metric document is written once with `{{it}}` in its `where`, and
+   * the reader that fills the parameter writes this key on the copy it hands the evaluator (`fill`,
+   * in `pages.ts`). Nothing in the shipped seed carries it and nothing needs to.
+   *
+   * BUT A BODY THAT CARRIES IT IS INSTALLED AND IS HONOURED, WHICH IS NOT A GUARANTEE THIS FIELD HAS
+   * EARNED. Measured: a metric installed as `{where: 'state is open', within: 'party is HMRC'}` was
+   * accepted by `install` with no refusal, because a metric body has no unknown-key check at all
+   * (`wibble: 1` installs too), and `PageDeps.metric` in `index.ts` hands the whole parsed body to
+   * `evaluateMetric`. The tile read `rows: 4, held: 1` on a five-row register. A `held` under `rows`
+   * is a reading that contradicts itself, which is the one shape `scopeOf` in `pages.ts` refuses to
+   * produce on purpose, so the shape a pack can write by hand is worse than the one a reader builds.
+   * Closing it belongs in `declare.ts`, which is the only place that can refuse a body, and until it
+   * does the sentence above is a convention rather than an invariant.
+   *
+   * `project-owed:Kiln` IS NOT A FILTER OVER THE OBLIGATIONS REGISTER, IT IS A QUESTION ABOUT KILN.
+   * `held` exists to tell an empty register from an empty match, and on a project page the register
+   * the reader means is that project's rows. Without this key the count was a bare `count(*)` over
+   * every obligation in the record, so a project with nothing in it answered `rows: 0, held: 38`,
+   * which reads as *everything here is settled* on the screen most likely to be new and empty.
+   */
+  within?: Predicate | string | undefined;
 };
 
 /**
@@ -170,12 +194,27 @@ export type Reading = {
    * two windows of a comparison, the two halves of a ratio and the parts of a grouped figure are all
    * cut out of this one number rather than each carrying their own.
    *
+   * AND A PARAMETER IS PART OF THE SCOPE, WHICH IS MOST OF THE POINT OF THE FIELD. `project-owed:Kiln`
+   * is a question about Kiln, so the rows Kiln's own clause admits are what the predicate chose from.
+   * Counted as the whole register instead, a brand-new project read `rows: 0, held: 38` against this
+   * seed's obligations, and zero matched out of thirty-eight held is the good-news zero: the tile
+   * would have said nothing is overdue for a project with no invoice ever written. `MetricDecl.within`
+   * carries those clauses, and `heldBy` counts inside them.
+   *
    * THE BROWSER'S COPY OF THIS EVALUATOR HAS CARRIED THE FIELD ALL ALONG, under the same name and
    * with the same meaning, counted before its filter runs (`apps/web/src/lib/record/metrics.ts`),
    * and its tile keys a verdict off it: zero matched over rows that exist is good news, zero held is
    * not news at all. This side did not carry it, so a host reading the same figure over the API got
    * the ambiguous pair while the browser did not. `50 §1` says there should not be two engines;
    * while there are, a field on one of them is half a field.
+   *
+   * AND THE TWO NOW DISAGREE ON EXACTLY THE PARAMETERISED CASE, which the paragraph above only fixed
+   * on this side. The browser's `held` is `all.length`, the register's rows before its filter runs,
+   * and `withParam` fills `{{it}}` without setting any scope, so `project-owed:Kiln` in the demo
+   * still answers the whole register. `engines.test.ts` holds the two to one `held`, and every case
+   * in that loop is unparameterised, so nothing measures the half they differ on. Closing it means
+   * narrowing `all` in `apps/web/src/lib/record/metrics.ts` the way `scopeOf` narrows here, which is
+   * a second copy of this rule in the copy `50 §1` wants deleted.
    */
   held: number;
   /** `(value − prior) / prior`, or `null` with `why` naming the clause that stopped it. */
@@ -521,6 +560,14 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   refusals.push(...said.bad);
   if (schema && said.predicate) refusals.push(...compile(said.predicate, schema).bad);
 
+  /* THE PARAMETER'S OWN CLAUSES, RESOLVED THE SAME WAY THE WHOLE PREDICATE IS, because they are a
+     subset of it and a subset read by a second grammar would be a second answer. Anything wrong
+     with them is already wrong with `where`, so this adds no refusal a reader has not been given;
+     it is here so that a `within` some future reader builds by hand cannot reach SQL unchecked. */
+  const scope = schema && decl.within !== undefined ? predicateOf(decl.within, schema, ctx) : { predicate: undefined, bad: [] };
+  refusals.push(...scope.bad);
+  if (schema && scope.predicate) refusals.push(...compile(scope.predicate, schema).bad);
+
   if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
   /* THE CURRENCY A MONEY FIGURE IS ADDED UP IN: the record's home currency when it has one, else the figure's own. */
@@ -604,12 +651,12 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetFor(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
   const judged = moved ? targetIn?.target : decl.target;
   /* ONE MORE `count(*)` ON A TABLE THIS FIGURE HAS ALREADY COUNTED ONCE, and it is counted here
-     rather than inside a scan because it is a fact about the register and not about an aggregation:
+     rather than inside a scan because it is a fact about the scope and not about an aggregation:
      the comparison window, the two halves of a ratio and every group are all the same rows under a
      narrower predicate, so each of them reading it would be the same query several times over. */
   return ok({
     ...now.value,
-    held: heldBy(sql, schema.register),
+    held: heldBy(sql, schema, scope.predicate),
     delta,
     why,
     met: now.value.value === null || !judged ? null : meets(now.value.value, judged),
@@ -722,21 +769,36 @@ export const meets = (value: number, target: { lte: number } | { gte: number }):
  *
  * `held` IS NOT HERE BECAUSE A SCAN CANNOT KNOW IT. Every scan in this file is already inside the
  * predicate, and `held` is the count of the rows the predicate chose from, so it belongs to the
- * register rather than to the aggregation: reading it per scan would have each half of a ratio and
+ * scope rather than to the aggregation: reading it per scan would have each half of a ratio and
  * each bucket of a grouped figure answer the same number over again, once per query.
  */
 type Read = Omit<Reading, 'delta' | 'why' | 'met' | 'held'>;
 
 /**
- * The rows the predicate chose from: the register, less what is deleted.
+ * The rows the predicate chose from: the register, less what is deleted, and inside the parameter's
+ * own clauses when the figure has one.
  *
- * THE SAME TWO CLAUSES EVERY SCAN BELOW OPENS WITH, and deliberately no third. `deleted_at IS NULL`
- * is in because a deleted row is held by nobody and a tile counting it would say the register has
- * something in it when it has not. The clock is out because `asOf` moves the PREDICATE and never the
- * rows (`EvalContext`), so a snapshot of last Tuesday is last Tuesday's question over today's scope.
+ * THE SAME TWO CLAUSES EVERY SCAN BELOW OPENS WITH, and a third only for a parameter. `deleted_at IS
+ * NULL` is in because a deleted row is held by nobody and a tile counting it would say the register
+ * has something in it when it has not. The clock is out because `asOf` moves the PREDICATE and never
+ * the rows (`EvalContext`), so a snapshot of last Tuesday is last Tuesday's question over today's
+ * scope.
+ *
+ * `within` IS THE THIRD, AND IT IS NOT THE FILTER. It holds only the clauses a parameter filled
+ * (`MetricDecl.within`), so `project-owed:Kiln` counts Kiln's obligations and `state is open` still
+ * stands between this number and `rows`. `compile(undefined, …)` answers `1 = 1`, so a figure with
+ * no parameter asks the same question it always did.
  */
-const heldBy = (sql: Sql, register: string): number =>
-  Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', register)?.n ?? 0);
+const heldBy = (sql: Sql, schema: Schema, within: Predicate | undefined): number => {
+  const w = compile(within, schema);
+  return Number(
+    sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${w.sql}`,
+      schema.register,
+      ...w.params,
+    )?.n ?? 0,
+  );
+};
 
 function read(
   sql: Sql,
