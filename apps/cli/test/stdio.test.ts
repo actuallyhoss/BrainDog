@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { TOOLS } from '@braindog/mcp';
 import { INSTRUCTIONS } from '@braindog/mcp/rpc';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
@@ -38,8 +39,15 @@ after(() => {
 type Seen = { method: string; query: URLSearchParams; headers: IncomingHttpHeaders };
 const ROWS = { rows: [{ seq: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
 
-/** `list` answers at once, after 300 ms for `late`, or never for `hangs`. Everything else is refused. */
-async function stubHost(t: { after: (fn: () => Promise<void>) => void }) {
+/**
+ * `list` answers at once, after 300 ms for `late`, or never for `hangs`.
+ *
+ * EVERY OTHER METHOD IS REFUSED UNLESS `answers` NAMES IT, which is what lets the whole-surface runs
+ * below have a record that says yes to everything without importing the self-host. What each answer
+ * holds is shaped only where a tool reads a field off it, because what is under test here is that
+ * the name reached a method at all.
+ */
+async function stubHost(t: { after: (fn: () => Promise<void>) => void }, answers: Record<string, unknown> = {}) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub');
@@ -50,7 +58,10 @@ async function stubHost(t: { after: (fn: () => Promise<void>) => void }) {
       res.end(JSON.stringify(body));
     };
     const register = url.searchParams.get('register');
-    if (method !== 'list') return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub answers list, and not ${method}.` } });
+    if (method !== 'list') {
+      if (Object.hasOwn(answers, method)) return answer({ ok: true, value: answers[method] });
+      return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub answers list, and not ${method}.` } });
+    }
     if (register === 'hangs') return;
     if (register === 'late') return void setTimeout(() => answer({ ok: true, value: ROWS }), 300);
     answer({ ok: true, value: ROWS });
@@ -136,7 +147,7 @@ const said = (reply: Rpc) => JSON.parse(reply.result.content[0].text) as Record<
 
 /* ── the protocol ──────────────────────────────────────────────────────── */
 
-test('initialize and tools/list answer without touching the host, and the list is the fifteen', async (t) => {
+test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {
   const host = await stubHost(t);
   const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
 
@@ -145,14 +156,140 @@ test('initialize and tools/list answer without touching the host, and the list i
   assert.equal(init.result.serverInfo.name, 'braindog');
   assert.match(init.result.instructions, /^BrainDog is one person's record/);
 
+  /* THE NAMES, NOT A COUNT. This read `tools.length, 15` and went red the day a sixteenth tool
+     landed, which taught nobody anything: a number a person edits to match is a number that agrees
+     with whatever is there. What the command has to get right is that the list it serves is the
+     server's own list, and that every name on it answers, which is the test below this one. */
   const listed = await s.ask('tools/list');
-  assert.equal(listed.result.tools.length, 15);
-  for (const name of ['record_index', 'context', 'list', 'handoff', 'meet', 'activity']) assert.ok(listed.result.tools.some((x: { name: string }) => x.name === name), name);
+  assert.deepEqual(listed.result.tools.map((x: { name: string }) => x.name), TOOLS.map((t) => t.name));
 
   const { code, err } = await s.end();
   assert.equal(code, 0, err);
   assert.equal(host.seen.length, 0, 'the handshake reached the host, and it must answer when the host is down');
   for (const line of s.lines) assert.equal(JSON.parse(line).jsonrpc, '2.0', `stdout carried something other than the protocol: ${line}`);
+});
+
+/* ── every advertised name, driven over the transport ──────────────────── */
+
+/** What each tool is called with: enough to reach a method, and nothing about what it then does. */
+const CALLS: Record<string, Record<string, unknown>> = {
+  record_index: {},
+  context: {},
+  schema: { register: 'obligations' },
+  get: { spoken: 'obligations#1' },
+  list: { register: 'obligations' },
+  search: { q: 'rent' },
+  history: { spoken: 'obligations#1' },
+  activity: { limit: 5 },
+  money: {},
+  governance: {},
+  propose: {
+    question: 'Keep it?',
+    body_kind: 'options',
+    body: { options: [{ id: 'yes', label: 'Keep it', because: 'It is used' }, { id: 'no', label: 'Drop it', because: 'It is not' }] },
+  },
+  create: { register: 'obligations', fields: { what: 'Invoice 42' } },
+  update: { spoken: 'obligations#1', patch: { state: 'paid' }, version: 1 },
+  log: { spoken: 'obligations#1', note: 'Chased twice.' },
+  handoff: { doing: 'Driving the tool list', next: 'Report what answered' },
+  meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
+};
+
+/** What the stub record answers each method, shaped only where a tool or a resource reads a field off it. */
+const ANSWERS: Record<string, unknown> = {
+  boot: { registers: [{ id: 'obligations', name: 'Obligations' }] },
+  version: { version: 3 },
+  whoami: { level: 'owner' },
+  context: { project: 'braindog' },
+  schema: { fields: [] },
+  get: { register: 'obligations', seq: 1, fields: { what: 'Rent' } },
+  search: [],
+  history: [],
+  recentHistory: { events: [] },
+  metric: { value: 1200, unit: 'USD' },
+  governance: [],
+  propose: { spoken: 'suggestions#1' },
+  create: { spoken: 'obligations#2', version: 1 },
+  update: { spoken: 'obligations#1', version: 2 },
+  handoff: { spoken: 'sessions#1' },
+  meet: { person: 'people#1', created: true },
+  sessionsLive: { runs: [] },
+  digestToday: { lines: [] },
+  actions: [],
+  arrangement: { packs: [] },
+  pages: [],
+};
+
+/**
+ * THE COUNT AGREEING IS NOT THE PROPERTY THAT MATTERS; the tool answering is.
+ *
+ * A name in `TOOLS` that `apps/cli/src/surface.ts` has no member for refuses `NOT_IN_THIS_BUILD` on
+ * every call for ever, and an agent cannot tell that from a tool that happens to be refusing today,
+ * so it spends a turn on it every session. That shipped once: `activity` was served, the record
+ * routed `recentHistory`, and stdio said "not in this build" for a run because the allow-list had
+ * not heard of the name (7b6fd267). `packages/mcp/test/index.test.ts` makes this claim in process;
+ * this is the same claim over the transport Claude Code actually speaks, which is where it went
+ * wrong, and it is the run that would have caught it.
+ */
+test('EVERY TOOL THE SERVER SERVES ANSWERS OVER STDIO, none of them advertised and dead', async (t) => {
+  const host = await stubHost(t, ANSWERS);
+  const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  assert.deepEqual(Object.keys(CALLS).sort(), TOOLS.map((x) => x.name).sort(), 'a tool has no call here, or a call names no tool');
+
+  const dead: string[] = [];
+  for (const tool of TOOLS) {
+    const reply = await s.ask('tools/call', { name: tool.name, arguments: CALLS[tool.name]! });
+    assert.ok(reply.result, `${tool.name}: ${JSON.stringify(reply.error)}`);
+    if (reply.result.isError !== true) continue;
+    const code = String(said(reply).code);
+    t.diagnostic(`${tool.name}: ${code}`);
+    if (code === 'ROUTE_UNKNOWN' || code === 'NOT_IN_THIS_BUILD') dead.push(`${tool.name} (${code})`);
+  }
+  assert.deepEqual(dead, [], 'a tool is advertised over stdio and no method behind it answers');
+
+  /* AND A NAME THAT IS NOT A TOOL IS STILL REFUSED BY NAME. `credentials` was surveyed as advertised
+     and dead; it is neither, because the vault needs a person in a browser and no tool was ever
+     served for it. The refusal hands back the served names, so the second attempt works. */
+  const refused = await s.ask('tools/call', { name: 'credentials', arguments: {} });
+  assert.equal(refused.result.isError, true);
+  assert.equal(said(refused).code, 'ROUTE_UNKNOWN');
+  assert.deepEqual(said(refused).allowed, TOOLS.map((x) => x.name));
+
+  const { code, err } = await s.end();
+  assert.equal(code, 0, err);
+});
+
+/**
+ * AND EVERY RESOURCE WITH NO PARAMETER, for the same reason and with a sharper edge.
+ *
+ * A resource is listed only once it has been read, so a method the allow-list is missing does not
+ * refuse where anyone can see it: the address simply is not there, and nothing says why. That was
+ * true of `braindog:actions` until this run: the record routes `actions`, the client's table has
+ * carried the name since it was written, and `LATER` did not, so the one address that lists what
+ * this BrainDog runs on a schedule was absent from every stdio session.
+ */
+test('AND EVERY RESOURCE WITH NO PARAMETER IS LISTED, so none of them goes quietly missing', async (t) => {
+  const host = await stubHost(t, ANSWERS);
+  const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+
+  const listed = await s.ask('resources/list');
+  const uris = (listed.result.resources as { uri: string }[]).map((r) => r.uri);
+  for (const uri of [
+    'braindog:whoami',
+    'braindog:boot',
+    'braindog:context',
+    'braindog:sessions/live',
+    'braindog:digest/today',
+    'braindog:decisions',
+    'braindog:actions',
+    'braindog:arrangement',
+    'braindog:grammar/page',
+    'braindog:grammar/proposals',
+  ])
+    assert.ok(uris.includes(uri), `${uri} is not listed, so nothing over stdio can read it`);
+
+  const { code, err } = await s.end();
+  assert.equal(code, 0, err);
 });
 
 test('A LIST CALL goes to /api/list with the bearer and the session headers, and comes back as the tool result', async (t) => {

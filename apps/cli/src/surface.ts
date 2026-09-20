@@ -30,6 +30,13 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * `activity` tool shipped, `packages/host` routes the method (`src/index.ts:459`), and stdio answered
  * `NOT_IN_THIS_BUILD` because the one place that turns a routed method into a surface member had not heard of it. The
  * probe is what makes adding a name safe: a host that does not route it still gets the tool's own sentence.
+ *
+ * AND `actions` IS THE SAME FAILURE WITH NOTHING VISIBLE TO GO ON, which is why it lasted longer. It backs no tool: it
+ * backs the resource `braindog:actions`, and a resource is listed only once it has been read, so the missing member did
+ * not refuse where an agent could see it. The address was simply absent from every stdio session, and the one list of
+ * what this BrainDog runs on a schedule was unreachable from the command line. Driving `resources/list` over the
+ * transport is what found it (`test/stdio.test.ts`), after reading the list found nothing: the name is in the client's
+ * own table and in the record's routes, and only this line was short.
  */
 const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory'] as const;
 
@@ -47,8 +54,11 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
   const allowed = refused(probe) ? (probe.refusal as { allowed?: unknown }).allowed : undefined;
   const routed = new Set(Array.isArray(allowed) ? allowed : []);
 
-  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number]> = {};
+  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions'> = {};
   for (const name of LATER) if (routed.has(name)) later[name] = (args: object, ctx: Ctx) => ask<unknown>(ctx, name, args);
+  /* `actions` TAKES NO ARGUMENTS, so it is written out rather than folded into the loop above: the surface declares it
+     as `(ctx)` alone, and giving it the loop's `(args, ctx)` shape is a compile error, not a harmless widening. */
+  if (routed.has('actions')) later.actions = (ctx: Ctx) => ask<unknown>(ctx, 'actions');
 
   return {
     boot: (ctx) => ask(ctx, 'boot'),

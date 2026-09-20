@@ -18,8 +18,8 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { draftSetup, planLegacyTool, readLegacyTool, readSetup, spoken, type Plan, type Setup } from '../src/legacy.ts';
-import { applyPlan, importCommand, said, type Door } from '../src/import.ts';
+import { draftSetup, KEY_PREFIX, ORDER, planLegacyTool, readLegacyTool, readSetup, spoken, type Plan, type Setup } from '../src/legacy.ts';
+import { applyPlan, importCommand, said, type Door, type Report } from '../src/import.ts';
 import type { AgentIo } from '../src/skills.ts';
 import { syntheticExport, syntheticSetup } from './legacy-export.ts';
 
@@ -67,7 +67,28 @@ function memoryRecord(registers: string[]) {
   return { door, rows, asked, writes };
 }
 
-const ALL = ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'services', 'organisations', 'session'];
+/* EVERY LIST `ORDER` NAMES, the four money-core 1.2.0 added among them: a record short of those four is the case
+   `a record without the founder and agents lists` and the Estate test set up on purpose, not the ordinary one. */
+const ALL = [
+  'things',
+  'people',
+  'tracks',
+  'tasks',
+  'datapoints',
+  'learnings',
+  'skills',
+  'tools',
+  'credentials',
+  'accounts',
+  'categories',
+  'obligations',
+  'transactions',
+  'recurring',
+  'installments',
+  'services',
+  'organisations',
+  'session',
+];
 
 test('an export is read only when it has a db with projects', () => {
   assert.equal(readLegacyTool('not json').ok, false);
@@ -215,13 +236,25 @@ test('money: accounts with their balances, bills and income due from the export 
   assert.deepEqual(skippedItems(p, /gold, certificates/u), ['Gold']);
   assert.deepEqual(skippedItems(p, /pending balances/u), ['Stripe pending']);
 
-  assert.deepEqual(row(p, 'legacy:recurring:7')!.fields, { what: 'Hosting', direction: 'owed_by_me', amount: { amount: 4500, currency: 'USD' }, due: '2026-10-03', state: 'open', repeats: 'monthly', category: 'other' });
+  /* NOTHING IN THE EXPORT SAYS WHICH WAY HOSTING GOES, so it is read from the sign and the row says as much. */
+  assert.deepEqual(row(p, 'legacy:recurring:7')!.fields, {
+    what: 'Hosting',
+    direction: 'owed_by_me',
+    amount: { amount: 4500, currency: 'USD' },
+    due: '2026-10-03',
+    state: 'open',
+    repeats: 'monthly',
+    category: 'other',
+    note: 'the old tool did not say which way this goes, so it was read from the sign of the amount and carried as Money out. Check it.',
+  });
   const retainer = row(p, 'legacy:income:3')!.fields;
   assert.equal(retainer.direction, 'owed_to_me');
   assert.equal(retainer.due, '2026-09-28', 'a monthly series keeps its day of the month');
   assert.deepEqual(skippedItems(p, /weekly and fortnightly/u), ['Gym']);
   assert.deepEqual(skippedItems(p, /one-off that fell before/u), ['Old grant']);
-  assert.deepEqual(row(p, 'legacy:instalment:flat:2026-10-01')!.fields.amount, { amount: 2500000, currency: 'EGP' });
+  /* `schedule:`, NOT `instalment:`: a part of the wall is an `installments` row now, and the key moved with it. */
+  assert.equal(row(p, 'legacy:schedule:flat:2026-10-01')!.register, 'installments');
+  assert.deepEqual(row(p, 'legacy:schedule:flat:2026-10-01')!.fields.amount, { amount: 2500000, currency: 'EGP' });
 
   const noMoney = syntheticExport();
   delete noMoney.money;
@@ -249,7 +282,7 @@ test('agent runs keep their handoff, and what the founder use case has no place 
 
 test('rows are written in an order where a row is there before a row that points at it', () => {
   const order = [...new Set(plan().rows.map((r) => r.register))];
-  assert.deepEqual(order, ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'services', 'session']);
+  assert.deepEqual(order, ['things', 'people', 'tracks', 'tasks', 'datapoints', 'learnings', 'skills', 'tools', 'credentials', 'accounts', 'obligations', 'recurring', 'installments', 'services', 'session']);
 });
 
 test('applied to a record, refs become ids; applied again it adds nothing, asks nothing, and updates only what changed', async () => {
@@ -402,6 +435,64 @@ test('a record without the founder and agents lists is told what to install, and
   assert.match(lines[1]!, /^This BrainDog has no Datapoints, Learnings, Skills, Tools and Keys \(the index only\) lists, so nothing was written\. Install Solo founder and Agents on this BrainDog first, then run the import again\.$/u);
 });
 
+test('A RECORD STILL ON money-core 1.1.0 KEEPS ITS INSTALMENT WALL, having no Instalments list for it to have moved to', async () => {
+  /**
+   * THE BRANCH THAT COSTS THE MOST IF IT IS WRONG, AND THE GREEN CASE CANNOT REACH IT. Retiring the rows an earlier
+   * import left under `legacy:instalment:` is conditional on the record having the list they moved to. Dropping
+   * that condition and running the tests here was green, measured just now, so the condition was carrying the whole
+   * wall with nothing watching it: on a record short of `installments` the two parts below would have been written
+   * off in `obligations` with nothing put anywhere in their place.
+   */
+  const old = ALL.filter((r) => !['categories', 'transactions', 'recurring', 'installments'].includes(r));
+  const mem = memoryRecord(old);
+  /* WHAT THE IMPORTER THAT SHIPPED BEFORE THIS WEEK LEFT IN THE RECORD: each part of the wall as an obligation, under
+     the key that build filed them by. */
+  for (const due of ['2026-10-01', '2027-01-01'])
+    await mem.door.create({
+      register: 'obligations',
+      fields: { what: 'Instalment, flat', direction: 'owed_by_me', amount: { amount: 2_500_000, currency: 'EGP' }, due, state: 'open', tags: [`${KEY_PREFIX}instalment:flat:${due}`] },
+    });
+
+  const report = await applyPlan(plan(), mem.door, { dryRun: false });
+  assert.deepEqual(report.retired, [], 'the wall was written off on a record with nowhere for it to have gone');
+  assert.deepEqual(
+    mem.rows.filter((r) => r.register === 'obligations' && String(r.fields.what).startsWith('Instalment')).map((r) => r.fields.state),
+    ['open', 'open'],
+  );
+  assert.deepEqual(
+    mem.writes.filter((w) => w.startsWith('update obligations')),
+    [],
+  );
+
+  /* AND A LIST ASKED ABOUT ONLY SO SOMETHING COULD BE RETIRED IS NOT A SENTENCE WITH NOTHING AFTER IT: an export whose
+     wall is paid off plans no `installments` rows at all, so the record being short of that list is nothing to say. */
+  const paid = syntheticExport();
+  (paid.money as { obligations: { schedule: unknown[] } }).obligations = { schedule: [] };
+  const done = await applyPlan(planLegacyTool(paid, TODAY), memoryRecord(old).door, { dryRun: false });
+  assert.deepEqual(
+    done.plan.skipped.filter((s) => s.items.length === 0),
+    [],
+    'the report names a list with no rows behind it',
+  );
+});
+
+test('A LIST ASKED ABOUT ONLY SO SOMETHING COULD BE RETIRED CANNOT STOP AN IMPORT THAT WAS NEVER GOING TO WRITE TO IT', async () => {
+  /**
+   * A RECORD WITH NO MONEY PACK AT ALL, which is not the same case as one on the old money-core. `obligations` is not
+   * optional, so asking about it because a row might be retired out of it turned a record that simply has not got it
+   * into `missing` and returned before one row was written. Measured on the export below, whose money step answered
+   * nothing but its day: the projects were written before the retire pass existed, and were not written after.
+   */
+  const thin = syntheticExport();
+  thin.money = { asOf: '2026-09-15' };
+  const noMoney = ALL.filter((r) => !['accounts', 'categories', 'obligations', 'transactions', 'recurring', 'installments'].includes(r));
+  const mem = memoryRecord(noMoney);
+  const report = await applyPlan(planLegacyTool(thin, TODAY), mem.door, { dryRun: false });
+  assert.deepEqual(report.missing, [], 'a list nothing was planned for stopped the whole import');
+  assert.equal(report.tally.things?.added, 5);
+  assert.deepEqual(report.retired, []);
+});
+
 test('the report says every list, the questions, what was left out and that no key value was read, with no em dash', async () => {
   const mem = memoryRecord(ALL);
   const lines = said(await applyPlan(plan(), mem.door, { dryRun: false }), { dryRun: false, file: 'export.json' });
@@ -412,6 +503,43 @@ test('the report says every list, the questions, what was left out and that no k
   assert.ok(text.includes('No key value was read or sent.'));
   assert.ok(!text.includes('\u2014'));
   assert.ok(!text.includes('FAKEFAKE'));
+});
+
+test('THE FOUR LEDGER LISTS ARE NAMED IN WORDS IN THE MAIN TALLY, not by the id an API uses', () => {
+  const one = { added: 1, updated: 0, unchanged: 0 };
+  const report: Report = {
+    missing: [],
+    tally: { accounts: one, categories: one, transactions: one, recurring: one, installments: one },
+    asked: 0,
+    alreadyAsked: 0,
+    polls: { filed: 0, before: 0 },
+    changes: [],
+    refused: [],
+    retired: [],
+    clashes: [],
+    examples: 0,
+    outcomes: {},
+    plan: { taken: null, rev: null, rows: [], asks: [], polls: [], skipped: [], changed: [] },
+  };
+  assert.deepEqual(
+    said(report, { dryRun: false, file: 'export.json' }).filter((l) => l.includes('1 added')),
+    [
+      'Accounts: 1 added, 0 updated, 0 unchanged.',
+      'Categories: 1 added, 0 updated, 0 unchanged.',
+      'Ledger: 1 added, 0 updated, 0 unchanged.',
+      'Repeating: 1 added, 0 updated, 0 unchanged.',
+      'Instalments: 1 added, 0 updated, 0 unchanged.',
+    ],
+  );
+
+  /* AND EVERY OTHER LIST TOO, so a register added later cannot print its id in the main tally unnoticed. */
+  const every = said({ ...report, tally: Object.fromEntries(ORDER.map((r) => [r, one])) }, { dryRun: false, file: 'export.json' }).filter((l) => l.includes('1 added'));
+  assert.equal(every.length, ORDER.length);
+  assert.deepEqual(
+    every.filter((l) => ORDER.some((r) => l.startsWith(`${r}:`))),
+    [],
+    'a list is named in the report by the id the API uses',
+  );
 });
 
 test('the command reads the file, talks to the host over the API, and exits 0; a missing file or a wrong source is one sentence', async (t) => {

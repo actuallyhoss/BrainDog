@@ -66,6 +66,10 @@ export type Report = {
   /** Each row that changes, with the fields that change. */
   changes: { register: string; label: string; fields: string[] }[];
   refused: { label: string; register: string; fix: string }[];
+  /** Each row an earlier import left on a list this one no longer writes to, closed so it is not counted twice. */
+  retired: { register: string; label: string; why: string }[];
+  /** A category name this record already holds, and how many ledger rows arrived without it as a result. */
+  clashes: { label: string; rows: number; fix: string }[];
   /** Example rows setting up planted, found in the lists the import writes to: the report suggests clearing them on Home. */
   examples: number;
   /** What happened to each planned row, by its key: the report lists dates, domains and services one by one. */
@@ -85,7 +89,15 @@ const NAMES: Readonly<Record<string, string>> = {
   tools: 'Tools',
   credentials: 'Keys (the index only)',
   accounts: 'Accounts',
+  categories: 'Categories',
   obligations: 'Money in and out',
+  /* THE WORDS money-core PUTS OVER THESE FOUR LISTS AND NOTHING ELSE (`packages/seed/src/modules/money.ts`): a list
+     with no entry here falls back to the id the API uses, so a real run printed
+     `installments: 1 added, 0 updated, 0 unchanged.` in the main tally directly beside `Accounts: 1 added`. Every
+     register in `ORDER` now has a line in this map, which `test/import.test.ts` holds it to. */
+  transactions: 'Ledger',
+  recurring: 'Repeating',
+  installments: 'Instalments',
   services: 'Services',
   organisations: 'Organisations',
   session: 'Agent runs',
@@ -206,15 +218,29 @@ async function readDecide(door: Door): Promise<Result<Decide>> {
  */
 export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean }): Promise<Report> {
   let plan = given;
-  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], examples: 0, outcomes: {}, plan };
+  const report: Report = { missing: [], tally: {}, asked: 0, alreadyAsked: 0, polls: { filed: 0, before: 0 }, changes: [], refused: [], retired: [], clashes: [], examples: 0, outcomes: {}, plan };
   let registers = ORDER.filter((r) => plan.rows.some((row) => row.register === r));
 
+  /**
+   * A LIST WITH NOTHING PLANNED FOR IT IS STILL ASKED ABOUT WHEN A ROW IS TO BE RETIRED OUT OF IT OR INTO IT. An
+   * export whose instalment wall has been paid off plans no `installments` rows at all, and the copies the earlier
+   * importer left in `obligations` are exactly the rows that then need closing.
+   *
+   * AND NOT HAVING ONE OF THOSE CANNOT STOP THE IMPORT, which is what asking about them naively did. `obligations` is
+   * not optional, so a record without the Money pack answered `REGISTER_UNKNOWN` for a list this run was only ever
+   * going to close rows in, and `missing` returned before a single row was written. Measured against a record holding
+   * the founder and agents lists and no money at all: the import wrote five projects before, and nothing after.
+   * Nothing is planned for these, so not having one means only that there is nothing to close.
+   */
+  const held = new Set<string>(registers);
+  const spare: string[] = [...new Set((plan.retire ?? []).flatMap((r) => [r.register, r.replaces]).filter((r) => !held.has(r)))];
+
   const absent: string[] = [];
-  for (const register of registers) {
+  for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (!has.ok) {
       if (unreachable(has)) throw new Unreachable();
-      if (OPTIONAL.has(register)) absent.push(register);
+      if (OPTIONAL.has(register) || spare.includes(register)) absent.push(register);
       else report.missing.push(register);
     }
   }
@@ -227,25 +253,50 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
       rows: plan.rows.filter((r) => !absent.includes(r.register)),
       skipped: [
         ...plan.skipped,
-        ...absent.map((register) => ({
-          reason: `This BrainDog has no ${NAMES[register] ?? register} list. Install ${PROVIDED_BY[register] ?? register} beside Solo founder, then run the import again to bring these in`,
-          items: out.filter((r) => r.register === register).map((r) => r.label),
-        })),
+        /* A LIST WITH NO ROWS FOR IT IS NOT A SENTENCE: `absent` now holds lists asked about only so that something
+           could be retired, and one of those would otherwise print a reason with nothing after it. */
+        ...absent
+          .filter((register) => out.some((r) => r.register === register))
+          .map((register) => ({
+            reason: `This BrainDog has no ${NAMES[register] ?? register} list. Install ${PROVIDED_BY[register] ?? register} beside Solo founder, then run the import again to bring these in`,
+            items: out.filter((r) => r.register === register).map((r) => r.label),
+          })),
       ],
     };
     report.plan = plan;
     registers = registers.filter((r) => !absent.includes(r));
   }
 
+  /**
+   * ROWS AN EARLIER IMPORT WROTE UNDER A KEY THIS ONE NO LONGER USES, AND WHY IT IS CONDITIONAL.
+   *
+   * Nothing is retired unless the list that replaces those rows is one this record actually has. A record still on
+   * money-core 1.1.0 has no `installments` list, so the instalment wall stays in `obligations` and closing it there
+   * would delete the largest number in his record rather than move it.
+   */
+  const retiring = (plan.retire ?? []).filter((r) => !absent.includes(r.register) && !absent.includes(r.replaces));
+
   const ids = new Map<string, string>();
   const existing = new Map<string, Row>();
-  for (const register of registers)
+  /** Which list each already-written row is in: `existing` is keyed by import key alone and a key can change lists. */
+  const where = new Map<string, string>();
+  /**
+   * WHAT EACH NAME IN `categories` IS ALREADY TAKEN BY, because `categories.name` is unique and the record he imports
+   * into has nine example categories planted at setup (`packages/seed/src/modules/money.ts`, CATEGORIES: Client work,
+   * Licensing, Contractors, Software, Premises, Tax, Professional fees, Production, Travel). Without this the record
+   * refuses his own category of that name, every ledger row filed under it arrives with no category at all, and the
+   * only thing said is one refusal line that names no ledger row.
+   */
+  const named = new Map<string, Row>();
+  for (const register of [...new Set([...registers, ...retiring.map((r) => r.register)])])
     for (const row of await readAll(door, register)) {
       if (Array.isArray(row.fields.tags) && row.fields.tags.includes('example')) report.examples++;
+      if (register === 'categories' && typeof row.fields.name === 'string') named.set(row.fields.name.toLowerCase(), row);
       const key = keyOf(register, row.fields);
       if (key) {
         existing.set(key, row);
         ids.set(key, row.id);
+        where.set(key, register);
       }
     }
 
@@ -260,6 +311,8 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     return v;
   };
   const planned = new Set(plan.rows.map((r) => r.key));
+  /** Categories this run could not write because the name is taken, and every row that pointed at one. */
+  const lost = new Map<string, { label: string; rows: number; fix: string }>();
 
   for (const row of plan.rows) {
     const tally = (report.tally[row.register] ??= { added: 0, updated: 0, unchanged: 0 });
@@ -267,11 +320,40 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     for (const [field, value] of Object.entries(row.fields)) {
       const put = resolveValue(value);
       if (put !== undefined) fields[field] = put;
-      /* A ref to a row planned in this run and not written yet waits for the second pass; one to a row left out is dropped. */ else if ([value].flat().some((x) => isRef(x) && planned.has(x.$ref))) later.push({ row, field, value });
+      else {
+        const refs = [value].flat().filter(isRef);
+        const gone = refs.map((x) => lost.get(x.$ref)).find((x) => x !== undefined);
+        /* A ROW WHOSE CATEGORY COULD NOT BE WRITTEN STILL ARRIVES, uncategorised, and the count is what makes that
+           visible: a Where it went chart with a slice missing says nothing about itself. */
+        if (gone) gone.rows++;
+        /* A ref to a row planned in this run and not written yet waits for the second pass; one to a row left out is dropped. */ else if (refs.some((x) => planned.has(x.$ref))) later.push({ row, field, value });
+      }
     }
     const found = existing.get(row.key);
     if (holdsKey(fields)) {
       report.refused.push({ label: row.label, register: row.register, fix: 'A field looked like a key itself, so the row was not sent.' });
+      continue;
+    }
+
+    /**
+     * A NAME THIS RECORD ALREADY HOLDS, CAUGHT BEFORE THE WRITE RATHER THAN AFTER THE REFUSAL.
+     *
+     * `categories.name` is unique, so sending it earns one refusal line naming the category and nothing naming the
+     * ledger rows that then arrive with no category. The row is left for a person deliberately: adopting the row
+     * already there would carry its example `budget` and `match` onto his category, and a wrong number on the Money
+     * page is worse than a category he has to clear and import again.
+     */
+    const taken = row.register === 'categories' && !found && typeof fields.name === 'string' ? named.get(fields.name.toLowerCase()) : undefined;
+    if (taken) {
+      const planted = Array.isArray(taken.fields.tags) && taken.fields.tags.includes('example');
+      lost.set(row.key, {
+        label: row.label,
+        rows: 0,
+        fix: planted
+          ? `This BrainDog already holds a category called ${row.label} from setting up, and one name is one category. Open Home, press Clear the examples, then run the import again.`
+          : `This BrainDog already holds a category called ${row.label}, and one name is one category. Rename one of the two, then run the import again.`,
+      });
+      report.outcomes[row.key] = 'refused';
       continue;
     }
 
@@ -332,6 +414,50 @@ export async function applyPlan(given: Plan, door: Door, o: { dryRun: boolean })
     else if (unreachable(done)) throw new Unreachable();
     else report.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
   }
+
+  report.clashes = [...lost.values()];
+
+  /**
+   * THE ROWS AN EARLIER IMPORT LEFT IN A LIST THIS ONE HAS MOVED OFF, CLOSED SO NOTHING IS COUNTED TWICE.
+   *
+   * Moving a key is what makes these invisible: `existing` is keyed by import key alone, so a row written under
+   * `legacy:instalment:` is never found by a plan that writes `legacy:schedule:`, and the record ends up
+   * holding the same instalment in two lists with a wall that is double. Measured on an in-memory record with
+   * money-core 1.2.0 installed (`test/legacy.test.ts`): a wall of EGP 5,000,000 imported under the old shape and
+   * then under the new read EGP 10,000,000 across the two lists.
+   *
+   * THE PATCH ONLY EVER CLOSES A ROW, and the reason goes in the write's own note rather than into the row's `note`
+   * field: whatever a person wrote on that row is theirs, and the history is where "why did this change" belongs.
+   */
+  for (const r of retiring)
+    for (const [key, register] of where) {
+      if (register !== r.register || !key.startsWith(r.prefix) || planned.has(key)) continue;
+      const at = existing.get(key);
+      if (!at) continue;
+      /* A ROW A PERSON HAS ALREADY SETTLED IS LEFT EXACTLY AS IT IS. A part standing at `paid` says money left his
+         account; `written_off` says a debt was cancelled, and nothing about a key moving list makes the second one
+         true. The export's schedule holds only what is still owed, so such a row has no new row double-counting it. */
+      if (Object.entries(r.only).some(([field, value]) => stable(at.fields[field]) !== stable(value))) continue;
+      const patch = Object.fromEntries(Object.entries(r.patch).filter(([field, value]) => stable(at.fields[field]) !== stable(value)));
+      if (Object.keys(patch).length === 0) continue;
+      const names = r.titles.map((f) => at.fields[f]).filter((v): v is string => typeof v === 'string');
+      const label = names.length > 0 ? names.join(' ') : key;
+      if (o.dryRun) {
+        report.retired.push({ register: r.register, label, why: r.why });
+        continue;
+      }
+      const done = await door.update({ register: r.register, seq: at.seq as number, patch, version: at.version, note: r.why });
+      if (!done.ok) {
+        if (unreachable(done)) throw new Unreachable();
+        report.refused.push({ label, register: r.register, fix: fixOf(done) });
+        continue;
+      }
+      existing.set(key, done.value as Row);
+      report.retired.push({ register: r.register, label, why: r.why });
+    }
+  /* IN A STEADY ORDER, because `where` is in the order the record answered a list in and a run report a person
+     compares against yesterday's should not reshuffle itself. */
+  report.retired.sort((a, b) => `${a.register} ${a.label}`.localeCompare(`${b.register} ${b.label}`));
 
   /**
    * WHAT DECIDE ALREADY HOLDS, AND ASKING NOTHING WHEN THAT CANNOT BE READ.
@@ -459,6 +585,17 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     for (const c of report.changes.slice(0, most)) lines.push(`- ${NAMES[c.register] ?? c.register}, ${c.label}: ${c.fields.join(', ')}.`);
     if (report.changes.length > most) lines.push(`- and ${String(report.changes.length - most)} more.`);
   }
+  if (report.retired.length > 0) {
+    const by = new Map<string, string[]>();
+    for (const r of report.retired) by.set(r.why, [...(by.get(r.why) ?? []), `${NAMES[r.register] ?? r.register}, ${r.label}`]);
+    lines.push('', o.dryRun ? 'What would be closed, and why:' : 'Closed, and why:');
+    for (const [why, items] of by) lines.push(`- ${why} ${few(items)}.`);
+  }
+  if (report.clashes.length > 0) {
+    lines.push('', 'Categories this BrainDog already has under that name:');
+    for (const c of report.clashes)
+      lines.push(`- ${c.label}: ${c.fix} ${c.rows === 0 ? 'No ledger row named it.' : c.rows === 1 ? 'One ledger row arrived without a category.' : `${String(c.rows)} ledger rows arrived without a category.`}`);
+  }
   if (report.refused.length > 0) {
     lines.push('', 'Refused by the record:');
     for (const r of report.refused) lines.push(`- ${r.label} (${NAMES[r.register] ?? r.register}): ${r.fix}`);
@@ -580,5 +717,7 @@ export async function importCommand(args: string[], io: AgentIo, today: string =
     throw e;
   }
   for (const line of said(report, { dryRun: values['dry-run'] === true, file })) io.out(line);
-  return report.missing.length > 0 || report.refused.length > 0 ? 1 : 0;
+  /* A CLASHING CATEGORY IS AN EXIT 1 LIKE A REFUSAL IS, because something he asked for is not in the record and the
+     run's next step is his: clear the examples, or rename, and import again. */
+  return report.missing.length > 0 || report.refused.length > 0 || report.clashes.length > 0 ? 1 : 0;
 }
