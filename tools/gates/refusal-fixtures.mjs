@@ -28,6 +28,7 @@
  *     code:   ROW_LOCKED                          # UPPER_SNAKE; kebab-case of it is the file name
  *     via:    write                               # one of 40 §6's seven, the surface a runner drives
  *     raises: packages/kernel/src/index.ts        # the file that CONSTRUCTS it, repo-relative
+ *     derived: clash                              # optional; the code is read off this envelope, §6
  *     at:     lesson                              # the path the refusal carries (30 §6's `at`)
  *     found:  reverted                            # optional, and `wanted:` likewise
  *     fix:    Reopen the row before editing it.   # ONE sentence, 30 §6's shape for the fix
@@ -91,16 +92,21 @@
  * never had: it cites documents, and nothing in the tree connected a code to the line.
  *
  * A DIFFERENT PREDICATE FROM `refusals.mjs`, ON PURPOSE, AND THEY AGREE. That gate matches the shape
- * of a refusal CONSTRUCTOR (`no(` `bad(` `refuse(` `at(` and `code:`) because it is hunting for
- * codes outside the registry and has to see the call. This one asks the simpler question: is the
- * code written as a whole string literal anywhere in first-party source? Re-measured on 2026-09-20
- * by replicating both predicates over the same file set: the same code for code, 115 and 115, and
- * the eleven with no fixture are exactly the eleven no line constructs. Note that `refusals.mjs`
- * prints 113 rather than 115 on the same tree, so its own line is counting something narrower than
- * the predicate described here; the two codes are unaccounted for and are noted in `loop/STATUS.md`
- * rather than papered over. Simpler is right here because the failure this
- * gate guards against is a code somebody NAMED and did not fixture, and a test that asserts on a
- * code names it just as much as the line that throws it.
+ * of a refusal CONSTRUCTOR (`no(` `bad(` `refuse(` `at(`, `code:` and `new <Prefix>Error(`) because it
+ * is hunting for codes outside the registry and has to see the call. This one asks the simpler
+ * question: is the code written as a whole string literal anywhere in first-party source? Both are
+ * at 115 on this tree, code for code, and the eleven with no fixture are exactly the eleven no line
+ * constructs. Simpler is right here because the failure this gate guards against is a code somebody
+ * NAMED and did not fixture, and a test that asserts on a code names it just as much as the line
+ * that throws it.
+ *
+ * AND THE GAP BETWEEN THE TWO IS WHAT THE PAIR IS FOR. `refusals.mjs` printed 113 against this
+ * gate's 115 until 2026-09-20, and the two it could not see were `PULL_SHAPE_MISMATCH` and
+ * `PULL_EXPECT_FAILED`: `@braindog/connect` raises by constructing, `throw new PullError('CODE', …)`
+ * at eight sites, and a predicate that knew four call verbs and no constructor walked past all
+ * eight. The narrow predicate learned the constructor form and both now print 115. That is the
+ * second time the disagreement has found a raising shape nobody had written down, which is the
+ * argument for keeping both rather than for making one of them authoritative.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -174,13 +180,18 @@ if (VIAS.size === 0) findings.push("40 §6's `via` table is not where this gate 
  * which is strictly more use than restating the code's own name; `VERSION_STALE` is derived from a
  * conflict envelope that has no slot for one.
  *
+ * `derived` IS THE SAME ARGUMENT ONE FIELD ALONG, and it is an addition rather than a subtraction.
+ * `at` was a required field with no honest answer, so the fix was to stop requiring it; `raises`
+ * has an honest answer for every code and asks the wrong question of the handful that are read off
+ * an envelope, so the fix is a way to say which question to ask. `§6` holds the whole of it.
+ *
  * WHICH IS A SUBTRACTION AND NOT A CHECK, deliberately. Nothing here verifies that a fixture's `at`
  * matches what its emitter produces, and nothing cheap can: a code with six emitters has six legal
  * shapes, and each is a template literal over values only a running emitter has. That verification
  * is the `via` runners' (`40 §6`) and there is no honest proxy for it. What this line can do is
  * stop the format manufacturing claims nobody asked for, which is the cheaper half and is free.
  */
-const HEADER = { code: true, via: true, raises: true, at: false, fix: true, found: false, wanted: false };
+const HEADER = { code: true, via: true, raises: true, derived: false, at: false, fix: true, found: false, wanted: false };
 
 /* ── 3 · the fixture directory, and the two places the corpus says it is ─── */
 
@@ -202,6 +213,38 @@ const homes = HOMES.filter((home) => {
   }
 });
 if (homes.length > 1) findings.push(`the fixtures are in two places at once: ${homes.join(' and ')}`);
+
+/**
+ * A CODE NAMED IN A COMMENT IS NOT AN EMITTER.
+ *
+ * `§5` scanned raw file text, and the paragraph there naming two codes as an example put both of
+ * them into this gate's count by being written. A gate whose number moves when somebody EXPLAINS
+ * it is a gate reading its own commentary, and it is the third time that shape has turned up in
+ * this directory: dead-copy counted a copy key named in prose, flags counted a flag named in prose,
+ * and both blank comments for exactly this reason.
+ *
+ * IT SITS HERE BECAUSE TWO SECTIONS READ THROUGH IT NOW. `§4`'s `raises:` check asks the same
+ * question of one named file and asked it of raw text, so a file that argues about a code in a
+ * comment counted as a file that raises it.
+ */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+const readable = (text) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+
+/**
+ * THE TWO PLACES A CODE IS WRITTEN DOWN AND NOT RAISED, in one predicate both sections use.
+ *
+ * `packages/ports/src/index.ts` is the registry: 126 quoted codes in nine arrays, and it answers
+ * yes to every code there is. The negative trees under `tools/gates/negative/` carry copies of it
+ * and are a gate's input rather than its source. `§5` has skipped both since it was written and
+ * `§4` did not, so a fixture could name the registry as the file that raises its code and go green
+ * for the one thing the registry cannot fail to say.
+ */
+const registryFile = (path) => path.endsWith('packages/ports/src/index.ts');
+const seeded = (path) => path === 'tools/gates/negative' || path.startsWith('tools/gates/negative/');
 
 /* ── 4 · every fixture, parsed ───────────────────────────────────────────── */
 
@@ -242,6 +285,8 @@ function header(text, where) {
 const oneSentence = (fix) => /[.?!]$/.test(fix) && !/[.?!]\s/.test(fix) && /^[A-Z]/.test(fix);
 
 const seen = new Map();
+/** The `derived:` claims, resolved in `§6` once the tree has been walked for what exports what. */
+const derivations = [];
 let fixtureCount = 0;
 
 for (const home of homes) {
@@ -291,17 +336,40 @@ for (const home of homes) {
     /* THE SITE IT CLAIMS, READ. A fixture pointing at a file that does not name its code is a
        fixture about a refusal that has moved, and it is the only check here that opens the tree. */
     const raises = keys.get('raises') ?? '';
+    /* A CONSTRUCTOR IS A NAME. Anything else is not a claim this gate can resolve, so it is one
+       finding and the fixture is read as any other from here: `§6` cannot chase an identifier that
+       is not one, and three findings about one typo say no more than the first. */
+    let derived = keys.get('derived') ?? '';
+    if (derived !== '' && !/^[a-z][A-Za-z0-9_]*$/.test(derived)) {
+      findings.push(`${where} is derived from \`${derived}\`, and a constructor is one identifier`);
+      derived = '';
+    }
     if (raises !== '') {
       if (raises.includes('..') || raises.startsWith('/')) findings.push(`${where} raises \`${raises}\`, which leaves the tree`);
+      else if (registryFile(raises)) findings.push(`${where} raises \`${raises}\`, which is the registry and lists every code`);
+      else if (seeded(raises)) findings.push(`${where} raises \`${raises}\`, which is a gate's seeded input and not source`);
       else {
         let source = null;
         try {
-          source = readFileSync(join(root, ...raises.split('/')), 'utf8');
+          source = readable(readFileSync(join(root, ...raises.split('/')), 'utf8'));
         } catch {
           findings.push(`${where} raises \`${raises}\`, and there is no such file`);
         }
-        if (source !== null && !new RegExp(`(['"])${code}\\1`).test(source))
-          findings.push(`${where} raises \`${raises}\`, and nothing in it says \`${code}\``);
+        if (source !== null) {
+          const says = new RegExp(`(['"])${code}\\1`).test(source);
+          if (derived === '') {
+            if (!says) findings.push(`${where} raises \`${raises}\`, and nothing in it says \`${code}\``);
+          } else {
+            /* THE CLAIM INVERTED. `derived:` says the raising file answers with an envelope and never
+               names the code, so the file saying it is the fixture being wrong about itself. This is
+               what stops the key becoming a way out: put it on an ordinary fixture and the ordinary
+               fixture goes red, because its site does say its code. */
+            if (says) findings.push(`${where} is derived from \`${derived}\`, and \`${raises}\` says \`${code}\` itself`);
+            if (!new RegExp(`\\b${derived}\\s*[(<]`).test(source))
+              findings.push(`${where} is derived from \`${derived}\`, and \`${raises}\` never calls it`);
+            derivations.push({ where, code, derived });
+          }
+        }
       }
     }
   }
@@ -322,39 +390,39 @@ for (const home of homes) {
  * would answer yes to every one of them; the negative fixture trees under `tools/gates/negative/`
  * carry copies of it for the same reason, so the file is skipped by name wherever it sits. The
  * negatives are skipped whole besides: a seeded violation is an input to a gate, not source.
+ *
+ * BOTH SKIPS ARE `§4`'S TOO NOW, and they were this section's alone for as long as the `raises:`
+ * check existed. One fixture had found the gap: `version-stale.yaml` named the registry as the file
+ * that raises `VERSION_STALE`, and the registry is the one file that cannot fail that question.
  */
 const CODE_LITERAL = /(['"])([A-Z][A-Z0-9_]{2,})\1/g;
 const named = new Map();
 let scanned = 0;
 
 /**
- * A CODE NAMED IN A COMMENT IS NOT AN EMITTER.
+ * And what each source exports, which is the one thing `§6` needs and this walk is already open.
  *
- * This scanned raw file text, and the paragraph above naming two codes as an example put both of
- * them into this gate's count by being written. A gate whose number moves when somebody EXPLAINS
- * it is a gate reading its own commentary, and it is the third time that shape has turned up in
- * this directory: dead-copy counted a copy key named in prose, flags counted a flag named in prose,
- * and both blank comments for exactly this reason.
+ * COLLECTED FROM THE REGISTRY FILE TOO, unlike the codes. The registry is skipped for codes because
+ * it names all of them; it is not skipped for exports, because `clash` is declared there and a
+ * fixture naming a constructor has to be able to resolve one that lives beside the enumeration.
  */
-const blank = (m) => m.replace(/[^\n]/g, ' ');
-const readable = (text) =>
-  text
-    .replace(/\/\*[\s\S]*?\*\//g, blank)
-    .replace(/<!--[\s\S]*?-->/g, blank)
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+const EXPORTED = /^export (?:const|function) ([A-Za-z_$][\w$]*)/gm;
+const declares = new Map();
 
 function walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!skipDir(entry.name) && entry.name !== 'node_modules' && rel(path) !== 'tools/gates/negative') walk(path);
+      if (!skipDir(entry.name) && entry.name !== 'node_modules' && !seeded(rel(path))) walk(path);
       continue;
     }
     if (!['.ts', '.svelte', '.mjs'].includes(extname(entry.name))) continue;
     const where = rel(path);
-    if (where.endsWith('packages/ports/src/index.ts')) continue;
+    const text = readable(readFileSync(path, 'utf8'));
+    for (const m of text.matchAll(EXPORTED)) declares.set(m[1], [...(declares.get(m[1]) ?? []), where]);
+    if (registryFile(where)) continue;
     scanned += 1;
-    for (const m of readable(readFileSync(path, 'utf8')).matchAll(CODE_LITERAL))
+    for (const m of text.matchAll(CODE_LITERAL))
       if (registry.has(m[2])) named.set(m[2], [...new Set([...(named.get(m[2]) ?? []), where])]);
   }
 }
@@ -377,7 +445,58 @@ if (homes.length > 0)
     if (!seen.has(code))
       findings.push(`\`${code}\` is named by ${named.get(code).slice(0, 3).join(', ')} and has no fixture`);
 
-/* ── 6 · the line ────────────────────────────────────────────────────────── */
+/* ── 6 · the derived codes, held to the constructor they name ───────────── */
+
+/**
+ * A CODE CAN BE RAISED WITHOUT BEING WRITTEN DOWN, and `§4` had no way to be told so.
+ *
+ * `30 §6` has three answers and not two: ok, a refusal, and a conflict. A refusal carries its own
+ * `code`; a conflict carries a version, a row and an actor, and `ports`' `codeOf` is what reads it
+ * as `VERSION_STALE`. So the file that RAISES the code never quotes it, and a fixture for one of
+ * these had nowhere honest to point: for months `version-stale.yaml` pointed at the registry, which
+ * lists all 126 and therefore cannot fail the question `§4` was asking.
+ *
+ * `derived:` IS NOT AN EXEMPTION, AND THE TEST IS THAT IT COSTS MORE THAN IT SAVES. A fixture
+ * carrying it is checked three ways where a fixture without it is checked one:
+ *
+ *   1 · its site must NOT name the code (`§4`), which is the whole claim and the reason the key
+ *       cannot be pasted onto an ordinary fixture to quieten it;
+ *   2 · its site must CALL the constructor it names (`§4`), so `raises:` is still read against the
+ *       tree and a site that stops answering with the envelope goes red;
+ *   3 · the constructor must be exported by exactly one first-party source, and that source must
+ *       name the code somewhere that is not a list of codes. Below.
+ *
+ * ONE SOURCE, BECAUSE TWO WOULD BE A GUESS. Resolving `clash` to a file is only honest while the
+ * name is unambiguous across `packages`, `apps` and `tools`; the day a second package exports one
+ * too, this says so rather than picking the first it walked into.
+ *
+ * AND A LINE THAT IS NOTHING BUT CODES IS A LIST. `packages/ports/src/index.ts` both declares the
+ * envelope and holds the registry, so "does that file name the code" is a question it answers yes
+ * to 126 times over, which is the same loophole one key along. A registry line is quoted codes, commas and
+ * brackets and nothing else; strip those and what remains is empty. `codeOf`'s line does not go
+ * empty, because it is an expression. That is the difference between listing a code and reading
+ * one, measured rather than asserted.
+ */
+const listOfCodes = (line) => line.replace(/(['"])[A-Z][A-Z0-9_]{2,}\1/g, '').replace(/[\s,[\]]/g, '') === '';
+
+for (const d of derivations) {
+  const from = declares.get(d.derived) ?? [];
+  if (from.length === 0) {
+    findings.push(`${d.where} is derived from \`${d.derived}\`, which no first-party source exports`);
+    continue;
+  }
+  if (from.length > 1) {
+    const some = from.slice(0, 3).join(', ');
+    findings.push(`${d.where} is derived from \`${d.derived}\`, and ${from.length} sources export it: ${some}`);
+    continue;
+  }
+  const text = readable(readFileSync(join(root, ...from[0].split('/')), 'utf8'));
+  const reads = text.split('\n').filter((l) => new RegExp(`(['"])${d.code}\\1`).test(l) && !listOfCodes(l));
+  if (reads.length === 0)
+    findings.push(`${d.where} is derived from \`${d.derived}\`, and ${from[0]} names \`${d.code}\` only in a list of codes`);
+}
+
+/* ── 7 · the line ────────────────────────────────────────────────────────── */
 
 if (findings.length > 0) {
   console.error(`\n  refusal-fixtures: ${findings.length} finding(s) against 30 §6\n`);
@@ -398,6 +517,7 @@ if (findings.length > 0) {
     `  refusal-fixtures: ${fixtureCount} fixtures for ${rows.length} codes in ${homes[0]}/, ` +
       `one per code and one code per fixture; ` +
       `${named.size} codes named across ${scanned} sources, all fixtured; ` +
-      `${unfixtured.length} codes have none, and no source names any of them`,
+      `${unfixtured.length} codes have none, and no source names any of them; ` +
+      `${derivations.length} read off an envelope rather than constructed, each resolved to the one source that exports it`,
   );
 }

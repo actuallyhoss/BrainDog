@@ -1,4 +1,5 @@
-code:   VERSION_STALE
-via:    write
-raises: packages/ports/src/index.ts
-fix:    Read the row again and re-apply the change.
+code:    VERSION_STALE
+via:     write
+raises:  packages/kernel/src/index.ts
+derived: clash
+fix:     Read the row again and re-apply the change.

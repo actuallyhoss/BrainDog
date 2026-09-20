@@ -357,8 +357,10 @@ Nothing here reads wall-clock time or `Math.random`; §9's two-run test proves i
 
 ## 6 · Refusals and errors
 
-The package raises none. It **carries** the seventy-five fixtures of [30-BLUEPRINT](30-BLUEPRINT.md) §6 — one file
-per code, named by that table's *Fixture* column — and this section fixes their shape.
+The package raises none. It **carries** the fixtures of [30-BLUEPRINT](30-BLUEPRINT.md) §6 — one file per code,
+named by that table's *Fixture* column — and this section fixes their shape. The count is deliberately not written
+here; `tools/gates/refusal-fixtures.mjs` prints it on every run, against the registry, and the paragraph three
+screens down explains why a figure typed into this page is the thing that goes stale first.
 
 **Rule one: a fixture that fails `declare` lint is a test failure, not a fixture.** Every pack in `packs/`, every
 `pack:` inside a `lint`/`install` refusal fixture, and every inline declaration lints clean — except where the
@@ -366,8 +368,10 @@ fixture *is* the lint failure, in which case the file names the code and the tes
 The one pack this applies to is `reactor-core`, whose `expect.lint` is `PRIMITIVES_OUT_OF_RANGE` at
 `requires.primitives` (found `2`, wanted `≤ 1`).
 
-**Rule two: every refusal fixture names its `code` and its exact `at`**, and the runner asserts the refusal list is
-exactly one long. Common keys:
+**Rule two: every refusal fixture names its `code`, and its `at` when the refusal has one**, and the runner asserts
+the refusal list is exactly one long. `at` was a required key until September 20th 2026, which is a rule this page
+was never entitled to make: §6 below says `at` is optional, in terms, and nine refusals have no address to give.
+What a required key bought was nine invented ones. Common keys:
 
 ```yaml
 code: FIELD_TYPE_UNKNOWN          # UPPER_SNAKE; kebab-case of it is the file name
@@ -406,6 +410,34 @@ behaviour.
 because the format left no way to say there is none. Three of those nine are now blank, which is the true answer for
 a refusal about several tables at once, for one that carries `allowed:` instead, and for one derived from a conflict
 envelope that has no slot for an address at all.
+
+**`derived:` says the code is read off an envelope rather than built.** Every fixture names in `raises:` the file
+that raises its code, and `refusal-fixtures` opens that file and looks for the code written in it. That question is
+the wrong one for a code nothing writes down. [30-BLUEPRINT](30-BLUEPRINT.md) §6 has three answers and not two: a
+conflict is not a refusal, it carries a version, a row and the actor who moved it, and it carries no `code` — so the
+kernel's write path answers a race with `clash(…)` and never types `VERSION_STALE`, and `ports`' `codeOf` is what
+reads the envelope as that code. `version-stale.yaml` therefore pointed at `packages/ports/src/index.ts` and was
+green on the one file in the repository that cannot fail the question, because the registry array there lists all
+126 codes. `derived:` is how the fixture says which question to ask instead:
+
+```yaml
+raises:  packages/kernel/src/index.ts   # the file that answers with the envelope
+derived: clash                          # the constructor of that envelope; the code is read off it
+```
+
+**It is not an exemption, and a fixture carrying it is checked three ways where a fixture without it is checked
+one.** The raising file must *not* name the code, which is the whole of the claim and the reason the key cannot be
+pasted onto an ordinary fixture to quieten it — do that and the ordinary fixture goes red, because its site does say
+its code. The raising file must call the constructor, so `raises:` is still read against the tree and a write path
+that stops answering with the envelope takes the fixture with it. And the constructor must be exported by exactly
+one first-party source, which must name the code somewhere that is not a list of codes: a line of quoted codes,
+commas and brackets is a registry entry, and stripping those from `codeOf`'s line leaves an expression behind. One
+source, because two make resolving the name a guess, and the day a second package exports a `clash` the gate says so
+rather than picking whichever it walked into first. The value is one identifier; a path is refused.
+
+`VERSION_STALE` is the only code that carries it today. The key exists because the shape does: any code a caller
+derives from an answer that does not carry one will need it, and the alternative is a fixture that points at the
+registry and proves nothing.
 
 115, counted: 27 + 20 + 7 + 15 + 37 + 7 + 2, against a registry of 126. The eleven without a fixture are the eleven
 no line of source names, which is the rule `refusal-fixtures` enforces and prints on every run. Do not hand-copy
