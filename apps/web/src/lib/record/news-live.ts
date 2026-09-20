@@ -64,11 +64,11 @@ const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: un
  * about the same figure. The sentence naming the list is not here: this reader holds the figure's declaration and not
  * the record's own name for the register behind it.
  *
- * AND THE `stat` TILE NAMED ABOVE IS NO LONGER THE SAME READING, which is why this says so rather than leaving the
- * pointer to be followed. `page-live.ts` keys its verdict and its door off `rows` still, and its own `Reading` type
- * leaves `held` out, so the live pages draw the collapsed tile that this one no longer draws. Measured over the seed
- * in `engines.test.ts`, the kernel answers `rows: 0, held: 40` for a figure that matches nobody over forty
- * obligations, and both readers are handed that same answer.
+ * AND THE `stat` TILE NAMED ABOVE READS IT THE SAME WAY NOW, which it did not when this sentence was first written:
+ * `page-live.ts` kept keying its verdict and its door off `rows` for one commit, so the live pages drew the collapsed
+ * tile that this one had stopped drawing. `engines.test.ts` hands one kernel reading, `rows: 0, held: 40` over the
+ * seed's forty obligations, to both renderers and holds them to one verdict and one door, so the next divergence is a
+ * failing test rather than two screens answering differently about one figure.
  */
 export function tileOf(id: string, r: Reading | null): Metric {
   const decl = METRICS[id];

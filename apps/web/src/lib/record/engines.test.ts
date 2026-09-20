@@ -12,12 +12,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { costOf, isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
+import { costOf, fill, isStale, openRecord, ratesFrom, readBlock as kernelBlock, type Kernel, type PageBlock as KernelBlock, type PageDeps } from '@braindog/kernel';
 import { AGENTS_PAGES, NOW, RUNS_ON, installSeed } from '@braindog/seed';
 
 import { page, pages, readBlock as webBlock, ROWS } from './api.ts';
-import { read as webRead, withFx, type MetricDecl as WebMetric } from './metrics.ts';
+import { METRICS } from './declared.ts';
+import { read as webRead, withFx, withParam, type MetricDecl as WebMetric } from './metrics.ts';
 import { tileOf } from './news-live.ts';
+import { tileOf as pageTile } from './page-live.ts';
 import type { PageBlock } from './schema.ts';
 import { copy } from '../copy.ts';
 
@@ -573,4 +575,59 @@ test('THE LIVE HOME TILE KEYS ITS VERDICT OFF WHAT THE LIST HOLDS, because the r
   const empty = tileOf('overdue', { ...none.value, held: 0 } as never);
   assert.equal(empty.tone, undefined, 'a tick over a list nobody has written to');
   assert.equal(empty.href, undefined, 'a door into a list with nothing behind it');
+
+  /* AND THE OTHER LIVE RENDERER IS HANDED THE SAME READING, because there are two of them and the
+     pages use the one that was not changed. `news-live.ts` draws Home and `page-live.ts` draws
+     `/p/<slug>`, and both are handed a kernel reading whole over the wire. Measured on this reading
+     before this assertion existed: Home answered `tone: "good"` with an href and the page answered
+     `tone: undefined` with none, so a record with forty invoices and nothing overdue was given the
+     good news on one screen and denied it on the other, including on the project page the kernel's
+     own `held` narrowing was written for. Two screens, one figure, one answer or one of them is
+     lying. */
+  const onPage = pageTile({ metric: 'overdue', reading: none.value as never });
+  assert.equal(onPage.tone, answered.tone, 'Home and a live page disagree about the verdict on one reading');
+  assert.equal(Boolean(onPage.href), Boolean(answered.href), 'Home and a live page disagree about the door on one reading');
+
+  const emptyOnPage = pageTile({ metric: 'overdue', reading: { ...none.value, held: 0 } as never });
+  assert.equal(emptyOnPage.tone, undefined, 'a page tile ticked a list nobody has written to');
+  assert.equal(emptyOnPage.href, undefined, 'a page tile opened a door into a list with nothing behind it');
+});
+
+test('A FIGURE WITH A PARAMETER HOLDS THE SAME `held` IN BOTH ENGINES, which is the half the grouped loop cannot reach', async () => {
+  /* THE LOOP ABOVE PINS `held` OVER FIGURES THE TWO ENGINES NEVER DIFFERED ON. Every case in it is
+     unparameterised, and the case they differed on is the one a project page draws: `project-owed:Kiln`
+     came back `held: 10` from the kernel and `held: 40` from the browser, the whole obligations
+     register, because the browser counted `ROWS[register].length` with no scope input at all. Ten
+     against forty, on every project page, with an assertion in place that said the two were pinned.
+     So the parameter is filled here by each engine's own rule — the kernel's `fill`, which writes
+     `within`, and the browser's `withParam` — rather than by a `where:` this test substituted, which
+     is what makes this measure the scope derivation and not the arithmetic after it.
+
+     `held` UNDER THE WHOLE REGISTER IS THE POINT, so each case asserts the narrowing happened as well
+     as that the two agree: two engines both answering forty would satisfy an equality and still be
+     the defect. */
+  await seeded;
+  const k = opened!;
+  const cases: { id: string; it: string; register: string }[] = [
+    { id: 'project-owed', it: 'Kiln', register: 'obligations' },
+    { id: 'project-owed', it: 'Tallow', register: 'obligations' },
+    { id: 'project-open', it: 'Kiln', register: 'tasks' },
+    { id: 'project-cost', it: 'Kiln', register: 'services' },
+  ];
+  for (const { id, it, register } of cases) {
+    const template = METRICS[id]!;
+    const kernel = k.metric(fill(template, null, it) as never);
+    assert.ok(kernel.ok, `${id}:${it}, the kernel: ${JSON.stringify(kernel)}`);
+    const web = webRead(withParam(template as WebMetric, it));
+    assert.deepEqual(web.refusals, [], `${id}:${it}, the app: ${web.refusals.join('; ')}`);
+    assert.equal(web.rows, kernel.value.rows, `${id}:${it}: what the predicate matched`);
+    assert.equal(web.value, kernel.value.value, `${id}:${it}: the figure`);
+    assert.equal(web.held, kernel.value.held, `${id}:${it}: how many rows the list holds`);
+    const whole = (ROWS[register] ?? []).length;
+    assert.ok(whole > 0, `the demo holds no ${register}, so this case reads nothing`);
+    assert.ok(
+      kernel.value.held < whole,
+      `${id}:${it} counts all ${whole} rows of ${register} as its scope, so a project with nothing in it reads as settled`,
+    );
+  }
 });

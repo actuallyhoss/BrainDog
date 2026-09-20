@@ -122,6 +122,21 @@ export type MetricDecl = {
   group_by?: string;
   /** `day` · `week` · `month` · `quarter` · `year`, beside a date `group_by` only. */
   bucket?: Bucket;
+  /**
+   * THE CLAUSES A PARAMETER FILLED, WHICH ARE SCOPE AND NOT FILTER, and what `held` counts.
+   *
+   * NOBODY WRITES THIS IN A DOCUMENT. `withParam` puts it on the copy it hands `read`, the way the
+   * kernel's `fill` puts `MetricDecl.within` on the copy it hands `evaluateMetric`. The seed carries
+   * no such key and needs none.
+   *
+   * IT IS THE SECOND COPY OF A RULE THAT SHOULD EXIST ONCE, which `50 §1` is about: the kernel
+   * derives it in `scopeOf` and this file derives it again, because there are two engines. Measured
+   * before it existed, over the demo's own rows: `project-owed:Kiln` answered `held: 40` here and
+   * `held: 10` in the kernel, and forty is every obligation in the record. `engines.test.ts` now
+   * drives the two over the same declaration, each filling the parameter by its own rule, so the
+   * next divergence is a failing test rather than two screens.
+   */
+  within?: string;
 };
 
 /* ── evaluating one ──────────────────────────────────────────────────────── */
@@ -139,6 +154,13 @@ export type Reading = {
    * deliver. Nothing overdue on a register somebody has not typed into yet is not news at all, and
    * with only `rows` to read from, the tile could not tell them apart — so an hour-old record
    * reported its finances healthy, in green, on all four tiles.
+   *
+   * AND A PARAMETER IS PART OF THE SCOPE, so `project-owed:Kiln` counts Kiln's obligations and not
+   * the record's. This was `ROWS[register].length` with no scope input at all, which made every
+   * project page read the whole register: measured on the demo's rows, `project-owed:Kiln` answered
+   * `held: 40` here against the kernel's `held: 10`, so a project created inside a record that
+   * already has invoices elsewhere read `rows: 0` out of forty held, which is the good-news zero.
+   * `MetricDecl.within` carries the clauses the parameter filled and this is counted inside them.
    */
   held: number;
   /** The proportional change against the shifted window, or `null` when it is not comparable. */
@@ -675,8 +697,15 @@ export const isTemplate = (decl: MetricDecl): boolean => (decl.where ?? '').incl
 /** The six aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
 const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 
-/** Every key a metric document may carry here, so one it may not is named rather than ignored. */
-const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket']);
+/**
+ * Every key a metric document may carry here, so one it may not is named rather than ignored.
+ *
+ * `within` IS IN HERE THOUGH NO DOCUMENT WRITES IT, because `withParam` puts it on the copy it hands
+ * `read` and this check runs on that copy: left out, every parameterised figure came back refused
+ * with *"within: is published in 08 and not read by this build"*, which is every tile on every
+ * project page.
+ */
+const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket', 'within']);
 
 /** The formats this build writes. A format it does not know printed the bare number. */
 const READS_FORMAT = ['int', 'pct', 'days', 'decimal', 'day'];
@@ -752,8 +781,42 @@ function unaggregatable(decl: MetricDecl): string[] {
   return out;
 }
 
+/**
+ * The one placeholder a parameter fills, spelled once so the substitution and the scope derived from
+ * it below cannot disagree about which clauses carried it. `isTemplate` above deliberately asks a
+ * wider question, whether there is any `{{` left at all, so that a placeholder this build does not
+ * fill is still named as unread rather than measured as a predicate.
+ */
+const PARAM = '{{it}}';
+
+/**
+ * A template filled: the id with its parameter, the predicate with the name, and the scope the
+ * parameter cut.
+ *
+ * A PARAMETER IS NOT A FILTER OVER A REGISTER, IT IS WHICH REGISTER THE FIGURE IS ABOUT, and that is
+ * the whole distinction `Reading.held` exists to draw. `project-owed:Kiln` fills `thing is {{it}}`
+ * into a predicate that also says `state is open`, so the rows the predicate chose from are Kiln's
+ * obligations and the open ones among them are what it matched. Counted as the whole register
+ * instead, this side answered `held: 40` on the demo against the kernel's `held: 10`, and `api.ts`
+ * reads `held === 0` to decide between *nothing is overdue* and *add your first invoice*: with forty
+ * rows in the register that is never zero, so a brand-new project was told its invoices were all
+ * settled. The kernel repaired its own copy and this one was left, which `engines.test.ts` now
+ * measures by driving both over one declaration.
+ *
+ * A COMMA IS WHAT SEPARATES A SENTENCE'S CLAUSES, exactly as `compile` splits it, so the clauses kept
+ * here are the clauses that grammar would have built — the same rule the kernel's `scopeOf` applies
+ * to the same sentence, one level up. A predicate with no `{{it}}` in any clause cuts nothing, and
+ * `within` is then left off so `held` stays the whole register it has always been.
+ */
 export function withParam(decl: MetricDecl, it: string): MetricDecl {
-  return decl.where === undefined ? decl : { ...decl, metric: `${decl.metric}:${it}`, where: decl.where.replaceAll('{{it}}', it) };
+  if (decl.where === undefined) return decl;
+  const scope = decl.where.split(',').filter((clause) => clause.includes(PARAM));
+  return {
+    ...decl,
+    metric: `${decl.metric}:${it}`,
+    where: decl.where.replaceAll(PARAM, it),
+    ...(scope.length === 0 ? {} : { within: scope.join(',').replaceAll(PARAM, it) }),
+  };
 }
 
 export function read(decl: MetricDecl, now: number = NOW): Reading {
@@ -804,6 +867,20 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const all = ROWS[register] ?? [];
   const rows = all.filter((e) => matches(e, w, now));
 
+  /**
+   * THE ROWS THE PREDICATE CHOSE FROM, which is the register's own unless a parameter narrowed it.
+   *
+   * `held` was `all.length` with nothing able to narrow it, so every project page counted the whole
+   * register as its scope: `project-owed:Kiln` read `held: 40` where the kernel read `held: 10`.
+   * The clauses `withParam` kept are a strict subset of `where`, so `explain` above has already said
+   * anything wrong with them and there is nothing new to refuse here — and unlike the kernel's, this
+   * predicate is matched in JavaScript and reaches no SQL, so an unchecked one is a wrong answer
+   * rather than a hole. The clock is the same one `rows` was matched at, because the parameter's
+   * clauses resolve their dates exactly as the whole sentence does.
+   */
+  const scope = decl.within === undefined ? null : compile(register, decl.within);
+  const heldRows = scope === null ? all : all.filter((e) => matches(e, scope, now));
+
   /* TWO CURRENCIES ARE NEVER ADDED, and this is the line that would have added them. A tile is one
      figure with one code beside it; a sum across two is a number of the right size in the wrong
      unit, and there is no screen on which anybody notices. */
@@ -822,7 +899,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const acrossed = figure.parts !== undefined || figure.fx !== undefined;
   if (seen.size > 1 && !acrossed) {
     const why = `${decl.metric}: ${mixedFix([...seen].sort())}`;
-    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
@@ -831,7 +908,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const held = [...seen][0];
   if (!acrossed && fx.into && declared && held && fx.into !== held) {
     const why = `${decl.metric}: the rows are in ${held} and the format says ${fx.into}`;
-    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   /* A FACTOR THE TABLE DOES NOT HOLD IS A REFUSAL, NOT A SMALLER NUMBER. `operand` answered `null`
@@ -843,7 +920,7 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const short = missingFactors(rows, decl.value);
   if (short.length) {
     const why = `${decl.metric}: no factor for ${short.slice(0, 3).join(', ')}${short.length > 3 ? ` and ${short.length - 3} more` : ''}`;
-    return { value: null, shown: '—', rows: rows.length, held: all.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
+    return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
   const value = figure.value;
@@ -930,13 +1007,16 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
    * record somebody installed an hour ago, `OWED TO YOU · GBP 0.00 · ✓` reported the finances
    * healthy, four times, in green. `19 §6`'s collapse, in the direction nothing had audited:
    * `no-data-yet` read as `cleared`.
+   *
+   * AND ON A PARAMETERISED FIGURE THE LIST IS THE PARAMETER'S, not the register's: `heldRows` above
+   * has the measurement and the reason.
    */
   return {
     value,
     /* A FIGURE IN PARTS IS WRITTEN AS ITS PARTS, and one converted into a currency other than the declared one in that. */
     shown: figure.parts ? partsShown(decl.format, figure.parts) : figure.unit && declared && figure.unit !== declared ? money(Math.round(value ?? 0), figure.unit) : format(decl.format, value),
     rows: rows.length,
-    held: all.length,
+    held: heldRows.length,
     delta,
     why,
     unmeasured,

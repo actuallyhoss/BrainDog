@@ -62,6 +62,16 @@ type Reading = {
   value: number | null;
   unit: string | null;
   rows: number;
+  /**
+   * How many rows the list holds at all, which is not `rows` and is what an empty list means here.
+   *
+   * OPTIONAL BECAUSE A READING BUILT BY HAND HAS ONLY EVER WRITTEN `rows`, the same reason
+   * `news-live.ts` leaves it optional: a required key would have made every such reading in
+   * `page-live.test.ts` a compile error rather than a repair. Where it is absent the tile falls back
+   * to `rows`, which is the old, ambiguous reading of a zero and withholds the verdict rather than
+   * inventing one. The record always sends it.
+   */
+  held?: number;
   met: boolean | null;
   refusals: Said[];
   /** A grouped figure's parts, and how many past the cap were not drawn. */
@@ -226,13 +236,23 @@ const columnsOf = (b: Answered) => {
 /**
  * One figure of a `stat` block, as a tile.
  *
- * THE VERDICT IS THE RECORD'S (`met`), and a figure over no rows carries none, because a tick over an
- * empty list is a verdict on nothing. The label, the format and the target line are the declaration's.
+ * THE VERDICT IS THE RECORD'S (`met`), and a figure over an empty list carries none, because a tick
+ * over an empty list is a verdict on nothing. The label, the format and the target line are the
+ * declaration's.
+ *
+ * AN EMPTY LIST IS `held === 0` AND NOT `rows === 0`, and the difference is the whole of it. `rows` is
+ * what the predicate matched and `held` is what the list holds at all, so nothing overdue over forty
+ * invoices and nothing overdue over a list nobody has written to came through here as the same tile.
+ * This is the renderer the live pages use, `/p/<slug>` among them, and it was the one left keying off
+ * `rows` after `news-live.ts` was moved: driven in `engines.test.ts` over one kernel reading,
+ * `{rows: 0, held: 40}`, Home answered `tone: "good"` with a link and this answered no verdict and no
+ * link. One figure, two screens, two answers — and the project page is the screen the kernel's own
+ * narrowing of `held` was written for, so it was the screen most likely to be asked.
  */
 const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
   typeof v === 'object' && v !== null && (typeof (v as { lte?: unknown }).lte === 'number' || typeof (v as { gte?: unknown }).gte === 'number');
 
-function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>): Metric {
+export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
   const built = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
@@ -256,7 +276,8 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
     return { id: cell.metric, label, value: partsShown(decl?.format, r.parts), note: [said(''), across].filter(Boolean).join(' · ') };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
-  const met = r.rows === 0 ? null : r.met;
+  const empty = (r.held ?? r.rows) === 0;
+  const met = empty ? null : r.met;
   /* THE LINE IS THE RECORD'S SERIES, and only numbers and gaps are drawn: anything else is not a day. */
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   return {
@@ -274,7 +295,7 @@ function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record
        figure says as of which day's rates. */
     note: [said(decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    ...(decl && r.rows > 0 ? { href: hrefFor(decl) } : {}),
+    ...(decl && !empty ? { href: hrefFor(decl) } : {}),
   };
 }
 
