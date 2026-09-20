@@ -300,16 +300,17 @@ test('INIT AND SERVE ARE THE SELF-HOST\'S, spawned with their arguments and thei
   assert.match(missing.stderr, /^braindog init needs the self-host\. Set BRAINDOG_SELFHOST to its entry file\.$/m);
 });
 
-test('a command from a later step says so, and an unknown one is not echoed unless it is a plain word', () => {
+test('nothing is listed as coming later, and an unknown command is not echoed unless it is a plain word', () => {
   const run = (...args: string[]) => {
     const r = spawnSync(process.execPath, ['src/main.ts', ...args], { cwd: APP, env: envFor({}), encoding: 'utf8' });
     printed.push(r.stdout, r.stderr);
     return r;
   };
-  /* `login` is built now (`login.test.ts`), and run here it would reach a real host. */
-  const later = run('logout');
-  assert.equal(later.status, 1);
-  assert.equal(later.stderr.trim(), 'braindog logout is not built yet.');
+  /* EVERY COMMAND OF THE AGENT PATH'S §4.2 IS BUILT, so the sentence that named one and did nothing is
+     gone with the list behind it. A command that answers "not built yet" and a command that does not
+     exist read the same to a person typing quickly, and only one of them is a typo. */
+  const built = run('logout', '--help');
+  assert.doesNotMatch(built.stderr, /is not built yet/, built.stderr);
 
   const typo = run('mpc');
   assert.equal(typo.status, 1);

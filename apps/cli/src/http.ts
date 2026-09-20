@@ -94,8 +94,14 @@ export function hostKey(raw: string): string {
   return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
 }
 
-/* A hand-written key with a trailing slash or no scheme still names the same host. */
-const sameHost = (written: string, key: string) => {
+/**
+ * A hand-written key with a trailing slash or no scheme still names the same host.
+ *
+ * EXPORTED BECAUSE `logout` HAS TO REMOVE WHAT `target` WOULD HAVE USED. A second copy of this that
+ * matched one key fewer would leave behind an entry every other command still reads, which is a
+ * logout that did not log out.
+ */
+export const sameHost = (written: string, key: string) => {
   try {
     return hostKey(written) === key;
   } catch {

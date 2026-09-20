@@ -13,7 +13,8 @@
     "@braindog/kernel": "workspace:*",
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
-    "@braindog/seed": "workspace:*"
+    "@braindog/seed": "workspace:*",
+    "braindog-render": "workspace:*"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

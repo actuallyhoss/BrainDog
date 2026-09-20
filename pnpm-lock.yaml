@@ -48,6 +48,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
+      braindog-render:
+        specifier: workspace:*
+        version: link:../../packages/render
 
   apps/selfhost:
     dependencies:

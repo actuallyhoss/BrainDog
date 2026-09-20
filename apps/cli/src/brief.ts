@@ -26,8 +26,8 @@ export type Moved = number | null | undefined;
 /* A line the cap may drop, or one it keeps: who this is, the handoff, the warning, the questions, the next step. */
 type Line = { text: string; keep: boolean };
 
-/* One line of someone else's words: control characters and runs of space collapsed, and long text cut. */
-const clip = (said: string, max: number): string => {
+/** One line of someone else's words: control characters and runs of space collapsed, and long text cut. */
+export const clip = (said: string, max: number): string => {
   const one = said.replace(/[\x00-\u001f\s]+/g, ' ').trim();
   return one.length > max ? `${one.slice(0, max - 3)}...` : one;
 };
@@ -59,22 +59,40 @@ const where = (row: Brief): string => (row.scope === 'project' ? 'this project' 
 const OWN = new Set(['learnings', 'credentials', 'skills']);
 const PER_LINE = 5;
 
-export function briefing(attached: Attached, at: Where, moved: Moved): string {
-  const c: Context | undefined = attached.context;
-  const lines: Line[] = [];
-  const keep = (text: string) => lines.push({ text, keep: true });
-  const add = (text: string) => lines.push({ text, keep: false });
-
-  const place = c?.project
+/** The folder's project, the projects it could belong to, or neither. The tail of every first line. */
+export function placeOf(c: Context | undefined): string {
+  return c?.project
     ? `Project: ${clip(c.project.name, 60)}.`
     : c && c.ambiguous.length > 0
       ? `This folder matches ${c.ambiguous.join(' and ')}. Global until one of them lists it.`
       : 'No project here, so only what applies everywhere is shown.';
-  keep(`BrainDog: ${attached.spoken} ${attached.resumed ? 'resumed' : 'started'} in ${at.repo ?? 'a folder outside any repository'} on ${at.host}. ${place}`);
-  if (!c) {
-    keep('This host sends no briefing. Call context for one, and call handoff with the one next step before you stop.');
-    return fit(lines);
-  }
+}
+
+/** The repository as a first line names it. */
+export const repoOf = (at: Where): string => at.repo ?? 'a folder outside any repository';
+
+/** The start hook's briefing: the line saying which run this is and where, then everything the context holds. */
+export function briefing(attached: Attached, at: Where, moved: Moved): string {
+  const c: Context | undefined = attached.context;
+  const head = `BrainDog: ${attached.spoken} ${attached.resumed ? 'resumed' : 'started'} in ${repoOf(at)} on ${at.host}. ${placeOf(c)}`;
+  if (!c)
+    return fit([
+      { text: head, keep: true },
+      { text: 'This host sends no briefing. Call context for one, and call handoff with the one next step before you stop.', keep: true },
+    ]);
+  return briefingOf(head, c, moved);
+}
+
+/**
+ * The briefing under a first line the caller writes: the handoff, who else is live, what waits, what applies.
+ *
+ * THE FIRST LINE IS PART OF IT, so the caps of `fit` count it, and a caller that has not attached can say what
+ * `attach` cannot say for it. `braindog context` starts nothing and resumes nothing, so it writes its own.
+ */
+export function briefingOf(head: string, c: Context, moved: Moved): string {
+  const lines: Line[] = [{ text: head, keep: true }];
+  const keep = (text: string) => lines.push({ text, keep: true });
+  const add = (text: string) => lines.push({ text, keep: false });
 
   if (c.handoff) {
     keep(`Last handoff (${c.handoff.from}, ${ago(c.handoff.age_s)}): ${clip(c.handoff.next, 200)}`);

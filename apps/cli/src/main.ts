@@ -2,10 +2,12 @@
 /**
  * `braindog`, the command on an agent's machine.
  *
- * FIVE COMMANDS ARE BUILT: `mcp`, the stdio server Claude Code launches (`loop/research-agent-path.md`
- * §1.1), `hook` and `install`, the session hooks of its §4, `login`, the device grant of its step 12, and `keys`, the
- * key doors of its step 18, and `skills` and `tools`, the sync and scan of its step 19. The rest of the plan's §4.2 is named, so
- * a person who types one learns it is coming rather than that it does not exist.
+ * THE WHOLE OF `loop/research-agent-path.md` §4.2 IS BUILT: `mcp`, the stdio server Claude Code
+ * launches (§1.1), `hook` and `install`, the session hooks of its §4, `login` and `logout`, the device
+ * grant of its step 12 and its other half, `keys` and `run`, the key doors of its step 18, `skills`
+ * and `tools`, the sync and scan of its step 19, and `session` and `context`, the handoff and the
+ * briefing from a shell. There is no longer a list of commands that name themselves and do nothing:
+ * a word this command does not know is a typo, and it says so.
  *
  * `init` AND `serve` BELONG TO THE SELF-HOST, which has no `bin` of its own and whose messages tell
  * people to run `braindog init` and `braindog serve`. This command claims the name and hands those two
@@ -19,14 +21,20 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
+import { PRIMITIVES_VERSION } from 'braindog-render';
+
 import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target } from './http.ts';
 import { importCommand } from './import.ts';
 import { installAt, installInto, profilesOf } from './install.ts';
 import { keys, spawnInherit } from './keys.ts';
 import { login } from './login.ts';
+import { logout } from './logout.ts';
 import { page as pageCommand } from './page.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
+import { context } from './context.ts';
+import { session } from './session.ts';
 import { skills } from './skills.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
@@ -43,23 +51,40 @@ const stop = (line: string): never => {
   return process.exit(1);
 };
 
-const LATER = ['logout', 'session', 'run', 'context', '--version'];
+/**
+ * THE APP HAS NO VERSION OF ITS OWN, and inventing one would create the second version number
+ * `52 §5.6` exists to prevent. The build is a date and a commit, put here by `48 §3`'s bundler; run
+ * from a checkout there is no bundle and no commit, and it says so. The other three numbers are the
+ * ones a host and a file can disagree with this build about, which is the question a person asking
+ * for a version has.
+ */
+declare const __BUILD__: string;
+const version = (): string =>
+  `app ${typeof __BUILD__ === 'string' ? __BUILD__ : 'dev+0000000'} · format ${FORMAT_VERSION} · kernel ${KERNEL_MIGRATION} · primitives ${PRIMITIVES_VERSION}`;
 
 const usage = () =>
   [
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
     '  With --vault it asks for a grant that opens the keys of one project, or with * the keys of no project.',
+    'braindog logout [<host>] [--host <host>]',
+    "  Remove this machine's token, runner token and vault grants for one host from the hosts file. Nothing is sent, and the host is not told.",
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--vault <project>] [--host <host>]',
     '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
     'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
     '  Run the command with the key in one environment variable, named from the label unless --as names it. It is never printed.',
+    'braindog run <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
+    '  The same as keys exec, under a shorter name.',
     'braindog skills sync [--host <host>] [--dry-run]',
     "  Write the record's skills where Claude Code reads them, keep a local edit and propose it, and register a skill kept by hand.",
     'braindog tools scan [--host <host>] [--dry-run]',
     '  Record the MCP servers in .mcp.json and ~/.claude.json. A key found there is deposited, and only its name is recorded.',
     'braindog tools write [--scope user|project] [--dry-run]',
     "  Show the Claude Code entries the record's tools become, and apply one scope only when it is named. No entry holds a key.",
+    'braindog session show|next <text>|tried <text>|note <text>|end [--state idle|handoff|done] [--next <text>]',
+    '  Address the run this folder is in: read where it stands, leave a next step, a thing tried or a note, or end it.',
+    'braindog context [--host <host>]',
+    '  Print the briefing again: this run and where it stands, the last handoff, who else is live, what waits on the owner, and what applies here.',
     'braindog page pull <slug> [--host <host>] [--out <file>]',
     "  Fetch a page's declaration and write it as <page>.dog: one page, one file, in the source view's dialect.",
     'braindog page push <file> [--host <host>]',
@@ -105,10 +130,11 @@ const usage = () =>
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
+    'braindog --version',
+    '  The build, the file format it writes, the kernel it expects, and the primitives it renders.',
     '',
     `The host comes from --host, then BRAINDOG_HOST, then the default in ${hostsPath(process.env)}.`,
     'The token comes from BRAINDOG_TOKEN, then the same file. It is never taken as an argument.',
-    `Not built yet: ${LATER.join(', ')}.`,
   ].join('\n');
 
 async function mcp(args: string[]): Promise<void> {
@@ -198,8 +224,8 @@ async function keysCommand(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog skills|tools|page|usecase|import`, over the real terminal, and the exit code the command decides. */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import', args: string[]): Promise<void> {
+/** `braindog skills|tools|page|usecase|import|context|session`, over the real terminal, and the exit code the command decides. */
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'import' | 'context' | 'session', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -215,7 +241,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   const code =
-    which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : await pageCommand(args, io);
+    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await usecase(args, io) : which === 'pack' ? await pack(args, io) : await pageCommand(args, io);
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
@@ -294,15 +320,22 @@ function install(args: string[]): void {
 
 const [command, ...rest] = process.argv.slice(2);
 try {
-  if (command === 'mcp') await mcp(rest);
+  /* FIRST, `48 §5.1`: a version is answered by this build alone, so it needs no host, no token and no
+     hosts file, and it answers even when all three are missing. */
+  if (command === '--version' || command === '-v') process.stdout.write(`${version()}\n`);
+  else if (command === 'mcp') await mcp(rest);
   else if (command === 'login') await signIn(rest);
+  /* LOCAL ONLY, AND IT OPENS NO SOCKET, so it needs none of the guards the others end with. */
+  else if (command === 'logout') process.exitCode = await logout(rest, { file: hostsPath(process.env), env: process.env, say });
   else if (command === 'keys') await keysCommand(rest);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import') await agentCommand(command, rest);
+  /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: one command opens a key
+     into one environment variable, and adding a way to print one would undo the reason it exists. */
+  else if (command === 'run') await keysCommand(['exec', ...rest]);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'import' || command === 'context' || command === 'session') await agentCommand(command, rest);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(rest);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);
   else if (command === 'help' || command === '--help' || command === '-h') process.stdout.write(`${usage()}\n`);
-  else if (command !== undefined && LATER.includes(command)) stop(`braindog ${command} is not built yet.`);
   else if (command === undefined) stop(usage());
   /* A plain word is echoed, to catch a typo. Anything else could be a token pasted in the wrong place. */
   else stop(`braindog has no ${/^[a-z][a-z-]{0,31}$/.test(command) ? `command called ${command}` : 'such command'}.\n\n${usage()}`);
