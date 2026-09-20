@@ -80,7 +80,15 @@ const CASES = [
      code block, an inline code span and an HTML comment. A bare glyph and a heading rule sit there
      too, unspaced. If any exemption stops working this goes to three or more rather than staying
      green, and an exemption nothing tests is an exemption that quietly widens. */
-  { gate: 'em-dash', expect: /used as punctuation/, findings: 2 },
+  /* TWO FIXTURES AND ONE SENTENCE, because the rule has two halves and a count of one proves each.
+     Both trees carry the line *"A seeded sentence — in prose, outside any fence."* in a README, and
+     the only difference between them is `private` in the manifest. `em-dash` is private and its one
+     finding is in the source, which says the README was forgiven; `em-dash-readme` is published and
+     its one finding is the README, which says the same sentence is read when a stranger can reach
+     it. Seeding both halves in one tree would have made the total two and `named()` one, which is
+     how this pair was born. */
+  { gate: 'em-dash', expect: /used as punctuation/, findings: 1 },
+  { gate: 'em-dash-readme', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
   { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
   { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },

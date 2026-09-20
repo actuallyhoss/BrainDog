@@ -1,5 +1,8 @@
 /**
- * The one seeded violation, and four decoys the gate must NOT name.
+ * The one seeded violation, and five decoys the gate must NOT name: a block comment, a line
+ * comment, a glyph standing alone, a rule drawn after a heading, and two SQL column annotations.
+ * The sixth is the README beside this file, which carries the same sentence as the published
+ * fixture `em-dash-readme/` and is forgiven here for the one reason that this package is private.
  *
  * A BLOCK COMMENT IS NOT PROSE — this line is spaced on both sides and is forgiven because
  * of where it sits, not because of what it says.

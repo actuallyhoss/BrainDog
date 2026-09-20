@@ -1,4 +1,5 @@
 {
-  "name": "seeded-published",
-  "version": "0.0.0"
+  "name": "seeded-private",
+  "version": "0.0.0",
+  "private": true
 }
