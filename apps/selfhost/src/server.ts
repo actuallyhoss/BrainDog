@@ -356,7 +356,28 @@ const IN_PER_MINUTE = 120;
 const IN_WINDOW_MS = 60_000;
 const IN_KEYS_MOST = 1_000;
 
-/** The SHA-256 of a token, in hex: the only shape of an inbound token this process keeps after boot. */
+/**
+ * How long a digest read from `<slug>/inbound.token` is trusted before the file is read again: the
+ * longest a rotation takes to bite, and the ceiling on how often a stranger can make this process
+ * touch the disk.
+ *
+ * A NUMBER RATHER THAN A FILE WATCH, and it is the second design. Reading the file on every mail
+ * arrival is the version with no staleness at all, and measured on this machine on 2026-09-20 a
+ * `readFileSync` of the 43-byte token costs 275 microseconds against 15 for a `statSync` and 19 for
+ * the digest itself. The budget above lets 120 arrivals a minute through for each of 1,000 distinct
+ * digests, so a flood costs up to 2,000 lookups a second: at 275 microseconds of SYNCHRONOUS read
+ * each, that is over half of the only thread this process has, spent by somebody with no credential
+ * on a door that is answering them 404. One read a second is 0.03 percent of it.
+ *
+ * AND NOT A MODIFICATION TIME EITHER, which would be the cheap way to get both. Two tokens are the
+ * same 43 bytes, so `size` cannot tell them apart, and a timestamp is the filesystem's to round: an
+ * operator rotating twice inside one tick, or a test doing it inside one, would be served the old
+ * digest with the file saying otherwise. A window that always expires depends on nothing the
+ * filesystem does.
+ */
+export const IN_TOKEN_MS = 1_000;
+
+/** The SHA-256 of a token, in hex: the only shape of an inbound token this process ever keeps. */
 async function digestOf(text: string): Promise<string> {
   const out = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(out)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -404,6 +425,61 @@ function ingestBudget(now: () => number): (key: string) => number | null {
 }
 
 /**
+ * The digest of whatever `<slug>/inbound.token` holds right now, or `null` for a record that takes
+ * no forwarded mail: the self-host's whole implementation of the index the Cloud needs a table for.
+ *
+ * THE FILE IS THE INDEX, WHICH IS WHY THIS IS A FUNCTION AND NOT THE STRING IT USED TO BE. A
+ * self-host serves one record, so the Cloud's lookup from digest to record collapses into a
+ * comparison against one digest, and the only store that comparison needs is the file `init` wrote.
+ * Reading it once at boot made that store write-only: the token a person pasted into their bank's
+ * forwarding settings was the token that record had for as long as the process lived, and a
+ * forwarding address is handed to third parties by definition. The answer to a leaked credential is
+ * a new one, not a restart scheduled for whenever somebody next notices.
+ *
+ * SO ROTATION IS `write the file`, AND REVOCATION IS `delete it`, with no command to learn and no
+ * restart. Both are what an operator would try first, and both were previously silent no-ops.
+ *
+ * AN UNREADABLE OR EMPTY FILE IS A CLOSED DOOR AND NOT AN OPEN ONE. `writeFileSync` truncates
+ * before it writes, so zero bytes is a state a reader can genuinely land in mid-rotation, and the
+ * digest of the empty string is a perfectly good digest: taking it would mean a secret anybody can
+ * guess, saved only by `servesIngest` happening to refuse an empty path segment. Refusing here does
+ * not depend on that. The trim is for the newline an editor adds.
+ *
+ * THE TOKEN IS NOT KEPT, only its digest, which is the same rule the boot-time read followed: after
+ * this returns, nothing in the process holds a value that would open the door if it leaked.
+ *
+ * AND WHAT IS CACHED IS THE READ AND NOT ITS ANSWER, which is the whole reason `pending` is a
+ * promise. The first cut kept the digest in a variable and stamped the window before awaiting it,
+ * so a second arrival in the same tick found the window closed and was served the value from
+ * before the read: measured on 2026-09-20 with four callers in one tick against a file holding a
+ * real token, three of the four were answered `null` and would have had a valid forwarded message
+ * refused 404. Two messages arriving together is what a forwarder's queue draining looks like.
+ * Holding the promise makes every caller in the window wait on the one read.
+ */
+function inboundDigest(file: string, now: () => number): () => Promise<string | null> {
+  let pending: Promise<string | null> | null = null;
+  let read = Number.NEGATIVE_INFINITY;
+  const load = async (): Promise<string | null> => {
+    let text: string;
+    try {
+      text = readWhole(file, 'utf8').trim();
+    } catch {
+      /* GONE, OR UNREADABLE, IS THE SAME ANSWER AS EMPTY. A door that stayed open because the read
+         threw would make a revocation depend on the operator's `rm` not racing this line. */
+      return null;
+    }
+    return text === '' ? null : digestOf(text);
+  };
+  return () => {
+    const at = now();
+    if (pending !== null && at - read < IN_TOKEN_MS) return pending;
+    read = at;
+    pending = load();
+    return pending;
+  };
+}
+
+/**
  * The self-host's half of `/in/*`: one record, one process, and `49 §5.16`'s two shapes.
  *
  * THE CLOUD'S WEBHOOK SHAPE IS DECLINED HERE, and that is what `verify` answering `null` to an ask
@@ -412,16 +488,19 @@ function ingestBudget(now: () => number): (key: string) => number | null {
  * would either ignore the id, which makes two URLs one door, or compare it, which tells whoever
  * holds the URL what this record's id is. 404 says neither.
  *
- * THE MAIL DOOR EXISTS ONLY WHERE `init` WROTE A TOKEN. `<slug>/inbound.token` is 32 random bytes
- * written 0600 at `init` (`49 §5.22`), and a record installed before that file existed takes no
- * forwarded mail rather than taking it from anybody: `serveIngest` answers 404 for the whole
- * `/in/email/*` surface when `inbound` is absent, the way `/auth/provision` answers `off()`.
+ * THE MAIL DOOR EXISTS ONLY WHERE THERE IS A DIRECTORY TO KEEP A TOKEN IN. `inbound` is absent for
+ * a database in memory, and `serveIngest` then answers 404 for the whole `/in/email/*` surface, the
+ * way `/auth/provision` answers `off()`. Everywhere else the key is present and the FILE decides:
+ * a record whose `inbound.token` has not been written, or has been deleted, refuses every digest.
+ * The two are one answer on the wire and the difference is which half knows it.
  *
  * WHAT THE DOOR NEVER SEES IS THE TOKEN. `serveIngest` hands across the SHA-256 of what the caller
- * sent, and this compares it against the digest of the file read at boot, so nothing in this
- * process holds a comparable copy of the secret after start-up and no index here is a credential.
+ * sent, and this compares it against the digest of the file, so nothing in this process holds a
+ * comparable copy of the secret and no index here is a credential. It is the same division
+ * `cloudIngest` makes for a Worker (`apps/worker/src/route.ts`): there the digest is a key into the
+ * Directory's index, here it is one comparison, and neither side is given the token.
  */
-function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: string | null): IngestDoor {
+function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (() => Promise<string | null>) | null): IngestDoor {
   return {
     verify: async (ask) => (ask.rec === undefined ? api.ingestVerify({ ingest: ask.ingest }) : null),
     /* THE RECORD TAKES THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. `rec` is this process's
@@ -438,7 +517,12 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: s
     ...(inbound === null
       ? {}
       : {
-          inbound: async (hash: string) => ((await sameKey(hash, inbound)) ? (api.kernel.identity()?.id ?? null) : null),
+          /* THE DIGEST IS ASKED FOR FIRST AND COMPARED IN CONSTANT TIME, and a record this process
+             has not created yet is `null` rather than an arrival with nowhere to go. */
+          inbound: async (hash: string) => {
+            const held = await inbound();
+            return held !== null && (await sameKey(hash, held)) ? (api.kernel.identity()?.id ?? null) : null;
+          },
         }),
   };
 }
@@ -975,24 +1059,18 @@ export async function start(options: {
      way: `https.Server` differs from `http.Server` in the handshake and in nothing this file does. Both
      refusals a certificate can cause were already made above, before this socket existed. */
   /**
-   * The inbound mail token, read once at boot and kept only as a digest (`49 §5.1` step 5, `§5.22`).
+   * Where the inbound mail token lives, and what reads it (`49 §5.1` step 5, `§5.22`).
    *
-   * READ ONCE AND NOT PER REQUEST, because a file read on a path a stranger can reach is a stranger
-   * deciding how often this process touches the disk. A token rotated on disk takes a restart, which
-   * is the same rule the server key already follows.
+   * `null` IS A HOST THAT CAN TAKE NO FORWARDED MAIL AT ALL, which here means a database in memory:
+   * there is no directory to keep a token in, so there is no file an operator could write to change
+   * that, and `/in/email/*` is 404 for everybody rather than open to anybody. Every other host gets
+   * the reader, whether or not `init` has written the file yet, because on those hosts the file is
+   * the answer and it can be written, replaced or deleted while this process runs.
    *
-   * ABSENT IS A HOST THAT TAKES NO FORWARDED MAIL: a record made before `init` wrote the file, and a
-   * database in memory, which has no directory to hold one. `/in/email/*` is then 404 for everybody
-   * rather than open to anybody.
-   *
-   * BEFORE `listen` AND NOT AFTER IT, WHICH IS THE ONLY REASON IT IS THIS FAR UP. It needs nothing
-   * the port tells us, and the line below `listen` says in so many words that nothing between there
-   * and `site = …` awaits. A digest does await: read there, a request arriving in that window found
-   * `site` still `null` and was answered 503 by a server that had already accepted the connection.
+   * NOTHING IS READ HERE. `inboundDigest` reads on the first arrival and at most once every
+   * `IN_TOKEN_MS` after that, so boot does not pay for a door most records never use.
    */
-  const inboundFile = joinPath(dirOf(options.file), 'inbound.token');
-  const inboundHash =
-    options.file === ':memory:' || !present(inboundFile) ? null : await digestOf(readWhole(inboundFile, 'utf8').trim());
+  const inboundMail = options.file === ':memory:' ? null : inboundDigest(joinPath(dirOf(options.file), 'inbound.token'), clock.now);
 
   const names = options.tls === undefined ? [] : certificateNames(options.tls.cert);
   const server =
@@ -1074,7 +1152,7 @@ export async function start(options: {
     vault: vaultDoor(api, options.keys),
     keys: keysDoor(api, options.keys, origins),
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
-    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundHash),
+    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail),
     snapshots: kept,
     door: {
       on: 'selfhost',

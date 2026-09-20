@@ -16,17 +16,32 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Declaration } from '@braindog/kernel';
 
-import { start } from '../src/server.ts';
+import { IN_TOKEN_MS, start } from '../src/server.ts';
 
-/** Obviously not a real token. It stands in for what `init` writes to `<slug>/inbound.token`. */
-const INBOUND = 'not-a-real-inbound-token-just-a-fixture';
+/**
+ * The token `init` would have written, minted here and never anywhere else.
+ *
+ * MADE AT RUN TIME BECAUSE A TOKEN IN THE TREE IS A TOKEN THAT OUTLIVES ITS FILE. A real one is
+ * `randomBytes(32).toString('base64url')` written 0600 into the data directory
+ * (`apps/selfhost/src/main.ts:333`), and the only safe copy of that shape in a repository is none:
+ * a checked-in fixture gets copied into a deployment's data directory by whoever is reading the
+ * test to find out what the file should look like. These live in a temp directory for the length
+ * of one run and are deleted with it.
+ *
+ * AND THE DOOR MUST NOT CARE WHAT IS IN THEM, which is the second thing a fresh pair proves: the
+ * comparison is against a digest, so a token with no fixed value cannot be what any assertion here
+ * is really passing on.
+ */
+const token = (): string => randomBytes(32).toString('base64url');
+const INBOUND = token();
 
 const ACCOUNTS: Declaration = {
   id: 'register.accounts',
@@ -96,13 +111,11 @@ const message = (of: { dkim: 'pass' | 'fail'; signer: string; amount: string; me
 
 type Running = Awaited<ReturnType<typeof start>>;
 
-/** A record with both patterns installed, its inbound token on disk before boot, and the port it listens on. */
-async function host(): Promise<{ running: Running; port: number; dir: string }> {
+/** A record with both patterns installed, its inbound token on disk, and the port it listens on. */
+async function host(now?: () => number): Promise<{ running: Running; port: number; dir: string }> {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-in-'));
-  /* WRITTEN BEFORE `start`, because the token is read once at boot: a file appearing later is a
-     restart away from being served, which is the same rule the server key follows. */
   writeFileSync(join(dir, 'inbound.token'), INBOUND);
-  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0 });
+  const running = await start({ file: join(dir, 'record.brain'), port: 0, pollMs: 0, ...(now === undefined ? {} : { now }) });
   assert.ok((await running.api.kernel.install([ACCOUNTS, TRANSACTIONS, HSBC, HOOK])).ok);
   assert.ok(
     running.api.kernel.createRecord({
@@ -436,5 +449,214 @@ test('A STRANGER WHO SIGNS WITH THEIR OWN DOMAIN IS NOT THE BANK, however well t
     assert.equal(rows(made.running), 0, 'a forged bank alert was written into the ledger');
   } finally {
     await stop(made);
+  }
+});
+
+/* ── rotation, which is the way out of a credential ──────────────────────── */
+
+/**
+ * `<slug>/inbound.token` is the whole of the door, so replacing the file has to be the whole of the
+ * rotation.
+ *
+ * WHAT WAS WRONG IS THAT THERE WAS NO WAY OUT. The file is written once by `init`
+ * (`apps/selfhost/src/main.ts:333`) and was read once at boot, so the token a person pasted into
+ * their bank's forwarding settings was the token that record had for as long as the process lived.
+ * A forwarding address is handed to a third party by definition: it goes into a mail provider's
+ * rule, a bank's alert settings, sometimes an email to support. Every one of those is a place it
+ * can leak from, and the answer to a leaked credential is a new one, not a restart scheduled for
+ * whenever somebody next notices.
+ *
+ * THE CLOCK IS MOVED RATHER THAN WAITED ON, because the door reads the file at most once every
+ * `IN_TOKEN_MS`, and `now` is the same injected clock the vault's fifteen minutes are tested with.
+ */
+test('A TOKEN IS ROTATED BY REPLACING THE FILE, and the old one stops opening the door', async () => {
+  let at = Date.now();
+  const made = await host(() => at);
+  const rotated = token();
+  try {
+    /* THE OLD ONE WORKS FIRST, so what the rest of this test measures is the rotation and not a
+       door that never opened. */
+    assert.equal((await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'))).status, 202);
+
+    /* WRITTEN WITH THE NEWLINE AN EDITOR ADDS, because that is what a rotation done by hand leaves
+       on disk and the reader trims for exactly that reason. Without the trailing byte here nothing
+       in this file held the trim: removed on 2026-09-20, all twenty tests still passed, and an
+       operator who rotated with `nano` would have been left with a door that opened for nobody. */
+    writeFileSync(join(made.dir, 'inbound.token'), `${rotated}\n`);
+    at += IN_TOKEN_MS;
+
+    const old = await send(made.port, `/in/email/${INBOUND}`, message({ dkim: 'pass', signer: 'hsbc.example', amount: '2.00', merchant: 'After' }));
+    assert.equal(old.status, 404, 'the rotated-out token still opened the door');
+    assert.equal(await old.text(), '', 'the `/api` fallback answered, not the arrival door');
+
+    const fresh = await send(made.port, `/in/email/${rotated}`, message({ dkim: 'pass', signer: 'hsbc.example', amount: '3.00', merchant: 'Fresh' }));
+    assert.equal(fresh.status, 202, 'the token now on disk did not open the door');
+
+    /* TWO ARRIVALS AND NOT THREE: the first, and the one the new token carried. */
+    const seen = raws(made.running);
+    assert.equal(seen.length, 2, 'the message sent with the old token was stored anyway');
+    assert.match(seen[1]?.body ?? '', /Fresh/u);
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and deleting the file shuts the door, which is a revocation with nothing to replace it', async () => {
+  /* THE OPERATOR WHOSE TOKEN LEAKED AND WHO IS NOT READY WITH ANOTHER needs the surface gone now,
+     not open until they think of a replacement. `rm` is that, and it needs no new command. */
+  let at = Date.now();
+  const made = await host(() => at);
+  try {
+    assert.equal((await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'))).status, 202);
+    rmSync(join(made.dir, 'inbound.token'));
+    at += IN_TOKEN_MS;
+
+    const out = await send(made.port, `/in/email/${INBOUND}`, message({ dkim: 'pass', signer: 'hsbc.example', amount: '4.00', merchant: 'Revoked' }));
+    assert.equal(out.status, 404, 'a deleted token file left the door open');
+    assert.equal(await out.text(), '');
+    assert.equal(raws(made.running).length, 1, 'a revoked token still reached the record');
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and four messages arriving together are four arrivals, not one read and three refusals', async () => {
+  /**
+   * A FORWARDER'S QUEUE DRAINING IS SEVERAL MESSAGES IN ONE TICK, and the window that keeps the
+   * door off the disk must not turn that into 404s. The first cut of `inboundDigest` stamped the
+   * window before it awaited the digest and kept the ANSWER rather than the read, so callers two,
+   * three and four found the window already closed and were handed the value from before the read,
+   * which is `null`: measured on 2026-09-20, three of four callers in one tick. A message refused
+   * 404 is one a forwarder may not send again.
+   */
+  const made = await host();
+  try {
+    const out = await Promise.all(
+      ['One', 'Two', 'Three', 'Four'].map((merchant) =>
+        send(made.port, `/in/email/${INBOUND}`, message({ dkim: 'pass', signer: 'hsbc.example', amount: '5.00', merchant })),
+      ),
+    );
+    assert.deepEqual(
+      out.map((r) => r.status),
+      [202, 202, 202, 202],
+      'a message was refused because another was reading the token file',
+    );
+    assert.equal(raws(made.running).length, 4);
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and a file caught half-written opens nothing, rather than opening on the empty string', async () => {
+  /**
+   * A REPLACEMENT IS NOT ATOMIC AND THE WINDOW IS A REAL FILE STATE. `writeFileSync` truncates and
+   * then writes, so a reader that lands between the two sees zero bytes; an operator using
+   * `> inbound.token` leaves exactly that state for as long as their editor takes. The digest of
+   * the empty string is a perfectly good digest, so a door that took it would be a door whose
+   * secret is knowable, and the only reason nothing can spend it today is that `servesIngest`
+   * happens to refuse an empty path segment. Relying on that is relying on a second file.
+   */
+  let at = Date.now();
+  const made = await host(() => at);
+  try {
+    writeFileSync(join(made.dir, 'inbound.token'), '   \n');
+    at += IN_TOKEN_MS;
+
+    const out = await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'));
+    assert.equal(out.status, 404, 'a token file holding whitespace still served the old token');
+    assert.equal(raws(made.running).length, 0);
+  } finally {
+    await stop(made);
+  }
+});
+
+/* ── what the door refuses, and what it keeps ────────────────────────────── */
+
+test('and a forwarded message past the five mebibytes this channel takes is refused with the number', async () => {
+  /* `serveIngest`'s email ceiling is five mebibytes against a webhook's one, because an RFC 5322
+     message carries its attachments inline. Nothing exercised the larger of the two, so nothing
+     would have noticed the day a message was measured against the webhook's. */
+  const made = await host();
+  try {
+    const out = await send(made.port, `/in/email/${INBOUND}`, 'x'.repeat(5 * 1024 * 1024 + 1));
+    assert.equal(out.status, 413);
+    const said = (await out.json()) as { refusal?: { code?: string } };
+    assert.equal(said.refusal?.code, 'BODY_MALFORMED', 'a sender just over the channel ceiling was told nothing it could use');
+    assert.equal(raws(made.running).length, 0);
+
+    /* AND THE SAME BODY AT A TOKEN NOBODY MINTED IS 404 AND NOT 413, which is the order the door
+       asks its questions in and the reason it cannot be used to sort real addresses from guesses:
+       a 413 here would tell a stranger that the token they tried is live. */
+    const guessed = await send(made.port, '/in/email/not-the-token', 'x'.repeat(5 * 1024 * 1024 + 1));
+    assert.equal(guessed.status, 404, 'the size refusal told a stranger their guessed token exists');
+    assert.equal(await guessed.text(), '');
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and a two-mebibyte message, over a webhook ceiling and under this one, is taken', async () => {
+  /**
+   * THE REFUSAL ABOVE CANNOT SAY WHICH CEILING REFUSED IT, which is what this one is for. A body of
+   * `5 MiB + 1` is over the webhook's one mebibyte as well, so `mail` measured against
+   * `WEBHOOK_LIMIT` answers it 413 too and every assertion up there still holds: swapped on
+   * 2026-09-20 in `packages/host/src/ingest.ts` and the whole file stayed green. Two mebibytes is
+   * over one and under five, so it separates them, and it is an ordinary size for a forwarded
+   * statement with a PDF inline.
+   */
+  const made = await host();
+  try {
+    const out = await send(made.port, `/in/email/${INBOUND}`, `${forwarded('pass')}\r\n${'x'.repeat(2 * 1024 * 1024)}`);
+    assert.equal(out.status, 202, 'a message inside this channel ceiling was measured against the webhook one');
+    const seen = raws(made.running);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.body?.length, forwarded('pass').length + 2 + 2 * 1024 * 1024, 'the bytes stored are not the bytes sent');
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and the raw token is in nothing this process writes down', async () => {
+  /**
+   * THE TOKEN IS THE URL, AND A URL IS THE MOST COPIED THING THERE IS. It reaches this process in
+   * the path of a request a stranger made, and everything on this side of `serveIngest` sees only
+   * its SHA-256: the budget is keyed on the digest, the door compares digests, and the row the
+   * record keeps holds the message and not the address it came to. What this pins is the absence,
+   * because an absence is what a later "just log the path while we debug this" would end.
+   */
+  const made = await host();
+  const said: string[] = [];
+  const wasError = console.error;
+  const wasLog = console.log;
+  console.error = (...a: unknown[]): void => void said.push(a.map(String).join(' '));
+  console.log = (...a: unknown[]): void => void said.push(a.map(String).join(' '));
+  try {
+    assert.equal((await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'))).status, 202);
+    /* AND A TOKEN THAT OPENS NOTHING IS ALSO NOT WRITTEN DOWN, which is the case a log line would
+       most plausibly be added for. */
+    assert.equal((await send(made.port, '/in/email/not-the-token', forwarded('pass'))).status, 404);
+  } finally {
+    console.error = wasError;
+    console.log = wasLog;
+    /* CLOSED BEFORE THE FILES ARE READ, so what is scanned is everything this record left on disk
+       and not whatever had happened to be flushed by then. */
+    await made.running.close();
+  }
+  const dir = made.dir;
+  try {
+    assert.equal(
+      said.filter((line) => line.includes(INBOUND)).length,
+      0,
+      'the raw inbound token was written to the console',
+    );
+    /* EVERY FILE THIS RECORD LEFT BEHIND EXCEPT THE ONE WHOSE WHOLE JOB IS TO HOLD IT. Read as
+       latin1 so a match is a byte match and no decoder can quietly drop the bytes being looked for.
+       The WAL counts: a value can sit there unmerged for the life of the process. */
+    for (const name of readdirSync(dir)) {
+      if (name === 'inbound.token') continue;
+      assert.ok(!readFileSync(join(dir, name), 'latin1').includes(INBOUND), `the raw inbound token is in ${name}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
