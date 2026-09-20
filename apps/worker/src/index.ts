@@ -41,6 +41,7 @@ import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
 import { cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type CloudIngestDeps } from './route.ts';
+import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
@@ -758,6 +759,24 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
+   * A record's forwarding address, registered, rotated or taken away: a digest writes it, `null` empties it.
+   * `null` back is written, and a `Refusal` is a write that did not happen.
+   *
+   * THE OTHER HALF OF `recordFor`, AND IT WAS MISSING FOR A DAY. `feefa3f4` put the reader above on this object
+   * and left the writer off it, so the index this Worker reads on every forwarded message was one nothing in
+   * the deployment could write: measured on 2026-09-21 by grepping `apps/` and `packages/` for `inbound$`, whose
+   * only callers were tests. `/api/inbound/mint` is the caller that needed it (`inbound.ts`).
+   *
+   * IT TAKES THE DIGEST AND CANNOT BE HANDED A TOKEN, which `inbound$` refuses with a sentence rather than
+   * trusting its callers. So the tenant map holds 64 hex characters that open nothing, and this RPC hop carries
+   * nothing that would open a door if it were logged at either end.
+   */
+  inbound$(record: string, tokenHash: string | null): Refusal | null {
+    const out = this.#directory().inbound$(record, tokenHash);
+    return out.ok ? null : refusalOf(out);
+  }
+
+  /**
    * Every record on this deployment that is still open, a page at a time. `51 §5.12` step 1.
    *
    * THE CURSOR IS THE LAST ID AND NOT AN OFFSET. A keyset page is stable while the walk runs: a
@@ -1120,11 +1139,23 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        sentence rather than with a route that does not exist. */
     const keysAsked = servesKeys(url.pathname) !== null;
 
+    /* AND THE FORWARDING ADDRESS IS THE OTHER ONE, for the same reason and with the opposite half of the
+       platform behind it: `/api/inbound/*` writes the DIRECTORY's `dir_inbound`, not the record, so it cannot
+       be a record method however much its path looks like one. It is here rather than above `doorOf` because
+       a mint needs to know who is asking, which is precisely what `/in/*` three branches up does not. */
+    const mintAsked = servesInbound(url.pathname) !== null;
+
     /* THE PUBLIC DEMO: nothing the caller sent names it, and `demoRecord` says everything it opens. It skips
        the Directory on purpose. The Directory answers which record a NAME means, and this has no name,
        only the deployment's constant. */
-    if (door.door === 'demo')
-      return keysAsked ? noSession() : env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
+    if (door.door === 'demo') {
+      if (keysAsked) return noSession();
+      /* AND THE DEMO MINTS NOTHING. `demoRecord` admits only a GET whose name is in `ROUTES`, and a mint is
+         neither, so this is unreachable today and written anyway: the demo record is the one surface somebody
+         reaches without signing in, and an address minted on it would be a live door into the sample. */
+      if (mintAsked) return json({ ok: false, refusal: NO_MINT_SESSION }, 403);
+      return env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx));
+    }
 
     /* A PERSON, on the record their session names, and a rotation rides back on the record's answer. The
        record authorises exactly as it does for a bearer: every check is inside `createRecordApi`. */
@@ -1132,7 +1163,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       return withCookie(
         keysAsked
           ? await appKeys(request, env, door.record, door.ctx)
-          : await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)),
+          : mintAsked
+            ? await mailAddress(request, env, door.record, door.ctx)
+            : await env.RECORD.get(env.RECORD.idFromName(door.record)).fetch(inward(request, door.ctx)),
         door.cookie,
       );
 
@@ -1145,6 +1178,12 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
     /* AND WHAT IS LEFT AT `/api/keys/*` IS A BEARER OR NOTHING, which is the one thing those doors do not take. */
     if (keysAsked) return noSession();
+
+    /* NOR MAY AN AGENT MOVE A RECORD'S MAIL. A bearer works from anywhere for thirty days, so a token that could
+       rotate the forwarding address could take over a record's incoming statements without anybody signing in,
+       and a token that could revoke one could stop them arriving silently. `serveInbound` refuses the header
+       itself for a host that wires it differently; this is the branch that never reaches it. */
+    if (mintAsked) return json({ ok: false, refusal: NO_MINT_SESSION }, 403);
 
     /* A BEARER. This Worker serves MANY records, and a request that says who it is by nothing but the
        header it carries says so here, or not at all. `session.ts` holds the path, and `/mcp` takes the same one. */
@@ -1254,6 +1293,32 @@ function appKeys(request: Request, env: Env, id: string, ctx: CallContext): Prom
     record: id,
     keys: isBound(env.KEK) ? keyHalf(env) : undefined,
   });
+}
+
+/**
+ * `/api/inbound/*`: the record's forwarding address, for the browser session `doorOf` has already resolved.
+ *
+ * THE RECORD IS THE SESSION'S, as it is at `/api/keys/*`. Nothing in the request names a record, so there is no
+ * way for one owner to mint an address onto somebody else's: what `inbound$` is handed is the id the cookie
+ * resolved to. Which is also why this passes `id` and not a slug, since `dir_inbound.record` joins `dir_record`.
+ *
+ * THE DIRECTORY IS THE ONLY THING ASKED, and the record's own object is never woken. A forwarding address is a
+ * fact about the tenant map rather than about the record's contents, which is what makes `/in/email/<token>`
+ * resolvable before any object is addressed at all.
+ */
+function mailAddress(request: Request, env: Env, id: string, ctx: CallContext): Promise<Response> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return serveInbound(
+    request,
+    {
+      origins: new Set([`https://${env.PUBLIC_HOST ?? ''}`]),
+      registers: async (hash) => {
+        const stop = await directory.inbound$(id, hash);
+        return stop === null ? { ok: true, value: null } : { ok: false, refusal: stop };
+      },
+    },
+    ctx,
+  );
 }
 
 /**

@@ -19,11 +19,13 @@ import { fileURLToPath } from 'node:url';
 
 import type { Refusal, Result } from '@braindog/ports';
 import { serveIngest, type IngestArrival } from '@braindog/host';
+import type { CallContext } from '@braindog/record';
 import { createDirectory, type Directory } from '@braindog/record/directory';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 
-import { cloudIngest, servesApi, servesAuth, servesIn, servesMcp, type CloudIngestDeps, type InboundIndex } from '../src/route.ts';
+import { serveInbound, servesInbound, type InboundDoor } from '../src/inbound.ts';
+import { cloudIngest, demoRecord, servesApi, servesAuth, servesIn, servesMcp, type CloudIngestDeps, type InboundIndex } from '../src/route.ts';
 
 const SOURCE = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
 
@@ -455,4 +457,271 @@ test('THE TABLE ARRIVES ON A DIRECTORY THAT ALREADY EXISTS, WITH NO MIGRATION ST
 
   const { door } = overDirectory(d);
   assert.equal((await serveIngest(mail(TOKEN), door)).status, 202);
+});
+
+/* ── where a token comes from at all ─────────────────────────────────────── */
+
+/**
+ * `POST /api/inbound/mint`: the one thing that can put a digest in the index above.
+ *
+ * THE DOOR AND THE INDEX WERE BOTH FINISHED AND NO ADDRESS EXISTED. Grepped on 2026-09-21 across
+ * `apps/` and `packages/`: every caller of the Directory's `inbound$` was a test in this file, so
+ * `dir_inbound` on the hosted Worker held only what tests wrote and `/in/email/<token>` answered 404
+ * to every token in existence. `feefa3f4` closed the lookup and left the minting with no home, which
+ * is a surface that reads as shipped in both halves and works for nobody.
+ *
+ * THE ORDER IS THE PROPERTY A UNIT TEST OF THE DOOR CANNOT SEE, so it is read out of the text of
+ * `index.ts` here for the reason the head of this file gives. A mint needs a principal, so it is
+ * decided AFTER `doorOf` rather than before it, which is the opposite of where `/in/*` sits.
+ */
+test('THE WORKER HAS A DOOR THAT MINTS AN ADDRESS, AND IT IS DECIDED AFTER THE PRINCIPAL IS', () => {
+  assert.match(SOURCE, /serveInbound\(/u, 'index.ts wires no mint, so nothing on this deployment can put an address in the index');
+  assert.match(SOURCE, /inbound\$\(/u, 'the Directory object exposes no writer, so a mint would have nothing to write through');
+
+  const at = SOURCE.indexOf('servesInbound(url.pathname)');
+  assert.ok(at > 0, 'route() does not branch on /api/inbound/*, so the mint is forwarded to the record as a method it does not have');
+  /* A MINT IS THE OPPOSITE OF AN ARRIVAL. `/in/*` is answered above the auth gate because a bank
+     carries no credential; this one answers only to a person a session names, so it is decided where
+     that person is known. */
+  assert.ok(at > SOURCE.indexOf('doorOf(request'), 'the mint is decided before anybody knows who is asking');
+
+  /* AND IT IS A `/api/` PATH, which is what puts it after `doorOf` at all: a prefix this router does
+     not claim falls through to the app shell, and a prefix outside `servesApi` is refused
+     `ROUTE_UNKNOWN` before any door is asked. */
+  assert.equal(servesApi('/api/inbound/mint'), true);
+  assert.equal(servesIn('/api/inbound/mint'), false);
+
+  /* AND THE PUBLIC DEMO CANNOT REACH IT, decided where the demo is decided rather than by the order
+     of two branches: `DEMO_READS` is built from `ROUTES`, and a mint is not a record method, so no
+     name in the table spells this path. */
+  assert.equal(demoRecord(new Request('https://app.brain.dog/api/inbound/mint'), REC), null);
+});
+
+const ORIGIN = 'https://app.brain.dog';
+
+/** The owner of the record `studio()` makes, as `doorOf` hands a session's context on. */
+const OWNER: CallContext = { principal: { kind: 'person', id: 'p_01J8ZC0000000000000000000B', level: 'owner' } };
+
+type AskInit = { method?: string; origin?: string | null; bearer?: string };
+
+const mintAsk = (which: string, init: AskInit = {}): Request =>
+  new Request(`${ORIGIN}/api/inbound/${which}`, {
+    method: init.method ?? 'POST',
+    headers: {
+      ...(init.origin === null ? {} : { origin: init.origin ?? ORIGIN }),
+      ...(init.bearer === undefined ? {} : { authorization: init.bearer }),
+    },
+  });
+
+/**
+ * The digest, COMPUTED here where every other token in this file has it written out.
+ *
+ * A MINTED TOKEN CANNOT BE WRITTEN OUT, which is the whole property under test: it is 32 bytes this
+ * process has never seen before, so the only way to say "the index holds its digest and not the token"
+ * is to digest what came back. The constants above stay written out for the tokens that are fixtures.
+ */
+const sha256 = async (text: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/** The Cloud's mint over the real Directory, and every digest it was handed, in order. */
+function mintDoor(d: Directory, record: string): { door: InboundDoor; wrote: (string | null)[] } {
+  const wrote: (string | null)[] = [];
+  return {
+    door: {
+      origins: new Set([ORIGIN]),
+      registers: (hash) => {
+        wrote.push(hash);
+        return Promise.resolve(d.inbound$(record, hash));
+      },
+    },
+    wrote,
+  };
+}
+
+/** The token a mint answered, or an assertion naming what it answered instead. */
+async function minted(res: Response): Promise<string> {
+  assert.equal(res.status, 200, `the mint was refused: ${await res.clone().text()}`);
+  const body = (await res.json()) as { ok: boolean; value: { token: string } };
+  /* AND NOTHING ELSE IS IN THE ANSWER. The address is this origin plus `/in/email/<token>`, which the
+     page that shows it builds for itself; a second field holding the same secret spelled as a URL is a
+     second thing to keep out of a log. */
+  assert.deepEqual(Object.keys(body.value), ['token']);
+  return body.value.token;
+}
+
+test('THE TWO DOORS, AND THE PATHS THAT LOOK LIKE THEM ARE NOT THEM', () => {
+  assert.equal(servesInbound('/api/inbound/mint'), 'mint');
+  assert.equal(servesInbound('/api/inbound/revoke'), 'revoke');
+  /* REPEATED AND TRAILING SLASHES ARE FORGIVEN, the way `servesKeys` forgives them: a path a page
+     builds by joining a base and a route has `//` in it. */
+  assert.equal(servesInbound('//api//inbound//mint//'), 'mint');
+
+  /* AND THERE IS NO THIRD DOOR. A route that answered "what is my address" would have to hold the
+     token to answer with, which is the one thing this surface is built not to keep. */
+  for (const path of ['/api/inbound', '/api/inbound/', '/api/inbound/show', '/api/inbound/token', '/api/inbound/mint/again', '/api/inboundmint', '/api/keys/put'])
+    assert.equal(servesInbound(path), null, path);
+});
+
+test('AN OWNER MINTS AN ADDRESS THAT TAKES MAIL AT ONCE, AND THE INDEX HOLDS ONLY ITS DIGEST', async () => {
+  const { d, record, sql } = studio();
+  const { door, wrote } = mintDoor(d, record);
+
+  const res = await serveInbound(mintAsk('mint'), door, OWNER);
+  const token = await minted(res);
+  /* THE ANSWER CARRIES A LIVE CREDENTIAL, so it is one caller's and never a cache's: the path names no
+     record, which makes it one address for every tenant on this deployment. */
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+
+  /* THIRTY-TWO RANDOM BYTES, BASE64URL, WHICH IS THE SELF-HOST'S OWN VALUE. `init` writes
+     `randomBytes(32).toString('base64url')`, and a person moving a record between the two hosts must
+     not find that their bank's forwarding settings hold a shape the other host cannot serve. */
+  assert.match(token, /^[A-Za-z0-9_-]{43}$/u, 'a minted token is not 32 bytes of base64url');
+
+  /* AND WHAT WENT TO THE DIRECTORY IS THE DIGEST AND NOTHING ELSE. Measured by mutation on
+     2026-09-21: handing `registers` the token instead of its digest turns this mint into a 422, because
+     `inbound$` refuses anything that is not 64 lower-case hex characters, and four tests in this
+     section go red together. The guard in the Directory and the digest in the door are one rule
+     asserted from both ends. */
+  const hash = await sha256(token);
+  assert.deepEqual(wrote, [hash]);
+  assert.equal(d.recordFor(hash), record, 'the digest the mint wrote does not name the record it was minted for');
+
+  /* THE TOKEN IS IN NO ROW OF THE TABLE, asserted over the whole of it rather than over the column
+     this test already knows about: what makes the index safe to hold is that a copy of it opens
+     nothing, and a second column added later carrying the token would be invisible to a narrower read. */
+  const rows = JSON.stringify(sql.all('SELECT * FROM dir_inbound'));
+  assert.equal(rows.includes(token), false, 'the token itself was written into the Directory');
+  assert.equal(rows.includes(hash), true, 'the digest is not in the table this test just read');
+
+  /* AND THE ADDRESS WORKS THE MOMENT IT IS ANSWERED, through the real reader and the real mail door.
+     This is the loop that was open until 2026-09-21: the door could resolve a digest and nothing could
+     put one there, so both halves were finished and no forwarded message had ever arrived. */
+  const { door: arrival, seen } = overDirectory(d);
+  const delivered = await serveIngest(mail(token), arrival);
+  assert.equal(delivered.status, 202);
+  assert.equal(seen.arrives[0]?.[0], record, 'a message to the minted address reached no record or the wrong one');
+  assert.equal(seen.arrives[0]?.[1].channel, 'email');
+});
+
+test('ROTATION IS MINTING AGAIN, AND THE ADDRESS IT REPLACES STOPS TAKING MAIL IN THAT SAME WRITE', async () => {
+  const { d, record } = studio();
+  const { door } = mintDoor(d, record);
+
+  const first = await minted(await serveInbound(mintAsk('mint'), door, OWNER));
+  const second = await minted(await serveInbound(mintAsk('mint'), door, OWNER));
+  assert.notEqual(first, second, 'two mints answered the same token, so the bytes are not random');
+
+  /* ONE RECORD HOLDS ONE ADDRESS. `inbound$` deletes the asking record's row before it inserts, so
+     there is no rotation that leaves both live: a forwarding address is handed to third parties by
+     definition, and the answer to a leaked one is a new one rather than a second one. */
+  const { door: arrival } = overDirectory(d);
+  assert.equal((await serveIngest(mail(first), arrival)).status, 404, 'the rotated address still takes mail, so rotating revokes nothing');
+  assert.equal((await serveIngest(mail(second), arrival)).status, 202);
+  assert.equal(d.recordFor(await sha256(first)), null);
+});
+
+test('REVOCATION WRITES `null`, AND A RECORD WITH NO ADDRESS TAKES NO MAIL AT ALL', async () => {
+  const { d, record } = studio();
+  const { door, wrote } = mintDoor(d, record);
+  const token = await minted(await serveInbound(mintAsk('mint'), door, OWNER));
+  const { door: arrival } = overDirectory(d);
+  assert.equal((await serveIngest(mail(token), arrival)).status, 202);
+
+  const gone = await serveInbound(mintAsk('revoke'), door, OWNER);
+  assert.equal(gone.status, 200);
+  /* AND IT ANSWERS NO VALUE, because there is nothing to show: the point of revoking is that the
+     address is gone, and a body echoing what was taken away would be the token again. */
+  assert.deepEqual(await gone.json(), { ok: true, value: null });
+  assert.equal(wrote[wrote.length - 1], null, 'revocation wrote something other than `null`');
+
+  assert.equal((await serveIngest(mail(token), arrival)).status, 404, 'a revoked address still takes mail');
+  /* AND REVOKING AGAIN IS THE SAME ANSWER. `rm` on the self-host is idempotent and this has to be too:
+     an owner who clicks twice is not somebody to show a refusal to. */
+  assert.equal((await serveInbound(mintAsk('revoke'), door, OWNER)).status, 200);
+});
+
+/**
+ * WHOEVER CAN MOVE THIS ADDRESS CAN REDIRECT A RECORD'S BANK MAIL, which is why the ladder here is the
+ * vault's rather than ADMIN's. Every case below is a refusal that must also be a write that did not
+ * happen, so `wrote` is asserted empty at the end rather than per case: a door that refused and wrote
+ * anyway would have rotated an address on its way to saying no.
+ *
+ * CHECKED BY MUTATION ON 2026-09-21, twice, because a ladder nobody watched fail is a ladder nobody
+ * has. With the owner check replaced by `false` this test fails and the other twenty-two in the file
+ * pass; with the origin check replaced by `false` the same thing happens. Both mutants are silent
+ * everywhere else, which is what makes this the only test standing between a `read` colleague and the
+ * address a record's bank statements arrive at.
+ */
+test('NOTHING BUT AN OWNER, IN A BROWSER, ON A PAGE OF THIS HOST, MINTS ONE', async () => {
+  const { d, record } = studio();
+  const { door, wrote } = mintDoor(d, record);
+  const refusalOf = async (res: Response): Promise<{ code: string; at?: string }> => {
+    const body = (await res.json()) as { refusal: { code: string; at?: string } };
+    return body.refusal;
+  };
+
+  /* A METHOD THAT IS NOT A POST, BEFORE ANYTHING ELSE IS READ. */
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const res = await serveInbound(mintAsk('mint', { method }), door, OWNER);
+    assert.equal(res.status, 405, method);
+    assert.equal(res.headers.get('allow'), 'POST', method);
+  }
+
+  /* A BEARER OF ANY KIND, AND THE HEADER IS WHAT IS REFUSED RATHER THAN THE PRINCIPAL BEHIND IT: on a
+     self-host the server key makes the owner, and it would pass every check under this one. */
+  const bearer = await serveInbound(mintAsk('mint', { bearer: 'Bearer rec_01J8ZC0000000000000000000A.not-a-secret' }), door, OWNER);
+  assert.equal(bearer.status, 403);
+  assert.equal((await refusalOf(bearer)).code, 'NEEDS_BROWSER_SESSION');
+
+  /* A REQUEST THAT IS NOT A PAGE OF THIS HOST. Every browser sends `Origin` on a POST, so none is not
+     a page, and another origin is what a session cookie must never be allowed to serve (`12 §8`). */
+  for (const origin of [null, 'https://evil.example', 'https://app.brain.dog.evil.example', '']) {
+    const res = await serveInbound(mintAsk('mint', { origin }), door, OWNER);
+    assert.equal(res.status, 403, String(origin));
+    assert.equal((await refusalOf(res)).at, 'origin', String(origin));
+  }
+
+  /* EVERY RUNG BELOW THE TOP ONE, AND A COLLEAGUE AT `decide` IS STILL NOT AN OWNER. */
+  for (const level of ['read', 'append', 'write', 'decide', null] as const) {
+    const res = await serveInbound(mintAsk('mint'), door, { principal: { kind: 'person', id: 'p_01J8ZC0000000000000000000C', level } });
+    assert.equal(res.status, 403, String(level));
+    assert.equal((await refusalOf(res)).code, 'LEVEL_REQUIRED', String(level));
+  }
+
+  /* AND A TOKEN PRINCIPAL AT `owner` IS NOT A PERSON. A bearer never reaches this door on this Worker,
+     which is exactly why the check is written against the principal as well as against the header. */
+  const agent = await serveInbound(mintAsk('mint'), door, {
+    principal: { kind: 'token', id: 'tk_1', scope: 'write', person: 'p_01J8ZC0000000000000000000B', level: 'owner' },
+  });
+  assert.equal(agent.status, 403);
+
+  /* AND A PRINCIPAL NOBODY AUTHENTICATED. `createToken` and `invite` refuse `credentialed === false`
+     for the same reason: an uncredentialed owner is a self-host on loopback, and a forwarding address
+     works from anywhere for as long as it is registered. */
+  const loopback = await serveInbound(mintAsk('mint'), door, { ...OWNER, credentialed: false });
+  assert.equal(loopback.status, 403);
+  assert.equal((await refusalOf(loopback)).code, 'NEEDS_BROWSER_SESSION');
+
+  /* A PATH THIS DOOR DOES NOT SERVE IS A 404 AND NOT A 405, so a scanner cannot tell which subpaths
+     exist by their `allow` header. */
+  assert.equal((await serveInbound(mintAsk('show'), door, OWNER)).status, 404);
+
+  assert.deepEqual(wrote, [], 'a refused call wrote to the Directory on its way to refusing');
+  assert.equal(d.recordFor('0'.repeat(64)), null);
+});
+
+test('A WRITE THE DIRECTORY REFUSES IS NOT AN ADDRESS ANYBODY WAS SHOWN', async () => {
+  const { d, record } = studio();
+  const { door } = mintDoor(d, record);
+  value(d.close(record));
+
+  /* A CLOSED RECORD TAKES NO ADDRESS, and the refusal is the Directory's own sentence at the status
+     every other route gives it. Answering a token whose digest was refused would hand somebody an
+     address to paste into their bank and a door that answers 404 for ever after. */
+  const res = await serveInbound(mintAsk('mint'), door, OWNER);
+  assert.equal(res.status, 422);
+  const body = (await res.text()) as string;
+  assert.equal(JSON.parse(body).refusal.code, 'OUT_OF_BOUNDS');
+  assert.equal(/[A-Za-z0-9_-]{43}/u.test(JSON.parse(body).refusal.fix ?? ''), false, 'the refusal quoted something token-shaped back');
+  assert.equal(body.includes('token'), false, 'a refused mint answered a token anyway');
 });
