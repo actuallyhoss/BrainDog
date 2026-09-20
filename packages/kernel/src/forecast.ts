@@ -192,7 +192,7 @@ export function runway(deps: ForecastDeps, opening: number, legs: readonly Leg[]
     if (rows.length > CAP) {
       refusals.push({
         code: 'OUT_OF_BOUNDS',
-        fix: `${leg.register} matches more than ${CAP.toLocaleString('en-GB')} rows, which is more than one walk can carry — narrow what this leg reads.`,
+        fix: `${leg.register} matches more than ${CAP.toLocaleString('en-GB')} rows, which is more than one walk can carry. Narrow what this leg reads.`,
         at: 'where',
       });
       continue;

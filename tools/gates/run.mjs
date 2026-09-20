@@ -108,6 +108,10 @@ const GATES = [
      only while the file and the product hold the same sentences, and 26 of 212 were reviewable and
      unrendered, including the five that define the words the product is built out of. */
   ['dead-copy', ['node', [join(here, 'dead-copy.mjs')]]],
+  /* AND THE ONE HOUSE RULE ABOUT THOSE SENTENCES THAT NOTHING ENFORCED. `LOOP.md`: "no em dashes
+     and no flippant register in anything a stranger reads", against 91 string literals carrying
+     one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
+  ['em-dash', ['node', [join(here, 'em-dash.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. It exits 3 when there is not one, which is a skip here and not a pass, so
   // `pnpm gates` is useful on a fresh checkout; CI builds first, and then it is a real gate.

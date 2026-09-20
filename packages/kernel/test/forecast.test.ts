@@ -275,7 +275,7 @@ test('THE CAP REFUSES RATHER THAN TRUNCATING, because most of the money is not a
   assert.equal(out.steps.length, 0, 'it walked a subset');
   assert.equal(out.crossed, null);
   assert.equal(out.refusals[0]?.code, 'OUT_OF_BOUNDS');
-  assert.match(out.refusals[0]!.fix, /narrow what this leg reads/);
+  assert.match(out.refusals[0]!.fix, /Narrow what this leg reads/);
   sql.close();
 });
 

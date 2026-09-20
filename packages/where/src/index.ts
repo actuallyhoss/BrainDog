@@ -732,7 +732,7 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     for (const key of ['matches', 'predicate', 'near'])
       if (key in leaf) {
         bad.push(
-          refuse('MATCH_OP_UNSUPPORTED', `${key} is in the grammar and not read by this build — it needs the text index.`, key),
+          refuse('MATCH_OP_UNSUPPORTED', `${key} is in the grammar and not read by this build: it needs the text index.`, key),
         );
         return '';
       }

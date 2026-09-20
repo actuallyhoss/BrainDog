@@ -635,7 +635,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (installed && !installed.has(want))
         return bad(
           'DEPENDENCY_UNRESOLVED',
-          `${id} requires ${want} — not installed. Install the pack that declares it first, or use --with-deps.`,
+          `${id} requires ${want}: not installed. Install the pack that declares it first, or use --with-deps.`,
           'requires',
         );
     }
@@ -646,7 +646,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
   if (!Array.isArray(blocks) || blocks.length === 0)
     return bad('DECLARATION_INVALID', `${id} declares no blocks, so opening it shows a heading and nothing under it.`, 'blocks');
   if (blocks.length > BLOCK_CEILING)
-    return bad('DECLARATION_INVALID', `${id} declares ${blocks.length} blocks. The ceiling is ${BLOCK_CEILING} — a page longer than that is a report.`, 'blocks');
+    return bad('DECLARATION_INVALID', `${id} declares ${blocks.length} blocks. The ceiling is ${BLOCK_CEILING}: a page longer than that is a report.`, 'blocks');
 
   for (const [i, raw] of blocks.entries()) {
     const block = raw as {
@@ -1223,9 +1223,9 @@ function dedupeFault(dedupe: unknown, id: string): Refusal | null {
     return notOne === undefined ? null : wrong(`names ${JSON.stringify(notOne)} as a field, and it is not one.`);
   };
   if (Array.isArray(dedupe)) return names(dedupe, 4, 'is a field list, which');
-  if (typeof dedupe !== 'object') return wrong('is a field list, or { near: { on, day, prefix } } — 07 §2.');
+  if (typeof dedupe !== 'object') return wrong('is a field list, or { near: { on, day, prefix } }. 07 §2.');
   const near = (dedupe as { near?: unknown }).near;
-  if (near === null || typeof near !== 'object') return wrong('is a field list, or { near: { on, day, prefix } } — 07 §2.');
+  if (near === null || typeof near !== 'object') return wrong('is a field list, or { near: { on, day, prefix } }. 07 §2.');
   const { on, day, prefix } = near as { on?: unknown; day?: unknown; prefix?: unknown };
   const wrongOn = names(on, 4, "near.on, which");
   if (wrongOn) return wrongOn;
@@ -1249,7 +1249,7 @@ function dedupeFault(dedupe: unknown, id: string): Refusal | null {
 function routeFault(register: unknown, id: string): Refusal | null {
   if (typeof register === 'string') return IDENT.test(register) ? null : bad('DECLARATION_INVALID', `${id} writes to ${JSON.stringify(register)}, and it is not a register.`, 'writes.register');
   if (register === null || typeof register !== 'object')
-    return bad('DECLARATION_INVALID', `${id} writes to a register, or to a table of them — { by, to }.`, 'writes.register');
+    return bad('DECLARATION_INVALID', `${id} writes to a register, or to a table of them: { by, to }.`, 'writes.register');
   const { by, to } = register as { by?: unknown; to?: unknown };
   if (!Array.isArray(by) || by.length === 0 || by.length > ROUTE_BY_MOST)
     return bad('DECLARATION_INVALID', `${id}'s routing table routes on 1 to ${ROUTE_BY_MOST} fields.`, 'writes.register.by');
@@ -1451,7 +1451,7 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
     if (typeof fetch.base !== 'string' || !FETCH_BASE.test(fetch.base))
       return bad(
         'ACTION_NOT_HTTPS',
-        `${id} fetches from ${JSON.stringify(String(fetch.base).slice(0, 80))}, and a connector's base is an https:// host on its own — no path, no placeholder.`,
+        `${id} fetches from ${JSON.stringify(String(fetch.base).slice(0, 80))}, and a connector's base is an https:// host on its own. No path, no placeholder.`,
         'fetch.base',
       );
     const wrongRead = readFault(fetch, id);
@@ -1846,7 +1846,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
     if (!(EXTRACTORS as readonly string[]).includes(key))
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}: ${JSON.stringify(key)} is not one of the thirteen forms — ten extractors and three combinators.`,
+        `${at}: ${JSON.stringify(key)} is not one of the thirteen forms, ten extractors and three combinators.`,
         at,
         EXTRACTORS as unknown as string[],
       );
@@ -1920,7 +1920,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
       'EXTRACTOR_UNKNOWN',
       named.length === 0
         ? `${at} holds no form. One object with one of the thirteen keys reads the field; an empty one reads nothing, on every arrival.`
-        : `${at} holds ${named.length} forms — ${named.join(', ')} — and a form is one object with one key. Two ways of reading a field is first: [a, b].`,
+        : `${at} holds ${named.length} forms: ${named.join(', ')}. A form is one object with one key. Two ways of reading a field is first: [a, b].`,
       at,
     );
 
@@ -1946,7 +1946,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
     if (body === null || typeof body !== 'object' || Array.isArray(body))
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}.${only} is ${JSON.stringify(body ?? null)}, and a form's arguments are an object — {} when it takes none.`,
+        `${at}.${only} is ${JSON.stringify(body ?? null)}, and a form's arguments are an object: {} when it takes none.`,
         `${at}.${only}`,
       );
     const args = body as Record<string, unknown>;
@@ -1967,7 +1967,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
     if (anchors.length > 1)
       return bad(
         'EXTRACTOR_UNKNOWN',
-        `${at}.${only} narrows the text ${anchors.length} ways — ${anchors.join(' and ')} — and an extractor takes at most one. between: [a, b] is how a slice takes both ends.`,
+        `${at}.${only} narrows the text ${anchors.length} ways: ${anchors.join(' and ')}. An extractor takes at most one. between: [a, b] is how a slice takes both ends.`,
         `${at}.${only}`,
       );
     for (const a of ['after', 'before'] as const)
@@ -2329,7 +2329,7 @@ function patternFault(node: unknown, id: string): Refusal | null {
       if (bytes > PATTERN_MAX)
         return bad(
           'PATTERN_OVER_CAP',
-          `${id}.when — the '${key}' pattern is ${bytes} bytes. The cap is ${PATTERN_MAX}. Use 'matches', which searches the full-text index instead.`,
+          `${id}.when: the '${key}' pattern is ${bytes} bytes. The cap is ${PATTERN_MAX}. Use 'matches', which searches the full-text index instead.`,
           'when',
         );
     }
@@ -3091,7 +3091,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
         if (span === null)
           return bad(
             'DECLARATION_INVALID',
-            `${decl.id} schedules ${String(action.schedule.in)} ahead, and a span is a number and one of d, w, m or y — write 14d.`,
+            `${decl.id} schedules ${String(action.schedule.in)} ahead, and a span is a number and one of d, w, m or y. Write 14d.`,
             'then',
           );
       }
@@ -3158,7 +3158,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners):
   if (fields.length > FIELD_CEILING)
     return bad(
       'FIELDS_OVER_CAP',
-      `${id} declares ${fields.length} fields. The ceiling is ${FIELD_CEILING} — a register with more than that is a database, not a register.`,
+      `${id} declares ${fields.length} fields. The ceiling is ${FIELD_CEILING}: a register with more than that is a database, not a register.`,
       'fields',
     );
 

@@ -70,6 +70,12 @@ const CASES = [
   { gate: 'css-rules-identifier-size', run: 'css-rules', expect: /two roles colliding/, findings: 1 },
   { gate: 'css-rules-icon-color', run: 'css-rules', expect: /currentColor only/, findings: 1 },
   { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /rename left the rule behind/, findings: 1 },
+  /* THE FIXTURE CARRIES FOUR DECOYS BESIDE THE ONE VIOLATION, and a count of one is what proves
+     they are still forgiven. A block comment, a line comment, a bare glyph, a heading rule and two
+     SQL column annotations all hold an em dash spaced on both sides, which is the exact shape the
+     gate refuses in prose. If any exemption stops working this goes to two or more rather than
+     staying green, and an exemption nothing tests is an exemption that quietly widens. */
+  { gate: 'em-dash', expect: /used as punctuation/, findings: 1 },
   { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
   { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },

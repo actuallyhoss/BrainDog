@@ -414,11 +414,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      all — which is precisely the class this file exists to prevent. */
   const bound = decl.target && ('lte' in decl.target ? decl.target.lte : decl.target.gte);
   if (decl.target && typeof bound !== 'number')
-    at('VALUE_MALFORMED', "target takes a number in the figure's own units — { lte: 400000 } for money in minor units", 'target');
+    at('VALUE_MALFORMED', "target takes a number in the figure's own units: { lte: 400000 } for money in minor units", 'target');
 
   if (!decl.window) at('REQUIRED_MISSING', 'a number with no comparison window is a number you cannot act on', 'window');
   const shift = decl.window ? windowMs(decl.window) : null;
-  if (decl.window && shift === null) at('VALUE_MALFORMED', `${decl.window} is not a window — write 30d, 4w or 3m`, 'window');
+  if (decl.window && shift === null) at('VALUE_MALFORMED', `${decl.window} is not a window: write 30d, 4w or 3m`, 'window');
 
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
   if (!register) at('SOURCE_UNKNOWN', `${decl.source} is not a register this build reads`, 'source');
@@ -1191,7 +1191,7 @@ export function scorePrediction(
   if (met === false && row.on_miss === 'suggest' && deps.propose)
     deps.propose(
       {
-        question: `${row.claim} — predicted ${row.target}, observed ${observed === null ? 'nothing' : observed}. Supersede that decision, or say why you are keeping it.`,
+        question: `${row.claim}: predicted ${row.target}, observed ${observed === null ? 'nothing' : observed}. Supersede that decision, or say why you are keeping it.`,
         body_kind: 'options',
         body: {
           options: [

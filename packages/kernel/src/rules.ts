@@ -767,7 +767,7 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
       out.push(
         found.length === 1
           ? `link ${a.link.field}`
-          : `link ${a.link.field} — ${found.length === 0 ? 'nothing bears that name' : 'two rows bear that name'}`,
+          : `link ${a.link.field}: ${found.length === 0 ? 'nothing bears that name' : 'two rows bear that name'}`,
       );
     }
   }

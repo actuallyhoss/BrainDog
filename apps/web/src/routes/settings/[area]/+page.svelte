@@ -2222,7 +2222,7 @@
               <!-- THE SERVER'S `fix` SENTENCE, VERBATIM (13 §6), ON ITS OWN LINE SO IT WRAPS.
                    In the five-column ledger it was a `.line-detail` — one line, `overflow: hidden`,
                    ellipsis — so the sentence that says what to DO about a broken connector read
-                   "Reconnect the credential — the provider rejected it; the connector is…". A `fix`
+                   "Reconnect the credential: the provider rejected it, and the connector is…". A `fix`
                    rendered verbatim and then cut is not rendered verbatim.
 
                    And the credential by the LABEL the vault indexes it under. A pull failure names

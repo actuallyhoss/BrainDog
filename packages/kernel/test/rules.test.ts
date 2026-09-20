@@ -1041,7 +1041,7 @@ test('AND A SPAN THIS RECORD CANNOT READ DOES NOT INSTALL', async () => {
     } as never,
   ]);
   assert.equal(out.ok, false, 'a span nobody can read installed');
-  assert.match((out as { refusal: { fix: string } }).refusal.fix, /write 14d/);
+  assert.match((out as { refusal: { fix: string } }).refusal.fix, /Write 14d/);
   sql.close();
 });
 

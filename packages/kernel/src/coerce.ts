@@ -327,7 +327,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       if (hasEscapedNewline(value))
         return bad(
           'TEXT_ESCAPED_NEWLINE',
-          `${at} contains the two characters backslash and n, and no line break anywhere. Send a real newline — or, if those two characters are meant literally, a value with a real line break in it as well.`,
+          `${at} contains the two characters backslash and n, and no line break anywhere. Send a real newline; or, if those two characters are meant literally, a value with a real line break in it as well.`,
           at,
         );
       // A `document` is the dialect, and the dialect is line-based: CRLF would put a stray CR in
@@ -364,7 +364,7 @@ export function coerce(field: FieldDecl, value: unknown, look: Lookups = {}, at 
       const amount =
         typeof amountIn === 'string' && INT_STRING.test(amountIn.trim()) ? Number(amountIn.trim()) : amountIn;
       if (typeof amount !== 'number' || !Number.isFinite(amount))
-        return malformed(`${at}.amount takes an integer in minor units — 4800 is GBP 48.00.`);
+        return malformed(`${at}.amount takes an integer in minor units: 4800 is GBP 48.00.`);
       /* A FLOAT IS THE EXACT BUG MINOR UNITS EXIST TO STOP, so it is refused rather than rounded:
          rounding is how a record ends up a penny out on a figure somebody is about to act on. */
       if (!Number.isInteger(amount))

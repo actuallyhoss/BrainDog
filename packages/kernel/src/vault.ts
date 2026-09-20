@@ -164,13 +164,13 @@ export function bindGrant(
     });
   if (!args.label.trim()) return no<GrantRow>('REQUIRED_MISSING', 'A grant has a label a person would say.', { at: 'label' });
   if (!args.opens.trim())
-    return no<GrantRow>('REQUIRED_MISSING', 'A grant says what it opens — a host, an account, a machine.', { at: 'opens' });
+    return no<GrantRow>('REQUIRED_MISSING', 'A grant says what it opens: a host, an account, a machine.', { at: 'opens' });
   if (args.ciphertext.length === 0)
     return no<GrantRow>('REQUIRED_MISSING', 'A grant carries sealed bytes. Seal them before binding.', { at: 'ciphertext' });
   /* THE HINT IS NOT THE SECRET. It is read on a screen by whoever the record belongs to, and a hint
      long enough to be the thing it hints at is a credential written down in plain text. */
   if (args.hint && args.hint.length > 60)
-    return no<GrantRow>('OUT_OF_BOUNDS', 'A hint says what the thing IS, unopened — sixty characters, not the value.', {
+    return no<GrantRow>('OUT_OF_BOUNDS', 'A hint says what the thing IS, unopened: sixty characters, not the value.', {
       at: 'hint',
     });
   if (args.id !== undefined && !ID.test(args.id))
@@ -186,7 +186,7 @@ export function bindGrant(
      anyway — that is what it is for — but a refusal that arrives before anything was tried is the
      one that needs no machinery to be correct. */
   if (args.rotate_every && spanMs(args.rotate_every) === null)
-    return no<GrantRow>('VALUE_MALFORMED', `${args.rotate_every} is not a span — write 90d, 12w or 1y.`, {
+    return no<GrantRow>('VALUE_MALFORMED', `${args.rotate_every} is not a span: write 90d, 12w or 1y.`, {
       at: 'rotate_every',
     });
   if (args.expires_at && !Number.isFinite(dayMs(args.expires_at)))

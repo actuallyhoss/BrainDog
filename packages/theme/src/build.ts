@@ -306,11 +306,11 @@ const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 export function parseColour(s: string): Rgb {
   const t = s.trim();
   if (t.startsWith('#')) {
-    if (!HEX.test(t)) throw new Error(`THEME_VALUE_INVALID — "${s}" is not a colour this dialect accepts.`);
+    if (!HEX.test(t)) throw new Error(`THEME_VALUE_INVALID: "${s}" is not a colour this dialect accepts.`);
     return fromHex(t);
   }
   const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/i.exec(t);
-  if (!m) throw new Error(`THEME_VALUE_INVALID — "${s}" is not a colour this dialect accepts.`);
+  if (!m) throw new Error(`THEME_VALUE_INVALID: "${s}" is not a colour this dialect accepts.`);
   return quantise(gamutMap({ L: Number(m[1]), C: Number(m[2]), H: Number(m[3]) }));
 }
 
@@ -321,7 +321,7 @@ export function normalise(seed: string): Lch {
   const c = rgbToLch(rgb(seed));
   if (c.C < 0.02)
     throw new Error(
-      `theme — the seed ${seed} is almost grey, so there is no hue to build from. Pick a colour with some chroma in it.`,
+      `theme: the seed ${seed} is almost grey, so there is no hue to build from. Pick a colour with some chroma in it.`,
     );
   return c;
 }
@@ -557,7 +557,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
           }
   if (!chosen)
     throw new Error(
-      `INTENT_INSEPARABLE — in ${scheme}, the best palette on the search grid gets ${best.pair} only ` +
+      `INTENT_INSEPARABLE: in ${scheme}, the best palette on the search grid gets ${best.pair} only ` +
         `${best.worst.toFixed(1)} apart to a dichromat. Four intents need at least 10. ` +
         `Move the accent hue, or widen the profile's chroma ladder.`,
     );

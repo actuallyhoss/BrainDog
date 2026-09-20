@@ -88,7 +88,7 @@ const usage = () =>
     'braindog page pull <slug> [--host <host>] [--out <file>]',
     "  Fetch a page's declaration and write it as <page>.dog: one page, one file, in the source view's dialect.",
     'braindog page push <file> [--host <host>]',
-    '  Read a .dog file and set it as the page. An owner in the app only — a token is refused, this CLI included.',
+    '  Read a .dog file and set it as the page. An owner in the app only: a token is refused, this CLI included.',
     'braindog page check <file>',
     '  Validate a .dog file against the authoring grammar, locally. Nothing is sent.',
     'braindog usecase list [--host <host>]',

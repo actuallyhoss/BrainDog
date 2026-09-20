@@ -63,6 +63,10 @@
     "//": "13 §2. How much of an offending line is quoted — a colour literal is not a secret, but a whole minified line is not a finding either.",
     "excerptChars": 100
   },
+  "emDash": {
+    "//": "How much of an offending line is quoted on EACH SIDE of the dash. Windowed rather than clipped from the start, because a refusal's sentence is regularly longer than this and the clause break is the only part of it the finding is about.",
+    "excerptChars": 60
+  },
   "report": {
     "//": "packages/record/src/report.ts, REPORT_ROWS_PER_MINUTE: the rows one report key may send in a minute, refused past it as RATE_LIMITED with retry_after (30 §6). A report key is kept in a project's environment, where a credential is most likely to leak, and a hundred rows a call as often as it liked was every row a record could hold. Six hundred is a reading every tenth of a second. The record enforces the constant, because the Worker cannot read this file; guards holds the two equal. Added September 17th 2026.",
     "rowsPerMinute": 600

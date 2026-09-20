@@ -270,9 +270,9 @@ export const PULL_CODES: readonly PullCode[] = REFUSAL_CODES.filter(isPullCode);
  */
 export const PULL_FIXES: Readonly<Record<PullCode, string>> = {
   WRONG_KEY: 'The root key changed; re-wrap the connector key and retry.',
-  PULL_AUTH_REJECTED: 'Reconnect the credential — the provider rejected it; the connector is paused until you do.',
+  PULL_AUTH_REJECTED: 'Reconnect the credential: the provider rejected it, and the connector is paused until you do.',
   PULL_PROVIDER_UNAVAILABLE: 'Nothing to do; the next attempt is scheduled.',
-  PULL_REQUEST_REFUSED: 'Fix the declaration — the provider refused the request as declared.',
+  PULL_REQUEST_REFUSED: 'Fix the declaration: the provider refused the request as declared.',
   PULL_EXPECT_FAILED: 'The server did not do what was asked: <at> was <found>, expected <wanted>; nothing was written.',
   PULL_SHAPE_MISMATCH: 'The response shape changed; check <at> against a recent response.',
   PULL_ORIGIN_REFUSED: 'The connector may only call <base>; a redirect or a foreign link was not followed.',

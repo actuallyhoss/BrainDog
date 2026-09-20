@@ -84,7 +84,7 @@ export function classify(decl: FetchDecl, res: Answered, nowMs: number, at: stri
     throw new PullError('PULL_ORIGIN_REFUSED', at, {
       found: status,
       base: decl.base,
-      wanted: 'an answer, not a redirect — a connector goes where the declaration says and nowhere else',
+      wanted: 'an answer, not a redirect: a connector goes where the declaration says and nowhere else',
     });
 
   if (status === 401 || status === 403) throw new PullError('PULL_AUTH_REJECTED', at, { found: status });

@@ -107,8 +107,8 @@ export function checkInterval(decl: PullDecl): Result<number> {
       /* NAMED RATHER THAN PRINTED WHEN THERE IS NOTHING TO PRINT. "undefined is not an interval" is
          a sentence about this program and not about the declaration somebody wrote. */
       typeof decl.every === 'string'
-        ? `${decl.every} is not an interval — write 15m, 1h, 6h or 1d.`
-        : `${decl.ingest} says how to fetch but not how often — write every: 15m, 1h, 6h or 1d.`,
+        ? `${decl.every} is not an interval: write 15m, 1h, 6h or 1d.`
+        : `${decl.ingest} says how to fetch but not how often. Write every: 15m, 1h, 6h or 1d.`,
       { at: 'every' },
     );
 
