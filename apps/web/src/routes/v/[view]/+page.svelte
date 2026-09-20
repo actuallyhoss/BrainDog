@@ -2,31 +2,41 @@
   A saved view: `/v/obligations.overdue`.
 
   The up half of the two-altitude ladder. Filter a register, press ⌥V, and the filter becomes a
-  NAMED PREDICATE on the register's own declaration — a first-class object with an owner and a share
-  link, in one keystroke, because THE URL IS THE SERIALISATION. There is no "save this search"
-  dialog and nothing to publish (19 §1).
+  NAMED PREDICATE held against that register on the record: a row of its own with an owner and a
+  share link, in one keystroke, because THE URL IS THE SERIALISATION. There is no "save this
+  search" dialog and nothing to publish (19 §1).
 
-  `order` stays URL state and is not part of the saved object: what you are looking at is the
-  predicate; how it is sorted is how you happen to be looking at it today.
+  `order` stays URL state on the sample and is part of the saved object on a record: `saveView`
+  stores the sort somebody was looking at, so a live view reopens the way it was left.
+
+  IT DREW THE SAMPLE'S TWO VIEWS ON EVERY RECORD, and it was the last data screen left that way.
+  `VIEWS` at `data.ts:833` is a fictional studio's pair, and the key a person opens is matched
+  against that object alone: no `createClient`, no `*-live` import, so `/v/services.lapsing` on a
+  real record drew a filter somebody else wrote over rows from a register this record may not even
+  declare. `views-live.ts` is the live half, built on the record's own `view` table, and the sample
+  stays exactly where it was: the answer when there is no record to ask.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { goto } from '$app/navigation';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { page } from '$app/state';
   import { CapLine, Table } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
-  import { DOM_CAP, VIEWS, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, NOW, VIEWS, iconFor, REGISTERS, columnsFor, seqWidth, display, labelOf, list, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import RowCards from '$lib/ui/RowCards.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES } from '$lib/record/data.ts';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   /**
    * A register's named predicate, never a free-form slug.
@@ -36,15 +46,14 @@
    * that only filtered on state, so 28 rows were drawn under the word Overdue and 24 of them were
    * not overdue — row four was due in four days. A printed predicate that is not the predicate is
    * worse than none, because it is checkable and wrong.
+   *
+   * WHICH IS WHY A LIVE VIEW MAY PRINT NO SENTENCE AT ALL. The record holds the predicate as a
+   * tree, and `clausesOf` turns back into chips only the shapes these chips can say. An `any`
+   * group, a hop through `via` or a `contains` leaf comes back `null`, and the Filter line is then
+   * absent rather than short by a clause.
    */
 
   const key = $derived(page.params.view ?? '');
-  const view = $derived(VIEWS[key]);
-  const decl = $derived(view ? REGISTERS[view.register] : undefined);
-  /* The spoken id ends the row, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
-  const columns = $derived(
-    view ? [...columnsFor(view.register).filter((c) => c.field !== 'seq'), ...columnsFor(view.register).filter((c) => c.field === 'seq')] : [],
-  );
 
   /**
    * THE REST OF THE URL, WHICH THIS ROUTE USED TO THROW AWAY WITHOUT SAYING SO.
@@ -70,33 +79,94 @@
   const narrowed = $derived(Boolean(q) || extra.length > 0);
 
   /**
+   * THE RECORD'S ANSWER, AND THE SAMPLE ONLY WHERE THERE IS NO RECORD.
+   *
+   * One read per address, bracketed by `opened()` and `closed()`, so `data-screen` is away while it
+   * is out. The whole URL goes into the read: an extra clause is a narrower question about the same
+   * view, so it is ANDed onto the record's own predicate rather than being applied to a second list
+   * afterwards, which is what the sample path does in memory.
+   *
+   * AN ANSWER FOR AN ADDRESS SOMEBODY HAS ALREADY LEFT IS DROPPED, the way the row screen drops one.
+   */
+  let got = $state<Viewed | null>(null);
+  let clock = $state(NOW);
+  let reader: ViewReader | null = null;
+  let askedFor = '';
+
+  async function readView(address: string, filters: Filter[], query: string) {
+    const asked = JSON.stringify([address, filters, query]);
+    askedFor = asked;
+    got = null;
+    const at = opened();
+    reader ??= viewReader(location.origin);
+    const out = await reader.read(address, filters, query);
+    const current = askedFor === asked;
+    closed(!current || out.from !== 'refused', at);
+    if (!current) return;
+    /* A LIVE ROW IS READ AGAINST TODAY AND A SAMPLE ROW AGAINST THE SAMPLE'S OWN DAY, since a
+       fixture date read against today is wrong by months. */
+    clock = out.from === 'live' ? Date.now() : NOW;
+    got = out;
+  }
+
+  $effect(() => {
+    const address = key;
+    const filters = extra;
+    const query = q;
+    untrack(() => void readView(address, filters, query));
+  });
+
+  const live = $derived(got?.from === 'live' ? got.view : undefined);
+  const sample = $derived(got?.from === 'sample' ? VIEWS[key] : undefined);
+  /* THE TWO REFUSALS AS VALUES, because a `{#snippet}` is a scope of its own and the narrowing a
+     `{:else if got?.from === 'refused'}` gives the markup does not reach inside one. */
+  const refused = $derived(got?.from === 'refused' ? got : undefined);
+  const missing = $derived(got?.from === 'missing' ? got : undefined);
+  const register = $derived(live?.register ?? sample?.register);
+  const name = $derived(live?.name ?? sample?.name);
+  /* READ AGAIN ONCE THE VIEW IS: a use case's own list is declared by the record, and `viewReader`
+     learns it on the way (`remote.ts` `learn`), which a plain read of `REGISTERS` would not notice. */
+  const decl = $derived.by(() => (void got, register ? REGISTERS[register] : undefined));
+  const filters = $derived(live ? live.filters : (sample?.filters ?? null));
+  /* THE COLUMNS THE VIEW KEPT, and the register's own where it kept none. The spoken id ends the
+     row either way, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
+  const columns = $derived(register ? keptColumns(columnsFor(register), live?.columns ?? []) : []);
+
+  const sampled = $derived(
+    sample && register ? list(register, { filters: [...sample.filters, ...extra], ...(q ? { q } : {}) }) : undefined,
+  );
+  const entries = $derived(got?.from === 'live' ? got.entries : (sampled?.entries ?? []));
+  const matched = $derived(got?.from === 'live' ? got.matched : (sampled?.matched ?? 0));
+  const total = $derived(got?.from === 'live' ? got.total : (sampled?.total ?? 0));
+  /* WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT. Undefined on the sample, where `display`
+     names a ref out of the sample's own rows as it always has. */
+  const names = $derived(got?.from === 'live' ? got.names : undefined);
+  /* NOTHING IS DRAWN UNTIL THE VIEW HAS BEEN READ, so the sample never shows over a live one. */
+  const waiting = $derived(got === null);
+
+  /**
    * THE FILTER IN THE LIST'S OWN WORDS. `copy.filterClause` says why the reading line stopped being
    * the `where` sentence; this is the half that knows the register, so a field is called what its
    * column is called and an enum value is written the way its cell writes it. A date clause keeps
    * its value as typed, because `today` is already a word and `display` would read it as a day.
    */
-  const readable = (filters: Filter[]): string =>
+  const readable = (said: Filter[]): string =>
     copy.filterReads(
-      filters.map((f) => {
+      said.map((f) => {
         const field = decl?.fields.find((d) => d.id === f.field);
         const dated = f.op === 'before' || f.op === 'after';
-        const values = dated || !view ? f.values : f.values.map((v) => display(view.register, f.field, v) ?? v);
+        const values = dated || !register ? f.values : f.values.map((v) => display(register, f.field, v) ?? v);
         return copy.filterClause(field ? labelOf(field) : f.field, values, f.op);
       }),
     );
 
-  const result = $derived(
-    view
-      ? list(view.register, { filters: [...view.filters, ...extra], ...(q ? { q } : {}) })
-      : { entries: [], total: 0, matched: 0 },
-  );
   /* THE SAME CAP THE REGISTER APPLIES, because this is the same list with a different filter — and
      it is the surface `13 §4.3` sends you to when a register gets big, so it was the one place a
      five-thousand-row answer was rendered whole. `Table` draws the line that says so. */
-  const shown = $derived(result.entries.slice(0, DOM_CAP));
-  const rows = $derived(view ? toRows(view.register, shown, columns) : []);
+  const shown = $derived(entries.slice(0, DOM_CAP));
+  const rows = $derived(register ? toRows(register, shown, columns, clock, names) : []);
   /* The `#` column holds the digits of the highest id in hand, as on the list this view narrows. */
-  const sized = $derived(columns.map((c) => (c.field === 'seq' ? { ...c, width: seqWidth(result.entries) } : c)));
+  const sized = $derived(columns.map((c) => (c.field === 'seq' ? { ...c, width: seqWidth(entries) } : c)));
 
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
@@ -108,7 +178,7 @@
        buttons left the page behind it holding its own keyboard. */
     if (covered()) return;
     if (typing()) return;
-    if (e.altKey && e.key.toLowerCase() === 'b' && view) {
+    if (e.altKey && e.key.toLowerCase() === 'b' && register) {
       e.preventDefault();
       binding = true;
       return;
@@ -119,33 +189,62 @@
        `silenced` FIRST, because `o` is a bare letter and `Character keys: off` is what makes the
        whole bare namespace legal (19 §4). */
     if (silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'o' && view) {
+    if (e.key === 'o' && register) {
       e.preventDefault();
-      void goto(`/r/${view.register}`);
+      void goto(`/r/${register}`);
     }
   }
 
   /**
-   * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
+   * DRAWN ONCE THE VIEW HAS BEEN READ, from the record or the sample.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
    * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
    * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
    * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
+   * the other claim.
    *
-   * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
-   * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * IT USED TO READ `$effect(() => drew('ready'))` UNCONDITIONALLY, on the argument that this
+   * screen computes its content synchronously. That argument was true of a screen reading a
+   * fixture and is not true of this one: the read is bracketed by `opened()` and `closed()`, and
+   * the attribute stays away until the answer lands.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (!waiting) drew('ready');
+  });
 </script>
 
-<svelte:head><title>{titleOf(view?.name, 'View')}</title></svelte:head>
+<svelte:head><title>{titleOf(name, 'View')}</title></svelte:head>
 
 <svelte:window {onkeydown} />
 
-{#if !view || !decl}
+{#if waiting}
+  <!-- Bars until the view has been read, never the sample's view of the same key. -->
+  <Waiting head rows={8} />
+{:else if refused}
+  <div class="page">
+    <!-- THE REFUSAL IS THE TEACHER, and the sentence is the record's. The case worth the branch is
+         a view whose filter the record can no longer read: the view itself reads back fine, and
+         `list` names the field that is gone. Without this the screen was a heading over nothing. -->
+    <Empty kind="error" heading title={refused.fix}>
+      {#snippet actions()}
+        {#if refused.register}
+          <Button href="/r/{refused.register}">{copy.openUnfiltered(REGISTERS[refused.register]?.name ?? refused.register)}</Button>
+        {/if}
+        <Button href="/">{copy.home}</Button>
+      {/snippet}
+    </Empty>
+  </div>
+{:else if missing}
+  <div class="page">
+    <!-- A VIEW THIS RECORD DOES NOT HOLD, IN THE RECORD'S OWN WORDS AND WITH THE RECORD'S OWN
+         ADDRESSES. Listing the sample's two names here would answer the question with two links
+         that open somebody else's list. -->
+    <Empty kind="error" heading title={missing.said} body={copy.theseExist('Saved views', missing.addresses)}>
+      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
+    </Empty>
+  </div>
+{:else if !register || !decl || !name}
   <div class="page">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
@@ -162,9 +261,9 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={view.name} count={result.matched} total={result.total}>
+  <PageHead icon={iconFor(decl.icon, 'rows')} kicker="{decl.name} · saved view" title={name} count={matched} {total}>
     {#snippet actions()}
-      <Button weight="bare" href="/r/{view.register}"><Icon name="external" size="s" />Open {decl.name}</Button>
+      <Button weight="bare" href="/r/{register}"><Icon name="external" size="s" />Open {decl.name}</Button>
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
            means by a page builder. It opened and worked on a phone. -->
       <span class="bind-slot">
@@ -175,22 +274,38 @@
 
   <BindBlock
     bind:open={binding}
-    register={view.register}
-    predicate={view.name}
-    says={whereOf(view.filters)}
+    {register}
+    predicate={name}
+    says={filters ? whereOf(filters) : ''}
     onbind={(target, kind) =>
       toasts.push(copy.bound(copy.kindNames[kind] ?? kind, PAGES[target]?.title ?? target), { intent: 'warn' })}
   />
 
   <div class="page">
-    <p class="predicate">
-      <span class="predicate-label">Filter</span>
-      <span class="predicate-said">{readable([...view.filters, ...extra])}</span>
-      {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
-      {#if narrowed}
-        <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
-      {/if}
-    </p>
+    <!-- NO LINE AT ALL WHERE THE PREDICATE CANNOT BE WRITTEN AS CHIPS, which is the header's own
+         rule applied to a shape the sample could never produce: a printed predicate that is not the
+         predicate is worse than none.
+
+         AND NO LINE WHERE THERE IS NO PREDICATE EITHER. `viewReader` answers `filters: []` for a
+         view the record holds with `filter: null`, which the kernel's own `ViewRow` header calls a
+         view that shows the whole register, and `[]` is truthy: this line drew the word Filter with
+         an empty `.predicate-said` after it in a flex row, so the whole line was the label. The
+         sample could not reach it because every view in `VIEWS` ships at least one clause. The
+         length is what is asked, not the array, and `extra` counts too so a `?f=` clause over an
+         unfiltered view is still written out. -->
+    {#if filters?.length || narrowed || live?.search}
+      <p class="predicate">
+        <span class="predicate-label">Filter</span>
+        {#if filters && filters.length + extra.length > 0}<span class="predicate-said">{readable([...filters, ...extra])}</span>{/if}
+        <!-- A SAVED VIEW REMEMBERS WHAT WAS IN THE BOX, and the record has stored it all along with
+             nothing reading it back. It is quoted as typed, like `q`, because it is text somebody typed. -->
+        {#if live?.search}<span class="predicate-q">{copy.matching} <code>{live.search}</code></span>{/if}
+        {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
+        {#if narrowed}
+          <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
+        {/if}
+      </p>
+    {/if}
 
     <!--
       THE FIVE STATES, WHICH THIS ROUTE HAD NONE OF.
@@ -204,22 +319,20 @@
       thirty-eight is `no-results` and the thing to do is widen it. The register next door has said
       both correctly for months, so the sentences come from the same place.
     -->
-    {#if result.entries.length === 0}
+    {#if entries.length === 0}
       <Empty
-        kind={result.total === 0 ? 'no-data-yet' : 'no-results'}
-        title={result.total === 0
-          ? copy.nothingIn(decl.name)
-          : copy.noneMatching(result.total, copy.rowsWord(result.total))}
-        query={result.total === 0 ? undefined : [q, whereOf([...view.filters, ...extra])].filter(Boolean).join(' · ')}
-        body={result.total === 0 && decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined}
+        kind={total === 0 ? 'no-data-yet' : 'no-results'}
+        title={total === 0 ? copy.nothingIn(decl.name) : copy.noneMatching(total, copy.rowsWord(total))}
+        query={total === 0 ? undefined : [q, live?.search, filters ? whereOf([...filters, ...extra]) : ''].filter(Boolean).join(' · ')}
+        body={total === 0 && decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined}
       >
         {#snippet actions()}
-          {#if result.total === 0}
-            <Button weight="primary" href="/r/{view.register}?new=1">{copy.addOne}</Button>
+          {#if total === 0}
+            <Button weight="primary" href="/r/{register}?new=1">{copy.addOne}</Button>
           {:else if narrowed}
             <Button href="/v/{key}">{copy.backToView}</Button>
           {:else}
-            <Button href="/r/{view.register}">{copy.openUnfiltered(decl.name)}</Button>
+            <Button href="/r/{register}">{copy.openUnfiltered(decl.name)}</Button>
           {/if}
         {/snippet}
       </Empty>
@@ -228,18 +341,18 @@
     <!-- ONE BODY AT A TIME, in the document and not only in the stylesheet — the register's own
          measurement: both bodies were built at every width and one was hidden, so a list of 2,614
          rows held 4,001 rows and 102,681 nodes and took eight seconds to settle. -->
-    {#if result.entries.length > 0 && rowsAsCards()}
-      <RowCards register={view.register} entries={shown} />
+    {#if entries.length > 0 && rowsAsCards()}
+      <RowCards {register} entries={shown} />
     {:else}
-    <div class="table-slot" class:gone={result.entries.length === 0}>
+    <div class="table-slot" class:gone={entries.length === 0}>
       <Table
         columns={sized}
         {rows}
-        total={result.matched}
+        total={matched}
         cap={DOM_CAP}
-        label={view.name}
+        label={name}
         bind:focus
-        onactivate={(row) => goto(`/r/${view.register}/${row.key.split('#')[1]}`)}
+        onactivate={(row) => goto(`/r/${register}/${row.key.split('#')[1]}`)}
       />
     </div>
     {/if}
@@ -254,11 +367,11 @@
 
       And the comment that used to sit here justified itself with *"`Table` used to draw it from
       `aria-rowcount`, which is `-1` while a filtered list pages"* — true of the register, and this
-      route does not page at all and passes `result.matched`, never `-1`. It was the register's
-      reason, copied onto a screen it is not about.
+      route does not page at all and passes `matched`, never `-1`. It was the register's reason,
+      copied onto a screen it is not about.
     -->
     {#if shown.length >= DOM_CAP}
-      <CapLine shown={shown.length} total={result.matched} />
+      <CapLine shown={shown.length} total={matched} />
     {/if}
   </div>
 {/if}

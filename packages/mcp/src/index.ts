@@ -1,5 +1,5 @@
 /**
- * The fifteen tools, which are the whole of what an agent sees.
+ * The sixteen tools, which are the whole of what an agent sees.
  *
  * THE COUNT IS THE DESIGN. `10-MCP` §4 puts a budget on it: the tool list is in every turn of every
  * session, so one more tool costs every conversation for ever. So the record's own vocabulary
@@ -21,6 +21,23 @@
  * their own schema and the instructions say, and `meet` listed the examples the instructions list.
  * The list measured 2,555 tokens before and 2,565 after, against a ceiling of 2,600.
  *
+ * AND `money` IS THE SIXTEENTH, AND IT PAID FOR ITSELF THE SAME WAY. A money ledger arrived in
+ * money-core 1.2.0 with transactions, categories, recurring items, instalments and snapshots, and
+ * the thing a person asks most days, "how am I doing this month", had no verb: an agent had to know
+ * the register names, write a predicate for each, and add the rows up itself, once per currency,
+ * which is the one piece of arithmetic this record refuses to do by guess. It cost 91 tokens of the
+ * 35 the ceiling had left, and nine descriptions gave them back by stopping saying what the
+ * instructions or the schema beside them already say. The instructions are ten rules
+ * (`loop/research-agent-path.md` §1.4) and a client shows them in the same payload as this list, so
+ * `propose` carried two of them word for word ("an agent never decides" and "to change what you may
+ * not"), `context` opened on the first rule's "where you are", and `handoff`'s `tried` repeated the
+ * rule about ruling a dead end out. The other five are the schema beside them: `activity` compared
+ * itself with `history` after its own first clause had said "the whole record", `governance`
+ * explained its own `id` argument, `meet` said "never guess an email" beside an `email` that says
+ * "only as seen", `propose`'s `question` said the word question, and two cursors said "to continue"
+ * after the word cursor.
+ * The list measured 2,565 before, 2,656 with the tool, and 2,565 again after.
+ *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
  * nothing in a turn that does not ask for it.
@@ -31,7 +48,7 @@
  * attempt works.
  */
 
-import type { Result } from '@braindog/ports';
+import { refused, type Result } from '@braindog/ports';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -135,7 +152,7 @@ export type Tool = {
 
 const str = (description: string) => ({ type: 'string', description });
 const int = (description: string) => ({ type: 'integer', description });
-/* `required` is left out when empty: it is fifteen tools' worth of tokens that say nothing. */
+/* `required` is left out when empty: it is sixteen tools' worth of tokens that say nothing. */
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
   properties,
@@ -152,8 +169,10 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'context',
+    /* THAT IT IS THE FIRST CALL, AND THAT IT IS ABOUT WHERE YOU ARE, IS THE INSTRUCTIONS' FIRST
+       LINE, which a client shows in the same payload. What is left is what comes back. */
     description:
-      'Where you are and what applies here: your session, your project, its open work, questions waiting on the person, people, the keys and servers you may use (by name, never a value), skills and learnings, plus everything global. Call it again after a long pause.',
+      'Your session, your project, its open work, questions waiting on the person, people, the keys and servers you may use (by name, never a value), skills and learnings, and everything global. Call it again after a long pause.',
     input: obj({}),
     writes: false,
   },
@@ -181,7 +200,7 @@ export const TOOLS: readonly Tool[] = [
         register: str('A register id.'),
         where: { type: 'object', description: 'A predicate tree. Omit for everything.' },
         limit: int('1 to 200. Default 25.'),
-        cursor: str('From a previous answer, to continue.'),
+        cursor: str('From a previous answer.'),
       },
       ['register'],
     ),
@@ -202,30 +221,40 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'activity',
     description:
-      'What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read it to pick up after another session. history is one row; this is all of them.',
+      'What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read it to pick up after another session.',
     input: obj({ limit: int('1 to 200. Default 50.') }),
+    writes: false,
+  },
+  {
+    name: 'money',
+    /* ONE AMOUNT PER CURRENCY IS SAID ONCE, in the instructions, which say it about every tool
+       (`never add two currencies`). What is left here is what this tool alone is for. */
+    description: 'How money stands: cash now, what moved in 30 days, what is due in and out, and what is late each way. One amount per currency.',
+    input: obj({}),
     writes: false,
   },
   {
     name: 'governance',
     description:
-      'What has been proposed and not yet answered, what was decided and why, and what was predicted. A list gives each question; ask by id for its body.',
+      'What has been proposed and not yet answered, what was decided and why, and what was predicted. Ask by id for a body.',
     input: obj({
       register: str('suggestion (the default), decision, or prediction.'),
       id: str('One row, by its SG or D number.'),
       status: str('open (the default), resolved, or all.'),
       limit: int('At most 200.'),
-      cursor: str('From a previous answer, to continue.'),
+      cursor: str('From a previous answer.'),
     }),
     writes: false,
   },
   {
     name: 'propose',
-    description:
-      'Put a question to the person, with what you would do about it. It changes nothing by itself, so it is the verb to use when you are not sure, or to change what you may not.',
+    /* WHEN TO REACH FOR IT IS SAID IN THE INSTRUCTIONS, and was said again here: "an agent never
+       decides, lay out options with propose" and "to change something you may not change yourself,
+       propose it" are the two clauses this description carried, in the same payload, a line apart. */
+    description: 'Put a question to the person, with what you would do about it. It changes nothing by itself.',
     input: obj(
       {
-        question: str('What is being asked, in one sentence a person can answer.'),
+        question: str('One sentence a person can answer.'),
         body_kind: str('options, rowset, pattern, change, pack, settings or arrange.'),
         body: {
           type: 'object',
@@ -279,7 +308,9 @@ export const TOOLS: readonly Tool[] = [
     description: "Keep your session's handoff true, so whoever picks this up next knows where it stands.",
     input: obj({
       next: str("The one concrete next step. 'Carry on' is not one."),
-      tried: str('A dead end, the moment you rule it out. It appends.'),
+      /* WHEN TO SEND IT IS IN THE INSTRUCTIONS, word for word: "record each dead end in tried when
+         you rule it out". What is left is the part they do not say, which is that it appends. */
+      tried: str('A dead end. It appends.'),
       note: str('One line of reasoning. It appends.'),
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
       doing: str('What this session is doing.'),
@@ -294,7 +325,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'meet',
     description:
-      'Someone you came across in the work. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
+      'Someone you came across in the work. They are matched by email or handle, added if new, and linked to your project with where you met them.',
     input: obj(
       {
         name: str('As written in the work.'),
@@ -429,6 +460,90 @@ const unbuilt = (name: string, instead: string): Result<never> => ({
   ok: false,
   refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This record does not answer ${name} yet. ${instead}` },
 });
+
+/**
+ * The money figures the `money` tool relays, in the order an answer reads in.
+ *
+ * EVERY ONE IS A FIGURE THE MONEY PACK ALREADY DECLARES (`packages/seed/src/modules/money.ts`), so
+ * the number an agent reads here is the number the Money page draws and `metric` answers by id.
+ * Adding the rows up in the tool instead would be a second engine over the same registers, and the
+ * two would part company the first time a predicate moved: `spent-30d` leaves out a transfer between
+ * your own accounts and a payment the bank has not settled, and a tool that summed
+ * `transactions.amount` would count both.
+ *
+ * SEVEN, BECAUSE EACH ONE IS A READ OF THE RECORD. They are what "how am I doing this month" asks:
+ * where the money is, what has moved in thirty days, what is due to move in thirty more, and what is
+ * late in each direction. The pack declares twenty-five, and the other eighteen are one `metric`
+ * call away by id, which is what keeps this list short enough to read in one go.
+ */
+export const MONEY_FIGURES = ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue'] as const;
+
+/** A figure as the record answers it, with only what an overview reads. Structural, in the manner of `McpSurface`. */
+type Figure = {
+  value?: unknown;
+  unit?: unknown;
+  rows?: unknown;
+  met?: unknown;
+  delta?: unknown;
+  parts?: unknown;
+  fx?: { asOf?: unknown; forward?: unknown; missing?: unknown };
+};
+
+/**
+ * One figure as an agent reads it: an amount with the currency it is in, or one amount per currency.
+ *
+ * THIS IS THE WHOLE ARGUMENT FOR THE TOOL OVER `list`. An agent given the rows adds them up itself,
+ * and nothing in a list of rows stops it adding EGP 5,200,000 to USD 3,400.50 and reading the sum as
+ * a position. The record holds that line in three places: `where/src/index.ts:1165` answers
+ * `MIXED_CURRENCY` to a range with two currencies in it, `kernel/src/fx.ts` `across` hands back one
+ * part per currency when no rate reaches the home currency, and `kernel/src/metrics.ts:970` refuses
+ * where the amounts cannot be read one at a time at all. `fx.ts` itself emits no refusal code, which
+ * is worth saying because parts are not a refusal: they are the answer, and the missing pair is the
+ * repair. So this relays what the record answered and adds nothing: `parts` when the
+ * record kept them apart, with `missing` naming the pair of currencies a rate would join, and
+ * otherwise the one amount with its currency.
+ *
+ * A CONVERTED FIGURE NAMES THE DAY OF THE RATE IT USED, because "GBP 9,850" built from dollars at
+ * last Tuesday's rate and the same figure at today's are different numbers, and an agent writing
+ * either into a note should be able to say which. `rate_forward` is the case the kernel marks for
+ * the same reason: no rate on or before the amount's day existed, so a later one stood in.
+ */
+const figureOf = (answered: unknown): Record<string, unknown> => {
+  const read = (isObject(answered) ? answered : {}) as Figure;
+  const fx = isObject(read.fx) ? (read.fx as Figure['fx'] & object) : {};
+  const missing = Array.isArray(fx.missing) ? fx.missing : [];
+  return {
+    ...(Array.isArray(read.parts)
+      ? { parts: read.parts, ...(missing.length > 0 ? { missing } : {}) }
+      : { currency: read.unit ?? null, amount: read.value ?? null }),
+    ...(typeof read.rows === 'number' ? { rows: read.rows } : {}),
+    ...(typeof fx.asOf === 'string' ? { rate_as_of: fx.asOf } : {}),
+    ...(fx.forward === true ? { rate_forward: true } : {}),
+    ...(typeof read.met === 'boolean' ? { met: read.met } : {}),
+    ...(typeof read.delta === 'number' ? { delta: read.delta } : {}),
+  };
+};
+
+/**
+ * A record that keeps no money at all, refused by naming what would give it some.
+ *
+ * `METRIC_UNKNOWN` IS WHAT ALL SEVEN SAID, and this is those seven collapsed into one rather than a
+ * code of the tool's own for the same fact. The sentence names the add-on because "there is no
+ * metric called cash-now" is true and useless: an agent cannot install anything, and what it can do
+ * is say which add-on the person is missing and carry on.
+ *
+ * AND IT IS THE SAME SENTENCE FOR A CALLER WHO MAY NOT READ THE MONEY REGISTERS, deliberately. The
+ * record answers `METRIC_UNKNOWN` for a figure over a register outside the caller's ceiling so that a
+ * probe cannot enumerate what a business keeps (`record/src/index.ts`), and a tool that told those
+ * two cases apart would hand the list back one layer further out.
+ */
+const NO_MONEY: Result<never> = {
+  ok: false,
+  refusal: {
+    code: 'METRIC_UNKNOWN',
+    fix: 'This record keeps no money figures. Install the money-core add-on, which declares them, or call record_index for what it does hold.',
+  },
+};
 
 const nowhere = (uri: string): Result<never> => ({
   ok: false,
@@ -683,6 +798,41 @@ export function tools<C>(surface: McpSurface<C>) {
          does not take is an argument a model will try to send: the second call would be refused for
          a field the first answer offered it. `limit` is the whole of the dial here. */
       return out.ok && isObject(out.value) && Array.isArray(out.value.events) ? { ok: true, value: { events: out.value.events } } : out;
+    },
+
+    /**
+     * HOW MONEY STANDS, AND NOT ONE FIGURE OF THIS TOOL'S OWN.
+     *
+     * SEVEN READS AT ONCE, BECAUSE THEY DO NOT DEPEND ON EACH OTHER. Over the command line each is a
+     * request to the host, and in the app each is a query; done one after another the tool would be
+     * as slow as its slowest seven added together for no reason.
+     *
+     * A FIGURE THIS RECORD HAS NOT GOT IS LEFT OUT AND NOT REPORTED, because a record with the pack
+     * and an older version of it is the ordinary case: `spent-30d` and `received-30d` arrived with
+     * the ledger in money-core 1.2.0, and an agent on a record from before it should read the five
+     * that are there rather than five figures and two apologies.
+     *
+     * A FIGURE THAT REFUSED FOR ANY OTHER REASON KEEPS ITS PLACE AND ITS SENTENCE, because a gap
+     * where a figure was is read as a zero. Measured on a record with sterling and dollars in it,
+     * two currencies with no rate between them are NOT a refusal: `evaluateMetric` always hands the
+     * aggregation an fx context, so the answer is one amount per currency with the pair named, which
+     * is what `money.test.ts` asserts. What can still refuse here is narrower, a `MIXED_CURRENCY` or
+     * a `LOOKUP_MISSING` from a figure whose declaration and rows have parted company, and that is
+     * a sentence somebody has to see in order to fix.
+     */
+    money: async (_args, ctx) => {
+      const read = await Promise.all(MONEY_FIGURES.map(async (id) => [id, await surface.metric({ metric: id }, ctx)] as const));
+      /* NOTHING ANSWERED IS EITHER NO MONEY PACK OR ONE REFUSAL SAID SEVEN TIMES, such as a caller
+         outside the read ceiling. The record's own sentence goes back where there is one, because
+         "install the money-core add-on" to somebody who cannot read what is already installed is an
+         instruction that cannot work. */
+      if (!read.some(([, got]) => got.ok)) return read.find(([, got]) => refused(got) && got.refusal.code !== 'METRIC_UNKNOWN')?.[1] ?? NO_MONEY;
+      const figures: Record<string, unknown> = {};
+      for (const [id, got] of read) {
+        if (got.ok) figures[id] = figureOf(got.value);
+        else if (refused(got) && got.refusal.code !== 'METRIC_UNKNOWN') figures[id] = { refusal: got.refusal };
+      }
+      return { ok: true, value: { figures } };
     },
 
     /**
