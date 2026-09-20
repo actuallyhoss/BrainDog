@@ -84,12 +84,12 @@ test('ping answers, and prompts are an empty list for now', async () => {
   assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
-test('tools/list is the fourteen, with the instructions again and the read-only ones marked', async () => {
+test('tools/list is the fifteen, with the instructions again and the read-only ones marked', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; inputSchema: { type: string }; annotations?: { readOnlyHint: boolean } }[]; instructions: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 14);
+  assert.equal(r.tools.length, 15);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, INSTRUCTIONS);
   assert.equal(r.ttlMs, 3_600_000);
@@ -110,6 +110,7 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['list', { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }, ['list'], { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }],
   ['search', { q: 'invoice' }, ['search'], { q: 'invoice' }],
   ['history', { spoken: 'obligations#41' }, ['history'], { register: 'obligations', seq: 41 }],
+  ['activity', { limit: 5 }, ['recentHistory'], { limit: 5 }],
   ['governance', { status: 'all' }, ['governance'], { status: 'all' }],
   ['propose', { question: 'Keep it?', body_kind: 'options', body: {} }, ['propose'], { question: 'Keep it?', body_kind: 'options', body: {} }],
   ['create', { register: 'obligations', fields: { what: 'a' } }, ['create'], { register: 'obligations', fields: { what: 'a' } }],

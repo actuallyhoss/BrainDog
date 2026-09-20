@@ -43,7 +43,10 @@ test('THE ARRANGEMENT, A DECLARATION AND THE GRAMMARS ARE RESOURCES, and a pack 
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW), catalogue: CATALOGUE });
   const mcp = tools(api);
-  assert.equal(TOOLS.length, 14, 'reading an arrangement became a tool');
+  assert.ok(
+    !TOOLS.some((t) => t.name === 'arrangement'),
+    'reading an arrangement became a tool',
+  );
 
   const listed = (await mcp.resources(agent)).map((r) => r.uri);
   for (const uri of ['braindog:arrangement', 'braindog:grammar/page', 'braindog:grammar/proposals']) assert.ok(listed.includes(uri), uri);

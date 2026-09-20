@@ -1,5 +1,5 @@
 /**
- * The fourteen tools and the resources, from an agent's side, over a real record.
+ * The fifteen tools and the resources, from an agent's side, over a real record.
  *
  * Two things are being asserted, and the second is the unusual one. The first is that each tool does
  * what it says. The second is that its REFUSALS TEACH: the caller is a model that will try again
@@ -76,14 +76,15 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: fourteen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: fifteen, and each is named by the plan', () => {
   /* `research-agent-path` §1.5: the eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
-     discovering. */
+     discovering. `activity` is the fifteenth, and it is the one thing an agent could reach in Sam
+     Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison. */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -128,6 +129,37 @@ test('a row is addressed the way a person says it, and made and read and changed
   const events = value<{ kind: string; note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
   assert.deepEqual(events.map((e) => e.kind), ['create', 'state']);
   assert.equal(events[0]?.note, 'From the PDF');
+  sql.close();
+});
+
+/**
+ * DELETING WORKED AND NOTHING SAID SO, which is the same thing as not having it.
+ *
+ * the old tool hands its agents a `brain_task_delete` (`loop/research-switch.md` §1). Here a delete is
+ * `deleted_at` through `update`, on the same verb and the same permission, and the tool list said
+ * only "null clears a field": an agent reading it had no way to reach a verb the record has had all
+ * along. The repair is a clause, not a sixteenth tool, and this test holds the clause to the truth.
+ */
+test('AN AGENT CAN DELETE A ROW, and the tool list is where it finds out how', async () => {
+  const patch = (TOOLS.find((t) => t.name === 'update')?.input as { properties: { patch: { description: string } } }).properties.patch;
+  assert.match(patch.description, /deleted_at/, 'nothing in the tool list tells an agent how to delete a row');
+
+  const { mcp, sql } = await agent();
+  value(await mcp.call('create', { register: 'obligations', fields: { what: 'Duplicate of 41' } }, owner));
+  value(await mcp.call('update', { spoken: 'obligations#1', patch: { deleted_at: true }, note: 'A duplicate.' }, owner));
+
+  /* GONE FROM EVERY READ, and the record says so by answering nothing rather than by refusing:
+     a deleted row is not a row somebody may not see. */
+  assert.equal(value<unknown>(await mcp.call('get', { spoken: 'obligations#1' }, owner)), null);
+  assert.equal(value<{ matched: number }>(await mcp.call('list', { register: 'obligations' }, owner)).matched, 0);
+  /* AND IT HAPPENED, rather than the patch being dropped quietly. `history` answers nothing for a
+     row that is gone, so the log of the whole record is the only place left that carries it, which
+     is a second use for `activity` nobody planned. */
+  assert.deepEqual(value<unknown[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner)), []);
+  const { events } = value<{ events: { spoken: string; kind: string; note?: string }[] }>(await mcp.call('activity', {}, owner));
+  assert.equal(events[0]?.kind, 'delete');
+  assert.equal(events[0]?.spoken, 'obligations#1');
+  assert.equal(events[0]?.note, 'A duplicate.');
   sql.close();
 });
 

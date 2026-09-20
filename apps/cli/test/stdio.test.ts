@@ -136,7 +136,7 @@ const said = (reply: Rpc) => JSON.parse(reply.result.content[0].text) as Record<
 
 /* ── the protocol ──────────────────────────────────────────────────────── */
 
-test('initialize and tools/list answer without touching the host, and the list is the fourteen', async (t) => {
+test('initialize and tools/list answer without touching the host, and the list is the fifteen', async (t) => {
   const host = await stubHost(t);
   const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
 
@@ -146,8 +146,8 @@ test('initialize and tools/list answer without touching the host, and the list i
   assert.match(init.result.instructions, /^BrainDog is one person's record/);
 
   const listed = await s.ask('tools/list');
-  assert.equal(listed.result.tools.length, 14);
-  for (const name of ['record_index', 'context', 'list', 'handoff', 'meet']) assert.ok(listed.result.tools.some((x: { name: string }) => x.name === name), name);
+  assert.equal(listed.result.tools.length, 15);
+  for (const name of ['record_index', 'context', 'list', 'handoff', 'meet', 'activity']) assert.ok(listed.result.tools.some((x: { name: string }) => x.name === name), name);
 
   const { code, err } = await s.end();
   assert.equal(code, 0, err);

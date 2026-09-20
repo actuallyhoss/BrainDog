@@ -1,15 +1,25 @@
 /**
- * The fourteen tools, which are the whole of what an agent sees.
+ * The fifteen tools, which are the whole of what an agent sees.
  *
  * THE COUNT IS THE DESIGN. `10-MCP` §4 puts a budget on it: the tool list is in every turn of every
  * session, so one more tool costs every conversation for ever. So the record's own vocabulary
  * carries the load: `list` takes a predicate rather than there being a filter tool per register.
  *
- * FOURTEEN, AND THE THREE NEWEST ARE THINGS AN AGENT DOES EVERY SESSION (`loop/research-agent-path.md`
- * §1.5). `context` is the briefing for where it stands, `handoff` keeps its session's next step true,
- * and `meet` records a person it came across. Five went to pay for them: `pages`, `page` and
- * `metric` were already resources, `credentials` could never answer a token because the vault
- * refuses every one, and `dry_run` previews a rule, which only a person installs.
+ * FOURTEEN OF THEM, AND THE THREE NEWEST ARE THINGS AN AGENT DOES EVERY SESSION
+ * (`loop/research-agent-path.md` §1.5). `context` is the briefing for where it stands, `handoff`
+ * keeps its session's next step true, and `meet` records a person it came across. Five went to pay
+ * for them: `pages`, `page` and `metric` were already resources, `credentials` could never answer a
+ * token because the vault refuses every one, and `dry_run` previews a rule, which only a person
+ * installs.
+ *
+ * AND `activity` IS THE FIFTEENTH, WHICH PAID FOR ITSELF. `loop/research-switch.md` §1 lists the
+ * twenty-one tools the old tool gives its agents, and nineteen of them have a path here already;
+ * `brain_audit` had none, because `history` takes a row and a session picking up after another one
+ * does not yet know which row to ask about. It cost 117 tokens of the 45 the ceiling had left, so
+ * four descriptions gave back what they were saying twice: `get` said the id grammar in its
+ * description and again in its schema, `handoff` and `update` each said in their description what
+ * their own schema and the instructions say, and `meet` listed the examples the instructions list.
+ * The list measured 2,555 tokens before and 2,565 after, against a ceiling of 2,600.
  *
  * AND THE RESOURCES ARE NOT TOOLS, which is the other half of the same argument. A resource list is
  * fetched when it is wanted, so the per-register variability, one `schema/<register>` each, costs
@@ -38,10 +48,10 @@ type Row = { state?: string | null; fields: Record<string, unknown> };
  * command line it is nothing the tools look at, because the bearer travels in the request. The tools
  * hand it on and never read it, which is what keeps authorisation in one place: the record.
  *
- * THE LAST FOUR ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers all four since
- * build step 16, and a host older than that does not. The command line offers only the
- * routes its client knows, so it still works against an older host. Without one, its tool refuses
- * with what to do instead, and its resource is not listed.
+ * THE LAST SEVEN ARE OPTIONAL, BECAUSE A HOST MAY NOT ANSWER THEM. The record answers the first four
+ * of them since build step 16, and a host older than that does not. The command line offers only
+ * the routes its client knows, so it still works against an older host. Without one, its tool
+ * refuses with what to do instead, and its resource is not listed.
  */
 export type McpSurface<C> = {
   boot(ctx: C): Answer<{ registers: { id: string; name: string }[] }>;
@@ -64,7 +74,17 @@ export type McpSurface<C> = {
   handoff?(args: Args, ctx: C): Answer;
   meet?(args: Args, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
-  /** Every scheduled action, with its key by label only. READ+, and optional for the same reason as the four above. */
+  /**
+   * The record's whole log, newest first, a page at a time, held to what the caller may see. READ+.
+   *
+   * OPTIONAL FOR ONE HOST AND NOT THE OTHER TWO. Both HTTP hosts hand `serveMcp` the whole
+   * `RecordApi` (`apps/worker/src/index.ts:143`, `apps/selfhost/src/server.ts:1139`), so this
+   * arrives with them. The command line builds a narrow surface over `@braindog/client` and routes
+   * a fixed list (`apps/cli/src/surface.ts`), so until the name is in that list its callers get
+   * `activity`'s own "not in this build" sentence rather than a method the client refuses.
+   */
+  recentHistory?(args: { limit?: number }, ctx: C): Answer;
+  /** Every scheduled action, with its key by label only. READ+, and optional for the same reason as the five above. */
   actions?(ctx: C): Answer;
   /** How the record is arranged, one page's declaration, or a grammar (`loop/research-spark.md` S12). READ+, optional likewise. */
   arrangement?(args: { page?: string; grammar?: string }, ctx: C): Answer;
@@ -115,7 +135,7 @@ export type Tool = {
 
 const str = (description: string) => ({ type: 'string', description });
 const int = (description: string) => ({ type: 'integer', description });
-/* `required` is left out when empty: it is fourteen tools' worth of tokens that say nothing. */
+/* `required` is left out when empty: it is fifteen tools' worth of tokens that say nothing. */
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
   properties,
@@ -133,7 +153,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'context',
     description:
-      'Where you are and what applies here: your session, your project, its open work, questions waiting on the person, people, the keys and servers you may use (by name, never a value), skills and learnings, plus everything global. Call it first, and again after a long pause.',
+      'Where you are and what applies here: your session, your project, its open work, questions waiting on the person, people, the keys and servers you may use (by name, never a value), skills and learnings, plus everything global. Call it again after a long pause.',
     input: obj({}),
     writes: false,
   },
@@ -145,14 +165,17 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'get',
-    description: 'One row, by the id a person says out loud: tasks#41, S42 or LN7. A ref field holds a row id, and get takes that too.',
+    /* THE GRAMMAR IS SAID ONCE, in the argument that takes it. It was in both, and a client shows a
+       model the description and the schema together, so the three forms were read twice for 27
+       tokens in every turn of every session. */
+    description: 'One row, by the id a person says out loud.',
     input: obj({ spoken: str('register#number, a prefixed id such as S42, or a row id from a ref field.') }, ['spoken']),
     writes: false,
   },
   {
     name: 'list',
     description:
-      'Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}. Each row says its spoken id.',
+      'Rows of one register, newest first, narrowed by a predicate. The predicate is a tree: {"field":"state","is":"open"}, or {"all":[...]}.',
     input: obj(
       {
         register: str('A register id.'),
@@ -177,15 +200,22 @@ export const TOOLS: readonly Tool[] = [
     writes: false,
   },
   {
+    name: 'activity',
+    description:
+      'What has changed in the whole record lately, newest first: each write, the row it touched, and who made it. Read it to pick up after another session. history is one row; this is all of them.',
+    input: obj({ limit: int('1 to 200. Default 50.') }),
+    writes: false,
+  },
+  {
     name: 'governance',
     description:
-      'What has been proposed and not yet answered, what was decided and why, and what was predicted. Open suggestions unless you ask for more. A list gives each question; ask by id for its body.',
+      'What has been proposed and not yet answered, what was decided and why, and what was predicted. A list gives each question; ask by id for its body.',
     input: obj({
       register: str('suggestion (the default), decision, or prediction.'),
       id: str('One row, by its SG or D number.'),
       status: str('open (the default), resolved, or all.'),
       limit: int('At most 200.'),
-      cursor: str('The id of the last row the page above held, for the page after it.'),
+      cursor: str('From a previous answer, to continue.'),
     }),
     writes: false,
   },
@@ -209,7 +239,7 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'create',
-    description: 'Add a row to a register. The record allocates its number and hands it back.',
+    description: 'Add a row to a register, which comes back with the number the record gave it.',
     input: obj(
       { register: str('A register id.'), fields: { type: 'object', description: 'Field ids to values.' }, note: str('One sentence a person reads in six weeks.') },
       ['register', 'fields'],
@@ -218,11 +248,16 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'update',
-    description: 'Change a row. Send the version you read; a stale write is refused rather than merged, so read it again and reapply.',
+    /* COMPARE-AND-SET IS A RULE ABOUT EVERY WRITE, so it is one line of the instructions and no
+       longer a second copy here. What is left is what is true of this tool alone.
+       AND DELETING IS SAID, because nothing told an agent how. the old tool gives its agents a
+       `brain_task_delete` (`loop/research-switch.md` §1); here it is `deleted_at` through the same
+       verb and the same permission, and an agent had no way to find that out. */
+    description: 'Change a row. Send the version you read.',
     input: obj(
       {
         spoken: str('register#number, or a prefixed id such as LN7.'),
-        patch: { type: 'object', description: 'Field ids to values. null clears a field.' },
+        patch: { type: 'object', description: 'Field ids to values, and null clears one. deleted_at true deletes the whole row.' },
         version: int("The row's version when you read it."),
         note: str('One sentence a person reads in six weeks.'),
       },
@@ -232,28 +267,34 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'log',
-    description: 'Append one note to a row, changing nothing about it. One sentence, for the next reader.',
-    input: obj({ spoken: str('register#number, or a prefixed id such as LN7.'), note: str('One sentence.') }, ['spoken', 'note']),
+    description: 'Append one note to a row, changing nothing about it.',
+    input: obj({ spoken: str('register#number, or a prefixed id such as LN7.'), note: str('One sentence, for the next reader.') }, ['spoken', 'note']),
     writes: true,
   },
   {
     name: 'handoff',
-    description:
-      "Keep your session's handoff true. next is the one concrete next step; 'carry on' is not one. tried adds a dead end, and note adds a line of reasoning; both append and never overwrite. state handoff asks another session to pick it up, and state done clears the old next unless you give a new one.",
+    /* EACH FIELD IS EXPLAINED ONCE, BESIDE ITSELF. The description said what `next`, `tried`, `note`
+       and `state` are, and then every one of them said it again in the schema, which a client shows
+       the model in the same breath. The rules moved down to the arguments they are rules about. */
+    description: "Keep your session's handoff true, so whoever picks this up next knows where it stands.",
     input: obj({
-      next: str('The one concrete next step.'),
-      tried: str('A dead end, the moment you rule it out.'),
-      note: str('One line of reasoning.'),
+      next: str("The one concrete next step. 'Carry on' is not one."),
+      tried: str('A dead end, the moment you rule it out. It appends.'),
+      note: str('One line of reasoning. It appends.'),
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
       doing: str('What this session is doing.'),
-      state: { type: 'string', enum: ['idle', 'handoff', 'done'] },
+      state: {
+        type: 'string',
+        enum: ['idle', 'handoff', 'done'],
+        description: 'handoff asks another session to take it on; done clears next.',
+      },
     }),
     writes: true,
   },
   {
     name: 'meet',
     description:
-      'Someone you came across in the work, such as a commit author, the sender of a message, a client or a classmate. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
+      'Someone you came across in the work. They are matched by email or handle, added if new, and linked to your project with where you met them. Never guess an email.',
     input: obj(
       {
         name: str('As written in the work.'),
@@ -313,11 +354,49 @@ export function compact(row: Entry, prefix = ''): Record<string, unknown> {
 type PrefixOf = (register: string) => string;
 const unprefixed: PrefixOf = () => '';
 
-/** A row, or a page of rows, made compact; anything else as it came. */
+/**
+ * One line of the log, addressed the way a row is.
+ *
+ * THE SAME FAULT `compact` WAS WRITTEN FOR. A line carried `register` and `seq` apart, so an agent
+ * reading "something changed on notes, 1" had to assemble `NO1` itself before it could call `get`.
+ * Here the two become the one address every tool takes, with the register's own prefix.
+ *
+ * A LINE ABOUT NO ROW KEEPS ITS `target`. A declaration installed, a pack enabled and a proposal
+ * decided are all in this log with `register` and `seq` both null, and `target` is the only thing
+ * that says which one it was. Where there IS a row, `target` is `entry:<id>`, the same row the
+ * address above names, so it goes with `target_kind`.
+ *
+ * AND AN EMPTY FIELD GOES, as `governance` drops one from a list for the same reason. `field`,
+ * `from`, `to`, `note` and `batch` are null on most lines: one create measured 339 bytes as the
+ * record answers it and 211 as this relays it, which `activity.test.ts` re-measures. The default
+ * page is fifty lines, so it is that difference fifty times.
+ *
+ * `id` STAYS, because it is the EVENT's id and not the row's, and `rowid` stays because it is where
+ * a page below this one would start.
+ */
+const spoke = (line: Record<string, unknown>, prefixOf: PrefixOf): Record<string, unknown> => {
+  const { register, seq } = line;
+  const named = typeof register === 'string' && typeof seq === 'number';
+  const prefix = named ? prefixOf(register) : '';
+  const out: Record<string, unknown> = named
+    ? { spoken: prefix ? `${prefix}${String(seq)}` : `${register}#${String(seq)}` }
+    : {};
+  for (const [key, value] of Object.entries(line)) {
+    if (key === 'register' || key === 'seq') continue;
+    if (named && (key === 'target' || key === 'target_kind')) continue;
+    if (value === null) continue;
+    out[key] = value;
+  }
+  return out;
+};
+
+/** A row, a page of rows, or a page of log lines, made compact; anything else as it came. */
 const compacted = (value: unknown, prefixOf: PrefixOf = unprefixed): unknown => {
   if (isEntry(value)) return compact(value, prefixOf(value.register));
   if (isObject(value) && Array.isArray(value.rows))
     return { ...value, rows: value.rows.map((r) => (isEntry(r) ? compact(r, prefixOf(r.register)) : r)) };
+  if (isObject(value) && Array.isArray(value.events))
+    return { ...value, events: value.events.map((e) => (isObject(e) ? spoke(e, prefixOf) : e)) };
   return value;
 };
 
@@ -329,11 +408,13 @@ const shaped = (r: Result<unknown>, prefixOf: PrefixOf = unprefixed): Result<unk
     : r;
 };
 
-/** The registers a tool's answer holds rows of: one row, a page, or the row a conflict carries. */
+/** The registers a tool's answer names: one row, a page, the row a conflict carries, or a page of log lines. */
 const registersIn = (r: Result<unknown>): string[] => {
   const value = r.ok ? r.value : (r as { conflict?: { current?: unknown } }).conflict?.current;
   if (isEntry(value)) return [value.register];
   if (isObject(value) && Array.isArray(value.rows)) return [...new Set(value.rows.filter(isEntry).map((row) => row.register))];
+  if (isObject(value) && Array.isArray(value.events))
+    return [...new Set(value.events.map((e) => (isObject(e) ? e.register : null)).filter((id): id is string => typeof id === 'string'))];
   return [];
 };
 const badSpoken = (fix: string): Result<never> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'spoken' } });
@@ -588,6 +669,23 @@ export function tools<C>(surface: McpSurface<C>) {
     },
 
     /**
+     * THE LOG TAKES A LIMIT AND NO CURSOR, which is the one place this tool is narrower than the
+     * record's route. Paging the whole log backwards is the app's Activity screen; an agent picking
+     * up after another session wants the last few writes, and `limit` up to the record's own 200
+     * covers that. A cursor argument would be twenty-odd tokens in every turn of every session for
+     * a page nothing asked for. The route keeps it, so the app is unaffected.
+     */
+    activity: async (args, ctx) => {
+      if (!surface.recentHistory)
+        return unbuilt('activity', 'Call history with a row you already know about, or context for where things stand.');
+      const out = await surface.recentHistory({ ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx);
+      /* AND THE CURSOR DOES NOT COME BACK EITHER. The record answers one, and an argument this tool
+         does not take is an argument a model will try to send: the second call would be refused for
+         a field the first answer offered it. `limit` is the whole of the dial here. */
+      return out.ok && isObject(out.value) && Array.isArray(out.value.events) ? { ok: true, value: { events: out.value.events } } : out;
+    },
+
+    /**
      * A LIST IS EACH QUESTION WITHOUT ITS BODY, and one by id is whole. A `rowset` body carries every field it
      * would write, and the seeded queue's one proposal to change a page's note was four kilobytes of
      * markdown in a list an agent reads to learn what is waiting. Empty fields go too.
@@ -810,5 +908,5 @@ export function tools<C>(surface: McpSurface<C>) {
   };
 }
 
-/** The tools whose answer is a row or a page of rows. */
-const SHAPED = new Set(['get', 'list', 'create', 'update', 'log', 'handoff']);
+/** The tools whose answer is a row, a page of rows, or a page of log lines. */
+const SHAPED = new Set(['get', 'list', 'create', 'update', 'log', 'handoff', 'activity']);

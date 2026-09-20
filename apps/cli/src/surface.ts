@@ -22,10 +22,16 @@ const reachable = <T>(r: Result<T>): Result<T> =>
   refused(r) && r.refusal.code === 'UNREACHABLE' ? { ok: false, refusal: { ...r.refusal, fix: UNREACHABLE_FIX } } : r;
 
 /**
- * The optional methods of `McpSurface` this client routes: the first four since build step 16, and `arrangement` since S12; the
- * probe below stays so that a client built before a route landed gives its tool's own "not yet" sentence.
+ * The optional methods of `McpSurface` this client routes: the first four since build step 16, `arrangement` since S12 and
+ * `recentHistory` with the `activity` tool; the probe below stays so that a client built before a route landed gives its
+ * tool's own "not yet" sentence.
+ *
+ * A NAME LEFT OFF THIS LIST IS A TOOL THAT REFUSES FOREVER, which is the failure `recentHistory` was for one run: the
+ * `activity` tool shipped, `packages/host` routes the method (`src/index.ts:459`), and stdio answered
+ * `NOT_IN_THIS_BUILD` because the one place that turns a routed method into a surface member had not heard of it. The
+ * probe is what makes adding a name safe: a host that does not route it still gets the tool's own sentence.
  */
-const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement'] as const;
+const LATER = ['context', 'handoff', 'meet', 'sessionsLive', 'arrangement', 'recentHistory'] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {
   const ask = async <T>(ctx: Ctx, name: string, args: unknown = {}): Promise<Result<T>> =>

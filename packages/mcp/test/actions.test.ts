@@ -1,7 +1,8 @@
 /**
  * `braindog:actions`, the scheduled actions as a resource (`10-MCP` §6).
  *
- * A READ, SO A RESOURCE AND NOT A TOOL: the tool list stays at fourteen. It relays the record's list, where a key is
+ * A READ, SO A RESOURCE AND NOT A TOOL, which is a claim about the name and not about the count. It relays the
+ * record's list, where a key is
  * its label, and it is listed only where the surface answers it.
  */
 
@@ -54,7 +55,10 @@ test('ON A REAL RECORD, braindog:actions IS LISTED AND ANSWERS EACH ACTION WITH 
   assert.doesNotMatch(said, /ciphertext|nonce|wrapped|kek_/);
   assert.doesNotMatch(said, /189,250,78/, 'the sealed bytes came back');
 
-  assert.equal(TOOLS.length, 14, 'actions became a tool');
+  assert.ok(
+    !TOOLS.some((t) => t.name === 'actions'),
+    'actions became a tool',
+  );
   assert.equal((await mcp.read('braindog:actions/balance', owner)).ok, false);
   sql.close();
 });

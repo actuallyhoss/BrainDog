@@ -10,6 +10,12 @@
  * 2,600 AND NOT 44's 1,800. That ceiling was set for eight tools; the agent path needs fourteen,
  * because `context`, `handoff` and `meet` are what an agent does every session
  * (`loop/research-agent-path.md` §1.5). A test and not a gate, on purpose.
+ *
+ * AND THE CEILING IS THE ARBITER, WHICH IS WHY THE HEADROOM IS SMALL. Doc 44 §7 records 2,311 with
+ * 289 to spare; this run measured 2,555 before `activity` was added, so the spare was 45 and the
+ * doc's figure is stale. `activity` cost 117, so it was paid for out of four descriptions that
+ * were saying something the schema beside them, or the instructions above them, already said. The
+ * figure now is 2,565. A tool that cannot be paid for is a tool that does not go in.
  */
 
 import { test } from 'node:test';
