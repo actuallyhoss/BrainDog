@@ -5,6 +5,14 @@
  *   node scripts/usecases.mjs              # every use case that exists
  *   node scripts/usecases.mjs student team # just these
  *
+ * WHAT THE SITE ACTUALLY SERVES TODAY IS ONE OF THESE: usecase-founder-dashboard-<scheme>.webp, in
+ * the band about projects reporting their own numbers. The five use cases are drawn on the home
+ * page by a switcher now rather than by five photographs, because five pictures of five
+ * arrangements of the same application, each painted below full size, were five pictures a reader
+ * could not read and could not tell apart. This script still takes all of them: they are the
+ * cheapest way to see what a stranger actually gets out of /start, and that is worth keeping
+ * whether or not a page serves the result. Do not commit the ones no page asks for.
+ *
  * Writes static/shots/usecase-<id>-<scheme>.webp at 1440 by 900 (2x) and
  * static/shots/usecase-<id>-phone-<scheme>.webp at 390 by 844 (3x), plus any further page a use case
  * lists under `more` (the founder's dashboard) as usecase-<id>-<page>[-phone]-<scheme>.webp.

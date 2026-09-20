@@ -1,44 +1,38 @@
-<!--
-  The landing page.
-
-  THE FOURTH PASS, AND WHY. The app was redesigned into a quiet, monochrome ledger, and a landing
-  page drawn in the old lavender, with a glow behind every picture and a tinted glyph above every
-  heading, was selling a product that no longer looked like that. The best product pages (Linear,
-  Mercury, Vercel, Attio) share a short list of habits, and this page takes them:
-
-    - ONE PROMISE, then the product itself. The headline is the slogan and the first picture is the
-      demo's real home screen, photographed by `scripts/product.mjs`, not a drawing of it.
-    - COLOUR IS STATE. Ink for words and actions; a colour appears only where the product would
-      show one (overdue, refused).
-    - HIERARCHY FROM TYPE, not boxes. No kicker over a heading, no card around a paragraph.
-    - HONEST COPY. What it keeps, how agents work with it, and then what is not built and what it
-      will not do, set as a plain ledger rather than a feature grid.
-
-  THE FIFTH PASS, AND WHY (September 17th). The page read as a product for small businesses, and
-  BrainDog is for every kind of person (`loop/DIRECTION.md` §11). The slogan stays until the owner
-  picks another, and everything under it speaks to all of them: who it is for, with a photograph of
-  each use case from a fresh record; the facade and the modules under it; the founder story of
-  numbers arriving; the same parts for everyone; agents over MCP; then the limits.
-
-  It gets more specific as it goes: a promise, the people, the idea, the mechanism, the limits.
--->
 <script lang="ts">
-  import Fields from '$lib/Fields.svelte';
+  /**
+   * brain.dog's home page, drawn as the thing it sells.
+   *
+   * THE PAGE IS THE RECORD. One hairline runs down the left of every band, and each band is
+   * numbered `0001`, `0002`, `0003` in the identifier face, ascending and never repeating. The
+   * sections are events in an append-only log. That is the whole device, it costs one border and
+   * one number per band, and it is the product's own thesis: nothing here is overwritten.
+   *
+   * WHAT THIS REPLACED, and why. The page before it was 1,804 words and ten pictures of the
+   * product, seven of them screenshots painted at about 75 per cent, so the app's own 14px text
+   * landed at 11px and every one of them read as the same grey table. A reader was shown the
+   * product ten times and could read it none of them. It also carried eight bands of identical
+   * shape, forty headings and ten calls to action, three of them in the first screen, against
+   * `app.css`'s own rule that exactly one per view is filled.
+   *
+   * THE RULES THIS PAGE HOLDS ITSELF TO NOW. Both numbers below were wrong in the first draft of
+   * this comment and an audit measured them, which is the argument for counting rather than
+   * estimating: a rule stated in a file and broken in the same file is worth less than no rule.
+   *   - Under 400 words. Measured on the built `<main>`: 373 counting the band numbers and the
+   *     rail's contents, 320 without them. The page before it was 1,804.
+   *   - Two product images, each painted at 1:1 inside a window that scrolls. An image is never
+   *     scaled below full size: at full size a reader can read it, and shrunk they cannot, so the
+   *     frame gives way rather than the pixels.
+   *   - One thing moves, the ledger, and it stops when it has said what it had to say.
+   *   - Two display sizes and four from the scale. The two are `clamp()` expressions, one for the
+   *     hero and one for the close, because `tokens.css` has no step above `--t-xl` and a display
+   *     face that does not answer the viewport is a headline that wraps to four lines on a phone.
+   *     Everything else is `--t-xl`, `--t-md`, `--t-base`, `--t-sm` and `--t-xs`.
+   *   - Colour is spent twice: the filled primary, and `--accent-ground` under the closing band.
+   */
+  import Arrange from '$lib/Arrange.svelte';
   import Icon from '$lib/Icon.svelte';
-  import Note from '$lib/Note.svelte';
-  import Steps from '$lib/Steps.svelte';
-  import Ask from '$lib/bento/Ask.svelte';
-  import Export from '$lib/bento/Export.svelte';
-  import History from '$lib/bento/History.svelte';
-  import Inbox from '$lib/bento/Inbox.svelte';
-  import Money from '$lib/bento/Money.svelte';
-  import Vault from '$lib/bento/Vault.svelte';
+  import Ledger from '$lib/Ledger.svelte';
   import { APP, site } from '$lib/copy.ts';
-
-  const b = site.bento;
-  const w = site.who;
-  const f = site.founder;
-  const t = site.trust;
 </script>
 
 <svelte:head>
@@ -51,286 +45,155 @@
   <meta property="og:url" content="https://brain.dog/" />
   <meta property="og:title" content={site.meta.home.title} />
   <meta property="og:description" content={site.meta.home.description} />
-  <!-- The hero picture is the largest paint on the page, so the browser hears about it first. -->
-  <link rel="preload" as="image" href="/shots/home-light.webp" media="(min-width: 640px) and (prefers-color-scheme: light)" />
-  <link rel="preload" as="image" href="/shots/home-dark.webp" media="(min-width: 640px) and (prefers-color-scheme: dark)" />
 </svelte:head>
 
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-copy">
-      <h1 class="hero-title">{site.hero.title}</h1>
-      <p class="hero-sub">{site.hero.sub}</p>
-      <div class="actions">
-        <!-- THE PAGE'S ONE FILLED PRIMARY. It opens the demo, and the note under it says what the
-             demo is. -->
-        <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
-        <a class="btn btn-lg" href="#who">{site.hero.secondary}</a>
-      </div>
-      <p class="hero-note">{site.hero.note}</p>
-    </div>
-
-    <!-- THE PRODUCT, AS IT IS. A phone gets the phone's own capture, because the wide one shrinks
-         to unreadable in a 358px box, and each scheme gets its own. `width` and `height` on every
-         source reserve the box, so nothing below it moves when it arrives. -->
-    <div class="shot">
-      <picture>
-        <source
-          media="(max-width: 639px) and (prefers-color-scheme: dark)"
-          srcset="/shots/home-phone-dark.webp"
-          width="1170"
-          height="2532"
-        />
-        <source media="(max-width: 639px)" srcset="/shots/home-phone-light.webp" width="1170" height="2532" />
-        <source media="(prefers-color-scheme: dark)" srcset="/shots/home-dark.webp" width="2880" height="1800" />
-        <img
-          src="/shots/home-light.webp"
-          width="2880"
-          height="1800"
-          alt={site.hero.shotAlt}
-          fetchpriority="high"
-          decoding="async"
-        />
-      </picture>
-    </div>
-  </div>
-</section>
-
-<section class="band" id="who" aria-labelledby="who-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="who-title">{w.title}</h2>
-      <p class="lead">{w.body}</p>
-      <!-- ALL FIVE NAMED AT ONCE, before the long run of pictures, so a reader finds themselves
-           without scrolling past four other people first. -->
-      <nav class="jump" aria-label={w.jump}>
-        {#each w.cases as c (c.id)}<a class="btn" href="#uc-{c.id}">{c.title}</a>{/each}
-      </nav>
-    </div>
-
-    <!-- FIVE USE CASES, each a row: what it is for and what it opens on, beside its own first page.
-         The picture is cropped to the rail and the main column, at a scale where the words in it
-         can be read, and a phone gets the phone's own capture. A use case with no picture yet is
-         text only and carries `data-reshoot`, so the next run of `scripts/usecases.mjs` finds it. -->
-    <div class="cases">
-      {#each w.cases as c (c.id)}
-        <article class="case" id="uc-{c.id}" class:case-text={!c.shot} data-reshoot={c.shot ? undefined : c.id} aria-labelledby="case-{c.id}">
-          <div class="case-copy">
-            <h3 class="case-title" id="case-{c.id}">{c.title}</h3>
-            <p class="case-body">{c.body}</p>
-            <p class="case-holds">{c.holds}</p>
-            {#if !c.shot}<div class="case-note"><Note text={w.pending} /></div>{/if}
+<div class="wrap">
+  <div class="log">
+    <section class="band" aria-labelledby="hero-title">
+      <p class="seq" aria-hidden="true">0001</p>
+      <div class="band-body hero">
+        <div class="hero-copy">
+          <h1 class="display" id="hero-title">{site.hero.title}</h1>
+          <p class="sub">{site.hero.sub}</p>
+          <div class="actions">
+            <!-- THE PAGE'S ONE FILLED PRIMARY, and the only one above the close. -->
+            <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
           </div>
-          {#if c.shot}
-            <div class="case-shot">
-              <picture>
-                <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="/shots/usecase-{c.shot}-phone-dark.webp" width="1170" height="2532" />
-                <source media="(max-width: 639px)" srcset="/shots/usecase-{c.shot}-phone-light.webp" width="1170" height="2532" />
-                <source media="(prefers-color-scheme: dark)" srcset="/shots/usecase-{c.shot}-dark.webp" width="2880" height="1800" />
-                <img src="/shots/usecase-{c.shot}-light.webp" width="2880" height="1800" alt={c.alt} loading="lazy" decoding="async" />
-              </picture>
+          <p class="note">{site.hero.note}</p>
+        </div>
+
+        <!-- THE CLAIM, BEING DEMONSTRATED FOUR FEET TO ITS RIGHT. "The log only grows" is a claim
+             about behaviour over time, and no still picture can carry one. A list that only ever
+             grows, watched for four seconds, can. -->
+        <Ledger
+          events={site.ledger.events}
+          head={site.ledger.head}
+          only={site.ledger.only}
+          all={site.ledger.all}
+        />
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="arrange-title">
+      <p class="seq" aria-hidden="true">0002</p>
+      <div class="band-body">
+        <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
+        <p class="lead">{site.arrange.lead}</p>
+        <!-- FIVE SCREENSHOTS OF FIVE NEAR-IDENTICAL APPS WERE THE WORST PASSAGE ON THE OLD PAGE.
+             One control that rearranges in front of a reader makes the point in one gesture, and
+             the point is that the product rearranges itself: the device and the claim are the
+             same thing. -->
+        <Arrange cases={site.arrange.cases} head={site.arrange.head} label={site.arrange.label} />
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="typed-title">
+      <p class="seq" aria-hidden="true">0003</p>
+      <div class="band-body">
+        <h2 class="title" id="typed-title">{site.typed.title}</h2>
+        <p class="lead">{site.typed.lead}</p>
+        <figure class="shot">
+          <!-- 1:1 AND NOT A PIXEL SMALLER. The capture is a 1440pt screen at 2x, so painting it
+               1440 wide puts the app's 14px text on the page at 14px. The window scrolls; the
+               image does not shrink. -->
+          <!-- NAMED FOR WHAT THE REGION IS, not for what the picture shows. The `<figure>` already
+               takes its accessible name from the caption below, so repeating the caption here made
+               a screen reader say the same eight words twice before reaching the alt text. -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex (a scrollable region is a keyboard focus stop under WCAG 2.1.1, and this one is named) -->
+          <div class="window" tabindex="0" role="group" aria-label={site.typed.region}>
+            <picture>
+              <source media="(prefers-color-scheme: dark)" srcset="/shots/home-dark.webp" width="2880" height="1800" />
+              <!-- LAZY, AND IT IS THE THIRD BAND DOWN. It is 263 KB and well below the fold, so
+                   eager it competed with the hero for bandwidth on the first paint. -->
+              <img
+                src="/shots/home-light.webp"
+                width="2880"
+                height="1800"
+                alt={site.typed.alt}
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
+          </div>
+          <figcaption class="caption">{site.typed.caption}</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="agents-title">
+      <p class="seq" aria-hidden="true">0004</p>
+      <div class="band-body">
+        <h2 class="title" id="agents-title">{site.agents.title}</h2>
+        <p class="lead">{site.agents.lead}</p>
+        <!-- A DRAWN DIAGRAM STOOD HERE AND SAID NOTHING: three nodes on one line, no labels, the
+             line at `--line` so it was invisible at 1px anyway. A reader saw three dots. The three
+             chips below already carry every word it was trying to carry, so the dots went. -->
+        <ul class="chips">
+          {#each site.agents.chips as chip (chip)}<li class="chip">{chip}</li>{/each}
+        </ul>
+        <p class="note">{site.agents.note}</p>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="report-title">
+      <p class="seq" aria-hidden="true">0005</p>
+      <div class="band-body">
+        <h2 class="title" id="report-title">{site.report.title}</h2>
+        <p class="lead">{site.report.lead}</p>
+        <figure class="shot">
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex (a scrollable region is a keyboard focus stop under WCAG 2.1.1, and this one is named) -->
+          <div class="window" tabindex="0" role="group" aria-label={site.report.region}>
+            <picture>
+              <source
+                media="(prefers-color-scheme: dark)"
+                srcset="/shots/usecase-founder-dashboard-dark.webp"
+                width="2880"
+                height="1800"
+              />
+              <img
+                src="/shots/usecase-founder-dashboard-light.webp"
+                width="2880"
+                height="1800"
+                alt={site.report.alt}
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
+          </div>
+          <figcaption class="caption">{site.report.caption}</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="plain-title">
+      <p class="seq" aria-hidden="true">0006</p>
+      <div class="band-body">
+        <h2 class="title" id="plain-title">{site.plain.title}</h2>
+        <!-- NO CARD, NO TICK AND NO CROSS. The three columns read at one weight on purpose: the
+             limits are not a footnote, they are the reason the rest is believable. -->
+        <div class="cols">
+          {#each site.plain.columns as column (column.head)}
+            <div>
+              <h3 class="col-head">{column.head}</h3>
+              <ul class="lines">
+                {#each column.lines as line (line)}<li>{line}</li>{/each}
+              </ul>
             </div>
-          {/if}
-        </article>
-      {/each}
-    </div>
-  </div>
-</section>
-
-<section class="band" aria-labelledby="facade-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="facade-title">{site.facade.title}</h2>
-      <p class="lead">{site.facade.body}</p>
-    </div>
-    <ul class="items">
-      {#each site.facade.items as item}
-        <li class="item">
-          <h3 class="item-title">{item.title}</h3>
-          <p class="item-body">{item.body}</p>
-        </li>
-      {/each}
-    </ul>
-  </div>
-</section>
-
-<section class="band" aria-labelledby="founder-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="founder-title">{f.title}</h2>
-      <p class="lead">{f.body}</p>
-    </div>
-    <ol class="items items-3 flow">
-      {#each f.steps as step, i}
-        <li class="item">
-          <span class="flow-n num" aria-hidden="true">{i + 1}</span>
-          <h3 class="item-title">{step.title}</h3>
-          <p class="item-body">{step.body}</p>
-        </li>
-      {/each}
-    </ol>
-    <div class="shot">
-      <picture>
-        <source media="(max-width: 639px) and (prefers-color-scheme: dark)" srcset="/shots/usecase-founder-dashboard-phone-dark.webp" width="1170" height="2532" />
-        <source media="(max-width: 639px)" srcset="/shots/usecase-founder-dashboard-phone-light.webp" width="1170" height="2532" />
-        <source media="(prefers-color-scheme: dark)" srcset="/shots/usecase-founder-dashboard-dark.webp" width="2880" height="1800" />
-        <img src="/shots/usecase-founder-dashboard-light.webp" width="2880" height="1800" alt={f.alt} loading="lazy" decoding="async" />
-      </picture>
-    </div>
-    <div class="note-at"><Note text={f.note} /></div>
-  </div>
-</section>
-
-<section class="band" aria-labelledby="inside-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="inside-title">{b.title}</h2>
-      <p class="lead">{b.body}</p>
-    </div>
-
-    <!-- SEVEN TILES, each a feature doing its one thing, with its one line under it. The drawings
-         are `aria-hidden` and the line is the content, except the typed row, which is a real
-         definition list because what it says is the sentence under it. -->
-    <div class="bento">
-      <article class="tile t-wide">
-        <div class="stage"><Money /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.money.title}</h3>
-          <p class="tile-caption">{b.money.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile">
-        <div class="stage"><Ask /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.ask.title}</h3>
-          <p class="tile-caption">{b.ask.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile">
-        <div class="stage"><Inbox /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.inbox.title}</h3>
-          <p class="tile-caption">{b.inbox.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile t-wide">
-        <div class="stage">
-          <Fields register={b.typed.figure.register} row={b.typed.figure.row} fields={b.typed.figure.fields} />
-        </div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.typed.title}</h3>
-          <!-- THE TEACHING SENTENCE, in one text node: `test/content.test.ts` reads it back out of
-               the served bytes and checks the registers it names against the seed. -->
-          <p class="tile-caption">{b.typed.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile">
-        <div class="stage"><Vault /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.vault.title}</h3>
-          <p class="tile-caption">{b.vault.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile">
-        <div class="stage"><History /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.history.title}</h3>
-          <p class="tile-caption">{b.history.caption}</p>
-        </div>
-      </article>
-
-      <article class="tile t-last">
-        <div class="stage"><Export /></div>
-        <div class="tile-copy">
-          <h3 class="tile-title">{b.export.title}</h3>
-          <p class="tile-caption">{b.export.caption}</p>
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<section class="band" id="how" aria-labelledby="how-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="how-title">{site.steps.title}</h2>
-      <p class="lead">{site.steps.body}</p>
-    </div>
-    <Steps />
-    <!-- THE LIMIT, under the steps and not in a footnote: the tools are written and the transport
-         that carries them is not. -->
-    <ul class="items items-3 ways">
-      {#each site.steps.ways as way}
-        <li class="item">
-          <h3 class="item-title">{way.title}</h3>
-          <p class="item-body">{way.body}</p>
-        </li>
-      {/each}
-    </ul>
-    <div class="note-at"><Note text={site.steps.note} /></div>
-  </div>
-</section>
-
-<section class="band" aria-labelledby="trust-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 class="title" id="trust-title">{t.title}</h2>
-    </div>
-
-    <!-- A LEDGER, NOT A GRID OF CARDS. Three groups, each a label on the left and its lines on the
-         right, divided by a hairline, so the limits read with the same weight as the promises. -->
-    <div class="ledger">
-      <section class="group" aria-labelledby="keep-title">
-        <h3 class="group-title" id="keep-title">{t.keepTitle}</h3>
-        <ul class="items">
-          {#each t.keep as item}
-            <li class="item">
-              <h4 class="item-title">{item.title}</h4>
-              <p class="item-body">{item.body}</p>
-            </li>
           {/each}
-        </ul>
-      </section>
-
-      <section class="group" aria-labelledby="notyet-title">
-        <h3 class="group-title" id="notyet-title">{t.notYetTitle}</h3>
-        <ul class="lines">
-          {#each t.notYet as line}<li>{line}</li>{/each}
-        </ul>
-      </section>
-
-      <section class="group" aria-labelledby="limits-title">
-        <h3 class="group-title" id="limits-title">{site.limits.title}</h3>
-        <ul class="items">
-          {#each site.limits.items as item}
-            <li class="item">
-              <h4 class="item-title">{item.title}</h4>
-              <p class="item-body">{item.body}</p>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    </div>
+        </div>
+      </div>
+    </section>
   </div>
-</section>
 
-<section class="band close">
-  <div class="wrap close-in">
-    <div>
-      <h2 class="close-title">{site.tagline}</h2>
-      <p class="close-body">{site.closing.body}</p>
-    </div>
+  <section class="close" aria-labelledby="close-title">
+    <h2 class="display close-title" id="close-title">{site.closing.title}</h2>
+    <p class="close-body">{site.closing.body}</p>
     <div class="actions">
-      <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
-      <a class="btn btn-lg" href="/pricing">{site.closing.secondary}</a>
+      <a class="btn btn-primary btn-lg" href={APP}>{site.closing.primary}<Icon name="arrow" size="s" /></a>
+      <a class="quiet" href="/pricing">{site.closing.secondary}</a>
     </div>
-  </div>
-</section>
+  </section>
+</div>
 
 <style>
   .wrap {
@@ -339,327 +202,224 @@
     padding-inline: var(--sp-6);
   }
 
-  /* ── The hero ─────────────────────────────────────────────────────── */
+  /* ── The device ───────────────────────────────────────────────────── */
 
-  .hero {
-    padding-block: clamp(56px, 7vw, 104px) clamp(56px, 7vw, 96px);
+  /* ONE HAIRLINE FOR THE WHOLE PAGE, not one per band. Bands are separated by space, which is
+     what `tokens.css` asks for: "a rule is what you reach for when there is no space to spend."
+     The only rule on this page is the log's own line, and it means something. */
+  .log {
+    border-inline-start: 1px solid var(--line);
   }
 
-  .hero-copy {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    max-inline-size: 760px;
+  .band {
+    display: grid;
+    grid-template-columns: minmax(0, 96px) minmax(0, 1fr);
+    padding-block: var(--sp-9);
   }
 
-  /* `clamp` and not a media query, because the headline's job is to fit. */
-  .hero-title {
+  .band:first-child {
+    padding-block-start: var(--sp-7);
+  }
+
+  .seq {
+    margin: 0;
+    padding-inline-start: var(--sp-4);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    line-height: var(--lh-body);
+  }
+
+  .band-body {
+    min-inline-size: 0;
+  }
+
+  /* ── Type ─────────────────────────────────────────────────────────── */
+
+  /* THE DISPLAY FACE IS SPENT TWICE on the whole page, here and at the close. `--lh-3xl` and
+     `--tr-tight` exist in `tokens.css` and had no caller until this page: a display step without
+     leading and tracking is why nothing had used them. */
+  .display {
+    margin: 0;
     max-inline-size: 14ch;
-    font-size: clamp(40px, 3.4vw + 20px, 68px);
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 6vw, 6rem);
     font-weight: 600;
-    line-height: 1.02;
-    letter-spacing: -0.04em;
-    text-wrap: balance;
+    line-height: var(--lh-3xl);
+    letter-spacing: var(--tr-tight);
   }
 
-  .hero-sub {
+  .title {
+    margin: 0;
+    max-inline-size: 22ch;
+    font-size: var(--t-xl);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tr-tight);
+  }
+
+  .sub,
+  .lead {
     max-inline-size: 46ch;
-    margin-block-start: var(--sp-5);
+    margin-block: var(--sp-5) 0;
     color: var(--ink2);
-    font-size: clamp(17px, 0.4vw + 15px, 20px);
-    line-height: 1.5;
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
     text-wrap: pretty;
+  }
+
+  .note {
+    margin-block: var(--sp-4) 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .caption {
+    margin-block-start: var(--sp-3);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-4);
     margin-block-start: var(--sp-6);
   }
 
-  .hero-note {
-    max-inline-size: 60ch;
-    margin-block-start: var(--sp-4);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  /* The screen sits on the page the way the app sits on the desk: a hairline and a radius, no glow
-     and no tilt. */
-  .shot {
-    margin-block-start: clamp(48px, 6vw, 80px);
-    overflow: hidden;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-  }
-
-  .shot img {
-    display: block;
-    inline-size: 100%;
-    block-size: auto;
-  }
-
-  /* ── Sections ─────────────────────────────────────────────────────── */
-
-  .band {
-    padding-block: clamp(64px, 8vw, 112px);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .sec-head {
-    max-inline-size: 720px;
-    margin-block-end: clamp(32px, 4vw, 48px);
-  }
-
-  .title {
-    font-size: clamp(28px, 1.2vw + 20px, 40px);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    text-wrap: balance;
-  }
-
-  .lead {
-    max-inline-size: 58ch;
-    margin-block-start: var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  .note-at {
-    margin-block-start: var(--sp-7);
-  }
-
-  /* ── Who it's for ─────────────────────────────────────────────────── */
-
-  .cases {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* One row per use case: the words on the left, the record on the right, a hairline between rows. */
-  .case {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    gap: var(--sp-7);
-    align-items: start;
-    padding-block: var(--sp-7);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .jump {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-5);
-  }
-
-  /* Clear of the sticky bar when a jump link lands here. */
-  .case {
-    scroll-margin-block-start: 72px;
-  }
-
-  .case:first-child {
-    padding-block-start: 0;
-    border-block-start: 0;
-  }
-
-  .case-text {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .case-copy {
-    max-inline-size: 44ch;
-  }
-
-  .case-title {
-    font-size: var(--t-lg);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .case-body {
-    margin-block-start: var(--sp-2);
-    font-size: var(--t-md);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  .case-holds {
-    margin-block-start: var(--sp-3);
+  /* A THUMB HAS TO HIT IT. Drawn quietly beside the primary action, but 21px of text is not a
+     target on a coarse pointer, so `--tap` gives it the height the rest of this repository keeps.
+     `inline-flex` rather than padding, so the extra height does not push the row apart. */
+  .quiet {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap);
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 1.55;
-    text-wrap: pretty;
   }
 
-  .case-note {
-    margin-block-start: var(--sp-4);
+  /* ── The hero ─────────────────────────────────────────────────────── */
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--sp-8);
+    align-items: start;
   }
 
-  /* THE CROP, and why it is a crop. The whole 1440px screen in a 780px box is text at half size;
-     the rail and the main column, the left 70 per cent of it, are text a reader can read. The
-     feed on the right is what is cut, and it is the same on every use case. */
-  .case-shot {
-    aspect-ratio: 16 / 11;
-    overflow: hidden;
+  .hero-copy {
+    min-inline-size: 0;
+  }
+
+  /* ── The two windows ──────────────────────────────────────────────── */
+
+  .shot {
+    /* The one place the window's height is written, so the fade over its right edge and the
+       narrow override cannot drift apart from the box they are measured against. */
+    --window-h: 420px;
+
+    position: relative;
+    margin: var(--sp-6) 0 0;
+  }
+
+  /* `overscroll-behavior` IS THE DIFFERENCE BETWEEN A WINDOW AND A TRAP. These boxes are 420px
+     tall over an image 900px tall, so a reader scrolling the page with the pointer over one is
+     held there for roughly 480px of image before the page moves again, twice on the way down.
+     `contain` keeps the wheel inside the box only while the box has somewhere to go, and hands
+     the rest to the page. `Ledger.svelte` already had this; these two did not. */
+  .window {
+    overflow: auto;
+    overscroll-behavior: contain;
+    block-size: var(--window-h);
     background: var(--sunk);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
   }
 
-  .case-shot img {
+  /* THERE IS MORE OF THE PICTURE THAN THE FRAME, and a hard cut at the right edge reads as a
+     screenshot somebody trimmed badly rather than as a window onto a wider thing. The image is
+     1440px and the band is about 1,024 at the design width, so roughly a third of every shot is
+     past the edge; a reader who cannot tell it is there will never look for it, and the whole
+     argument for painting these at full size collapses.
+
+     A fade and not a sentence, because `ui-copy` says a control gets a label and never an
+     explanation, and this is not even a control. It sits on the figure rather than inside the
+     scroller so it does not travel with the content, and it takes no pointer events so it cannot
+     eat a drag. It stays visible at the far right of the scroll, which is a small lie and cheaper
+     than the scroll-driven animation that would tell the truth. */
+  .shot::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 1px;
+    block-size: var(--window-h);
+    inline-size: var(--sp-8);
+    background: linear-gradient(to left, var(--bg), transparent);
+    border-start-end-radius: var(--r-lg);
+    border-end-end-radius: var(--r-lg);
+    pointer-events: none;
+  }
+
+  .window img {
     display: block;
-    inline-size: 142%;
+    inline-size: 1440px;
     max-inline-size: none;
     block-size: auto;
   }
 
-  /* ── The facade, the founder story and the agents' ways in ───────── */
+  /* ── The agents chips ─────────────────────────────────────────────── */
 
-  .items.items-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .items.ways {
-    margin-block-start: var(--sp-7);
-    padding-block-start: var(--sp-6);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .flow-n {
-    display: block;
-    margin-block-end: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* ── The bento ────────────────────────────────────────────────────── */
-
-  .bento {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-3);
-  }
-
-  .t-wide {
-    grid-column: span 2;
-  }
-
-  .tile {
+  .chips {
     display: flex;
-    flex-direction: column;
-    min-inline-size: 0;
-    overflow: hidden;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-  }
-
-  .stage {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-block-size: 260px;
-    padding: var(--sp-5);
-    background: var(--sunk);
-  }
-
-  .stage > :global(*) {
-    inline-size: 100%;
-    max-inline-size: 400px;
-  }
-
-  .t-wide .stage > :global(*) {
-    max-inline-size: 620px;
-  }
-
-  .tile-copy {
-    padding-block: var(--sp-4) var(--sp-5);
-    padding-inline: var(--sp-5);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .tile-title {
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: -0.005em;
-  }
-
-  .tile-caption {
-    margin-block-start: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-
-  /* ── The ledger ───────────────────────────────────────────────────── */
-
-  .group {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
-    gap: var(--sp-5);
-    padding-block: var(--sp-6);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .group-title {
-    font-size: var(--t-base);
-    font-weight: 600;
-    letter-spacing: -0.005em;
-  }
-
-  .items {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-5) var(--sp-7);
-    margin: 0;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block: var(--sp-5) 0;
     padding: 0;
     list-style: none;
   }
 
-  .item-title {
-    font-size: var(--t-base);
-    font-weight: 500;
-    letter-spacing: 0;
+  .chip {
+    padding: var(--sp-1) var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
   }
 
-  .item-body {
-    margin-block-start: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.55;
-    text-wrap: pretty;
+  /* ── Plain about what it is ───────────────────────────────────────── */
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-7);
+    margin-block-start: var(--sp-6);
+  }
+
+  .col-head {
+    margin: 0 0 var(--sp-4);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    text-transform: uppercase;
   }
 
   .lines {
-    display: flex;
-    flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .lines li {
-    max-inline-size: 72ch;
-    padding-block: var(--sp-2);
+    padding-block: var(--sp-3);
     color: var(--ink2);
     font-size: var(--t-base);
-    line-height: 1.55;
+    line-height: var(--lh-body);
     text-wrap: pretty;
-  }
-
-  .lines li:first-child {
-    padding-block-start: 0;
   }
 
   .lines li + li {
@@ -668,126 +428,67 @@
 
   /* ── The close ────────────────────────────────────────────────────── */
 
-  .close-in {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--sp-6);
+  /* THE ONE PLACE COLOUR IS SPENT AS A SURFACE. `tokens.css` says what `--accent-ground` is for:
+     brain.dog's closing band and the recommended plan card, and nothing else. */
+  .close {
+    margin-block: var(--sp-8) var(--sp-9);
+    padding: var(--sp-8) var(--sp-7);
+    background: var(--accent-ground);
+    border-radius: var(--r-lg);
   }
 
   .close-title {
-    font-size: clamp(28px, 1.2vw + 20px, 40px);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
+    max-inline-size: 18ch;
+    font-size: clamp(1.75rem, 3.5vw, 3rem);
   }
 
   .close-body {
-    max-inline-size: 48ch;
-    margin-block-start: var(--sp-3);
+    max-inline-size: 46ch;
+    margin-block: var(--sp-4) 0;
     color: var(--ink2);
     font-size: var(--t-md);
-    line-height: 1.55;
-    text-wrap: pretty;
+    line-height: var(--lh-body);
   }
 
-  .close .actions {
-    margin-block-start: 0;
-  }
-
-  /* Somebody pointing at a drawing is reading it. */
-  @media (prefers-reduced-motion: no-preference) {
-    .tile:hover :global(*) {
-      animation-play-state: paused;
-    }
-  }
-
-  @media (width < 1080px) {
-    .bento {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .t-last {
-      grid-column: span 2;
-    }
-  }
-
-  @media (width < 960px) {
-    .case {
+  @media (width < 900px) {
+    .hero {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-5);
+      gap: var(--sp-7);
     }
 
-    .items.items-3 {
+    .cols {
       grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-6);
     }
   }
 
-  @media (width < 860px) {
-    .group {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-4);
-    }
-  }
-
-  @media (width < 700px) {
-    .bento {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .t-wide,
-    .t-last {
-      grid-column: auto;
-    }
-
-    .items {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  /**
-   * THE PHONE, designed for rather than survived. The two actions are one column of full-width
-   * buttons, and the hero shows the top of the phone capture, cut where the first list begins,
-   * because a screen three phones tall is a scroll trap in the middle of a page.
-   */
   @media (width < 640px) {
     .wrap {
       padding-inline: var(--sp-4);
     }
 
-    .actions {
-      flex-direction: column;
-      align-items: stretch;
-      align-self: stretch;
+    /* THE SEQUENCE NUMBER SITS ABOVE ITS BAND ON A PHONE rather than beside it, because 96px of a
+       390px screen is a quarter of the page spent on four characters. The line stays. */
+    .band {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-2);
+      padding-block: var(--sp-8);
     }
 
-    .close .actions {
-      inline-size: 100%;
+    .seq {
+      padding-inline-start: var(--sp-3);
     }
 
-    .shot img {
-      aspect-ratio: 390 / 560;
-      object-fit: cover;
-      object-position: top;
+    .band-body {
+      padding-inline-start: var(--sp-3);
     }
 
-    /* A phone shows the phone's own capture whole-width, cut where a thumb would start scrolling. */
-    .case-shot {
-      aspect-ratio: 390 / 520;
+    .shot {
+      --window-h: 300px;
     }
 
-    .case-shot img {
-      inline-size: 100%;
-    }
-
-    .stage {
-      min-block-size: 0;
-      padding: var(--sp-4);
-    }
-
-    .tile-copy {
-      padding: var(--sp-4);
+    .close {
+      padding: var(--sp-6) var(--sp-5);
     }
   }
 </style>

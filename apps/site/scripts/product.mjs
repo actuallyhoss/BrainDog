@@ -45,21 +45,23 @@ const OUT = join(import.meta.dirname, '..', 'static', 'shots');
 const PORT = 5188;
 
 /** Each shot, and what it has to be showing. `do` runs after load, before the shutter. */
+/**
+ * ONE SHOT, BECAUSE THE SITE SERVES ONE.
+ *
+ * This list held five: `home`, `grid`, `money`, `project` and `arrange`. Four of them existed for
+ * the bento and the use-case rows on the old home page, which drew ten pictures of the product,
+ * most of them painted below full size. The redesign kept two pictures, and photographing four
+ * screens nobody is shown cost 2.2 MB in `static/`, every byte of it deployed and none of it
+ * requested. The four went with the sections that asked for them.
+ *
+ * Adding one back is one line here and one `node scripts/product.mjs` run. That is the whole
+ * reason this comment names the four rather than just deleting them quietly.
+ */
 const SHOTS = [
-  // `webp`: the landing page's hero serves this one, so it gets a WebP beside its PNG.
+  /* `webp`: the typed band serves this one at full size, so it gets a WebP beside its PNG. The
+     PNG is not spare — `app.html` names `home-light.png` as the `og:image`, and a link preview
+     fetcher is the one reader that will not take a WebP from every service that renders it. */
   { name: 'home', route: '/', webp: true },
-  { name: 'grid', route: '/r/obligations' },
-  { name: 'money', route: '/p/money' },
-  { name: 'project', route: '/p/kiln' },
-  // The one that is a STATE rather than a route: arranging has no URL, by design.
-  {
-    name: 'arrange',
-    route: '/p/kiln',
-    act: async (page) => {
-      await page.locator('.arrange-slot button').first().click({ timeout: 4000 });
-      await page.waitForSelector('[role="listitem"]', { timeout: 4000 });
-    },
-  },
 ];
 
 const TYPES = {

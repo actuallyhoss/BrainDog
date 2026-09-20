@@ -15,8 +15,9 @@
  *   - NO EM DASHES, anywhere a person reads. A sentence that only worked because of the dash was
  *     two sentences. Write them as two, or use a colon.
  *
- * THE DRAWINGS ARE COPY TOO. The landing page shows the product as small drawn moments rather than
- * screenshots, and every label, figure, name and time in them is below, read off the demo record
+ * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: a
+ * ledger whose events are only ever added to, and a switcher that rearranges the page as you pick
+ * who the record is for. Every name, figure and time in both is below, read off the demo record
  * (`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`). Nothing in a drawing is
  * invented: when the seed's sample business changes, these change with it, not before it. A key
  * that nothing renders is deleted rather than kept for later.
@@ -73,407 +74,306 @@ export const site = {
 
   hero: {
     title: 'Give your business a memory',
-    /* THE SLOGAN STAYS UNTIL THE OWNER PICKS ANOTHER; the line under it speaks to every kind of person
-       the product is for (`loop/DIRECTION.md` §11), not to a business alone. */
-    sub:
-      'One record for what you keep track of, arranged around you: your own money, a term of ' +
-      "coursework, the companies you run, a team's work or a project you are starting. You and your " +
-      'AI agents keep it up to date.',
-    /* `Open the demo` opens the demo, where nothing needs an account; `note` says so under it. */
-    primary: 'Open the demo',
-    secondary: 'See who it is for',
-    note:
-      'The demo is a made-up business, not yours. There is no sign-up and no billing yet, and ' +
-      'nothing you type into it is kept.',
-    /* THE PICTURE UNDER THE PROMISE is the demo's home screen, photographed by
-       `scripts/product.mjs`, so its alt text says what that screen holds. */
-    shotAlt:
+    /**
+     * IT SAID `Nothing in it is ever overwritten` AND THAT IS STRONGER THAN THE STORAGE.
+     *
+     * The design is a current-state table beside an append-only log, which is the right design and
+     * is not the same sentence. `packages/kernel/src/index.ts` updates a row in place and bumps its
+     * version; `erase.ts` writes over the log itself when somebody exercises a right to erasure;
+     * `provision.ts` deletes past the retention cutoff. Three greps falsify the old claim. What is
+     * true without qualification is the half that matters to a reader: changes are events, and the
+     * list of them only grows.
+     */
+    sub: 'One record. You and your AI agents both write to it. Every change is an event, and the log only grows.',
+    /**
+     * `Open the app` AND NOT `Open the demo`, WHICH IS THE VERB THIS SITE ALREADY USES for the same
+     * address in the nav and on the pricing page.
+     *
+     * There is no demo to open. `apps/worker/wrangler.jsonc:270` and `:360` both set
+     * `DEMO_RECORD: ""`, and `apps/worker/src/route.ts:139` answers `null` for an unset one, so the
+     * anonymous door never opens in either environment. A primary button naming a verb the product
+     * cannot perform is the exact defect `test/content.test.ts` says this app keeps shipping, and
+     * it was in the one filled button on the page.
+     *
+     * The note under it is the state rather than a reassurance. It used to read `No sign-up.`,
+     * which was meant as *nothing is asked of you* and reads, once there is no demo behind the
+     * button, as *there is no way in*. That second reading is the true one, so it is said plainly.
+     */
+    primary: 'Open the app',
+    note: 'Neither plan is open yet.',
+  },
+
+  /**
+   * THE LEDGER UNDER THE HERO, which the home page draws as rows rather than as a picture of rows.
+   * `head` and `only` are its heading, drawn as one line.
+   *
+   * WHAT IS CHECKABLE ABOUT THESE FIVE, said exactly, because the looser version of this sentence
+   * was wrong three ways at once and an audit found all three.
+   *   - Every register named is one `packages/seed` declares, and `test/content.test.ts` holds
+   *     them to it, reading the served bytes for the two that prerender and this file for the
+   *     three the tick appends.
+   *   - Every actor named is a person, an agent, or a rule this build actually ships. It said
+   *     `Renewal rule` and `Reply rule`, which are neither: they are the fallback string
+   *     `apps/web/src/lib/record/api.ts` synthesises from an id when `ruleName()` finds nothing.
+   *     The three rules that exist are named in `packages/seed/src/usecases/names.ts`.
+   *   - A `seq` is a place in a list and never a number typed beside a row, which is
+   *     `apps/web/src/lib/record/data.ts`'s own rule about itself: it sorts the ledger and
+   *     renumbers from the top, so every number typed here was overwritten by position anyway.
+   *     These ascend, they are spaced the way a real ledger's are, and nothing reads them as an
+   *     address.
+   *
+   * A sixth event invented here would be this file breaking its own rule, in the one section whose
+   * whole point is that nothing in it was made up.
+   *
+   * OLDEST FIRST, which is not the order a history page shows and is the order this list needs.
+   * `Ledger.svelte` draws the first two and then appends one every four seconds, so the array's
+   * order is the order a reader watches them arrive in. Newest first would have the sequence
+   * number counting DOWN as rows landed, under a heading that says only ever added: the one
+   * component on the site whose job is to prove the claim beside it would be contradicting it.
+   */
+  ledger: {
+    head: 'History',
+    only: 'only ever added',
+    /* TWO WORDS, AND NO REASON GIVEN. The control ends the wait; it does not explain that there
+       is a timer, how long is left, or why the rows appear one at a time. */
+    all: 'Show all',
+    events: [
+      {
+        seq: '4176',
+        who: 'You',
+        /* `12d ago` AND NOT `14h ago`: `packages/seed/src/modules/work.ts:35` carries
+           `done_on: day(-12)` on this row, and the copy was quoting the other of the demo's two
+           sources, which disagreed with it. */
+        what: 'Moved tasks#12 from open to done',
+        age: '12d ago',
+      },
+      {
+        seq: '4181',
+        who: 'Codex',
+        /* NO ID ON THIS ONE, because the id it carried was a sample's and not a record's.
+           `packages/seed/src/index.ts:424-429` is explicit that a question is filed under the
+           record's own counter, so the sample's `SG31` is filed as something else entirely.
+           Naming the question rather than numbering it is true under either counter. */
+        what: 'Opened a question, Kiln licensing model',
+        age: '2d ago',
+      },
+      {
+        seq: '4183',
+        who: 'You',
+        what: 'Moved services#2 from live to lapsing',
+        age: '1d ago',
+      },
+      {
+        seq: '4187',
+        /* A RULE THAT EXISTS, under the name the seed gives it. `packages/seed/src/usecases/names.ts:45`
+           names `invoice-late` as this, and chasing a late invoice is what it does. */
+        who: 'Chase late payments',
+        what: 'Added a note to obligations#1',
+        age: '14h ago',
+      },
+      {
+        seq: '4191',
+        who: 'Claude',
+        what: 'Created services#6, Object storage',
+        age: '3h ago',
+      },
+    ],
+  },
+
+  /**
+   * THE ARRANGEMENT SWITCHER on the home page: pressing a case redraws the section, so the claim
+   * above it is made by the page doing the thing rather than by a sentence about it.
+   *
+   * `id` is what the switcher tracks and what /start calls the setup. `holds` is the pages and the
+   * lists that setup ships, each under the name the record itself gives it, so a reader can check
+   * this list against the screen they get after Make my record.
+   */
+  arrange: {
+    title: 'Arranged for you. Made of parts.',
+    /* THE TWO STRINGS THE SWITCHER ITSELF SAYS, here rather than defaulted inside the component,
+       because every word a stranger reads on this site is in this file and a default in a
+       component is a word nobody edits. `head` is the line above the drawn rail, where the real
+       application says Switch record; `label` is what a screen reader calls the switcher. */
+    head: 'Your record',
+    label: 'What your record is for',
+    lead:
+      'Say what your record is for. The pages, the lists and the words follow. Underneath, every ' +
+      'part can be changed or turned off.',
+    cases: [
+      {
+        id: 'personal',
+        /* `Money` WAS IN THIS LIST BESIDE `Bills`, AND THEY ARE ONE REGISTER.
+           `packages/seed/src/usecases/personal.ts:160` renames `obligations` to `Bills` for this
+           setup, and `personal.ts:6` gives the reason in the file itself: a person's words, so
+           "Bills" and not "Money". A personal record never shows a page or a list called Money;
+           the word survives only as a heading in the rail, which is not what `holds` lists. */
+        label: 'Personal',
+        holds: [
+          'Day to day',
+          'Spending',
+          'Goals',
+          'Bills',
+          'Accounts',
+          'Budget',
+          'Savings goals',
+          'Log',
+          'Put by',
+          'Projects',
+        ],
+      },
+      {
+        id: 'student',
+        label: 'Student',
+        holds: ['Today', 'Studies', 'Courses', 'Assignments', 'Study sessions'],
+      },
+      {
+        id: 'founder',
+        label: 'Solo founder',
+        holds: ['Overview', 'Dashboard', 'Organisations', 'Datapoints', 'Money', 'Projects', 'People', 'Tasks'],
+      },
+      {
+        id: 'team',
+        /* `Work` WAS A NAV SECTION AND NOT A PAGE. `packages/seed/src/modules/work.ts:426` and
+           `:538` put two pages under a section called Work, and they are titled Overview and
+           Board. `holds` lists what a reader will actually see named on a page or a list. */
+        label: 'Team',
+        holds: ['Team', 'Cycles', 'Agent work', 'Board', 'Tickets', 'Cycle plan', 'Teammates'],
+      },
+      {
+        id: 'guide',
+        label: 'New project',
+        holds: ['Your project', 'Guide', 'Milestones', 'Steps', 'Choices', 'Resources'],
+      },
+    ],
+  },
+
+  /**
+   * THE ONE SENTENCE ON THE SITE THAT TEACHES THE WORD REGISTER by example.
+   *
+   * `test/content.test.ts` reads the register names back out of the served page and checks each
+   * against the seed's declarations, so `money, services, people` cannot be edited here alone. The
+   * picture beside it is the demo's home screen, photographed by `scripts/product.mjs`, and `alt`
+   * says what that screen holds for somebody who is not shown it.
+   */
+  typed: {
+    title: 'Typed rows, not a pile of notes',
+    lead:
+      'A register is a typed collection: money, services, people. So "what is due in October" has ' +
+      'an answer, not a search.',
+    caption: 'the demo record, at full size',
+    /* THE NAME OF THE SCROLLING BOX, which is not the caption. The figure already takes its
+       accessible name from the caption, so naming the region the same thing made a screen reader
+       read the same words twice on the way to the alt text. This says what the region IS. */
+    region: 'The demo record home screen. Scroll to see the rest of it.',
+    alt:
       'The home screen of the demo record, The Studio: what it is owed and what is due, the ' +
       'questions waiting on a decision, and what its agents and rules did while you were away.',
   },
 
-  /** The demo's projects, with the mark and the frozen hue the seed gives each one. */
-  projects: {
-    Kiln: { name: 'Kiln', mark: 'diamond', hue: 214 },
-    Portage: { name: 'Portage', mark: 'circle', hue: 176 },
-    Tallow: { name: 'Tallow', mark: 'square', hue: 261 },
+  /**
+   * AGENTS, with the limit in `note` and not in a footnote.
+   *
+   * THE RATIONALE HERE USED TO SAY *the transport is written and the hosted door is not*, and the
+   * hosted door IS written: `apps/worker/src/index.ts:1020-1032`, routed at
+   * `apps/worker/src/route.ts:70`, with `apps/worker/test/mcp.test.ts` over it. The public
+   * sentence in `note` was right for a different reason, which is worth having straight before
+   * somebody edits it: a hosted record is what nobody can open yet, not the door into one. A
+   * buyer who reads specifications works that out in about four minutes, so better it comes from
+   * us.
+   */
+  agents: {
+    title: 'Agents propose. You decide.',
+    lead:
+      'Claude, Codex and Cursor read and write the same rows you do, over MCP, with a key you ' +
+      'issue. Every change carries a name.',
+    chips: ['Over MCP', 'With a key you issue', 'Proposals land with you'],
+    note: 'Agents reach a self-hosted record today.',
   },
 
   /**
-   * WHO IT IS FOR: the five use cases, each with a photograph of its own first page.
-   *
-   * THE PICTURES ARE NOT THE DEMO. Each is a new self-hosted record set up through /start by
-   * `scripts/usecases.mjs`, so what it shows is what that person sees after Make my record, with the
-   * examples the use case ships. `shot: null` is a use case not yet built, drawn as text only and
-   * marked for a re-shoot: run `node scripts/usecases.mjs <id>` once /start offers it, then set
-   * `shot: '<id>'` and write its alt text.
+   * THE OWNER'S OWN CASE: numbers arriving from the projects themselves, drawn as dashboards.
+   * `caption` says where the numbers in the picture came from, because a dashboard with no
+   * provenance is a mock-up.
    */
-  who: {
-    title: "Who it's for",
-    body:
-      'Say who you are and what the record is for, and it is arranged around that: its pages, its ' +
-      'lists and the words on them. Each picture is a new record, set up that way from the first screen.',
-    cases: [
-      {
-        id: 'personal',
-        title: 'Personal',
-        body: 'Your own money and bills, what renews, what you are saving for, and the passion projects you come back to.',
-        holds: 'Opens on Day to day, with Spending under Money, Goals and a page for each project. Lists: Bills, Accounts, Spending, Budget, Savings goals, Goals, Log, Put by and Projects.',
-        /* A NAME, OR null FOR A USE CASE NOT YET PHOTOGRAPHED, which the page draws as text with a re-shoot mark. */
-        shot: 'personal' as string | null,
-        alt: "A person's record on Day to day: this month's spending, budget and bills, spending against each budget with one over, and the record's setup said in one line.",
-      },
-      {
-        id: 'student',
-        title: 'Student',
-        body: 'Your courses, what is due and when, and how each piece of work went.',
-        holds: 'Opens on Today, with Studies beside it. Lists: Courses, Assignments and Study sessions.',
-        shot: 'student',
-        alt: "A student's record on Today: an assignment due this week, a study session tomorrow, and what changed since the last look.",
-      },
-      {
-        id: 'founder',
-        title: 'Solo founder',
-        body: 'The organisations you run, the money across them, and the numbers your projects report.',
-        holds: 'Opens on Overview, with a Dashboard across organisations and a page for each. Lists: Organisations and Datapoints, beside Money, Projects, People and Tasks.',
-        shot: 'founder',
-        alt: "A solo founder's Overview: cash now, what comes in and goes out in 30 days, the numbers a project reported, and the organisations.",
-      },
-      {
-        id: 'team',
-        title: 'Team board',
-        body: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
-        holds: 'Opens on Team, with Cycles and Agent work beside Work. Lists: Tickets, Cycles, Cycle plan and Teammates.',
-        shot: 'team',
-        alt: "A team's record: tickets in flight with the agent working on each, what is blocked, and what is due this week.",
-      },
-      {
-        id: 'guide',
-        title: 'New project guide',
-        body: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
-        holds: 'Opens on Your project, with a Guide page. Lists: Milestones, Steps, Choices and Resources.',
-        shot: 'guide',
-        alt: 'A new project on its first page: the milestone it is at, the next three steps with their dates, and a choice waiting.',
-      },
-    ],
-    pending: 'A picture follows when this setup ships.',
-    jump: 'The use cases',
-  },
-
-  /** THE FACADE, in plain words (`loop/DIRECTION.md` §11). */
-  facade: {
-    title: 'Arranged for you. Made of parts.',
-    body:
-      'Everything you see in a BrainDog is arranged for you. Underneath, it is modules that you or your ' +
-      'agents can change, and a setup that works can be handed to somebody else.',
-    items: [
-      {
-        title: 'What you see is arranged',
-        body: "The pages, the rail, the names of the lists and the voice of each screen follow what the record is for. A student's record talks about courses and due dates, not invoices.",
-      },
-      {
-        title: 'Underneath, it is modules',
-        body: 'Lists with typed fields, pages built from blocks, rules, polls and the tools agents use. Each can be turned on, turned off, renamed or changed, by you or by an agent you allow to.',
-      },
-      {
-        title: 'Spark suggests, you accept',
-        body: 'Spark, the manager of your BrainDog, suggests an arrangement from what you tell it on the first screen. Nothing is arranged or rearranged until you accept.',
-      },
-      {
-        title: 'Setups are shared',
-        body: 'An arrangement saves as a use case file. Another record installs it from the file or an address, and browses the ones on offer as cards. A shared setup is readable text and runs no code.',
-      },
-    ],
-  },
-
-  /** THE OWNER'S OWN CASE: numbers arriving from projects, drawn as dashboards. */
-  founder: {
+  report: {
     title: 'Your projects report. Your dashboards draw.',
-    body:
-      'The case BrainDog was first built for: one person running several organisations, with the ' +
-      'numbers coming from the projects themselves rather than typed in.',
-    steps: [
-      {
-        title: 'A project reports',
-        body: 'Each project gets a report key that opens nothing else. It sends a measure, a value and a time, and the record keeps it as a row.',
-      },
-      {
-        title: 'Or BrainDog polls it',
-        body: 'Give it an address and an interval and it reads every number there, with no key when the address needs none. You approve the poll once.',
-      },
-      {
-        title: 'Dashboards draw them',
-        body: "Tiles, lines against the period before, and each organisation's balance from the accounts it names: across all of them, and one page for each.",
-      },
-    ],
-    alt: "A founder's Dashboard: cash across organisations, the balance of each, and active users, recurring revenue and signups drawn against the thirty days before.",
-    note: 'The numbers in this picture are sixty days of rows written the way a project reports them, into a new record.',
+    lead: 'Give a project a report key, or an address to poll. The numbers arrive and the tiles draw.',
+    caption: 'sixty days of rows, written the way a project reports them',
+    region: "A founder's dashboard. Scroll to see the rest of it.",
+    alt:
+      "A founder's Dashboard: cash across organisations, the balance of each, and active users, " +
+      'recurring revenue and signups drawn against the thirty days before.',
   },
 
-  /** SEVEN SMALL MOMENTS, each a real feature in miniature, drawn from the same demo record. */
-  bento: {
-    title: 'The same parts, whoever it is for.',
-    body:
-      'Every setup draws on the same modules: typed rows, questions, rules, keys, history and export. ' +
-      'The pictures here are small pieces of the demo, a made-up studio called The Studio.',
-    money: {
-      title: 'Money, owed and owing',
-      caption: 'What you are owed, what is late, and the balance walked forward to the first day it would go under.',
-      figures: [
-        { label: 'Owed to you', amount: '£28,320.00', late: false },
-        { label: 'Due in 30 days', amount: '£26,690.00', late: false },
-        { label: 'Overdue to pay', amount: '£10,540.00', late: true },
-      ],
-      walked: 'Walked forward',
-      under: 'First day under',
-    },
-    ask: {
-      title: 'Questions, with a recommendation',
-      caption: 'When the record should not guess, it asks you, and says what it would do.',
-      project: 'Portage',
-      id: 'SG29',
-      question: 'Does Portage keep sending from portagemail.example, or move to the apex?',
-      options: [
-        { title: 'Keep the subdomain', recommended: true },
-        { title: 'Move to the apex', recommended: false },
-      ],
-      recommended: 'Recommended',
-      answered: 'Answered: Keep the subdomain',
-    },
-    inbox: {
-      title: 'Mail, filed by a rule',
-      caption: 'A rule reads the reply and writes it onto the invoice it is about.',
-      from: 'ap@halden.example',
-      subject: 'RE: Invoice 2026-041',
-      preview:
-        'Apologies for the delay. This is with our finance team and should clear in the next payment run on the 12th.',
-      age: '9h ago',
-      rule: 'Reply rule',
-      row: 'Invoice 2026-041, brand system',
-      party: 'Halden Type Co · Owed to you',
-      amount: '£4,800.00',
-      line: 'Halden replied on 2026-041: payment run on the 12th',
-    },
-    vault: {
-      title: 'Keys, without the keys',
-      caption: 'The vault records what each key opens. The key itself is never in a row, and agents are refused it.',
-      key: {
-        label: 'Fenwick deploy key',
-        opens: 'Workers deploys for kiln.example',
-      },
-      other: { label: 'Nordhaven API', opens: 'DNS for five domains' },
-      stale: 'Due for rotation',
-      opens: 'Opens',
-      secret: 'The key',
-      sealed: 'Not in the row',
-      asks: 'Claude asks for the Fenwick deploy key',
-      refused: 'Refused',
-    },
-    history: {
-      title: 'Who changed what, and when',
-      caption: 'Every change is an event with a name and a time, and events are only ever added.',
-      head: 'History',
-      only: 'Only ever added',
-      events: [
-        {
-          seq: '4192',
-          who: 'Claude',
-          what: 'Created services#6, Object storage',
-          age: '3h ago',
-        },
-        {
-          seq: '4188',
-          who: 'Reply rule',
-          what: 'Added a note to obligations#1',
-          age: '9h ago',
-        },
-        {
-          seq: '4181',
-          who: 'You',
-          what: 'Moved tasks#12 from open to done',
-          age: '14h ago',
-        },
-        {
-          seq: '4174',
-          who: 'Renewal rule',
-          what: 'Moved services#2 from live to lapsing',
-          age: '1d ago',
-        },
-        {
-          seq: '4160',
-          who: 'Codex',
-          what: 'Opened SG31, Kiln licensing model',
-          age: '1d ago',
-        },
-      ],
-    },
-    export: {
-      title: 'All of it, as one file',
-      caption: 'Export is one SQLite file with every row, the fields each register declared, and every event.',
-      parts: ['Money', 'Services', 'People', 'Projects', 'History'],
-      file: 'The Studio',
-      ext: '.brain',
-      what: 'One SQLite file',
-    },
-    /**
-     * THE TYPED ROW, and the one sentence on the site that teaches the word register by example.
-     *
-     * `test/content.test.ts` reads the caption back out of the served page and checks each register
-     * it names against the seed, and checks every field label in the figure against the money
-     * register's declaration. The values are item #4 of the same synthetic record.
-     */
-    typed: {
-      title: 'Typed rows, not a pile of notes',
-      caption: 'A register is a typed collection: money, services, people.',
-      figure: {
-        register: 'Money',
-        row: 'item #4',
-        fields: [
-          {
-            label: 'Description',
-            type: 'text',
-            value: 'Corporation tax, payment on account',
-          },
-          { label: 'Which way', type: 'one of two', value: 'owed by me' },
-          { label: 'Amount', type: 'money', value: '£19,100.00' },
-          { label: 'Due', type: 'a date', value: '7 Sep 2026' },
-          { label: 'Status', type: 'one of four', value: 'open' },
+  /**
+   * WHAT A READER CAN HOLD THE PRODUCT TO, what is not built, and what it will never do, in three
+   * columns side by side. The middle column is the reason the other two get believed.
+   */
+  plain: {
+    title: 'Plain about what it is',
+    columns: [
+      {
+        head: 'Yours to keep',
+        /**
+         * ALL THREE OF THESE WERE FALSE OR OVERSTATED, and an audit falsified each with one grep.
+         * They are the three sentences on the page a reader is most likely to check, which is the
+         * whole point of the column, so they are the three worst ones to have got wrong.
+         *
+         *   - `The code is on GitHub` is true of the address and not of a reader: the repository
+         *     is private and the link 404s. `/legal` admitted it and this page did not, which is
+         *     exactly the footnote this file's own rule forbids.
+         *   - `One SQLite file` is the record. An installation writes three things
+         *     (`apps/selfhost/src/main.ts:105`, `:171`, `:257`): the record, a second database
+         *     holding sign-in and people, and a `blobs` directory where attachments live OUTSIDE
+         *     the record. The pricing page kept the qualifier and this page dropped it.
+         *   - `Nothing is overwritten` is the hero's claim and falls for the hero's reason.
+         */
+        lines: [
+          'Open source. The code opens on GitHub when the product launches.',
+          'Your record is one file. Leaving is a copy, not a migration.',
+          'Every change is an event, and the log only grows.',
         ],
       },
-    },
-  },
-
-  /**
-   * HOW IT WORKS WITH AGENTS, as the one chain in the demo that runs from an arrival to rows: the
-   * Fenwick invoice, the question it raised, the answer and its reason, and the two rows written.
-   *
-   * THE NOTE IS THE LIMIT, and it sits under the steps rather than in a footnote. The tools are
-   * written and the transport is not, and a buyer who reads specifications will find that out in
-   * about four minutes. Better it comes from us.
-   */
-  steps: {
-    title: 'Agents propose. You decide.',
-    body:
-      'Claude, Codex, Cursor or any MCP client reads and writes the record with a key you issue. ' +
-      'Nothing it does is quiet: every change carries its name, and what needs you arrives as a proposal.',
-    /* HOW AN AGENT CONNECTS, as a ledger under the chain. Each line is a thing the self-host does today. */
-    ways: [
       {
-        title: 'Over MCP',
-        body: 'The record serves MCP over HTTP, and the braindog command serves it over stdio for tools that start one. Its tools read, search, write and propose.',
+        head: 'Not built yet',
+        lines: [
+          'Spark arranges by reading what you type. A language model does not do it yet.',
+          'Mail does not arrive by itself.',
+          /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
+             to point its one filled button at it. `DEMO_RECORD` is empty in both environments. */
+          'Neither plan is open, and there is no demo to open yet.',
+        ],
       },
       {
-        title: 'With a key you issue',
-        body: 'braindog login signs a machine in with a six-digit code you approve in Settings. A key can read, propose or write, and it expires.',
-      },
-      {
-        title: 'Proposals land with you',
-        body: 'A change the agent may not make itself is proposed. Decide draws what it would change, and one press applies it as you.',
-      },
-    ],
-    items: [
-      {
-        title: 'An agent proposes',
-        body: 'The assistant reads the Fenwick invoice and drafts the two services on it.',
-      },
-      {
-        title: 'The record asks you',
-        body: 'One question, with the options and the one it recommends.',
-      },
-      {
-        title: 'You decide, and it is written down',
-        body: 'Your answer, your reason, and each new row with a name and a time.',
-      },
-    ],
-    mail: {
-      from: 'billing@fenwick.example',
-      subject: 'Your September invoice is ready',
-    },
-    proposer: 'The assistant',
-    proposes: 'drafted two services',
-    drafts: [
-      { name: 'Object storage', cost: '£41.00 monthly' },
-      { name: 'Workers plan', cost: '£5.00 monthly' },
-    ],
-    question: 'Add the two services on the Fenwick invoice?',
-    options: [
-      { title: 'Add both', recommended: true },
-      { title: 'Leave them out', recommended: false },
-    ],
-    recommended: 'Recommended',
-    answered: 'Answered: Add both',
-    reason:
-      'Both are live and both renew; an invoice line nobody has a row for is the thing this record exists to stop.',
-    written: [
-      { seq: '4192', id: 'services#6', name: 'Object storage' },
-      { seq: '4191', id: 'services#7', name: 'Workers plan' },
-    ],
-    writer: 'Claude',
-    age: '3h ago',
-    note:
-      'Agents reach a self-hosted record over MCP today. The chain above is drawn from the demo, and ' +
-      'on the hosted app it opens with sign-up.',
-  },
-
-  /** What a reader can hold the product to, and what it cannot do yet, side by side. */
-  trust: {
-    title: 'Plain about what it is.',
-    keepTitle: 'Yours to keep',
-    keep: [
-      {
-        title: 'Open source',
-        body: 'The code is on GitHub, and the self-hosted build is built from it. The repository opens to the public when the product launches.',
-      },
-      {
-        title: 'Run it yourself',
-        body: 'The self-hosted build is the same software as the hosted one: one process, one record file, one port.',
-      },
-      {
-        /* `in the format every operating system has a free reader for` and not a named tool, because
-           Windows ships no `sqlite3` and this is the sentence somebody checks on the way out. */
-        title: 'Your data is one file',
-        body: 'A record is one SQLite file, in the format every operating system has a free reader for. Leaving is a copy, not a migration.',
-      },
-      {
-        title: 'Nothing is overwritten',
-        body: 'Every change is an event, and events are only ever added. A write made against an old version is refused rather than merged behind you.',
-      },
-    ],
-    notYetTitle: 'Not built yet',
-    notYet: [
-      'Spark suggests a setup by reading the words you type on the first screen. Arranging with a language model is not built yet.',
-      'Mail does not arrive by itself yet. The inbox in the demo holds sample mail.',
-      'Neither plan is open. There is no sign-up and no billing.',
-    ],
-  },
-
-  /** Stated because a page that lists only strengths is a page nobody believes twice. */
-  limits: {
-    title: 'What it will not do',
-    items: [
-      {
-        title: 'It is not an accounting package.',
-        body: 'It records what you owe and what you are owed. It does not do double entry, and it will not file anything for you.',
-      },
-      {
-        title: 'It is not a CRM.',
-        body: 'People are rows because contracts and invoices point at them. There is no pipeline, no sequence and no lead score.',
-      },
-      {
-        title: 'A pack never runs code.',
-        body: 'A pack is a file that adds registers and pages. It is readable text, checked before installation, and nothing in it runs, which closes a whole class of supply-chain attack and means some things you might want a pack to do are things it cannot do.',
+        head: 'It will not do',
+        /* `file anything for you` WAS IN THIS COLUMN AND CONTRADICTED THE DIRECTION DOCUMENT.
+           `loop/DIRECTION.md:224` schedules exactly that: *agents do the legwork in view: filing
+           invoices from email, chasing, flagging, proposing*. This column is a list of permanent
+           never-promises, so a capability the owner has written down as planned cannot be in it.
+           Double entry stays, because DIRECTION §2 is explicit that Money is not a ledger. */
+        lines: [
+          'Double entry, or a general ledger.',
+          'A pipeline, a sequence or a lead score.',
+          'Run code from a pack. Ever.',
+        ],
       },
     ],
   },
 
   closing: {
-    body: 'The demo opens on The Studio, a made-up business with questions waiting. A record of your own starts with who you are and what it is for.',
+    /* NOT THE SLOGAN AGAIN: the hero already made the promise in this face, and the same seven
+       words at the foot of the page read as a mistake. This one says what to do next. */
+    title: 'Start your record',
+    /* IT SAID `The demo is a made-up business`, and there is no demo. What is true and is the
+       better sentence anyway: making a record is two answers long. `/start` asks who you are and
+       what the record is for, and arranges the rest from those (`packages/seed/src/usecases`). */
+    body: 'A record of your own starts with two answers: who you are, and what it is for.',
+    primary: 'Open the app',
     secondary: 'See the pricing',
   },
 
   pricing: {
     title: 'Two ways to run it.',
-    body: 'The same software either way. Hosting is the only thing being sold.',
     /**
      * THE STATE OF BOTH PLANS, above the prices rather than under them.
      *
@@ -481,10 +381,7 @@ export const site = {
      * plain words, is what lets the rest of the page describe the plans in the present tense.
      */
     statusTitle: 'Not open yet',
-    status:
-      'Neither plan is open yet. The record app is live and you can use it, hosting has no billing ' +
-      'and no sign-up, and the self-host boots but still needs its authentication finished. These ' +
-      'are the prices for when they open, published early so nobody has to ask.',
+    status: 'Neither plan is open. No sign-up and no billing yet.',
     self: {
       name: 'Self-hosted',
       price: 'Free',
@@ -513,9 +410,8 @@ export const site = {
     },
     honestTitle: 'Why there is no free hosted tier',
     honest:
-      'No free hosted tier, on purpose. A free tier on a per-customer database is a per-customer ' +
-      'cost with no revenue against it, and the way that ends is a product that quietly gets worse ' +
-      'for the people paying for it.',
+      'No free hosted tier, on purpose. A per-customer database with no revenue against it ends as ' +
+      'a product that gets worse for the people paying for it.',
   },
 
   /**
@@ -541,7 +437,6 @@ export const site = {
    */
   legal: {
     title: 'Legal',
-    lede: 'The licence BrainDog is published under, and what is still to be written.',
     licence: {
       title: 'Licence',
       body: [

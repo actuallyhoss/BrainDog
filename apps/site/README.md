@@ -26,36 +26,65 @@ sections 3 and 4): a monochrome ground, headings in Geist, the primary button in
 spent only on state. The button and the glyph are the site's own, in `src/app.css`, so the three
 pages draw them one way. No kicker over a heading, no glow, no tinted card, no translucent bar.
 
-## The hero is photographed, the rest is drawn
+## Two photographs at full size, and the rest is drawn
 
-The hero is the demo's real home screen, `static/shots/home-*.webp`, with the phone's own capture
-on a phone and one per scheme, so the first picture a stranger sees is the product and not an
-illustration of it. The bento (`src/lib/bento/`, with `Fields.svelte`) is seven features in
-miniature, and `src/lib/Steps.svelte` is the one chain in the demo that runs from an email to rows.
-Those are markup and tokens, so they paint with the first byte of HTML, read at phone size and wear
-whichever palette the tokens say.
+THE OLD PAGE HAD TEN PICTURES OF THE PRODUCT and a reader could read none of them. Seven were
+screenshots painted at about three quarters, so the app's own 14px text landed on the page at
+11px, and all ten read as the same grey table. It ran to 1,804 words down eight bands of identical
+shape. The page is six numbered bands and about 300 words now.
+
+The two photographs that stayed, `home-*.webp` in the typed band and
+`usecase-founder-dashboard-*.webp` in the reporting band, are painted at exactly `1440px` inside a
+window that scrolls. That is the rule and it is worth stating plainly: an image of an interface is
+never scaled below 1:1, because at full size a reader can read it and shrunk they cannot, so the
+frame gives way rather than the pixels.
+
+Everything else is drawn from tokens, so it paints with the first byte of HTML, reads at phone size
+and wears whichever palette the tokens say. `src/lib/Ledger.svelte` is the record's history
+arriving a row at a time, and `src/lib/Arrange.svelte` is the application's own rail, redrawn when
+a reader presses one of five use cases.
+
+**The page is the record.** One hairline runs down the left of every band with an ascending mono
+sequence number pinned to it, `0001` to `0006`. The sections are events in an append-only log. It
+costs one border and one number per band, and it is the product's own thesis: nothing here is
+overwritten.
 
 **Nothing in them is invented.** Every label, figure, name and time is read off the demo record
 (`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`) and lives in `copy.ts` with
 the rest of the words. When the seed's sample business changes, the drawings change with it.
 
-**The motion is CSS, and it cannot fail open.** Every loop lives inside
-`prefers-reduced-motion: no-preference`, so the resting style is the finished state: a reader who
-asked for no motion, and the a11y gate, see the whole picture standing still. A loop pauses under
-the pointer. A list that gains rows moves inside a box of fixed height, so nothing on the page
-shifts once per loop.
+**One thing moves, and it stops.** The ledger shows two rows and adds one every four seconds until
+all five have landed, and then it rests. It never loops, never removes a row and never invents a
+sixth to keep the motion going: an append-only log that secretly recycles its rows is a picture of
+a lie, and the component's whole job is to be the proof of the claim beside it. The rows arrive
+inside a box of fixed height, so nothing below the hero moves while somebody is reading it.
 
-**Who it's for is photographed from fresh records, not the demo.** `scripts/usecases.mjs` creates one
+**Its reduced-motion guard is in the script, not the stylesheet**, and that is the one place this
+app departs from the app's rule that motion is CSS. A `prefers-reduced-motion` rule can stop a
+transition; it cannot stop a `setInterval`. So the component asks `matchMedia` before it creates a
+timer: under that preference every row is on screen at once and no timer is ever created. A CSS
+guard here would have left the tick running and only hidden the evidence.
+
+**Who it's for was photographed from fresh records, and is now drawn.** `scripts/usecases.mjs` creates one
 self-hosted record per use case (a temporary data directory, a free port that is never 5189 or 5317,
 nothing secret), sets it up through `/start` the way a stranger would, and writes
 `static/shots/usecase-<id>[-phone]-<scheme>.webp` of the page it opens on, plus the founder's
-Dashboard after sixty days of reported numbers. It needs `apps/web/build`. A use case `/start` does not
-offer yet is skipped and said, and its row on the page is text only with `data-reshoot` until
-`node scripts/usecases.mjs <id>` is run and `copy.ts` gives it a `shot`. Personal is that row today.
+Dashboard after sixty days of reported numbers. It needs `apps/web/build`. A use case `/start` does
+not offer yet is skipped and said.
+
+Of those, **the page serves one**: the founder's Dashboard, in the reporting band. The five
+arrangements are drawn by `Arrange.svelte` now, because five photographs of five arrangements of
+the same application, each painted below full size, were five pictures a reader could not read and
+could not tell apart. The script still takes all of them, since it is the cheapest way to see what
+a stranger actually gets out of `/start`, and that is worth keeping whether or not a page serves
+the result. **Do not commit the ones no page asks for**: `static/` is deployed whole, and the
+twenty-four that nobody requested were 3 MB of it.
 
 `scripts/product.mjs` writes `static/shots/` from the app's build, or from a running app with
-`--from=http://localhost:5317` while the build lags the source. The page serves the `home` WebPs;
-`home-light.png` is the `og:image` in `src/app.html`, because not every preview fetcher decodes WebP.
+`--from=http://localhost:5317` while the build lags the source. It takes one shot, `home`, for the
+same reason: it used to take five, and the other four existed for sections the redesign deleted.
+The page serves the `home` WebPs; `home-light.png` is the `og:image` in `src/app.html`, because not
+every preview fetcher decodes WebP.
 
 ## The copy is one file
 

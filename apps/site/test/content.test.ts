@@ -35,8 +35,16 @@ const seedSource = (): string =>
     .map((name) => readFileSync(new URL(name, MODULES), 'utf8'))
     .join('\n');
 
-/** The four routes the static adapter writes, under the names it writes them. */
-const PAGES = ['index.html', 'pricing.html', 'changelog.html', 'legal.html'] as const;
+/**
+ * Every document the static adapter writes, under the names it writes them.
+ *
+ * `404.html` IS ONE OF THEM. It was left out while it had a test of its own three tests down, but
+ * that test reads three lines of its shell and nothing else, so the page a stranger is most likely
+ * to meet after a mistyped link was the one page here nobody checked for an em dash, a stray
+ * backtick, a dead href or a missing picture. It is prerendered from `src/routes/404` through the
+ * same layout as the rest, so it carries the same nav, the same footer and the same risks.
+ */
+const PAGES = ['index.html', 'pricing.html', 'changelog.html', 'legal.html', '404.html'] as const;
 
 const absent = PAGES.filter((page) => !existsSync(new URL(page, BUILD)));
 
@@ -49,6 +57,14 @@ const NO_BUILD =
 const NO_SEED = existsSync(SEED)
   ? null
   : 'packages/seed/src/index.ts is not readable from here, and it is where the registers are declared.';
+
+/* The use cases are declared apart from the registers, and one check below imports them rather
+   than reading them as text, so it needs its own reason to stand down. */
+const USECASES = new URL('../../../packages/seed/src/usecases/index.ts', import.meta.url);
+
+const NO_USECASES = existsSync(USECASES)
+  ? null
+  : 'packages/seed/src/usecases is not readable from here, and it is where the pages and the lists a setup ships are declared.';
 
 /** `{ skip: reason }` or nothing, because `exactOptionalPropertyTypes` refuses `{ skip: undefined }`. */
 const when = (reason: string | null): { skip: string } | Record<string, never> => (reason ? { skip: reason } : {});
@@ -250,82 +266,196 @@ test('every register the copy names by example is one the seed declares', when(N
 });
 
 /**
- * THE FIELDS THE FIGURE DRAWS ARE FIELDS THE SEED DECLARES.
+ * EVERY ROW THE HOME PAGE CLAIMS IS IN A REGISTER THE SEED DECLARES.
  *
- * The home page draws one row of the money register beside the types its fields hold, and that
- * figure is the only thing on this site that names a FIELD. It is the same class of defect as the
- * sentence above and one step more likely: field labels get renamed more often than registers do.
- * `Party` became `Who`, `Direction` became `Which way` and `State` became `Status` in a single
- * pass this week, and the marketing copy is not next to the declaration that moved.
+ * WHAT THIS USED TO READ, and why it moved. The page drew one row of the money register beside
+ * the types its fields hold, and the check read the field labels out of that figure's `<dt>`
+ * elements. The figure is gone: it was one of ten pictures of the product on a page a stranger
+ * could not read, and the redesign kept two. The check is not gone, because the defect it caught
+ * is not: `Party` became `Who`, `Direction` became `Which way` and `State` became `Status` in a
+ * single pass, and the marketing copy is never next to the declaration that moved.
  *
- * A field's displayed name is its `label` where it has one and its id where it does not, so both
- * are accepted. And the figure going missing is a FAILURE rather than a quiet pass, for the
- * reason the register check gives about itself: a check that stops finding what it measures has
- * stopped measuring.
+ * WHAT IT READS NOW is the ledger under the hero, which is the one thing on the site that names
+ * the record's own rows: `Created services#6`, `Moved tasks#12 from open to done`. Every
+ * `register#n` a stranger is shown is a claim that such a register exists, and it is a stronger
+ * anchor than the old one because the ledger's whole point is that nothing in it was made up.
+ *
+ * The ledger going missing is a FAILURE and not a quiet pass, for the reason the register check
+ * gives about itself: a check that stops finding what it measures has stopped measuring.
  */
-test('every field the home page draws is one the money register declares', when(NO_BUILD ?? NO_SEED), () => {
+test('every row the home page names belongs to a register the seed declares', when(NO_BUILD ?? NO_SEED), () => {
   const source = seedSource();
-  const opens = source.indexOf('  obligations: {');
-  assert.notEqual(opens, -1, 'packages/seed/src/index.ts no longer declares the obligations register');
-
-  /* The register's own block, ended at the next declaration at its indentation. `fields:` sits
-     inside it and nowhere else, which is what keeps a neighbouring register's labels out. */
-  const rest = source.slice(opens + 2);
-  const closes = rest.search(/\n {2}[a-z_]+: \{$/m);
-  const block = closes === -1 ? rest : rest.slice(0, closes);
-
   const declared = new Set<string>();
-  for (const m of block.matchAll(/\bid: '([^']+)'/g)) declared.add((m[1] ?? '').toLowerCase());
-  for (const m of block.matchAll(/\blabel: '([^']+)'/g)) declared.add((m[1] ?? '').toLowerCase());
-  assert.equal(declared.size > 6, true, `only ${declared.size} field words parsed out of the seed; its shape has changed`);
+  for (const m of source.matchAll(/^ {2}([a-z_]+): \{$/gm)) declared.add(m[1] ?? '');
+  assert.equal(declared.size > 8, true, `only ${declared.size} register ids parsed out of the seed; its shape has changed`);
 
-  const html = uncommented(read('index.html'));
-  const drawn = [...html.matchAll(/<dt class="label[^"]*">([^<]*)<\/dt>/g)].map((m) => decode(m[1] ?? '').trim());
-  if (drawn.length === 0) {
+  /* `services#6`, as the record itself writes a row's address: the register id, a hash, the
+     number. Read from the prose so a `#uc-personal` in an href cannot be mistaken for one. */
+  const rowRef = /\b([a-z_]+)#\d+\b/g;
+  const served = [...prose(read('index.html')).matchAll(rowRef)].map((m) => m[1] ?? '');
+  if (served.length === 0) {
     throw new Error(
-      'the figure that draws a typed row has gone from the home page. It is the one place the ' +
-        'copy names fields, and this check has nothing left to read.',
+      'the ledger has gone from the home page, or it no longer names the rows it claims to have ' +
+        "changed. It is the one place the site names the record's own rows, and this check has " +
+        'nothing left to read.',
     );
   }
 
-  for (const label of drawn) {
+  /* AND THE THREE THAT ARE NOT IN THE SERVED BYTES. `Ledger.svelte` prerenders the first two
+     events and appends the rest on a four-second tick, so three of the five reach a reader's eyes
+     and never reach this file's `read('index.html')`. Reading the source for those is not a
+     softening of the rule that this test measures what is served: it is the only way to measure
+     them at all short of driving a browser, and a claim a reader is shown four seconds late is
+     the same claim. */
+  const copy = readFileSync(new URL('../src/lib/copy.ts', import.meta.url), 'utf8');
+  const ledger = copy.slice(copy.indexOf('  ledger: {'), copy.indexOf('  arrange: {'));
+  const written = [...ledger.matchAll(rowRef)].map((m) => m[1] ?? '');
+  assert.equal(written.length >= served.length, true, 'copy.ts holds fewer row addresses than the page serves');
+
+  for (const register of [...served, ...written]) {
     assert.equal(
-      declared.has(label.toLowerCase()),
+      declared.has(register),
       true,
-      `the home page draws a field called "${label}" and packages/seed declares no such field on ` +
-        `the money register. It declares: ${[...declared].sort().join(', ')}`,
+      `the home page says it changed a row in "${register}" and packages/seed declares no such ` +
+        `register. It declares: ${[...declared].sort().join(', ')}`,
     );
   }
 });
 
 /**
- * EVERY KIND OF PERSON THE PRODUCT IS FOR IS NAMED ON THE HOME PAGE, and each has its own row.
+ * EVERY KIND OF PERSON THE PRODUCT IS FOR IS NAMED ON THE HOME PAGE, and each can be reached.
  *
  * The owner's word, 2026-09-17 (`loop/DIRECTION.md` §11): the product is for everyone, and the site
- * read as a product for small businesses. Five use cases are named, each with a row a jump link can
- * land on, and each row either shows its own photograph, served from `static/shots/`, or says it is
- * waiting for one with `data-reshoot`. A row that silently lost its picture is neither, and fails.
+ * read as a product for small businesses. Five use cases are named and none may quietly drop out.
+ *
+ * THE PHOTOGRAPHS ARE GONE ON PURPOSE and that half of this check went with them. Five screenshots
+ * of five arrangements of the same application, each painted at about three quarters of full size,
+ * were five pictures a reader could not read and could not tell apart, which made the point they
+ * were there to make worse rather than better. One switcher does it instead: pressing a case
+ * redraws the section in front of the reader. So what is checked now is that each case is still
+ * named and still has a control of its own to press, under the id the old row carried.
  */
 const USE_CASES = [
   ['personal', 'Personal'],
   ['student', 'Student'],
   ['founder', 'Solo founder'],
-  ['team', 'Team board'],
-  ['guide', 'New project guide'],
+  ['team', 'Team'],
+  ['guide', 'New project'],
 ] as const;
 
-test('the home page names all five use cases, each with its picture or marked for one', when(NO_BUILD), () => {
+test('the home page names all five use cases, each with a control of its own', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
   const words = readable(read('index.html'));
+  assert.match(html, /\srole="tablist"/, 'index.html no longer has the switcher the use cases are drawn in');
   for (const [id, title] of USE_CASES) {
     assert.match(words, new RegExp(`\\b${title}\\b`), `index.html no longer names the ${title} use case`);
-    const opens = html.search(new RegExp(`<article\\b[^>]*\\sid="uc-${id}"`));
-    assert.notEqual(opens, -1, `index.html has no row for the ${title} use case (id="uc-${id}")`);
-    const row = html.slice(opens, html.indexOf('</article>', opens));
-    const shot = new RegExp(`src="/shots/usecase-${id}-light\\.webp"`).test(row);
-    const waiting = /\sdata-reshoot="/.test(row);
-    assert.equal(shot || waiting, true, `the ${title} row shows no picture of its own and is not marked for a re-shoot`);
+    assert.match(html, new RegExp(`\\sid="uc-${id}"`), `index.html has no control for the ${title} use case (id="uc-${id}")`);
   }
+});
+
+/**
+ * EVERY PAGE AND EVERY LIST THE RAIL SAYS A RECORD HOLDS IS ONE THE SETUP ACTUALLY SHIPS.
+ *
+ * `copy.ts` states this contract over `arrange.cases` itself: `holds` is the pages and the lists
+ * that setup ships, each under the name the record itself gives it, so a reader can check this list
+ * against the screen they get after Make my record. That is about forty names typed by hand beside
+ * a seed that renames things, and nothing measured them. An audit found two wrong: the Personal
+ * rail listed both `Money` and `Bills` for the one register, and the Team rail listed `Work`.
+ *
+ * IT IMPORTS THE SEED INSTEAD OF READING IT AS TEXT, which is what every other seed check in this
+ * file does, and the reason is that these names are not written in the seed. `Bills` is the
+ * `obligations` register of `money-core`, declared as `Money` and renamed by the `labels` map the
+ * Personal use case carries. A regex would have to reimplement `pagesOf`, `listsOf`, the label
+ * overrides and the module expansion, and a reimplementation of the thing under test is not a test
+ * of it. This does not make the site depend on the seed: the site's own rule is about what the
+ * BUNDLE may reach for, and `apps/site` still builds with `packages/seed` deleted. A test may know
+ * more than a bundle may.
+ *
+ * WHAT COUNTS AS SHIPPED, per case: the title of its own Home page, the titles of the pages it
+ * declares, the names of the lists it declares, and the same two out of every first-party module it
+ * installs, with every list name put through that use case's `labels` first.
+ *
+ * A NAV SECTION IS NOT A PAGE, and leaving sections out is exactly what catches the second of the
+ * two. `Work` is a heading over two pages titled Overview and Board. A reader told their record
+ * holds Work goes looking for it and finds neither, which is the whole defect this measures.
+ *
+ * ONE DIRECTION ONLY. `holds` is an editorial shortlist and not an inventory: Personal also ships
+ * `Project steps` and `Exchange rates`, and the rail is right not to recite them. So every name in
+ * `holds` must be shipped, and not every shipped name need be in `holds`.
+ */
+test('every page and list the rail says a record holds is one the seed ships', when(NO_USECASES), async () => {
+  /* The shapes this reads out of the three modules. Written out rather than inferred because a
+     check that reaches into a sibling package should say what it expects to find there, and go
+     red at the cast when that changes rather than quietly measuring nothing. */
+  type Body = Record<string, unknown>;
+  type Seeded = { usecase: string; modules: readonly string[]; labels: Record<string, string>; pack: { declarations?: readonly Body[] } | null };
+  type Seed = { useCase: (id: string) => Seeded | undefined; pagesOf: (u: Seeded) => readonly { page: string; title: string }[]; listsOf: (u: Seeded) => readonly { id: string; name: string }[] };
+  type Share = { modulesToInstall: (u: Seeded) => readonly string[] };
+  type Packs = { FIRST_PARTY: readonly string[]; firstPartyDocument: (id: string) => { declarations: readonly Body[] } };
+  type Copy = { site: { arrange: { cases: readonly { id: string; holds: readonly string[] }[] } } };
+
+  const seed = (await import(USECASES.href)) as Seed;
+  const share = (await import(new URL('share.ts', USECASES).href)) as Share;
+  const packs = (await import(new URL('../packs/first-party.ts', USECASES).href)) as Packs;
+  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
+
+  /** Every name a reader could meet on the rail after this use case is installed. */
+  const shipped = (u: Seeded): Set<string> => {
+    const names = new Set<string>();
+
+    /* Home is not in `pagesOf`: it REPLACES the house Home rather than adding a rail entry. The
+       rail still names it, as `Day to day`, `Today` and `Your project`, so it is counted here. */
+    const home = (u.pack?.declarations ?? []).find((d) => d.page === `home-${u.usecase}`);
+    if (typeof home?.title === 'string') names.add(home.title);
+
+    for (const page of seed.pagesOf(u)) names.add(page.title);
+    for (const list of seed.listsOf(u)) names.add(u.labels[list.id] ?? list.name);
+
+    for (const id of share.modulesToInstall(u)) {
+      assert.equal(
+        packs.FIRST_PARTY.includes(id),
+        true,
+        `the ${u.usecase} setup installs a module named "${id}" that packs/first-party.ts does not ` +
+          'declare, so this check cannot see what that module ships and would pass by not looking',
+      );
+      for (const d of packs.firstPartyDocument(id).declarations) {
+        const register = typeof d.register === 'string' ? d.register : null;
+        if (register !== null && d.page === undefined && d.rule === undefined) {
+          names.add(u.labels[register] ?? (typeof d.name === 'string' ? d.name : register));
+        }
+        /* A `for:` page is drawn once per row and titled out of the row (`{{name}}`), so it has no
+           one name a rail could print. */
+        if (typeof d.page === 'string' && d.for === undefined && typeof d.title === 'string') names.add(d.title);
+      }
+    }
+    return names;
+  };
+
+  const cases = site.arrange.cases;
+  assert.equal(cases.length, USE_CASES.length, `copy.ts arranges ${cases.length} cases and the home page names ${USE_CASES.length}`);
+
+  const wrong: string[] = [];
+  for (const one of cases) {
+    const u = seed.useCase(one.id);
+    if (!u) {
+      wrong.push(`the rail offers a case called "${one.id}" and the seed declares no such use case`);
+      continue;
+    }
+    assert.equal(one.holds.length > 0, true, `the ${one.id} case holds nothing, so this check has nothing to read for it`);
+
+    const ships = shipped(u);
+    assert.equal(ships.size > 0, true, `the ${one.id} setup ships no pages and no lists at all; the seed's shape has changed under this check`);
+
+    for (const name of one.holds) {
+      if (ships.has(name)) continue;
+      wrong.push(
+        `the ${one.id} rail says a record holds "${name}", and that setup ships no page and no list ` +
+          `under that name. It ships: ${[...ships].sort().join(', ')}`,
+      );
+    }
+  }
+
+  assert.equal(wrong.length, 0, `${wrong.length} name(s) on the rail are not things a record will have:\n  - ${wrong.join('\n  - ')}`);
 });
 
 /**
@@ -344,16 +474,57 @@ test('every image a page asks for is in the build', when(NO_BUILD), () => {
 });
 
 /**
- * NO LICENCE NAME AND NO EM DASH IN THE COPY FILE'S MARKETING HALF EITHER. The served-bytes checks
- * above only see what a page renders today, and a key added for a section not drawn yet slips past
- * them. Everything in `copy.ts` above `legal:` is marketing copy.
+ * NO LICENCE NAME AND NO EM DASH IN THE COPY FILE EITHER. The served-bytes checks above only see
+ * what a page renders today, and a key added for a section not drawn yet slips past them.
+ *
+ * IT USED TO READ A PREFIX AND NOW IT READS THE WHOLE OBJECT. The line was
+ * `source.slice(indexOf('export const site'), indexOf('\n  legal: {'))`, which measured everything
+ * declared ABOVE `legal:` and nothing below it. That is not a rule about what is marketing copy, it
+ * is an accident of key order: `changelog` and `footer` sit after `legal` and were unscanned, and
+ * moving any section past `legal:` would have dropped it out of the check without a word. So the
+ * sections are read out of the file by their indentation and every one of them is scanned.
+ *
+ * THE LICENCE NAMES ARE EXCUSED IN `legal:` AND NOWHERE ELSE, which is the owner's split of
+ * 2026-09-16 that the served-bytes test above measures from the other side. The em dash rule has no
+ * exception: `copy.ts` states it as the fifth of its five voice rules, and a reader on /legal is
+ * still a reader.
  */
-test('the marketing copy in copy.ts names no licence and holds no em dash', () => {
+test('copy.ts holds no em dash, and names a licence only in its legal section', () => {
   const source = readFileSync(new URL('../src/lib/copy.ts', import.meta.url), 'utf8');
-  const marketing = source.slice(source.indexOf('export const site'), source.indexOf('\n  legal: {'));
-  const strings = [...marketing.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').join('\n');
-  assert.equal(/\bApache\b|\bMIT\b/.test(strings), false, 'copy.ts names a licence above the legal section');
-  assert.equal(strings.includes('—'), false, 'copy.ts has an em dash in a marketing string');
+  const opens = source.indexOf('export const site');
+  const closes = source.indexOf('\n} as const;', opens);
+  assert.equal(opens !== -1 && closes !== -1, true, 'copy.ts no longer holds one `export const site` object, so this check reads nothing');
+  const site = source.slice(opens, closes);
+
+  /* The sections, at the two-space indent a top-level key of `site` is declared at. Reading them
+     out of the file rather than naming them here is the whole point: a section added tomorrow is
+     scanned the day it lands, and no ordering of them can put one out of reach. */
+  const sections = [...site.matchAll(/^ {2}([A-Za-z]+): \{$/gm)];
+  const named = sections.map((m) => m[1] ?? '');
+  assert.equal(named.length > 8, true, `only ${named.length} sections parsed out of copy.ts; its shape has changed`);
+  assert.equal(named.includes('legal'), true, `copy.ts declares no "legal" section, so this check cannot tell where the licence names are allowed. It declares: ${named.join(', ')}`);
+
+  const at = named.indexOf('legal');
+  const from = sections[at]?.index ?? 0;
+  const to = sections[at + 1]?.index ?? site.length;
+
+  const quoted = (region: string): string =>
+    [...region.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').join('\n');
+
+  const legal = quoted(site.slice(from, to));
+  const rest = quoted(site.slice(0, from) + site.slice(to));
+
+  /* THE LEGAL SECTION STILL NAMES BOTH LICENCES, which is what proves the two regions above landed
+     where this test thinks they did. If the split misfired, either this goes red or the licence
+     assertion below does, and a silent pass over an empty string is not one of the outcomes. */
+  assert.match(legal, /\bApache\b/, 'the legal section of copy.ts no longer names the Apache licence');
+  assert.match(legal, /\bMIT\b/, 'the legal section of copy.ts no longer names the MIT licence');
+
+  const licence = /\bApache\b|\bMIT\b/.exec(rest);
+  assert.equal(licence, null, `copy.ts names a licence outside its legal section: ${licence ? around(rest, licence[0]).join(' | ') : ''}`);
+
+  const dashes = around(`${rest}\n${legal}`, '—');
+  assert.equal(dashes.length, 0, `copy.ts has ${dashes.length} em dash(es) in its strings: ${dashes.join(' | ')}`);
 });
 
 /**
@@ -366,7 +537,11 @@ test('the Worker serves a prerendered 404 page for a path with no file', () => {
   assert.ok(existsSync(new URL('../src/routes/404/+page.svelte', import.meta.url)), 'there is no 404 route to prerender');
 });
 
-test('the build writes 404.html, in the site shell and not indexed', when(existsSync(new URL('404.html', BUILD)) ? null : NO_BUILD ?? 'apps/site/build has no 404.html'), () => {
+/* `404.html` is in `PAGES` now, so its absence is already what `NO_BUILD` says and the separate
+   reason this test used to carry would only ever repeat it. What is left here is the part the
+   shared loops cannot see: that this particular document is the 404 page and asks not to be
+   indexed, rather than some other page that happens to have been written under that name. */
+test('the build writes 404.html, in the site shell and not indexed', when(NO_BUILD), () => {
   const html = read('404.html');
   assert.match(html, /There is no page here/);
   assert.match(html, /name="robots" content="noindex"/);

@@ -26,7 +26,6 @@
 
 <section class="wrap head">
   <h1 class="title">{p.title}</h1>
-  <p class="lede">{p.body}</p>
   <!-- ABOVE THE PRICES, NOT UNDER THEM. A price on a page is an offer, and neither of these can be
        accepted today. Saying so once, before the plans, is what lets the plans describe themselves
        in the present tense without the page lying. -->
@@ -87,15 +86,6 @@
     line-height: 1.04;
     letter-spacing: -0.04em;
     text-wrap: balance;
-  }
-
-  .lede {
-    max-inline-size: 48ch;
-    margin-block-start: var(--sp-4);
-    color: var(--ink2);
-    font-size: clamp(17px, 0.4vw + 15px, 20px);
-    line-height: 1.5;
-    text-wrap: pretty;
   }
 
   /* A fact about the state of the product, not an alarm: a line of text with one dot of state. */

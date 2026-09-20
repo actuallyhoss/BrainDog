@@ -25,7 +25,6 @@
 
 <section class="wrap head">
   <h1 class="title">{l.title}</h1>
-  <p class="lede">{l.lede}</p>
 </section>
 
 <section class="wrap part" aria-labelledby="licence-title">
@@ -63,15 +62,6 @@
     line-height: 1.04;
     letter-spacing: -0.04em;
     text-wrap: balance;
-  }
-
-  .lede {
-    max-inline-size: 48ch;
-    margin-block-start: var(--sp-4);
-    color: var(--ink2);
-    font-size: clamp(17px, 0.4vw + 15px, 20px);
-    line-height: 1.5;
-    text-wrap: pretty;
   }
 
   /* Each part is a hairline, a heading and its sentences, the same weight as the pricing page's
