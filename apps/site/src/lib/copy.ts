@@ -57,9 +57,12 @@ export const site = {
     },
     changelog: {
       title: 'Changelog · BrainDog',
+      /* `live on a synthetic record` IS THE SAME FALSE CLAIM `STATUS.body` CARRIED, one layer out,
+         and a meta description is read by every person a search result or a shared link reaches.
+         `DEMO_RECORD` is empty in both environments, so there is no record to be live on. */
       description:
-        "What shipped in BrainDog and when, in the repository's own words. The app is live on a " +
-        'synthetic record, and nothing is for sale yet.',
+        "What shipped in BrainDog and when, in the repository's own words. The app is live, " +
+        'signing in works, and nothing is for sale yet.',
     },
   },
 
@@ -73,7 +76,24 @@ export const site = {
   },
 
   hero: {
-    title: 'Give your business a memory',
+    /**
+     * THE SLOGAN, IN TWO HALVES, AND THE WORDS ARE UNCHANGED.
+     *
+     * It reads `Give your business a memory` on the page, because it is one `<h1>` with a coloured
+     * span inside it, and the slogan is the owner's call rather than a redesign's
+     * (`loop/research-site-copy.md` closes with three alternatives and leaves the decision with
+     * him). The split exists so the last two words can take `--accent-text`, which is the one move
+     * taken verbatim from the reference: PostHog's hero headline carries
+     * `className="text-red dark:text-yellow"` on a phrase inside it
+     * (`src/components/Home/Hero.js`), a different hue per scheme because neither reads on both
+     * grounds. Ours needs no swap: `--accent-text` is already solved per scheme for text on the
+     * page ground, and it is the token whose whole job is this.
+     *
+     * A SEARCH RESULT AND A SHARED CARD STILL SEE ONE SENTENCE, because `site.tagline` and
+     * `footer.tagline` hold it whole and neither of them is built from these two.
+     */
+    title: 'Give your business',
+    titleAccent: 'a memory',
     /**
      * IT SAID `Nothing in it is ever overwritten` AND THAT IS STRONGER THAN THE STORAGE.
      *
@@ -100,7 +120,45 @@ export const site = {
      * button, as *there is no way in*. That second reading is the true one, so it is said plainly.
      */
     primary: 'Open the app',
+    /**
+     * THE QUIET SECOND ACTION, and it is quiet for `app.css`'s reason: one filled button per view
+     * is the answer to "what do I do here", and a second filled one is a second answer. A reader
+     * who has just been told neither plan is open has exactly one other question, which is what it
+     * would cost, so the quiet link answers that one.
+     *
+     * NOT `See the pricing`, WHICH IS WHAT THE RULE AT THE TOP OF THIS FILE ASKS FOR and is what
+     * the closing band says. Two reasons, and the second is the stronger. The rule exists to stop
+     * `Learn More`, and what it is really asking for is a label that names the thing you get; this
+     * one names it in five words instead of two. And the close already uses those two words, so
+     * repeating them in the hero would put the same label on both ends of the page, which is the
+     * repetition `closing.title` refuses in the paragraph above it for the same reason.
+     */
+    secondary: 'See what it costs',
     note: 'Neither plan is open yet.',
+  },
+
+  /**
+   * THE FOUR FIGURES UNDER THE HERO, and every one of them was counted on 2026-09-21 rather than
+   * remembered. `apps/site/DESIGN-NOTES.md` §4 carries the command beside each.
+   *
+   *   16   the `name:` keys of `packages/mcp/src/index.ts:163-329`
+   *    5   the `TEMPLATES` array of the same file
+   *    1   `apps/selfhost/src/main.ts:105`: the record is one file (of three an install writes,
+   *        which is why the label says the record and not the installation)
+   *   30   `apps/selfhost/src/snapshots.ts:30` and `apps/worker/src/snapshots.ts`, both hosts
+   *
+   * TWO FIGURES FROM THE BRIEF ARE NOT HERE and the reason is the rule above: a commit count moves
+   * every hour on a site that redeploys on a schedule, and the brief's gate count was 31 where the
+   * registered list in `tools/gates/run.mjs` holds 30. A number that has to be re-earned on every
+   * deploy is a number this file will eventually ship stale, which is the defect it exists to stop.
+   */
+  facts: {
+    items: [
+      { figure: '16', label: 'tools an agent can call' },
+      { figure: '5', label: 'resource templates beside them' },
+      { figure: '1', label: 'file holds your record' },
+      { figure: '30', label: 'nightly backups, either host' },
+    ],
   },
 
   /**
@@ -199,6 +257,25 @@ export const site = {
     lead:
       'Say what your record is for. The pages, the lists and the words follow. Underneath, every ' +
       'part can be changed or turned off.',
+    /**
+     * THE SENTENCE THIS REPLACES WAS FALSE, AND IT WAS IN THE `Not built yet` COLUMN.
+     *
+     * It read: *Spark arranges by reading what you type. A language model does not do it yet.*
+     * `loop/research-site-copy.md` falsifies it twice over. `packages/host/src/spark.ts:52`
+     * defines `endpointModel()`, a real model behind a chat-completions port, and BOTH hosts wire
+     * it in (`apps/worker/src/spark.ts:22`, `apps/selfhost/src/spark.ts:29`). What is true is
+     * narrower and is what `loop/STATUS.md` §5 actually says: with none configured, the rules
+     * draft. So the claim moves out of the not-built column, where it was a lie about our own
+     * software, and becomes the limit it always was, stated beside the thing it limits.
+     *
+     * `Turn a module off, People included` IS FROM THE CHANGELOG OF 2026-09-14 and is the detail
+     * `research-site-copy.md` ranks fifth of the eight things this page should say and does not:
+     * the granularity goes all the way down to the one register most products treat as
+     * infrastructure.
+     */
+    note:
+      'Rules draft the arrangement. A model drafts it instead once you configure one, and none is ' +
+      'configured by default. Any module can be turned off afterwards, People included.',
     cases: [
       {
         id: 'personal',
@@ -260,14 +337,20 @@ export const site = {
     lead:
       'A register is a typed collection: money, services, people. So "what is due in October" has ' +
       'an answer, not a search.',
-    caption: 'the demo record, at full size',
-    /* THE NAME OF THE SCROLLING BOX, which is not the caption. The figure already takes its
-       accessible name from the caption, so naming the region the same thing made a screen reader
-       read the same words twice on the way to the alt text. This says what the region IS. */
-    region: 'The demo record home screen. Scroll to see the rest of it.',
+    /**
+     * THE CAPTION FOR A PICTURE THAT IS NOW THE WIDTH OF THE SCREEN.
+     *
+     * It read `the demo record, at full size`, which was a promise about the pixels made inside a
+     * 420px window that showed about a third of them. The picture is full-bleed now and the
+     * capture is 1440 CSS px wide, so at a 1440 viewport it paints one device pixel per captured
+     * pixel and the sentence is finally literal. `loop/research-site-reference.md` §5 measured
+     * that none of the four references boxes its primary product image.
+     */
+    caption: 'One record, photographed on the day this build was made',
     alt:
-      'The home screen of the demo record, The Studio: what it is owed and what is due, the ' +
-      'questions waiting on a decision, and what its agents and rules did while you were away.',
+      'The home screen of a record: what it is owed and what is due, the money falling due this ' +
+      'week, the questions waiting on a decision, and what its agents and rules did while you ' +
+      'were away.',
   },
 
   /**
@@ -280,13 +363,46 @@ export const site = {
    * somebody edits it: a hosted record is what nobody can open yet, not the door into one. A
    * buyer who reads specifications works that out in about four minutes, so better it comes from
    * us.
+   *
+   * THE TWENTY-ONE NAMES BELOW ARE THE SURFACE ITSELF, and they are here because
+   * `loop/research-site-copy.md` ranks this first of the eight things the page should say and does
+   * not: *"Agents get a typed surface, not a chat window."* The old section said agents "read and
+   * write the same rows", which undersells a surface built so a session can ask for a schema, a
+   * filtered list, a search, an activity feed, a money view, a governance queue, and hand context
+   * to the next session, all typed and none of it scraped HTML.
+   *
+   * THEY ARE COPIED FROM THE DECLARATION AND NOT INVENTED. `tools` is every `name:` key of
+   * `packages/mcp/src/index.ts:163-329`, in declaration order; `templates` is the `name` of each
+   * entry in that file's `TEMPLATES` array. `schema` appears in both lists and that is not a
+   * mistake: it is a tool a caller runs and a resource a client can subscribe to, which is why the
+   * two lists are drawn under two headings rather than merged into one of twenty.
    */
   agents: {
     title: 'Agents propose. You decide.',
     lead:
       'Claude, Codex and Cursor read and write the same rows you do, over MCP, with a key you ' +
       'issue. Every change carries a name.',
-    chips: ['Over MCP', 'With a key you issue', 'Proposals land with you'],
+    toolsHead: 'Tools',
+    tools: [
+      'record_index',
+      'context',
+      'schema',
+      'get',
+      'list',
+      'search',
+      'history',
+      'activity',
+      'money',
+      'governance',
+      'propose',
+      'create',
+      'update',
+      'log',
+      'handoff',
+      'meet',
+    ],
+    templatesHead: 'Resource templates',
+    templates: ['schema/{register}', 'page/{slug}', 'metric/{id}', 'skill/{name}', 'declaration/{slug}'],
     note: 'Agents reach a self-hosted record today.',
   },
 
@@ -298,8 +414,28 @@ export const site = {
   report: {
     title: 'Your projects report. Your dashboards draw.',
     lead: 'Give a project a report key, or an address to poll. The numbers arrive and the tiles draw.',
+    /**
+     * WHAT A LEAKED REPORT KEY CAN ACTUALLY DO, which is the fourth thing
+     * `loop/research-site-copy.md` says this page should say and does not.
+     *
+     * Every figure is read off `packages/record/src/report.ts:1-30`. A developer deciding whether
+     * to paste a credential into a deploy script checks exactly this before anything else, and
+     * "give a project a report key" on its own invites them to assume the worst, which is an API
+     * token with read access to their whole record. It is the opposite: it cannot read one row of
+     * the record it writes into.
+     */
+    specHead: 'What a report key can do',
+    spec: [
+      { term: 'Direction', def: 'Write only. It cannot read a row.' },
+      { term: 'Reach', def: 'One register, and a fixed set of fields.' },
+      { term: 'Per call', def: '100 rows, 256 KB.' },
+      { term: 'Per minute', def: '600 rows.' },
+    ],
     caption: 'sixty days of rows, written the way a project reports them',
-    region: "A founder's dashboard. Scroll to see the rest of it.",
+    /* `region` WENT WITH THE SCROLLING BOX IT NAMED. It was the accessible name of a 420px window
+       a reader had to scroll, and there is no window now: the picture is painted at its own size
+       and the band clips what will not fit. This file's own rule is that a key nothing renders is
+       deleted rather than kept for later, and `typed.region` went the same way in the same pass. */
     alt:
       "A founder's Dashboard: cash across organisations, the balance of each, and active users, " +
       'recurring revenue and signups drawn against the thirty days before.',
@@ -336,12 +472,26 @@ export const site = {
         lines: [
           'Open source. The code opens on GitHub when the product launches.',
           'Your record is one file. Leaving is a copy, not a migration.',
+          /* THE STRONGEST ANSWER TO "WHAT HAPPENS IF I LEAVE" AND IT WAS ON NEITHER MARKETING
+             PAGE. `loop/research-site-copy.md` ranks it third: the self-host writes a signed,
+             versioned export, the hosted Cloud takes the same format as its nightly backup, and
+             thirty are kept on both sides (`apps/worker/src/snapshots.ts:1-30`,
+             `apps/selfhost/src/snapshots.ts:30`). The pricing page offered "your own backups" to
+             self-hosters only, which reads as a reason NOT to take the hosted plan. */
+          'Thirty nightly backups, in the same portable format on either host.',
         ],
       },
       {
         head: 'Not built yet',
         lines: [
-          'Spark arranges by reading what you type. A language model does not do it yet.',
+          /* THE LINE THAT STOOD HERE WAS FALSE. See the note on `arrange.note`, which is where the
+             true half of it now lives. What IS unbuilt, and what this replaces it with, is the
+             other Spark: `packages/spark` answers a typed question against a person's own rows and
+             cites what it read (`packages/spark/src/propose.ts:1-25`), and
+             `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returns nothing, so no
+             host reaches it. A visitor can do nothing with it today, which is the definition of
+             this column. */
+          'Asking your record a question in words. The engine is written; no host reaches it yet.',
           'Mail does not arrive by itself.',
           /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
              to point its one filled button at it. `DEMO_RECORD` is empty in both environments. */
@@ -412,6 +562,36 @@ export const site = {
       ],
       cta: 'Open the app',
     },
+    /**
+     * A TABLE, AND THE PAGE'S OWN COMMENT SAYS WHY THERE IS NO FEATURE MATRIX. Both are true and
+     * they are not the same table.
+     *
+     * `pricing/+page.svelte` argues, correctly, that a matrix of ticks exists to make the cheaper
+     * column look incomplete, and that there is nothing to make incomplete here because the
+     * self-hosted build is the same software. So this table has no ticks and no crosses in it. It
+     * is six rows of what is OPERATIONALLY different between running it yourself and having it
+     * run: who runs the process, where the database is, what the backup is, whose domain, how you
+     * leave, and what it costs. Four of the six answer the same for both plans, which is the point
+     * being made and is the opposite of what a feature matrix is for.
+     *
+     * Every cell is settled in `loop/research-site-copy.md`: one Durable Object with its own
+     * SQLite per hosted record (`apps/worker/src/snapshots.ts:1-10`), the nightly `VACUUM INTO`
+     * with thirty kept on self-host (`apps/selfhost/src/backup.ts:4-15`,
+     * `snapshots.ts:30`), and export as a live host-independent call
+     * (`apps/web/src/lib/record/settings-write.ts:154-159`).
+     */
+    compareTitle: 'What actually differs',
+    compare: {
+      columns: ['', 'Self-hosted', 'Hosted'],
+      rows: [
+        ['The software', 'The same build', 'The same build'],
+        ['Runs on', 'Your machine, one process, one port', 'Cloudflare, run by us'],
+        ['Your record lives in', 'One file on your disk', 'A database of its own, never shared'],
+        ['Backups', 'Nightly, thirty kept', 'Nightly, thirty kept'],
+        ['Leaving', 'Copy the file', 'Export the file, whenever you like'],
+        ['Price', 'Free', '$12 a month, per record'],
+      ],
+    },
     honestTitle: 'Why there is no free hosted tier',
     honest:
       'No free hosted tier, on purpose. A per-customer database with no revenue against it ends as ' +
@@ -456,7 +636,11 @@ export const site = {
     },
     terms: {
       title: 'Terms and privacy',
-      body: 'The Terms of Service and the Privacy policy are not published yet. Both will be published here before hosted sign-up opens. Until then there is no sign-up and no billing, and the demo keeps nothing you type into it.',
+      /* THE LAST CLAUSE PROMISED SOMETHING ABOUT A DEMO THAT DOES NOT EXIST. It read *the demo
+         keeps nothing you type into it*, which is a data-handling promise about a surface no
+         visitor can reach: `DEMO_RECORD` is empty in both environments. A promise nobody can test
+         is the kind a legal page must not make, so it says the true and smaller thing. */
+      body: 'The Terms of Service and the Privacy policy are not published yet. Both will be published here before hosted sign-up opens. Until then there is no sign-up and no billing, so there is nothing to collect.',
     },
   },
 

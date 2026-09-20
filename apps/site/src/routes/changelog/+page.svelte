@@ -41,9 +41,25 @@
     /* TWO SENTENCES, AND IT WAS NINE, THEN THREE. The third said what this page is for, which the
        heading and the lede above it have already said twice. Measured on the built page: 50 words
        to 31. */
+    /**
+     * `For now it draws a made-up record` WAS FALSE, AND IT CONTRADICTED TWO OTHER PAGES OF THIS
+     * SAME SITE.
+     *
+     * `loop/research-site-copy.md` settles it: `DEMO_RECORD` is empty in both environments
+     * (`apps/worker/wrangler.jsonc:270` and the equivalent production line), so
+     * `apps/worker/src/route.ts` never opens its anonymous-read door. That is the exact fact
+     * `copy.ts` already cites on the home page to justify saying *there is no demo to open yet*,
+     * and on the pricing page to say neither plan is open. This page was the one that had not been
+     * brought along, so a reader who opened the app from here expected a populated demo and got
+     * nothing to look at.
+     *
+     * It says the state instead, which is also the more interesting sentence: signing in works on
+     * both hosts and there is nothing behind it yet (the 2026-09-16 entry below says so in its own
+     * words), which is a real thing to know about a product that ships in slices.
+     */
     body:
       'The record app deploys from this repository on every green build, and you can open it. ' +
-      'For now it draws a made-up record: no sign-up, no billing, no release to install.',
+      'Signing in works; there is no sign-up, no billing, and no record to look at yet.',
   };
 
   const ENTRIES: Entry[] = [
@@ -426,8 +442,19 @@
   <meta property="og:description" content={site.meta.changelog.description} />
 </svelte:head>
 
-<section class="head">
-  <h1 class="title">{site.nav.changelog}</h1>
+<!-- THE HEAD GETS ITS OWN GROUND, which is the same move the home and pricing pages make and for
+     the same measured reason: with one surface for the whole document, nothing tells a reader
+     where the standing state of the product stops and the history starts. Here the split is
+     already in the content (one block about now, then eighteen days about the past), so it costs
+     one attribute. -->
+<section class="band" data-ground="sunk">
+  <div class="head">
+    <p class="band-mark">
+      <span class="band-seq">0001</span>
+      <span class="band-rule"></span>
+      <span class="band-tag">Where it stands</span>
+    </p>
+    <h1 class="title">{site.nav.changelog}</h1>
   <p class="lede">{site.changelog.lede}</p>
   <!-- THE COUNTS ARE COUNTED, from the list below, so they cannot drift from it. -->
   <p class="counts">
@@ -447,12 +474,14 @@
         <a class="btn btn-primary" href={APP}>{site.nav.open}<Icon name="arrow" size="s" /></a>
         {#if SOURCE}<a class="btn" href={SOURCE}>{site.nav.source}</a>{/if}
       </p>
+      </div>
     </div>
   </div>
 </section>
 
-<div class="log">
-  {#each DAYS as day}
+<div class="band" data-ground="page">
+  <div class="log">
+    {#each DAYS as day}
     <section class="day">
       <!-- A machine-readable date beside a human one, as a heading, because it is what the entries
            under it belong to, and it holds its place while they scroll past. -->
@@ -468,7 +497,8 @@
         {/each}
       </ol>
     </section>
-  {/each}
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -479,8 +509,16 @@
     padding-inline: var(--sp-6);
   }
 
-  .head {
-    padding-block: clamp(56px, 7vw, 104px) var(--sp-6);
+  /* The band pays for the air above and below; the column inside it pays for nothing. It was
+     `clamp(56px, 7vw, 104px)` on the head alone, which put the standing state of the product a
+     third of a screen further down than the home page's first band. */
+  .band {
+    padding-block: var(--sp-8);
+  }
+
+  /* The seam, as on the other two pages. */
+  .band + .band {
+    border-block-start: 1px solid var(--line);
   }
 
   .title {

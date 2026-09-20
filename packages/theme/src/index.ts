@@ -70,9 +70,30 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  *
  * AND THE INK RAMP GOES WITH IT, because "how readable everything is" was the other half of what he
  * asked for. `HOUSE_PROFILE.ink` was `[12, 8, 6, 4.5]` and is now `[14, 9, 6.5, 4.5]`, the most the
- * validator will accept. Body text lands at 15.4:1 in light and 17.6:1 in dark, against PostHog's
- * 17.6. That is a bigger readability gain than the accent, and it is the one that shows on every
- * screen rather than on the few things the accent touches.
+ * validator will accept. Body text lands at 15.4:1 in light and 17.6:1 in dark, which is a bigger
+ * readability gain than the accent and the one that shows on every screen rather than on the few
+ * things the accent touches.
+ *
+ * `against PostHog's 17.6` WAS ON THAT LAST LINE AND IT WAS NOT A MEASUREMENT.
+ *
+ * The single figure corresponds to neither of PostHog's schemes. Read from their source on
+ * 2026-09-21 and computed against each scheme's own page ground
+ * (`github.com/PostHog/posthog.com`, `src/styles/global.css`):
+ *
+ *   light   `--text-primary: 17 17 17` (#111111) on `--bg: 253 253 248` (#FDFDF8)   18.51:1
+ *   dark    `--text-primary: 250 250 250` (#FAFAFA) on `--bg: 30 31 35` (#1E1F23)   15.77:1
+ *
+ * So the honest comparison is that the two products cross over: they are brighter than us in
+ * light (18.51 to 15.4) and we are brighter than them in dark (17.6 to 15.77). Both pairs are far
+ * above the 7:1 AAA floor and the difference is not one a reader can see, which is the real reason
+ * this line should never have been a scoreboard.
+ *
+ * IT IS WRITTEN OUT HERE BECAUSE OF HOW IT GOT WRONG. `loop/DIRECTION.md` §17 records the owner
+ * asking twice for PostHog to be read from its source, and what the tree held afterwards was two
+ * contrast ratios in this comment and nothing else: no token values, no file paths, no comparison
+ * of the two schemes. A number that agrees with a direction does not discharge it. The read that
+ * was actually asked for is `loop/research-site-reference.md`, and `apps/site/DESIGN-NOTES.md` is
+ * the second pass over the same sources.
  */
 export const HOUSE_SEED: Seed = {
   accent: 'oklch(0.575 0.215 6)',

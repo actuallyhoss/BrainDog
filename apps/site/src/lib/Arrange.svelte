@@ -191,14 +191,26 @@
     font-weight: 600;
   }
 
-  /* THE RAIL, AT THE RECORD APP'S OWN PROPORTIONS: `--rail` wide, rows `--rail-item-h` tall, sunk
-     ground, hairline, large radius. One grid cell, so every arrangement is stacked in the same
-     place and the box is the height of the longest of them. */
+  /**
+   * THE RAIL, AND THE 240px CAP IS GONE.
+   *
+   * It was `max-inline-size: var(--rail)`, which is the record app's own sidebar proportion, and
+   * the argument for it was that this drawing should be the app's rail rather than a list. The
+   * argument was right about the ROWS and wrong about the BOX, and
+   * `loop/research-site-reference.md` measured the cost: the band this component sits in used 529
+   * of 1,440 pixels, 37 per cent, with the right two thirds of it empty, and 21 per cent of that
+   * band's rows carried no ink at all. A 240px box in a 1,136px column is not a sidebar, it is a
+   * sidebar-shaped hole.
+   *
+   * What makes it read as a rail is unchanged and is where it always was: the `Switch record`
+   * line above a hairline, rows at `--rail-item-h`, a mark where the app draws a glyph, a sunk
+   * ground inside a hairline. Those are the app's proportions. The width of the box is the page's
+   * business, and the page now gives it a column to fill.
+   */
   .rail {
     display: flex;
     flex-direction: column;
     inline-size: 100%;
-    max-inline-size: var(--rail);
     padding: var(--sp-2);
     background: var(--sunk);
     border: 1px solid var(--line);
@@ -303,10 +315,12 @@
       scroll-snap-align: start;
     }
 
-    /* The rail keeps the record app's row height here too: these are rows of a drawing, not
-       controls, so the 44px thumb rule is the segmented control's business and not theirs. */
-    .rail {
-      max-inline-size: 100%;
+    /* ONE COLUMN ON A PHONE, whatever the count. Two columns of a ten-row rail inside 358px is two
+       columns of ellipsis: `Savings goals` and `Day to day` are both wider than 160px at 13px, and
+       `.name` truncates rather than wraps, so the reader would be shown half of every word the
+       band exists to name. */
+    .wide {
+      columns: 1;
     }
   }
 

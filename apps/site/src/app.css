@@ -31,6 +31,213 @@
   /* The one width every page's content and the bar share, so their edges line up. */
   :root {
     --site-max: 1200px;
+
+    /**
+     * THE GROUNDS, AND THE PAGE HAD ONE.
+     *
+     * `loop/research-site-reference.md` measured it: scanning down the centre of the dark capture,
+     * the background is `--bg` from y=0 to y=3693 and from y=4013 to the footer, and the only
+     * other surface on 4,368px of page is a 320px closing band at **1.04:1** against what it sits
+     * on. FirstLook flips its ground six times in ten sections and the flip is a **15.88:1** jump
+     * (`firstlook.ai` inline stylesheet, sections measured in that file's §2). PostHog carries
+     * three surface levels per scheme, selected by a `data-scheme` attribute on a container
+     * (`src/styles/global.css:178-439`). Both of them tell a reader where one idea stops. We told
+     * them nothing for four thousand pixels.
+     *
+     * A BAND SETS A GROUND BY RENAMING THE SEMANTIC TOKENS, not by painting a colour. That is the
+     * whole trick and it is worth stating, because the obvious alternative is a per-band class on
+     * every element inside it. A custom property's own `var()`s are substituted where the property
+     * is DECLARED, so `--flip-bg: var(--ink)` computed here on `:root` freezes to the page's ink
+     * colour; a band that then says `--bg: var(--flip-bg)` hands that value to everything under
+     * it. `.btn-primary` below is `background: var(--ink); color: var(--bg)`, so inside a flipped
+     * band it comes out dark-on-light without one line of band-specific button CSS. Every
+     * component on the page inherits its band's ground for free, and there is one place to get it
+     * wrong instead of forty.
+     *
+     * THE FLIP IS THE BODY-TEXT PAIR, REVERSED, which is why it needs no contrast check of its
+     * own: `--ink` on `--bg` is certified by `packages/theme` at 17.61:1 in dark and 15.41:1 in
+     * light, and swapping which one is the ground does not change the ratio. In the dark scheme a
+     * flipped band is a near-white field; in the light scheme it is near-black. That is the same
+     * move FirstLook makes with `--ink` against `--paper`, done in a way that survives a reader
+     * who has their system set either way.
+     *
+     * THE FOUR MIXES ARE HERE AND NOT AT A CALL SITE, for the reason `tokens.css` gives at length
+     * over `--hover-wash`: a percentage chosen where it is used is a colour chosen where it is
+     * used with one extra step in front of it, and it drifts. These four are the secondary text,
+     * the quiet text, the hairline and the raised surface of a flipped band, and every band that
+     * flips uses these and no others.
+     *
+     * THE PERCENTAGES WERE SOLVED, NOT PICKED, against the shipped palette in both schemes. The
+     * flipped ground is the page's `--ink`, so the ratios are computed against that:
+     *
+     *   --flip-ink2  76%   8.42:1 on the dark scheme's flipped ground, 11.0:1 on the light's
+     *   --flip-dim   65%   5.69:1 dark, 7.19:1 light
+     *
+     * The dark scheme is the binding one both times, because its flipped ground is near-white and
+     * a mix towards near-black climbs more slowly there. 58% was tried first for the quiet role
+     * and landed at 4.39:1, under the 4.5 body floor, which is why the number is 65 and not a
+     * rounder one. The hairline and the raised surface carry no text and only have to be seen.
+     */
+    --flip-bg: var(--ink);
+    --flip-ink: var(--bg);
+    --flip-ink2: color-mix(in srgb, var(--bg) 76%, var(--ink));
+    --flip-dim: color-mix(in srgb, var(--bg) 65%, var(--ink));
+    --flip-line: color-mix(in srgb, var(--bg) 22%, var(--ink));
+    --flip-s1: color-mix(in srgb, var(--bg) 9%, var(--ink));
+  }
+
+  /**
+   * A BAND'S GROUND, in four values, and one of them is "the page".
+   *
+   * `page` is written rather than assumed so a section that changes its mind is one attribute
+   * value, and so the list of grounds this site has is readable in one place.
+   *
+   * `brand` IS THE ACCENT AS A WHOLE FIELD, and `--accent-ink` is the token the theme already
+   * solves against `--accent` for exactly this: it is what a filled accent control puts its label
+   * in, so the pair is certified in both schemes by `packages/theme/src/checks.ts`. On this ground
+   * there is no secondary text colour at all, and that is deliberate: every candidate mix of
+   * `--accent-ink` towards `--accent` came out between 3.9:1 and 4.4:1, under the body floor, so
+   * hierarchy on a brand band is made with size and weight instead. `--line` there is decoration
+   * rather than text and only has to clear 3:1.
+   */
+  [data-ground] {
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  [data-ground='sunk'] {
+    --bg: var(--sunk);
+  }
+
+  [data-ground='flip'] {
+    --bg: var(--flip-bg);
+    --ink: var(--flip-ink);
+    --ink2: var(--flip-ink2);
+    --dim: var(--flip-dim);
+    --line: var(--flip-line);
+    --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
+    --s1: var(--flip-s1);
+    --s2: var(--flip-s1);
+    /* Re-declared HERE so its `var(--ink)` resolves against this band's ink and not the page's.
+       Declared on `:root` it would be a near-white wash on a near-white field in the dark scheme,
+       which is not wrong so much as absent, and absent is the harder bug to see. */
+    --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
+    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
+    /**
+     * THE FOCUS RING GOES WITH THE GROUND, and this is the line that stops a band from breaking
+     * `a11y.css`.
+     *
+     * `a11y.css` draws `:focus-visible` as `2px solid var(--accent-text)`, and `--accent-text` is
+     * solved against the five DECLARED surfaces of the scheme. A flipped band is not one of them:
+     * it is the OTHER scheme's ground, so in dark mode the ring would be the light-pink
+     * `--accent-text` on a near-white field at about 1.9:1, and in light mode the dark-magenta one
+     * on near-black at about 2.5:1. Both are under the 3:1 a focus indicator needs, on the one
+     * band a keyboard reader has sixteen tab stops to walk.
+     *
+     * It becomes the flipped ink, which is the certified body pair and is 15:1 or better in both
+     * schemes. The ring loses its brand hue on this band and that is the trade being made
+     * knowingly: `a11y.css`'s own note calls the ring it replaced "visible and anonymous", and
+     * anonymous on one band costs less than invisible on one band. `base.css` paints prose links
+     * in the same token, so this keeps those readable here too.
+     */
+    --accent-text: var(--flip-ink);
+  }
+
+  [data-ground='brand'] {
+    --bg: var(--accent);
+    --ink: var(--accent-ink);
+    --ink2: var(--accent-ink);
+    --dim: var(--accent-ink);
+    --line: color-mix(in srgb, var(--accent-ink) 42%, var(--accent));
+    --line-soft: color-mix(in srgb, var(--accent-ink) 24%, var(--accent));
+    --s1: color-mix(in srgb, var(--accent-ink) 12%, var(--accent));
+    --s2: color-mix(in srgb, var(--accent-ink) 18%, var(--accent));
+    --hover-wash: color-mix(in srgb, var(--accent-ink) 14%, transparent);
+    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
+    /* Same reason as the flipped band above, and a sharper case: `--accent-text` against
+       `--accent` is a dark magenta on a magenta field in light and a light pink on it in dark, so
+       the focus ring on the page's closing action would be about 2:1. `--accent-ink` is the token
+       the theme solves against this exact ground. */
+    --accent-text: var(--accent-ink);
+  }
+
+  /**
+   * THE READING COLUMN, and the number was already right.
+   *
+   * 1200 less two 32px gutters is 1136 of a 1440 viewport, 78.9%, within a point of FirstLook's
+   * 79.2% and PostHog's 79.1% window. What was wrong was never the column: it was that ours sat on
+   * the same grey as the margin beside it, so nothing was full-bleed and nothing had an edge. The
+   * bands are the full width of the screen now and this is what sits inside them.
+   */
+  .in {
+    max-inline-size: var(--site-max);
+    margin-inline: auto;
+    padding-inline: var(--sp-6);
+  }
+
+  /**
+   * THE BAND OPENER: a sequence number, a rule that runs to the far edge, and a word.
+   *
+   * The sequence numbers are the one thing this page does that none of the four references do, and
+   * `research-site-reference.md` ranks the way they were drawn ninth on its list of faults: the
+   * best idea on the page at the quietest possible volume, costing a 96px gutter on every band to
+   * carry four `--dim` characters at 12px. So the gutter is gone and the number is in the accent,
+   * which is what FirstLook does with the same device (`counter(s, decimal-leading-zero)` in cyan
+   * mono at 13px). The rule between the number and the label is the thing that actually earns its
+   * place: it is 1px of ink running the entire width of the column, on a page where the median row
+   * of ink used to stop at x=389 of 1440.
+   */
+  .band-mark {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-block-end: var(--sp-5);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  .band-seq {
+    color: var(--accent-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .band-rule {
+    flex: 1;
+    block-size: 1px;
+    background: var(--line);
+  }
+
+  .band-tag {
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /**
+   * THE HAIRLINE GRID, taken from the two references that agree on it.
+   *
+   * PostHog's `OSTable` is `inline-grid ... divide-x divide-y divide-border rounded-md`
+   * (`src/components/OSTable/index.tsx`) and FirstLook's `.pillars` and `.systems` are grids with
+   * `gap: 1px` over a border-coloured ground under `overflow: hidden` at a 12px radius. Both end
+   * up in the same place: the divider between cells IS the gap, so a grid of sixteen cells carries
+   * one border instead of sixteen, every line is exactly 1px whatever the browser's rounding does,
+   * and there is one radius on the outside rather than a rule about which corner is which.
+   *
+   * `research-site-reference.md` counts 64 to 145 hairlines per page on PostHog and 68 on Linear,
+   * against ours: one vertical rule for the whole document. This is how the count goes up without
+   * a border declaration per element.
+   */
+  .hair {
+    display: grid;
+    gap: 1px;
+    overflow: hidden;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .hair > * {
+    background: var(--bg);
   }
 
   /* HEADINGS IN THE TEXT FACE, as the app now sets them. Poppins stays on the wordmark only: a
