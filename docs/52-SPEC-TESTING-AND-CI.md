@@ -52,7 +52,7 @@ The commands a developer runs. Six root scripts; the first three exist in commit
 
 | Command | Runs | Where |
 |---|---|---|
-| `pnpm test` | unit, property (1,000 runs), the Node conformance host, the fixture tests (materialise the nine seed records, the seventy-five refusal fixtures through their seven runners, determinism), `brain-roundtrip`, `boot-probe`, `theme-sixteen` | `ci.yml` |
+| `pnpm test` | unit, property (1,000 runs), the Node conformance host, the fixture tests (materialise the nine seed records, the refusal fixtures through their runners, both counts read from 40 §6, determinism), `brain-roundtrip`, `boot-probe`, `theme-sixteen` | `ci.yml` |
 | `pnpm typecheck` | `tsc -b` over every package and app; `references` mirror the graph so a cycle fails here first ([31-STACK](31-STACK.md) §3) | `ci.yml` |
 | `pnpm gates [-- --only a,b] [-- --allow-skip a,b] [-- --negative]` | the scripts of §3. A gate whose `needs` are unmet prints a skip; under `CI=true` a skip not named in `--allow-skip` is red. `--negative` runs §9 | `gates.yml`, `ci.yml`, `deploy.yml` |
 | `pnpm test:browser [-- --shard=i/n]` | the Playwright specs over 8 fixtures × 4 widths × 2 schemes × 2 directions | `ci.yml` |
@@ -182,6 +182,7 @@ files. Each script gate, its inputs, its assertion, its failure line's `what`, a
 | `grant-note` | the `corpus` record, materialised — it seeds two grants (40 §4.1) | no `grant.*` event note contains its grant's `label` or `opens` (12 §8) | `grant note leaks <label\|opens>` | 2,000 |
 | `harness-constants` | `apps/web/test/**` except `env.ts` | no `localhost`, `127.0.0.1`, `:<4 digits>`, `http(s)://` literal | `harness literal outside env.ts` | 50 |
 | `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2; the dead-class report | one `what` per rule, §5.2 | 1,500 |
+| `em-dash` | `packages/*/src/**`, `apps/*/src/**`, `.ts` and `.svelte`, tests excluded; comments blanked in all three dialects (`/* */`, `//`, `<!-- -->`) and in the SQL nested inside a literal | `LOOP.md`'s "no em dashes in anything a stranger reads": no U+2014 with a space on each side. One that stands alone, opens a line or closes one is a glyph (an empty cell, a rule under a heading, a signature) and is not punctuation | `<n> em dash(es) used as punctuation in prose a stranger reads` | 220 |
 
 ## 4 · Data structures
 
@@ -239,7 +240,8 @@ SEED.records.corpus   // every pack, two seeded grants — the record spark-acto
 REFUSALS           // kebab code → path; seventy-five files
 ```
 
-A refusal fixture (40 §6) carries `code`, `via` (one of seven: `lint install where write rpc import render`), `at`,
+A refusal fixture (40 §6) carries `code`, `via` (one of the values 40 §6’s table names, which is the closed list; `pull` was the eighth, added
+September 20th 2026), `at`,
 optional `found`, and the input keys its `via` names; its runner is the test file 40 §6's table assigns
 (`declare/test`, `record/test`, `apps/web/test`).
 
@@ -535,16 +537,21 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
    rows are identical for every table but `event`.
 4. Import into a non-empty record → `IMPORT_NOT_EMPTY`; a flipped byte in a body line → `CHECKSUM_MISMATCH`.
 
-**`refusals`** — the seven `via` runners of 40 §6, one test file per runner where 40's table puts it: `lint` in
-`packages/declare/test`; `install`, `where`, `write`, `rpc`, `import` in `packages/record/test`; `render` in
-`apps/web/test/unit` (30 §6; 40 §6)
+**`refusals`** — the `via` runners of 40 §6, one test file per runner, each where 40's table puts it (30 §6; 40 §6).
+**Two of them exist.** `render` is `apps/web/test/refusals-render.test.ts` and `write` is
+`packages/kernel/test/refusals-write.test.ts`; both discover the corpus themselves and assert their family's size,
+so a new fixture cannot arrive undriven. The write runner sits beside the kernel rather than in `record/test`
+because all fifteen of its `raises:` name kernel files, and a runner a layer above the raiser goes green the day
+the layer between starts answering for itself. `lint`, `install`, `where`, `rpc`, `import` and `pull` are not built,
+and until one is, its fixtures are headers nothing drives
 
 1. For each `REFUSALS` entry with this runner's `via`: build the input its keys describe (40 §6's table), run the
    surface (`lint(pack, null)`; `plan`; `where/sql`'s `compile`; the kernel's `write` on a fresh materialised record;
    an RPC call; export → tamper → `importBrainl`; `toHTML`).
 2. Assert the refusal list is exactly one long, its `code` and `at` equal the fixture's, `found` when the fixture
    carries it, and `fix` is a non-empty sentence (40 §6 rule two).
-3. The runners' case counts sum to seventy-five, so a code with no fixture fails here as well as in the script.
+3. The runners' case counts sum to the total in 40 §6, so a code with no fixture fails here as well as in the
+   script. Do not write that total here: 40 §6 owns it and says why copying it is how it goes stale.
 
 **Other tests that are gates**, each a case in its package's `test/`:
 
@@ -836,7 +843,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 15 | **Each conformance host writes `packages/ports/test/results/<host>.json`** (§4) so `conformance-count` has an artefact to read; the reference's `provisional` flag and `CONFORMANCE_WRITE=1` are 37 §9.3's, adopted as written | 37 §3, §9.3 (add the results file); 33 §3 |
 | 16 | **INP on the target phone is a release checklist row, not a workflow step**, until an ADB harness exists | 18 §6; 53 |
 | 17 | **`deploy-parity` also checks the deployed build id**, at the public `/.well-known/braindog-build` rather than at `READ+` `/api/version`, which takes a bearer this job has never held: the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
-| 18 | **`refusal-fixtures` is a script and seven runners.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
+| 18 | **`refusal-fixtures` is a script and the runners of 40 §6.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
 | 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half (decision 13), and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
 | 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | BUILD.md |
 | 21 | **`budgets.mcp` and 44's `BUDGETS` are one number twice, asserted equal.** `mcp-budget` deep-equals them on the five shared keys before counting; a change to either without the other is red | 44 §2 (cite `budgets.json`); 33 §8 |
@@ -851,7 +858,8 @@ Twenty-two, counted.
 - [ ] `ci.yml`, `gates.yml`, `deploy.yml`, `release.yml`, `gate1.yml` exist as §2's tables; every job has `permissions:` and `timeout-minutes`
 - [ ] `pnpm test` runs `where-property` at 1,000 runs with every `test/seeds/*.json` replayed first, and the seeds directory has at least the first committed counter-example
 - [ ] `packages/ports/src/conformance/reference.json` is committed; `conformance-count` reads `test/results/node-sqlite.json` and reports equal counts and every skip
-- [ ] `refusal-fixtures` and the seven `via` runners are green over seventy-five fixtures, and the runners' counts sum to seventy-five
+- [ ] `refusal-fixtures` and every built `via` runner are green, and the runners' counts sum to the per-`via`
+      totals in 40 §6
 - [ ] the seventeen specs run over 128 configurations in four projects; `targets` and `field-height` also under `hasTouch`; the first assertion of every spec is non-vacuous
 - [ ] `env.ts` is the only file under `apps/web/test/` with a host or port literal
 - [ ] `braindog-render@0.0.1` and `braindog-cli@0.0.1` were published by hand; both packages have Trusted Publishing configured; the token used is revoked
