@@ -280,7 +280,7 @@ for `id`, checked through `api.page` with a `{ kind: 'share', id, slug }` princi
    2. `api = createRecordApi({ sql, scheduler, clock })` with `scheduler = new NodeScheduler(…)` whose `fire` is `api.drainSchedule({}, systemCtx)` and whose `kick` is `poller.kick`. There is no MCP handler per record: `/mcp` calls `serveMcp(request, api, ctx)` on each request (§5.2).
    3. `await api.kernel.applyMigrations()` (41 §2); `api.kernel.refused()` non-null → `rec.sick = its code`, log, continue — one bad record does not stop the host.
    4. `{ nextDueMs, outboxPending } = api.kernel.pendingWork()` (41 §2); `nextDueMs !== null && await scheduler.set(nextDueMs)`; `outboxPending && poller.kick()`.
-   5. `poller.start()` (§5.12); `snapshots.armNightly()` (§5.13); read `<slug>/inbound.token` if present (§5.16, §5.22).
+   5. `poller.start()` (§5.12); `snapshots.armNightly()` (§5.13). `<slug>/inbound.token` is **not** read here (September 20th 2026): boot only builds the reader, which opens the file on the first forwarded message and at most once a second after that (§5.16, §5.22).
 6. A `record_dir` row with no directory, or a directory with no row, is logged as `slug` and skipped.
 7. `http.createServer(handle).listen(port, '0.0.0.0')`; resolve `{ port, close }`.
 8. `SIGTERM`/`SIGINT` → `close()`.
@@ -526,8 +526,26 @@ at wait + 10 s on its side.
 
 ### 5.16 · Inbound — phase 4
 
-1. `POST /in/webhook/<ingest-id>`: resolve the record (§5.3); store raw first — `api.arrive({ channel: 'webhook', headers, body, ingest_id }, systemCtx)` (45 names the arrival write; §12); then verify per the declaration's `verify:` — `hmac_sha256` over the raw body with the grant's secret, compared `timingSafeEqual` against `headers[verify.header]` — or the URL's random path segment; verified → the row is eligible to match; unverified → it stays `untriaged` and never matches (12 §3). Answer 202 either way. The HMAC secret is decrypted once per ingest per process and cached; the `grant.read` event that produces is the audit trail.
-2. `POST /in/email/<token>`: the self-host has no MX, so email arrives as a forwarded raw RFC 5322 message from the self-hoster's provider or a script; `<token>` is the content of `<slug>/inbound.token`, written by `init` (§5.22; 32 random bytes, base64url, 0600), read at boot and compared `timingSafeEqual`; `api.arrive({ channel: 'email', headers, body }, systemCtx)`; the forwarding MTA's `Authentication-Results` header must show `dkim=pass` or `spf=pass` for the row to be eligible to match — otherwise quarantined `untriaged`, exactly 12 §3's rule with the forwarder as the verifier (§13 #3). 202.
+1. `POST /in/webhook/<ingest-id>`: resolve the record (§5.3); store raw first — `api.arrive({ channel: 'webhook', headers, body, ingest_id }, systemCtx)` (45 names the arrival write; §12); then verify per the declaration's `verify:` — `hmac_sha256` over the raw body with the grant's secret, compared against `headers[verify.header]` (its `sha256=` prefix taken off) by `sameSecret` (`packages/host/src/ingest.ts`), which digests both sides and walks all 32 bytes — or the URL's random path segment, compared the same way; verified → the row is eligible to match; unverified → it stays `untriaged` and never matches (12 §3). Answer 202 either way. The HMAC secret is decrypted once per ingest per process and cached; the `grant.read` event that produces is the audit trail.
+2. `POST /in/email/<token>`: the self-host has no MX, so email arrives as a forwarded raw RFC 5322 message from the self-hoster's provider or a script; `<token>` is the content of `<slug>/inbound.token`, written by `init` (§5.22; 32 random bytes, base64url, 0600), read on each arrival and at most once a second, its trailing newline trimmed, and compared as SHA-256 digests by `sameKey` (`packages/host/src/auth.ts`), which digests both sides before walking all 32 bytes so that no length can answer early; `api.arrive({ channel: 'email', headers, body }, systemCtx)`; the forwarding MTA's `Authentication-Results` header must show `dkim=pass` or `spf=pass` for the row to be eligible to match, and otherwise it is quarantined `untriaged`, exactly 12 §3's rule with the forwarder as the verifier (§13 #3). 202.
+
+*Amended September 21st 2026.* Item 2 and §5.1 step 5 both said the token was read at boot, and by then
+neither was true. The boot read went on September 20th 2026 in `91cda54d`: `inboundDigest`
+(`apps/selfhost/src/server.ts`) is built while the record opens and reads nothing, then opens the file on the
+first forwarded message and at most once every `IN_TOKEN_MS`, which is one second. A token read once at boot
+is a store that can only be written to, so rotating meant a restart and revoking meant a restart; reading on
+arrival makes rotation `write the file` and revocation `rm`, with no command to learn. Three rules come with
+it, each with a test of its own in `apps/selfhost/test/server.test.ts`: a missing, unreadable or
+whitespace-only file is a closed door rather than the digest of the empty string; the read is cached as a
+promise and not as its answer, so several messages arriving in one tick wait on the one read instead of being
+served the value from before it; and the trailing newline an editor leaves is trimmed, because a rotation done
+by hand is the common case. The comparison had drifted earlier and is corrected in the same pass: it is
+`sameKey` over SHA-256 digests, not `timingSafeEqual` over the tokens, so nothing in the process holds a value
+that would open the door if it leaked. Item 1 carried the same wrong name for the webhook HMAC and is corrected
+with it: `timingSafeEqual` is in no source file in this tree, and both webhook comparisons are `sameSecret`
+(`packages/host/src/ingest.ts`), which digests each side before walking it for the same reason. 51 §5.4 step 3
+still names `timingSafeEqual` for the Worker's half of the same door, and correcting that is not this file's to
+do.
 
 ### 5.17 · Attachments
 
@@ -769,6 +787,9 @@ specified in 48 §5.6 and is none of the eleven commands the CLI dispatches (48 
 | `claimJob?wait=20`, client disconnects at 1 s | the loop stops within one tick; no further `claimJob` calls |
 | `/in/webhook/<id>` with a valid HMAC; with a bad one | both 202; `arrive` called with `verified: true` / `false` |
 | `/in/email/<token>` with `Authentication-Results: … dkim=pass`; without the header | 202 both; eligible / quarantined |
+| `<slug>/inbound.token` replaced while the process runs, then a message a second later at each token | the replaced one 404 bare; the one now on disk 202 |
+| the same file deleted; the same file truncated to whitespace | 404 both, and the whitespace is not itself a token that opens the door |
+| a token file written with the trailing newline an editor leaves | 202, the newline trimmed before the digest |
 | `POST /a` with a 1 KB PNG | 200 `{ sha256, mime: 'image/png', bytes: 1024 }`; file at `blobs/<sha>`; `GET /a/<sha>` → 200 with the four headers of §5.17 |
 | `POST /a` with an SVG; with 2 MB + 1 | 415; 413 |
 | `GET /a/<63 hex>` | falls through to the shell, not the blob route |

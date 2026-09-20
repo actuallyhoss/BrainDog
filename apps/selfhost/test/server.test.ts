@@ -479,9 +479,9 @@ test('A TOKEN IS ROTATED BY REPLACING THE FILE, and the old one stops opening th
     assert.equal((await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'))).status, 202);
 
     /* WRITTEN WITH THE NEWLINE AN EDITOR ADDS, because that is what a rotation done by hand leaves
-       on disk and the reader trims for exactly that reason. Without the trailing byte here nothing
-       in this file held the trim: removed on 2026-09-20, all twenty tests still passed, and an
-       operator who rotated with `nano` would have been left with a door that opened for nobody. */
+       on disk and the reader trims for exactly that reason. An operator who rotated with `nano` and
+       met an untrimmed reader would have been left with a door that opened for nobody: the two tests
+       below say that in their own names, and this line is only where it first mattered. */
     writeFileSync(join(made.dir, 'inbound.token'), `${rotated}\n`);
     at += IN_TOKEN_MS;
 
@@ -565,6 +565,65 @@ test('and a file caught half-written opens nothing, rather than opening on the e
     const out = await send(made.port, `/in/email/${INBOUND}`, forwarded('pass'));
     assert.equal(out.status, 404, 'a token file holding whitespace still served the old token');
     assert.equal(raws(made.running).length, 0);
+  } finally {
+    await stop(made);
+  }
+});
+
+/**
+ * The two halves of the `.trim()` in `load()` (`apps/selfhost/src/server.ts:465`), each named for the
+ * half it holds, because until 2026-09-21 neither had a test of its own.
+ *
+ * WHAT HELD THE TRIM BEFORE THIS WAS A TRAILING BYTE IN THE ROTATION TEST ABOVE, where the newline is
+ * incidental to what that test is about. Remove the trim and the rotation test does go red, but its
+ * message is "the token now on disk did not open the door", which sends the next reader looking at the
+ * window, the digest or the rotation, and not at the one character that changed.
+ *
+ * MEASURED ON 2026-09-21 BY DELETING THE `.trim()` AND RUNNING THIS FILE: 23 tests, 20 pass, 3 fail.
+ * The three are the rotation test and the two below. With the trim back: 23 pass, 0 fail.
+ */
+test('and a token file ending in the newline an editor leaves still opens the door', async () => {
+  /* THE SHAPE A ROTATION DONE BY HAND LEAVES. `nano`, `vi` and `echo >` all end the line, so this is
+     the common case and not an edge one. Without the trim this answers 404 rather than 202, which is
+     an operator who rotated correctly and is left with a door that opens for nobody. */
+  let at = Date.now();
+  const made = await host(() => at);
+  const rotated = token();
+  try {
+    writeFileSync(join(made.dir, 'inbound.token'), `${rotated}\n`);
+    at += IN_TOKEN_MS;
+
+    const out = await send(made.port, `/in/email/${rotated}`, message({ dkim: 'pass', signer: 'hsbc.example', amount: '5.00', merchant: 'Nano' }));
+    assert.equal(out.status, 202, 'a trailing newline closed the door');
+    assert.equal(raws(made.running).length, 1, 'the message the newline-terminated token carried was not stored');
+  } finally {
+    await stop(made);
+  }
+});
+
+test('and a file holding nothing but whitespace is no token, rather than a token a stranger can type', async () => {
+  /**
+   * THIS IS THE HALF THE HALF-WRITTEN TEST ABOVE CANNOT SEE. That one writes `'   \n'` and then sends
+   * the OLD token, which is 404 with the trim and 404 without it, because whitespace digests to
+   * neither token either way. What actually changes is what the whitespace itself becomes: with no
+   * trim, `load()` returns the digest of `'   \n'`, so the file's own contents are a live credential
+   * and `/in/email/%20%20%20%0A` opens the record to anybody who thinks of it. Measured on 2026-09-21
+   * with the `.trim()` deleted: 202 and one row in `inbox_raw`. With it: 404 and none.
+   */
+  let at = Date.now();
+  const made = await host(() => at);
+  try {
+    writeFileSync(join(made.dir, 'inbound.token'), '   \n');
+    at += IN_TOKEN_MS;
+
+    const guessed = await send(
+      made.port,
+      `/in/email/${encodeURIComponent('   \n')}`,
+      message({ dkim: 'pass', signer: 'hsbc.example', amount: '6.00', merchant: 'Guessed' }),
+    );
+    assert.equal(guessed.status, 404, 'a file holding only whitespace was itself a token a stranger could send');
+    assert.equal(await guessed.text(), '', 'the `/api` fallback answered, not the arrival door');
+    assert.equal(raws(made.running).length, 0, 'the guessed whitespace token reached the record');
   } finally {
     await stop(made);
   }
