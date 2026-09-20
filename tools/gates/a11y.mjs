@@ -3,7 +3,7 @@
  *
  *   node tools/gates/a11y.mjs
  *
- * WHY A GATE AND NOT A CHECKLIST. Every rule in here is one a machine can decide — a control with
+ * WHY A GATE AND NOT A CHECKLIST. Every rule in here is one a machine can decide: a control with
  * no name, a heading level skipped, an `aria-*` that names nothing, contrast below the floor. Those
  * are exactly the failures that arrive by accident during a redesign and survive review, because
  * nothing about them looks wrong in a screenshot. The judgement calls axe cannot make (is the
@@ -12,13 +12,13 @@
  *
  * BOTH SCHEMES, because contrast is the most common failure and half of it is invisible in the
  * scheme you happen to be developing in. Two widths, because the phone layout swaps the table for
- * cards and the rail for a tab bar — different markup, different names, different failures.
+ * cards and the rail for a tab bar: different markup, different names, different failures.
  *
  * It serves `build/` itself for the same reason the screenshot script does, and reports and exits 0
  * when there is no build, so `pnpm gates` stays useful on a fresh checkout.
  *
  * `color-contrast` is included but reported separately. The theme's own proof already guarantees
- * the token PAIRS clear their floors; what axe adds is the composition — a token used against a
+ * the token PAIRS clear their floors; what axe adds is the composition: a token used against a
  * surface it was never solved for. That is a real class of bug and worth catching, but a false
  * positive on it means the theme is right and one call site is wrong, which reads differently from
  * a missing button name.
@@ -40,7 +40,7 @@ const REPO = join(import.meta.dirname, '..', '..');
 /**
  * BOTH APPS. The record app is where the interesting failures are, but the marketing site is the
  * first page anybody ever sees and the only one they meet before deciding whether to trust the
- * rest — a contrast failure there is a contrast failure in the shop window. It is prerendered
+ * rest. A contrast failure there is a contrast failure in the shop window. It is prerendered
  * rather than a shell, so it needs no fallback and has no states to drive.
  */
 const APPS = [
@@ -57,10 +57,10 @@ const APPS = [
      file*, which every variant needs; running the thirteen state scenarios is a different question,
      and every variant answered yes to it because the two facts shared a boolean.
 
-     ALL THIRTEEN SCENARIOS STAND ON `/r/obligations`, `/`, `/p/kiln` AND `/r/nope` — routes no
+     ALL THIRTEEN SCENARIOS STAND ON `/r/obligations`, `/`, `/p/kiln` AND `/r/nope`, routes no
      variant changes. A variant differs in `DEPLOYMENT`, `DEVICES`, `TOKENS` and `DECIDED`, which is
      why each one names the two or three routes where that shows. So the three variants contributed
-     **156 audits of 156 identical pages** — 13 scenarios x 4 passes x 3 variants, 44% of this
+     **156 audits of 156 identical pages**: 13 scenarios x 4 passes x 3 variants, 44% of this
      gate's run, spent proving that opening the palette on a record with no machines connected draws
      the same palette.
 
@@ -94,13 +94,13 @@ const ready = readiness('a11y', budget('ready').settleTimeoutMs, APPS[0].root);
 /**
  * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
  *
- * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` — the shared page,
- * the only surface a non-user ever sees — and neither list was compared to the route directory, so a
- * route added tomorrow was audited by neither and nothing noticed. The derivation also found
+ * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` (the shared page,
+ * the only surface a non-user ever sees), and neither list was compared to the route directory, so
+ * a route added tomorrow was audited by neither and nothing noticed. The derivation also found
  * `/[id]`, the spoken-id resolver, which neither list had ever covered.
  *
- * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST — a different page, a different
- * track — because one sample proves the route renders and a second proves the DECLARATION does.
+ * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
+ * track), because one sample proves the route renders and a second proves the DECLARATION does.
  */
 const { routes: ROUTES, unsampled } = await routesOf(join(REPO, 'apps', 'web'), ['/p/kiln', '/t/3', '/nowhere']);
 if (unsampled.length) {
@@ -113,7 +113,7 @@ if (unsampled.length) {
  *
  * Everything above is a page at rest, and a page at rest is the easy case. A dialog that never
  * moves focus into itself, a menu with no accessible name, a toggle whose `aria-pressed` never
- * flips, a selection count nothing announces — none of those exist until somebody presses a key,
+ * flips, a selection count nothing announces. None of those exist until somebody presses a key,
  * and none of them are reachable by a crawler that only visits URLs.
  *
  * Each one names the keys to press and what should exist afterwards. The `expect` is not
@@ -123,7 +123,7 @@ if (unsampled.length) {
 const STATES = [
   /* THE FILTER DRAWER IS GONE AND `f` OPENS NOTHING. It rendered the same enum fields as the chips
      in the toolbar, as checkboxes, behind a scrim, over the identical controls still visible
-     underneath — so this scenario audited a second copy of the row above it. What is worth auditing
+     underneath. So this scenario audited a second copy of the row above it. What is worth auditing
      is that the chips themselves carry their state to somebody who cannot see the raised segment. */
   /* AND THE CHIPS BECAME MENUS. A list with three or more choice fields draws each as a menu of its values, where a
      value is a `menuitemcheckbox` carrying `aria-checked`, and a phone draws one Filter button and a sheet of
@@ -142,14 +142,14 @@ const STATES = [
   { name: 'keymap sheet', route: '/r/obligations', keys: ['?'], expect: 'dialog[open]' },
   { name: 'palette', route: '/', keys: ['/'], expect: '[role="listbox"], [role="dialog"]' },
   { name: 'page: declaration', route: '/p/kiln', keys: ['Shift+E'], expect: '.source, pre' },
-  /* Arranging has no key — it is a button, and only on desktop. 13 §10 keeps authoring off phones,
+  /* Arranging has no key: it is a button, and only on desktop. 13 §10 keeps authoring off phones,
      and `.arrange-slot` is display:none below 900px rather than a control that exists and refuses. */
   { name: 'page: arrange mode', route: '/p/kiln', click: '.arrange-slot button', expect: '[role="listitem"]', desktop: true },
   /* THE EMPTY STATES, WHICH NO ROUTE AT REST EVER REACHES. `19 §6` designs five and says collapsing
      them is the failure; an audit measured `no-results`, `cleared`, `no-permission` and `error`
      rendering zero times across forty-two routes, so four fifths of that section had never been in
      front of this gate. Two of them are reachable from an address, and these are those two. The
-     other three need a record shaped differently from the seed — `no-data-yet` needs an empty list,
+     other three need a record shaped differently from the seed: `no-data-yet` needs an empty list,
      which is why the state was unreachable in the product for as long as it was. */
   { name: 'empty: no results', route: '/r/obligations?q=zzzzz', keys: [], expect: '.empty[data-kind="no-results"]' },
   { name: 'empty: not found', route: '/r/nope', keys: [], expect: '.empty[data-kind="error"]' },
@@ -198,15 +198,15 @@ const server = createServer(async (req, res) => {
   /* THE SPA FALLBACK, and leaving it out made this gate lie. `svelte.config.js` builds with
      `fallback: 'index.html'`, so the deployed host answers every unmatched path with the shell and
      lets the router decide. A server that 404s instead hands axe an empty document, and an empty
-     document fails `html-has-lang`, `landmark-one-main` and `page-has-heading-one` — sixty-four
-     findings that say nothing about the app. Serve what production serves.
+     document fails `html-has-lang`, `landmark-one-main` and `page-has-heading-one`. That is
+     sixty-four findings that say nothing about the app. Serve what production serves.
 
      A ROUTE SEGMENT MAY CONTAIN A DOT. `/v/obligations.overdue` is a view id, not a file, so the
-     test cannot be "has an extension" — that 404s a real page and blames the app for having no
+     test cannot be "has an extension". That 404s a real page and blames the app for having no
      `lang`. It is "has an extension WE SERVE": anything in `TYPES` that is missing stays a 404, so
      a genuinely broken asset still fails loudly, and everything else gets the shell. Worth knowing
-     when this is deployed, because an SPA fallback that excludes dotted paths — several hosts
-     default to exactly that — would 404 every view in production. */
+     when this is deployed, because an SPA fallback that excludes dotted paths (several hosts
+     default to exactly that) would 404 every view in production. */
   const shell = join(current.root, 'index.html');
   const asset = Object.hasOwn(TYPES, extname(rel));
   if (current.spa && !asset && (await stat(shell).catch(() => null))?.isFile()) {
@@ -221,10 +221,10 @@ await answers(`http://localhost:${PORT}`);
 const browser = await chromium.launch();
 /** `id -> { help, nodes: Set<'route scheme@width  target'> }`, so one bug is one line however often it repeats. */
 const found = new Map();
-/** Apps this run did not look at. A skip is not a pass — see the exit at the bottom. */
+/** Apps this run did not look at. A skip is not a pass. See the exit at the bottom. */
 const skipped = [];
 let checked = 0;
-/** Scenarios whose keystroke did not produce the state it names — a silently dead key. */
+/** Scenarios whose keystroke did not produce the state it names: a silently dead key. */
 const broken = [];
 /**
  * Pages that were never in a state to audit, which is a different sentence from `broken`.
@@ -242,12 +242,12 @@ for (const app of APPS) {
     /* NOT A PASS. Skipping one app silently dropped the marketing site from every run that did not
        build it, and the gate still printed its own green line.
 
-       AN `optional` APP IS A VARIANT RECORD, not a missing build — it is written only when somebody
+       AN `optional` APP IS A VARIANT RECORD, not a missing build. It is written only when somebody
        asks for it, so its absence is a smaller sentence and not a skip that shows up beside the
        marketing site's. It still says what was not measured. */
     console.log(
       app.optional
-        ? `  a11y: no ${app.name} record built — \`pnpm --filter @braindog/web build\` draws the other half of every host branch.`
+        ? `  a11y: no ${app.name} record built. \`pnpm --filter @braindog/web build\` draws the other half of every host branch.`
         : `  a11y: no ${app.name} build to check. \`pnpm build\` first, and CI does.`,
     );
     if (!app.optional) skipped.push(app.name);
@@ -298,14 +298,14 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
           '*,*::before,*::after{transition:none !important;animation:none !important}',
       });
       /* THE GATE'S OWN PROOF THAT ITS NEW RULE LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=intent`
-         a row wearing an intent and carrying no name for it is put into `#main` — the exact bug the
-         rule is for — and the run must go red. Here rather than in a fixture tree for the same
+         a row wearing an intent and carrying no name for it is put into `#main` (the exact bug the
+         rule is for), and the run must go red. Here rather than in a fixture tree for the same
          reason the layout gate's is: the thing under test is a real browser over a real build. */
       if (process.env.BRAINDOG_GATE_SEED === 'intent')
         await page.evaluate(() => {
           /* AN ANCHOR, NOT A `div`, and that is the whole of what the negative is worth.
              
-             The first version seeded a bare `<div>`, which the old exemption did not cover — so the
+             The first version seeded a bare `<div>`, which the old exemption did not cover. So the
              gate proved itself against the one shape that could not slip through, while every phone
              card, being `<a class="card" href=…>`, was exempt. A negative that cannot fail the way
              the rule fails is a negative that certifies nothing. */
@@ -329,14 +329,14 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
         });
       });
       /**
-       * COLOUR NEVER CARRIES MEANING ALONE — `13 §5.1`, and axe cannot decide it.
+       * COLOUR NEVER CARRIES MEANING ALONE (`13 §5.1`), and axe cannot decide it.
        *
        * "The glyph is part of the intent token, not a choice at the call site. There is exactly one
        * table mapping intent → (role, glyph), and it is the only path by which an intent reaches the
        * DOM. A component cannot render `warn` without its glyph because there is no API that lets
        * it." There WAS such a path: `data-intent` is an attribute, and four components set it and
        * drew a coloured edge and nothing else. Measured on `/r/obligations`: sixteen rows carrying
-       * an intent, zero elements naming one — so an overdue invoice and a paid one were the same
+       * an intent, zero elements naming one. So an overdue invoice and a paid one were the same
        * row to a screen reader and the same row to anybody who does not see red.
        *
        * WHAT COUNTS AS NAMED. The intent's own glyph, `role="img"` with the `TONES` label, anywhere
@@ -345,15 +345,16 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
        *
        * WHAT IS EXEMPT: an element whose own TEXT is the meaning, and the list is named rather
        * than described. A `.btn` reading `Uninstall` or `Stop the run` is not telling you it is
-       * destructive with colour — it is telling you with the verb. A `.count` or `.badge` is a
+       * destructive with colour. It is telling you with the verb. A `.count` or `.badge` is a
        * number, and the tint is emphasis on a fact already written out. A `.toast` is a whole
        * sentence in a live region: "Nothing was written" says what happened, and the amber agrees.
        *
        * IT WAS WRITTEN AS `button, a[href], .count, .badge` AND EXEMPTED THE SURFACE IT WAS FOR.
        * Every phone card is `<a class="card" href=… data-intent=…>`, so all sixteen rows on
-       * `/r/obligations` at 390 were exempt — one of the four components the rule was written to
-       * protect, and stripping every glyph out of them left the gate green. Being a link is not
-       * being a sentence. The exemption is by class now, and each class is here with its reason.
+       * `/r/obligations` at 390 were exempt. That is one of the four components the rule was
+       * written to protect, and stripping every glyph out of them left the gate green. Being a
+       * link is not being a sentence. The exemption is by class now, and each class is here with
+       * its reason.
        *
        * The guard was also written `el.closest(sel)?.contains(el) && el.matches(sel)`, and an
        * element always contains itself, so the first half could never decide anything. Dead code
@@ -426,8 +427,8 @@ for (const scheme of SEEDED ? ['dark'] : ['dark', 'light']) {
         continue;
       }
       // Focus the grid first: bare letters act only inside one, which is the point of the rule.
-      /* SHORT timeouts, and they matter. Both of these clicks are speculative — a page surface has
-         no `[role="row"]` at all — and Playwright's default is to wait thirty seconds before
+      /* SHORT timeouts, and they matter. Both of these clicks are speculative (a page surface has
+         no `[role="row"]` at all), and Playwright's default is to wait thirty seconds before
          admitting it. Nine scenarios times four passes times thirty seconds is the difference
          between a gate that runs and a gate nobody waits for. */
       await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
@@ -463,14 +464,14 @@ console.log(
 
 if (mute.size) {
   console.error(`
-  intent-without-glyph (serious) — 13 §5.1: colour never carries meaning alone`);
+  intent-without-glyph (serious): colour never carries meaning alone (13 §5.1)`);
   for (const [what, at] of [...mute].slice(0, 8))
     console.error(`      ${what}  ${[...at].slice(0, 3).join(' · ')}${at.size > 3 ? ` …${at.size - 3} more` : ''}`);
   if (mute.size > 8) console.error(`      ...and ${mute.size - 8} more`);
 }
 
 const show = (id, e) => {
-  console.error(`\n  ${id} (${e.impact}) — ${e.help}`);
+  console.error(`\n  ${id} (${e.impact}): ${e.help}`);
   for (const n of [...e.nodes].slice(0, 6)) console.error(`      ${n}`);
   if (e.nodes.size > 6) console.error(`      ...and ${e.nodes.size - 6} more`);
 };
@@ -509,8 +510,8 @@ const blind = ready.nothingDrawn();
 if (blind) console.error(`\n  ${blind}`);
 
 if (found.size || contrast || broken.length || mute.size || unsettled.length || blind) process.exitCode = 1;
-/* AND A RUN THAT LOOKED AT NOTHING IS A SKIP, exit 3 — not the green line it used to print. */
+/* AND A RUN THAT LOOKED AT NOTHING IS A SKIP: exit 3, not the green line it used to print. */
 else if (skipped.length) {
-  console.log(`  a11y: skipped ${skipped.join(', ')} — no build.`);
+  console.log(`  a11y: skipped ${skipped.join(', ')}. No build.`);
   process.exitCode = 3;
 }

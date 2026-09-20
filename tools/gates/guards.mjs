@@ -1,5 +1,5 @@
 /**
- * `guards` — the route table's group and the check the record actually applies, side by side.
+ * `guards`: the route table's group and the check the record actually applies, side by side.
  *
  *   node tools/gates/guards.mjs
  *
@@ -21,7 +21,7 @@
  * caught it is that the two facts live in two packages edited for two different reasons.
  *
  * IT IS NOT A NEW IDEA. `52 §5`'s row for `router-groups` asks for five checks, and one of them is
- * *"ADMIN admits no token principal"* — which is what `admin()` does and what `guard(ctx, 'read')`
+ * *"ADMIN admits no token principal"*, which is what `admin()` does and what `guard(ctx, 'read')`
  * does not. The gate that shipped under that name checks the table against the document and stops
  * there. This is the half of that row nobody built, kept apart rather than folded in, because the
  * two halves read different files for different reasons and one script that greps both is one
@@ -56,7 +56,30 @@ import { fileURLToPath } from 'node:url';
 import { budget } from './lib.mjs';
 
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
+
+/**
+ * A FILE THAT IS NOT THERE IS A FINDING, AND IT IS THE SAME FINDING AS AN EMPTY ROUTE TABLE.
+ *
+ * Both files this reads are committed source. Neither is produced by a command, so a skip could not
+ * print the sentence a skip is for, and absence is not "you have not built yet" but "the route table
+ * or the surface it is compared against has been moved, renamed or deleted". That is the loudest
+ * thing this gate can find, not a reason to stop looking.
+ *
+ * IT WAS A STACK TRACE, WHICH IS THE WRONG SHAPE OF RED. `run.mjs` reads any non-zero, non-3 exit as
+ * a failure, so an absent `packages/host` already went red, but it went red as ten lines of
+ * `node:fs` frames that send a person hunting for a defect in the gate. Same exit, same colour, one
+ * sentence naming the file.
+ *
+ * Only ENOENT. A file that is there and cannot be read is a different fact and stays a throw.
+ */
+const read = (...parts) => {
+  try {
+    return readFileSync(join(root, ...parts), 'utf8');
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+    return null;
+  }
+};
 
 /**
  * ONE LIST, SHARED BY DATA AND `READ+`, BECAUSE THEY SHARE ONE REQUIREMENT.
@@ -112,23 +135,44 @@ const findings = [];
 
 /* ── the route table, as data ────────────────────────────────────────────── */
 const host = read('packages', 'host', 'src', 'index.ts');
-const routes = [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({
-  name: m[1],
-  group: m[2],
-}));
-if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
+const routes =
+  host === null
+    ? []
+    : [...host.matchAll(/\{ name: '([a-zA-Z]+)', group: '([A-Z+]+)',/g)].map((m) => ({
+        name: m[1],
+        group: m[2],
+      }));
+
+/**
+ * NO ROUTE TABLE IS A FINDING ON PURPOSE, AND THIS IS THE PLACE TO SAY WHY, because the line reads
+ * like an unhandled absence and it is a decision.
+ *
+ * The two ways to get here are both defects and neither is a missing prerequisite. Either the table
+ * really is empty, which means nothing is routed and the product has no surface; or the table is
+ * there and the regex above no longer matches its shape, which means THIS GATE HAS GONE BLIND while
+ * still printing a line. The second is the one that happens, it is the failure `self-test.mjs`
+ * exists for, and a skip would make a gate that can no longer see look exactly like a tree that has
+ * nothing to look at. `bundle` answers the identical question the identical way about a workspace
+ * with no `app.html`: a gate that found nothing to read must not report that it read everything.
+ */
+if (host === null) findings.push('packages/host/src/index.ts is not there, so this gate read no route table at all');
+else if (routes.length === 0) findings.push('packages/host/src/index.ts has no route table this gate can read');
 
 /* ── the record's surface, as data ───────────────────────────────────────── */
 const surface = read('packages', 'record', 'src', 'index.ts');
+if (surface === null) findings.push('packages/record/src/index.ts is not there, so this gate read no authorisation check for any route');
 
 /* FOUR SPACES AND THEN A NAME, which is the indentation of the returned object's own methods and of
    nothing else in the file: the guard helpers sit at two, and everything inside a body at six or
    more. Anchoring on the shape rather than on a list is what makes a method added tomorrow visible
    to this gate without anybody remembering to add it. */
-const starts = [...surface.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\(/gm)].map((m) => ({
-  name: m[1],
-  at: m.index,
-}));
+const starts =
+  surface === null
+    ? []
+    : [...surface.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\(/gm)].map((m) => ({
+        name: m[1],
+        at: m.index,
+      }));
 
 const bodies = new Map();
 starts.forEach((m, i) => {
@@ -142,11 +186,14 @@ const guardOf = (body) => {
   return /\b(admin|vault|guard|scoped)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
 };
 
-for (const route of routes) {
+/* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on
+   "the surface has no method by that name", which is true of each and useless as a report: the one
+   fact a person can act on would be spread across eighty-two lines that all say it. */
+for (const route of surface === null ? [] : routes) {
   const body = bodies.get(route.name);
   if (body === undefined) {
     findings.push(
-      `${route.name} is routed and packages/record's surface has no method by that name — this gate read no check for it`,
+      `${route.name} is routed and packages/record's surface has no method by that name, so this gate read no check for it`,
     );
     continue;
   }
@@ -179,10 +226,15 @@ for (const route of routes) {
  */
 if (routes.some((r) => r.name === 'report')) {
   const R = budget('report');
+  /* `report` IS ROUTED AND ITS LIMIT IS NOT THERE, which is the worst of the three states this
+     block can be in: the route exists, the key that reaches it exists, and the number that stops it
+     writing without end does not. Named as the file rather than left to fall through as
+     "REPORT_ROWS_PER_MINUTE at nothing", which reads as a typo in a file somebody could open. */
   const code = read('packages', 'record', 'src', 'report.ts');
-  const said = /export const REPORT_ROWS_PER_MINUTE = ([\d_]+);/.exec(code)?.[1];
+  if (code === null) findings.push('report is routed and packages/record/src/report.ts is not there, so nothing holds its rows-per-minute limit');
+  const said = code === null ? undefined : /export const REPORT_ROWS_PER_MINUTE = ([\d_]+);/.exec(code)?.[1];
   const enforced = said === undefined ? null : Number(said.split('_').join(''));
-  if (enforced !== R.rowsPerMinute)
+  if (code !== null && enforced !== R.rowsPerMinute)
     findings.push(`packages/record/src/report.ts holds REPORT_ROWS_PER_MINUTE at ${enforced ?? 'nothing'}, and budgets.json's report.rowsPerMinute is ${R.rowsPerMinute}`);
   const body = (bodies.get('report') ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
   if (!/\breportBudget\(/.test(body)) findings.push('report is routed and its body spends no reportBudget(), so a report key has no limit');
@@ -194,9 +246,9 @@ if (findings.length === 0) {
     .filter(([, n]) => n > 0)
     .map(([g, n]) => `${n} ${g}`)
     .join(' · ');
-  console.log(`  guards: ${routes.length} routes, every one guarded as its group says — ${shape}`);
+  console.log(`  guards: ${routes.length} routes, every one guarded as its group says: ${shape}`);
 } else {
-  console.error(`\n  guards: ${findings.length} finding(s) — 30 §10\n`);
+  console.error(`\n  guards: ${findings.length} finding(s) (30 §10)\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);
   console.error(
     '\n  The group in ROUTES gates nothing at runtime: authorisation is in the record, in one\n' +

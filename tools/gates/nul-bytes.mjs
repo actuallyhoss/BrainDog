@@ -5,15 +5,15 @@
  *   node tools/gates/nul-bytes.mjs
  *
  * THIS EXISTS BECAUSE A NUL BYTE IS INVISIBLE TO EVERY OTHER GATE. `apps/web/src/lib/design/nav-shape.ts`
- * held one inside a string literal — the source read `sections.add('\0lists')` where the author
- * meant `sections.add('lists')` — and typecheck passed, every test passed, and the value was
+ * held one inside a string literal (the source read `sections.add('\0lists')` where the author
+ * meant `sections.add('lists')`), and typecheck passed, every test passed, and the value was
  * silently wrong for as long as nobody happened to print it. `apps/cli/src/brief.ts` held a second
  * one, embedded raw inside a regex character class where `\x00` was meant. Neither is a shape any
  * grep gate here was built to see, because both are syntactically valid TypeScript; the defect is
  * in the byte, not in the code around it.
  *
  * AND GIT ITSELF STOPS SEEING THE FILE. A NUL byte is git's own heuristic for "this is binary", so
- * a source file that picks one up silently stops diffing and stops merging — the tool that is
+ * a source file that picks one up silently stops diffing and stops merging. The tool that is
  * supposed to show every other change in the file goes quiet about this one.
  *
  * AND NUL WAS NEVER THE ONLY ONE. This gate scanned for 0x00 alone for months, and the paragraph
@@ -36,7 +36,7 @@
  * So the rule is every C0 control except the three that are real whitespace, and DEL with them.
  *
  * SO THIS IS A RAW BYTE SCAN, not a parse. It reads every tracked-looking file as bytes, skips the
- * ones that are genuinely binary by extension, and is red on the first NUL in anything left —
+ * ones that are genuinely binary by extension, and is red on the first NUL in anything left,
  * naming the file, the byte offset, and the text around it so the reader can tell at a glance
  * whether it sits inside a string literal (as both real findings did) or is some other kind of
  * corruption.
@@ -114,8 +114,8 @@ function walk(dir, out = []) {
 
 /**
  * The text around a NUL, decoded byte-for-byte rather than as UTF-8, so a byte offset that lands
- * mid-character never throws. Other control bytes in the window are made visible too — a run of
- * them is exactly what surrounds a NUL that was meant to be `\x00` — and the NUL itself is marked
+ * mid-character never throws. Other control bytes in the window are made visible too (a run of
+ * them is exactly what surrounds a NUL that was meant to be `\x00`), and the NUL itself is marked
  * so it is not just a gap in the printed line.
  */
 function excerptAround(buf, offset, radius = 30) {

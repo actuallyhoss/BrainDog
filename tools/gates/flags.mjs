@@ -293,13 +293,13 @@ if (findings.length) {
  * A SKIP IS ONLY HONEST WHEN THERE WAS SOMETHING TO SKIP.
  *
  * Question 6 compares `build/` against `build-flags/` to prove each flag's OTHER half still
- * compiles — the half no test exercises, because a statically-false branch is exactly what
+ * compiles. That is the half no test exercises, because a statically-false branch is exactly what
  * `dead-copy` counts as rendered. With flags declared, not asking that is a real gap and exit 3 is
  * right: `run.mjs` makes a skip red under CI, so it arrives as a sentence rather than as silence.
  *
  * With NO flags declared there is no other half. Requiring a second full build to prove nothing
  * about an empty list is the shape this repository keeps deleting: a check that reports something
  * while measuring nothing. An empty list is the state this file should usually be in, so the common
- * case must not be permanently amber — an amber that is always there is read as the background.
+ * case must not be permanently amber. An amber that is always there is read as the background.
  */
 if (!comparable && findings.length === 0 && FLAGS.size > 0) process.exit(3);

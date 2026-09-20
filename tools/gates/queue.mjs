@@ -38,8 +38,8 @@
  * the list it sits in. Each seam is covered and the claim is about the whole chain: what a person
  * sees on a real page is dearest first. So this reads the bands off the cards in the order the
  * browser laid them out and checks the rank never improves going down. It also checks the bands are
- * bands this build knows, because a chip drawn from an unknown one is a ranking silently ignored —
- * the failure that looks exactly like it worked.
+ * bands this build knows, because a chip drawn from an unknown one is a ranking silently ignored.
+ * That is the failure that looks exactly like it worked.
  *
  * PLUS TWO CHEAP ONES WHILE A REAL PAGE IS OPEN ANYWAY: the queue's empty sentence
  * (`packages/render/src/queue.ts`'s `QUEUE_CLEARED`) never appears beside cards that are actually
@@ -181,8 +181,8 @@ try {
        The bands off the DOM, in the order the browser laid them out, against the record's own
        ranking function rather than a copy of the order written here: a gate holding its own list of
        four words would be a second answer to the question `weigh.ts` exists to answer once. A card
-       with no chip is a question whose body this build cannot read, which is allowed and sorts last
-       — `costRank` says so, so it needs no branch here. */
+       with no chip is a question whose body this build cannot read, which is allowed and sorts
+       last. `costRank` says so, so it needs no branch here. */
     /* THE GATE'S OWN PROOF THAT THIS LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=queue` puts the cheapest
        band at the top and the dearest at the bottom, which is the rule read backwards, and creates
        the chip where a card has none so the seed does not depend on what the seed record happens to

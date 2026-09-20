@@ -14,15 +14,15 @@
  * from a token pinned to a constant. Full-page screenshots at Small, Normal and Large were
  * byte-identical on six routes at two widths; 0 of 182 elements moved on Home. It shipped that way
  * because the 128-configuration matrix (`50 §9`) is 8 fixtures x 4 widths x 2 schemes x 2
- * directions — `data-text` is not an axis of it, and neither is any other preference but `scheme`.
+ * directions. `data-text` is not an axis of it, and neither is any other preference but `scheme`.
  *
  * SO THIS GATE ASKS ONE QUESTION OF EACH: set it, and does the page come back different? Not "is it
- * the right difference" — a gate cannot judge that — but "is there one at all", which is the
+ * the right difference" (a gate cannot judge that) but "is there one at all", which is the
  * question that was never asked. Each check names the token or attribute it measures, so a red line
  * says which preference stopped reaching the DOM rather than that something is wrong.
  *
  * WHAT IT DOES NOT COVER, AND THE LIST HAD DRIFTED FROM THE TYPE IT GUARDS. It used to name `keys`,
- * `columns`, `previewDismissed` and `suggestPages` — and `Pref` has never had `previewDismissed` or
+ * `columns`, `previewDismissed` and `suggestPages`. `Pref` has never had `previewDismissed` or
  * `suggestPages`, while four real fields went unmentioned. The file written to catch an excuse that
  * outlives its reason had grown one of its own.
  *
@@ -54,7 +54,7 @@
  *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
  *               than one token. **A duplicate swatch that repainted nothing lived here for months**
  *               precisely because this gate could not reach it; `theme.test.ts` asserts the
- *               invariant instead — no suggestion is the house colour.
+ *               invariant instead: no suggestion is the house colour.
  *   - `chars`   needs a keystroke, and `keys` (the gate next door) is the one that presses keys.
  *   - `seen`    needs a click on Home's *Mark all read*, and its effect is an absence.
  *   - `columns` needs the Display sheet opened and a column unticked.
@@ -80,7 +80,7 @@ const PORT = budget('prefs').port;
 /**
  * WHEN A PROBE IS ALLOWED TO BE BELIEVED, and for this gate that is a question about false REDS.
  *
- * Six of the nine cases read the record: `text` measures a grid cell, `suggestPages` counts
+ * Seven of the ten cases read the record: `text` measures a grid cell, `suggestPages` counts
  * `#main .ledger li`, `nav` joins the rail's hrefs. Over a screen that has not drawn, all three
  * settings come back `no element`, `0` and `''`, the values are identical, and this gate prints
  * exactly the sentence it is named for: a preference that reached the cookie and not the page. The
@@ -112,7 +112,7 @@ const CASES = [
     what: 'the body step (13 §7)',
     route: '/r/obligations',
     /* `50 §4.7`: `text: 'sm' | 'base' | 'md'`, applied before first paint. `13 §7`: it "picks the
-       body step" — so the chrome moves and the fixed steps around it do not. */
+       body step". So the chrome moves and the fixed steps around it do not. */
     values: [{ text: 'sm' }, { text: 'base' }, { text: 'md' }],
     /* A CELL IN `#main`, AND NEVER THE RAIL. The probe used to take the first of `.line-title, .td,
        .rail a[data-nav]` in document order, and the rail comes first: its rows are `--t-sm` on
@@ -139,7 +139,7 @@ const CASES = [
   },
   {
     /**
-     * `contrast` — the second palette, which shipped and had no control at all.
+     * `contrast`: the second palette, which shipped and had no control at all.
      *
      * `packages/theme` solves it against a higher floor, `theme.mjs` writes it into `house.css`
      * behind `html[data-theme='hc']`, and `--check` byte-compares it on every build. Nothing in the
@@ -163,17 +163,17 @@ const CASES = [
     name: 'sidebar',
     what: 'whether the rail is drawn',
     route: '/',
-    /* `undefined` is open, which is what a first visit should be — so the two values are "unset"
+    /* `undefined` is open, which is what a first visit should be. So the two values are "unset"
        and `false` rather than `true` and `false`. */
     values: [{}, { sidebar: false }],
     /* THE RENDERED WIDTH, not the link count. Folding hides the rail with CSS, so its anchors are
-       still in the DOM and still queryable — a probe that counts them reports "no change" about a
+       still in the DOM and still queryable. A probe that counts them reports "no change" about a
        control that works, which is the same lie in the other direction. */
     probe: () => String(Math.round(document.querySelector('.rail-slot, nav.rail')?.getBoundingClientRect().width ?? -1)),
   },
   {
     /**
-     * `navShape` — which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
+     * `navShape`: which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
      *
      * THE ONE PREFERENCE WHERE A LAZY PROBE WOULD GO GREEN ON A BROKEN BUILD, and it would do it
      * the opposite way round from `sidebar` two cases up. `sidebar` leaves its anchors in the DOM,
@@ -204,14 +204,15 @@ const CASES = [
   },
   {
     /**
-     * `suggestPages` — `29 §4`'s one global switch, and the list it empties.
+     * `suggestPages`: `29 §4`'s one global switch, and the list it empties.
      *
      * A page LOAD settles it, which is what makes it gateable at all: off draws a `cleared` empty
      * state where on draws the holding pen, so the count in the section heading is the measurement.
      * `19 §2` says this switch is the reason the `navigation` area exists, and the area shipped
-     * without it — the third control in this product found to move a tick and write nothing.
+     * without it. That is the third control in this product found to move a tick and write nothing.
      */
     name: 'suggestPages',
+    what: 'how many rows the holding pen draws (29 §4)',
     route: '/settings/navigation',
     values: [{}, { suggestPages: false }],
     probe: () => String(document.querySelectorAll('#main .ledger li').length),
@@ -336,6 +337,30 @@ else {
       );
 }
 
+/**
+ * AND EVERY CASE HAS TO CARRY THE FIVE KEYS THE RUN READS, because a missing one is invisible until
+ * the day it matters.
+ *
+ * `suggestPages` shipped with no `what`, and the finding line below interpolates `${test.what}`. So
+ * the one run where that case went red would have printed `suggestPages: 2 values, 1 distinct.
+ * undefined` to somebody trying to work out which preference had stopped reaching the page. The
+ * check above already reads `Pref` rather than trusting the paragraph at the top; this reads the
+ * cases the same way, rather than trusting nine entries to look like the tenth.
+ *
+ * IT GOES IN `drift` AND NOT IN THE FINDINGS, for the reason written beside `sayDrift`: a case
+ * missing a key is a claim about this file, and a preference that reached the cookie and not the
+ * page is a claim about the app. A reader who cannot tell them apart fixes the wrong one.
+ */
+const NEEDED = ['name', 'what', 'route', 'values', 'probe'];
+for (const [at, test] of CASES.entries()) {
+  const short = NEEDED.filter((key) => test[key] === undefined);
+  if (short.length)
+    drift.push(
+      `the case at ${at} (${test.name ?? 'unnamed'}) has no ${short.join(', no ')}, and the run reads all five.\n` +
+        '        `what` is printed in the finding, so a case without one names the preference and then says undefined.',
+    );
+}
+
 /* NOT UNDER EITHER OF THE HEADINGS AT THE BOTTOM, for the reason written beside them: "a preference
    that reaches the cookie and not the page" is a claim about the app and this is a claim about this
    file, and a reader who cannot tell them apart fixes the wrong one. */
@@ -396,7 +421,7 @@ for (const test of CASES) {
   for (const value of test.values) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
-       script before first paint, so setting it is exactly what the product does — and it keeps this
+       script before first paint, so setting it is exactly what the product does. It keeps this
        gate about whether the preference REACHES the DOM rather than about the control that sets it,
        which the a11y and layout gates already drive. */
     await context.addCookies([
@@ -414,8 +439,8 @@ for (const test of CASES) {
       continue;
     }
     /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
-       tokens the checks read, which is exactly the shape of the bug this gate is named after — a
-       preference reaching the cookie and a constant reaching the page — and the run must go red. */
+       tokens the checks read, which is exactly the shape of the bug this gate is named after (a
+       preference reaching the cookie and a constant reaching the page), and the run must go red. */
     if (process.env.BRAINDOG_GATE_SEED === 'prefs')
       await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
     await page.waitForTimeout(120);
@@ -433,7 +458,7 @@ for (const test of CASES) {
   const distinct = new Set(answers.map(([, v]) => v));
   if (distinct.size < answers.length) {
     findings.push(
-      `${test.name}: ${answers.length} values, ${distinct.size} distinct — ${test.what}\n` +
+      `${test.name}: ${answers.length} values, ${distinct.size} distinct. ${test.what}\n` +
         answers.map(([k, v]) => `        ${k} -> ${v}`).join('\n'),
     );
     process.stdout.write('!');
@@ -469,7 +494,7 @@ if (unsettled.length) {
 /**
  * AND A RUN WHERE NO SCREEN DREW IS RED even when every case came back distinct.
  *
- * Three of the nine cases read tokens off `documentElement` and `body`, which `app.html` sets from
+ * Three of the ten cases read tokens off `documentElement` and `body`, which `app.html` sets from
  * the cookie before first paint and which are true of an empty document as well as a full one. Those
  * three would pass over a product that drew nothing at all, so the aggregate is what keeps a clean
  * `prefs` run from meaning less than it says.

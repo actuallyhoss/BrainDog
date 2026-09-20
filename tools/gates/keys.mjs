@@ -5,7 +5,7 @@
  *
  * `19 §4` makes the keymap "a registry the dispatcher consults" for two reasons, and the second is
  * the one this checks: *"a `?` sheet that documents the bindings by READING them, so it cannot drift
- * from what is bound"*. `50 §9`'s `keys-sheet` gate is specified for it — *"the `?` sheet lists
+ * from what is bound"*. `50 §9`'s `keys-sheet` gate is specified for it: *"the `?` sheet lists
  * exactly the registry; every palette row's printed `<kbd>` matches its binding"*.
  *
  * IT HAD DRIFTED THREE WAYS, and a sweep of 379 clicked controls found them, not a gate. `f`
@@ -16,22 +16,22 @@
  *
  * TWO QUESTIONS, AND THE FIRST ONE IS WHY THIS IS NOT A HAND-WRITTEN LIST.
  *
- *   1. Every bare binding in the registry has a RECIPE here — a route, a setup, and the keys to
+ *   1. Every bare binding in the registry has a RECIPE here: a route, a setup, and the keys to
  *      press. Add a row to the registry and this goes red until somebody says how it is exercised.
  *      That is the direction the coupling has to run: the registry is the claim, and the gate has to
  *      be forced to keep up with it rather than the other way round.
- *   2. Every recipe produces a change. Not the RIGHT change — a gate cannot judge that — but any
+ *   2. Every recipe produces a change. Not the RIGHT change (a gate cannot judge that) but any
  *      change at all in the URL, the DOM, an open dialog, a toast, the focused element or a live
  *      region. That is the question none of the other seventeen gates asked.
  *
  * A RECIPE IS A PRECONDITION, NOT A CHEAT. `o` on a grid follows the ref the focused cell points at,
  * so a cell with no ref is correctly silent and pressing it there would prove nothing; `k` on the
  * first row has nowhere to go. The first version of this gate pressed every key on a fresh page and
- * called seven of fifteen dead — five of them correct behaviour. A gate that cries wolf is worse
+ * called seven of fifteen dead. Five of them were correct behaviour. A gate that cries wolf is worse
  * than no gate, because the next person turns it off.
  *
  * CHORDS AND THE TWO OVERLAY SCOPES ARE OUT. A modifier spelling would have to be invented here, and
- * `palette` and `nav` need a state open first — the a11y gate's `STATES` drives both by keystroke
+ * `palette` and `nav` need a state open first. The a11y gate's `STATES` drives both by keystroke
  * already. `bare: false` rows are skipped, and skipped rows are counted so the number is honest.
  */
 
@@ -87,7 +87,7 @@ if (!(await stat(ROOT).catch(() => null))) {
 const record = await startRecord();
 
 /* Read as text, not imported: the registry uses runes, so anything reaching it cannot load outside
-   a Svelte build — the same reason `silenced` lives next door in a plain `.ts`. */
+   a Svelte build. That is the same reason `silenced` lives next door in a plain `.ts`. */
 const source = await readFile(REGISTRY, 'utf8');
 const rows = [
   ...source.matchAll(/\{\s*id:\s*'([^']+)',\s*scope:\s*'([^']+)',\s*key:\s*'([^']+)',[^}]*?bare:\s*(true|false)/g),
@@ -157,12 +157,12 @@ const focusFirstCell = async (page) => {
 /**
  * How each bare binding is exercised, by id.
  *
- * `press` is a list of Playwright key names, sent in order — which is how a SEQUENCE is tested at
+ * `press` is a list of Playwright key names, sent in order, which is how a SEQUENCE is tested at
  * all: `g` on its own arms a prefix and changes nothing anybody can see, so a `goto` run presses `g`
  * then a letter and the change is the navigation.
  *
  * `runs` IS THE PLURAL, AND IT EXISTS BECAUSE ONE RUN WAS NOT ENOUGH. The registry advertises
- * `g then h d i s v p ,` — seven destinations on one row — and this gate proved the row by pressing
+ * `g then h d i s v p ,` (seven destinations on one row) and this gate proved the row by pressing
  * `g h` and nothing else. So `s` could be deleted from the chord map and 344 tests, `dead-copy` and
  * this gate all stayed green, which is the exact defect it was written to make impossible: *"a key we
  * print that nothing binds"*. A row that advertises seven letters is checked on seven letters.
@@ -174,7 +174,7 @@ const RECIPES = {
    * ITS OWN.
    *
    * It ran on `/r/obligations`, where `p` is `peek` and `v` is `display` on the grid's own key
-   * handler — and the layout's `g`-armed branch `return`s without `stopPropagation`, so the grid
+   * handler, and the layout's `g`-armed branch `return`s without `stopPropagation`, so the grid
    * fires too and the snapshot changes whatever the chord did. Measured: deleting `p` and `v` from
    * the chord map left the gate reporting **18 checked, 0 dead**. Two of the seven letters could not
    * fail, on the gate written to make exactly that impossible.
@@ -348,13 +348,13 @@ for (const row of rows) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
   /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=keys` swallows every `y` in
-     the capture phase before any handler sees it — which is exactly what a binding that was never
-     written looks like from outside — and the run must go red naming `copy-id`. */
+     the capture phase before any handler sees it, which is exactly what a binding that was never
+     written looks like from outside. The run must go red naming `copy-id`. */
   if (process.env.BRAINDOG_GATE_SEED === 'keys')
     await page.addInitScript(() => {
       addEventListener('keydown', (e) => e.key === 'y' && e.stopImmediatePropagation(), true);
     });
-  /* One recipe or several — a row that advertises several keys is proved on each of them, and a
+  /* One recipe or several: a row that advertises several keys is proved on each of them, and a
      single dead letter fails the row. */
   const runs = recipe.runs ?? [recipe];
   let alive = 0;
@@ -378,7 +378,7 @@ for (const row of rows) {
     const after = await page.evaluate(SNAPSHOT);
 
     if (before === after) {
-      dead.push(`${row.id} (${row.scope}) — the sheet prints "${row.key}"; ${run.press.join(' then ')} on ${run.route} changes nothing`);
+      dead.push(`${row.id} (${row.scope}): the sheet prints "${row.key}", and ${run.press.join(' then ')} on ${run.route} changes nothing`);
       process.stdout.write('!');
     } else {
       alive++;
@@ -403,7 +403,7 @@ console.log(
 
 if (uncovered.length) {
   console.error('\n  a binding in the registry that this gate does not exercise:');
-  for (const u of uncovered) console.error(`      ${u} — add a recipe to tools/gates/keys.mjs saying how it is pressed`);
+  for (const u of uncovered) console.error(`      ${u}. Add a recipe to tools/gates/keys.mjs saying how it is pressed.`);
 }
 
 if (dead.length) {

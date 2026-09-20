@@ -5,7 +5,7 @@
  *
  * `30 §2`: "the corpus's closed lists are its security argument. A list enforced only by a validator
  * is a list one code path forgets." Twenty-three of them are `CHECK (… IN (…))` in the DDL, so the
- * *database* refuses a ninth pack kind rather than merely the validator — and that argument only
+ * *database* refuses a ninth pack kind rather than merely the validator, and that argument only
  * holds while the `CHECK` and the document agree about what the list is.
  *
  * THEY ARE WRITTEN IN THREE PLACES AND EDITED IN ONE AT A TIME. `30 §1`'s SQL block is the schema a
@@ -22,8 +22,8 @@
  *      AND IT IS EVERY MIGRATION, NOT THE FIRST ONE, which is what this gate read for as long as it
  *      existed. SQLite cannot change a `CHECK` in place, so widening one means rebuilding the table:
  *      `CREATE TABLE x_next (… CHECK …)`, copy, `DROP TABLE x`, `ALTER TABLE x_next RENAME TO x`.
- *      Three migrations have done it — `0004` to `device_grant`, `0005` to `schedule`, `0008` to
- *      `suggestion` — and against `0001` alone the gate was comparing the document to three lists
+ *      Three migrations have done it (`0004` to `device_grant`, `0005` to `schedule`, `0008` to
+ *      `suggestion`), and against `0001` alone the gate was comparing the document to three lists
  *      the database stopped enforcing. It went red when `30 §1` was corrected to the schema that
  *      actually runs, which is the wrong way round: the document told the truth and the gate called
  *      it drift. So the files are folded in order, and a drop and a rename move the lists with the
@@ -38,12 +38,12 @@
  * completely, and `event-kinds.mjs` holds the one that has the full five-way comparison.
  *
  *   4. Every SPELLED-OUT count of `render`'s block kinds, anywhere in the corpus's prose and
- *      comments, against `packages/render/src/kinds.ts`'s own `TABLE` — the one closed list here
- *      that is TypeScript rather than a `CHECK`, so checks 1–3 never look at it and a sentence that
+ *      comments, against `packages/render/src/kinds.ts`'s own `TABLE`, the one closed list here
+ *      that is TypeScript rather than a `CHECK`, so checks 1 to 3 never look at it and a sentence that
  *      says "sixteen kinds" can go stale forever without any of them noticing.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -76,7 +76,7 @@ function checks(sql, found = new Map()) {
           found.set(`${renamed[2]}.${key.slice(renamed[1].length + 1)}`, found.get(key));
           found.delete(key);
         }
-    /* `CHECK (col IN (` may open on one line and close several below — `event.kind` spans seven — so
+    /* `CHECK (col IN (` may open on one line and close several below (`event.kind` spans seven), so
        the members are collected from the opening line onward until the brackets balance. */
     const opened = /CHECK\s*\(\s*([a-z_]+)\s+IN\s*\(/i.exec(line);
     if (!opened) continue;
@@ -89,6 +89,16 @@ function checks(sql, found = new Map()) {
 }
 
 const findings = [];
+
+/**
+ * WHAT THIS RUN DID NOT LOOK AT, which is a third outcome and not a kind of pass.
+ *
+ * A check whose input is not in this tree has neither agreed nor disagreed, and the green line at
+ * the bottom is a claim about the checks that ran. Anything dropped is named here and printed
+ * beside that line, so the two can never be confused by a reader who does not already know how
+ * many checks this gate has.
+ */
+const notChecked = [];
 
 const blueprint = read('docs/30-BLUEPRINT.md');
 const migration = read('packages/kernel/src/migrations/0001_kernel.ts');
@@ -117,7 +127,7 @@ for (const where of runs.keys())
 /**
  * AND THE LISTS A LATER MIGRATION WIDENED, which nothing held to anything.
  *
- * `30 §1` is migration 0001 verbatim — `packages/kernel/test/migrate.test.ts` asserts it statement by
+ * `30 §1` is migration 0001 verbatim: `packages/kernel/test/migrate.test.ts` asserts it statement by
  * statement, so it CANNOT be corrected to the schema that is running, and the two checks above are
  * right to compare it with the first migration alone. The hole is on the other side. SQLite cannot
  * change a `CHECK` in place, so widening one means rebuilding the table, and three migrations have
@@ -125,8 +135,8 @@ for (const where of runs.keys())
  * `suggestion.body_kind`. Every one of those members is enforced by the database, is absent from the
  * DDL a person reads, and had nothing checking that the document mentions it at all.
  *
- * SO THE ANCHOR IS THE MIGRATION'S NUMBER. `30 §1`'s prose already names one of them the right way
- * — *"the seventh, `vault`, from kernel migration 4"* — and that phrasing is the rule: a migration
+ * SO THE ANCHOR IS THE MIGRATION'S NUMBER. `30 §1`'s prose already names one of them the right way,
+ * *"the seventh, `vault`, from kernel migration 4"*, and that phrasing is the rule: a migration
  * that widens a list says which migration it was, where the lists are counted. Matching on the
  * members instead would pass on the words `pack` and `call` appearing anywhere in a page of prose
  * about packs and calls.
@@ -155,15 +165,15 @@ for (const file of later) {
 /**
  * `34 §6`'s table, for the lists it spells out.
  *
- * A COUNT LIKE `16 + 2 meta` OR `4 (+4 aliases, +\`hole\`)` IS SUMMED PER ITS OWN RULE — `52 §5.2`
+ * A COUNT LIKE `16 + 2 meta` OR `4 (+4 aliases, +\`hole\`)` IS SUMMED PER ITS OWN RULE, `52 §5.2`
  * clause 1. The first number is the list; a parenthesised aside is a note about neighbouring things
  * that are not in it, and adding it would make the table disagree with itself.
  */
 const CELL = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/;
 let counted = 0;
 
-/* §6'S TABLE AND NOT EVERY FOUR-COLUMN TABLE IN THE FILE. `34` has several with the same shape — the
-   type scale, the fixture records, the Playwright specs — and reading those as closed lists reported
+/* §6'S TABLE AND NOT EVERY FOUR-COLUMN TABLE IN THE FILE. `34` has several with the same shape (the
+   type scale, the fixture records, the Playwright specs) and reading those as closed lists reported
    findings about tables that are not making the claim this gate checks. */
 const grammars = read('docs/34-GRAMMARS.md');
 const from = grammars.indexOf('## 6 · Every closed list');
@@ -176,13 +186,13 @@ for (const line of section.split('\n')) {
 
   const [, list, count, members] = row;
 
-  /* A CELL THAT CITES A SECTION OR EXPLAINS ITSELF IN PROSE IS A COUNT ONLY — `52 §5.2` clause 1.
-     `Block kinds` says "§2.1 — one TypeScript table"; `Suggestion body kinds` spells four and then
+  /* A CELL THAT CITES A SECTION OR EXPLAINS ITSELF IN PROSE IS A COUNT ONLY. `52 §5.2` clause 1.
+     `Block kinds` cites "§2.1" and calls it one TypeScript table; `Suggestion body kinds` spells four and then
      explains a fifth that is never filed. Counting the words in either would be this gate asserting
      its own reading of a sentence, which is worse than not checking. So: every member is inside
      backticks, and anything outside them but the separators means the cell is prose. */
   /* THE MIDDLE DOT IS THE MEMBER SEPARATOR WHERE THERE IS ONE, and whitespace where there is not.
-     Most cells are bare words — `register page block` — and a few carry a value with each member:
+     Most cells are bare words (`register page block`) and a few carry a value with each member:
      the type scale is `t-xs 12 · t-sm 13 · …`, which is eight members and sixteen words. Splitting on
      both made it sixteen. */
   const words = [...members.matchAll(/`([^`]+)`/g)].flatMap((m) =>
@@ -201,32 +211,38 @@ for (const line of section.split('\n')) {
   if (words.length !== total) findings.push(`34 §6 counts ${count} for ${list} and its own cell lists ${words.length}`);
 }
 
+/* AND A TABLE THIS READ NO ROW OF IS NOT A TABLE THAT AGREES. The header finding above fires only
+   when the section is missing; every row of a section that IS there can still be skipped as prose
+   or as a cell with no number, and `counted` would print 0 beside the word "add up". The same
+   one-line guard `spelledOut` already carries, for the same reason. */
+if (counted === 0) findings.push("34 §6's table has no row this gate could read a count out of");
+
 
 /**
  * 4 · Every spelled-out count of the kinds, against `kinds.ts`'s own `TABLE`.
  *
  * A NUMBER WRITTEN IN WORDS IS STILL A CLAIM. `render`'s block kinds have moved several times in a
- * season — sixteen, then twenty, then twenty-six, then twenty-eight, now twenty-nine — and every
+ * season (sixteen, then twenty, then twenty-six, then twenty-eight, now twenty-nine) and every
  * sentence that spelled the count out by hand was a place the move had to be repeated by hand. Three
  * of those sentences went stale at once and two were simply wrong, and the only reason it was ever
  * noticed was somebody counting by eye. This is that count, run every time instead.
  *
  * "KIND" IS NOT A WORD THIS CORPUS OWNS ONCE. Pack declarations have their own eight kinds
  * (`04-PACKS` §1: "is not one of the eight kinds of declaration"), schedule actions their own, a job's
- * transcript its own nine, `event.kind` its own thirty-nine (`event-kinds.mjs`) — and ordinary English
+ * transcript its own nine, `event.kind` its own thirty-nine (`event-kinds.mjs`), and ordinary English
  * says "two kinds of X" about nothing in particular. A bare "sixteen kinds" is therefore ambiguous
  * EVERYWHERE EXCEPT `packages/render`, the one place "kind" has no other referent to be. Outside it, a
  * spelled-out count is read as a claim about BLOCK kinds only when the word `block` sits right against
- * it — `sixteen block kinds`, `nineteen kinds of block` — because none of this corpus's OTHER closed
+ * it (`sixteen block kinds`, `nineteen kinds of block`) because none of this corpus's OTHER closed
  * lists ever say that about themselves. Matching bare `kind(s)` everywhere would report `04 §1`'s eight
  * pack kinds as a wrong count of twenty-nine; matching nothing outside `packages/render` would miss
- * every doc written ABOUT this exact list. This is the narrowest rule that gets both right — it is not
+ * every doc written ABOUT this exact list. This is the narrowest rule that gets both right. It is not
  * a parser of English, and it does not try to catch every phrasing (`kinds.ts`'s own "Twenty-five,
  * counted." names no word "kind" at all and this gate cannot see it either).
  *
  * NUMBER WORDS ONLY GO TO FORTY. Twenty-nine is today's count with room to grow, and the largest
  * spelled-out count of anything called "kinds" anywhere in the corpus is `event-kinds`' own
- * thirty-nine — a different list entirely. Forty covers every real sentence without this table
+ * thirty-nine, a different list entirely. Forty covers every real sentence without this table
  * pretending to parse English numbers in general.
  */
 const ONES = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
@@ -250,7 +266,7 @@ for (const [base, tens] of [
 }
 
 /* Longest first. Harmless either way under `\b` boundaries, since `twenty` failing to reach `kinds`
-   through the `-nine` in its way just backtracks to try `twenty-nine` next — but cheaper without it. */
+   through the `-nine` in its way just backtracks to try `twenty-nine` next, but cheaper without it. */
 const NUMBER_PATTERN = [...NUMBER_WORDS.keys()].sort((a, b) => b.length - a.length).join('|');
 
 /**
@@ -283,7 +299,7 @@ const COUNT_OF_KINDS = new RegExp(`\\b(${NUMBER_PATTERN})\\s+(block\\s+)?kinds\\
  * The rest of `checks()`'s idiom: text, not import. Executing `kinds.ts` to read its own export
  * would need a TypeScript runtime and would learn only what `as const satisfies` already enforces at
  * compile time; what it CANNOT enforce is a sentence agreeing with it, which is the one thing counted
- * here by reading the table the way a person does — top-level entries, one per line.
+ * here by reading the table the way a person does: top-level entries, one per line.
  */
 function realKindCount() {
   const src = read('packages/render/src/kinds.ts');
@@ -333,7 +349,7 @@ function proseFiles(dir, out = []) {
 
 /* A FIXTURE MISSING `kinds.ts` MUST NOT CRASH THE OTHER THREE CHECKS. This one is the only one of the
    four that reads outside `docs/30-BLUEPRINT.md`, `docs/34-GRAMMARS.md` and the migration, so it is
-   also the only one a smaller fixture — this gate's own negative, for one — will not have. */
+   also the only one a smaller fixture (this gate's own negative, for one) will not have. */
 /** Every kind `kinds.ts` declares, by name, read the way `realKindCount` reads the count. */
 function kindsDeclared() {
   const src = read('packages/render/src/kinds.ts');
@@ -370,12 +386,12 @@ if (kindTotal === undefined) {
     lines.forEach((line, i) => {
       for (const m of line.matchAll(COUNT_OF_KINDS)) {
         const after = line.slice(m.index + m[0].length);
-        /* `block` between the number and `kinds`, or right after `kinds` as `kinds of block(s)` — the
+        /* `block` between the number and `kinds`, or right after `kinds` as `kinds of block(s)`: the
            two shapes this corpus uses when a sentence means THIS list rather than one of its several
            others also called "kinds". */
         const ofWhat = /^\s+of\s+(\w+)/i.exec(after)?.[1]?.toLowerCase();
         const namesBlockKinds = Boolean(m[2]) || ofWhat === 'block' || ofWhat === 'blocks';
-        /* AND, INSIDE `packages/render` ITSELF, A BARE COUNT WITH NO "of" AT ALL — because "kind" has
+        /* AND, INSIDE `packages/render` ITSELF, A BARE COUNT WITH NO "of" AT ALL, because "kind" has
            no other referent there to begin with. `kinds.ts` still says "Two kinds of row" about
            `queue`'s two row shapes, which is a real count of a real thing and not this one, so `of`
            FOLLOWED BY ANY OTHER NOUN still opts a bare match out even on `render`'s own ground. */
@@ -414,44 +430,82 @@ if (kindTotal === undefined) {
  * writing a declaration that installs and never runs; a word in the package that the document does
  * not list is a surface nobody reviewed.
  *
- * MISSING EITHER SIDE IS NOT A FINDING, because the fixtures under `tools/gates/negative` are small
+ * MISSING THE PACKAGE IS NOT A FINDING, because the fixtures under `tools/gates/negative` are small
  * trees that carry only the files their own case needs, and a gate that demanded the whole
- * repository could not be aimed at one.
+ * repository could not be aimed at one. That is why this is a note in green rather than an exit 3
+ * or a finding: `closed-lists` reads four independent things and this is one of them, so a tree
+ * without `packages/extract` costs one row and leaves the other three meaning exactly what they
+ * say, and being aimed at one small tree is the designed use of this gate rather than a fault in
+ * the tree.
+ *
+ * IT IS NOT SILENT EITHER, AND THAT IS THE REPAIR. The whole block sat inside a bare
+ * `try {} catch {}` whose comment read *"One side or the other is not in this tree"*, and the green
+ * line below names three counts, none of which is this one. Moving `packages/extract/src/extractors.ts`
+ * aside and running this gate produced output byte-identical to a clean run: thirteen words that
+ * decide what a declaration may do to a stranger's message, unchecked, and nothing said so.
+ *
+ * AND A BARE CATCH SWALLOWS MORE THAN THE CASE IT WAS WRITTEN FOR. `row[3].split('·')` destructured
+ * into two, so an Extractors row reformatted without the middle dot left `drawnCombinators`
+ * undefined and `doc.length` threw a `TypeError` into the same catch. The combinator half of the
+ * check disappeared, silently, at the exact moment somebody edited the thing it validates. The
+ * absence of the package is now asked for by name and everything else is a finding: a file that is
+ * here and cannot be read has always been a finding in this directory, and only an absent one was
+ * ever meant to be excused.
  */
-try {
+const extractorsAt = join(root, 'packages', 'extract', 'src', 'extractors.ts');
+/** The two read lists, extractors and combinators, that were actually compared. */
+let readLists = 0;
+if (!existsSync(extractorsAt)) {
+  notChecked.push('the ten extractors and the three combinators of 34 §6, for want of packages/extract/src/extractors.ts');
+} else {
   const row = /^\| Extractors \| (\d+) \+ (\d+) \| ([^|]*) \|/m.exec(read('docs/34-GRAMMARS.md'));
-  const src = read('packages/extract/src/extractors.ts');
+  const src = readFileSync(extractorsAt, 'utf8');
+  /* A LIST THIS GATE CANNOT FIND IS A FINDING, NOT AN EMPTY LIST. Unguarded, `indexOf` returning -1
+     fed `slice(-1, end)` an empty string and the comparison went red naming `()`, which sends a
+     reader to the document when the export had been renamed. */
   const listed = (name) => {
     const at = src.indexOf(`export const ${name} = [`);
-    const end = src.indexOf(']', at);
-    return [...src.slice(at, end).matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    if (at < 0) {
+      findings.push(`packages/extract/src/extractors.ts has no ${name} list this gate can read`);
+      return null;
+    }
+    return [...src.slice(at, src.indexOf(']', at)).matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
   };
+  const halves = row === null ? [] : row[3].split('·').map((half) => [...half.matchAll(/([a-z]+)/g)].map((m) => m[1]));
   if (row === null) findings.push('34 §6 has no Extractors row, and this gate reads the list from it');
-  else {
-    const [drawnExtractors, drawnCombinators] = row[3].split('·').map((half) => [...half.matchAll(/([a-z]+)/g)].map((m) => m[1]));
+  else if (halves.length !== 2)
+    findings.push(`34 §6's Extractors row names ${halves.length} list(s), and this gate reads the extractors and the combinators either side of a ·`);
+  else
     for (const [what, doc, said, code] of [
-      ['extractor', drawnExtractors, Number(row[1]), listed('EXTRACTORS')],
-      ['combinator', drawnCombinators, Number(row[2]), listed('COMBINATORS')],
+      ['extractor', halves[0], Number(row[1]), listed('EXTRACTORS')],
+      ['combinator', halves[1], Number(row[2]), listed('COMBINATORS')],
     ]) {
+      if (code === null) continue;
       if (doc.length !== said) findings.push(`34 §6 says ${said} ${what}s and names ${doc.length}`);
       /* IN ORDER, not as a set. `EXTRACTORS` is exported so a refusal can list the forms that do
          exist, and a list a person reads in a different order from the one the document taught them
          is a list they have to check twice. */
       if (doc.join(' ') !== code.join(' '))
         findings.push(`34 §6's ${what}s (${doc.join(' ')}) and extractors.ts's (${code.join(' ')}) are not the same list in the same order`);
+      readLists++;
     }
-  }
-} catch {
-  /* One side or the other is not in this tree. */
 }
 
 if (findings.length === 0) {
+  /* `readLists` IS IN THE SENTENCE, not merely in a skip line, because a count that never mentions
+     a check cannot report that the check stopped running. Three numbers were printed here and the
+     fourth check contributed none of them, which is why a permanently dead extractor comparison
+     looked exactly like a passing one. */
   console.log(
-    `  closed-lists: ${said.size} CHECKs agree across the document and the DDL, ${counted} counted lists add up, and ${spelledOut} spelled-out kind counts agree`,
+    `  closed-lists: ${said.size} CHECKs agree across the document and the DDL, ${counted} counted lists add up, ` +
+      `${spelledOut} spelled-out kind counts agree, and ${readLists} of 2 word-for-word lists match`,
   );
+  for (const what of notChecked) console.log(`  closed-lists: NOT checked, ${what}`);
 } else {
-  console.error(`\n  closed-lists: ${findings.length} finding(s) — 34 §6, 30 §1, kinds.ts\n`);
+  console.error(`\n  closed-lists: ${findings.length} finding(s) (34 §6, 30 §1, kinds.ts)\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);
+  /* AND ON THE RED PATH TOO. A reader fixing these needs to know the list is not exhaustive. */
+  for (const what of notChecked) console.error(`    NOT checked, ${what}`);
   console.error(
     '\n  A closed list is a security argument, not a tidiness one: a list enforced only by a\n' +
       '  validator is a list one code path forgets. A new member is a migration.\n',

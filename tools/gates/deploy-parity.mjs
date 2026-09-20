@@ -1,5 +1,5 @@
 /**
- * `deploy-parity` — THE ONE GATE THAT MEASURES THE LIVE HOST (52 §3, 51 §5.17, 33 §8).
+ * `deploy-parity`: THE ONE GATE THAT MEASURES THE LIVE HOST (52 §3, 51 §5.17, 33 §8).
  *
  * Every other gate in this directory reads the repository. This one reads what the internet is
  * actually serving, and it exists because of a specific failure that a green pipeline cannot see:
@@ -10,9 +10,9 @@
  * SO THE QUESTION IS NOT "did the command succeed" BUT "is the thing I built the thing being
  * served", and it is asked of two files and one route:
  *
- *   1. `/` — the prerendered shell. 51 §5.17 guarantees it is not in `run_worker_first`, so `ASSETS`
+ *   1. `/`: the prerendered shell. 51 §5.17 guarantees it is not in `run_worker_first`, so `ASSETS`
  *      serves the built bytes unchanged and a byte comparison is meaningful rather than a race.
- *   2. `/_app/version.json` — SvelteKit's build id, which changes on every build (50 §53).
+ *   2. `/_app/version.json`: SvelteKit's build id, which changes on every build (50 §53).
  *   3. `/.well-known/braindog-build`, whose `app` field is the `BRAINDOG_BUILD` tuple this run
  *      passed to the deploy (33 §4). The two hashes prove the ASSETS are current; this proves the
  *      WORKER is. They deploy as one version (51's `assets` carries `apps/web/build` into the

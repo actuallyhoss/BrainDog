@@ -4,7 +4,7 @@
  *   node tools/gates/stack.mjs
  *
  * One kernel has to run unchanged in workerd, in Node 24 and in a bare test process. That is not a
- * preference — it is what makes a self-host the same code as the hosted product, and what makes a
+ * preference. It is what makes a self-host the same code as the hosted product, and what makes a
  * test in Node evidence about production. A source file that imports a driver has chosen one of the
  * three, and the choice is invisible until the day the other two break.
  *
@@ -19,7 +19,7 @@
  * there, on the other side of the line: it is allowed to know exactly which runtime it is in, and
  * the kernel is not allowed to ask.
  *
- * The web app is not in scope — it is a browser bundle and answers to the bundle gate instead.
+ * The web app is not in scope. It is a browser bundle and answers to the bundle gate instead.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -30,7 +30,7 @@ import { skipDir } from './lib.mjs';
 
 /* THE WORKING DIRECTORY, LIKE EVERY OTHER GATE, falling back to the repository this file sits in.
    Deriving the root from `import.meta.url` alone meant this gate scanned the real tree no matter
-   where it was pointed — so its own negative fixture passed, which `self-test.mjs` found on the
+   where it was pointed. So its own negative fixture passed, which `self-test.mjs` found on the
    first run. A gate that cannot be aimed at a seeded violation cannot be shown to work. */
 const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -40,25 +40,25 @@ const BANNED = [
     id: 'node-import',
     strings: true,
     re: /(?:^|[^\w])(?:import|from|require\s*\()\s*['"]node:([a-z_/]+)['"]/gm,
-    why: 'imports node:$1 — a package that names a runtime has chosen one. Take it through a port, or move the file to test/.',
+    why: 'imports node:$1. A package that names a runtime has chosen one. Take it through a port, or move the file to test/.',
   },
   {
     id: 'cloudflare-import',
     strings: true,
     re: /(?:^|[^\w])(?:import|from)\s*['"]cloudflare:([a-z_/]+)['"]/gm,
-    why: 'imports cloudflare:$1 — the same rule in the other direction. The Worker wires it; the package takes a port.',
+    why: 'imports cloudflare:$1. The same rule in the other direction. The Worker wires it; the package takes a port.',
   },
   /* `globalThis.` IS NOT AN ESCAPE HATCH. The lookbehind was written to let `res.fetch(` and
-     `this.fetch(` through, and it let `globalThis.fetch(` through with them — which is the spelling
+     `this.fetch(` through, and it let `globalThis.fetch(` through with them. That is the spelling
      somebody reaches for precisely when they know the bare one is banned. */
-  { id: 'fetch', re: /(?<![.\w])(?:globalThis\.)?fetch\s*\(/g, why: 'calls fetch — the record makes no outbound call (01 §1). Queue an outbox row.' },
-  { id: 'buffer', re: /(?<![.\w])(?:globalThis\.)?Buffer\s*[.(]/g, why: 'uses Buffer — Uint8Array and TextEncoder are the two that exist everywhere.' },
+  { id: 'fetch', re: /(?<![.\w])(?:globalThis\.)?fetch\s*\(/g, why: 'calls fetch. The record makes no outbound call (01 §1). Queue an outbox row.' },
+  { id: 'buffer', re: /(?<![.\w])(?:globalThis\.)?Buffer\s*[.(]/g, why: 'uses Buffer. Uint8Array and TextEncoder are the two that exist everywhere.' },
   /* 52 §5.2 rule 4 lists five words and this gate knew three. `process.` is a Node global that does
      not exist in a Durable Object, and `__dirname` is a CommonJS one that exists in neither. */
   {
     id: 'node-globals',
     re: /(?<![.\w])(process\.|__dirname|__filename)/g,
-    why: 'names a Node global — `process` and `__dirname` exist in neither runtime this ships to.',
+    why: 'names a Node global. `process` and `__dirname` exist in neither runtime this ships to.',
   },
   /* THE ONLY SCOPED RULES HERE, and `31 §3` layer 4 is where the scope comes from: `no RegExp` is
      true of `packages/extract` and of nothing else, because every other package matches literals
@@ -70,13 +70,13 @@ const BANNED = [
     id: 'regexp-literal',
     under: 'packages/extract/',
     re: /(?:^|[=(,:[!&|?{};]|=>|\breturn\b|\bcase\b)\s*\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\/[dgimsuvy]*/gm,
-    why: 'holds a regular expression — extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
+    why: 'holds a regular expression: extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
   },
   {
     id: 'regexp-built',
     under: 'packages/extract/',
     re: /(?<![.\w])(?:new\s+)?RegExp\s*\(/g,
-    why: 'builds a RegExp — extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
+    why: 'builds a RegExp: extract scans a stranger’s payload with one advancing index and compiles nothing (43 §8).',
   },
 ];
 
@@ -84,7 +84,7 @@ const BANNED = [
  * Blanked, not removed, so a line number still means the line it names.
  *
  * IT USED TO COLLAPSE A BLOCK COMMENT TO ONE SPACE, and every finding below the first one in a file
- * was reported at the wrong line — this file's own header is twenty lines, so a violation on line
+ * was reported at the wrong line. This file's own header is twenty lines, so a violation on line
  * forty-five came back as line fifteen. `graph.mjs` has always blanked; the two were written apart.
  */
 const blank = (m) => m.replace(/[^\n]/g, ' ');
@@ -98,7 +98,7 @@ const decomment = (text) =>
  *
  * `37 §2.2`'s `Http` port has one method and it is called `fetch`, because a reader who knows what
  * `fetch` does knows what the port does minus what the adapter took away. Written as a method,
- * `fetch(url: URL, init: HttpInit)` matched the rule below exactly as a call would — so the gate
+ * `fetch(url: URL, init: HttpInit)` matched the rule below exactly as a call would. So the gate
  * that exists to stop a package reaching the network reported the port whose whole purpose is that
  * it must not. Renaming the method would have been the gate choosing the vocabulary, which is `52
  * §9`'s subject from the other side.
@@ -175,7 +175,7 @@ for (const pkg of packages)
       if (rule.under !== undefined && !rel.startsWith(rule.under)) continue;
       const text = rule.strings ? bare : stripped;
       /* EVERY HIT, NOT THE FIRST. `exec` once per rule per file named one line and stopped, so a
-         file with four `node:` imports was reported as having one — and the three below it were
+         file with four `node:` imports was reported as having one. The three below it were
          found on the next run, after the first was fixed. A gate that names one problem when there
          are four costs four runs, which is the argument the runner above it is built on. */
       rule.re.lastIndex = 0;

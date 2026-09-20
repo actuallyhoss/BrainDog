@@ -4,13 +4,13 @@
  *   node tools/gates/secret-grep.mjs
  *
  * THE PROMISE THIS GUARDS IS THE ONE THE PRODUCT IS BUILT ON: a credential never goes in the record.
- * The registers index what a key OPENS, never the key — so the record holds sealed bytes and the
+ * The registers index what a key OPENS, never the key. So the record holds sealed bytes and the
  * fingerprint of what wrapped them, and it has no way to open either. The two hosts hold the KEK and
  * do the unwrapping, and that is the whole of where a plaintext is allowed to exist.
  *
  * WHAT GOES WRONG IS NEVER THE STORING. Nobody writes a credential into a register. What happens is
- * that somebody unwraps one to use it, and then logs the call that used it — `console.error('post
- * failed', options)` where `options.headers.authorization` is the secret — and the credential is now
+ * that somebody unwraps one to use it, and then logs the call that used it (`console.error('post
+ * failed', options)`, where `options.headers.authorization` is the secret), and the credential is now
  * in whatever reads the logs, for ever, in a system that was designed so it could not be. That is
  * one line, added while debugging, by somebody who knows the rule perfectly well.
  *
@@ -39,7 +39,7 @@ const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', i
  * gate that matched substrings would be a gate somebody turns off.
  *
  * AND THE FIVE THE KEY HIERARCHY ACTUALLY USES. `apps/selfhost/src/keys.ts` holds the root key, two
- * data keys and an Ed25519 private half, and calls them `plain`, `dek`, `kek`, `root` and `pkcs8` —
+ * data keys and an Ed25519 private half, and calls them `plain`, `dek`, `kek`, `root` and `pkcs8`,
  * none of which the four names above match. Its own header claimed this gate was red on a plaintext
  * reaching a log, and `console.error('unwrap failed', plain)` was green. A gate that cannot see the
  * one file the whole key hierarchy lives in is a gate that passes because it is not looking.
@@ -53,12 +53,12 @@ const SOURCE = /\b(?:plaintext|plainText|decrypted|secretValue|plain|dek|kek|roo
  * `pnpm theme`.
  *
  * The other eight names are only ever a key. `root` is a key in `apps/selfhost/src/keys.ts` and a
- * directory, a DOM node or a tree everywhere else — so on its own it is not evidence, and a gate
+ * directory, a DOM node or a tree everywhere else. So on its own it is not evidence, and a gate
  * that reports a build script for printing a path is a gate somebody adds an exemption to. The
  * exemption is the real cost: the next genuine leak in that file is exempted with it.
  *
  * So `root` counts only in a file that is ALSO about keys. That is a weaker test than the other
- * eight get, and it is the honest one — the file where a root key leaks is a file that unwraps
+ * eight get, and it is the honest one: the file where a root key leaks is a file that unwraps
  * something, and `keys.ts` names `kek`, `dek` and `unwrap` in its first thirty lines. A file that
  * says `root` and nothing else has no key in it to leak.
  */
@@ -136,7 +136,7 @@ const SINKS = [
    *
    * *"A credential never goes in the record, and never in a log."* Five sinks, and every one of them
    * was the log half: `console`, `log`, `telemetry`, `push`, `dispatch`. A plaintext written into
-   * the record through `sql.exec` was checked by nothing at all — and that is `12 §6`'s promise, the
+   * the record through `sql.exec` was checked by nothing at all. That is `12 §6`'s promise, the
    * one the vault exists to keep and the one ADR-062 is about. Measured against seven leak shapes,
    * this gate caught one.
    */
@@ -371,7 +371,7 @@ function enclosing(text, at) {
 const findings = [];
 let scanned = 0;
 
-/* `packages/fixtures/**` IS IN SCOPE TOO — 52 §6's table: a fixture that carried a real credential
+/* `packages/fixtures/**` IS IN SCOPE TOO (52 §6's table): a fixture that carried a real credential
    would be one committed to a public repository, which is the failure this gate is for at its
    worst. Everything under `packages` and `apps` is walked, tests included. */
 for (const top of ['packages', 'apps'])
@@ -427,11 +427,11 @@ for (const top of ['packages', 'apps'])
 if (findings.length === 0) {
   console.log(`  secret-grep: 0 plaintexts reach a sink, over ${scanned} files`);
 } else {
-  console.error(`\n  secret-grep: ${findings.length} finding(s) — 12 §8, ADR-062\n`);
+  console.error(`\n  secret-grep: ${findings.length} finding(s) (12 §8, ADR-062)\n`);
   for (const f of findings) console.error(`    ${f.where}  ${f.why}\n      ${f.text}`);
   console.error(
     '\n  A credential never goes in the record, and never in a log. Say what it opened, its id, or\n' +
-      '  the label — never the value. If it must be used, use it and let it go out of scope.\n',
+      '  the label. Never the value. If it must be used, use it and let it go out of scope.\n',
   );
   process.exitCode = 1;
 }

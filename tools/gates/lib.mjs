@@ -3,11 +3,11 @@
  *
  * A GATE THAT HOLDS ITS OWN NUMBER IS A NUMBER NOBODY REVIEWS. `52 §4`: every number a gate asserts
  * lives in `budgets.json`, and a gate holds no numeric literal that is not `0`, `1` or an index. The
- * reason is not tidiness — it is that a budget is a decision some design document made, and a
+ * reason is not tidiness. A budget is a decision some design document made, and a
  * decision spread across ten scripts is one that gets quietly widened by whoever is in a hurry. In
  * one file, changing 30 KB to 40 KB is a diff a reviewer sees and asks about.
  *
- * A COUNT IS NEVER A BUDGET. `34 §6`: a count is read from the enumeration that owns it — the nine
+ * A COUNT IS NEVER A BUDGET. `34 §6`: a count is read from the enumeration that owns it. The nine
  * outbox kinds are counted from `OUTBOX_KINDS`, never from a `9` written down here, because the
  * whole point of counting them is to catch the day somebody adds a tenth.
  *
@@ -57,7 +57,7 @@ export function budgets() {
  * One section, and a missing one is loud.
  *
  * A GATE READING AN ABSENT SECTION WOULD GET `undefined` AND COMPARE AGAINST IT, and every
- * comparison against `undefined` is false — so the gate would go green having asserted nothing,
+ * comparison against `undefined` is false. So the gate would go green having asserted nothing,
  * which is the exact silence `self-test` exists to break. It throws instead.
  */
 export function budget(section) {
@@ -79,7 +79,7 @@ export function keyPaths() {
  *
  * THERE WERE SEVEN, AND THEY HAD DRIFTED. `secret-grep` skipped four names, `stack` three,
  * `layout` three, `css-rules` and `colour-grep` their own supersets, and `routes` and
- * `no-declarations-in-kernel` skipped `node_modules` alone — so the same directory was source to
+ * `no-declarations-in-kernel` skipped `node_modules` alone. So the same directory was source to
  * two gates and invisible to five, with nothing anywhere saying which answer was intended.
  *
  * WHAT IT COST, MEASURED: a subagent left a scratch script under `apps/web/.verify/` during an
@@ -93,14 +93,14 @@ export function keyPaths() {
  * because they do not.
  *
  * IT IS THE UNIVERSAL PART ONLY. A gate that also skips its own fixtures, or `docs/`, keeps saying
- * so at its own call site — those are statements about what that gate measures, not about what a
+ * so at its own call site. Those are statements about what that gate measures, not about what a
  * directory is.
  */
 const BUILT = new Set(['node_modules', 'build', 'dist', 'shots']);
 
 /**
  * AND A VARIANT BUILD IS A BUILD. `build-cloud/` is the same output for a different record, and the
- * moment it existed every grep gate started reading minified CSS as though it were a component —
+ * moment it existed every grep gate started reading minified CSS as though it were a component.
  * `css-rules` reported fourteen colour literals in `Button.css`, which is the compiled form of rules
  * that name only tokens. A built directory is built whatever the record inside it is.
  */

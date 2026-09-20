@@ -1,5 +1,5 @@
 /**
- * `bundle` — the size budget, measured from the ENTRY GRAPH rather than from the output directory.
+ * `bundle`: the size budget, measured from the ENTRY GRAPH rather than from the output directory.
  *
  * A size budget that only warns is a size budget that is exceeded, so this exits non-zero. And it
  * measures the right thing: the total of `build/` is nineteen code-split routes, and what a person
@@ -96,7 +96,7 @@ try {
   built = (await stat(at)).mtimeMs;
 } catch {
   /* EXIT 3 IS A SKIP, NOT A PASS. Exiting 0 with no build made `pnpm gates` report ten gates
-     passed on a fresh checkout while three of them had examined nothing — the same silence the
+     passed on a fresh checkout while three of them had examined nothing, the same silence the
      self-test exists to break, one level up. The runner names a skip and is red under CI. */
   console.log('  bundle: no build to measure, so nothing was measured. Run `pnpm --filter @braindog/web build` first.');
   process.exit(3);
@@ -105,8 +105,8 @@ try {
 /**
  * AND A BUILD OLDER THAN THE SOURCE IS NOT A MEASUREMENT.
  *
- * THIS GATE HAS BEEN REPORTING ON CODE THAT IS NOT THE CODE. A missing build was already a skip —
- * the paragraph above argues it carefully — and a STALE one was a pass: `pnpm gates` measured
+ * THIS GATE HAS BEEN REPORTING ON CODE THAT IS NOT THE CODE. A missing build was already a skip,
+ * argued carefully in the paragraph above, and a STALE one was a pass: `pnpm gates` measured
  * whatever `build/` happened to hold, so a session that edited the shell and ran the gates without
  * rebuilding got a green entry-chunk row about the previous version. That is the same silence one
  * level up again, and it is how 116 bytes of growth got three commits past the gate that exists to
@@ -117,7 +117,7 @@ try {
  */
 /* `apps/web/src` IS NOT ALL OF THE SOURCE. The app imports eight workspace packages and compiles
    them into its own chunks, so a change to `packages/kernel/src` makes the build exactly as stale as
-   a change to a route — and the first version of this check walked only the app, so the first kernel
+   a change to a route. The first version of this check walked only the app, so the first kernel
    commit after it went straight through a green bundle row again. */
 const dirs = [join(APP, 'src')];
 for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes: true }))
@@ -125,7 +125,7 @@ for (const pkg of await readdir(join(process.cwd(), 'packages'), { withFileTypes
 
 /* `src` AND NOT THE PACKAGE. A package's `test/` is not compiled into anything the browser
    downloads, so counting it would demand a rebuild for a change that cannot move a byte of the
-   bundle — and a gate that cries stale on work it does not measure is a gate people learn to
+   bundle, and a gate that cries stale on work it does not measure is a gate people learn to
    re-run blind. */
 const newest = (await Promise.all(dirs.map((d) => newestSource(d)))).reduce((a, b) => (a.when >= b.when ? a : b));
 if (newest.when > built) {
@@ -216,6 +216,38 @@ for (const f of allCss) {
   else routeCss += size;
 }
 
+/**
+ * AND THE ADAPTER'S OUTPUT, WHICH IS A SECOND BUILD AND WAS NEVER CHECKED FOR.
+ *
+ * The skip above turns on `.svelte-kit/output/client/.vite/manifest.json`, which `vite build`
+ * writes. Everything from here down reads `apps/web/build/`, which the ADAPTER writes afterwards,
+ * and the two are not the same event: a run that compiled and then failed to adapt, or a
+ * `rm -rf apps/web/build` that left `.svelte-kit` alone, leaves a manifest with no shell beside it.
+ * `readFile` then threw ENOENT out of the top level and `run.mjs` reads any non-zero, non-3 exit as
+ * a FAILURE, so a half-finished build was reported as the bundle gate going red and sent a person
+ * looking for a size regression that was not there.
+ *
+ * A SKIP AND NOT A FINDING, unlike the absences `event-kinds` and `guards` answer for. Nothing here
+ * is committed: every one of these paths is output, there is a command that produces it, and "you
+ * have not finished building" is not "you have broken something" - the same sentence the staleness
+ * check above already makes about the same directory. A skip is red under CI anyway, because CI
+ * builds first.
+ *
+ * THE FONTS ARE IN THE LIST BECAUSE THEY ARE THE SAME HAZARD thirty lines later. Two of the five
+ * budget rows `stat` a file under `build/fonts/`, and guarding the shell alone would have moved the
+ * stack trace rather than removed it.
+ */
+const NEEDED = ['index.html', join('fonts', 'geist.woff2'), join('fonts', 'poppins-600.woff2')];
+const missing = [];
+for (const f of NEEDED) if (!(await stat(join(BUILD, f)).then((s) => s.isFile(), () => false))) missing.push(f.split(/[\\/]/).join('/'));
+if (missing.length > 0) {
+  console.log(
+    `  bundle: the build has a manifest but no ${missing.join(' and no ')}, so nothing was measured.` +
+      ' Run `pnpm --filter @braindog/web build` first.',
+  );
+  process.exit(3);
+}
+
 const shellHtml = await readFile(join(BUILD, 'index.html'), 'utf8');
 
 /**
@@ -280,7 +312,7 @@ const ROWS = [
     // The measurement and the argument are in `budgets.json` beside the number, which is where a
     // reviewer widening it would have to read them.
     /* THE BAND IS ON THE RECORDED NUMBER, NOT ON THE BUDGET. Its argument, and the measurement it
-       rests on, are in `budgets.json` beside the number — which is where a reviewer widening either
+       rests on, are in `budgets.json` beside the number, which is where a reviewer widening either
        would have to read them. */
     baseline: B.mainJsBaseline + B.mainJsNoise,
     note: "Kit's runtime alone; the interpreter is 19.3 of it",
@@ -300,7 +332,7 @@ for (const { name, size, budget, baseline, note } of ROWS) {
   const ok = within || (baseline !== undefined && size <= baseline);
   if (!ok && !report) failed++;
   const mark = within ? 'ok  ' : ok ? 'over' : 'FAIL';
-  const tail = within ? note : `RECORDED, fails above ${KB(baseline ?? budget)} — ${note}`;
+  const tail = within ? note : `RECORDED, fails above ${KB(baseline ?? budget)}. ${note}`;
   console.log(`  ${mark}  ${name.padEnd(22)} ${KB(size).padStart(9)} / ${KB(budget).padStart(9)}   ${tail}`);
 }
 console.log(

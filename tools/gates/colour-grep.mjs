@@ -1,9 +1,9 @@
 /**
- * `colour-grep` — the gate over what `css-rules` cannot see.
+ * `colour-grep`: the gate over what `css-rules` cannot see.
  *
  * A class computed in TypeScript. A `fill="#333"` in an inline SVG. A hex in a data file that ends
  * up in a `style` attribute. Thirty lines of Node, AND THIS IS THE GATE THAT ACTUALLY FIRES IN
- * PRACTICE (22 §7 gate 2) — the stylesheet is the place people remember to be careful.
+ * PRACTICE (22 §7 gate 2). The stylesheet is the place people remember to be careful.
  *
  * Usage:  node tools/gates/colour-grep.mjs [root]
  */
@@ -32,32 +32,23 @@ const SKIP = new Set(['docs', 'loop', 'negative']);
 // one:
 //
 //   packages/theme         the generator IS the thing that produces colours
-//   theme/house.css        generated, and byte-compared against its generator
+//   any generated sheet    earns it by carrying the generator's header, not by being listed here
 //   tools/gates            this file has to know what a colour looks like
 //   any *.test.ts          a test asserts on values, which is the point of a test
 //
 // `--brand` lives in app.css and is caught deliberately: see the exemption note below.
 const EXEMPT = [
   /^packages\/theme\//,
-  /**
-   * EVERY GENERATED STYLESHEET, BY WHAT IT IS RATHER THAN BY ITS NAME.
-   *
-   * This read `house.css` and only that. The generator writes `alpha.css` too now — the
-   * environment palette — and the moment it did, this gate reported 360 literals in a file whose
-   * first line says it is generated and must not be edited. A gate that has to be told each new
-   * output by name is a gate that goes red on the day somebody adds one, which trains them to add
-   * an exemption rather than to ask whether the finding is real.
-   *
-   * The marker is the generator's own first line, so a file earns the exemption by being generated
-   * rather than by being remembered. `theme.mjs --check` is what holds these files honest, and it
-   * byte-compares them against a fresh solve.
-   */
-  /^packages\/skin\/[a-z-]+\.css$/,
+  /* THE GENERATED STYLESHEETS ARE NOT EXEMPT HERE. They are exempt further down, by carrying the
+     generator's own first line, which is the argument this list used to make and then not follow:
+     `packages/skin/[a-z-]+.css` was a NAME pattern sitting under a paragraph headed "by what it is
+     rather than by its name". It also reached three sheets nobody generates. See the marker test
+     below, which is the version that does what the paragraph says. */
   /^tools\/gates\//,
   /\.test\.ts$/,
   /**
    * The favicons, one per app. Fetched as their own document, outside any page, so they can reach no
-   * custom property and no theme — the mark's colour has to be literal there or it has none.
+   * custom property and no theme. The mark's colour has to be literal there or it has none.
    *
    * Which is exactly why they are GENERATED rather than written: they were the one copy of the mark
    * that no token change touched, and so the one copy that drifted. `packages/skin/scripts/theme.mjs`
@@ -79,11 +70,11 @@ const EXEMPT = [
  * somebody switches off, which costs more than the three-digit form ever saves.
  */
 /* THE 8-DIGIT FORM TOO. `#[0-9a-fA-F]{6}\b` fails on `#11223344`, because `\b` needs a non-word
-   character after the sixth digit and the seventh is one \u2014 so the one hex form that carries an alpha
+   character after the sixth digit and the seventh is one. So the one hex form that carries an alpha
    channel, which is exactly what somebody reaches for when they want "the accent, faded", walked
    straight through the gate written to stop it. */
 /* AND `oklch(` WITH A NUMBER IN IT. The palette is solved in OKLCH, so a hand-written `oklch(0.7
-   0.2 30)` is the modern way to write the literal this gate exists to stop — and it matched none of
+   0.2 30)` is the modern way to write the literal this gate exists to stop. It matched none of
    the three older forms. `\s*[\d.]` rather than a bare `(`, for the same reason `rgba(` carries one:
    `oklch(var(--mark-l) …)` is three tokens and a function, not a colour. */
 const LITERAL_ANY = /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b|\brgba?\(\s*\d|\bhsla?\(\s*\d|\bok(?:lch|lab)\(\s*[\d.]/;
@@ -93,7 +84,7 @@ const LITERAL_CSS = /#[0-9a-fA-F]{3}\b/;
  * AND THE PLAINEST NOTATION OF ALL, which three regexes over hex, `rgb()` and `oklch()` all miss.
  *
  * `color: red` is how somebody writes a colour when they are not thinking about the theme, which is
- * exactly the population this gate exists for — and it was invisible. Measured against ten ways to
+ * exactly the population this gate exists for. It was invisible. Measured against ten ways to
  * write a colour in CSS, the gate caught three; `red`, `white` and `rebeccapurple` went through.
  *
  * THE PROPERTY IS PART OF THE RULE, not just the word. `tan`, `plum`, `linen`, `orange` and `gold`
@@ -135,7 +126,7 @@ const COLOUR_PROP = String.raw`(?:[a-z-]*color|background(?:-color)?|fill|stroke
 const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*\b(?:${NAMED.join('|')})\b`, 'i');
 
 /**
- * Two lines are allowed to hold a literal, and they are named rather than exempted by file — a
+ * Two lines are allowed to hold a literal, and they are named rather than exempted by file. A
  * whole-file exemption is how the next one gets in.
  *
  *   --brand:            the mark. It is the one colour that belongs to the PRODUCT rather than to a
@@ -178,26 +169,29 @@ for (const file of await walk(ROOT)) {
   /**
    * A GENERATED STYLESHEET IS EXEMPT BY WHAT IT IS, NOT BY ITS NAME.
    *
-   * The list above named `house.css` and only that. The generator writes `alpha.css` too now —
-   * the environment palette — and the moment it did, this gate reported 360 literals in a file
+   * The list above named `house.css` and only that. The generator writes `alpha.css` too now
+   * (the environment palette), and the moment it did, this gate reported 360 literals in a file
    * whose own first line says it is generated and must not be edited. A gate that has to be told
    * each new output by name goes red the day somebody adds one, which teaches them to add an
    * exemption rather than to ask whether the finding is real.
    *
    * The marker is the generator's own header, so a file earns this by BEING generated rather than
-   * by being remembered — and a hand-written file cannot claim it without saying, in its first
+   * by being remembered. A hand-written file cannot claim it without saying, in its first
    * line, something that `theme.mjs --check` would then hold it to.
    */
   const source = await readFile(file, 'utf8');
   if (source.startsWith('/* GENERATED by packages/theme.')) continue;
 
   /* MARKUP COUNTS AS CSS FOR THE THREE-DIGIT FORM. This gate's own header names the case it exists
-     for — *"a `fill="#333"` in an inline SVG"* — and the three-digit rule was applied to `.css`
+     for: *"a `fill="#333"` in an inline SVG"*. The three-digit rule was applied to `.css`
      files only, so that exact example passed. A `#333` inside a `style=` or an SVG attribute is a
      colour by construction; the spoken-id collision the rule guards against lives in prose and in
      `.ts`, not in markup attributes. */
   const isCss = /\.(css|svelte|html)$/.test(rel);
-  const lines = blankComments(await readFile(file, 'utf8')).split('\n');
+  /* `source` AGAIN, NOT A SECOND READ. This asked the disk for the same bytes it had just been
+     handed by the marker test above, over roughly two thousand files, for no difference in what
+     the gate concludes. */
+  const lines = blankComments(source).split('\n');
   for (const [i, line] of lines.entries()) {
     if (!LITERAL_ANY.test(line) && !(isCss && (LITERAL_CSS.test(line) || LITERAL_NAMED.test(line)))) continue;
     if (ALLOWED_LINES.some((r) => r.test(line))) continue;

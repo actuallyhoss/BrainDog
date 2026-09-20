@@ -4,7 +4,7 @@
  *   node tools/gates/no-declarations-in-kernel.mjs
  *
  * THIS IS THE RULE THE WHOLE ADDITIVE STORY RESTS ON. A register, a page, a rule, a metric is a
- * DECLARATION — a row in one table, owned by a pack or by the person who wrote it — and the kernel's
+ * DECLARATION (a row in one table, owned by a pack or by the person who wrote it), and the kernel's
  * job is to run whatever is declared, not to know what any of it means. The moment the kernel ships
  * an `obligations` register of its own, three things follow that nobody chose: a pack cannot own that
  * name, uninstalling it is a special case, and the record has a schema somebody has to migrate
@@ -12,8 +12,8 @@
  *
  * IT IS THE KIND OF RULE THAT IS TRUE ON DAY ONE AND FALSE ON DAY NINETY, because breaking it is
  * always the shortest path: a seed row for a test, a "default" page, a register the first-run screen
- * needs. Each is one line and each is permanent. `02 §1` allows exactly one exception —
- * `register.session`, `pack_id = 'kernel'` — and the exception exists so that the rule can be
+ * needs. Each is one line and each is permanent. `02 §1` allows exactly one exception:
+ * `register.session`, with `pack_id = 'kernel'`. That exception exists so that the rule can be
  * absolute everywhere else.
  *
  * WHAT IT CHECKS:
@@ -25,7 +25,7 @@
  *      zero now means the register every agent write resolves to has been lost, which is a mistake
  *      and not a thing nobody has written yet.
  *   3. No object literal under `src/**` with a `kind:` of one of the eight pack kinds beside an
- *      `id:` — which is a declaration written in TypeScript, and the way this rule actually gets
+ *      `id:`. That is a declaration written in TypeScript, and the way this rule actually gets
  *      broken. Nobody adds a YAML file to the kernel; somebody adds a `const DEFAULT_PAGE = { id:
  *      'page.home', kind: 'page', … }` and it looks like configuration.
  */
@@ -104,7 +104,7 @@ for (const file of files.filter((f) => /[\\/]src[\\/].*\.ts$/.test(f) && !f.ends
 if (findings.length === 0) {
   console.log(`  no-declarations-in-kernel: ${files.length} files, ${inserts} declaration row(s), 0 written in code`);
 } else {
-  console.error(`\n  no-declarations-in-kernel: ${findings.length} finding(s) — 02 §1\n`);
+  console.error(`\n  no-declarations-in-kernel: ${findings.length} finding(s) (02 §1)\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);
   console.error(
     '\n  The kernel runs whatever is declared and knows what none of it means. A register the\n' +

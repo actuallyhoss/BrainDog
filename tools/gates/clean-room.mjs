@@ -1,11 +1,11 @@
 /**
- * `clean-room` — a tripwire, not a proof.
+ * `clean-room`: a tripwire, not a proof.
  *
  * Nothing in BrainDog is ported from the predecessor at `C:\Tools\legacy`. Nobody building it reads
  * that code; the design documents are the only source, and every part is designed on its own merits.
  * Its BEHAVIOURS were traced into `docs/32-PARITY.md`; its CODE stays where it is.
  *
- * This looks for the predecessor's distinctive identifiers. It cannot prove a clean room — the proof
+ * This looks for the predecessor's distinctive identifiers. It cannot prove a clean room. The proof
  * is the rule, and the rule is kept by people. What it CAN do is fail loudly the day somebody pastes.
  *
  * Usage:  node tools/gates/clean-room.mjs [root]
@@ -48,8 +48,8 @@ async function walk(dir, out = []) {
 }
 
 /* AN EMPTY LIST IS RED. A tripwire list that somebody empties to make the gate quiet is a gate that
-   reports "no predecessor identifiers" over a repository nobody checked — the same shape as every
-   other gate in this directory that passed by examining nothing. */
+   reports "no predecessor identifiers" over a repository nobody checked. That is the same shape as
+   every other gate in this directory that passed by examining nothing. */
 if (TRIPWIRES.length === 0) {
   console.error('  clean-room: the tripwire list is empty, so this gate is checking nothing.');
   process.exitCode = 1;
@@ -63,7 +63,7 @@ for (const file of files) {
   if (rel.startsWith('tools/gates/')) continue;
   const text = await readFile(file, 'utf8');
   /* CASE-INSENSITIVE. `includes` is case-SENSITIVE, so `BRAIN_TOKEN` was caught and `Brain_Token`
-     was not — and a paste is exactly where a case changes: an identifier renamed on the way in is
+     was not. A paste is exactly where a case changes: an identifier renamed on the way in is
      the ordinary shape of a port, not an exotic one. 52 §5.2 says whole-word and case-insensitive;
      this was neither. Whole-word is not applied because several tripwires contain a `.` or a `-`,
      which `\b` treats as a boundary. They are already distinctive enough to be narrow. */

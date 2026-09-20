@@ -5,12 +5,12 @@
  *
  * `30 §5` splits the RPC surface by WHO MAY REACH IT rather than by convenience, and then states the
  * rule that keeps it honest: *if a screen needs something outside DATA and READ+, it is either a
- * browser-session group — VAULT, JOBS, ADMIN — or it is a design error. There is no third case, and
- * the router asserts it — every route declares its group, and a CI test walks the router and fails
+ * browser-session group (VAULT, JOBS, ADMIN) or it is a design error. There is no third case, and
+ * the router asserts it: every route declares its group, and a CI test walks the router and fails
  * on a route with no group.* This is that test.
  *
  * WHAT IT IS REALLY FOR IS THE SIXTEEN INTERNAL METHODS. `createRecord` writes the `record` row and
- * the owner's `member('*', 'owner')` — routing it is handing anybody the ability to make themselves
+ * the owner's `member('*', 'owner')`, so routing it is handing anybody the ability to make themselves
  * the owner of a record. `sealedGrant` returns sealed material to the host. `arrive` is the ingest
  * pipeline with no authorisation of its own, because its callers do it. Each is one line away from
  * being routable, and `UNROUTED` guards exactly one of them.
@@ -21,7 +21,7 @@
  * different people looking at different problems.
  *
  * AND THE ROUTES `30 §5` DOES NOT ENUMERATE ARE RECORDED, NOT WAIVED. Ten of the thirty-six are
- * names the document's own list does not carry — `history`, `packs`, `decide`, `members` and the
+ * names the document's own list does not carry: `history`, `packs`, `decide`, `members` and the
  * rest. Every one is a real method with a real check, and the divergence is `30 §5`'s enumeration
  * being older than the code rather than a route sneaking in. They are listed below with the group
  * they claim, so adding an eleventh is a diff somebody has to justify, and the day `30 §5` is
@@ -43,7 +43,7 @@ const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
  * Each of these is a method the document describes in prose without listing in its table.
  */
 const UNENUMERATED = {
-  history: 'READ+', //   the writes that made one row — 45's `history`, in 30 §5's prose and not its table
+  history: 'READ+', //   the writes that made one row: 45's `history`, in 30 §5's prose and not its table
   version: 'READ+', //   `/api/version`, which 33 §4 routes and 30 §5 folds into `whatsNew`
   pages: 'READ+', //     every page, where 30 §5 lists only `page`
   packs: 'READ+', //     which packs are installed; the read half of ADMIN's pack methods
@@ -106,7 +106,7 @@ for (const r of routes) {
   const said = GROUPS.find((g) => spec[g]?.includes(r.name));
   if (said === undefined) {
     if (UNENUMERATED[r.name] === undefined)
-      findings.push(`${r.name} is routed and 30 §5's table does not enumerate it — add it there, or record it here`);
+      findings.push(`${r.name} is routed and 30 §5's table does not enumerate it. Add it there, or record it here`);
     else if (UNENUMERATED[r.name] !== r.group)
       findings.push(`${r.name} is routed as ${r.group} and this gate records it as ${UNENUMERATED[r.name]}`);
   } else if (said !== r.group) findings.push(`${r.name} is routed as ${r.group} and 30 §5 puts it in ${said}`);
@@ -121,7 +121,7 @@ for (const name of spec.INTERNAL ?? [])
 for (const name of unrouted) {
   const known = GROUPS.some((g) => spec[g]?.includes(name));
   if (!known && UNENUMERATED[name] === undefined)
-    findings.push(`UNROUTED names ${name}, which no group in 30 §5 has — a name that guards nothing`);
+    findings.push(`UNROUTED names ${name}, which no group in 30 §5 has, a name that guards nothing`);
 }
 
 /* AND EVERY RECORDED DEVIATION IS STILL A ROUTE. One that was removed leaves a line here claiming a
@@ -138,12 +138,30 @@ for (const name of Object.keys(UNENUMERATED))
  * web app is written against, the two operator routes on the Worker only, and a GET only where nothing
  * changes who is signed in, since a browser may prefetch a GET.
  *
- * A TREE WITH NO SIGN-IN HAS NOTHING TO CHECK, and a tree whose host package exports one has to have it.
+ * A TREE WITH NO `auth.ts` IS A FINDING, AND IT USED TO BE NOTHING AT ALL.
+ *
+ * WHAT THIS DID. Both halves below were wrapped in `if (existsSync(authFile))` and nothing else, so a tree
+ * without the file skipped the fifteen sign-in checks and the account table together, printed neither of the
+ * two summary lines (each is guarded on a count that had stayed zero), and exited 0 on the one line about
+ * route groups. The run reads exactly like a clean one. Moving `packages/host/src/auth.ts` aside and running
+ * this gate on the real tree is the whole demonstration.
+ *
+ * THERE WAS A GUARD AND IT WAS DEFEATED BY AN ACCIDENT. It fired only when `packages/host/package.json` was
+ * present AND exported `./auth`, which is true of the real tree and of no fixture, so the one place the
+ * silence could be observed was the one place the guard could not reach. A rule that holds wherever it is
+ * not needed is not a rule.
+ *
+ * WHY A FINDING RATHER THAN A SKIP OR A NOTE. `auth.ts` is checked-in source, not a build artefact: nothing
+ * about an environment decides whether it is here, so exit 3 would be reporting an unmet prerequisite that
+ * cannot be unmet for an honest reason. And it is not optional either, which is what a note in green would
+ * claim: it is the file that says who may sign in and what an account route may read, so a tree that has
+ * `packages/host/src/index.ts` and not its sibling has lost sign-in rather than not built it.
+ * `no-declarations-in-kernel` makes the same call in the same words, on `inserts !== 1` rather than
+ * `inserts > 1`: zero is a mistake and not a thing nobody has written yet.
  */
 const authFile = join(root, 'packages', 'host', 'src', 'auth.ts');
-const hostPackage = join(root, 'packages', 'host', 'package.json');
-if (existsSync(hostPackage) && /"\.\/auth"/.test(readFileSync(hostPackage, 'utf8')) && !existsSync(authFile))
-  findings.push('packages/host exports ./auth, and packages/host/src/auth.ts is not there');
+if (!existsSync(authFile))
+  findings.push('packages/host/src/auth.ts is not there, and it is where the sign-in table and the account table are declared');
 
 let authRoutes = [];
 if (existsSync(authFile)) {
@@ -230,15 +248,18 @@ if (existsSync(authFile)) {
 
 if (findings.length === 0) {
   const shape = GROUPS.map((g) => `${routes.filter((r) => r.group === g).length} ${g}`).join(' · ');
-  console.log(`  router-groups: ${routes.length} routes, every one with a group — ${shape}`);
-  if (authRoutes.length > 0) console.log(`  router-groups: ${authRoutes.length} sign-in routes, one per flow, named by the rule`);
-  if (accountRoutes.length > 0) console.log(`  router-groups: ${accountRoutes.length} account route(s), each a GET under /account/ behind the session cookie`);
+  console.log(`  router-groups: ${routes.length} routes, every one with a group: ${shape}`);
+  /* UNCONDITIONAL, BECAUSE A COUNT THAT HIDES AT ZERO IS A COUNT THAT CANNOT REPORT A DEGENERATE RUN.
+     These two were each printed only when their own count was above zero, so the output of a run that
+     read both tables and the output of a run that read neither differed by nothing at all. */
+  console.log(`  router-groups: ${authRoutes.length} sign-in routes, one per flow, named by the rule`);
+  console.log(`  router-groups: ${accountRoutes.length} account route(s), each a GET under /account/ behind the session cookie`);
 } else {
-  console.error(`\n  router-groups: ${findings.length} finding(s) — 30 §5\n`);
+  console.error(`\n  router-groups: ${findings.length} finding(s) (30 §5)\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);
   console.error(
     '\n  The surface is split by who may reach it. If a screen needs something outside DATA and\n' +
-      '  READ+, it is a browser-session group — VAULT, JOBS, ADMIN — or it is a design error.\n',
+      '  READ+, it is a browser-session group (VAULT, JOBS, ADMIN) or it is a design error.\n',
   );
   process.exitCode = 1;
 }

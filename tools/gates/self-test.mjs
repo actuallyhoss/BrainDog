@@ -9,11 +9,11 @@
  * where a token typo lives; the stack gate did not know two of the five words the spec bans. Every
  * one of them printed green. `52 §9` had specified this file all along.
  *
- * HOW IT WORKS. `tools/gates/negative/<gate>/` holds one seeded violation — a minimal tree the gate
+ * HOW IT WORKS. `tools/gates/negative/<gate>/` holds one seeded violation: a minimal tree the gate
  * runs against with its root pointed at the fixture. Each gate must exit non-zero and name the
  * seeded file. A gate that passes its own negative is reported by name, and the run is red.
  *
- * WHY A FIXTURE TREE RATHER THAN A UNIT TEST. The thing under test is the gate as CI runs it —
+ * WHY A FIXTURE TREE RATHER THAN A UNIT TEST. The thing under test is the gate as CI runs it:
  * its walk, its exemptions, its regexes and its exit code together. Four of the six failures above
  * were in the walk or the exemptions rather than in the pattern, and no unit test of the pattern
  * would have found them.
@@ -44,18 +44,18 @@ const CASES = [
   { gate: 'colour-grep-hex8', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   { gate: 'colour-grep-oklch', run: 'colour-grep', expect: /colour literal/, findings: 1 },
   /* THE FOURTH NOTATION, and the plainest: `color: red`. The gate knew hex, `rgb()` and `oklch()`,
-     so the two real scrims in this repository — `color-mix(in srgb, black …)`, at two strengths six
-     per cent apart — had never been seen. ONE finding, and the fixture carries two decoys beside
+     so the two real scrims in this repository (`color-mix(in srgb, black …)`, at two strengths six
+     per cent apart) had never been seen. ONE finding, and the fixture carries two decoys beside
      it: `content: 'gold'` and a grid area called `tan`. `tan`, `linen`, `plum` and `gold` are CSS
      colour names and ordinary English, so the rule is the PROPERTY plus the name, and a count of
      one is what proves the distinction rather than asserting it. */
   { gate: 'colour-grep-named', run: 'colour-grep', expect: /colour literal/, findings: 1 },
-  /* `css-rules` CLAIMS ELEVEN OF `52 §5.2`'s TWELVE ROWS (row 12 is skipped — see the gate's own
+  /* `css-rules` CLAIMS ELEVEN OF `52 §5.2`'s TWELVE ROWS (row 12 is skipped; see the gate's own
      header) plus the two rules the table does not number, and this is where the finding that started
      this work landed: the gate seeded TWO cases for TWELVE-ish rules, so one working rule
      (`unknown-property`, below) made every other one look alive, including the four that had never
      fired once. `loop/finding-css-rules.md` is the record of it. One fixture per rule now, each one
-     crafted so it trips EXACTLY the rule under test and nothing else — a fixture that also fires
+     crafted so it trips EXACTLY the rule under test and nothing else. A fixture that also fires
      `unknown-property` on an incidental `var()` would assert a count that means something else. */
   { gate: 'css-rules-colour', run: 'css-rules', expect: /never a colour/, findings: 1 },
   { gate: 'css-rules-font-size', run: 'css-rules', expect: /escapes the type scale/, findings: 1 },
@@ -63,32 +63,32 @@ const CASES = [
   { gate: 'css-rules-outline', run: 'css-rules', expect: /focus-ok/, findings: 1 },
   { gate: 'css-rules-physical', run: 'css-rules', expect: /breaks under dir="rtl"/, findings: 1 },
   { gate: 'css-rules-zindex', run: 'css-rules', expect: /a fight the next literal wins/, findings: 1 },
-  /* ROW 7 HAS TWO HALVES — an `<Icon size=…>` outside the four names, and a literal `width`/`height`
-     on an `<svg>` — and one fixture carries both, so a count of two is what proves neither half is
+  /* ROW 7 HAS TWO HALVES (an `<Icon size=…>` outside the four names, and a literal `width`/`height`
+     on an `<svg>`) and one fixture carries both, so a count of two is what proves neither half is
      riding on the other's finding. */
   { gate: 'css-rules-icon-size', run: 'css-rules', expect: /not a number/, findings: 2 },
   { gate: 'css-rules-identifier-size', run: 'css-rules', expect: /two roles colliding/, findings: 1 },
   { gate: 'css-rules-icon-color', run: 'css-rules', expect: /currentColor only/, findings: 1 },
-  { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /a rename left the rule behind/, findings: 1 },
+  { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /rename left the rule behind/, findings: 1 },
   { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
   { gate: 'css-rules-faint', run: 'css-rules', expect: /not below 24px/, findings: 1 },
   { gate: 'css-rules-ellipsis', run: 'css-rules', expect: /does nothing on a flex/, findings: 1 },
   { gate: 'stack', expect: /finding\(s\)/, findings: 1 },
   /* AND THE OTHER HALF OF THAT RULE: a `fetch(` the gate must NOT name. `37 §2.2`'s `Http` port
      declares a method called `fetch`, and the rule matched the signature exactly as it matches a
-     call — so the gate that stops a package reaching the network reported the port that exists so
+     call, so the gate that stops a package reaching the network reported the port that exists so
      none of them does. The fixture holds both in one file and asserts a count of one, because a
      gate that went red here would look identical to a gate that got it right. */
   { gate: 'stack-signature', run: 'stack', expect: /calls fetch/, findings: 1 },
   /* THE ONE SCOPED RULE, AND BOTH HALVES OF IT. `43 §8` bans regular expressions under
      `packages/extract` and nowhere else, so the fixture seeds three: a literal and a constructor
      inside that package, which must be named, and a literal in another package, which must not.
-     Two findings rather than three is the assertion — a count of three would mean the gate had
+     Two findings rather than three is the assertion: a count of three would mean the gate had
      quietly become a repository-wide ban, and a count of one would mean it knew the slash form and
      not `new RegExp(source)`, which is the spelling somebody reaches for next. */
   { gate: 'stack-regexp', run: 'stack', expect: /compiles nothing/, findings: 2 },
   /* THE RAW BYTE SCAN. The fixture is `Buffer.from`-built rather than typed, because a NUL byte
-     does not survive being typed through an editing tool — the same reason the gate's own header
+     does not survive being typed through an editing tool, the same reason the gate's own header
      insists on it for anyone seeding a case here. One finding: a NUL sitting inside a string
      literal, the shape of both real defects this gate was written for. */
   { gate: 'nul-bytes', expect: /a raw NUL at offset/, findings: 1 },
@@ -102,7 +102,7 @@ const CASES = [
   { gate: 'nul-bytes-backspace', run: 'nul-bytes', expect: /a raw BACKSPACE at offset/, findings: 1 },
 
   /* THE FOUR HALVES OF `graph`, ONE FIXTURE EACH. A gate with three checks and one fixture is a
-     gate with one check under test and two that have never been asked to fire — and this one's
+     gate with one check under test and two that have never been asked to fire, and this one's
      three are independent: a cycle is found in the manifests, an undeclared import in the source,
      and a relative escape in a specifier that resolves outside its own package.
 
@@ -113,7 +113,18 @@ const CASES = [
      `graph-cycle` names its seeded file TWICE on purpose: a cycle inside a total order always
      contains an edge that points up it, so the same manifest line is reported by the cycle check
      and by the direction check. Two findings is the honest number. */
-  { gate: 'graph-cycle', run: 'graph', expect: /cycle —/, findings: 2 },
+  /* AND `expect` IS ANCHORED ON THE RULE'S VOCABULARY, NOT ON ITS PUNCTUATION. This pattern read
+     the word `cycle` followed by an em dash, and a sweep of those over the other gate files turned
+     `graph`'s finding into `cycle: kernel → where → kernel. where → kernel closes it`, which the
+     pattern could no longer match. Two words the rule cannot be stated without survive a reformat; a dash between them
+     does not.
+
+     THE FAILURE MODE HERE IS ALREADY THE SAFE ONE, which is why this is a better pattern rather
+     than a new mechanism. A stale `expect` lands on the branch below that prints "went red with a
+     sentence this test does not recognise" and pushes the gate onto `failed`, so the run is red
+     and the gate is named. Nothing goes quiet: the cost of rewording a finding is a false red
+     against this table, which is the direction a test of tests should fail in. */
+  { gate: 'graph-cycle', run: 'graph', expect: /\bcycle\b.*\bcloses it\b/u, findings: 2 },
   { gate: 'graph-direction', run: 'graph', expect: /points up the order/, findings: 1 },
   { gate: 'graph-undeclared', run: 'graph', expect: /undeclared import/, findings: 1 },
   { gate: 'graph-escape', run: 'graph', expect: /cross-package relative import/, findings: 1 },
@@ -124,7 +135,7 @@ const CASES = [
      that can be proved rather than asserted. */
   { gate: 'secret-grep-dek', run: 'secret-grep', expect: /reaches a log/, findings: 1 },
   /* THE THIRD SINK, AND THE ONE THIS GATE'S OWN MESSAGE NAMES FIRST: *"a credential never goes in
-     the record."* One finding, not two — the fixture holds a real leak and an innocent call whose
+     the record."* One finding, not two: the fixture holds a real leak and an innocent call whose
      SQL merely contains the words `root`, `wrapped_by` and `kek`, because eight calls in the real
      tree are that shape and a gate red on all of them is a gate switched off. */
   { gate: 'secret-grep-record', run: 'secret-grep', expect: /reaches the record/, findings: 1 },
@@ -148,7 +159,7 @@ const CASES = [
   { gate: 'secret-grep-opened', run: 'secret-grep', expect: /a report key or an opened action key reaches a log/, findings: 1 },
   { gate: 'secret-grep-held', run: 'secret-grep', expect: /a report key or an opened action key reaches an error message/, findings: 1 },
   /* THREE, because a kind in one source and not the other three is three statements about the same
-     drift — and which three is the repair. A count of one would pass a gate that compared two. */
+     drift, and which three is the repair. A count of one would pass a gate that compared two. */
   { gate: 'event-kinds', expect: /and migration 0001 does not/, findings: 3 },
   { gate: 'router-groups', expect: /INTERNAL is the host's own surface|puts it in INTERNAL/, findings: 2 },
   /* THE ACCOUNT TABLE, which reads the session cookie and nothing else. The fixture holds a correct row beside the
@@ -190,7 +201,7 @@ const CASES = [
      reports the placeholder that is wrong rather than every placeholder it finds. */
   { gate: 'bundle-shell', run: 'bundle', expect: /a shell the build cannot substitute/, findings: 1 },
   /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
-     it — the missing code, and the family whose size no longer matches — and only the first can
+     it (the missing code, and the family whose size no longer matches) and only the first can
      name it, because the second is about a count. `findings` here is *lines that name the seeded
      token*, not *findings the gate made*, and conflating them is how a fixture ends up asserting a
      number that means something else. */
@@ -203,7 +214,7 @@ const CASES = [
   { gate: 'refusals', expect: /and REFUSAL_CODES does not/, findings: 1 },
 
   /* TWO CODES NAMED IN ONE SOURCE FILE AND ONE OF THEM FIXTURED, and the seeded violation is the
-     second — which is the rule that matters, because a code the tree already hands to callers with
+     second, which is the rule that matters, because a code the tree already hands to callers with
      no fixture is the enumeration rotting in the direction that costs something. The file names two
      codes on purpose: a gate counting fixtures rather than finding gaps would report zero or two
      here, and only "one" is the right answer. */
@@ -213,12 +224,12 @@ const CASES = [
      finding dead ones. */
   { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
-  /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both — or neither —
+  /* THE SEEDED FIXTURE HOLDS TWO SENTENCES AND RENDERS ONE, so a gate that named both (or neither)
      is a gate that is counting keys rather than finding dead ones. */
   { gate: 'dead-copy', expect: /nobody reads/, findings: 1 },
 
   /* AND THE SHAPE `dead-copy` COULD NOT SEE: a sentence whose only renderer is a module nothing
-     imports. It cost a real one — `copy.alpha`, the word that tells the alpha deployment apart from
+     imports. It cost a real one: `copy.alpha`, the word that tells the alpha deployment apart from
      the real record, named only by a component that had never been mounted. A grep over source said
      it was rendered. */
   { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
@@ -227,7 +238,38 @@ const CASES = [
 /** How many lines of a gate's output name the seeded file. One per seeded violation. */
 const named = (said, seeded) => said.split('\n').filter((l) => l.includes(seeded)).length;
 
+/**
+ * THE SENTENCE IS THE WORDS AND NOT THEIR CAPITALISATION, so every `expect` above is matched
+ * case-insensitively.
+ *
+ * TWICE IN TWO DAYS A REWORDING HAS UNHOOKED ONE OF THESE, and both times for a reason that had
+ * nothing to do with the rule under test. `graph`'s cycle finding lost the em dash the pattern was
+ * anchored on. `css-rules`'s `unemitted-class` message had a comma before *"a rename left the rule
+ * behind"* turned into a full stop, which capitalised the `a`, and the pattern went from matching
+ * to not matching without a single word changing.
+ *
+ * THE FIX IS TO MATCH WHAT THE ASSERTION IS ABOUT. No gate in this directory has two findings that
+ * differ only in case, so nothing is weakened by ignoring it, and one entire class of false red
+ * stops happening. The other half of the answer is in the patterns themselves: anchor on the words
+ * a rule cannot be stated without, never on the punctuation between them.
+ *
+ * AND THE FAILURE IS LOUD EITHER WAY, which is why this stays a pattern match rather than becoming
+ * machine-readable finding codes across thirty gates. A pattern that no longer matches makes this
+ * run red and names the gate; it has never been able to turn into a quiet pass. A test of tests
+ * should fail towards the false red, and this one does.
+ */
+const recognises = (expect) => (expect.flags.includes('i') ? expect : new RegExp(expect.source, `${expect.flags}i`));
+
 const failed = [];
+
+/**
+ * THE NEGATIVES THAT WERE NEVER ASKED, held apart from the ones that failed.
+ *
+ * A gate whose negative could not be run has not passed and has not failed, and those are three
+ * outcomes rather than two. Keeping the third in its own list is what lets the summary at the
+ * bottom print a denominator instead of a total that quietly shrank.
+ */
+const notRun = [];
 
 /**
  * The negatives that cannot be a fixture tree, because the thing under test is a real browser over
@@ -235,8 +277,8 @@ const failed = [];
  *
  * THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT COST AN EVENING. This was written as
  * `if (r.status === 0 || !said.includes(names))`, so a gate that went red for something else
- * entirely — a route that never settled, a browser that would not launch, a build too old for the
- * fixtures it is served with — was reported in the same words as a gate that saw the seeded
+ * entirely (a route that never settled, a browser that would not launch, a build too old for the
+ * fixtures it is served with) was reported in the same words as a gate that saw the seeded
  * violation and shrugged: "PASSED an intent with no glyph". That sentence sends a reader into the
  * rule, and the rule was fine. The fixture runner below has always said "went red but never named
  * X" and printed what the gate did say; these four now say the same thing, for the same reason.
@@ -247,7 +289,7 @@ const failed = [];
  */
 const BROWSER = [
   /**
-   * `layout`: `BRAINDOG_GATE_SEED=1` puts a 2000px heading inside `#main` — the exact bug the gate
+   * `layout`: `BRAINDOG_GATE_SEED=1` puts a 2000px heading inside `#main`, the exact bug the gate
    * is named after, and the one it could not see while it treated the app's own scroll container
    * as an exemption.
    */
@@ -255,7 +297,7 @@ const BROWSER = [
     gate: 'layout',
     seed: '1',
     names: 'reaches 2000px',
-    blind: 'PASSED a 2000px heading inside #main — it is examining nothing.',
+    blind: 'PASSED a 2000px heading inside #main. It is examining nothing.',
     red: 'red on a 2000px heading inside #main',
   },
   /**
@@ -264,37 +306,37 @@ const BROWSER = [
    * can be checked.
    *
    * AN ANCHOR BECAUSE A `div` PROVED NOTHING. The gate's exemption was written `button, a[href], …`,
-   * so every phone card — each one an anchor — was exempt, and the negative was seeding the one
+   * so every phone card, each one an anchor, was exempt, and the negative was seeding the one
    * shape that could not slip through. The rule looked tested and covered a third of what it claimed.
    */
   {
     gate: 'a11y',
     seed: 'intent',
     names: 'a.seeded[bad]',
-    blind: 'PASSED an intent with no glyph — colour is carrying meaning alone and nothing sees it.',
+    blind: 'PASSED an intent with no glyph. Colour is carrying meaning alone and nothing sees it.',
     red: 'red on an intent with no glyph',
   },
   /**
-   * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants — which
-   * is precisely what the build shipped for the life of the Text control — and the gate must notice
+   * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants, which
+   * is precisely what the build shipped for the life of the Text control, and the gate must notice
    * that two settings come back identical.
    */
   {
     gate: 'prefs',
     seed: 'prefs',
     names: 'the body step',
-    blind: 'PASSED a pinned token — a preference could reach the cookie and nothing else.',
+    blind: 'PASSED a pinned token. A preference could reach the cookie and nothing else.',
     red: 'red on a preference pinned to a constant',
   },
   /**
    * `keys`: `BRAINDOG_GATE_SEED=keys` swallows every `y` in the capture phase, which is what a
-   * binding nobody wrote looks like from outside the page — and the gate must name `copy-id`.
+   * binding nobody wrote looks like from outside the page, and the gate must name `copy-id`.
    */
   {
     gate: 'keys',
     seed: 'keys',
     names: 'copy-id',
-    blind: 'PASSED a swallowed key — the sheet could advertise a binding nothing answers.',
+    blind: 'PASSED a swallowed key. The sheet could advertise a binding nothing answers.',
     red: 'red on a key the page never receives',
   },
   /**
@@ -308,15 +350,18 @@ const BROWSER = [
     gate: 'queue',
     seed: 'queue',
     names: 'not ranked by cost of being wrong',
-    blind: 'PASSED a queue with the cheapest question first — the ranking could be reversed and nothing would say.',
+    blind: 'PASSED a queue with the cheapest question first. The ranking could be reversed and nothing would say.',
     red: 'red on a queue ranked backwards',
   },
 ];
 
 function seededBrowser({ gate, seed, names, blind, red }) {
-  /* Skipped when there is no build, like the gate itself. */
+  /* SKIPPED WHEN THERE IS NO BUILD, like the gate itself, AND WRITTEN DOWN. This returned without
+     touching either counter, so the five browser negatives could every one of them be skipped and
+     the only trace was five lines above a summary that still read like a full pass. */
   if (!existsSync(join(here, '..', '..', 'apps/web/build'))) {
     console.log(`  ${gate}: no build, so its negative is not run`);
+    notRun.push(gate);
     return;
   }
   const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
@@ -367,18 +412,26 @@ for (const { gate, expect, findings, run } of CASES) {
      which is a different failure wearing the same colour. */
   const seeded = readFileSync(join(fixture, 'expect.txt'), 'utf8').trim();
   if (r.status === 0) {
-    console.error(`  ${gate}: PASSED its own seeded violation — it is checking nothing.`);
+    console.error(`  ${gate}: PASSED its own seeded violation. It is checking nothing.`);
     failed.push(gate);
   } else if (!said.includes(seeded)) {
     console.error(`  ${gate}: went red but never named ${seeded}.`);
     console.error(said.split('\n').slice(0, 6).map((l) => `      ${l}`).join('\n'));
     failed.push(gate);
-  } else if (!expect.test(said)) {
-    console.error(`  ${gate}: went red with a sentence this test does not recognise.`);
+  } else if (!recognises(expect).test(said)) {
+    console.error(`  ${gate}: went red with a sentence this test does not recognise. What it did say:`);
+    console.error(
+      said
+        .split('\n')
+        .filter((l) => l.trim())
+        .slice(0, 6)
+        .map((l) => `      ${l}`)
+        .join('\n'),
+    );
     failed.push(gate);
   } else if (named(said, seeded) !== findings) {
     /* THE COUNT, NOT ONLY THE COLOUR. The colour-grep fixture used to carry three forms in one
-       file and this only asserted that the gate went red — so reverting any two of the three
+       file and this only asserted that the gate went red, so reverting any two of the three
        fixes still left the third firing, and the negative could not tell which of them was doing
        the work. A fixture that proves "something here is caught" is not a fixture; it has to
        prove that THIS is caught, which means one violation per fixture and the count asserted. */
@@ -405,12 +458,12 @@ for (const name of readdirSync(negatives, { withFileTypes: true }))
  *
  * `52 §4`: "every key is read by at least one gate (a `budgets.json` key nothing reads is a
  * `self-test` failure)". The reason is the same one the file exists for. A budget nobody reads is a
- * number that looks reviewed and asserts nothing — somebody tightens it, the diff is approved, and
+ * number that looks reviewed and asserts nothing: somebody tightens it, the diff is approved, and
  * the gate goes on measuring against whatever it holds instead. That is strictly worse than no
  * budget at all, because a missing one is visible and a dead one is not.
  *
  * IT GREPS FOR `.key` RATHER THAN PARSING. A gate reads its section into a one-letter binding, so
- * the use is `B.mainJsBrotli` and the name is unambiguous across this directory — no other file
+ * the use is `B.mainJsBrotli` and the name is unambiguous across this directory: no other file
  * here has a property by any of these names. A parser would be more precise and would also be a
  * second thing that can be wrong.
  */
@@ -501,9 +554,40 @@ function noSilentPass() {
 budgetsAreRead();
 noSilentPass();
 
-console.log(
-  failed.length === 0
-    ? `\n  self-test: ${ran} negative${ran === 1 ? '' : 's'} caught by the gate seeded for it.\n`
-    : `\n  self-test: ${failed.length} gate(s) do not: ${[...new Set(failed)].join(', ')}.\n`,
-);
-if (failed.length) process.exitCode = 1;
+/**
+ * AND THE ANSWER IS ONE CLAIM, so it may not be made from part of the evidence.
+ *
+ * `ran` USED TO BE PRINTED WITH NO DENOMINATOR. The five browser negatives need `apps/web/build`,
+ * and without one they returned from `seededBrowser` counting towards neither `ran` nor `failed`.
+ * A checkout with no build therefore printed `self-test: 56 negatives caught by the gate seeded for
+ * it.` and exited 0, and 56 is a comfortable number: nothing in that sentence says the five gates
+ * that guard the rendered product were never asked. The number that shrank was the only symptom,
+ * and a reader has to know 61 by heart to see it.
+ *
+ * A FINDING BEATS A SKIP, which is why `failed` is tested first. A run that caught a dead gate has
+ * an answer and it is red, whether or not five others were reachable.
+ *
+ * EXIT 3 AND NOT 0 FOR THE REST, and this is the one gate in the directory where the choice is not
+ * close. Every other gate reports a list of independent findings, so one input missing costs one
+ * check and the rest of the output still means what it says. This file reports a single verdict
+ * about the whole suite: *every gate catches the violation seeded for it*. That sentence is true
+ * or it is unproven, and five gates unasked make it unproven. Passing it off as a pass would be
+ * this file committing, about itself, the exact defect it was written to catch in others.
+ *
+ * AND THE SKIP LANDS WHERE IT SHOULD. `run.mjs` reads 3 as a skip and never as a pass, and CI
+ * builds before it runs the gates, so in CI this is red and the missing build is the finding. On a
+ * fresh clone it is a skip, which is the honest word for a question nobody could put.
+ */
+if (failed.length) {
+  console.log(`\n  self-test: ${failed.length} gate(s) do not: ${[...new Set(failed)].join(', ')}.\n`);
+  process.exitCode = 1;
+} else if (notRun.length) {
+  const asked = ran + notRun.length;
+  console.log(
+    `\n  self-test: ${ran} of ${asked} negatives caught, and ${notRun.length} not run for want of ` +
+      `apps/web/build: ${notRun.join(', ')}. Build, then ask again.\n`,
+  );
+  process.exit(3);
+} else {
+  console.log(`\n  self-test: ${ran} negative${ran === 1 ? '' : 's'} caught by the gate seeded for it.\n`);
+}

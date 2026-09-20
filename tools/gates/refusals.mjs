@@ -5,12 +5,12 @@
  *
  * `30 §6` opens with the reason there is a registry at all: *"Every document demands refusals that
  * name the field and what was expected. That only stays true if there is one shape."* And it names
- * where the list lives — *"the type `Refusal` (with `RefusalCode`) is a type-only export of
+ * where the list lives: *"the type `Refusal` (with `RefusalCode`) is a type-only export of
  * `@braindog/ports`, the lowest shared package, because `where` raises one and sits below the
  * kernel; **this table stays the list's home**, and every package imports the type."*
  *
  * `RefusalCode` DID NOT EXIST, and `code` was `string`. A code is the one part of a refusal a caller
- * can branch on: `10 §7` builds the agent contract on it — *"the refusal teaches"* — and an agent
+ * can branch on: `10 §7` builds the agent contract on it (*"the refusal teaches"*), and an agent
  * teaches itself from a code that is stable across versions. With nothing closing the list, the first
  * audit counted **51 of the 99 emitted, 48 emitted by nothing, and 24 more outside the registry**.
  *
@@ -24,22 +24,22 @@
  * code red today, and lets the type narrow the day it reaches zero.
  *
  * The 2026-09-08 pass took it from twenty-four to seven, and the arithmetic is in the budget's own
- * comment below: eleven renames, thirteen amendments to `30 §6` — including a ninth family, `Host and
- * client`, for the boundary a request arrives through — and three placeholders given the refusal
+ * comment below: eleven renames, thirteen amendments to `30 §6` (including a ninth family, `Host and
+ * client`, for the boundary a request arrives through) and three placeholders given the refusal
  * they were standing in front of. Two of the seven that remain are test fixtures that SHOULD stay,
  * so the honest floor is above zero and the comment says which two and why.
  *
  * The three sources, and the same shape `event-kinds` uses for the one other list this large:
  *
- *   1 · `30 §6`'s table — the home, and what a person reads.
- *   2 · `30 §6`'s counting sentence — *"One hundred and fifteen, counted, in nine families"* plus
+ *   1 · `30 §6`'s table: the home, and what a person reads.
+ *   2 · `30 §6`'s counting sentence: *"One hundred and fifteen, counted, in nine families"* plus
  *       nine sizes. A sentence that counts is a sentence that can be wrong, and a family can gain a
  *       code while the total stays right if another loses one.
  *   3 · `REFUSAL_CODES` in `@braindog/ports`, which is what code compares against.
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, extname, sep } from 'node:path';
+import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
@@ -107,12 +107,12 @@ for (const [name, konst] of FAMILIES) {
 }
 
 /* Every pair, both ways, because "the table gained a code" and "the array invented one" are
-   different repairs — the same argument `event-kinds` makes about its five sources. */
+   different repairs, the same argument `event-kinds` makes about its five sources. */
 for (const code of table) if (!declared.includes(code)) findings.push(`30 §6's table has \`${code}\` and REFUSAL_CODES does not`);
 for (const code of declared) if (!table.includes(code)) findings.push(`REFUSAL_CODES has \`${code}\` and 30 §6's table does not`);
 
 /* AND IN THE SAME FAMILY. A code that moves between families keeps the total and changes what it
-   MEANS — `30 §2`'s own argument about its groups, and it holds here for the same reason. */
+   MEANS. That is `30 §2`'s own argument about its groups, and it holds here for the same reason. */
 FAMILIES.forEach(([name], i) => {
   if (tableSizes[i] !== undefined && declaredSizes[i] !== undefined && tableSizes[i] !== declaredSizes[i])
     findings.push(`${name}: the table lists ${tableSizes[i]} and REFUSAL_CODES declares ${declaredSizes[i]}`);
@@ -187,11 +187,11 @@ for (const [text, want] of [['Ninety', 90], ['Ninety-nine', 99], ['One hundred',
 /* ── 3 · the sentence that counts ───────────────────────────────────────── */
 
 /* ONE LINE, BECAUSE THE SENTENCE IS NOT. It wraps in the document, and a regex anchored to a line
-   would report the sentence missing every time somebody reflowed the paragraph — a gate that goes
+   would report the sentence missing every time somebody reflowed the paragraph, and a gate that goes
    red on a line break is a gate people learn to ignore. */
 const flat = section.replace(/\s+/gu, ' ');
-/* AND THE TOTAL IS SPELLED IN WORDS THAT MAY HOLD A SPACE. This matched `[A-Z][a-z-]+` — one
-   capitalised, optionally hyphenated word — which reads `Ninety-nine` and cannot read `One hundred
+/* AND THE TOTAL IS SPELLED IN WORDS THAT MAY HOLD A SPACE. This matched `[A-Z][a-z-]+`, one
+   capitalised, optionally hyphenated word, which reads `Ninety-nine` and cannot read `One hundred
    and twelve`. The moment the list passed a hundred the gate reported the sentence MISSING rather
    than the count wrong, which is the least useful thing it could have said about the change that
    was happening.
@@ -199,11 +199,11 @@ const flat = section.replace(/\s+/gu, ' ');
    THE WORDS WERE THEN A LOOKUP TABLE, and the argument for it was that five entries is cheaper
    than an English number grammar nobody will test. Eleven entries later, every single code added
    to this repository has cost somebody a second red gate and a one-line edit to a table of
-   spellings — and the failure it gives them says `this gate cannot read as a number`, which
+   spellings, and the failure it gives them says `this gate cannot read as a number`, which
    sounds like a defect in their change and is not. A gate that manufactures work is a gate people
    route around. `words()` below reads the range this sentence can plausibly occupy, it is tested
    by `spelled()` beneath it on every run, and it costs nothing per code from here on. */
-const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families — (\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) spark · (\d+) connector · (\d+) host and client/.exec(flat);
+const counted = /([A-Z][a-z-]+(?: [a-z-]+)*), counted, in nine families\s+\S\s+(\d+) pack and declaration · (\d+) grammar · (\d+) write path · (\d+) auth and vault · (\d+) format and lifecycle · (\d+) dialect · (\d+) spark · (\d+) connector · (\d+) host and client/.exec(flat);
 if (!counted) {
   findings.push("30 §6's counting sentence is not where this gate looks for it");
 } else {
@@ -231,7 +231,7 @@ for (const [what, list] of [['30 §6', table], ['REFUSAL_CODES', declared]]) {
 /**
  * A code handed to a refusal constructor, or written as a `code:`.
  *
- * FOUR HELPERS, NOT ONE. The first version of this matched `no(` and `code:` only — and
+ * FOUR HELPERS, NOT ONE. The first version of this matched `no(` and `code:` only, and
  * `declare.ts`, the single largest emitter in the repository, builds every refusal through a local
  * `bad(code, fix, at, allowed)`. So the gate reported *39 emitted* over a scan that could not see
  * the file `04 §5` is about, and the six checks added the same afternoon moved the number by zero.
@@ -246,15 +246,15 @@ for (const [what, list] of [['30 §6', table], ['REFUSAL_CODES', declared]]) {
  *     code: e instanceof BadLine ? "FILE_MALFORMED" : "IMPORT_FAILED"
  *
  * puts an expression there. (Double quotes, because this gate scans `tools/` and the first version
- * of this comment reported ITSELF as an invented code — which is at least evidence the widening
- * works.) Two codes were hiding behind one — `IMPORT_FAILED`, which appeared
+ * of this comment reported ITSELF as an invented code, which is at least evidence the widening
+ * works.) Two codes were hiding behind one: `IMPORT_FAILED`, which appeared
  * nowhere else in the tree and so was outside the registry and invisible to the gate that counts
  * what is outside the registry, and `SCOPE_INSUFFICIENT`, which a test asserts on. The optional
  * middle group below crosses a ternary's condition and the trailing group takes its else arm, so a
  * two-armed `code:` is counted as the two codes it is. It deliberately stops at a newline and at a
  * quote: a pattern that would chew through a whole file to find an upper-case string would start
  * reporting SQL keywords and enum values as refusal codes, and a gate that cries wolf is a gate
- * people learn to read past — the failure the budget below is written to avoid.
+ * people learn to read past, the failure the budget below is written to avoid.
  */
 const EMITTED =
   /(?:code:\s*|\b(?:no|bad|refuse|at)\s*(?:<[^>]*>)?\(\s*)(?:[^'"\n]{0,160}\?\s*)?'([A-Z][A-Z0-9_]{2,})'(?:\s*:\s*'([A-Z][A-Z0-9_]{2,})')?/g;
@@ -269,17 +269,26 @@ let scanned = 0;
  *
  * `tools/gates/negative/` holds one small tree per gate, each seeded with the defect that gate is
  * meant to report. They are `.ts` files under `tools/`, so this walk read them like any other
- * source — and the day `refusal-fixtures` landed its negative, which seeds a `bad('ROW_LOCKED')`
+ * source, and the day `refusal-fixtures` landed its negative, which seeds a `bad('ROW_LOCKED')`
  * and a `bad('HUMAN_ONLY')` for its own gate to find, this gate's headline went from 75 emitted to
  * 77. Two codes the PRODUCT emits nowhere, counted as emitted, because another gate needed
  * something to fail on.
  *
  * That is the shape this file exists to catch, arriving through the front door: a number propped
  * up by a fixture rather than by the thing it claims to measure. It was caught by two gates
- * disagreeing — `refusal-fixtures` said 75 named and this said 77 emitted — which is the argument
+ * disagreeing (`refusal-fixtures` said 75 named and this said 77 emitted), which is the argument
  * for having both.
  */
-const SEEDED = `${sep}negative${sep}`;
+/*
+ * AND THE EXCLUSION IS ONE DIRECTORY, NOT A SUBSTRING OF EVERY PATH. Written `${sep}negative${sep}`
+ * this matched any absolute path with that segment anywhere in it, including the fixture roots
+ * themselves: `self-test` runs this gate with `BRAINDOG_GATE_ROOT` pointing INSIDE
+ * `tools/gates/negative/refusals`, so the very first call to `walk` returned on its own root and
+ * the gate's whole source scan read zero files under its own negative. The seeded emitter was never
+ * opened. `refusal-fixtures` excludes the same tree by relative path for the same reason.
+ */
+const SEEDED = 'tools/gates/negative';
+const rel = (path) => path.slice(root.length + 1).replaceAll('\\', '/');
 
 /**
  * A CODE NAMED IN A COMMENT IS NOT AN EMITTER.
@@ -298,7 +307,7 @@ const readable = (text) =>
     .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
 
 function walk(dir) {
-  if (`${dir}${sep}`.includes(SEEDED)) return;
+  if (rel(dir) === SEEDED) return;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (!skipDir(entry.name) && entry.name !== 'node_modules') walk(join(dir, entry.name));
@@ -306,7 +315,7 @@ function walk(dir) {
     }
     if (!['.ts', '.svelte', '.mjs'].includes(extname(entry.name))) continue;
     scanned += 1;
-    const where = join(dir, entry.name).slice(root.length + 1).replaceAll('\\', '/');
+    const where = rel(join(dir, entry.name));
     for (const m of readable(readFileSync(join(dir, entry.name), 'utf8')).matchAll(EMITTED))
       /* BOTH ARMS OF A TERNARY, and `m[2]` is `undefined` for the ordinary one-code case. */
       for (const code of [m[1], m[2]]) {
@@ -316,17 +325,28 @@ function walk(dir) {
       }
   }
 }
-for (const dir of ['packages', 'apps', 'tools']) {
+const TREES = ['packages', 'apps', 'tools'];
+const walked = [];
+for (const dir of TREES) {
   const at = join(root, dir);
   try {
-    if (statSync(at).isDirectory()) walk(at);
+    if (statSync(at).isDirectory()) {
+      walk(at);
+      walked.push(dir);
+    }
   } catch {
     /* a tree that is not here is not a finding */
   }
 }
 
 /**
- * The budget: five, and it may only go down.
+ * The budget: four, and it may only go down.
+ *
+ * IT SAID FIVE WHILE THE CONSTANT SAID FOUR. The ratchet below is enforced in both directions, so
+ * the number in the code cannot go slack, and the number in this sentence had gone slack anyway by
+ * being written twice. Four is the arithmetic of the list further down: seven remained after the
+ * 2026-09-08 pass, three of those are marked GONE, and the four rows with no such mark are the
+ * four the gate counts.
  *
  * Each of these is one of three things and the gate cannot tell which: a concept `30 §6` is missing
  * and should gain by amendment; a code that already exists under another name; or a placeholder
@@ -334,7 +354,7 @@ for (const dir of ['packages', 'apps', 'tools']) {
  * What a gate can do is stop the number growing while that happens.
  *
  * TWENTY-SIX WERE SORTED ON 2026-09-08 AND SEVEN ARE LEFT. Six were renames onto codes that already
- * existed and five onto new codes whose old names were wrong about their own subject — `UNIMPLEMENTED`
+ * existed and five onto new codes whose old names were wrong about their own subject: `UNIMPLEMENTED`
  * and `NOT_IMPLEMENTED` name nothing at all, and `SCHEMA_UNAVAILABLE` involved no schema. Thirteen
  * concepts `30 §6` genuinely lacked were admitted by amendment, including a ninth family for the
  * boundary a request arrives through, which this document had never had. The seven that remain, each
@@ -342,8 +362,8 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *
  *   `DECLARATION_INVALID` (32)  the catch-all `declare.ts` leans on. A project of its own, and it is
  *                               the one number here that measures how much validation has no word.
- *   `INTERNAL` (3)              a handler that threw. NOT a refusal — it names no field and no
- *                               expectation, and there is nothing a caller can fix — so `30 §6`
+ *   `INTERNAL` (3)              a handler that threw. NOT a refusal: it names no field and no
+ *                               expectation, and there is nothing a caller can fix, so `30 §6`
  *                               deliberately does not carry it. It is emitted identically by both
  *                               hosts and the Worker, and moving fewer than three of them would buy
  *                               a lower number here and a product that answers differently
@@ -364,36 +384,68 @@ for (const dir of ['packages', 'apps', 'tools']) {
  *                               `mcp`'s tests and three in `record`'s.
  *   `NOPE` (2) · `SOMETHING_NOBODY_MAPPED` (1)  test fixtures, and both are LEFT ON PURPOSE. The
  *                               first is a stub refusal in a transaction test where the code is not
- *                               what is asserted; the second is the subject of its own test —
- *                               *"a code nobody enumerated is still a 422"* — and replacing it with
+ *                               what is asserted; the second is the subject of its own test,
+ *                               *"a code nobody enumerated is still a 422"*, and replacing it with
  *                               a real code would delete the assertion. These two are the honest
  *                               floor: the budget cannot reach zero without making a test worse,
  *                               which is worth knowing before somebody tries.
  */
 const BUDGET = 4;
 const codes = [...invented.keys()].sort();
-/* THE BUDGET IS ABOUT A TREE WITH CODE IN IT. A fixture root holds a document and an array and no
-   source at all, so counting emitted codes there measures nothing — and the slack rule below would
-   report every fixture as an improvement. A gate that is red on its own negatives for the wrong
-   reason teaches people to read past its output. */
-const measured = scanned > 50;
+/**
+ * THE BUDGET IS A STATEMENT ABOUT THE WHOLE REPOSITORY, so it is measured when the whole
+ * repository was walked and not otherwise. A fixture root holds a document, an array and at most
+ * one package, so counting emitted codes there measures nothing, and the slack rule below would
+ * report every fixture as an improvement. A gate that is red on its own negatives for the wrong
+ * reason teaches people to read past its output.
+ *
+ * IT WAS WRITTEN `scanned > 50`, WHICH IS A DIFFERENT CLAIM AND A SILENT ONE. Fifty is not a
+ * property of anything: the real tree walks 814 files, sixteen times the threshold, so no real run
+ * has ever come near it, and the number was really asking "am I pointed at a fixture?" in a
+ * spelling that could also answer yes to a walk that had broken. A root with fifty-one source
+ * files measured the budget and went red; the same root with fifty went green and said nothing had
+ * been dropped. One file decided whether two checks existed.
+ *
+ * THE TEST IS NOW WHAT IT MEANT: `packages`, `apps` and `tools` all present and all walked. Those
+ * three are always in a real checkout, and no fixture has more than one of them, so the condition
+ * separates the two cases by what actually distinguishes them rather than by a size.
+ *
+ * AND IT IS SAID OUT LOUD BELOW RATHER THAN EXITING 3 OR PUSHING A FINDING. Exit 3 would be wrong
+ * because `self-test` runs this gate against a fixture root and reads its findings: a gate that
+ * skipped there would be reported as one that failed to catch its own seeded violation. A finding
+ * would be wrong because nothing is broken when this gate is aimed at one small tree on purpose,
+ * and a gate red about its own test harness is a gate people learn to read past. What was actually
+ * missing was the sentence.
+ */
+const measured = walked.length === TREES.length;
 if (measured && codes.length > BUDGET) {
   findings.push(`${codes.length} refusal codes are outside 30 §6's registry; the budget is ${BUDGET}`);
-  for (const code of codes.slice(0, 30)) findings.push(`  \`${code}\` — ${[...new Set(invented.get(code))].slice(0, 3).join(', ')}`);
+  for (const code of codes.slice(0, 30)) findings.push(`  \`${code}\`: ${[...new Set(invented.get(code))].slice(0, 3).join(', ')}`);
 }
 
 /* AND THE BUDGET IS NOT ALLOWED TO BE SLACK EITHER. A budget nobody lowers is a budget that stops
    meaning anything; when the count drops, this says so and asks for the number to come with it. */
 if (measured && codes.length < BUDGET)
-  findings.push(`only ${codes.length} codes are outside the registry now — lower the budget from ${BUDGET} to ${codes.length}`);
+  findings.push(`only ${codes.length} codes are outside the registry now. Lower the budget from ${BUDGET} to ${codes.length}`);
 
 if (findings.length === 0) {
-  console.log(
-    `  refusals: ${table.length} codes in ${FAMILIES.length} families, three sources agree; ` +
-      `${measured ? `${emitted.size} emitted, ${table.length - emitted.size} by nothing, ${codes.length} outside the list` : 'no source tree to measure'}`,
-  );
+  console.log(`  refusals: ${table.length} codes in ${FAMILIES.length} families, three sources agree`);
+  /* AND THE DENOMINATOR IS PRINTED EITHER WAY. `scanned` was never in this output, so a run that
+     walked 814 files and a run that walked none read the same except for one clause tucked inside
+     a green sentence. `refusal-fixtures` prints "N codes named across M sources" for this reason;
+     a count with no denominator is a number nobody can check. */
+  if (measured)
+    console.log(
+      `  refusals: ${scanned} sources in ${TREES.join(', ')}; ${emitted.size} emitted, ` +
+        `${table.length - emitted.size} by nothing, ${codes.length} outside the list against a budget of ${BUDGET}`,
+    );
+  else
+    console.log(
+      `  refusals: ${scanned} source(s) walked and ${emitted.size} emitted, and the ${BUDGET}-code budget was NOT measured, ` +
+        `because this root has no ${TREES.filter((t) => !walked.includes(t)).join(' and no ')}`,
+    );
 } else {
-  console.error(`\n  refusals: ${findings.length} finding(s) — 30 §6\n`);
+  console.error(`\n  refusals: ${findings.length} finding(s) (30 §6)\n`);
   for (const f of [...new Set(findings)]) console.error(`    ${f}`);
   console.error(
     "\n  30 §6 is the list's home. A code is the one part of a refusal a caller can branch on,\n" +

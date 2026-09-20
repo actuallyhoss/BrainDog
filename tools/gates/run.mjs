@@ -4,7 +4,7 @@
  *   node tools/gates/run.mjs
  *
  * A gate that only warns is a gate that is ignored, so each one exits non-zero and this runner
- * reports every failure rather than stopping at the first — a run that names one problem when there
+ * reports every failure rather than stopping at the first. A run that names one problem when there
  * are four costs four runs.
  */
 
@@ -29,11 +29,11 @@ const root = join(here, '..', '..');
 const PNPM = ['pnpm -r run typecheck', [], { shell: true }];
 
 const GATES = [
-  /* FIRST, because a type error invalidates every gate under it — and because two of them reached a
+  /* FIRST, because a type error invalidates every gate under it, and because two of them reached a
      commit while the seven browser-and-grep gates all reported green. `pnpm -r` so the packages and
      both apps are held to it, which is where the shapes actually cross. */
   ['typecheck', PNPM],
-  /* THE GATES' OWN TEST, SECOND. A gate that has never failed is a gate that may not work — and an
+  /* THE GATES' OWN TEST, SECOND. A gate that has never failed is a gate that may not work. An
      audit found six here reporting zero findings because their predicate could never be true, every
      one of them printing green. This runs each grep gate against a seeded violation and is red when
      one of them passes it, which is the only thing that makes the nine below mean anything. */
@@ -45,12 +45,12 @@ const GATES = [
 
   /* BESIDE `stack` BECAUSE IT IS THE SAME KIND OF CHECK: a raw byte scan over source, cheap and
      early. Two files in this repository picked up a stray NUL byte and nothing in the other
-     twenty-four gates noticed — one sat inside a string literal and typechecked clean, the other
+     twenty-four gates noticed: one sat inside a string literal and typechecked clean, the other
      sat inside a regex character class where `\x00` was meant. A NUL also makes git call the file
      binary, so it silently stops diffing and stops merging. This is a scan of bytes rather than of
      syntax, because the defect is in the byte and not in the shape of the code around it. */
   ['nul-bytes', ['node', [join(here, 'nul-bytes.mjs')]]],
-  /* THE OTHER HALF OF `31 §3`. `stack` is layer 4 — the runtime surface a package may not name.
+  /* THE OTHER HALF OF `31 §3`. `stack` is layer 4: the runtime surface a package may not name.
      This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
      climbs out of its own package, which pnpm resolves happily and which nothing else can see. */
   ['graph', ['node', [join(here, 'graph.mjs')]]],
@@ -61,14 +61,14 @@ const GATES = [
      not code, so nothing but a gate can notice that a document gained a kind the database refuses. */
   ['event-kinds', ['node', [join(here, 'event-kinds.mjs')]]],
   /* THE SURFACE IS SPLIT BY WHO MAY REACH IT (30 §5), and sixteen INTERNAL methods are each one line
-     from being routable — `createRecord` makes somebody the owner of a record. */
+     from being routable. `createRecord` makes somebody the owner of a record. */
   ['router-groups', ['node', [join(here, 'router-groups.mjs')]]],
   /* AND WHETHER THE RECORD APPLIES THE GROUP THE TABLE PUBLISHES. `30 §10` puts authorisation in
      the record, so the group in `ROUTES` gates nothing at runtime; it was ADMIN on a method guarded
      `read`, and the answer to that method carries every colleague's email. */
   ['guards', ['node', [join(here, 'guards.mjs')]]],
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
-     code path forgets — which holds only while the CHECK and the document agree about what it is. */
+     code path forgets, which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', ['node', [join(here, 'closed-lists.mjs')]]],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
@@ -90,22 +90,22 @@ const GATES = [
 
   /* AND THE OTHER HALF OF `30 §6`'s LAST PARAGRAPH: *"every `code` has a fixture that produces
      it."* `refusals` counts which codes the tree emits and says 37 are emitted by nothing; this
-     holds the other 75 to a file each, keyed by the `via` that raises it — which is what turns that
+     holds the other 75 to a file each, keyed by the `via` that raises it, which is what turns that
      37 from a search into a burn-down. Beside `refusals` because they are two halves of one
      sentence. */
   ['refusal-fixtures', ['node', [join(here, 'refusal-fixtures.mjs')]]],
   /* A FLAG IS A DECISION THAT HAS NOT BEEN TAKEN, and the failure it becomes is permanent
      branching. This asks six questions of the list, of which the load-bearing one is whether the
-     flag is read at all — `dead-copy`'s own hole is that a statically-false `{#if}` counts as
+     flag is read at all. `dead-copy`'s own hole is that a statically-false `{#if}` counts as
      rendered, and every flag is that `{#if}`. */
   ['flags', ['node', [join(here, 'flags.mjs')]]],
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
-     pack can own — and breaking it is always the shortest path. */
+     pack can own, and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
   ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
   ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
   /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true
-     only while the file and the product hold the same sentences — and 26 of 212 were reviewable and
+     only while the file and the product hold the same sentences, and 26 of 212 were reviewable and
      unrendered, including the five that define the words the product is built out of. */
   ['dead-copy', ['node', [join(here, 'dead-copy.mjs')]]],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
@@ -114,11 +114,11 @@ const GATES = [
   ['bundle', ['node', [join(here, 'bundle.mjs')]]],
   /* A PREFERENCE THAT CHANGES NOTHING IS A CONTROL THAT LIES (`25 §1`'s `series` class). The Text
      setting shipped inert for the life of the build because the 128-configuration matrix is widths,
-     schemes and directions — no preference but `scheme` is an axis of it, so nothing ever asked. */
+     schemes and directions. No preference but `scheme` is an axis of it, so nothing ever asked. */
   ['prefs', ['node', [join(here, 'prefs.mjs')]]],
   /* AND EVERY KEY THE PRODUCT PRINTS IS A KEY THAT DOES SOMETHING. `19 §4`'s whole argument for a
-     registry is that the sheet documents by READING it, so it cannot drift — and it had drifted
-     three ways, found by a sweep rather than by anything here. */
+     registry is that the sheet documents by READING it, so it cannot drift. It had drifted three
+     ways, found by a sweep rather than by anything here. */
   ['keys', ['node', [join(here, 'keys.mjs')]]],
   // Last three because they are the slow ones: a real browser over every route.
   ['layout', ['node', [join(here, 'layout.mjs')]]],
@@ -139,7 +139,7 @@ const GATES = [
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The twenty-seven above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
-     ask — so everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
+     ask. Everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
   ['deploy-parity', ['node', [join(here, 'deploy-parity.mjs')]]],
 ];
@@ -148,22 +148,22 @@ const GATES = [
  * A GATE FILE NOBODY REGISTERED IS A GATE NOBODY RUNS, and nothing said so.
  *
  * `52 §5.1` step 1 is *"list `tools/gates/*.mjs` minus `run.mjs`, `lib.mjs`, `self-test.mjs`"* and
- * this file holds a hard-coded array instead — which is exactly the failure the `--except` comment
+ * this file holds a hard-coded array instead, which is exactly the failure the `--except` comment
  * below argues against, one level down: *"a workflow that names what it runs stops running the gate
  * somebody adds tomorrow, silently and for ever."* Two gates were written and left unregistered in
  * one week; both were caught by a person noticing, which is not a mechanism.
  *
  * IT IS NOT A DIRECTORY SCAN REPLACING THE ARRAY, and the array stays. It carries two things a scan
- * cannot: the ORDER, which is load-bearing — `typecheck` first because a type error invalidates
+ * cannot: the ORDER, which is load-bearing (`typecheck` first because a type error invalidates
  * everything under it, `self-test` second because it is what makes the rest mean anything, the two
- * browser gates last because they are nineteen minutes — and the entries that are not files in this
- * directory at all, like `theme`, which runs `packages/skin/scripts/theme.mjs --check`.
+ * browser gates last because they are nineteen minutes), and the entries that are not files in
+ * this directory at all, like `theme`, which runs `packages/skin/scripts/theme.mjs --check`.
  *
  * So the scan is the CHECK and not the source. Adding a gate is still a line in this file;
  * forgetting the line is now loud, before a single gate has run.
  *
  * AND WHAT COUNTS AS A GATE IS DERIVED RATHER THAN LISTED. The first version of this held
- * `['run.mjs', 'lib.mjs', 'self-test.mjs']` as a literal — `52 §5.1`'s own three — and reported
+ * `['run.mjs', 'lib.mjs', 'self-test.mjs']` as a literal (`52 §5.1`'s own three) and reported
  * `routes.mjs`, which is not a gate: it exports `routesOf` and `a11y` and `layout` both import it.
  * A hand-written list of exceptions is the same defect as a hand-written list of gates, one line
  * further down, so the rule is derived instead: **a file another file in this directory imports is
@@ -184,13 +184,13 @@ const registered = new Set(
 const unregistered = here_files.filter((name) => !RUNNERS.has(name) && !imported.has(name) && !registered.has(name));
 if (unregistered.length > 0) {
   console.error(
-    `\n  ${unregistered.join(', ')} in tools/gates/ and in no GATES entry — a gate nobody registered is a gate nobody runs.`,
+    `\n  ${unregistered.join(', ')} in tools/gates/ and in no GATES entry. A gate nobody registered is a gate nobody runs.`,
   );
   process.exit(1);
 }
 
 /**
- * Which of them this run is asking for — `52 §2`'s flags, less `--negative`.
+ * Which of them this run is asking for: `52 §2`'s flags, less `--negative`.
  *
  *   node tools/gates/run.mjs --except layout,a11y,keys,prefs,bundle    the ones that read source
  *   node tools/gates/run.mjs --only theme                              that one
@@ -199,20 +199,20 @@ if (unregistered.length > 0) {
  * SELECTION IS NOT TOLERANCE, and `52 §6` is about the other thing: *"there is no `skip`, `only`,
  * `retry` or `allow-failure` on a gate"* forbids a red gate being waved through, and nothing here
  * changes what a red gate does. What this picks is which JOB asks the question, and it exists
- * because five of the nineteen need a built app and a real browser — nineteen minutes of one — while
- * the fourteen that read source cost under a minute. One workflow cannot hold both answers: at
+ * because five of the nineteen need a built app and a real browser (nineteen minutes of one),
+ * while the fourteen that read source cost under a minute. One workflow cannot hold both answers: at
  * nineteen minutes on every push the run is cancelled or ignored, and at fourteen gates on merge
  * alone the browser ones report after the commit that broke them has landed.
  *
  * `--except`, AND NOT A LIST OF THE FAST ONES, is the whole reason it is spelt this way. A workflow
- * that names what it runs stops running the gate somebody adds tomorrow, silently and for ever — the
- * same defect as a gate that cannot fail, one level up again. A workflow that names what it
- * EXCLUDES picks the new one up; and if the new one turns out to need a build it exits 3, which is
- * red under CI, so what arrives is a sentence naming the gate rather than a green run that checked
- * one thing fewer than it claims.
+ * that names what it runs stops running the gate somebody adds tomorrow, silently and for ever.
+ * That is the same defect as a gate that cannot fail, one level up again. A workflow that names
+ * what it EXCLUDES picks the new one up; and if the new one turns out to need a build it exits 3,
+ * which is red under CI, so what arrives is a sentence naming the gate rather than a green run
+ * that checked one thing fewer than it claims.
  *
  * A NAME THAT MATCHES NOTHING IS EXIT 2. `--except a11y,ally` would otherwise run everything and
- * report success, and a typo that widens coverage is not the failure mode worth guarding — a typo
+ * report success, and a typo that widens coverage is not the failure mode worth guarding. A typo
  * that narrows it is, and `--only bundel` is that one.
  */
 const list = (flag) => {
@@ -247,7 +247,7 @@ const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
 const failed = [];
 
 /**
- * Gates that could not run — exit 3, which is a skip and not a pass.
+ * Gates that could not run: exit 3, which is a skip and not a pass.
  *
  * FIVE OF THESE PRINTED GREEN WITH NO BUILD. `bundle`, `layout` and `a11y` exited 0 when there was
  * nothing to measure, so `pnpm gates` on a fresh checkout reported every gate passed with three of

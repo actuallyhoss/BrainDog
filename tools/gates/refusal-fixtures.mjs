@@ -12,13 +12,13 @@
  * and it fixes where the files live and what keys them:
  *
  *     "Every fixture lives at `fixtures/refusals/<name>.yaml`; the name is the code in kebab-case,
- *      and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`, `write`,
+ *      and each fixture is keyed by the `via` that raises it: `install`, `lint`, `where`, `write`,
  *      `rpc` and the rest; the split per `via` is the fixtures spec's to count (40 §6)."
  *
  * THERE WAS NO `fixtures/` DIRECTORY, so that whole paragraph was a sentence about something nobody
  * had built, and `52 §3`'s gate table carried a `refusal-fixtures` row pointing at nothing. This is
- * the script half of it. `52 §5.2` splits the work in one line — *"the script owns the enumeration,
- * the tests own the behaviour"* — so what is here is: one fixture per code, one code per fixture,
+ * the script half of it. `52 §5.2` splits the work in one line: *"the script owns the enumeration,
+ * the tests own the behaviour"*. So what is here is: one fixture per code, one code per fixture,
  * kebab name = code, the header shape, and the live site each fixture claims. Whether driving that
  * site actually produces that code is the `via` runners' (`40 §6`), and they are not this file.
  *
@@ -26,17 +26,17 @@
  *
  *     # fixtures/refusals/row-locked.yaml
  *     code:   ROW_LOCKED                          # UPPER_SNAKE; kebab-case of it is the file name
- *     via:    write                               # one of 40 §6's seven — the surface a runner drives
+ *     via:    write                               # one of 40 §6's seven, the surface a runner drives
  *     raises: packages/kernel/src/index.ts        # the file that CONSTRUCTS it, repo-relative
- *     at:     fields.lesson                       # the path the refusal carries — 30 §6's `at`
+ *     at:     lesson                              # the path the refusal carries (30 §6's `at`)
  *     found:  reverted                            # optional, and `wanted:` likewise
- *     fix:    Reopen the row before editing it.   # ONE sentence — 30 §6's shape for the fix
+ *     fix:    Reopen the row before editing it.   # ONE sentence, 30 §6's shape for the fix
  *     declare:                                    # the via's input keys (40 §6), if the fixture
  *       register: learnings                       # carries them; this gate reads none of it
  *
  * The file is YAML and `40 §6` wrote it as YAML, but **nothing in this repository parses YAML**.
- * `42 §2` puts the one parser behind `@braindog/declare`'s `./yaml` subpath — *"the one module in
- * the repository that parses YAML"* — and that subpath does not exist: `packages/declare` exports
+ * `42 §2` puts the one parser behind `@braindog/declare`'s `./yaml` subpath, *"the one module in
+ * the repository that parses YAML"*. That subpath does not exist: `packages/declare` exports
  * `.` alone, there is no `src/yaml.ts`, and `yaml` 2.9.0 is in no `package.json` and no
  * `node_modules`. Even once it does exist a gate may not reach for it: every script in this
  * directory imports node builtins, `./lib.mjs` and `@playwright/test`, and a gate that needed a
@@ -46,12 +46,12 @@
  * this gate asserts on is a plain scalar at column 0. Anything indented belongs to a block and is
  * skipped whole, which is what lets a fixture carry `40 §6`'s nested `declare:`/`rows:`/`write:`
  * input for its runner without this file pretending to understand it. When `./yaml` lands, a real
- * parser reads these files unchanged — the subset is valid YAML, not a lookalike.
+ * parser reads these files unchanged. The subset is valid YAML, not a lookalike.
  *
  * ─── WHAT IS ASSERTED, AND WHAT IS DELIBERATELY NOT ──────────────────────────────────────────────
  *
  * NOT `REFUSAL_CODES`. `52 §5.2` step 4 asks this gate to compare the table against the closed code
- * list a package exports, and `refusals.mjs` already does exactly that — both directions, family by
+ * list a package exports, and `refusals.mjs` already does exactly that: both directions, family by
  * family, plus the counting sentence. Asserting it twice makes two files that can disagree about
  * one fact, and a reader hitting the disagreement has no way to tell which is the repair. The codes
  * here come from `30 §6`'s table because `30 §6` says *"this table stays the list's home"*, and
@@ -59,20 +59,31 @@
  *
  * ─── THE SHORTFALL, AND WHY IT IS NOT A BUDGET ───────────────────────────────────────────────────
  *
- * `refusals.mjs` measures which codes the tree EMITS: 74 of the 112, with 38 emitted by nothing.
- * Writing 112 fixtures would mean inventing a path, an input and a `fix` sentence for 38 refusals no
- * line of code raises — fiction that passes for ever, and the exact silence the self-test exists to
- * break. So the corpus is the 74, and this gate's rule is about the tree rather than the registry:
- * **every code the source names has a fixture.** Today that shortfall is zero and it is red the
- * moment it is not.
+ * `refusals.mjs` measures which codes the tree EMITS, and some of the registry is emitted by
+ * nothing. Writing a fixture for every registry entry would mean inventing a path, an input and a
+ * `fix` sentence for refusals no line of code raises. That is fiction that passes for ever, and the
+ * exact silence the self-test exists to break. So the corpus is what the source names, and this
+ * gate's rule is about the tree rather than the registry: **every code the source names has a
+ * fixture.** Today that shortfall is zero and it is red the moment it is not.
  *
- * WHICH IS WHY THE 38 ARE NOT A BUDGET. `refusals.mjs` holds `BUDGET = 7` because it cannot tell its
- * three cases apart — a missing concept, a synonym, a placeholder — and a number is what you write
- * when the gate cannot make the judgement. Here it can: the codes without a fixture are exactly the
+ * NO FIGURES IN THIS PARAGRAPH, AND THAT IS THE POINT. It used to read "74 of the 112, with 38
+ * emitted by nothing", measured once and then left. The registry is 126 now, so every number in it
+ * was wrong, and a reader checking this gate's reasoning was being handed arithmetic that had not
+ * been true for months. The counts are printed on every run by the line at the bottom of this file,
+ * which is the only place they cannot go stale.
+ *
+ * WHICH IS WHY THE SHORTFALL IS NOT A BUDGET. `refusals.mjs` holds a small `BUDGET` because it cannot
+ * tell its three cases apart (a missing concept, a synonym, a placeholder), and a number is what you
+ * write when the gate cannot make the judgement. Here it can: the codes without a fixture are the
  * codes the source does not name, and both halves are computed on every run, so the number is
  * derived rather than stored. A stored 38 could go slack (nobody lowers it) or be widened by whoever
  * is in a hurry; a derived one cannot be either. It is printed, because it is the burn-down list
- * `30 §6` wants — but it is printed as arithmetic that already agrees, not as a promise.
+ * `30 §6` wants. It is printed as arithmetic that already agrees, not as a promise.
+ *
+ * AND A STORED 38 IS EXACTLY WHAT WENT SLACK, in the paragraph above rather than in the code. The
+ * argument for deriving the number was written, acted on for the gate, and then the same file
+ * carried three hand-typed copies of the number it had just finished arguing should never be
+ * hand-typed. The code was right and its own explanation was the thing that rotted.
  *
  * AND THE OTHER DIRECTION IS PER-FIXTURE, NOT COUNTED. Each fixture names the file that raises its
  * code and this checks that the file is there and still says it, so a refusal site that is renamed
@@ -80,10 +91,14 @@
  * never had: it cites documents, and nothing in the tree connected a code to the line.
  *
  * A DIFFERENT PREDICATE FROM `refusals.mjs`, ON PURPOSE, AND THEY AGREE. That gate matches the shape
- * of a refusal CONSTRUCTOR — `no(` `bad(` `refuse(` `at(` and `code:` — because it is hunting for
+ * of a refusal CONSTRUCTOR (`no(` `bad(` `refuse(` `at(` and `code:`) because it is hunting for
  * codes outside the registry and has to see the call. This one asks the simpler question: is the
- * code written as a whole string literal anywhere in first-party source? Measured on 2026-09-09 the
- * two answers are the same code for code, 74 and 74. Simpler is right here because the failure this
+ * code written as a whole string literal anywhere in first-party source? Re-measured on 2026-09-20
+ * by replicating both predicates over the same file set: the same code for code, 115 and 115, and
+ * the eleven with no fixture are exactly the eleven no line constructs. Note that `refusals.mjs`
+ * prints 113 rather than 115 on the same tree, so its own line is counting something narrower than
+ * the predicate described here; the two codes are unaccounted for and are noted in `loop/STATUS.md`
+ * rather than papered over. Simpler is right here because the failure this
  * gate guards against is a code somebody NAMED and did not fixture, and a test that asserts on a
  * code names it just as much as the line that throws it.
  */
@@ -111,7 +126,7 @@ const section = blueprint.slice(at6, blueprint.indexOf('## 7 ', at6));
 if (section.length < 500) findings.push('30 §6 is not where this gate looks for it');
 
 /* THE FIXTURE COLUMN IS THE THIRD, AND IT IS READ RATHER THAN DERIVED. Every row of the nine tables
-   carries the file name it expects, so the document can be wrong about its own rule — which is
+   carries the file name it expects, so the document can be wrong about its own rule. That is
    `52 §5.2` step 1, and the only check here that needs no fixture on disk at all. */
 const rows = [...section.matchAll(/^\| `([A-Z][A-Z0-9_]*)` \| .* \| `([a-z0-9-]+)` \|$/gm)].map((m) => ({
   code: m[1],
@@ -128,11 +143,11 @@ const registry = new Map(rows.map((r) => [r.code, r]));
 
 /**
  * `30 §6` names five and says "and the rest", handing the closed list to `40 §6`. So it is read from
- * there — a count is read from the enumeration that owns it (`34 §6`), and a `via` list copied into
+ * there. A count is read from the enumeration that owns it (`34 §6`), and a `via` list copied into
  * a gate is a list that stops agreeing with the runners the day somebody adds an eighth.
  *
  * THE INPUT KEYS COME OFF THE SAME ROW. `40 §6`'s table gives each `via` the keys its fixtures may
- * carry, backticked and colon-suffixed — `pack:`, `predicate:`, `tamper:` — beside the nested names
+ * carry, backticked and colon-suffixed (`pack:`, `predicate:`, `tamper:`), beside the nested names
  * that carry no colon and are not top-level keys. Reading them makes that column load-bearing
  * instead of prose, and it is what lets a `write` fixture holding a `predicate:` go red.
  */
@@ -147,8 +162,25 @@ const VIAS = new Map(
 );
 if (VIAS.size === 0) findings.push("40 §6's `via` table is not where this gate looks for it");
 
-/** The keys this gate reads. `30 §6`'s Refusal shape, plus the two the fixture adds to it. */
-const HEADER = { code: true, via: true, raises: true, at: true, fix: true, found: false, wanted: false };
+/**
+ * The keys this gate reads. `30 §6`'s Refusal shape, plus the two the fixture adds to it.
+ *
+ * `at` IS OPTIONAL, AND MAKING IT REQUIRED WAS COMPELLING A LIE. `41 §6` says in terms that `at` is
+ * optional and that "a refusal with nothing to point at carries none, which is what the format
+ * codes do today". This line said otherwise, so an author writing a fixture for a code whose
+ * emitter carries no `at` had two moves: invent an address, or go red. Nine fixtures invented one.
+ * Three of those nine are still here because the right value is nothing: `IMPORT_NOT_EMPTY` is
+ * about several tables at once and says so in `fix`; `REGISTER_UNKNOWN` carries `allowed:` instead,
+ * which is strictly more use than restating the code's own name; `VERSION_STALE` is derived from a
+ * conflict envelope that has no slot for one.
+ *
+ * WHICH IS A SUBTRACTION AND NOT A CHECK, deliberately. Nothing here verifies that a fixture's `at`
+ * matches what its emitter produces, and nothing cheap can: a code with six emitters has six legal
+ * shapes, and each is a template literal over values only a running emitter has. That verification
+ * is the `via` runners' (`40 §6`) and there is no honest proxy for it. What this line can do is
+ * stop the format manufacturing claims nobody asked for, which is the cheaper half and is free.
+ */
+const HEADER = { code: true, via: true, raises: true, at: false, fix: true, found: false, wanted: false };
 
 /* ── 3 · the fixture directory, and the two places the corpus says it is ─── */
 
@@ -177,7 +209,7 @@ if (homes.length > 1) findings.push(`the fixtures are in two places at once: ${h
  * The forty lines. Column 0 is the header; everything indented is the runner's.
  *
  * IT IS STRICT ABOUT WHAT IT DOES NOT UNDERSTAND. A line at column 0 that is not a comment, not
- * blank and not `key:` is a finding rather than a skip — the failure worth guarding against is a
+ * blank and not `key:` is a finding rather than a skip. The failure worth guarding against is a
  * fixture whose `code:` was typed as `code =` and silently read as absent, which would have taken
  * the file out of the corpus while leaving it on disk.
  */
@@ -205,7 +237,7 @@ function header(text, where) {
  * ONE SENTENCE IS CHECKABLE AND IMPERATIVE IS NOT, and asserting only what can be measured is the
  * difference between a rule and a wish. A sentence break is terminal punctuation with anything after
  * it; the end is terminal punctuation with nothing after it. Neither is a number, so neither belongs
- * in `budgets.json` — `52 §4` is about numbers a design document owns, and a full stop is not one.
+ * in `budgets.json`. `52 §4` is about numbers a design document owns, and a full stop is not one.
  */
 const oneSentence = (fix) => /[.?!]$/.test(fix) && !/[.?!]\s/.test(fix) && /^[A-Z]/.test(fix);
 
@@ -281,12 +313,12 @@ for (const home of homes) {
  * A code written as a whole string literal in first-party source.
  *
  * WHOLE, BECAUSE HALF OF ONE IS PROSE. `apps/web`'s job-view mock carries the string
- * "PROPOSAL_UNCITED — a proposal must attach the rows it read" as the text of a fake tool result,
+ * "PROPOSAL_UNCITED: a proposal must attach the rows it read" as the text of a fake tool result,
  * and three source comments name a code in backticks to argue about it. A pattern that matched
  * inside a string or inside a comment reported four codes as raised that nothing raises, which is a
  * gate crying wolf about the one thing it exists to say.
  *
- * AND NOT THE REGISTRY ITSELF. `packages/ports/src/index.ts` is 112 quoted codes in nine arrays and
+ * AND NOT THE REGISTRY ITSELF. `packages/ports/src/index.ts` is 126 quoted codes in nine arrays and
  * would answer yes to every one of them; the negative fixture trees under `tools/gates/negative/`
  * carry copies of it for the same reason, so the file is skipped by name wherever it sits. The
  * negatives are skipped whole besides: a seeded violation is an input to a gate, not source.
@@ -348,7 +380,7 @@ if (homes.length > 0)
 /* ── 6 · the line ────────────────────────────────────────────────────────── */
 
 if (findings.length > 0) {
-  console.error(`\n  refusal-fixtures: ${findings.length} finding(s) — 30 §6\n`);
+  console.error(`\n  refusal-fixtures: ${findings.length} finding(s) against 30 §6\n`);
   for (const f of [...new Set(findings)].slice(0, 40)) console.error(`    ${f}`);
   console.error(
     '\n  30 §6: every code has a fixture that produces it, and a code with no fixture fails CI.\n' +
@@ -359,7 +391,7 @@ if (findings.length > 0) {
 } else if (homes.length === 0) {
   /* EXIT 3 IS A SKIP, NOT A PASS. With no corpus on disk the checks above examined 30 §6 and
      nothing else, and printing green would say the fixtures are fine when there are none. */
-  console.log(`  refusal-fixtures: ${rows.length} codes in 30 §6 and no fixtures — expected at ${HOMES[0]}/`);
+  console.log(`  refusal-fixtures: ${rows.length} codes in 30 §6 and no fixtures. Expected at ${HOMES[0]}/`);
   process.exit(3);
 } else {
   console.log(
