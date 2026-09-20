@@ -16,6 +16,7 @@
 import { parseArgs } from 'node:util';
 
 import { briefingOf, clip, placeOf, repoOf } from './brief.ts';
+import { movedSince } from './hooks.ts';
 import { positionOf } from './position.ts';
 import { connect, type AgentIo } from './skills.ts';
 
@@ -51,7 +52,7 @@ export async function context(args: string[], io: AgentIo): Promise<number> {
 
   const here = await positionOf(io.cwd);
   const head = headline(at.context.session, here, placeOf(at.context));
-  /* `moved` needs the handoff's commit counted against HEAD, which only the start hook does today. */
-  for (const line of briefingOf(head, at.context, undefined).split('\n')) io.out(line);
+  const moved = await movedSince(io.cwd, at.context.handoff?.head ?? null, here.head);
+  for (const line of briefingOf(head, at.context, moved).split('\n')) io.out(line);
   return 0;
 }

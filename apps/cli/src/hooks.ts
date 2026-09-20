@@ -125,8 +125,15 @@ function reach(env: Env): Target | string {
   }
 }
 
-/* How far HEAD moved since the handoff's commit. The commit comes from the record, so it must look like one before git sees it. */
-async function movedSince(cwd: string, from: string | null, head: string | null): Promise<Moved> {
+/**
+ * How far HEAD moved since the handoff's commit. The commit comes from the record, so it must look
+ * like one before git sees it.
+ *
+ * EXPORTED SO `context` SAYS THE SAME THING THE START HOOK SAYS. The two print one briefing through
+ * one renderer, and a second copy of this git call would be the one place the two could come to
+ * disagree about what "moved" counts.
+ */
+export async function movedSince(cwd: string, from: string | null, head: string | null): Promise<Moved> {
   if (!from || !head || !SHA.test(from) || head.startsWith(from) || from.startsWith(head)) return undefined;
   const count = Number(await git(cwd, 'rev-list', '--count', `${from}..HEAD`));
   return Number.isInteger(count) && count > 0 ? count : null;
