@@ -68,8 +68,25 @@ export type Boot = {
   };
   /** Each person on the record by name, by id: sent only to a caller who may read the membership list or People. */
   names?: Record<string, string>;
-  /** The pages the caller may open, each with its place in the rail when it has one. */
-  pages?: { slug: string; title: string; nav: { section: string; order: number } | null; icon: string | null; list?: string | null }[];
+  /**
+   * The pages the caller may open, each with its place in the rail when it has one.
+   *
+   * `about` IS THE ROW THE PAGE CAME OUT OF, and `null` for a page somebody wrote. A declaration
+   * carrying `for:` is one page per row, so it is also one rail entry per row, and the cap that
+   * holds that down is per list and per heading: measured at 27 projects, 23 services and 22
+   * skills, the rail drew 72 entries, one per row, against 15. Without this field the shell has a
+   * slug and a heading and no way to say which list an entry grew out of, so the rule could not
+   * be expressed there at all. Absent from a host older than the field, and the shell then draws
+   * the rail it drew before.
+   */
+  pages?: {
+    slug: string;
+    title: string;
+    nav: { section: string; order: number } | null;
+    icon: string | null;
+    list?: string | null;
+    about?: { register: string; seq: number | null } | null;
+  }[];
   /** How many questions wait on a person, and how many arrivals wait in the inbox: `null` when the caller may not see it. */
   counts?: { decide: number; inbox: number | null; decided?: number };
   /** What changed since the caller last read, as `whatsNew` answers. */

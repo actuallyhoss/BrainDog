@@ -357,3 +357,103 @@ test('AND A PREDICATE OVER THE STATE READS THE MIRRORED COLUMN, which `02 §1` s
   );
   sql.close();
 });
+
+/* ── a register bigger than one read ─────────────────────────────────────── */
+
+test('A BLOCK THAT ADDS ITS ROWS UP REFUSES PAST ONE READ, and it was summing 200 of 301', async () => {
+  /**
+   * `pages.ts` HAS SAID SINCE IT WAS WRITTEN THAT THIS REFUSAL EXISTS, and it did not exist. The
+   * comment over `REDUCES` reads "a register past that says it cannot be drawn rather than adding
+   * up part"; `READ_WHOLE` appeared at one site, which set the read limit to 200, and nothing
+   * compared `matched` against it. Measured on this record before the fix: a `split` over 301
+   * obligations came back with 200 rows, `matched: 301` and an EMPTY `refusals`, so the figure a
+   * reader saw was the first 200 amounts added together and nothing on the page said so.
+   *
+   * IT IS DRIVEN THROUGH THE KERNEL RATHER THAN THROUGH THE BROWSER because the browser is where
+   * the only guard was. `apps/web` refuses a reducing block whose rows are short of `matched`, so
+   * the one consumer with a screen was protected and every other one was not: `packages/mcp`
+   * publishes the same answer to an agent as "rows and figures", and an agent asked to total a bar
+   * over a 250-row register got 200 of them with nothing to read that said so.
+   */
+  const { k, sql } = await record(
+    pageOf({ kind: 'split', heading: 'By state', source: 'register.obligations', columns: [{ field: 'state' }, { field: 'amount' }] }),
+  );
+  /* 3 rows are already there, and 200 is the ceiling, so 301 is one read plus a hundred and one. */
+  for (let n = 0; n < 298; n += 1)
+    assert.ok(k.create('obligations', { what: `Row ${n}`, amount: gbp(100), due: day(1), state: 'open' }, { actor: 'p_1' }).ok);
+  assert.equal((k.list({ register: 'obligations' }) as { value: { matched: number } }).value.matched, 301);
+
+  const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: { code: string; fix: string }[] };
+  const said = split.refusals ?? [];
+  assert.equal(said.length, 1, `a split over 301 rows drew ${(split.rows ?? []).length} rows, matched ${split.matched}, and refused nothing`);
+  assert.equal(said[0]?.code, 'OUT_OF_BOUNDS');
+  assert.match(String(said[0]?.fix), /301/u);
+  assert.match(String(said[0]?.fix), /200/u);
+  /* AND A REFUSAL MEANS THE BLOCK DREW NOTHING, which is the contract every other refusal here keeps. */
+  assert.equal((split.rows ?? []).length, 0, 'the block refused and handed back rows to add up anyway');
+  sql.close();
+});
+
+test('and the same block under the ceiling still draws every row it matched', async () => {
+  /* THE REFUSAL HAS TO HAVE AN EDGE OR IT IS A KIND THAT NEVER DRAWS. Three rows is the record the
+     other tests in this file use, and a `split` over it answers rows and no refusal. */
+  const { k, sql } = await record(
+    pageOf({ kind: 'split', heading: 'By state', source: 'register.obligations', columns: [{ field: 'state' }, { field: 'amount' }] }),
+  );
+  const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: unknown[] };
+  assert.deepEqual(split.refusals, []);
+  assert.equal(split.matched, 3);
+  assert.equal((split.rows ?? []).length, 3);
+  sql.close();
+});
+
+/* ── which register a page came out of ───────────────────────────────────── */
+
+const PROJECTS: Declaration = {
+  id: 'register.things',
+  kind: 'register',
+  body: { id: 'things', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never,
+};
+
+/** One declaration, one page per project, and a place in the rail for every one of them. */
+const PER_PROJECT: Declaration = {
+  id: 'page.project',
+  kind: 'page',
+  body: {
+    page: 'project',
+    title: '{{name}}',
+    for: { register: 'things' },
+    requires: ['register.things'],
+    nav: { section: 'Projects', order: 1 },
+    blocks: [{ kind: 'note', body: 'About {{name}}.' }],
+  } as never,
+};
+
+test('A PAGE OUT OF A TEMPLATE SAYS WHICH ROW OF WHICH REGISTER IT IS ABOUT, and a written page says nothing', async () => {
+  /**
+   * `pages()` HANDED BACK THE REGISTERS A PAGE DRAWS FROM AND NEVER THE ONE IT CAME OUT OF, and
+   * those are different questions. A page per project draws from `updates`, `session` and whatever
+   * else its blocks name; what it is ABOUT is one row of `things`, and nothing in the answer said
+   * so. The rail is the caller that needs it: `boot` sends these to the shell, and a rule of the
+   * form "at most five pages per register in one heading" cannot be written against a list whose
+   * entries carry no register at all. Measured before this line: 27 projects gave 27 entries
+   * carrying `registers: ['things']` only because the template's own block named it, which is a
+   * coincidence of that declaration rather than a fact about where the page came from.
+   */
+  const { k, sql } = await record(PROJECTS, PER_PROJECT);
+  for (const name of ['Kiln', 'Loom', 'Anvil']) assert.ok(k.create('things', { name }, { actor: 'p_1' }).ok);
+
+  const pages = k.pages() as { slug: string; about: { register: string; seq: number | null } | null }[];
+  assert.deepEqual(
+    pages.filter((p) => p.about).map((p) => [p.slug, p.about?.register, p.about?.seq]),
+    /* The record's own order, which for these is newest first, and the order the rail draws them in. */
+    [
+      ['anvil', 'things', 3],
+      ['loom', 'things', 2],
+      ['kiln', 'things', 1],
+    ],
+    'a page per project did not say which project it is a page of',
+  );
+  assert.equal(pages.find((p) => p.slug === 'invoicing')?.about ?? null, null, 'a page somebody wrote was reported as a page about a row');
+  sql.close();
+});

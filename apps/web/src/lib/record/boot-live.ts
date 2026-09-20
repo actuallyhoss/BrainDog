@@ -14,6 +14,7 @@
  */
 
 import { createClient, type Boot, type ClientOptions, type EventLine } from '@braindog/client';
+import { railRoom } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, NOW, PACKS, REGISTERS, setupSaid, whoDid, type boot, type NavEntry } from './api.ts';
@@ -409,8 +410,29 @@ export function layoutOf(b: Boot): Shell {
   const views = new Map<string, { key: string; name: string; href: string }[]>();
   for (const p of b.pages ?? [])
     if (p.nav?.section === copy.viewsSection && p.list) views.set(p.list, [...(views.get(p.list) ?? []), { key: p.slug, name: p.title, href: `/p/${p.slug}` }]);
+  /**
+   * THE RAIL IS CAPPED PER LIST AND HEADING HERE TOO, and until now it was capped only in the sample.
+   *
+   * A declaration carrying `for:` is one page per row and every one of them carrying `nav` was a
+   * rail entry, so the rail grew with the record. Measured end to end through the record's own
+   * `boot` at his size, 27 projects, 23 services and 22 skills: 72 rail entries against 15 with
+   * the cap. The sample's `boot()` in `api.ts` had this rule already and the sample is four
+   * projects forever, so it was true where it changed nothing and absent from the rail
+   * app.brain.dog draws.
+   *
+   * IT STILL DOES NOTHING UNTIL `boot` SENDS `about`. `packages/record/src/index.ts` maps the
+   * kernel's page list key by key into the answer, and the key it does not copy is the one this
+   * rule reads: measured on that same record, 72 of 72 rail pages arrived with no `about` at all.
+   * A host older than the field sends none either, and the shell then draws the rail it drew
+   * before rather than guessing which entries grew out of a list.
+   *
+   * `railRoom` IS THE SAMPLE'S OWN RULE AND NOT A SECOND COPY OF IT. It is in `@braindog/kernel`
+   * because that is the one package both rails can read; `pages.ts` there carries the argument,
+   * the numbers behind it and why the budget is keyed on the pair rather than on the register.
+   */
+  const room = railRoom();
   const nav: NavEntry[] = (b.pages ?? []).flatMap((p) =>
-    p.nav
+    p.nav && room(p.about ? { register: p.about.register, section: p.nav.section } : null)
       ? [{ id: p.slug, title: p.title, href: `/p/${p.slug}`, section: p.nav.section, order: p.nav.order, icon: iconFor(p.icon ?? undefined, 'doc') }]
       : [],
   );

@@ -366,11 +366,33 @@ const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actio
 /**
  * The kinds that add their rows up, whose `limit:` cuts the GROUPS they draw and never the rows they read.
  *
- * A sum over the first six rows is a wrong number rather than a short list, and the app will not draw
- * a reducing block that was handed less than the whole answer. So these read as many rows as a list
- * read hands back at once, and a register past that says it cannot be drawn rather than adding up part.
+ * A sum over the first six rows is a wrong number rather than a short list. So these read as many
+ * rows as a list read hands back at once, and a register past that says it cannot be drawn rather
+ * than adding up part.
+ *
+ * THAT LAST CLAUSE WAS A SENTENCE IN THIS COMMENT AND NOT A LINE OF CODE. `READ_WHOLE` had one
+ * site, the read limit below, and nothing compared `matched` against it: measured on a record with
+ * 301 obligations, a `split` came back with 200 rows, `matched: 301` and an EMPTY `refusals`, so
+ * the figure was the first 200 amounts added up. `apps/web` happened to guard it, which made the
+ * kernel's own correctness rule the property of one of its callers: `packages/mcp` publishes the
+ * same answer to an agent as "rows and figures", and an agent totalling a bar over a 250-row
+ * register was told nothing. The refusal is below, where every consumer gets it.
+ *
+ * `section` IS NOT ONE OF THESE, and `apps/web/src/lib/record/schema.ts` says why it is in the set
+ * there: a section's count on screen is `total`, the whole match, so it is never showing a slice.
+ * It reads no row to be right, and measured over the same 301 rows it draws its default 50 and is
+ * correct, so putting it here would refuse a heading that has nothing to add up.
  */
-const REDUCES = new Set(['bar', 'chips', 'gauge', 'split', 'progress']);
+/* EXPORTED BECAUSE `apps/web` HOLDS A SECOND COPY OF IT, `SUMS` in `record/schema.ts`, and two
+   lists of which block kinds add their rows up are two answers to one question. The copy is the
+   one that is read on a screen, so a kind added here and not there would refuse in the kernel and
+   draw a wrong total in the browser.
+
+   `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE NOW, which `SPARK_KINDS` in `spark.ts` is declared as
+   for the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set
+   the kernel refuses by, and the copy this one replaces, `SUMS` in `record/schema.ts`, is a
+   `ReadonlySet<string>` today. Re-exported bare it would have widened that type where it stands. */
+export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'split', 'progress']);
 const READ_WHOLE = 200;
 
 /** The register `sessions.live` reads, whose fields its `where` and columns name. */
@@ -508,6 +530,53 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
     for (const row of rows) out.push({ slug: slugs.get(row)!, decl: fill(decl, row) as PageDecl, row });
   }
   return out;
+}
+
+/**
+ * HOW MANY PAGES OUT OF ONE TEMPLATE A RAIL DRAWS, and the rule lives here because two rails obey it.
+ *
+ * A template carrying `nav` is one rail entry per row it admits, which is a rail that grows with
+ * the record. Measured end to end through the record's own `boot` at his size, 27 projects, 23
+ * services and 22 skills over three nav-carrying templates: 72 rail entries, one per row, against
+ * 15 with this cap. A rail that grows without bound is a rail that stops being a rail.
+ *
+ * THE BUDGET IS KEYED ON THE REGISTER AND THE HEADING TOGETHER. Per register alone, the first
+ * template over a list spends the whole budget and a second one drew NOTHING: measured in
+ * `apps/web` with a `Clients` template beside the shipped `Projects` one over the same 26 rows,
+ * Projects drew 6 and Clients drew 0, so a heading somebody had declared was gone rather than
+ * short. A page nobody generated is never counted at all, so rows can never push out a page
+ * somebody wrote.
+ *
+ * IT IS IN THE KERNEL BECAUSE THE SAMPLE AND THE LIVE SHELL BOTH HAVE TO OBEY IT, and they are in
+ * different files with no other package between them. The cap shipped as a local constant inside
+ * `apps/web/src/lib/record/api.ts`'s `boot()`, which is the SAMPLE's rail: the sample is four
+ * projects forever, so the rule was true where it changed nothing and absent from the rail a real
+ * record draws, where the same 26 links were still being offered every morning.
+ *
+ * NOTHING IS HIDDEN BY IT. Every page keeps its own address, stays in the list of pages a caller
+ * may open, and the list it came out of carries the whole count beside its name in the rail.
+ */
+export const RAIL_PAGES = 5;
+
+/**
+ * The counter that rule needs, made once per rail: it answers whether one page may be drawn.
+ *
+ * A page with no `about` is a page somebody wrote, and it is always drawn. A page out of a
+ * template is drawn while its register and heading have room, and the ones kept are the first
+ * `RAIL_PAGES` offered, which is the order the rail draws them in.
+ *
+ * THE KEY IS A JSON PAIR RATHER THAN TWO STRINGS JOINED, because a heading is somebody's own
+ * words and any separator picked here is one they are allowed to type.
+ */
+export function railRoom(): (about: { register: string; section: string } | null | undefined) => boolean {
+  const drawn = new Map<string, number>();
+  return (about) => {
+    if (!about) return true;
+    const key = JSON.stringify([about.register, about.section]);
+    const n = (drawn.get(key) ?? 0) + 1;
+    drawn.set(key, n);
+    return n <= RAIL_PAGES;
+  };
 }
 
 /** One page, with every block run. */
@@ -872,6 +941,27 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
           ...(block.order?.length ? { order: block.order } : {}),
         });
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
+
+  /* AND A REGISTER PAST THAT ONE READ SAYS SO, which is what the comment over `REDUCES` had been
+     promising while this line was missing. The read above asked for 200 and `list` answers how many
+     the predicate matched, so the two numbers are in hand here and nowhere else: 301 matched against
+     200 read is a block whose every figure would be short by a hundred and one rows.
+
+     `OUT_OF_BOUNDS` RATHER THAN A NEW CODE OR `NOT_IN_THIS_BUILD`. `30 §6` closes the list at a
+     hundred and twenty-five and this is what that row already says, a value against a named bound
+     with both numbers in the sentence; `NOT_IN_THIS_BUILD` is 501 and its row says "the repair is a
+     deploy, not an edit", and the repair here is an edit the author can make in the declaration.
+     `at: 'where'` points at the key that makes the block answerable, because narrowing the predicate
+     is the fix and the kind is not the mistake. */
+  if (REDUCES.has(block.kind) && listed.value.matched > READ_WHOLE)
+    return {
+      ...base,
+      refusals: also({
+        code: 'OUT_OF_BOUNDS',
+        fix: `A ${block.kind} adds up every row it matched, and ${register} matched ${listed.value.matched} where a block that adds up reads ${READ_WHOLE}. Narrow it with where: until it matches ${READ_WHOLE} or fewer, or draw it as a list.`,
+        at: 'where',
+      }),
+    };
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no

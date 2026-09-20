@@ -336,3 +336,78 @@ test('THE DAY A ROW WAS FINISHED, filled by the record in the same write as its 
   /* A day a person set on its own, with no move beside it, keeps its line. */
   assert.equal(newsOf([moved[0]!] as never, 'p_1').length, 1);
 });
+
+/* ── the rail a real record draws ────────────────────────────────────────── */
+
+/** One template's worth of pages: one per row, all under one heading, each saying which row it is about. */
+const perRow = (register: string, section: string, rows: number, slug = register) =>
+  Array.from({ length: rows }, (_, i) => ({
+    slug: `${slug}-${i + 1}`,
+    title: `${section} ${i + 1}`,
+    nav: { section, order: i + 1 },
+    icon: null,
+    list: null,
+    about: { register, seq: i + 1 },
+  }));
+
+/** His record, as `boot` sends it: 27 projects, 23 services, 22 skills, and one page somebody wrote. */
+const AT_HIS_SCALE = [
+  { slug: 'money', title: 'Money', nav: { section: 'Work', order: 1 }, icon: null, list: null },
+  ...perRow('things', 'Projects', 27),
+  ...perRow('services', 'Services', 23),
+  ...perRow('skills', 'Skills', 22),
+];
+
+test('THE RAIL A LIVE RECORD DRAWS IS CAPPED PER LIST AND HEADING, the same cap the sample applies to its own', () => {
+  /**
+   * THE CAP SHIPPED INTO THE SAMPLE AND THE PRODUCT'S OWN RAIL NEVER SAW IT. `api.ts`'s `boot()`
+   * holds the rule and the sample is four projects forever, so the rule was true at a size where
+   * it changes nothing and absent at every size where it matters. Measured here on the shape
+   * `boot` really sends, at 27 projects, 23 services and 22 skills over three templates plus one
+   * page somebody wrote: 73 rail entries before this, 72 of them one per row, against 16 after.
+   * The same three templates through a real record's `boot`, which has no written page in it, are
+   * 72 against 15.
+   */
+  const shell = layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never);
+  const under = (section: string) => shell.nav.filter((n) => n.section === section).length;
+  assert.deepEqual([under('Projects'), under('Services'), under('Skills')], [5, 5, 5], `the rail drew ${shell.nav.length} entries`);
+  assert.equal(shell.nav.length, 16);
+  /* A PAGE SOMEBODY WROTE IS NEVER PUSHED OUT BY ROWS, which is why the count is kept per list. */
+  assert.equal(under('Work'), 1);
+  /* THE FIVE KEPT ARE THE FIRST FIVE the record sent, which is the order the rail draws them in. */
+  assert.deepEqual(
+    shell.nav.filter((n) => n.section === 'Projects').map((n) => n.id),
+    ['things-1', 'things-2', 'things-3', 'things-4', 'things-5'],
+  );
+  /* AND NOTHING IS HIDDEN BY IT: every page is still one Home may ask for, and still at its own address. */
+  assert.equal(shell.pages.length, AT_HIS_SCALE.length);
+});
+
+test('and a host that does not say which row a page is about draws the rail it drew before', () => {
+  /**
+   * THE RULE IS INERT UNTIL `boot` FORWARDS THE FIELD, and that is where the record stands today:
+   * `packages/record/src/index.ts` maps the kernel's page list key by key and does not copy this
+   * one, so 72 of 72 rail pages arrive with no `about` at all. An older host sends none either.
+   * Both have to draw the rail they drew before rather than a rail cut to five, which is what a
+   * counter keyed on the heading alone, or one that treated an absent field as a list of its own,
+   * would do to every page in the record at once.
+   */
+  const older = AT_HIS_SCALE.map((p) => ({ ...p, about: undefined }));
+  assert.equal(layoutOf({ ...BOOT, pages: older } as never).nav.length, 73);
+  /* AND THE COUNT IS PER RAIL. A counter made once where the module loads would spend the budget
+     on the first shell and draw no project at all in the second, which is every navigation after
+     the first in a tab that reads two records. */
+  const twice = [layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never), layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never)];
+  assert.deepEqual(
+    twice.map((s) => s.nav.length),
+    [16, 16],
+  );
+});
+
+test('and a second template over one list draws its own five, rather than nothing at all', () => {
+  /* THE HEADING IS IN THE KEY, as `api.ts` found when a `Clients` template beside the shipped
+     `Projects` one drew 0 of 26: the first template had spent a budget kept per register alone. */
+  const shell = layoutOf({ ...BOOT, pages: [...perRow('things', 'Projects', 27), ...perRow('things', 'Clients', 26, 'client')] } as never);
+  const under = (section: string) => shell.nav.filter((n) => n.section === section).length;
+  assert.deepEqual([under('Projects'), under('Clients')], [5, 5]);
+});

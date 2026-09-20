@@ -240,7 +240,7 @@ export { COSTS, MANY_ROWS, costOf, costRank, worseCost, type Cost } from './weig
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
-export { fill, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export { RAIL_PAGES, REDUCES, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 export {
   CHANNELS,
   carryingOf,
@@ -3715,6 +3715,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         registers: registersOf(p.decl, pageDeps().metric),
         /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
         nav: navOf(p.decl.nav),
+        /* AND WHICH ROW IT IS A PAGE OF, which is not one of the registers above: those are the
+           lists its blocks READ, and a page per project reads updates, runs and whatever else it
+           draws. What it is ABOUT is the one row the template expanded over, and `null` for a page
+           somebody wrote. The rail is what needs it: a cap of the form "at most five pages per
+           list under one heading" cannot be written against entries that carry no list, so the
+           one the sample applies could not be applied to the rail a real record draws. */
+        about: p.row ? { register: p.row.register, seq: p.row.seq } : null,
         icon: typeof p.decl.icon === 'string' ? p.decl.icon : null,
       })),
 
