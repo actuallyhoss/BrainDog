@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 import { applyFilters, chipsOf, list, whereOf } from './api.ts';
 import { REGISTERS, ROWS } from './data.ts';
 import { clausesOf } from './views-live.ts';
-import { compile } from './where.ts';
+import { compile, registerHref } from './where.ts';
 
 const route = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
 
@@ -170,6 +170,56 @@ test('the register page reads its chips through chipsOf, and draws a control for
   assert.match(route, /const listed = \$derived\(/, 'the bar does not know which clauses the pills cannot draw');
   assert.match(route, /\{#each listed as/, 'the bar draws no control for a list clause');
   assert.match(route, /dropFilter\(/, 'a list clause cannot be taken off');
+});
+
+test('AND THE ADDRESS A BLOCK HANDS OVER IS ONE OF THOSE CHIPS NOW, for every list field in the mirror', () => {
+  /**
+   * THE HALF THE READER ABOVE WAS BUILT FOR, AND IT WAS STILL REFUSED.
+   *
+   * `registerHref` answered the bare `/r/<register>` for any predicate carrying a list clause, with
+   * the reason written beside it: nothing could read `<field>:<op>:<value>` back, so minting one would
+   * have opened an empty grid under a block that had drawn rows. The tests above are that reader, and
+   * they round-tripped the chip from a link, from a metric and from a saved view. The assertion this
+   * one adds is the other end: the address the block itself writes.
+   *
+   * IT IS DRIVEN THROUGH THE ROUTE'S OWN PARSER and never through a copy of it, which is the rule the
+   * rest of this file keeps: `opened()` reads the href exactly as `/r/[register]` reads one, and the
+   * rows it answers are held against the rows the seed says hold that element. A URL asserted against
+   * a literal string would be a test of how `registerHref` spells a chip; this is a test that the door
+   * opens the list the block promised.
+   */
+  let minted = 0;
+  for (const [register, decl] of Object.entries(REGISTERS)) {
+    for (const field of decl.fields) {
+      if (field.type !== 'list') continue;
+      const elements = [...new Set((ROWS[register] ?? []).flatMap((e) => (Array.isArray(e.fields[field.id]) ? (e.fields[field.id] as unknown[]) : [])))];
+      for (const element of elements.slice(0, 3)) {
+        /* A `list<ref>` IS WRITTEN AS THE TITLE, because that is the word both engines take: the
+           compiled clause holds the target's `seq`, and `registerHref` has to say it back as a name or
+           the chip refuses on arrival with "there is no things called 1". */
+        const said =
+          field.of === 'ref' && field.to
+            ? String((ROWS[field.to] ?? []).find((e) => e.seq === Number(element))?.fields[REGISTERS[field.to]?.title ?? ''] ?? '')
+            : String(element);
+        /* THE COMMA IS THE ONE ELEMENT NEITHER LANGUAGE CARRIES, and the sentence cannot even be
+           written: `compile` splits the predicate on it, so no `has` clause over such a value reaches
+           `registerHref` at all. The test below holds that refusal to being loud. */
+        if (!said || said.includes(',')) continue;
+        minted += 1;
+        const href = registerHref(register, `${field.id} has ${said}`);
+        assert.notEqual(href, `/r/${register}`, `${register}.${field.id} still hands over the wide address`);
+        assert.ok(!href.includes(' '), `a raw space reached a URL: ${href}`);
+        assert.deepEqual(opened(href).seqs, holding(register, field.id, element), `${register}.${field.id} has ${said}`);
+      }
+    }
+  }
+  assert.ok(minted >= 11, `only ${minted} list clauses were minted, so this test stopped measuring anything`);
+
+  /* AND `lacks` IS THE COMPLEMENT BEHIND THE DOOR TOO, which is the half a reader reaches for when
+     they mean "and the ones with none". */
+  const lacking = registerHref('things', 'repos lacks portage');
+  const rest = (ROWS.things ?? []).map((e) => e.seq).filter((seq) => !holding('things', 'repos', 'portage').includes(seq));
+  assert.deepEqual(opened(lacking).seqs, rest);
 });
 
 test('a saved view filtered on a list comes back as chips rather than as no Filter line at all', () => {

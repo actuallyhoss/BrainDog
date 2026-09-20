@@ -792,37 +792,52 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
  */
 export const whereOf = (filters: Filter[]): string =>
   filters
-    .map((f) =>
-      f.op === 'in'
-        ? `${f.field} is ${f.values.join(' or ')}`
-        : /* `not-in`, so a URL can say everything the SENTENCE can. Without it a declared metric
-             whose predicate negates — `state is not cancelled` — had no link that opened its own
-             rows, and the alternative was writing out the enum's complement, which breaks the
-             moment a pack adds a value to it. */
-          f.op === 'not-in'
-          ? `${f.field} is not ${f.values.join(' or ')}`
-          : f.op === 'before' || f.op === 'after'
-            ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
-            : /**
-               * `has` AND `lacks`, THE TWO OPERATORS ONLY A LIST TAKES, and until they were written
-               * here nothing outside `where.ts` could spell either one.
-               *
-               * They fell to the line below and came back as `repos is portage`, which both engines
-               * now refuse: *"repos is a list, which cannot be asked \"is\""*. So the one shape a
-               * list filter could arrive in — a chip, from a link, from a metric or a saved view —
-               * was the one shape that could not be read, and `registerHref` answers the whole
-               * register for any predicate carrying a list clause because of it.
-               *
-               * ONE VALUE, WHICH IS THE GRAMMAR'S RULE AND NOT A NARROWING CHOSEN HERE. `where.ts`
-               * types the clause `values: [string]` because the operator looks for a single element
-               * inside a list, and `tags has urgent or soon` would otherwise look for a tag
-               * literally called `urgent or soon`. Joining the rest on ` or ` would have written a
-               * sentence the compiler refuses by name, so the first value is the value.
-               */
-              f.op === 'has' || f.op === 'lacks'
-              ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
-              : `${f.field} is ${f.values[0] ?? ''}`,
-    )
+    .map((f) => {
+      if (f.op === 'in') return `${f.field} is ${f.values.join(' or ')}`;
+      /* `not-in`, so a URL can say everything the SENTENCE can. Without it a declared metric whose
+         predicate negates, `state is not cancelled`, had no link that opened its own rows, and the
+         alternative was writing out the enum's complement, which breaks the moment a pack adds a
+         value to it. */
+      if (f.op === 'not-in') return `${f.field} is not ${f.values.join(' or ')}`;
+      if (f.op === 'before' || f.op === 'after') return `${f.field} ${f.op} ${f.values[0] ?? ''}`;
+      /**
+       * `not-on`, THE NEGATION OF A DATE CLAUSE, WHICH CAME BACK AS ITS OWN COMPLEMENT.
+       *
+       * `registerHref` minted `f=due:not on:today` for `due is not today`, the compiled operator
+       * written into the chip verbatim, and the chip fell past every arm here to `<field> is <value>`
+       * and came back `due is today`. Measured on the shipped mirror: the sentence admits all 40
+       * obligations and the chip drew 0 of them, because nothing there is due today. A filter that
+       * quietly inverts is the one failure that module exists to prevent.
+       *
+       * THE CHIP SPELLS IT WITH A HYPHEN for the reason `not-in` does: a raw space in a URL is not a
+       * chip anybody reads back, and `pages.test.ts` asserts no declared block's link carries one.
+       *
+       * `on` NEEDS NO ARM AND DELIBERATELY HAS NONE, because `<field> is <a day>` on a dated field IS
+       * the `on` clause: `due:on:today` falls to the last line as `due is today` and compiles to the
+       * clause it was minted from, which is the fold the record's own `ORDERED` table makes when it
+       * reads the word. A second arm would be one more spelling of one clause to keep in step.
+       */
+      if (f.op === 'not-on') return `${f.field} is not ${f.values[0] ?? ''}`;
+      /**
+       * `has` AND `lacks`, THE TWO OPERATORS ONLY A LIST TAKES, and until they were written here
+       * nothing outside `where.ts` could spell either one.
+       *
+       * They fell to the line below and came back as `repos is portage`, which both engines now
+       * refuse: *"repos is a list, which cannot be asked \"is\""*. So the one shape a list filter
+       * could arrive in, a chip, from a link, from a metric or a saved view, was the one shape that
+       * could not be read, and `registerHref` answered the whole register for any predicate carrying
+       * a list clause because of it. It mints the narrow address now, and this line is the reader
+       * that made that possible.
+       *
+       * ONE VALUE, WHICH IS THE GRAMMAR'S RULE AND NOT A NARROWING CHOSEN HERE. `where.ts` types the
+       * clause `values: [string]` because the operator looks for a single element inside a list, and
+       * `tags has urgent or soon` would otherwise look for a tag literally called `urgent or soon`.
+       * Joining the rest on ` or ` would have written a sentence the compiler refuses by name, so
+       * the first value is the value.
+       */
+      if (f.op === 'has' || f.op === 'lacks') return `${f.field} ${f.op} ${f.values[0] ?? ''}`;
+      return `${f.field} is ${f.values[0] ?? ''}`;
+    })
     .join(', ');
 
 export function applyFilters(register: string, entries: Entry[], filters: Filter[], q?: string): Entry[] {

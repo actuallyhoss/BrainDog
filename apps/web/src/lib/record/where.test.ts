@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { installSeed } from '@braindog/seed';
 
-import { applyFilters, display, labelOf } from './api.ts';
+import { applyFilters, chipsOf, display, labelOf, whereOf } from './api.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { resolvePages } from './pages.ts';
@@ -209,12 +209,15 @@ test('and an operator word that is a real value is still a value', () => {
 
 test('an unparseable clause says which operators exist, in the words to type', () => {
   /* THE SENTENCE IS THE KERNEL'S, BYTE FOR BYTE (`packages/where/src/sentence.ts`). It used to be
-     `This build reads: is · is not · before · after` — middle dots a person cannot type, and the
+     `This build reads: is · is not · before · after`, middle dots a person cannot type, and the
      software describing itself.
-     SIX WORDS NOW, NOT FOUR. The kernel's sentence names `has` and `lacks`, and while this compiler
-     read four the refusal was teaching an agent that two operators the record answers do not exist. */
+     SEVEN WORDS NOW, NOT SIX AND NOT FOUR. Four was this compiler's own count; six added `has` and
+     `lacks`; and `on` was omitted from both spellings while the record answered it, so the refusal
+     was teaching an agent that an operator it had just read in the published grammar and the record
+     beside it answers does not exist. The order is the record's own `allowed` array at
+     `packages/where/src/sentence.ts:466`, which has listed all seven since `on` was read there. */
   const said = compile('obligations', 'what contains invoice').bad[0] ?? '';
-  assert.match(said, /Write is, is not, before, after, has or lacks\./);
+  assert.match(said, /Write is, is not, before, after, on, has or lacks\./);
   assert.ok(!/This build/.test(said), 'the software is describing itself in a refusal');
 });
 
@@ -847,12 +850,17 @@ test('`before` and `after` are about dates, and were accepted on EVERY field typ
 test('and the rule holds over every field of every register, not just the two probed', () => {
   /* THE SWEEP, because the defect was 1,470 of a differential pass's 3,563 sentences: every
      `before` or `after` over every field in the record that is not a date. One register proves the
-     branch; the sweep proves nobody can add a field type back into it. */
+     branch; the sweep proves nobody can add a field type back into it.
+
+     AND `on` IS SWEPT WITH THEM, because it is the third operator in the record's `ORDERED` table and
+     shares their branch and their type check. It was refused on EVERY field of every register while
+     the record answered it on the dated ones, which is the drift this sweep is shaped to catch and
+     did not catch, because the operator was not in this list. */
   let checked = 0;
   for (const [id, decl] of Object.entries(REGISTERS)) {
     for (const field of decl.fields) {
       const dated = field.type === 'day' || field.type === 'instant';
-      for (const op of ['before', 'after'] as const) {
+      for (const op of ['before', 'after', 'on'] as const) {
         const w = compile(id, `${field.id} ${op} today`);
         if (dated) {
           assert.deepEqual(w.bad, [], `${id}.${field.id} is a ${field.type} and ${op} was refused`);
@@ -1216,10 +1224,13 @@ test('and the refusals say the same thing, because a refusal is the teacher', as
     assert.match(ours.refused ?? '', says, `the browser's refusal for "${sentence}"`);
   }
 
-  /* AND THE SENTENCE THAT NAMES THE OPERATORS NAMES ALL SIX NOW. It named four while the record named
-     six, which is a refusal teaching an agent that two of the operators it has just read in the
-     published grammar do not exist. */
-  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /Write is, is not, before, after, has or lacks/);
+  /* AND THE SENTENCE THAT NAMES THE OPERATORS NAMES ALL SEVEN NOW. It named four while the record
+     read eleven, then six while both engines answered `on` and neither admitted to it, which is a
+     refusal teaching an agent that an operator it has just read in the published grammar does not
+     exist. The record's own sentence is still six words at `packages/where/src/sentence.ts:464`
+     while its `allowed` array beside it is seven, so this one word is the one place the two
+     refusals differ on purpose, and it differs towards what both engines actually accept. */
+  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /Write is, is not, before, after, on, has or lacks/);
 });
 
 test('an operand that is not there is a question back, on every operator that takes one', async () => {
@@ -1237,21 +1248,201 @@ test('an operand that is not there is a question back, on every operator that ta
   }
 });
 
-test('a list filter hands over the honest wide address, because no chip can carry it yet', () => {
+test('`on` is a sentence the record answers, and it was the one operator the mirror still refused', async () => {
   /**
-   * ONE PREDICATE, TWO PRODUCTS, AND THE SECOND CANNOT BE WRITTEN YET. A chip is
-   * `<field>:<op>:<values>`, and `whereOf` in `api.ts` reads four operators back out of one — `in`,
-   * `not-in`, `before`, `after` — with everything else falling through to `<field> is <value>`. So a
-   * minted `repos:has:portage` would come back as `repos is portage`, which the record and this
-   * compiler now both REFUSE, and the link would open an empty grid under a filter that drew three
-   * rows. `registerHref`'s own paragraph is the rule: dropping the clause it cannot carry produces a
-   * list that looks narrowed and is not, so the whole register is the honest address until `whereOf`
-   * learns the operator.
+   * THE DRIFT `ccb853a3` CLOSED FOR `has` AND LEFT OPEN FOR `on`, measured the same way: one grammar,
+   * two renderings, and a sentence one of them takes and the other refuses is two languages.
+   *
+   * `packages/where/src/sentence.ts:156` reads `ORDERED = { before: 'before', after: 'after', on:
+   * 'is' }`, so the record has answered `due on today` since that table was written, and this
+   * compiler's `CLAUSE` listed six operators and not that one. Measured before this test was made to
+   * pass: the record drew 0 rows for `due on today` and the browser refused it with *"that is not
+   * something a filter can say"*, which is word for word the symptom `ccb853a3` was written to
+   * repair for `tags has urgent`.
+   *
+   * `on` IS THE WORD AND `is` IS THE CLAUSE, on both sides. The record compiles the verb `on` to the
+   * predicate `{field, is: day}` and this compiler has produced the `on` clause from `is <a date>`
+   * since the day the date path was written, so teaching the surface the word adds a spelling and no
+   * behaviour: the two sentences are the same question and are asserted here to draw the same rows.
    */
-  assert.equal(registerHref('things', 'repos has portage'), '/r/things');
-  assert.equal(registerHref('things', 'lane is earning, repos has portage'), '/r/things');
-  /* AND THE HALF THAT CAN BE CARRIED IS STILL CARRIED, when nothing in the sentence is a list. */
-  assert.match(registerHref('things', 'lane is earning'), /f=lane:in:earning/);
+  const spoken = await agree('obligations', 'due on today');
+  assert.deepEqual(spoken.seqs, (await agree('obligations', 'due is today')).seqs, '`on` and `is` are one clause');
+  /* A RELATIVE WORD AND A LITERAL ONE, because `on` takes the whole operand grammar `before` takes:
+     the record resolves it at parse time and this one at match time, and the answer is the same. */
+  assert.deepEqual((await agree('obligations', 'due on +30d')).seqs, (await agree('obligations', 'due is +30d')).seqs);
+  await agree('services', 'renews on eom');
+
+  /* AND IT NARROWS, ON A DAY THE SEED REALLY HOLDS. A pair of sentences that both drew nothing would
+     pass every line above, and the seed's days are relative to `NOW` so a date written here by hand
+     is a date that stops being in the register the next time the clock moves. */
+  const held = String((ROWS.obligations ?? [])[0]?.fields.due ?? '');
+  assert.match(held, /^\d{4}-\d{2}-\d{2}$/, 'the first obligation has no due date to ask about');
+  const literal = await agree('obligations', `due on ${held}`);
+  assert.deepEqual(literal.seqs, (await agree('obligations', `due is ${held}`)).seqs);
+  assert.ok(literal.seqs.length > 0, `nothing is due on ${held}, so this proves nothing`);
+  assert.ok(literal.seqs.length < all('obligations'), `everything is due on ${held}, so this proves nothing`);
+
+  /* AND WHAT IT IS NOT, EACH REFUSED BY BOTH: the negation the record does not read, the operator
+     outside its type, the operand that is not a date and the operand that is not there. `agree`
+     asserts that a refusal on one side is a refusal on the other, which is the whole comparison. */
+  for (const [register, sentence] of [
+    ['obligations', 'due not on today'],
+    ['obligations', 'state on today'],
+    ['obligations', 'due on banana'],
+    ['obligations', 'due on'],
+  ] as const) {
+    const answer = await agree(register, sentence);
+    assert.ok(answer.refused, `the record answered "${sentence}", so this row asserts the wrong fact`);
+  }
+  /* AND THE ONE OF THOSE FOUR THAT IS AN OPERATOR-OUTSIDE-ITS-TYPE SAYS SO IN BOTH ENGINES, in the
+     sentence `before` and `after` already share with the record. */
+  assert.match(askBrowser('obligations', 'state on today').refused ?? '', /state is a enum, and on is about dates/);
+  assert.match((await askRecord('obligations', 'state on today')).refused ?? '', /state is a enum, and on is about dates/);
+});
+
+test('a field whose own name ends in the operator is still that field, in both engines', async () => {
+  /**
+   * TEACHING THE SURFACE `on` PUT A WORD OF THE GRAMMAR INSIDE FOUR FIELD NAMES, and this is the
+   * measurement of it rather than a worry about it. `CLAUSE` ends the field at the FIRST operator it
+   * meets, so the shipped mirror's own declarations came apart the moment `on` joined that list:
+   *
+   *     obligations.settled     label `Paid on`       40 rows
+   *     installments.settled    label `Paid on`       12 rows
+   *     tasks.done_on           label `Done on`       27 rows, and `done_on` reads `done on` by id alone
+   *     learnings.confirmed_on  label `Confirmed on`   7 rows, and reads `confirmed on` the same way
+   *     tools.hosts             label `Seen on`        6 rows, and a LIST, so `has` is the operator after it
+   *
+   * Measured with `on` in the alternation and nothing else changed: `paid on before today` parsed as
+   * the field `paid`, which no register declares, and every one of those four sentences became
+   * *"there is no field called paid"* under a register page that had drawn the column. A grammar that
+   * cannot name a column the screen shows is the `type is domain` failure `fieldOf` already exists
+   * for, one word along.
+   *
+   * THE RECORD'S RULE IS THE LONGEST FIELD NAME FIRST and this keeps it: `sentence.ts:291` scans every
+   * declared id and label for the longest the clause starts with and reads the verb after it, so
+   * `paid on` is the field there and the verb is `before`. Both engines are driven here over the real
+   * seed, which is what makes this a copy of that rule rather than a second reading of it.
+   */
+  for (const [register, sentence] of [
+    ['obligations', 'paid on before today'],
+    ['obligations', 'paid on is empty'],
+    ['installments', 'paid on is set'],
+    ['tasks', 'done on before today'],
+    ['tasks', 'done on is 2026-09-01'],
+    ['learnings', 'confirmed on before today'],
+    /* THE DOUBLED WORD, which is the field's last word and then the operator. */
+    ['tasks', 'done on on 2026-09-01'],
+  ] as const) {
+    const answer = await agree(register, sentence);
+    assert.equal(answer.refused, null, `the record refused "${sentence}": ${answer.refused}`);
+  }
+  /* AND THE ROWS ARE THE ROWS THE FIELD'S OWN ID DRAWS, because "both engines agree" would also be
+     true of two engines that had both read the wrong field. */
+  assert.deepEqual(keep('tasks', 'done on before today').map((e) => e.seq), keep('tasks', 'done_on before today').map((e) => e.seq));
+  assert.ok(keep('obligations', 'paid on before today').length > 0, 'nothing in the seed is paid, so this proves nothing');
+
+  /**
+   * AND THE ONE OF THE FIVE WHERE THE LONGER NAME MUST LOSE, which is the record's precedence and was
+   * this repair's own overreach until the differential above caught it.
+   *
+   * `tools` declares `hosts` labelled **Seen on** AND `seen`, an instant labelled **Last seen**.
+   * `sentence.ts:269` reads the first word as a field id exactly and scans labels only when that finds
+   * nothing, so the record reads `seen on has kiln-mbp` as the field `seen` with `on` and the operand
+   * `has kiln-mbp`, and refuses: *"has kiln-mbp is not a date"*. Measured with the retry taken
+   * unconditionally, the browser answered `[1, 3, 5]` to a sentence the record refuses, which is the
+   * same drift as the one this test's own subject closes, pointing the other way.
+   */
+  const shadowed = await agree('tools', 'seen on has kiln-mbp');
+  assert.match(shadowed.refused ?? '', /has kiln-mbp is not a date/, 'the record no longer reads `seen` as the field here');
+  assert.match(askBrowser('tools', 'seen on has kiln-mbp').refused ?? '', /has kiln-mbp is not a date/);
+  /* AND THE LIST IS STILL REACHABLE BY ITS ID, which is what a page that wants those rows writes. */
+  assert.deepEqual((await agree('tools', 'hosts has kiln-mbp')).seqs, [1, 3, 5]);
+});
+
+test('a list filter mints the narrow address now, and it opens the rows the block drew', () => {
+  /**
+   * ONE PREDICATE, TWO PRODUCTS, AND THE SECOND ONE CAN BE WRITTEN NOW.
+   *
+   * This returned the bare register for any predicate carrying a list clause, and the reason was
+   * true when it was written: a chip is `<field>:<op>:<values>`, `whereOf` read four operators back
+   * out of one, and a minted `repos:has:portage` came back as `repos is portage`, which both engines
+   * refuse. `0ea5061b` built the reader. `chipsOf` splits at the first two colons so a value may
+   * hold one, and `whereOf` reads `has` and `lacks`, so the chip now comes back the sentence it was
+   * minted from and the door opens the rows the block drew.
+   *
+   * THE ROUND TRIP IS THE ASSERTION AND NOT THE STRING. A URL asserted against a literal is a test
+   * of this function's spelling; what matters is that the address compiles back to the same
+   * predicate over the same register, which is what `list-chips.test.ts` drives through the route's
+   * own reader as well.
+   */
+  const href = registerHref('things', 'repos has portage');
+  assert.equal(href, '/r/things?f=repos:has:portage');
+  const back = whereOf(chipsOf(new URL(href, 'http://x').searchParams));
+  assert.equal(back, 'repos has portage');
+  assert.deepEqual(keep('things', back).map((e) => e.seq), keep('things', 'repos has portage').map((e) => e.seq));
+  assert.deepEqual(keep('things', back).map((e) => e.seq), [3]);
+
+  /* AND THE OTHER HALF OF THE SENTENCE TRAVELS WITH IT, which is the whole reason the wide address
+     was wrong: a block filtered on two clauses linked to a register filtered by neither. */
+  const both = registerHref('things', 'lane is earning, repos has portage');
+  assert.match(both, /f=lane:in:earning/);
+  assert.match(both, /f=repos:has:portage/);
+  assert.deepEqual(
+    keep('things', whereOf(chipsOf(new URL(both, 'http://x').searchParams))).map((e) => e.seq),
+    keep('things', 'lane is earning, repos has portage').map((e) => e.seq),
+  );
+
+  /* `lacks` TRAVELS AS ITSELF rather than as a negation of `has`, because `whereOf` reads the word
+     and there is no `not-has` for it to read. */
+  const negated = registerHref('things', 'repos lacks portage');
+  assert.equal(negated, '/r/things?f=repos:lacks:portage');
+  assert.deepEqual(
+    keep('things', whereOf(chipsOf(new URL(negated, 'http://x').searchParams))).map((e) => e.seq),
+    keep('things', 'repos lacks portage').map((e) => e.seq),
+  );
+
+  /**
+   * AND A `list<ref>` CARRIES THE TITLE, NOT THE NUMBER THE COLUMN HOLDS.
+   *
+   * `elementValue` resolves a ref element to the target row's `seq`, so the compiled clause holds
+   * `values: ['2']` where the sentence said a name. Minting that number would have written
+   * `because:has:2`, which comes back as `because has 2` and is refused by both engines: *"there is
+   * no learnings called 2"*, the record's own sentence, because no chip can carry `has` so no number
+   * arrives from anywhere. So the chip is written in the words somebody typed, which is the same rule
+   * `declaredValue` keeps for a scalar one operator along.
+   */
+  const ref = registerHref('skills', 'because has Run the mastering pass before signing off an axis instance.');
+  assert.match(ref, /f=because:has:Run%20the%20mastering/, `the title did not reach the URL: ${ref}`);
+  const asked = whereOf(chipsOf(new URL(ref, 'http://x').searchParams));
+  assert.deepEqual(compile('skills', asked).bad, [], `the minted address does not compile: ${asked}`);
+  assert.deepEqual(keep('skills', asked).map((e) => e.seq), [2]);
+});
+
+test('a negated date chip comes back negated, rather than as its own complement', () => {
+  /**
+   * THE ONE CHIP `registerHref` MINTED THAT THE READER INVERTED, found while minting the list one.
+   *
+   * `due is not today` compiles to `{op: 'not on'}`, and the day branch wrote the operator into the
+   * chip verbatim: `f=due:not on:today`, a raw space in a URL. `whereOf` reads `in`, `not-in`,
+   * `before`, `after`, `has` and `lacks`, so `not on` fell to the line below them and came back
+   * `due is today` — the COMPLEMENT of the sentence the block printed above the link. Measured on the
+   * shipped mirror before this was read back: the sentence admits all 40 obligations and the chip
+   * drew 0 of them, because nothing there is due today. No block the mirror declares negates a dated
+   * field, so this was waiting for the first one that does rather than wrong on a screen today.
+   *
+   * `not-on` RATHER THAN A SECOND CHIP OPERATOR, because `not-in` is already the spelling this file
+   * uses for the negation of a value clause and a reader meeting both should not have to learn two
+   * conventions. It is also the one shape that cannot arrive from a hand-typed URL by accident.
+   */
+  const href = registerHref('obligations', 'due is not today');
+  assert.ok(!href.includes(' '), `a raw space reached a URL: ${href}`);
+  assert.equal(href, '/r/obligations?f=due:not-on:today');
+  const back = whereOf(chipsOf(new URL(href, 'http://x').searchParams));
+  assert.deepEqual(compile('obligations', back).clauses, compile('obligations', 'due is not today').clauses);
+  assert.deepEqual(keep('obligations', back).map((e) => e.seq), keep('obligations', 'due is not today').map((e) => e.seq));
+  /* AND THE POSITIVE IS UNCHANGED, which is the half that always worked: `due:on:today` falls to
+     `whereOf`'s last line as `due is today`, and `is <a date>` on a dated field IS the `on` clause. */
+  assert.equal(registerHref('obligations', 'due is today'), '/r/obligations?f=due:on:today');
 });
 
 test('and the printer says the clause back in words the record still reads', () => {
