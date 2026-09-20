@@ -401,7 +401,15 @@ test('A TARGET SETTING TYPED IN THE HOME CURRENCY holds the figure added up in i
   value(await api.setPackConfig({ id: 'money-home', values: { most_spent: { amount: 2_000_000, currency: 'EGP' } } }, owner));
   const held = cell();
   assert.equal(held.value, 1_500_000);
-  assert.deepEqual(held.targetIn, { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, from: 'EGP' }, 'typed in pounds, held in pounds');
+  /* `stale: false` BECAUSE THE RATE IS THE SAME DAY AS THE CLOCK, not because staleness is off.
+     `NOW` is 2026-09-17 and the rate's `as_of` is 2026-09-17, so it is zero days old against a
+     seven-day limit. A converted figure whose rate is older than that says so on the screen now,
+     which is why the key exists at all. */
+  assert.deepEqual(
+    held.targetIn,
+    { currency: 'EGP', target: { lte: 2_000_000 }, asOf: '2026-09-17', forward: false, from: 'EGP', stale: false },
+    'typed in pounds, held in pounds',
+  );
   assert.equal(held.met, true);
   sql.close();
 });

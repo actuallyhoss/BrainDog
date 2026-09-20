@@ -114,6 +114,7 @@ import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 import {
   carryingOf,
   headline,
+  localParts,
   nextOccurrence,
   noteEvent,
   notify,
@@ -751,6 +752,77 @@ function readSortCursor(cursor: string, order: string): Param[] | null {
   }
 }
 
+/* ── the nightly ledger row ──────────────────────────────────────────────── */
+
+/**
+ * money-core's `snapshots`, which the kernel knows by name the way `evalContext` knows `fx` by name.
+ *
+ * A REGISTER OF ROWS THE RECORD WRITES ITSELF is not something the declaration grammar can express:
+ * `04 §5`'s eight kinds are register, page, block, ingest, rule, metric, theme and digest, and none
+ * of them schedules a write into a register. Until one of them can, the alternative to naming this
+ * register here is the Ledger page drawing an empty table for ever, which is what it did.
+ */
+const NIGHT_REGISTER = 'snapshots';
+
+/**
+ * Which figure fills which field. The `net` field is the arithmetic over these three and is below.
+ *
+ * READ THROUGH THE FIGURES AND NOT OFF THE REGISTERS, deliberately. Every one of these three is a
+ * question the record already owns and already answers on the Ledger page, and a second summation
+ * here would be a second definition of "still owed" that nobody would notice had drifted until a
+ * tile and a chart disagreed about the same night. `owed-by-you` was added for exactly this reason:
+ * the payable book previously had only `overdue`, which is the late part of it, so anything filling
+ * a snapshot had to add the register up itself.
+ */
+const NIGHT_FIGURES: Readonly<Record<string, string>> = {
+  cash: 'cash-now',
+  owed_to_me: 'owed-to-you',
+  owed_by_me: 'owed-by-you',
+};
+
+/**
+ * How late a reading may be taken and still be honest about the night it names.
+ *
+ * A MACHINE ASLEEP AT MIDNIGHT MISSES THE NIGHT, and that is the whole of the catch-up policy. The
+ * other three figures could be backfilled — a predicate can be re-asked as of a past day — but
+ * `cash` cannot: the record holds what is in the account NOW, and no history of a balance exists to
+ * reconstruct one from. So a reading is a reading of the moment it is taken, and the only question
+ * is how far that moment may be from the midnight it is stamped with.
+ *
+ * SIX HOURS, because nothing moves in those six. A personal ledger changes when its owner is awake
+ * and when a bank posts, and the window from five past midnight to six in the morning has neither
+ * in it. Past that the day that has begun has had a morning in it, and stamping that morning's
+ * figures on last night is the one failure this whole design exists to avoid. The night is skipped,
+ * the gap stands in the chart, and the next night is armed as usual.
+ */
+const NIGHT_LATEST_HOUR = 6;
+
+/** A `money` value as a field holds one: minor units and one three-letter code. */
+type NightAmount = { amount: number; currency: string };
+
+const CURRENCY_CODE = /^[A-Z]{3}$/u;
+
+/** The day before a calendar day, done on the date and never on a timestamp, so no zone can shift it. */
+const dayBefore = (iso: string): string => new Date(Date.parse(`${iso}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+
+const NIGHT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A day as this product prints one: `2026-09-20` becomes `20 Sep 2026`.
+ *
+ * SPELLED HERE RATHER THAN IMPORTED, and the duplication is deliberate rather than lazy. The
+ * register keeps the night twice on purpose — `on` is the ISO day the arithmetic sorts by, and
+ * `what` is the title a person types into search, because indexing `on` made a search for what the
+ * screen says find nothing. The other two spellings of this line live in `packages/render`, which
+ * draws screens, and in `packages/seed`, which depends on this package: the kernel imports neither
+ * and cannot, so a third copy is the price of the title being findable.
+ */
+function nightOf(iso: string): string {
+  const [year, month, dayOfMonth] = iso.split('-');
+  const name = /^\d{4}-\d{2}-\d{2}$/u.test(iso) ? NIGHT_MONTHS[Number(month) - 1] : undefined;
+  return name === undefined || year === undefined || dayOfMonth === undefined ? iso : `${Number(dayOfMonth)} ${name} ${year}`;
+}
+
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
   return makeKernel(sql, clock, state, opts);
@@ -1151,6 +1223,31 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'metric' && body.snapshot) {
         const at = nextOccurrence({ at: '00:05' }, clock.now(), tz);
         if (at !== null) arm('snapshot', bare, { metric: typeof body.metric === 'string' ? body.metric : bare }, at);
+      }
+
+      /**
+       * AND THE LEDGER'S OWN NIGHT, WHICH NOTHING ARMED AND NOTHING WROTE.
+       *
+       * `register.snapshots` shipped in money-core 1.2.0 and the Ledger page draws "Night by night"
+       * from it, and no path in this repository ever wrote a row into it: the eight declaration
+       * kinds schedule nothing into a register, a rule's `create:` fills its fields through `fill`,
+       * which reads the triggering row's own fields and cannot carry an aggregate, the arm above
+       * writes `metric_point`, and a digest writes one event and sends. So the table said *No night
+       * has been recorded yet* for as long as the record ran.
+       *
+       * IT IS A `snapshot` ROW AND NOT A KIND OF ITS OWN, and the reason is a `CHECK` constraint.
+       * Migration 5 rewrites `schedule` with `CHECK (kind IN (...))` over twelve names, and a
+       * thirteenth needs a migration and an edit to `SCHEDULE_KINDS`. The two rows mean the same
+       * thing anyway — a reading taken at five past midnight and written down — and the handler
+       * tells them apart by the payload, which says `register` where a metric's says `metric`.
+       *
+       * THE KEY IS THE BARE REGISTER ID for `forgetPack`'s sake: it deletes pending `snapshot` rows
+       * whose key is the bare id of one of the pack's declarations, so this one leaves when
+       * money-core does and comes back out of `pack_removed` when money-core does.
+       */
+      if (decl.kind === 'register' && bare === NIGHT_REGISTER) {
+        const at = nextOccurrence({ at: '00:05' }, clock.now(), tz);
+        if (at !== null) arm('snapshot', bare, { register: bare }, at);
       }
     }
   }
@@ -3384,6 +3481,125 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     for (const rule of rules) transaction(() => applyRule(rulesDeps(), rule, { limit: 1000 }));
   }
 
+  /**
+   * One night of the ledger, written down: four figures across one row.
+   *
+   * WHAT IT ANSWERS IS "what was the whole position on the 14th", which nothing else in the record
+   * can answer. Every figure on the Ledger page is computed fresh, and a figure computed fresh
+   * cannot be asked about a day that has passed — `cash-now` reads the balance the account holds
+   * now, and there is no history of a balance anywhere in this schema to read instead.
+   *
+   * ALL FOUR OR NONE, and the register is why the check has to be here: only `cash` is `required:`,
+   * so a row carrying three of the four would be accepted, and the chart would draw the fourth as a
+   * zero. A hole that reads as a zero is worse than a hole.
+   *
+   * ONE CURRENCY OR NOTHING, and this is the decision the shape forces. A `money` field holds one
+   * amount and one code, so a position held in sterling, dollars and Egyptian pounds has no honest
+   * form in this row unless every part of it converts into one currency at a rate the record holds.
+   * `evaluateMetric` already does that work and already refuses to do it badly: a figure whose rows
+   * it cannot convert comes back with `value: null` and one amount per currency, and that is the
+   * signal to skip the night. A screen in that position asks for a rate; a row cannot ask anybody
+   * anything, because by the time it is read the night is over and the rates have moved. The gap in
+   * the chart is the honest answer, and it is repaired by typing the missing rate, after which
+   * every later night converts.
+   */
+  function writeNight(): void {
+    const tz = recordIdentity(sql)?.tz ?? 'UTC';
+    const nowMs = clock.now();
+    /* PAST THE WINDOW IS A MISSED NIGHT, not a late one. `NIGHT_LATEST_HOUR` has the argument. */
+    if (localParts(nowMs, tz).hour >= NIGHT_LATEST_HOUR) return;
+
+    const night = dayBefore(dayIn(nowMs, tz));
+    /* ALREADY TAKEN. `on` is unique, so the write below would be refused anyway — but a refusal out
+       of a schedule handler walks the retry ladder and opens a suggestion, and a redelivered alarm
+       is not a defect worth telling anybody about.
+
+       AND A DELETED NIGHT COUNTS AS TAKEN, which the unique index would not say: it is partial on
+       `deleted_at IS NULL`, so a row somebody removed leaves the day free again. Putting it back is
+       the record arguing with a person about their own ledger, over a row they deleted on purpose. */
+    if (sql.one(`SELECT 1 AS x FROM entry WHERE register = ? AND json_extract(fields, '$.on') = ?`, NIGHT_REGISTER, night)) return;
+
+    /**
+     * THE READINGS, AND A FIGURE THIS RECORD DOES NOT DECLARE ENDS THE NIGHT.
+     *
+     * A record with `snapshots` installed and `owed-by-you` missing is a record running money-core
+     * older than 1.2.0, where the payable book had only `overdue` — the late part of it. Filling
+     * `owed_by_me` from that would understate what is owed by however much is not yet due, every
+     * night, in a row nobody ever re-reads.
+     */
+    const ctx = evalContext();
+    const read: Record<string, Reading> = {};
+    for (const [field, id] of Object.entries(NIGHT_FIGURES)) {
+      const figure = pageDeps().metric(id);
+      if (!figure) return;
+      const out = evaluateMetric(sql, figure, ctx);
+      /* A REFUSAL IS A NIGHT THAT CANNOT BE RECORDED, not a failure of the alarm: `MIXED_CURRENCY`
+         is the ordinary one, and it is a fact about the rows rather than about this code. */
+      if (!out.ok || out.value.value === null) return;
+      read[field] = out.value;
+    }
+
+    /**
+     * A RECORD THAT HOLDS NO ACCOUNT HAS NO CASH POSITION, AND ZERO IS NOT THE SAME ANSWER.
+     *
+     * `cash-now` over no rows is a sum over nothing, which is `0` — and a night written from it
+     * claims this person had nothing in the bank, when the truth is that the record has not been
+     * told. That is the whole-row version of the hole the four-figures rule is about. The other two
+     * figures are left alone: having no open obligations IS a real state of the books, and a
+     * receivable book of nothing is worth a point on the chart.
+     */
+    if (read.cash!.rows === 0) return;
+
+    /**
+     * THE ONE CURRENCY ALL FOUR ARE IN.
+     *
+     * A ZERO CARRIES NO CURRENCY, and that is a real reading rather than an edge case: a sum over no
+     * rows comes back `{ value: 0, unit: null }`, so a person with no receivables has an
+     * `owed-to-you` with nothing to say about currency. Those adopt whatever the other figures are
+     * in. Two figures that came back in DIFFERENT codes is the case this must not add: it means
+     * neither could be converted into the other, which is the same fact the `parts` branch above
+     * catches, arriving by a different door.
+     */
+    const codes = new Set(Object.values(read).map((r) => r.unit).filter((u): u is string => typeof u === 'string' && CURRENCY_CODE.test(u)));
+    if (codes.size > 1) return;
+    /* EVERY FIGURE ZERO AND NO CODE ANYWHERE is a ledger with nothing in it. The home currency is
+       the only thing that could name one, and inventing a code the person never chose would write a
+       currency into the record on their behalf. */
+    const currency = codes.size === 1 ? [...codes][0]! : homeCurrency(sql);
+    if (currency === null) return;
+
+    const amount = (field: string): number => Math.round(read[field]!.value!);
+    const money = (value: number): NightAmount => ({ amount: value, currency });
+    const net = amount('cash') + amount('owed_to_me') - amount('owed_by_me');
+
+    /* WHAT THE ROW SAYS ABOUT ITSELF WHEN IT IS A CONVERSION. Without it a reader a year later sees
+       a figure in Egyptian pounds and cannot tell that a rate moved the line rather than a balance.
+       THE OLDEST OF THE THREE `asOf` DAYS, because the row is only as current as its weakest part:
+       naming the newest would say the whole night was priced yesterday when one figure was priced
+       last month. */
+    const asOf = Object.values(read)
+      .map((r) => r.fx?.asOf)
+      .filter((d): d is string => typeof d === 'string')
+      .sort()[0];
+    const fields: Record<string, Json> = {
+      what: nightOf(night),
+      on: night,
+      cash: money(amount('cash')),
+      owed_to_me: money(amount('owed_to_me')),
+      owed_by_me: money(amount('owed_by_me')),
+      net: money(net),
+      taken: 'nightly',
+      ...(asOf === undefined ? {} : { note: `Converted to ${currency} at rates as of ${asOf}.` }),
+    };
+
+    const wrote = write(NIGHT_REGISTER, null, fields, { actor: 'system', principal: { kind: 'system' } });
+    /* A CLASH IS THE NIGHT BEING TAKEN BETWEEN THE READ ABOVE AND THIS WRITE, which is the same
+       nothing-to-do as the check at the top. Any other refusal is the register not being the shape
+       this code was written against, and that is worth the ladder and the suggestion it ends in. */
+    if (!wrote.ok && refused(wrote) && wrote.refusal.code !== 'UNIQUE_VIOLATION' && wrote.refusal.code !== 'ALREADY_KNOWN')
+      throw new TypeError(fixOf(wrote));
+  }
+
   const HANDLERS: Partial<Record<ScheduleKind, Handler>> = {
     retry: retryHandler(sql),
 
@@ -3460,7 +3676,19 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * be asked of a number that only exists now.
      */
     snapshot: (row) => {
-      const { metric } = JSON.parse(row.payload) as { metric?: string };
+      const { metric, register } = JSON.parse(row.payload) as { metric?: string; register?: string };
+      /* THE LEDGER'S NIGHT COMES THROUGH THE SAME DOOR, and the payload is what tells them apart: a
+         metric's row says `metric`, the ledger's says `register`. `armDerived` has the reason a
+         thirteenth schedule kind was not worth a migration. It is armed again either way, because a
+         night that is skipped is one night and not the end of the history. */
+      if (register === NIGHT_REGISTER) {
+        /* THE REGISTER IS GONE AND SO IS THE ROW, like a digest whose declaration was retired: the
+           thing it was about is not true any more. Every other outcome re-arms, because a night
+           that could not be recorded is one night and not the end of the history. */
+        if (!registers.has(NIGHT_REGISTER)) return null;
+        writeNight();
+        return nextOccurrence({ at: '00:05' }, clock.now(), recordIdentity(sql)?.tz ?? 'UTC');
+      }
       const decl = metric ? pageDeps().metric(metric) : null;
       if (!decl) return null;
       snapshot(sql, decl, evalContext(), { nowAt: instant(clock.now()), tz: recordIdentity(sql)?.tz ?? 'UTC' });

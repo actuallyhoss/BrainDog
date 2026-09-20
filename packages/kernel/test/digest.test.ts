@@ -554,7 +554,11 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
 
 test('a digest writes money in its own currency and decimals, in the email and in the note', async () => {
   const { render, headline } = await import('../src/digest.ts');
-  const reading = (value: number, unit: string | null) => ({ value, unit, rows: 1, delta: null, why: '', met: null, refusals: [] });
+  /* `held` IS THE ROWS IN SCOPE BEFORE THE PREDICATE, and a `Reading` now requires it: the field
+     landed so a tile can tell an empty register from an empty match, which are the difference
+     between "add your first invoice" and "no invoices are overdue". One row matched out of one row
+     held is the honest fixture here, because every section below is a figure over rows that exist. */
+  const reading = (value: number, unit: string | null) => ({ value, unit, rows: 1, held: 1, delta: null, why: '', met: null, refusals: [] });
   const row = (amount: number, currency: string) =>
     ({ id: 'e_1', register: 'bills', seq: 1, fields: { what: 'Fenwick invoice', amount: { amount, currency } } }) as never;
   const sections = [

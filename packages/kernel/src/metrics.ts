@@ -151,6 +151,33 @@ export type Reading = {
   /** The currency the rows were in, when they were money. `null` for a plain figure. */
   unit: string | null;
   rows: number;
+  /**
+   * HOW MANY ROWS WERE IN SCOPE BEFORE THE PREDICATE RAN: the register's own, less the deleted.
+   *
+   * A READING COULD NOT TELL AN EMPTY REGISTER FROM AN EMPTY MATCH. `rows` is what the filter
+   * matched, so a tile at zero meant either *add your first invoice* or *nothing is overdue*, and
+   * those are not the same sentence. Measured over the five-row seed in `metrics.test.ts`, a
+   * predicate matching nobody and a register nobody has ever written to came back as the same
+   * reading, key for key:
+   *
+   *     {"value":0,"unit":null,"rows":0,"refusals":[],"delta":null,"why":"…","met":true}
+   *
+   * So whichever of the two sentences the app drew, it was guessing, and the guess that goes wrong
+   * is the one shown to somebody who has just arrived: their empty record reads as a record that is
+   * up to date, which is how a dashboard loses trust on the first screen anybody sees.
+   *
+   * IT IS THE SCOPE AND NOT THE WINDOW. Only the predicate stands between `held` and `rows`, so the
+   * two windows of a comparison, the two halves of a ratio and the parts of a grouped figure are all
+   * cut out of this one number rather than each carrying their own.
+   *
+   * THE BROWSER'S COPY OF THIS EVALUATOR HAS CARRIED THE FIELD ALL ALONG, under the same name and
+   * with the same meaning, counted before its filter runs (`apps/web/src/lib/record/metrics.ts`),
+   * and its tile keys a verdict off it: zero matched over rows that exist is good news, zero held is
+   * not news at all. This side did not carry it, so a host reading the same figure over the API got
+   * the ambiguous pair while the browser did not. `50 §1` says there should not be two engines;
+   * while there are, a field on one of them is half a field.
+   */
+  held: number;
   /** `(value − prior) / prior`, or `null` with `why` naming the clause that stopped it. */
   delta: number | null;
   why: string;
@@ -576,8 +603,13 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const moved = declared !== null && now.value.unit !== null && now.value.unit !== declared;
   const targetIn = moved && decl.target && /^[A-Z]{3}$/u.test(now.value.unit!) ? targetFor(decl.target, declared, now.value.unit!, fx.rates, fx.today) : null;
   const judged = moved ? targetIn?.target : decl.target;
+  /* ONE MORE `count(*)` ON A TABLE THIS FIGURE HAS ALREADY COUNTED ONCE, and it is counted here
+     rather than inside a scan because it is a fact about the register and not about an aggregation:
+     the comparison window, the two halves of a ratio and every group are all the same rows under a
+     narrower predicate, so each of them reading it would be the same query several times over. */
   return ok({
     ...now.value,
+    held: heldBy(sql, schema.register),
     delta,
     why,
     met: now.value.value === null || !judged ? null : meets(now.value.value, judged),
@@ -685,7 +717,26 @@ export const meets = (value: number, target: { lte: number } | { gte: number }):
 
 /* ── the scan ────────────────────────────────────────────────────────────── */
 
-type Read = Omit<Reading, 'delta' | 'why' | 'met'>;
+/**
+ * What one scan answers.
+ *
+ * `held` IS NOT HERE BECAUSE A SCAN CANNOT KNOW IT. Every scan in this file is already inside the
+ * predicate, and `held` is the count of the rows the predicate chose from, so it belongs to the
+ * register rather than to the aggregation: reading it per scan would have each half of a ratio and
+ * each bucket of a grouped figure answer the same number over again, once per query.
+ */
+type Read = Omit<Reading, 'delta' | 'why' | 'met' | 'held'>;
+
+/**
+ * The rows the predicate chose from: the register, less what is deleted.
+ *
+ * THE SAME TWO CLAUSES EVERY SCAN BELOW OPENS WITH, and deliberately no third. `deleted_at IS NULL`
+ * is in because a deleted row is held by nobody and a tile counting it would say the register has
+ * something in it when it has not. The clock is out because `asOf` moves the PREDICATE and never the
+ * rows (`EvalContext`), so a snapshot of last Tuesday is last Tuesday's question over today's scope.
+ */
+const heldBy = (sql: Sql, register: string): number =>
+  Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', register)?.n ?? 0);
 
 function read(
   sql: Sql,

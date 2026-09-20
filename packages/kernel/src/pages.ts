@@ -364,7 +364,7 @@ export type PageDeps = {
 const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open']);
 
 /**
- * The kinds that add their rows up, whose `limit:` cuts the GROUPS they draw and never the rows they read.
+ * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
  *
  * A sum over the first six rows is a wrong number rather than a short list. So these read as many
  * rows as a list read hands back at once, and a register past that says it cannot be drawn rather
@@ -378,21 +378,40 @@ const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actio
  * same answer to an agent as "rows and figures", and an agent totalling a bar over a 250-row
  * register was told nothing. The refusal is below, where every consumer gets it.
  *
- * `section` IS NOT ONE OF THESE, and `apps/web/src/lib/record/schema.ts` says why it is in the set
- * there: a section's count on screen is `total`, the whole match, so it is never showing a slice.
- * It reads no row to be right, and measured over the same 301 rows it draws its default 50 and is
- * correct, so putting it here would refuse a heading that has nothing to add up.
+ * `section` IS NOT ONE OF THESE. Its count on screen is `total`, the whole match, so it is never
+ * showing a slice; it reads no row to be right, and measured over the same 301 rows it draws its
+ * default 50 and is correct. Putting it here would refuse a heading that has nothing to add up.
+ * That is the other question, and it has its own name below.
+ *
+ * IT IS CALLED `SUMS` AND IT USED TO BE CALLED `REDUCES`, which was the name of a DIFFERENT SET one
+ * import away. `apps/web/src/lib/record/schema.ts` exported a `REDUCES` of these five plus
+ * `section`, and this file exported a `REDUCES` of the five, both `ReadonlySet<string>` and both
+ * importable into the same module: `page-live.ts` imports one of them today, and adding
+ * `import { REDUCES } from '@braindog/kernel'` beside it would have compiled and answered
+ * differently about `section`, with nothing in either name to say they disagreed. Two names now,
+ * one question each, and `apps/web`'s `block-kinds.test.ts` holds the two packages together.
  */
-/* EXPORTED BECAUSE `apps/web` HOLDS A SECOND COPY OF IT, `SUMS` in `record/schema.ts`, and two
-   lists of which block kinds add their rows up are two answers to one question. The copy is the
-   one that is read on a screen, so a kind added here and not there would refuse in the kernel and
-   draw a wrong total in the browser.
+/* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SPARK_KINDS` in `spark.ts` is declared as for
+   the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set the
+   kernel refuses by. */
+export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'progress', 'split']);
 
-   `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE NOW, which `SPARK_KINDS` in `spark.ts` is declared as
-   for the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set
-   the kernel refuses by, and the copy this one replaces, `SUMS` in `record/schema.ts`, is a
-   `ReadonlySet<string>` today. Re-exported bare it would have widened that type where it stands. */
-export const REDUCES: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'split', 'progress']);
+/**
+ * `SUMS` and `section`: the kinds whose count on screen is the WHOLE MATCH rather than the page drawn.
+ *
+ * Nothing in this file reads it, and it is here rather than in the app because it is a fact about
+ * the record's own dialect that every consumer with a screen has to get right. `apps/web` reads it
+ * for the slice line under a block, on both of its engines: `api.ts` over the sample and
+ * `page-live.ts` over a live answer. The two disagreed about `section` while this was one set doing
+ * both jobs, and the page said it twice, differently, for the same declaration: measured through
+ * `blockOf` on a section with 2 rows and `matched: 301`, `shown 2, total 301`, which is what
+ * `/p/[slug]` prints "Showing 2 of 301" on, over a heading that draws no row of its own and whose
+ * own count says 301, while the same heading on the sample printed nothing.
+ *
+ * DERIVED FROM `SUMS` RATHER THAN LISTED AGAIN, so the only way the two can disagree is the one
+ * kind that is the actual difference between the questions.
+ */
+export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
 const READ_WHOLE = 200;
 
 /** The register `sessions.live` reads, whose fields its `where` and columns name. */
@@ -926,7 +945,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
      a block declaring it wanted no rows and getting one is a block nobody can write. */
-  const limit = REDUCES.has(block.kind) ? READ_WHOLE : block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  const limit = SUMS.has(block.kind) ? READ_WHOLE : block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
   /* THE ORDER GOES TO THE QUERY, not to the page after it. Sorting the rows that came back is
      sorting a page that was already chosen: "the five largest" would be five arbitrary rows put in
@@ -942,7 +961,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
         });
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
 
-  /* AND A REGISTER PAST THAT ONE READ SAYS SO, which is what the comment over `REDUCES` had been
+  /* AND A REGISTER PAST THAT ONE READ SAYS SO, which is what the comment over `SUMS` had been
      promising while this line was missing. The read above asked for 200 and `list` answers how many
      the predicate matched, so the two numbers are in hand here and nowhere else: 301 matched against
      200 read is a block whose every figure would be short by a hundred and one rows.
@@ -953,7 +972,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      deploy, not an edit", and the repair here is an edit the author can make in the declaration.
      `at: 'where'` points at the key that makes the block answerable, because narrowing the predicate
      is the fix and the kind is not the mistake. */
-  if (REDUCES.has(block.kind) && listed.value.matched > READ_WHOLE)
+  if (SUMS.has(block.kind) && listed.value.matched > READ_WHOLE)
     return {
       ...base,
       refusals: also({

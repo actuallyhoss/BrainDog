@@ -208,6 +208,55 @@ test('AN AVERAGE OF NOTHING IS NOT ZERO, and a sum of nothing is', async () => {
   sql.close();
 });
 
+test('AN EMPTY REGISTER AND AN EMPTY MATCH ARE TWO DIFFERENT ZEROES, and a reading said the same thing about both', async () => {
+  /* A tile at zero is either "add your first invoice" or "nothing is overdue", and those are not the
+     same sentence. The reading carried no count of what was in scope before the filter, so the two
+     came back identical and whichever one the app drew it was guessing. Measured against this seed
+     before `held` existed:
+
+       FIVE ROWS HELD, FILTER MATCHED NONE: {"value":0,"unit":null,"rows":0}
+       REGISTER NOBODY HAS WRITTEN TO:      {"value":0,"unit":null,"rows":0}
+
+     The guess that goes wrong is the one told to somebody who has just arrived: their empty record
+     reads as a record that is up to date. */
+  const { k, sql } = await record();
+  const counted = { ...OVERDUE, value: { count: 'id' } as MetricDecl['value'], target: { lte: 5 }, format: 'int' };
+
+  const matched = value<Reading>(k.metric({ ...counted, where: { field: 'party', is: 'Nobody' } as never }));
+  assert.equal(matched.value, 0);
+  assert.equal(matched.rows, 0);
+  assert.equal(matched.held, 5, 'the register holds five rows, and the filter matched none of them');
+
+  assert.ok(
+    (
+      await k.install([
+        {
+          id: 'register.arrivals',
+          kind: 'register',
+          body: { id: 'arrivals', name: 'Arrivals', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] },
+        } as never,
+      ])
+    ).ok,
+  );
+  const empty = value<Reading>(k.metric({ ...counted, source: 'register.arrivals', where: undefined }));
+  assert.equal(empty.value, 0);
+  assert.equal(empty.rows, 0);
+  assert.equal(empty.held, 0, 'nothing has ever been written to this register');
+  assert.notEqual(matched.held, empty.held, 'the two zeroes are one zero again, and the app cannot say which it is holding');
+
+  /* AND IT IS THE SCOPE RATHER THAN THE MATCH: the figure the tile draws still counts the rows the
+     predicate matched, `held` counts the rows it chose from, and a deleted row is in neither. */
+  const overdue = value<Reading>(k.metric(OVERDUE));
+  assert.equal(overdue.rows, 2, 'the filter still decides the figure');
+  assert.equal(overdue.held, 5);
+
+  sql.exec("UPDATE entry SET deleted_at = ? WHERE register = 'obligations' AND json_extract(fields, '$.what') = 'Tax'", new Date(NOW).toISOString());
+  const after = value<Reading>(k.metric(OVERDUE));
+  assert.equal(after.rows, 2, 'the deleted row was never one the predicate matched');
+  assert.equal(after.held, 4, 'a deleted row is not held by anybody');
+  sql.close();
+});
+
 test('a ratio with a zero denominator is not a number', async () => {
   // Never `0`, never infinity, never `NaN` — the em dash, and the numerator is still behind it.
   const { k, sql } = await record();
