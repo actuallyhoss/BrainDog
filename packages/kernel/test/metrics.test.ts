@@ -550,6 +550,138 @@ test('and a count across two is fine, because a count is not a sum', async () =>
   sql.close();
 });
 
+/* ── and the word for what two of them are ───────────────────────────────── */
+
+/**
+ * A register of quantities and nothing else, so a mixed-unit refusal can be read where NEITHER half
+ * is money.
+ *
+ * SEPARATE FROM `OBLIGATIONS` BECAUSE THAT ONE IS COUNTED. Five tests above assert `rows`, `value`
+ * and `met` over its five rows, so a sixth field or a sixth row there is a change to their
+ * arithmetic and not to this one's.
+ */
+const MEASURES: Declaration = {
+  id: 'register.measures',
+  kind: 'register',
+  body: {
+    id: 'measures',
+    name: 'Measures',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'spent', type: 'quantity' },
+      { id: 'weighed', type: 'quantity' },
+    ],
+  } as never,
+};
+
+const MEASURED: MetricDecl = {
+  metric: 'measured',
+  name: 'Measured',
+  source: 'register.measures',
+  value: { sum: 'spent' },
+  target: { gte: 0 },
+  window: '30d',
+  format: 'decimal',
+};
+
+/**
+ * TWO QUANTITY FIELDS RATHER THAN ONE FIELD AND A PREDICATE PER HALF, and that is not a style
+ * choice. `one()` reads `Object.entries(agg)[0]`, so a `where` written on a half of a `diff` or a
+ * `ratio` never reaches SQL: both halves then read the same rows, the mixed-unit refusal fires
+ * INSIDE a half, and the two-halves check below it is never reached. The first shape of this test
+ * used one `size` field and a `where` per half, and it came back `QUANTITY_MIXED_UNIT` from the sum
+ * rather than the `diff` sentence it was written about. Two fields is the shape that reaches the
+ * check.
+ */
+async function measured(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([MEASURES])).ok);
+  for (const row of [
+    { what: 'Editing', spent: { value: 3, unit: 'h' }, weighed: { value: 5, unit: 'kg' } },
+    { what: 'Binding', spent: { value: 2, unit: 'h' }, weighed: { value: 1, unit: 'kg' } },
+  ])
+    assert.ok(k.create('measures', row, { actor: 'p_1' }).ok);
+  return { k, sql };
+}
+
+test('SUBTRACTING KILOGRAMS FROM HOURS IS NOT TWO CURRENCIES, and the refusal said it was', async () => {
+  /* The check is right to refuse — `h − kg` is not a quantity that exists — and the SENTENCE it
+     refuses with named the wrong thing entirely. Driven against the code before this test, over the
+     two rows below:
+
+       MIXED_CURRENCY  one half of this figure is in h and the other in kg, and two currencies are
+                       never subtracted either
+
+     Nothing in that record is money. `04 §5` gives the unit case its own row and the `added` arm
+     already splits on it, so the `diff` arm was the one place a person measuring in hours was sent
+     looking for a currency. */
+  const { k, sql } = await measured();
+  const out = refusal(
+    k.metric({ ...MEASURED, value: { diff: { of: { sum: 'spent' }, per: { sum: 'weighed' } } } } as never),
+  );
+  assert.equal(out.code, 'MIXED_CURRENCY');
+  assert.equal(out.fix, 'one half of this figure is in h and the other in kg, and two units are never subtracted either');
+  sql.close();
+});
+
+test('and a sum across two units says units, which is the arm that already did', async () => {
+  /* The neighbour that was right, kept beside the one that was wrong so a repair cannot swap them.
+     One `quantity` field holding two units, which is what the `added` arm is for. */
+  const { k, sql } = await measured();
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.spent', json('{"value":4,"unit":"d"}')) WHERE json_extract(fields, '$.what') = 'Binding'`);
+  const out = refusal(k.metric(MEASURED));
+  assert.equal(out.code, 'QUANTITY_MIXED_UNIT');
+  assert.equal(out.fix, 'these rows are in d and h, and two units are never added');
+  sql.close();
+});
+
+test('TWO UNITS SPELLED LIKE CURRENCY CODES ARE STILL UNITS, because the declaration knows what the regex cannot', async () => {
+  /* THE `money` ARGUMENT OF `mixedUnits` WAS THE ONE PART OF IT NOTHING DROVE. Deleting it, so that
+     the word came from `units.every(isCurrencyUnit)` alone, left all fifty-two tests in this file
+     green, and the paragraph above the function claims a behaviour on its own word. With it deleted
+     this test reads
+
+       QUANTITY_MIXED_UNIT  these rows are in KGS and LBS, and two currencies are never added
+
+     over a register that holds no money anywhere. `KGS` and `LBS` are three upper-case letters and
+     are not ISO 4217, so the regex is wrong about them and the field's declared type is not: a
+     `quantity` column is never currencies however its units happen to be spelled. */
+  const { k, sql } = await measured();
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.spent', json('{"value":3,"unit":"LBS"}')) WHERE json_extract(fields, '$.what') = 'Editing'`);
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.spent', json('{"value":4,"unit":"KGS"}')) WHERE json_extract(fields, '$.what') = 'Binding'`);
+  const out = refusal(k.metric(MEASURED));
+  assert.equal(out.code, 'QUANTITY_MIXED_UNIT');
+  assert.equal(out.fix, 'these rows are in KGS and LBS, and two units are never added');
+  sql.close();
+});
+
+test('A MONEY COLUMN WITH A ROW THAT CARRIES NO CURRENCY SAYS UNITS TOO, because one of the two is not a currency', async () => {
+  /* WRITTEN WITH SQL AND NOT WITH `create`, and that is the finding as much as the wording is.
+     `coerce.ts` refuses `{ amount: 250 }` — *"currency takes a three-letter code, and every money
+     value carries its own"* — so no caller of this record can put a unitless row in a money column,
+     and the `?? 'no unit'` in the refusal below cannot be reached through the write path at all.
+     What reaches it is JSON that was already in the column: a field that was `decimal` when the row
+     was written, or an import that went in under an older build. The browser's sample register is
+     the live instance of that, because it is typed in rather than coerced, and its own
+     `mixedFix` has said *"units"* about this set since `adf59786` while this said *"currencies"* —
+     one set of rows, two sentences, and this is the copy a paying customer reads.
+
+     Driven against the code before this test:
+
+       MIXED_CURRENCY  these rows are in GBP and no unit, and two currencies are never added
+
+     One currency named and two claimed. */
+  const { k, sql } = await record();
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.amount', json('{"amount":250}')) WHERE json_extract(fields, '$.what') = 'Tax'`);
+
+  const out = refusal(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'decimal' } as never));
+  assert.equal(out.code, 'MIXED_CURRENCY', 'a money column is still refused under the money code, whatever the sentence calls the set');
+  assert.equal(out.fix, 'these rows are in GBP and no unit, and two units are never added');
+  sql.close();
+});
+
 /* ── the two required fields ─────────────────────────────────────────────── */
 
 test('A NUMBER WITH NO TARGET IS DECORATION, and one with no window cannot be acted on', async () => {

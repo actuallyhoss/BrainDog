@@ -35,13 +35,13 @@ export const currencyOf = (value: unknown): string | null => (isMoney(value) ? v
 /**
  * The mark in a mixed set for "and some of these rows carried no currency at all".
  *
- * IT IS THE RECORD'S WORD, AND IT USED TO BE THIS FILE'S OWN. `packages/kernel/src/metrics.ts`
- * writes `g.u ?? 'no unit'` into the same refusal, twice, and that is the copy a paying customer
- * reads; the sample said `no currency` and the two therefore described the same two rows in
- * different words, one on the screen the product demonstrates itself on and one on the screen
- * somebody works from. The equality assertion written to stop exactly that held only the two web
- * modules to each other, so it passed the whole time. `money.test.ts` now reads the mark out of the
- * kernel's source and pins all three.
+ * IT IS THE RECORD'S WORD, AND IT USED TO BE THIS FILE'S OWN. The kernel writes the same mark into
+ * the same refusal, and that is the copy a paying customer reads; the sample said `no currency` and
+ * the two therefore described the same two rows in different words, one on the screen the product
+ * demonstrates itself on and one on the screen somebody works from. The equality assertion written
+ * to stop exactly that held only the two web modules to each other, so it passed the whole time.
+ * `money.test.ts` now opens a real record, drives the refusal, and compares this file's sentence
+ * with the one that came back.
  *
  * AND IT IS A UNIT RATHER THAN A CURRENCY BECAUSE THE SET IT JOINS IS UNITS. `GBP and no unit` is
  * a list of two units, one of which is money; `GBP and no currency` is a list with a hole in it.
@@ -55,6 +55,13 @@ export const currencyOf = (value: unknown): string | null => (isMoney(value) ? v
  * nothing left to guard. That file belonged to another change when this one was written.
  */
 export const BARE = 'no unit';
+
+/**
+ * A CURRENCY IS THREE UPPER-CASE LETTERS, which is ISO 4217, and it is the same test the kernel's
+ * `mixedUnits` applies to the same sets. `BARE` fails it, which is the point: so does any string a
+ * sample row put in a `currency` key that a real record would have refused at the write.
+ */
+const isCurrencyCode = (unit: string): boolean => /^[A-Z]{3}$/u.test(unit);
 
 /**
  * A total, and what it is a total of.
@@ -113,24 +120,35 @@ export function total(values: Iterable<unknown>): Total {
  * and a reason given for a failure that did not happen. It sends whoever reads it looking for a
  * second currency there is no trace of, which is the opposite of what a refusal is for.
  *
- * THE WORDING IS THE KERNEL'S, THE CHOICE OF WHEN TO SAY IT IS THIS SIDE'S, and the difference is
- * worth writing down because it is what is still divergent. `packages/kernel/src/metrics.ts:1072`
- * refuses a mixed `money` field with *"two currencies are never added"* and `:1077` a mixed
- * `quantity` with *"two units are never added"* under `QUANTITY_MIXED_UNIT`, and the comment above
- * the two gives the reason they were ever separated: *"a sentence about money attached to a figure
- * about metres"*. It splits on the FIELD'S TYPE, though, and not on what the set turned out to
- * hold: a money field with a row carrying no currency goes down the money arm, where
- * `g.u ?? 'no unit'` names that row, so the sentence a live record prints for the rows below is
- * *"these rows are in GBP and no unit, and two currencies are never added"*. This mirror declares
- * no `quantity` type at all (`schema.ts:39`), so the kernel's second arm is not a case anything
- * here can reach, and taking its clause is this file's own judgement that one sterling row and one
- * plain number are not two currencies. What that leaves is the record saying "currencies" about
- * the two rows this says "units" about, and the line that closes it is in the kernel's money arm
- * rather than here. `money.test.ts` reads both clauses back out of the kernel, so a rewording there
- * fails here rather than drifting again.
+ * THE WHOLE SENTENCE IS THE KERNEL'S AND THIS IS A MIRROR OF ONE FUNCTION. `mixedUnits`, in the
+ * kernel's `metrics.ts`, decides both halves of it: which units to name, in what order, and whether
+ * two of them are two *currencies* or two *units*. Grep for that name rather than for a line number.
+ * The pointer this paragraph replaces cited `metrics.ts:1072` and `:1077`, and those sentences were
+ * at `:1089` and `:1094` on the day it was written: it was wrong before it was committed, and it was
+ * the only mechanism the comment offered against the copies drifting.
+ *
+ * THE RULE, SPELLED OUT BECAUSE IT HAS TO BE THE SAME RULE AND NOT THE SAME OUTPUT BY LUCK: named
+ * units first and the unitless mark last, and *currencies* only when every entry in the set reads as
+ * an ISO 4217 code. This tested `mixed.includes(BARE)` instead, which agrees with the record on
+ * every set a coerced write can produce and disagrees the moment one does not. `{ amount: 100,
+ * currency: 'pounds' }` is money to `isMoney`, which checks only that the code is a string, and over
+ * that row the old clause said *currencies* where the record says *units*. The ORDER diverged on the
+ * same set: `total()` hands the set over sorted, and `no unit` sorts before `pounds`, so this printed
+ * *"in no unit and pounds"* where the record prints *"in pounds and no unit"*.
+ *
+ * THE CODE IS NOT PART OF THE SENTENCE. The kernel splits `MIXED_CURRENCY` from
+ * `QUANTITY_MIXED_UNIT` on the field's DECLARED type, for the reason its own comment gives, *"a
+ * sentence about money attached to a figure about metres"*; this mirror declares no `quantity` type,
+ * so only the first is reachable from here and nothing about the split has to be copied.
+ *
+ * `money.test.ts` opens a real record, puts these rows in a money column, and holds this function's
+ * output against the refusal that comes back, so a rewording there fails here rather than drifting.
  */
-export const mixedFix = (mixed: readonly string[]): string =>
-  `these rows are in ${mixed.join(' and ')}, and two ${mixed.includes(BARE) ? 'units' : 'currencies'} are never added`;
+export const mixedFix = (mixed: readonly string[]): string => {
+  const named = mixed.filter((u) => u !== BARE && u !== '');
+  const said = [...named, ...(named.length < mixed.length ? [BARE] : [])].join(' and ');
+  return `these rows are in ${said}, and two ${mixed.every(isCurrencyCode) ? 'currencies' : 'units'} are never added`;
+};
 
 /** A money value built from an amount and the currency of the rows it came from. */
 export const asMoney = (amount: number, currency: string | null): MoneyValue | number =>

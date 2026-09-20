@@ -800,6 +800,70 @@ const heldBy = (sql: Sql, schema: Schema, within: Predicate | undefined): number
   );
 };
 
+/**
+ * The mark a mixed-unit refusal gives a row that carries no unit at all.
+ *
+ * Spelled once here because it was spelled four times, and `apps/web/src/lib/record/money.ts` and
+ * `metrics.ts` each hold a copy for the sample: three modules, one string, and the day the sample
+ * said `no currency` a live record said `no unit` about the same two rows. It is a UNIT and not a
+ * CURRENCY because the set it joins is units, one of which happens to be money: `GBP and no unit`
+ * is a list of two units, `GBP and no currency` is a list with a hole in it.
+ */
+const BARE_UNIT = 'no unit';
+
+/**
+ * A CURRENCY IS THREE UPPER-CASE LETTERS, which is ISO 4217 and is what `money` stores in its
+ * `currency` half. A `quantity` stores `h`, `d`, `kg`, and a duration stores nothing.
+ */
+const isCurrencyUnit = (unit: string | null | undefined): unit is string =>
+  typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit);
+
+/**
+ * THE LIST OF UNITS A MIXED-UNIT REFUSAL NAMES, AND THE WORD FOR HOW MANY OF THEM THERE ARE, decided
+ * together and in one place.
+ *
+ * TWO SENTENCES SAID "CURRENCIES" ABOUT SETS THAT HELD NO CURRENCY, and both were driven before this
+ * function existed. A `diff` of one `quantity` field in `h` against another in `kg`:
+ *
+ *   MIXED_CURRENCY  one half of this figure is in h and the other in kg, and two currencies are
+ *                   never subtracted either
+ *
+ * and a `money` column holding one row that had lost its currency:
+ *
+ *   MIXED_CURRENCY  these rows are in no unit and GBP, and two currencies are never added
+ *
+ * One currency named, two claimed, and the reader sent looking for a second currency in a figure
+ * measured in hours. The `added` arm had already been given a second code and a second sentence for
+ * exactly this, and chose between them on the FIELD'S DECLARED TYPE, which is not what the rows
+ * turned out to hold.
+ *
+ * THE `ratio` SENTENCE WAS NOT ONE OF THE TWO, said here because an audit counted it as a third.
+ * That arm is reached only when both halves match the regex, so it is about two currencies whenever
+ * it speaks at all. The `?? 'no unit'` in both pair sentences is unreachable for the same reason: the
+ * `diff` arm needs both units non-empty and the `ratio` arm needs both to be codes. They keep the
+ * fallback so the mark is spelled in one place and not so that it prints.
+ *
+ * SO THE WORD FOLLOWS THE SET AND THE CODE FOLLOWS THE FIELD. `04 §5` gives `MIXED_CURRENCY` and
+ * `QUANTITY_MIXED_UNIT` separate rows, so an agent branching on the code still learns which kind of
+ * aggregation refused; what a person reads is about the units in front of them. `money` is passed
+ * `false` by the `quantity` arm so that two units spelled like currency codes, `KGS` against `LBS`,
+ * are still units: the regex cannot tell those apart and the declaration can.
+ *
+ * AND THE UNITLESS MARK GOES LAST, because SQLite's `ORDER BY u` puts `NULL` first and *"these rows
+ * are in no unit and GBP"* opens on the exception. That was the second half of the divergence with
+ * the browser and nobody had noticed it: the mirror's set arrives alphabetically sorted, so it said
+ * *"GBP and no unit"* about rows this called *"no unit and GBP"*. The mirror now names its units first
+ * as well, so the two agree by the same rule rather than by where a sort happened to put a word.
+ */
+function mixedUnits(units: readonly (string | null | undefined)[], money = true): { said: string; word: string } {
+  const named = units.filter((u): u is string => typeof u === 'string' && u !== '');
+  const bare = named.length < units.length;
+  return {
+    said: [...named, ...(bare ? [BARE_UNIT] : [])].join(' and '),
+    word: money && units.every(isCurrencyUnit) ? 'currencies' : 'units',
+  };
+}
+
 function read(
   sql: Sql,
   predicate: Predicate | undefined,
@@ -869,10 +933,11 @@ function read(
      * A DIFF STILL NEEDS THEM EQUAL, whatever they are: subtracting hours from pounds is not a
      * quantity that exists, and that is what the check was written for.
      *
-     * A CURRENCY IS THREE UPPER-CASE LETTERS, which is ISO 4217 and is what `money` stores in its
-     * `currency` half. A `quantity` stores `h`, `d`, `m`: no unit this record can hold is spelled
-     * like a currency and means something else, so the test is on the value rather than on a type
-     * that would have to be threaded down through two aggregations to get here.
+     * A CURRENCY IS THREE UPPER-CASE LETTERS (`isCurrencyUnit`), which is ISO 4217 and is what
+     * `money` stores in its `currency` half. A `quantity` stores `h`, `d`, `m`, so the test is on the
+     * value rather than on a type that would have to be threaded down through two aggregations to get
+     * here. It cannot tell `KGS` from a currency, and the `added` arm below, which does have the
+     * declared type, is told not to trust it for that reason.
      */
     /**
      * AND A HALF THAT READ NOTHING HAS NO UNIT, WHICH IS NOT A DIFFERENT UNIT.
@@ -887,11 +952,16 @@ function read(
      * SUBTRACTING NOTHING FROM POUNDS IS POUNDS. What the check is for is subtracting hours from
      * pounds, and that needs two units to be wrong about.
      */
-    const currency = (u: string | null | undefined) => typeof u === 'string' && /^[A-Z]{3}$/u.test(u);
     const said = (u: string | null | undefined) => typeof u === 'string' && u !== '';
     const clash = ratio
-      ? currency(of.value.unit) && currency(per.value.unit) && of.value.unit !== per.value.unit
+      ? isCurrencyUnit(of.value.unit) && isCurrencyUnit(per.value.unit) && of.value.unit !== per.value.unit
       : said(of.value.unit) && said(per.value.unit) && of.value.unit !== per.value.unit;
+    /* WHAT TWO OF THEM ARE CALLED, FROM `mixedUnits` AND NOT FROM THIS SENTENCE. The `ratio` arm
+       reaches here only when both halves ARE currencies, so its word does not move; the `diff` arm
+       reaches here on any two units that differ, and said "currencies" about hours against kilograms
+       until this line. Only the word is taken: these two sentences name their halves one at a time
+       rather than as a list, so the list is built here. */
+    const two = mixedUnits([of.value.unit, per.value.unit]).word;
     if (clash)
       /* `RATIO_MIXED_CURRENCY` FOR A RATIO, AND `MIXED_CURRENCY` FOR A DIFF, because `04 §5` gives
          them separate rows with separate sentences: the ratio's is *"revenue is USD, spend is EGP.
@@ -909,12 +979,12 @@ function read(
       return ratio
         ? no<Read>(
             'RATIO_MIXED_CURRENCY',
-            `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never divided either`,
+            `one half of this figure is in ${of.value.unit ?? BARE_UNIT} and the other in ${per.value.unit ?? BARE_UNIT}, and two ${two} are never divided either`,
             { at: 'value' },
           )
         : no<Read>(
             'MIXED_CURRENCY',
-            `one half of this figure is in ${of.value.unit ?? 'no unit'} and the other in ${per.value.unit ?? 'no unit'}, and two currencies are never subtracted either`,
+            `one half of this figure is in ${of.value.unit ?? BARE_UNIT} and the other in ${per.value.unit ?? BARE_UNIT}, and two ${two} are never subtracted either`,
             { at: 'value' },
           );
 
@@ -1077,23 +1147,31 @@ function aggregate(
         return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } });
       return ok({ value: null, unit: null, rows, refusals: [], parts: said.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: said.missing } });
     }
-    if (groups.length > 1)
-      /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
-         `quantity` aggregation across units"*, with its own sentence: *"sums consumption across m,
-         cm and g. Scope the predicate to one unit"*. The sentence below has said "units" since it
-         was written and the code said `MIXED_CURRENCY`, which is a sentence about money attached to
-         a figure about metres. */
+    /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
+       `quantity` aggregation across units"*, with its own sentence: *"sums consumption across m,
+       cm and g. Scope the predicate to one unit"*. The sentence below has said "units" since it
+       was written and the code said `MIXED_CURRENCY`, which is a sentence about money attached to
+       a figure about metres.
+
+       AND THE MONEY ARM'S WORD NOW FOLLOWS THE ROWS AS WELL AS THE FIELD (`mixedUnits`). It split on
+       the declared type alone, so a money column holding one row that had lost its currency refused
+       with *"these rows are in no unit and GBP, and two currencies are never added"*: one currency
+       named and two claimed, about the one set the browser's own `mixedFix` has called units since
+       `adf59786`. The code is still the money one, because the aggregation is still a money one. */
+    if (groups.length > 1) {
+      const mixed = mixedUnits(
+        groups.map((g) => g.u),
+        money,
+      );
+      const allowed = groups.map((g) => String(g.u ?? ''));
+      /* THE TWO SENTENCES ARE NOW THE SAME TEXT AND THE TWO CALLS STAY APART, because `refusals.mjs`
+         counts a code only where it is a quoted literal after `no(`: folding these into one call
+         with the code in a ternary would hide both from the gate that checks every published code is
+         emitted by something, and that gate is how the `QUANTITY_MIXED_UNIT` arm was found missing. */
       return money
-        ? no<Read>(
-            'MIXED_CURRENCY',
-            `these rows are in ${groups.map((g) => g.u ?? 'no unit').join(' and ')}, and two currencies are never added`,
-            { at: field, allowed: groups.map((g) => String(g.u ?? '')) },
-          )
-        : no<Read>(
-            'QUANTITY_MIXED_UNIT',
-            `these rows are in ${groups.map((g) => g.u ?? 'no unit').join(' and ')}, and two units are never added`,
-            { at: field, allowed: groups.map((g) => String(g.u ?? '')) },
-          );
+        ? no<Read>('MIXED_CURRENCY', `these rows are in ${mixed.said}, and two ${mixed.word} are never added`, { at: field, allowed })
+        : no<Read>('QUANTITY_MIXED_UNIT', `these rows are in ${mixed.said}, and two ${mixed.word} are never added`, { at: field, allowed });
+    }
     const only = groups[0]!;
     return ok({ value: only.v === null ? null : Number(only.v), unit: only.u, rows, refusals: [] });
   }

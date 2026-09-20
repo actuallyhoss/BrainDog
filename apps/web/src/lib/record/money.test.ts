@@ -13,9 +13,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord, type Declaration } from '@braindog/kernel';
 
 import { currencyFor, display, metric, page, readBlock, values } from './api.ts';
 import { resolverOf } from './page-live.ts';
@@ -40,29 +40,87 @@ const LEGS = Object.values(PAGES)
   .flatMap((p) => p.blocks)
   .find((b) => b.source === 'forecast.runway')!.from!;
 
-/* THE REFUSAL AND NOTHING ELSE. `packages/kernel/src/metrics.ts` writes `?? 'no unit'` in four
-   places, and two of them are the halves of a ratio: a different sentence with its own wording.
-   This reads only the two that render the mixed-unit refusal, so the pin below cannot be satisfied
-   by a match somewhere a reader of that sentence never goes. */
-const MARK = /these rows are in \$\{groups\.map\(\(g\) => g\.u \?\? '([^']+)'\)/gu;
+/** One money column and nothing else, which is all the mixed-unit refusal needs to be asked. */
+const TAKINGS: Declaration = {
+  id: 'register.takings',
+  kind: 'register',
+  body: {
+    id: 'takings',
+    name: 'Takings',
+    title: 'what',
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'amount', type: 'money' },
+    ],
+  } as never,
+};
 
 /**
- * THE RECORD'S OWN COPY OF THE MIXED-UNIT SENTENCE, read out of the kernel instead of typed here.
+ * THE RECORD'S OWN MIXED-UNIT SENTENCE, DRIVEN OUT OF A RUNNING RECORD RATHER THAN MATCHED IN ITS
+ * SOURCE. One argument per row, each the JSON that row's money column is to hold.
  *
- * A sentence typed a second time is the whole of what went wrong: this file held the two web
- * modules to each other and had no way to see the third spelling, which is the one a paying
- * customer reads. `@braindog/kernel` is already a dependency of this app, and `metrics.ts` imports
- * `across` and `targetFor` from it, but both words below are literals inside `aggregate` rather
- * than exports, so the source text is where they can be seen at all. `deployment.test.ts` reads
- * `tools/gates/*.mjs` from five directories up for the same reason.
+ * A sentence typed a second time is the whole of what went wrong: this file held the two web modules
+ * to each other and had no way to see the third spelling, which is the one a paying customer reads.
+ * The first repair read the kernel's source with a regex over the template literal, and that regex
+ * could see the mark and not the clause around it, so the two copies diverged on the clause one
+ * commit later with the assertions still green. `openRecord` is exported, so the whole sentence can
+ * be driven instead.
+ *
+ * WHY THE ROWS ARE FINISHED WITH SQL. `coerce.ts` refuses `{ amount: 250 }` and refuses
+ * `currency: 'pounds'`, so no caller can put either in a money column, and the arm of the refusal
+ * that names a unitless row cannot be reached through the write path at all. What reaches it is JSON
+ * that was already in the column: a field that was `decimal` when the row was written, or an import
+ * under an older build. This app's own sample registers are the live instance of that, because their
+ * rows are typed into `data.ts` rather than coerced, which is how the browser comes to print a
+ * sentence about a set a fresh record could not hold.
  */
-const KERNEL = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'packages', 'kernel', 'src', 'metrics.ts'),
-  'utf8',
-);
+async function refusedOver(amounts: readonly string[]): Promise<{ code: string; fix: string }> {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const out = fn();
+        db.exec('COMMIT');
+        return out;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
 
-/** Every mark the kernel writes for a row with no unit, taken from the refusal itself. */
-const RECORD_MARKS = [...new Set([...KERNEL.matchAll(MARK)].map((m) => m[1]!))];
+  const k = await openRecord(sql, { now: () => NOW });
+  assert.ok((await k.install([TAKINGS])).ok, 'the register the refusal is read over would not install');
+  for (const [at, json] of amounts.entries()) {
+    assert.ok(k.create('takings', { what: `Row ${at + 1}`, amount: gbp(100) }, { actor: 'p_1' }).ok);
+    sql.exec(`UPDATE entry SET fields = json_set(fields, '$.amount', json(?)) WHERE json_extract(fields, '$.what') = ?`, json, `Row ${at + 1}`);
+  }
+
+  const out = k.metric({
+    metric: 'taken',
+    name: 'Taken',
+    source: 'register.takings',
+    value: { sum: 'amount' },
+    target: { gte: 0 },
+    window: '30d',
+    format: 'decimal',
+  } as never) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(out.ok, false, 'the record answered a sum over a mixed money column instead of refusing');
+  db.close();
+  return out.refusal!;
+}
 
 test('a total of one currency is a total; a total of two is a REFUSAL', () => {
   const one = total([gbp(100), gbp(250), null, gbp(50)]);
@@ -90,7 +148,7 @@ test('MONEY AND A BARE NUMBER TOGETHER IS MIXED TOO', () => {
   assert.deepEqual(plain.mixed, []);
 });
 
-test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', () => {
+test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', async () => {
   /* `total()` saw the bare rows and refused over them, and then left them out of the set it hands
      to `mixedFix`, so a column of one sterling row and one plain number printed *"these rows are in
      GBP, and two currencies are never added"* — one currency named, two claimed, and nothing about
@@ -107,33 +165,42 @@ test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', () => {
   assert.equal(mixedFix([...currenciesRead(rows, { sum: 'amount' })].sort()), mixedFix(t.mixed));
   assert.equal(BARE, METRICS_BARE, 'the marker is spelled in two modules and the spellings have drifted');
 
-  /* AND THE THIRD SPELLING, WHICH IS THE ONE THAT WINS. The equality above holds the two web
-     modules to each other and can see nothing else, so it passed on the day the sample printed
-     *"these rows are in GBP and no currency"* about the same two rows the record described as
-     *"GBP and no unit"*: one situation, two sentences, and the assertion that was supposed to stop
-     exactly that looking straight through it. Measured against `packages/kernel/src/metrics.ts` as
-     it stands: two occurrences of the mixed-unit refusal, both writing `no unit`, so the marks come
-     back as one distinct word and the sample has to be spelling that one. */
-  assert.deepEqual(RECORD_MARKS, [BARE], 'the sample and the record name a unitless row differently');
+  /* AND THE THIRD SPELLING, WHICH IS THE ONE THAT WINS, ASKED OF A RUNNING RECORD. The equality
+     above holds the two web modules to each other and can see nothing else, so it passed on the day
+     the sample printed *"these rows are in GBP and no currency"* about the same two rows the record
+     described as *"GBP and no unit"*: one situation, two sentences, and the assertion that was
+     supposed to stop exactly that looking straight through it. Its replacement matched the kernel's
+     SOURCE with a regex, which saw the mark and not the clause around it, and the clause diverged one
+     commit later with the assertions still green. So the record is opened, the rows are put in a
+     money column, and the whole sentence is compared. */
+  const bare = await refusedOver(['{"amount":10000,"currency":"GBP"}', '{"amount":25000}']);
+  assert.equal(bare.code, 'MIXED_CURRENCY', 'the record no longer refuses a money column with a unitless row');
+  assert.equal(mixedFix(t.mixed), bare.fix, 'the sample and the record say different things about the same two rows');
 
-  /* AND THE TRAILING CLAUSE IS THE KERNEL'S TOO, rather than a third phrasing invented on this
-     side. One sterling row beside one plain number is not two currencies, so "two currencies are
-     never added" describes a failure that did not happen; the kernel already splits the two, giving
-     the unit case `QUANTITY_MIXED_UNIT` and its own words for the reason its comment gives, *"a
-     sentence about money attached to a figure about metres"*. Both clauses are read back out of it
-     so that a rewording there fails here rather than drifting again.
+  /* AND A SET WHOSE OTHER ENTRY IS NEITHER A CURRENCY NOR THE MARK, which is the case both copies
+     have got wrong in turn, and it is passed through `total()` rather than typed as an array because
+     the ORDER is half of what diverged. `total()` hands the set over sorted and `no unit` sorts
+     before `pounds`, so this printed *"in no unit and pounds"* where the record prints *"in pounds
+     and no unit"*. A write cannot produce the row — `coerce.ts` refuses `currency: 'pounds'` — and a
+     money column that already held it can, which is what the sample register is. */
+  const oddly = total([{ amount: 10_000, currency: 'pounds' }, 25_000]);
+  assert.deepEqual(oddly.mixed, [BARE, 'pounds'], 'the set no longer arrives sorted, so the order this pins is a different one');
+  const odd = await refusedOver(['{"amount":10000,"currency":"pounds"}', '{"amount":25000}']);
+  assert.equal(mixedFix(oddly.mixed), odd.fix);
+  assert.equal(odd.fix, 'these rows are in pounds and no unit, and two units are never added');
 
-     WHAT THESE TWO DO NOT PIN, SAID HERE SO NOBODY READS THEM AS MORE THAN THEY ARE: the kernel
-     chooses between its two clauses on the FIELD'S TYPE, at `metrics.ts:1072` and `:1077`, and a
-     money field holding a row with no currency goes down the money arm, so the record's sentence
-     for these same two rows is still *"and two currencies are never added"*. The second assertion
-     below is therefore satisfied by the `quantity` arm, which this mirror has no field type to
-     reach. The mark is one word across all three copies; this clause is two, and the line that
-     would make it one is in the kernel rather than in this app. */
-  assert.ok(KERNEL.includes('and two units are never added'), 'the kernel no longer carries the wording this sentence copies');
-  assert.ok(KERNEL.includes('and two currencies are never added'), 'the kernel no longer carries the money wording either');
+  /* AND THE SAME TEST WITH NO UNITLESS ROW AT ALL, which is the one a live record cannot be asked:
+     two named units in a money column send it to the rate table rather than to a refusal, so it
+     answers in parts. `includes(BARE)` saw no mark here and called `euros` and `pounds` two
+     currencies; the rule the record applies is that each entry has to read as a code. */
+  assert.equal(
+    mixedFix(total([{ amount: 100, currency: 'pounds' }, { amount: 200, currency: 'euros' }]).mixed),
+    'these rows are in euros and pounds, and two units are never added',
+  );
 
-  /* AND TWO REAL CURRENCIES STILL SAY CURRENCIES, which is the half of the split that was right. */
+  /* AND TWO REAL CURRENCIES STILL SAY CURRENCIES, which is the half of the split that was right. A
+     live record answers that case in parts rather than refusing, because it has a rate table to try
+     first, so this one is the mirror on its own. */
   assert.equal(mixedFix(['EUR', 'GBP']), 'these rows are in EUR and GBP, and two currencies are never added');
 });
 
