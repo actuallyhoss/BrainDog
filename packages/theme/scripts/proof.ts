@@ -94,7 +94,13 @@ for (const w of warn) console.log(`  warn   ${w.check}  ${w.fix}`);
 for (const b of bad) console.log(`  REFUSE ${b.check}  ${b.fix}`);
 console.log(
   bad.length === 0
-    ? `\n  PASS — ${findings.length} findings, 0 refusals, ${warn.length} warnings.\n`
+    /* RESULTS, NOT FINDINGS, AND THE PASSES COUNTED SEPARATELY. `validate` used to answer only
+       with what was wrong, so its length was a count of complaints and the word fit. It now
+       reports every check it ran, pass included, and the number went from 10 to 201 — a line
+       reading "PASS — 201 findings, 0 refusals" says the two halves of one sentence contradict
+       each other. A validator that reports its passes is the point; the summary has to say what
+       it is counting. */
+    ? `\n  PASS — ${findings.length} results: ${findings.length - warn.length - bad.length} clear, ${warn.length} warnings, 0 refusals.\n`
     : `\n  REFUSED — ${bad.length} floors breached.\n`,
 );
 
