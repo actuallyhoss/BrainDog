@@ -436,8 +436,18 @@ The text lens is the **YAML flow form** of [02-DATA-MODEL](02-DATA-MODEL.md) §6
 quantifier first, keys in the order `via field <op>` — converted through `declare`, the only package
 that holds a YAML parser. `where.parse` itself takes the JSON tree, the storage form, and `where.print`
 emits RFC 8785 canonical JSON ([33-CONTRACTS](33-CONTRACTS.md) §1, [34-GRAMMARS](34-GRAMMARS.md) §1), so
-the two properties below are over JSON trees. The sentence forms in §4.6 — `status is unpaid` — are the
-English restatement of §13's last row: read-only, never parsed.
+the two properties below are over JSON trees. The sentence forms in §4.6 — `status is unpaid` — were
+described here as the English restatement of §13's last row, read-only and never parsed. **They are
+parsed.** `predicateOf` hands any `where` that arrives as a string to `parseWhere`, so a sentence is
+a second way in to the same compiler, and it was one before `has` and `lacks` were added and is one
+after. The line is corrected rather than deleted because what it got right is the *direction*: the
+restatement in §13 is a read, and nothing round-trips through English.
+
+What is genuinely missing is a grammar for the spoken form. There is no word list and no EBNF for it
+anywhere in these documents, only examples, which is a fair part of how a whole field type came to be
+reachable from one surface and not the other: `tags has 2` parses to `{ has: '2' }` and `tags has true`
+to `{ has: 'true' }`, because the sentence has no way to carry an element's type and `Schema.fields`
+publishes one only for `list<enum>`.
 
 Two property tests are the entire safety story:
 
