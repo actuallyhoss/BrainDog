@@ -298,7 +298,48 @@ export type CloudIngestDeps = {
   arrives(rec: string, arrival: Omit<IngestArrival, 'rec' | 'ingest'>): Promise<Result<unknown>>;
   /** Whole seconds to wait, or `null` to let this one through. */
   spends(ask: { channel: string; key: string }): Promise<number | null>;
+  /**
+   * Which record a forwarded message is for. Absent, and this deployment takes no mail at all.
+   *
+   * OPTIONAL BECAUSE THE DIRECTORY CANNOT ANSWER IT YET, and optional is the honest way to say so:
+   * `serveIngest` answers 404 for the whole `/in/email/*` surface when a door offers no `inbound`,
+   * the way `/auth/provision` answers `off()` with no operator key set. The day the Directory has
+   * the index, wiring it here is the whole of the Worker's change.
+   */
+  inbound?: InboundIndex;
 };
+
+/**
+ * The digest of an inbound mail token, answered with the record it names.
+ *
+ * ONE METHOD, BECAUSE THE WORKER NEEDS EXACTLY ONE FACT FROM THIS INDEX. Everything else about
+ * inbound mail addresses — who issued one, when, how it is rotated, what the person was shown once
+ * and never again — is the Directory's and belongs nowhere near a path a stranger types. A wider
+ * shape here would be a wider surface reachable with no credential.
+ *
+ * THE DIGEST IS THE KEY AND THE TOKEN IS NEVER SEEN. `/in/email/<token>` has no record id in it, so
+ * the token IS the lookup key, and a lookup key held in the clear is a credential in whatever index
+ * holds it: anybody who can read that table can read the mail of every record in it. `serveIngest`
+ * hands across the SHA-256 in hex and nothing else, this Worker checks that shape before using it,
+ * and the Directory therefore stores 64 hex characters that open nothing. It is the same division
+ * the self-host already makes, which keeps only the digest of the file `init` wrote
+ * (`apps/selfhost/src/server.ts:994`).
+ */
+export type InboundIndex = {
+  /** The record whose inbound token has this digest, or `null` for a digest nobody registered. */
+  recordFor(tokenHash: string): Promise<string | null>;
+};
+
+/**
+ * A SHA-256 in hex, lower-cased, and nothing else may be used as a lookup key.
+ *
+ * WHAT THIS REFUSES IS THE TOKEN ITSELF. `init` writes `randomBytes(32).toString('base64url')`,
+ * which is 43 characters and fails this test, so a caller that passed the raw token where the
+ * digest belongs gets `null` instead of putting a live credential into the Directory's query path.
+ * `serveIngest` always digests first and cannot reach that mistake, and this is the guard for the
+ * other callers of `IngestDoor.inbound` rather than for that one.
+ */
+const TOKEN_DIGEST = /^[0-9a-f]{64}$/;
 
 /**
  * The Cloud's half of `/in/*`. `51 §5.4`, and `packages/host/src/ingest.ts` holds the order.
@@ -309,15 +350,19 @@ export type CloudIngestDeps = {
  * record's sender was given. 404 says neither, and the self-host declines the four-segment shape at
  * its own door for the mirror reason.
  *
- * MAIL IS NOT WIRED AND THE ABSENT `inbound` IS HOW IT SAYS SO. `serveIngest` answers 404 for the
- * whole `/in/email/*` surface when a host supplies no `inbound`, and the Cloud has nowhere to look a
- * forwarded token up: the Directory keeps no index of inbound token digests, and `49 §5.16` step 2's
- * `<slug>/inbound.token` is a file on a self-host's disk. The Cloud's mail is meant to arrive at the
- * runtime's own email handler rather than over HTTP, and nothing in this build has one. Answering
- * 404 is the honest report of that; the alternative, resolving the token against something else,
- * would be a second way to name a record.
+ * MAIL RESOLVES THROUGH AN INDEX OF DIGESTS, AND THROUGH NOTHING ELSE. `/in/email/<token>` is the
+ * one arrival whose path names no record (`49 §5.16` step 2), so the digest of the token is the
+ * address: `deps.inbound` is asked, and whatever it answers is put through the same two refusals a
+ * webhook's path segment goes through before it can become an argument to `idFromName`. A
+ * deployment that supplies no index takes no mail, which is every deployment in this build.
+ *
+ * THE SELF-HOST HOLDS ONE DIGEST AND THE CLOUD HOLDS AN INDEX OF THEM, and that is the only
+ * difference between the two halves. A self-host serves one record, so `inbound` there is a
+ * comparison against the digest of the file `init` wrote; a Worker serves every record, so the
+ * comparison has to be a lookup. Both sides see the digest and neither can see the token.
  */
 export function cloudIngest(deps: CloudIngestDeps): IngestDoor {
+  const index = deps.inbound;
   return {
     verify: async (ask) => {
       /* THE RECORD IS CHECKED BEFORE THE INGEST IS, so an id that is not this deployment's costs a
@@ -339,7 +384,36 @@ export function cloudIngest(deps: CloudIngestDeps): IngestDoor {
             verified: arrival.verified,
           }),
     limit: (ask) => deps.spends(ask),
+    /* AN ABSENT KEY AND NOT A METHOD ANSWERING `null`, and the difference is not one a caller can
+       see: measured against `serveIngest` on 2026-09-20, a door with no `inbound` and a door whose
+       `inbound` always answers `null` both give 404 to `POST /in/email/<tok>` and 405 to a GET.
+       What the absent key buys is that `IngestDoor.inbound?` is the type's own way of saying "this
+       host takes no forwarded mail", which the self-host spreads in the same way, so nothing has to
+       call anything to find out whether a deployment has a mail door at all. */
+    ...(index === undefined ? {} : { inbound: (hash: string) => inboundRecord(hash, index, deps) }),
   };
+}
+
+/**
+ * The record a forwarded message's digest names, or `null`, with every answer that must not become
+ * an address refused on the way.
+ *
+ * THREE REFUSALS, AND EACH ONE IS A DIFFERENT MISTAKE. The shape of the key keeps the raw token out
+ * of the Directory's lookup path. The shape of the ANSWER is the rule `recordOf` and `cloudIngest`'s
+ * `verify` both state: `idFromName` on a name nobody has CREATES the object, so a row holding a
+ * typo, an empty string or a path fragment would be an unauthenticated way to mint empty records,
+ * and this is reached with no credential at all. And `knows` is asked last because the index and
+ * the closure are two separate writes in the Directory: a record closed while a bank still has its
+ * forwarding address would otherwise keep taking mail into storage nobody can reach.
+ *
+ * ALL THREE ARE THE SAME 404 ON THE WIRE, which is what keeps this from being an oracle. A stranger
+ * who guesses an address learns only that guessing is not worth continuing.
+ */
+async function inboundRecord(hash: string, index: InboundIndex, deps: CloudIngestDeps): Promise<string | null> {
+  if (!TOKEN_DIGEST.test(hash)) return null;
+  const rec = await index.recordFor(hash);
+  if (rec === null || !isRecordId(rec)) return null;
+  return (await deps.knows(rec)) ? rec : null;
 }
 
 /**

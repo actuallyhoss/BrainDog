@@ -328,10 +328,14 @@ export const site = {
          *     the record. The pricing page kept the qualifier and this page dropped it.
          *   - `Nothing is overwritten` is the hero's claim and falls for the hero's reason.
          */
+        /* THE THIRD LINE WAS THE HERO'S SENTENCE AGAIN, WORD FOR WORD. `hero.sub` already ends
+           `Every change is an event, and the log only grows`, and the same ten words a second
+           time three bands down is not a second reason to believe it: it is the page counting
+           one claim twice. The column is two lines now, and the claim is made once, at the top,
+           where the ledger beside it is busy demonstrating it. */
         lines: [
           'Open source. The code opens on GitHub when the product launches.',
           'Your record is one file. Leaving is a copy, not a migration.',
-          'Every change is an event, and the log only grows.',
         ],
       },
       {
