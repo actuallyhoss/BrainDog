@@ -101,7 +101,29 @@ const ARTEFACTS = [
    reach and which is already in the page. Validating the theme on its own would refuse every build
    for the absence of a rule it is not allowed to write; validating with no `css` at all, which is
    what this used to do, skipped the check entirely. */
-const a11y = await readFile(join(skin, 'a11y.css'), 'utf8');
+/* AND ITS ABSENCE IS A FINDING RATHER THAN A SKIP, which is the opposite of the answer
+   `tools/gates/bundle.mjs` gives to the same question, and right for the opposite reason.
+   `a11y.css` is committed source in this package, beside `base.css` and `tokens.css`. No command
+   produces it, so a skip could not print the sentence a skip is for: there is nothing to tell a
+   person to run. And the two paths below both do real damage without it. `--check` would compare
+   against a house theme validated with check L unasked, which is the exact silence the paragraph
+   above says this arrangement exists to end; the write path would put four unvalidated palettes on
+   disk and report a success. Exiting non-zero here is the same colour `run.mjs` already gave the
+   uncaught ENOENT, with one sentence naming the file instead of ten frames of `node:fs`.
+
+   AND ONLY ENOENT IS TURNED INTO THAT SENTENCE. A file that is there and will not open is a
+   different fact, and dressing it up as a missing file sends a person to look for one that
+   exists. */
+const a11y = await readFile(join(skin, 'a11y.css'), 'utf8').catch((err) => {
+  if (err?.code !== 'ENOENT') throw err;
+  return null;
+});
+if (a11y === null) {
+  console.error('  packages/skin/a11y.css is not there, and check L reads the forced-colors block out of it.');
+  console.error('  No theme is validated or written without it. Restore the file.');
+  process.exit(1);
+}
+
 const houseDoc = toCSS(HOUSE, HIGH_CONTRAST) + a11y;
 const alphaDoc = toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + a11y;
 
