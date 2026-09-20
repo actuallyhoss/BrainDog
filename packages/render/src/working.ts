@@ -44,4 +44,7 @@ export function takeWorking(cell: string | null): { text: string | null; working
  */
 const TITLE_CELL: Readonly<Record<string, number>> = { board: 1, timeline: 1 };
 
-export const workingCell = (kind: string): number => TITLE_CELL[kind] ?? 0;
+/* `Object.hasOwn`, because `kind` is a string a caller chooses and `TITLE_CELL` is a plain object:
+   `workingCell('constructor')` answered with the Object constructor, which `?? 0` does not catch
+   because a function is not nullish, and the mark would have been put on cell `[Function]`. */
+export const workingCell = (kind: string): number => (Object.hasOwn(TITLE_CELL, kind) ? TITLE_CELL[kind]! : 0);

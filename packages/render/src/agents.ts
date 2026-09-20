@@ -41,7 +41,11 @@ export const AGENT_VERBS: Readonly<Record<string, string>> = {
 export function agentDoing(kind: string | null, thing: string | null, note: string | null): string {
   if (note !== null && note.trim() !== '') return note;
   if (kind === null) return '';
-  const verb = AGENT_VERBS[kind] ?? kind;
+  /* `Object.hasOwn`, because `kind` is the record's own word and `AGENT_VERBS` is a plain object:
+     an event kind spelled `constructor` read `Object.prototype.constructor`, which `?? kind` does
+     not catch because a function is not nullish, so the row said "function Object() { [native
+     code] } Write the notes". The same guard `kinds.ts` uses for `TONES`. */
+  const verb = Object.hasOwn(AGENT_VERBS, kind) ? AGENT_VERBS[kind]! : kind;
   return thing ? `${verb} ${thing}` : verb;
 }
 

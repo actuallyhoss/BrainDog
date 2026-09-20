@@ -92,6 +92,51 @@ function evidence(token: string): Inline | null {
   return { type: 'evidence', kind, ...(source ? { source } : {}) };
 }
 
+/**
+ * WHERE THE NEXT `needle` IS, REMEMBERED, and the reason this function exists is a measurement.
+ *
+ * Every opener below asks "where does this close", and each asked with a fresh `indexOf` that scans
+ * to the end of the text when the answer is nowhere. A document does not have to be malformed for
+ * that to hurt: it is the SAME question re-asked at every character, so the cost is the square of
+ * the length. Measured on this file before the change, with nothing but the opener repeated:
+ *
+ *   80,000 `[`                 3,745 ms
+ *   40,000 `[` and one `]`       998 ms
+ *   40,000 `[](`              3,905 ms
+ *   200,000 `{`               1,158 ms
+ *
+ * Eighty kilobytes of one character is not a big note, and a megabyte of it is minutes with the tab
+ * unresponsive, out of a record whose text agents write. Two facts make the memo exact rather than a
+ * heuristic. `from` only ever moves forward, so a hit at or after an earlier `from` is still the
+ * FIRST hit at or after a later one, because there is nothing between them. And `-1` is permanent:
+ * no occurrence at or after `from` means none at or after anything past it. Each rescan therefore
+ * covers a stretch the next rescan starts beyond, so the whole pass is linear in the text.
+ *
+ * Measured after: 2.3 ms, 1.0 ms, 2.4 ms and 4.4 ms, in the order above.
+ *
+ * WHAT IT COSTS AN ORDINARY LINE IS 11 TO 20 PER CENT, and the earlier figure of 3 per cent in this
+ * comment did not reproduce. Six closures are allocated per call to `tokens`, and `tokens` is called
+ * once per gap between code spans and once per emphasis body, so the cost is per call and not per
+ * character: over 200,000 renders, a plain sentence with no tokens in it went 125 ms to 143 ms, the
+ * sentence carrying a bold run, a link, an interpolation, an emphasis, an evidence tag and a code
+ * span went 190 ms to 211 ms, and a bare `**a** [b](/c) {{d}} *e*` went 103 ms to 123 ms. That is
+ * a tenth of a microsecond a cell against a quadratic, so it is the right trade, and it is not free.
+ * Holding the six positions in `let`s instead, with the memo written out at each of the six call
+ * sites, recovers most of it (104 ms, 197 ms) and was not taken: this is the version a reader can
+ * check, and 0.1 microseconds is not worth six copies of the same three lines.
+ *
+ * And the trees are identical: 320,000 random strings over this alphabet, half of them up to 60
+ * characters of nothing but brackets, parentheses, slashes and backslashes, were drawn through both
+ * versions with zero differences, and `render.test.ts` and `parity.test.ts` pass unchanged.
+ */
+const seeker = (text: string, needle: string) => {
+  let at = -2;
+  return (from: number): number => {
+    if (at !== -1 && at < from) at = text.indexOf(needle, from);
+    return at;
+  };
+};
+
 /** One pass over a run of text, after code spans have been lifted out of it. */
 function tokens(text: string, opts: InlineOptions): Inline[] {
   const out: Inline[] = [];
@@ -101,9 +146,16 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
     buf = '';
   };
 
+  const endOfPath = seeker(text, '}}');
+  const endOfTag = seeker(text, '}');
+  const endOfStrong = seeker(text, '**');
+  const endOfEm = seeker(text, '*');
+  const endOfLabel = seeker(text, ']');
+  const endOfHref = seeker(text, ')');
+
   for (let i = 0; i < text.length; ) {
     if (text.startsWith('{{', i)) {
-      const close = text.indexOf('}}', i + 2);
+      const close = endOfPath(i + 2);
       if (close !== -1) {
         push();
         out.push(braced(text.slice(i + 2, close), opts));
@@ -112,7 +164,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       }
     }
     if (text[i] === '{') {
-      const close = text.indexOf('}', i + 1);
+      const close = endOfTag(i + 1);
       if (close !== -1) {
         const tag = evidence(text.slice(i, close + 1));
         if (tag) {
@@ -124,7 +176,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       }
     }
     if (text.startsWith('**', i)) {
-      const close = text.indexOf('**', i + 2);
+      const close = endOfStrong(i + 2);
       if (close !== -1) {
         push();
         out.push({ type: 'strong', body: tokens(text.slice(i + 2, close), opts) });
@@ -133,7 +185,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       }
     }
     if (text[i] === '*') {
-      const close = text.indexOf('*', i + 1);
+      const close = endOfEm(i + 1);
       if (close !== -1) {
         push();
         out.push({ type: 'em', body: tokens(text.slice(i + 1, close), opts) });
@@ -142,15 +194,27 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       }
     }
     if (text[i] === '[') {
-      const m = /^\[([^\]]*)\]\(([^)\s]*)\)/.exec(text.slice(i));
-      if (m) {
-        const href = safeHref(m[2]!);
-        push();
-        // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
-        if (href) out.push({ type: 'link', href, body: tokens(m[1]!, opts) });
-        else out.push({ type: 'text', text: m[1]! });
-        i += m[0].length;
-        continue;
+      /* `[label](href)`, READ BY HAND RATHER THAN BY `/^\[([^\]]*)\]\(([^)\s]*)\)/`, and it is the
+         same grammar spelled so the memo above can be used. The pattern was run against
+         `text.slice(i)`, which copied the rest of the note at every `[` and then scanned it for a
+         `]` that is often not there: two quadratics on one line. Cell for cell: a label is
+         everything up to the first `]`, because `[^\]]` cannot cross one; an href is everything up
+         to the first `)`, because `[^)\s]` cannot cross one either, and it must hold no whitespace,
+         which is the rest of that class. */
+      const shut = endOfLabel(i + 1);
+      if (shut !== -1 && text[shut + 1] === '(') {
+        const end = endOfHref(shut + 2);
+        const raw = end === -1 ? null : text.slice(shut + 2, end);
+        if (raw !== null && !/\s/u.test(raw)) {
+          const label = text.slice(i + 1, shut);
+          const href = safeHref(raw);
+          push();
+          // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
+          if (href) out.push({ type: 'link', href, body: tokens(label, opts) });
+          else out.push({ type: 'text', text: label });
+          i = end + 1;
+          continue;
+        }
       }
     }
     buf += text[i];

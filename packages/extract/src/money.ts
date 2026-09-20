@@ -49,8 +49,19 @@ export const SPACE_LIKE: ReadonlySet<string> = new Set([
   '\u2007', '\u2008', '\u2009', '\u200a', '\u202f', '\u205f', '\u3000',
 ]);
 
+/**
+ * A SPACE, INCLUDING THE FIFTEEN THAT ARE NOT `U+0020`.
+ *
+ * `isSep` consulted `SPACE_LIKE` from the day it was written, and the two space skips in `scanMoney`
+ * compared against the literal `' '`, so one function in this file knew about the other fifteen and the
+ * other did not. `EGP<U+00A0>5.00` tokenised its number and then failed to find the code three characters
+ * to its left, and `Intl.NumberFormat('de-DE', { style: 'currency' })` prints exactly that: the record
+ * could not read back what its own formatter had written. One predicate now, and both callers use it.
+ */
+const isSpace = (ch: string | undefined): boolean => ch === ' ' || (ch !== undefined && SPACE_LIKE.has(ch));
+
 const isSep = (ch: string | undefined): boolean =>
-  ch === ',' || ch === '.' || ch === "'" || ch === ' ' || (ch !== undefined && SPACE_LIKE.has(ch));
+  ch === ',' || ch === '.' || ch === "'" || isSpace(ch);
 
 /* ── the tokenizer, shared by money, int and decimal ─────────────────────── */
 
@@ -70,6 +81,18 @@ function mayStart(text: string, i: number): boolean {
   if (isDigit(prev) || isLetter(prev)) return false;
   if (prev === '/' || prev === ':' || prev === '-') return !isDigit(text[i - 2]);
   return true;
+}
+
+/**
+ * Does a number begin at `p`, reached over at most one space?
+ *
+ * ASKED OF THE CHARACTERS AFTER A CURRENCY CODE, to tell a suffix from the next amount's prefix. In
+ * `USD 5.00 EGP 245.00` the `EGP` is three characters from one number and four from another, and the only
+ * thing in the string that says which one it belongs to is that a number follows it.
+ */
+function startsNumber(text: string, p: number): boolean {
+  const q = isSpace(text[p]) ? p + 1 : p;
+  return isDigit(text[q]) && mayStart(text, q);
 }
 
 /**
@@ -243,20 +266,25 @@ function symbolAfter(text: string, pos: number, symbols: readonly [string, strin
 export function scanMoney(text: string, table: CurrencyTable, declared?: string): Money[] {
   const symbols = unambiguousSymbols(table);
   const out: Money[] = [];
+  /* Where the previous amount found its trailing currency, so this one cannot claim the same three
+     characters as its leading one. See the two-amount note below. */
+  let claimed = -1;
 
   for (const token of numberTokens(text)) {
     /* Backwards: spaces, a currency, a sign and an opening parenthesis, each at most once and in whichever
        order they come — `-EGP 5` and `EGP -5` are the same amount and both are written. */
     let before: string | null = null;
+    let beforeAt = -1;
     let sign = 0;
     let open = false;
     let j = token.start;
     for (let step = 0; step < 4; step++) {
-      while (text[j - 1] === ' ') j -= 1;
+      while (isSpace(text[j - 1])) j -= 1;
       if (before === null) {
         const hit = codeBefore(text, j, table) ?? symbolBefore(text, j, symbols);
         if (hit !== null) {
           before = hit.code;
+          beforeAt = hit.at;
           j = hit.at;
           continue;
         }
@@ -275,24 +303,76 @@ export function scanMoney(text: string, table: CurrencyTable, declared?: string)
       break;
     }
 
-    /* Forwards: at most one space, then a currency, then a closing parenthesis. One space, because a
-       currency two words away belongs to the next sentence. */
+    /* Forwards: a trailing sign, at most one space, then a currency, then a closing parenthesis. One
+       space, because a currency two words away belongs to the next sentence. */
     let k = token.end;
-    if (text[k] === ' ') k += 1;
-    const afterHit = codeAfter(text, k, table) ?? symbolAfter(text, k, symbols);
+
+    /**
+     * THE MINUS AT THE FAR END, which SAP, a COBOL trailing-sign picture and several Gulf and Egyptian
+     * statements all print for a credit. It was read straight past, so `EGP 1,250.00-` came out as
+     * +125000: the right currency and the right magnitude with the sign inverted, which is a balance
+     * wrong by twice the amount and a row nothing downstream can question.
+     *
+     * GLUED TO THE DIGITS AND FOLLOWED BY NEITHER A DIGIT NOR A LETTER. A digit after it makes it a
+     * range (`12.00-15.00` is two prices), and a space before it makes it a dash in a sentence; neither
+     * is a sign, and the tokenizer already refuses to start a number after a digit-hyphen-digit for the
+     * same reason. A LETTER AFTER IT MAKES IT A REFERENCE, which cost a sign before the letter was
+     * excluded: with a declared currency, which is how `@braindog/record` wires this function,
+     * `Payment ref 4417-B` read as -441700 and `2026-Q3 fee` as -202600, a charge filed as a refund.
+     * Nothing prints a sign against a letter, because the trailing minus ends a field: what follows it
+     * is the end of the string, a space or a bracket, and all three still read.
+     */
+    const tail = text[k];
+    const next = text[k + 1];
+    const trailing = (tail === '-' || tail === '−') && !isDigit(next) && !isLetter(next);
+    if (trailing) k += 1;
+
+    if (isSpace(text[k])) k += 1;
+    const afterAt = k;
+    let afterHit = codeAfter(text, k, table) ?? symbolAfter(text, k, symbols);
+    /**
+     * TWO AMOUNTS ON ONE LINE, which is what a foreign-exchange row is: `USD 5.00 EGP 245.00`, charged
+     * and billed. The `EGP` sat after one number and before another, so the first number had a currency
+     * on each side, they disagreed, and the disagreement rule threw away a perfectly clear USD amount.
+     * Measured on the live code, that line yielded one pair instead of two.
+     *
+     * A CODE THAT PREFIXES THE NEXT NUMBER IS NOT ALSO THIS NUMBER'S SUFFIX, and only when this number
+     * already has a prefix of its own: `5.00 USD 245.00 EGP` is the mirror form, where the same three
+     * characters are the first number's suffix because nothing precedes it, and `claimed` then stops the
+     * second number from reading them as its prefix and contradicting its own `EGP`.
+     *
+     * THE DISAGREEMENT RULE SURVIVES INTACT. `USD 5.00 EGP` has no following number to explain either
+     * code away, so it is still no candidate at all.
+     */
+    /**
+     * THE CLAIM IS RELEASED FIRST, against the code that is there and not against the one that survives
+     * the suppression above. Measured with the two tests in the other order: `5.00 USD 245.00 EGP 10 JPY`
+     * gave `[500 USD, 24500 USD]`. The middle number's own `EGP` was struck out as the `10`'s prefix
+     * before anything had released the `USD` it had already lent to the first amount, so it was left
+     * holding a code that belonged to its neighbour, and the `JPY` amount vanished behind the same shift.
+     * A wrong currency, where the code before the two-amount repair had at least refused.
+     */
+    if (before !== null && afterHit !== null && beforeAt === claimed) before = null;
+    if (afterHit !== null && before !== null && startsNumber(text, afterHit.at)) afterHit = null;
     const after = afterHit?.code ?? null;
     if (afterHit !== null) k = afterHit.at;
     const closed = text[k] === ')';
 
     if (before !== null && after !== null && before !== after) continue;
+    if (before === null && afterHit !== null) claimed = afterAt;
+
     const currency = before ?? after ?? declared ?? null;
     if (currency === null || !Object.hasOwn(table, currency)) continue;
 
     const amount = readAmount(token.text, table[currency]!.exponent);
     if (amount === null) continue;
 
-    const negative = sign === -1 || (open && closed);
-    out.push({ amount: negative ? -amount : amount, currency });
+    /* NOT WHEN IT IS ZERO. `-0` is not an amount: it survives `JSON.stringify` as `0` and comes back from
+       `JSON.parse` as a value `Object.is` calls different, so the row in memory and the row read out of
+       the kernel stop comparing equal and a dedupe sees two rows where the bank sent one. An explicit
+       leading sign also wins over a trailing minus, because somebody wrote it. */
+    const negative = sign === -1 || (sign === 0 && trailing) || (open && closed);
+    out.push({ amount: negative && amount !== 0 ? -amount : amount, currency });
   }
   return out;
 }

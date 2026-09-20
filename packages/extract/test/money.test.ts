@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseMoney, type CurrencyTable, type Money } from '../src/money.ts';
+import { parseMoney, scanMoney, type CurrencyTable, type Money } from '../src/money.ts';
 
 const TABLE: CurrencyTable = {
   EGP: { exponent: 2 },
@@ -117,4 +117,165 @@ test('a round trip over every currency and every style, which is the floor until
       }
     }
   }
+});
+
+/* ── the adversarial pass: four shapes measured against the live code, all four wrong ─────────── */
+
+/**
+ * THE SIGN AT THE WRONG END, which is how a refund is filed as a charge.
+ *
+ * Measured before the repair: `EGP 1,250.00-` read as **+125000**. Not a refusal, not a missing
+ * field: the right currency and the right magnitude with the sign inverted, which is a balance out
+ * by twice the amount and a row that nothing downstream can question. The leading minus, the
+ * Unicode minus and the parenthesis were all read; the trailing one was walked straight past,
+ * because the forward scan looked for a currency and a closing bracket and nothing else.
+ *
+ * IT IS NOT AN EXOTIC FORM. It is what SAP prints, what a mainframe COBOL PIC clause with a
+ * trailing sign prints, and what several Gulf and Egyptian bank statements print for a credit.
+ *
+ * GLUED TO THE DIGITS, AND NOT FOLLOWED BY ONE, which is the whole of the rule that keeps a range
+ * from becoming a credit. `EGP 12.00-15.00` is two prices, and `Total EGP 5.00 - thanks` is a
+ * sentence with a dash in it; neither is negative, and both are pinned below.
+ */
+test('A TRAILING MINUS IS A MINUS, and walking past it files a refund as a charge', () => {
+  assert.deepEqual(parseMoney('EGP 1,250.00-', TABLE), money(-125000, 'EGP'));
+  assert.deepEqual(parseMoney('1,250.00- EGP', TABLE), money(-125000, 'EGP'));
+  assert.deepEqual(parseMoney('1.250,00- EUR', TABLE), money(-125000, 'EUR'));
+  assert.deepEqual(parseMoney('EGP 1,250.00−', TABLE), money(-125000, 'EGP'), 'the Unicode minus too');
+  assert.deepEqual(parseMoney('JPY 1,250-', TABLE), money(-1250, 'JPY'), 'and where there are no minor units');
+
+  /* A digit after it means it is a range, and a space before it means it is a dash. */
+  assert.deepEqual(parseMoney('EGP 12.00-15.00', TABLE), money(1200, 'EGP'), 'a range is not a credit');
+  assert.deepEqual(parseMoney('Total EGP 5.00 - thanks', TABLE), money(500, 'EGP'), 'a dash is not a sign');
+  /* An explicit leading sign was written by somebody and is not overruled by a character at the far end. */
+  assert.deepEqual(parseMoney('EGP +1,250.00-', TABLE), money(125000, 'EGP'));
+});
+
+/**
+ * THE SPACE BETWEEN THE CODE AND THE NUMBER IS NOT ALWAYS `U+0020`, and this file already knew it.
+ *
+ * `SPACE_LIKE` is exported from `money.ts` precisely because a statement writes sixteen different
+ * spaces, and `isSep` consults it, so `EUR 2<U+00A0>642,97` groups correctly. The two space skips
+ * inside `scanMoney` did not: both compared against the literal `' '`, so the currency on the other
+ * side of a no-break space was never found.
+ *
+ * MEASURED: `EGP<U+00A0>5.00` and `5.00<U+00A0>EGP` both returned `undefined`, and so did
+ * `Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(1234.56)` and the
+ * `fr-FR` one. The record could not read back the string its own formatter had printed, and an
+ * `&nbsp;` between the code and the figure is the ordinary output of an HTML email. A refusal
+ * rather than a wrong number, so it cost a field and not a balance, but it cost it on the most
+ * common rendering there is.
+ */
+test('A NO-BREAK SPACE BESIDE THE NUMBER STILL CARRIES THE CURRENCY', () => {
+  const nbsp = ' ';
+  assert.deepEqual(parseMoney(`EGP${nbsp}5.00`, TABLE), money(500, 'EGP'));
+  assert.deepEqual(parseMoney(`5.00${nbsp}EGP`, TABLE), money(500, 'EGP'));
+  assert.deepEqual(parseMoney(`1.234,56${nbsp}€`, TABLE), money(123456, 'EUR'));
+  assert.deepEqual(parseMoney(`€${nbsp}1.234,56`, TABLE), money(123456, 'EUR'));
+  assert.deepEqual(parseMoney(`EGP${nbsp}-1,250.00`, TABLE), money(-125000, 'EGP'), 'and the sign is still reached');
+
+  /* The record's own formatters, round-tripped. Both print a no-break space before the symbol. */
+  for (const locale of ['de-DE', 'fr-FR'])
+    assert.deepEqual(
+      parseMoney(new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(1234.56), TABLE),
+      money(123456, 'EUR'),
+      locale,
+    );
+});
+
+/**
+ * MINUS ZERO IS NOT AN AMOUNT, and `money-property.test.ts` says so in as many words while
+ * `scanMoney` was producing it.
+ *
+ * Measured: `(EGP 0.00)`, `EGP -0.00` and `EGP -0` all returned `{ amount: -0 }`, because the sign
+ * was applied to the magnitude without asking whether there was one. It survives `JSON.stringify`
+ * as `0` and dies in `JSON.parse`, so the row in memory and the row read back out of the kernel are
+ * two values that `Object.is` and `assert.deepStrictEqual` both call different: a dedupe that keys
+ * on the pair sees two rows where the bank sent one.
+ */
+test('MINUS ZERO IS NOT AN AMOUNT, it is zero', () => {
+  for (const written of ['(EGP 0.00)', 'EGP -0.00', 'EGP -0', 'EGP -0,000', '(EGP 0.00) EGP'])
+    assert.ok(Object.is(parseMoney(written, TABLE)?.amount, 0), `${written} produced minus zero`);
+  assert.deepEqual(parseMoney('(EGP 0.00)', TABLE), money(0, 'EGP'));
+});
+
+/**
+ * TWO AMOUNTS ON ONE LINE ARE TWO AMOUNTS, and one of them was being dropped.
+ *
+ * A foreign-exchange line prints both sides: `USD 5.00 EGP 245.00` charged and billed. Measured,
+ * `scanMoney` returned **one** pair for it, the EGP one. The code between the two numbers was read
+ * as a suffix for the first and as a prefix for the second, the first number therefore had `USD`
+ * before it and `EGP` after it, the two disagreed, and the disagreement rule threw it away. The
+ * mirror form `5.00 USD 245.00 EGP` lost the second for the same reason from the other side.
+ *
+ * THE DISAGREEMENT RULE ITSELF IS RIGHT AND STAYS, which is what the last three assertions are for.
+ * `USD 5.00 EGP` has a code on each side and no second number to explain either of them away, so it
+ * is still no candidate at all. What changed is narrow: a code that is itself the prefix of the next
+ * number is not also this number's suffix, and a code already read as one number's suffix does not
+ * get to contradict the next number's own suffix.
+ */
+test('TWO AMOUNTS ON ONE LINE ARE TWO AMOUNTS, not one and a silent loss', () => {
+  assert.deepEqual(scanMoney('USD 5.00 EGP 245.00', TABLE), [money(500, 'USD'), money(24500, 'EGP')]);
+  assert.deepEqual(scanMoney('5.00 USD 245.00 EGP', TABLE), [money(500, 'USD'), money(24500, 'EGP')]);
+  assert.deepEqual(scanMoney('EGP 5.00 EGP 245.00', TABLE), [money(500, 'EGP'), money(24500, 'EGP')]);
+  assert.deepEqual(scanMoney('USD 5.00 and EGP 245.00', TABLE), [money(500, 'USD'), money(24500, 'EGP')]);
+  assert.deepEqual(scanMoney('USD 5.00 (EGP 245.00)', TABLE), [money(500, 'USD'), money(-24500, 'EGP')]);
+
+  assert.deepEqual(scanMoney('USD 5.00 EGP', TABLE), [], 'the disagreement rule survives');
+  assert.deepEqual(scanMoney('5.00 EGP 245.00', TABLE), [money(500, 'EGP'), money(24500, 'EGP')], 'one code, two numbers');
+});
+
+/**
+ * THREE AMOUNTS IN SUFFIX FORM, where the two-amount repair shifted every currency one place left.
+ *
+ * Measured on the repaired code before this test was written: `5.00 USD 245.00 EGP 10 JPY` returned
+ * `[500 USD, 24500 USD]`. The second figure is written `EGP` in the string and came out `USD`, and the
+ * third was dropped altogether. On the code before the repair the same line returned `[500 USD]`, so the
+ * middle amount went from a refusal to a wrong currency, which is the one trade this file says it will
+ * never make: a wrong number cannot be questioned downstream and a missing one can.
+ *
+ * WHY IT ONLY BITES AT THREE. The middle number has a code on each side, and the code on its right is
+ * also the prefix of the number after it, so the suffix was suppressed as the next amount's property
+ * before the claim on its prefix had been released. It was then left holding the previous amount's code
+ * as its only candidate. The release has to be decided against the code that is actually there, not
+ * against what survives the suppression.
+ */
+test('THREE AMOUNTS IN SUFFIX FORM KEEP THEIR OWN CURRENCIES, and none borrows the one to its left', () => {
+  assert.deepEqual(scanMoney('5.00 USD 245.00 EGP 10 JPY', TABLE), [
+    money(500, 'USD'),
+    money(24500, 'EGP'),
+    money(10, 'JPY'),
+  ]);
+  assert.deepEqual(scanMoney('5.00 USD 245.00 EGP 10.00 EUR 3 JPY', TABLE), [
+    money(500, 'USD'),
+    money(24500, 'EGP'),
+    money(1000, 'EUR'),
+    money(3, 'JPY'),
+  ]);
+});
+
+/**
+ * A HYPHEN BETWEEN A DIGIT AND A LETTER IS A REFERENCE, and the trailing-sign repair read it as a credit.
+ *
+ * Measured after that repair and with a declared currency, which is how `@braindog/record` wires this
+ * function: `Payment ref 4417-B` returned `-441700`, `Card ending 1234-X` returned `-123400` and
+ * `2026-Q3 fee` returned `-202600`. Before the repair each came back positive. The number itself was
+ * always spurious, because a declared currency lets any bare figure in the slice be read as an amount,
+ * but the sign was not: a charge now files itself as a refund, and that is the same inversion the
+ * trailing-sign test was written to stop, arriving from the other direction.
+ *
+ * NO STATEMENT WRITES A SIGN AGAINST A LETTER. SAP and the COBOL picture put the trailing minus at the
+ * end of the field, so what follows it is the end of the string, a space or a bracket, and the two forms
+ * the repair set out to read, `1,250.00-` and `1,250.00- EGP`, both still read. Reference numbers with a
+ * letter suffix are ordinary in the same documents, so the letter is the tell.
+ */
+test('A HYPHEN BEFORE A LETTER IS A REFERENCE AND NOT A SIGN', () => {
+  assert.equal(parseMoney('Payment ref 4417-B', TABLE, 'EGP')?.amount, 441700);
+  assert.equal(parseMoney('Card ending 1234-X', TABLE, 'EGP')?.amount, 123400);
+  assert.equal(parseMoney('2026-Q3 fee', TABLE, 'EGP')?.amount, 202600);
+
+  /* And the shapes the trailing sign was added for are untouched. */
+  assert.deepEqual(parseMoney('EGP 1,250.00-', TABLE), money(-125000, 'EGP'));
+  assert.deepEqual(parseMoney('1,250.00- EGP', TABLE), money(-125000, 'EGP'));
+  assert.deepEqual(parseMoney('(EGP 1,250.00-)', TABLE), money(-125000, 'EGP'));
 });

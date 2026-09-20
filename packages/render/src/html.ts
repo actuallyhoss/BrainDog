@@ -151,8 +151,18 @@ const cell = (name: string, value: string | undefined, opts: RenderOptions, extr
    `aria-label` still names it — `title` is only the hover. */
 const workingSpan = (): string => `<span role="img" aria-label="${WORKING_LABEL}" title="${WORKING_LABEL}">${WORKING_GLYPH}</span> `;
 
-/** The intent reaches the DOM only as `data-intent` plus its glyph. There is no other path. */
-const toneAttrs = (tone?: string): string => (tone ? ` data-intent="${tone}"` : '');
+/**
+ * The intent reaches the DOM only as `data-intent` plus its glyph. There is no other path.
+ *
+ * ESCAPED, BECAUSE A TYPE IS A PROMISE AND NOT A CHECK. `Tone` is a closed union of four words, and
+ * this was written raw on the strength of that; but `Block` is a public type a host builds by hand,
+ * and the parser was separately reading `Object.prototype` into the tone slot, so the attribute has
+ * in fact carried `function Object() { [native code] }` out of a fence an author typed. The Svelte
+ * drawer escapes this attribute because Svelte escapes every attribute, so writing it raw here was
+ * also the two renderers disagreeing about one input. This file's own header promises ONE escape
+ * function used on every value, and this was the value it was not used on.
+ */
+const toneAttrs = (tone?: string): string => (tone ? ` data-intent="${escape(String(tone))}"` : '');
 
 const toneGlyph = (tone?: string): string => {
   if (!tone || !Object.hasOwn(TONES, tone)) return '';

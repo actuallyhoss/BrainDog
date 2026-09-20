@@ -442,8 +442,17 @@ const INITIALISMS: Readonly<Record<string, string>> = {
  */
 export function valueWord(value: string, lead = false): string {
   const word = value.replace(/_/g, ' ');
-  const known = INITIALISMS[word.toLowerCase()];
-  if (known) return known;
+  /* `Object.hasOwn`, BECAUSE THE KEY IS THE AUTHOR'S OWN WORD and every member of
+     `Object.prototype` was a hit on a plain object. `valueWord('constructor')` returned the Object
+     CONSTRUCTOR from a function declared to return a string, `html.ts` handed it straight to
+     `escape`, and `s.replace is not a function` took down the whole document over one cell: a
+     `board` column called `constructor` and a `chips` word of the same spelling both threw. That is
+     not a hypothetical spelling either, it is an ordinary English word in a status column, and it
+     is the one member of the prototype that survives the lower-casing above and the underscore
+     rewrite on the line before it. The same guard is what `kinds.ts` uses for `TONES` and what
+     `queue.ts` uses for its cost bands. */
+  const key = word.toLowerCase();
+  if (Object.hasOwn(INITIALISMS, key)) return INITIALISMS[key]!;
   return lead ? word.charAt(0).toUpperCase() + word.slice(1) : word;
 }
 

@@ -43,6 +43,8 @@
  * rule as `19 §6` read from the other side.
  */
 
+import { safeHref } from './inline.ts';
+
 /** The kinds of row, by their first cell. Closed, because a row filed under none of them is a fault. */
 export const QUEUE_ROWS = ['q', 'opt', 'more'] as const;
 
@@ -77,10 +79,34 @@ export const QUEUE_COSTS: Record<string, string> = {
   call: 'A judgement',
 };
 
-/** What a question's band is called, or `''` for a band this package has no word for. */
-export const queueCost = (band: string): string => QUEUE_COSTS[band] ?? '';
+/**
+ * What a question's band is called, or `''` for a band this package has no word for.
+ *
+ * `Object.hasOwn`, THE SAME GUARD `queueFault` TEN LINES DOWN ALREADY USES on this very table. A
+ * plain-object read answers `constructor` with the Object constructor, so a band spelled that way
+ * came back as a FUNCTION from a function declared to return a string, and `escape` throws on one.
+ * The parser refuses that band before a fence can reach here, which is the only reason it was never
+ * seen; `queueCost` is exported and a host calls it directly.
+ */
+export const queueCost = (band: string): string => (Object.hasOwn(QUEUE_COSTS, band) ? QUEUE_COSTS[band]! : '');
 /** What the last line says when a queue holds more than it draws. */
 export const queueMore = (n: number): string => `${n} more`;
+
+/**
+ * Where the rest of a queue is: a path of this host's, or nothing. Anything else is a fault.
+ *
+ * A LEADING SLASH IS NOT THE TEST FOR SAME-ORIGIN, and this was the second gate in the package that
+ * had not been told. `inline.ts`'s `safeHref` carries the whole argument: `//evil.example/x` starts
+ * with a slash, carries no scheme, and is a protocol-relative URL the browser completes with the
+ * current page's scheme; `/\evil.example/x` is the same thing, because a URL parser reads a
+ * backslash in the authority position as a slash. Both matched `^/\S*$`, both were accepted as "a
+ * path of this record", and `toHTML` drew `<a class="queue-more" href="/\evil.example/x">` on a page
+ * whose rows an agent writes. So the shape check stays here, and the origin question is asked of the
+ * one function that answers it, rather than of a second regex that would drift away from the first.
+ */
+const PATH = /^\/[^\s]*$/u;
+
+const ours = (where: string): boolean => PATH.test(where) && safeHref(where) !== null;
 
 /**
  * What is wrong with a queue's rows, in words, or null when nothing is.
@@ -89,9 +115,6 @@ export const queueMore = (n: number): string => `${n} more`;
  * question would otherwise vanish, and a queue that quietly loses a way to answer is a silent decision
  * about somebody else's choice.
  */
-/** Where the rest of a queue is: a path of this host's, or nothing. Anything else is a fault. */
-const PATH = /^\/[^\s]*$/u;
-
 export function queueFault(rows: readonly (readonly string[])[]): string | null {
   let open = false;
   let options = 0;
@@ -103,7 +126,7 @@ export function queueFault(rows: readonly (readonly string[])[]): string | null 
     if (word === 'more') {
       if (!/^\d+$/u.test((cells[1] ?? '').trim())) return 'a count of what is left that is not a whole number';
       const where = (cells[2] ?? '').trim();
-      if (where !== '' && !PATH.test(where)) return 'a place to see the rest that is not a path of this record';
+      if (where !== '' && !ours(where)) return 'a place to see the rest that is not a path of this record';
       ended = true;
       continue;
     }
@@ -172,7 +195,7 @@ export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly
       const n = Number(cell(row.cells, 1));
       more = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
       const where = cell(row.cells, 2);
-      moreHref = PATH.test(where) ? where : null;
+      moreHref = ours(where) ? where : null;
       continue;
     }
     if (word === 'q') {

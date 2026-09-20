@@ -111,7 +111,14 @@ function takeTone(cells: string[], spec: { cells: number; tone: boolean; hole?: 
   if (!spec.tone || cells.length <= spec.cells - (spec.optional ?? 0)) return { cells, tone: undefined, hole: false };
   const last = cells[cells.length - 1]!.toLowerCase();
   if (spec.hole && last === BAR_HOLE) return { cells: cells.slice(0, -1), tone: 'warn' as Tone, hole: true };
-  const tone = Object.hasOwn(TONES, last) ? (last as Tone) : TONE_ALIAS[last];
+  /* `Object.hasOwn` ON THE ALIASES TOO, and the miss was a cell that disappeared. `TONE_ALIAS` is a
+     plain object, so `TONE_ALIAS['constructor']` answered with the Object constructor and
+     `TONE_ALIAS['__proto__']` with `Object.prototype`: both truthy, so the last cell of the row was
+     sliced off as a tone word and the tone that reached `data-intent` was
+     `function Object() { [native code] }`. A `timeline` note reading "constructor" is an ordinary
+     word in an ordinary column and it vanished off the page. The first half of this line already
+     knew the answer, which is what makes the second half a slip rather than a design. */
+  const tone = Object.hasOwn(TONES, last) ? (last as Tone) : Object.hasOwn(TONE_ALIAS, last) ? TONE_ALIAS[last] : undefined;
   return tone ? { cells: cells.slice(0, -1), tone, hole: false } : { cells, tone: undefined, hole: false };
 }
 
