@@ -11,12 +11,19 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+/* THE RECORD ITSELF, not a description of it. The differential at the bottom of this file opens a
+   real SQLite record, installs the same seed into it and asks it the same sentences; `engines.test.ts`
+   wires a kernel the same way and for the same reason. */
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
 
 import { applyFilters, display, labelOf } from './api.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW, PAGES, REGISTERS, ROWS, VIEWS } from './data.ts';
 import { resolvePages } from './pages.ts';
-import type { Filter, PageDecl } from './schema.ts';
+import type { Fields, Filter, PageDecl } from './schema.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
 
 const keep = (register: string, where: string) => {
@@ -200,12 +207,14 @@ test('and an operator word that is a real value is still a value', () => {
   assert.deepEqual(compile('services', 'state is live').bad, []);
 });
 
-test('an unparseable clause says which four operators exist, in the words to type', () => {
+test('an unparseable clause says which operators exist, in the words to type', () => {
   /* THE SENTENCE IS THE KERNEL'S, BYTE FOR BYTE (`packages/where/src/sentence.ts`). It used to be
      `This build reads: is · is not · before · after` — middle dots a person cannot type, and the
-     software describing itself. */
+     software describing itself.
+     SIX WORDS NOW, NOT FOUR. The kernel's sentence names `has` and `lacks`, and while this compiler
+     read four the refusal was teaching an agent that two operators the record answers do not exist. */
   const said = compile('obligations', 'what contains invoice').bad[0] ?? '';
-  assert.match(said, /Write is, is not, before or after\./);
+  assert.match(said, /Write is, is not, before, after, has or lacks\./);
   assert.ok(!/This build/.test(said), 'the software is describing itself in a refusal');
 });
 
@@ -945,4 +954,476 @@ test('A LABELLED VALUE IS FOUND BY ITS LABEL, as the record finds it, and by its
   assert.deepEqual(compile('obligations', 'direction is money in').bad, []);
   assert.ok(byLabel > 0);
   assert.equal(byLabel, byWords);
+});
+
+/* ── the two engines over one grammar ────────────────────────────────────── */
+
+/**
+ * `has` AND `lacks`, ASKED OF BOTH ENGINES OVER THE SAME ROWS.
+ *
+ * `21-AUTHORING` §4.2 publishes eleven operators; this file's compiler read four of them, so
+ * `repos has portage` came back from the browser as *"that is not something a filter can say"* while
+ * the record beside it answered `rows [3]`. A sentence one rendering of a grammar takes and the
+ * other refuses is two languages, which is the failure the whole module is written against — and no
+ * assertion this file could make against itself would have seen it, because the mirror agreed with
+ * the mirror.
+ *
+ * SO THE RECORD IS DRIVEN, NOT DESCRIBED. A real SQLite record is opened, the same seed installed
+ * into it, and every sentence below goes to `k.list` and to `compile`/`matches`, and the two answers
+ * are compared. `data.ts` numbers `SEED_ROWS` by position and `installSeed` writes the same array in
+ * the same order, so `seq` is the same number on both sides; measured over all nineteen registers
+ * before this was written, every register's unfiltered set of `seq` is identical, which is what makes
+ * a set comparison mean anything at all.
+ */
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  return sql as unknown as Parameters<typeof openRecord>[0];
+}
+
+const record = (async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const out = await installSeed(k);
+  assert.ok(out.ok, JSON.stringify(out));
+  return k;
+})();
+
+/** One engine's answer: the refusal it gave, or the `seq` of every row it admitted. */
+type Answer = { refused: string | null; seqs: number[] };
+
+const askIn = async (k: Kernel, register: string, sentence: string): Promise<Answer> => {
+  /* 500 IS THE CEILING `list` CLAMPS TO, and its default is 50: a page of the answer held against
+     the whole of the browser's would read as a disagreement about the predicate. */
+  const out = k.list({ register, where: sentence, limit: 500 });
+  /* A `Result` CARRIES A REFUSAL OR A CONFLICT, and only one of the two is a fact about a filter. A
+     read cannot produce a conflict, so this names the shape rather than reaching for a key that may
+     not be there: `out.refusal.fix` on the other arm does not typecheck, and coercing it would hide
+     the day a read grows a second way of saying no. */
+  if (!out.ok) return { refused: 'refusal' in out ? out.refusal.fix : 'the record answered with a conflict, which a read cannot', seqs: [] };
+  /* `Entry.seq` IS `number | null` IN THE KERNEL'S TYPE, and a row without one cannot be held against
+     the browser's mirror at all — `data.ts` numbers the seed by position, so `seq` IS the identity
+     here. Every seeded row has one, which is asserted rather than coerced: a `?? 0` would compare a
+     row against nothing and pass. */
+  const seqs = out.value.rows.map((r) => r.seq).filter((n): n is number => n !== null);
+  assert.equal(seqs.length, out.value.rows.length, `${register}: a row came back with no seq, so it cannot be compared`);
+  return { refused: null, seqs: seqs.sort((a, b) => a - b) };
+};
+
+/** The same question of the seeded record, which is what almost every sentence here is asked of. */
+const askRecord = async (register: string, sentence: string): Promise<Answer> => askIn(await record, register, sentence);
+
+const askBrowser = (register: string, sentence: string): Answer => {
+  const w = compile(register, sentence);
+  return w.bad.length
+    ? { refused: w.bad[0] ?? '', seqs: [] }
+    : { refused: null, seqs: (ROWS[register] ?? []).filter((e) => matches(e, w, NOW)).map((e) => e.seq).sort((a, b) => a - b) };
+};
+
+/** Both engines asked one sentence, and held to the same answer. */
+async function agree(register: string, sentence: string): Promise<Answer> {
+  const theirs = await askRecord(register, sentence);
+  const ours = askBrowser(register, sentence);
+  assert.equal(
+    ours.refused === null,
+    theirs.refused === null,
+    `${register}: "${sentence}" — the record ${theirs.refused === null ? 'answered' : `refused: ${theirs.refused}`}, the browser ${ours.refused === null ? 'answered' : `refused: ${ours.refused}`}`,
+  );
+  assert.deepEqual(ours.seqs, theirs.seqs, `${register}: "${sentence}" drew different rows`);
+  return theirs;
+}
+
+/**
+ * Every list field in the mirror, with the values its rows really hold.
+ *
+ * A `list<ref>` IS PROBED BY THE TITLE AND NEVER BY THE NUMBER. The browser holds a ref as the
+ * target's `seq` and the record holds it as a ULID, so the elements themselves are not comparable;
+ * what both engines take is the row's TITLE, which is `thing is Kiln`'s argument one type along.
+ * Measured: the record answers `because has 4` with *"there is no learnings called 4"*.
+ */
+function listProbes(): { register: string; field: string; held: string[]; miss: string }[] {
+  const out: { register: string; field: string; held: string[]; miss: string }[] = [];
+  const titleOf = (register: string, seq: unknown): string | null => {
+    const title = REGISTERS[register]?.title ?? '';
+    const row = (ROWS[register] ?? []).find((e) => e.seq === Number(seq));
+    const said = row?.fields[title];
+    return typeof said === 'string' ? said : null;
+  };
+  for (const [register, decl] of Object.entries(REGISTERS)) {
+    for (const f of decl.fields) {
+      if (f.type !== 'list') continue;
+      const seen = new Set<string>();
+      for (const row of ROWS[register] ?? []) {
+        const value = row.fields[f.id];
+        if (!Array.isArray(value)) continue;
+        for (const one of value) {
+          const said = f.of === 'ref' && f.to ? titleOf(f.to, one) : one;
+          /* A COMMA IS THE CLAUSE SEPARATOR IN BOTH ENGINES, so a value holding one is not a probe of
+             this operator: both would split it and both would refuse, which proves nothing. */
+          if (typeof said !== 'string' || said.includes(',')) continue;
+          seen.add(said);
+        }
+      }
+      /**
+       * AND THE VALUE NOTHING HOLDS HAS TO BE ONE THE FIELD COULD HOLD.
+       *
+       * On a `list<ref>` an invented word is not a miss, it is a REFUSAL — the record answers
+       * `projects has a value no row holds` with *"there is no things called …"* — so a sweep that
+       * fed one in would be asking the same question as the refusal sweep below and would never test
+       * the operator that resolves and finds nothing. The miss on a ref is a real title of the
+       * register it points at, which is exactly the shape somebody types and gets no rows for.
+       */
+      const miss =
+        f.of === 'ref' && f.to
+          ? ((ROWS[f.to] ?? []).map((e) => titleOf(f.to!, e.seq)).find((t) => t !== null && !t.includes(',') && !seen.has(t)) ?? 'a value no row of this register holds')
+          : 'a value no row of this register holds';
+      out.push({ register, field: f.id, held: [...seen], miss });
+    }
+  }
+  return out;
+}
+
+test('`has` and `lacks` reach every list field in the mirror, and both engines admit the same rows', async () => {
+  const probes = listProbes();
+  assert.ok(probes.length >= 11, `${probes.length} list fields, which is fewer than the mirror declares`);
+  let asked = 0;
+  for (const { register, field, held, miss } of probes) {
+    /* A VALUE NOTHING HOLDS IS PART OF THE SWEEP, because a filter that matched nothing and a filter
+       that was not understood look identical on a screen and are opposite facts about a page. */
+    for (const value of [...held.slice(0, 3), miss]) {
+      const has = await agree(register, `${field} has ${value}`);
+      const lacks = await agree(register, `${field} lacks ${value}`);
+      /* `has not` IS `lacks`, IN BOTH ENGINES. A negation compiled as its own positive is the one
+         defect this grammar keeps being bitten by. */
+      const hasNot = await agree(register, `${field} has not ${value}`);
+      assert.deepEqual(hasNot.seqs, lacks.seqs, `${register}.${field}: "has not" and "lacks" parted company`);
+      /* AND THE TWO PARTITION THE REGISTER, whenever the value resolved at all: every row either holds
+         it or does not, so a pair that leaves a row out of both, or puts one in both, is a comparison
+         that answered a third thing. A refused sentence has no rows on either side and is not one. */
+      if (has.refused === null)
+        assert.deepEqual(
+          [...has.seqs, ...lacks.seqs].sort((a, b) => a - b),
+          (ROWS[register] ?? []).map((e) => e.seq).sort((a, b) => a - b),
+          `${register}.${field}: has and lacks do not partition the register`,
+        );
+      asked += 3;
+    }
+  }
+  /* NINETY-NINE, MEASURED: eleven list fields, up to three values each that a row really holds plus
+     one it does not, and three sentences per value. The floor is named so that a field quietly losing
+     its values is a red test rather than a shorter sweep nobody reads the tally of. */
+  assert.ok(asked >= 99, `${asked} sentences, which is fewer than the sweep drove when it was written`);
+});
+
+test('a value one row holds is a value that FINDS it, rather than a clause that matches nothing', async () => {
+  /* THE SWEEP ABOVE WOULD PASS ON TWO ENGINES THAT BOTH ANSWERED NOTHING, which is the shared
+     mistake a differential pass cannot see. These are rows the seed really holds. */
+  assert.deepEqual((await agree('things', 'repos has portage')).seqs, [3]);
+  /**
+   * AND THE ROW THAT HOLDS TWO, which is the case the `is` branch used to get wrong while getting the
+   * line above right. `formsOf` reads a list through `String()` and through `display()`, and a list of
+   * ONE stringifies to exactly its element: measured over these four rows, `repos is portage` matched
+   * row 3 and `repos is git.kiln.example/type/kiln-type` matched nothing at all, because row 1's stored
+   * form was both of its repositories in one string. `has` asks the elements, so the arity of the row
+   * stops being part of the answer.
+   */
+  assert.deepEqual((await agree('things', 'repos has git.kiln.example/type/kiln-type')).seqs, [1]);
+  assert.deepEqual((await agree('tools', 'hosts has kiln-mbp')).seqs, [1, 3, 5]);
+  assert.deepEqual((await agree('people', 'handles has git:jokonkwo')).seqs, [3]);
+  /* A `list<ref>` BY THE NAME A PERSON READS, which is the one element type that is not the word in
+     the column: the browser holds `1` there and the record holds a ULID, and both take the title. */
+  assert.deepEqual((await agree('skills', 'because has Run the mastering pass before signing off an axis instance.')).seqs, [2]);
+  /* AND THE FIELD BY THE LABEL THE SCREEN SHOWS, which is what a declared page prints its filter as. */
+  assert.deepEqual((await agree('things', 'Repositories has portage')).seqs, [3]);
+  /* CASE-SENSITIVELY, which is what the record does: `json_each.value = ?` is not `NOCASE`, and its
+     evaluator compares with `===`. Measured: the record answers `repos has Portage` with no rows. */
+  assert.deepEqual((await agree('things', 'repos has Portage')).seqs, []);
+});
+
+test('AN OPERATOR BELONGS TO A TYPE, and a list takes neither `is` nor `before`', async () => {
+  /**
+   * `operatorAllowed` IS ONE RELATION IN THE RECORD AND IT CANNOT BE IMPORTED HERE: `@braindog/where`
+   * is not a dependency of this app and `@braindog/kernel` does not re-export it. So the relation is
+   * held by driving it rather than by copying it — `is`, `is not`, `in` and `not_in` refused on a
+   * `list`, `has` and `lacks` refused on every other type, in both engines, over every field of every
+   * register.
+   */
+  let refused = 0;
+  for (const [register, decl] of Object.entries(REGISTERS)) {
+    for (const f of decl.fields) {
+      const answer = await agree(register, `${f.id} has something`);
+      if (f.type !== 'list') {
+        assert.ok(answer.refused, `${register}.${f.id} is a ${f.type} and took has`);
+        refused++;
+        continue;
+      }
+      /* AND THE FOUR A LIST REFUSES. One value is `is`, several is `in`, and each has its negation:
+         the record names the structured operator it refused, so the browser names the same one. */
+      for (const sentence of [`${f.id} is x`, `${f.id} is not x`, `${f.id} is x or y`, `${f.id} is not x or y`, `${f.id} before today`]) {
+        assert.ok((await agree(register, sentence)).refused, `${register}: "${sentence}" was accepted on a list`);
+        refused++;
+      }
+      /* `is empty` AND `is set` ARE THE EXCEPTION, and they are why the refusal above cannot simply
+         be "a list takes no `is`": `34 §1.2` admits absence on every type there is. */
+      assert.equal((await agree(register, `${f.id} is set`)).refused, null);
+      assert.equal((await agree(register, `${f.id} is empty`)).refused, null);
+    }
+  }
+  assert.ok(refused > 100, `${refused} refusals, which is too few to be the sweep`);
+});
+
+test('and the refusals say the same thing, because a refusal is the teacher', async () => {
+  /* `10 §7`'s fourth rule: an agent handed an empty block learns nothing, and an agent told what is
+     wrong fixes it on the next call. Each sentence below is read off the record here. */
+  for (const [register, sentence, says] of [
+    ['obligations', 'state has open', /state is a enum, and has is about lists/],
+    ['obligations', 'due has today', /due is a day, and has is about lists/],
+    ['things', 'repos is portage', /repos is a list, which cannot be asked "is"/],
+    ['things', 'repos is not portage', /repos is a list, which cannot be asked "not"/],
+    ['things', 'repos is a or b', /repos is a list, which cannot be asked "in"/],
+    ['things', 'repos is not a or b', /repos is a list, which cannot be asked "not_in"/],
+    ['things', 'repos has a or b', /has takes one value to look for in the list/],
+    ['things', 'repos has', /has what\?/],
+    ['things', 'repos has not', /has not what\?/],
+    ['skills', 'because has Kiln', /there is no learnings called Kiln/],
+  ] as const) {
+    const ours = askBrowser(register, sentence);
+    const theirs = await askRecord(register, sentence);
+    assert.ok(theirs.refused, `the record answered "${sentence}", so this row asserts the wrong fact`);
+    assert.match(theirs.refused ?? '', says, `the record no longer says this about "${sentence}"`);
+    assert.match(ours.refused ?? '', says, `the browser's refusal for "${sentence}"`);
+  }
+
+  /* AND THE SENTENCE THAT NAMES THE OPERATORS NAMES ALL SIX NOW. It named four while the record named
+     six, which is a refusal teaching an agent that two of the operators it has just read in the
+     published grammar do not exist. */
+  assert.match(compile('services', 'nonsense here').bad[0] ?? '', /Write is, is not, before, after, has or lacks/);
+});
+
+test('an operand that is not there is a question back, on every operator that takes one', async () => {
+  /* MEASURED BEFORE IT WAS CHANGED: the browser answered "that is not something a filter can say" to
+     all four of these, because `CLAUSE` demanded at least one character after the operator, and the
+     record answers with the one thing that is missing. */
+  for (const [register, sentence, says] of [
+    ['obligations', 'state is', /is what\?/],
+    ['obligations', 'due before', /\(nothing\) is not a date/],
+    ['things', 'repos has', /has what\?/],
+    ['things', 'repos lacks not', /lacks not what\?/],
+  ] as const) {
+    assert.match(askBrowser(register, sentence).refused ?? '', says, `the browser's refusal for "${sentence}"`);
+    assert.ok((await askRecord(register, sentence)).refused, `the record answered "${sentence}"`);
+  }
+});
+
+test('a list filter hands over the honest wide address, because no chip can carry it yet', () => {
+  /**
+   * ONE PREDICATE, TWO PRODUCTS, AND THE SECOND CANNOT BE WRITTEN YET. A chip is
+   * `<field>:<op>:<values>`, and `whereOf` in `api.ts` reads four operators back out of one — `in`,
+   * `not-in`, `before`, `after` — with everything else falling through to `<field> is <value>`. So a
+   * minted `repos:has:portage` would come back as `repos is portage`, which the record and this
+   * compiler now both REFUSE, and the link would open an empty grid under a filter that drew three
+   * rows. `registerHref`'s own paragraph is the rule: dropping the clause it cannot carry produces a
+   * list that looks narrowed and is not, so the whole register is the honest address until `whereOf`
+   * learns the operator.
+   */
+  assert.equal(registerHref('things', 'repos has portage'), '/r/things');
+  assert.equal(registerHref('things', 'lane is earning, repos has portage'), '/r/things');
+  /* AND THE HALF THAT CAN BE CARRIED IS STILL CARRIED, when nothing in the sentence is a list. */
+  assert.match(registerHref('things', 'lane is earning'), /f=lane:in:earning/);
+});
+
+test('and the printer says the clause back in words the record still reads', () => {
+  /**
+   * A PARSER WIDER THAN ITS PRINTER IS THE SAME DEFECT AS A PRINTER WIDER THAN ITS PARSER.
+   *
+   * `saidPlainly` read four operators because this compiler did, so a block filtered on `repos has
+   * portage` printed the schema's own field id under a column headed Repositories. It prints the label
+   * now — and the round trip is the assertion, not the string: what a page prints is what somebody
+   * types back and what an agent copies, so it has to compile.
+   */
+  const printed = saidPlainly('things', 'repos has portage');
+  assert.equal(printed, 'repositories has portage');
+  assert.deepEqual(compile('things', printed).bad, [], `the printed filter does not compile: ${printed}`);
+  assert.deepEqual(keep('things', printed).map((e) => e.seq), keep('things', 'repos has portage').map((e) => e.seq));
+
+  /**
+   * AND AN UNDERSCORE IN A LIST'S VALUE SURVIVES, which the enum swap beside it would have eaten.
+   * `tools.needs` holds `BRAINDOG_TOKEN`; measured against the record, `needs has BRAINDOG_TOKEN`
+   * answers `rows [1]` and `needs has BRAINDOG TOKEN` answers nothing, so printing the second under a
+   * block drawing the first is a sentence a reader cannot act on.
+   */
+  const keys = saidPlainly('tools', 'needs has BRAINDOG_TOKEN');
+  assert.equal(keys, 'keys it needs has BRAINDOG_TOKEN');
+  assert.deepEqual(keep('tools', keys).map((e) => e.seq), [1]);
+});
+
+test('and a SHOUTED operator is the same operator in the printer as it is in the parser', () => {
+  /**
+   * ONE SENTENCE, TWO READINGS, AND THE PRINTER'S DREW NO ROWS.
+   *
+   * `compile` folds the operator once, `op = said.toLowerCase()`, and has done since `STATE IS NOT
+   * Live` compiled to its own opposite. So `needs HAS BRAINDOG_TOKEN` is a sentence this build reads
+   * and it draws row 1. `saidPlainly` tested the UNFOLDED word, so the shouted spelling missed the
+   * list branch and fell to the enum swap beside it: measured, it printed `keys it needs HAS BRAINDOG
+   * TOKEN`, which compiles clean, refuses nothing and draws NO rows, under a block that drew one.
+   * What a page prints is what somebody types back, so a print that quietly narrows to nothing is
+   * the one thing this printer must not do, and it is the same argument the underscore above makes
+   * one spelling along.
+   */
+  const shouted = saidPlainly('tools', 'needs HAS BRAINDOG_TOKEN');
+  assert.deepEqual(compile('tools', shouted).bad, [], `the printed filter does not compile: ${shouted}`);
+  assert.deepEqual(
+    keep('tools', shouted).map((e) => e.seq),
+    keep('tools', 'needs HAS BRAINDOG_TOKEN').map((e) => e.seq),
+    `the shouted sentence and its printed form drew different rows: ${shouted}`,
+  );
+
+  /* AND THE FOLD IS THE FIX FOR THE PAIR BESIDE IT AS WELL, which was wrong before `has` arrived:
+     `before` and `after` were read unfolded on the same line, so `due BEFORE +30d` printed the
+     relative word a person typed where `due before +30d` printed the days it means. */
+  assert.equal(saidPlainly('obligations', 'due BEFORE +30d'), saidPlainly('obligations', 'due before +30d'));
+});
+
+/**
+ * A LIST OF EVERY ELEMENT TYPE, DECLARED INTO BOTH ENGINES, because the seed has only two.
+ *
+ * All eleven list fields the sample mirrors are `list<text>` or `list<ref>`, so the sweeps above leave
+ * the enum, the integer, the day, the boolean and the money element untouched — and a live record can
+ * send every one of them: `lib/data/record.ts` installs a real register's declaration straight into
+ * `REGISTERS` when it meets one, and `schema.ts`'s own header names `list<int>` and `list<day>` as
+ * shapes the record has had since it was written. Asserting those branches against the mirror alone
+ * would be the mirror agreeing with the mirror, which is the whole thing this section exists not to
+ * do, so the register is DECLARED INTO THE RECORD as well and the same sentences are put to both.
+ *
+ * `prices` IS A `list<money>` AND IS HERE TO BE REFUSED. A money is `{ amount, currency }` and this
+ * grammar has no literal for one; without the refusal the record compiled `prices has GBP 10.00` to
+ * real SQL comparing those characters against an object, matching nothing, for ever.
+ */
+const TODAY = new Date(NOW).toISOString().slice(0, 10);
+
+const ELEMENTS = {
+  id: 'zz_lists',
+  name: 'Element types',
+  one: 'Row',
+  title: 'name',
+  mobile: ['name', 'name', 'name'] as const,
+  fields: [
+    { id: 'name', type: 'text', required: true },
+    /* `Derailed` RATHER THAN `off track`, WHICH IS A LABEL THAT PROVES NOTHING. The words path already
+       turns `off_track` into `off track`, so a label spelt that way passes whether the label is read
+       or not: measured, deleting the label lookup from `elementValue` left every assertion here green.
+       A label a reader could not have guessed from the id is the only one that tests the branch. */
+    { id: 'moods', type: 'list', of: 'enum', values: ['off_track', 'on_track'], labels: { off_track: 'Derailed' } },
+    { id: 'counts', type: 'list', of: 'int' },
+    /* AND A DECIMAL, WHOSE ROUND TRIP IS THE WHOLE OF IT: the record resolves `3.50` to the number
+       `3.5` and the column holds `3.5`, so a branch that handed the typed characters back would
+       compare `3.50` against `3.5` and find nothing. Deleting that branch also left this file green
+       until this field was here. */
+    { id: 'rates', type: 'list', of: 'decimal' },
+    { id: 'days', type: 'list', of: 'day' },
+    { id: 'flags', type: 'list', of: 'bool' },
+    { id: 'prices', type: 'list', of: 'money' },
+  ],
+} as const;
+
+/** The three rows, written into the record in this order so `seq` is 1, 2, 3 on both sides. */
+const ELEMENT_ROWS: Fields[] = [
+  { name: 'one', moods: ['off_track'], counts: [3], rates: [3.5], days: [TODAY], flags: [true] },
+  { name: 'two', moods: ['on_track'], counts: [4, 5], rates: [0.25], days: ['2026-01-01'], flags: [false] },
+  { name: 'three' },
+];
+
+test('every element type a list can hold resolves the same way in both engines', async () => {
+  /* A SECOND RECORD, so the shared one above keeps the registers the sweeps counted. Nothing is
+     seeded into it: this register is the whole subject. */
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const declared = await k.install([{ id: 'register.zz_lists', kind: 'register', body: ELEMENTS } as never]);
+  assert.ok(declared.ok, JSON.stringify(declared));
+  for (const fields of ELEMENT_ROWS) {
+    const made = k.create('zz_lists', fields as never, { actor: 'p_test' });
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+
+  /* AND THE SAME DECLARATION IN THE BROWSER'S MIRROR, which is what `record.ts` does when a live
+     record answers `schema`. It is put back in `finally` so a failing assertion cannot leave a
+     register behind for whatever test runs next. */
+  REGISTERS.zz_lists = ELEMENTS as unknown as (typeof REGISTERS)[string];
+  ROWS.zz_lists = ELEMENT_ROWS.map((fields, i) => ({ seq: i + 1, fields, version: 1, created: '2026-01-01T00:00:00Z', by: 'p_test' }));
+  try {
+    for (const [sentence, seqs] of [
+      /* AN ENUM ELEMENT BY ITS DECLARED VALUE, BY THE WORDS, AND BY ITS LABEL — the three spellings the
+         scalar `is` already takes, which is what keeps `has` from being a second language. */
+      ['moods has off_track', [1]],
+      ['moods has off track', [1]],
+      ['moods has Derailed', [1]],
+      ['moods lacks Derailed', [2, 3]],
+      ['moods has on_track', [2]],
+      ['moods lacks off_track', [2, 3]],
+      /* A DECIMAL BY THE SPELLING A PERSON WRITES rather than the one the column holds: the record
+         resolves `3.50` to `3.5` and so does this, which is what makes the two answers comparable. */
+      ['rates has 3.50', [1]],
+      ['rates has 3.5', [1]],
+      ['rates has .25', [2]],
+      /* AN INTEGER IS A NUMBER IN THE COLUMN AND A WORD IN THE SENTENCE. `counts has 4` has to find the
+         row holding `[4, 5]`, which a string compared against a JSON number never would. */
+      ['counts has 3', [1]],
+      ['counts has 4', [2]],
+      ['counts has 5', [2]],
+      /* A DAY RESOLVED AGAINST THE CLOCK, which is the operand check `before` has always had and the
+         value branch of `is` only got later. */
+      ['days has today', [1]],
+      [`days has ${TODAY}`, [1]],
+      ['days has 2026-01-01', [2]],
+      /* A BOOLEAN ELEMENT IS A BOOLEAN. The column holds `true` and a person writes `yes`. */
+      ['flags has yes', [1]],
+      ['flags has true', [1]],
+      ['flags has no', [2]],
+      ['flags lacks yes', [2, 3]],
+    ] as const) {
+      const theirs = await askIn(k, 'zz_lists', sentence);
+      const ours = askBrowser('zz_lists', sentence);
+      assert.equal(theirs.refused, null, `the record refused "${sentence}": ${theirs.refused}`);
+      assert.deepEqual(theirs.seqs, [...seqs], `the record's own answer to "${sentence}" is not what this asserts`);
+      assert.deepEqual(ours.seqs, theirs.seqs, `"${sentence}" drew different rows`);
+    }
+
+    /* AND THE VALUES NO ELEMENT TYPE CAN MEAN, each with the sentence that names which kind of wrong
+       it is: a declared set, a shape, or a value that has no literal at all. */
+    for (const [sentence, says] of [
+      ['moods has nope', /moods has no value nope/],
+      ['counts has 3px', /3px is not a value counts can hold/],
+      ['days has banana', /banana is not a value days can hold/],
+      ['flags has maybe', /maybe is not a value flags can hold/],
+      ['prices has GBP 10.00', /prices is a list of money, and this grammar has no way to write one/],
+    ] as const) {
+      const theirs = await askIn(k, 'zz_lists', sentence);
+      assert.match(theirs.refused ?? '', says, `the record no longer says this about "${sentence}"`);
+      assert.match(askBrowser('zz_lists', sentence).refused ?? '', says, `the browser's refusal for "${sentence}"`);
+    }
+  } finally {
+    delete REGISTERS.zz_lists;
+    delete ROWS.zz_lists;
+  }
 });

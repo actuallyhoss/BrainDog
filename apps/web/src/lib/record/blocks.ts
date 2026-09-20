@@ -55,8 +55,11 @@ import { linesText, measuresOf, tileRows } from './measures.ts';
 export function linkOf(register: string | null, field: string | undefined): { to: string; money: string } | null {
   if (!register || !field) return null;
   const f = REGISTERS[register]?.fields.find((x) => x.id === field);
-  /* `FieldType` is the build's own list, and a record's schema may send a `list` it does not name. */
-  if (!f || (f.type as string) !== 'list' || !f.to) return null;
+  /* THE CAST IS GONE BECAUSE THE TYPE ARRIVED. `FieldType` named fifteen of the record's eighteen and
+     `list` was not one of them, so this line read `(f.type as string) !== 'list'` — a cast that
+     launders a missing member, which is how a whole type goes unhandled quietly, because the next
+     reader writes the same cast instead of the same question. `schema.ts` names `list` now. */
+  if (!f || f.type !== 'list' || !f.to) return null;
   const money = REGISTERS[f.to]?.fields.find((x) => x.type === 'money')?.id;
   return money ? { to: f.to, money } : null;
 }
@@ -1179,23 +1182,60 @@ export function saidPlainly(register: string, where: string | undefined): string
     .split(',')
     .map((clause) => {
       const said = clause.trim();
-      /* FOUR OPERATORS, THE SAME FOUR `where.ts` READS. `on` was a fifth: this would render
+      /* THE SAME OPERATORS `where.ts` READS, AND NO MORE. `on` was once a fifth: this would render
          `renews on today` as though it meant something, and `compile` answers "that is not
          something a filter can say". A printer that speaks a wider language than the parser is a
-         printer that teaches people sentences the record will not take. */
-      const m = /^(.+?)\s+(is not|is|before|after)\s+(.+)$/i.exec(said);
+         printer that teaches people sentences the record will not take.
+         AND NO FEWER, WHICH IS THE SAME RULE FROM THE OTHER SIDE. `has` and `lacks` were added to the
+         compiler and not here, so `repos has portage` fell past this regex and printed with the
+         schema's own field id where every clause beside it printed the label a reader sees — `repos`
+         under a table headed Repositories. A sentence it cannot improve, it must not change; a
+         sentence it can, it must. */
+      const m = /^(.+?)\s+(is not|is|before|after|has|lacks)\s+(.+)$/i.exec(said);
       if (!m) return said;
-      const [, rawField, verb, rest] = m as unknown as [string, string, string, string];
+      const [, rawField, wrote, rest] = m as unknown as [string, string, string, string];
+      /**
+       * THE OPERATOR FOLDED ONCE, WHICH IS WHAT `compile` DOES A FILE AWAY AND FOR THE SAME REASON.
+       *
+       * The regex takes its `i`, so `needs HAS BRAINDOG_TOKEN` matched here and `compile` reads it too
+       * — it folds with `op = said.toLowerCase()`, and the sentence draws row 1. Every test below was
+       * against a lower-case literal, so the shouted spelling missed the list branch and fell to the
+       * enum swap: it printed `keys it needs HAS BRAINDOG TOKEN`, which compiles clean, refuses
+       * nothing and draws NO rows, under a block that drew one. `due BEFORE +30d` was the same defect
+       * one operator along and older, printing the relative word where `before` printed the days.
+       *
+       * AND THE FOLDED WORD IS WHAT IS PRINTED, not the one somebody shouted: the field name beside it
+       * is already lower-cased, and a filter line is a sentence rather than a quotation of the
+       * declaration.
+       */
+      const verb = wrote.toLowerCase();
       const decl = REGISTERS[register]?.fields.find((f) => f.id.toLowerCase() === rawField.trim().toLowerCase());
       if (!decl) return said;
       const name = decl.label ?? decl.id.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+      /**
+       * AN UNDERSCORE IN AN ENUM'S VALUE IS A SPELLING AND IN A LIST'S IS THE VALUE.
+       *
+       * `owed_to_me` reads "owed to me" because the column holds an id a person never types, which is
+       * what the swap below is for. A `list<text>` holds whatever was written into it, and the swap
+       * would print `needs has BRAINDOG TOKEN` for a row whose key really is `BRAINDOG_TOKEN` —
+       * measured against the record, which answers `rows [1]` to the first spelling and nothing at all
+       * to the printed one. A filter printed in a spelling the record cannot find is worse than one
+       * printed in the dialect, because a reader has no way to tell.
+       *
+       * SO THE SWAP FOLLOWS THE DECLARATION AND NOT THE OPERATOR: a field that declares its values is
+       * an enum and gets it, and a field that does not keeps every character somebody wrote. And
+       * `has` takes ONE value, so there is nothing to split on ` or `; the compiler refuses two.
+       */
+      const listed = verb === 'has' || verb === 'lacks';
       const values =
         verb === 'before' || verb === 'after'
           ? spokenDay(rest)
-          : rest
-              .split(/\s+or\s+/)
-              .map((v) => declaredValue(register, decl.id, v.trim()).replace(/_/g, ' '))
-              .join(' or ');
+          : listed
+            ? (decl.values ? declaredValue(register, decl.id, rest.trim()).replace(/_/g, ' ') : rest.trim())
+            : rest
+                .split(/\s+or\s+/)
+                .map((v) => declaredValue(register, decl.id, v.trim()).replace(/_/g, ' '))
+                .join(' or ');
       return `${name.toLowerCase()} ${verb} ${values}`;
     })
     .join(', ');

@@ -35,6 +35,8 @@
  *     points at is empty                the field holds nothing: no value, '' or []
  *     points at is set                  and it holds something. `is not empty` is the second of
  *                                       those two and `is not set` is the first
+ *     tags has urgent                   a LIST holds the value
+ *     tags lacks urgent                 and it does not. `has not` is the second of those two
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * VALUES ARE MATCHED AGAINST WHAT THE UI SHOWS, not against what the column stores. `display()`
@@ -76,7 +78,42 @@ export type Clause =
    * that on every row and its negation true on every row, which is the clause that quietly matches
    * everything, so both readers here test the OPERATOR first and the shape second.
    */
-  | { field: string; op: 'empty' | 'present'; values: [] };
+  | { field: string; op: 'empty' | 'present'; values: [] }
+  /**
+   * AND THE TWO OPERATORS ONLY A LIST TAKES, which no sentence on this side could say.
+   *
+   * `38 §2.1` publishes `has` and `lacks` among the nineteen, the record's `operatorAllowed` admits
+   * them on `list` and on no other type, and its compiler and evaluator both answer them. This
+   * compiler read four operators, so every list field in the mirror — nine `list<text>` and two
+   * `list<ref>` over five registers — could be asked whether it held ANYTHING and never what it
+   * held. Measured against a real record beside it: `repos has portage` answered `rows [3]` there
+   * and *"that is not something a filter can say"* here.
+   *
+   * ONE VALUE, IN A `values` LIST, and both halves of that are deliberate. One, because the operator
+   * looks for a single element inside a list and `tags has urgent or soon` would otherwise look for
+   * a tag literally called `urgent or soon`; the tuple says so in the type rather than in a comment.
+   * `values` rather than a key of its own, because `metrics.ts`'s `resolvedAt` reads a clause with no
+   * `values` as a dated one — `'values' in c ? c : { ...c, day: resolveDay(c.day) }` — and would go
+   * looking for a day this clause does not have.
+   *
+   * THE VALUE IS THE ELEMENT AS THE RECORD WOULD STORE IT, not as it was typed: an enum's declared
+   * value, a ref's row number, a day resolved against the clock. `matches` compares elements, and an
+   * element compared against the word somebody wrote is the `projects has Kiln` failure the record
+   * names — four letters searched for in a column holding an id.
+   *
+   * A DAY IS THE ONE EXCEPTION AND IT KEEPS ITS WORD, because `compile` has no clock and `matches`
+   * does. Every other branch here already works that way: `before` and `on` store `today` and resolve
+   * it against the `now` their caller passes, and `compile` only checks that the word IS a day. A
+   * `list<day>` asked about `today` and resolved at compile time answered against the WALL clock while
+   * the rows were being matched against the record's — measured on a register declared into both
+   * engines, where the record answered one row and this one answered none.
+   *
+   * WHICH LEAVES ONE THING TRUE AND WORTH SAYING: `metrics.ts` reads any clause carrying `values` as
+   * timeless, and a `has` over a list of days is not. No register in the mirror declares one — all
+   * eleven of its list fields hold text or refs — and a live record's would have to be named in a
+   * metric's own `where` to matter, so it is recorded here rather than worked around.
+   */
+  | { field: string; op: 'has' | 'lacks'; values: [string] };
 
 export type Where = {
   /** The register it was compiled against. A value means nothing without one. */
@@ -197,7 +234,20 @@ export function resolveDay(word: string, now: number): string | null {
    under `[a-z][a-z0-9_]*`: it failed the grammar and got "that is not something a filter can say",
    which is the wrong sentence about the wrong half of the clause. Non-greedy, so the first operator
    still ends the field name and a value may contain the word `is`. */
-const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after)\s+(.+?)\s*$/i;
+/**
+ * AND THE OPERAND IS OPTIONAL, WHICH TURNED FOUR REFUSALS INTO THE WRONG REFUSAL.
+ *
+ * It was `\s+(.+?)\s*$`: at least one character after the operator, so `state is`, `due before` and
+ * `repos has` did not match the grammar at all and got *"that is not something a filter can say"* —
+ * a verdict about the whole clause when the operator was fine and one word was missing. The record
+ * answers `is what?`, `(nothing) is not a date` and `has what?`, each naming the one thing to add,
+ * which is what `10 §7`'s fourth rule asks a refusal to do.
+ *
+ * THE WHITESPACE STAYS INSIDE THE OPTIONAL GROUP rather than becoming `\s*`. With `\s*` the operator
+ * would no longer need a space after it, so `state isnot live` matched as `state is` with the value
+ * `not live` — a negation read out of a typo, which is the one thing this grammar must not do.
+ */
+const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after|has|lacks)(?:\s+(.+?))?\s*$/i;
 
 /**
  * The operators `21-AUTHORING` §4.2 publishes and this build does not read.
@@ -211,6 +261,9 @@ const CLAUSE = /^\s*([a-z][a-z0-9_ ]*?)\s+(is not|is|before|after)\s+(.+?)\s*$/i
    operators that needed no operand and no new comparison: the record's own compiler answers both
    with the three ways a value is absent, and this file was refusing the sentence for a predicate
    the kernel beside it has always compiled. */
+/* AND `has` AND `lacks` WERE NEVER ON IT, which is how they went unnoticed longest: a word in the
+   value slot is caught by the sweep below, and these two are VERBS. `tags has urgent` never reached
+   this list — it failed the grammar itself and got the sentence about the whole clause. */
 const UNIMPLEMENTED = ['at least', 'at most', 'more than', 'less than', 'contains', 'starts', 'starts with', 'ends', 'ends with', 'between', 'in', 'not in'];
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
@@ -228,6 +281,34 @@ const ABSENCE: Record<string, 'empty' | 'present'> = { empty: 'empty', set: 'pre
 
 /** And the negation inverts: `is not empty` is `present`, `is not set` is `empty`. */
 const INVERSE = { empty: 'present', present: 'empty' } as const;
+
+/**
+ * THE TWO WORDS FOR WHAT A LIST HOLDS, and they are the record's own rather than a translation.
+ *
+ * `before` and `after` are already shared verbatim between the two engines, and `has` and `lacks` are
+ * ordinary English before they are anything else, so there is nothing for either side to translate
+ * and nothing for a printer to choose. `contains` was the other candidate and is the one word that
+ * may not be used: `38 §2.1` already publishes it, meaning a substring of a text, and one word whose
+ * meaning is decided by the field's type is the ambiguity a person reading a sentence back cannot
+ * resolve.
+ */
+const LISTED: Record<string, 'has' | 'lacks'> = { has: 'has', lacks: 'lacks' };
+
+/** And the negation inverts here too, for the reason `INVERSE` does. `has not` is `lacks`. */
+const OPPOSITE = { has: 'lacks', lacks: 'has' } as const;
+
+/**
+ * The element types this grammar has no literal for, which is the record's own `COMPOUND` set.
+ *
+ * A money is `{ amount, currency }`, a quantity is `{ value, unit }`, a file is
+ * `{ sha256, mime, bytes, name }` and a `json` is whatever was put there: none is stored as a bare
+ * string, and no sentence can write one. The record measured what happens without the check —
+ * `bag has GBP 10.00` over a `list<money>` compiled to real SQL comparing those characters against an
+ * object, matching nothing, for ever — and `FieldDecl.of` on this side admits `money`, so the hole is
+ * reachable from here the day a register declares one. None in the shipped mirror does: all eleven of
+ * its list fields are `list<text>` or `list<ref>`, which is what `field-types.test.ts`'s walk counts.
+ */
+const COMPOUND = ['money', 'quantity', 'file', 'json'];
 
 /**
  * A value as the field DECLARES it, from a value as somebody said it.
@@ -344,8 +425,101 @@ const carriesCurrency = (value: string): boolean => {
  */
 const WRONG_SHAPE = 'where: takes a sentence like `state is open, due before +30d`, and not a tree of objects.';
 
+/* AND THE LIST IT NAMES IS SIX NOW. It named the four this compiler read while the record's own
+   sentence named six, so a refusal told an agent that `has` and `lacks` — which it had just read in
+   the published grammar, and which the record answers — do not exist. A refusal that teaches a
+   narrower language than the record speaks is worse than one that teaches nothing. */
 const cannotSay = (text: string): string =>
-  `${text}: that is not something a filter can say. Write is, is not, before or after.`;
+  `${text}: that is not something a filter can say. Write is, is not, before, after, has or lacks.`;
+
+/**
+ * One element of a list as the record would STORE it, from the value somebody wrote, or `null`.
+ *
+ * ASKED IN THE TYPE OF AN ELEMENT, BECAUSE THAT IS WHAT THE VALUE IS. `has` and `lacks` look for one
+ * value inside a list, so the word carries an element and never a list, and the record measured what
+ * happens when the list's own type is passed down instead: `projects has Kiln` compiled to a search
+ * for the four letters `Kiln` in a column holding an id, which parses, compiles and matches nothing,
+ * for ever. Four fields in the shipped seed are `list<ref>`.
+ *
+ * A REF RESOLVES BY THE TITLE AND NOT BY THE NUMBER, which is the one place this parts company with
+ * the scalar `is` beside it. `allowed` admits a ref's `seq` there because `registerHref` writes one
+ * into a URL and a link must not break when a row is renamed; no chip can carry `has` at all, so
+ * there is no number arriving from anywhere, and the record refuses `because has 4` with *"there is no
+ * learnings called 4"*. Accepting it here would make the browser answer a sentence the record does not.
+ */
+function elementValue(register: string, field: string, of: string, said: string, now: number): string | null {
+  const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
+
+  /* AN ENUM ELEMENT IS ITS DECLARED VALUE, matched in the words a screen shows and in the label the
+     register gives it — the same three spellings `declaredValue` and `allowed` accept on a scalar. */
+  if (of === 'enum') {
+    const want = norm(said);
+    const labelled = Object.entries(decl?.labels ?? {}).find(([, label]) => norm(label) === want)?.[0];
+    if (labelled && (decl?.values ?? []).includes(labelled)) return labelled;
+    return (decl?.values ?? []).find((v) => norm(v) === want) ?? null;
+  }
+
+  if (of === 'ref') {
+    const to = decl?.to;
+    const title = to ? REGISTERS[to]?.title : undefined;
+    if (!to || !title) return null;
+    /* THE ELEMENT THE COLUMN HOLDS, which on this side is the row's `seq`: `data.ts` numbers the seed
+       by position, so a ref in the mirror is a number where the record keeps a ULID. */
+    const row = (ROWS[to] ?? []).find((e) => String(e.fields[title] ?? '') === said);
+    return row ? String(row.seq) : null;
+  }
+
+  /* A BOOLEAN ELEMENT IS A BOOLEAN AND NOT THE WORD, which is why `matches` compares `String(v)`:
+     the column holds `true` and the sentence says `yes`. */
+  if (of === 'bool') return { true: 'true', yes: 'true', false: 'false', no: 'false' }[said.toLowerCase()] ?? null;
+
+  /* A DAY IS CHECKED HERE AND RESOLVED IN `matches`, which is what `before` and `on` already do: this
+     function is called from `compile`, and `compile` has no clock of its own. Handing back an absolute
+     day resolved on the wall clock made `days has today` answer nothing on a record whose rows were
+     being matched against `NOW`. */
+  if (of === 'day' || of === 'instant') return resolveDay(said, now) === null ? null : said;
+
+  /* AN INTEGER IS AN INTEGER, and the round trip says so: `Number('3px')` is `NaN` and `Number('')` is
+     `0`, so the pattern comes first. A `duration` is seconds and reads the same as an `int`. */
+  if (of === 'int' || of === 'duration') {
+    const n = Number(said);
+    return /^[+-]?\d+$/.test(said) && Number.isSafeInteger(n) ? String(n) : null;
+  }
+  if (of === 'decimal') {
+    const n = Number(said);
+    return said.trim() !== '' && Number.isFinite(n) ? String(n) : null;
+  }
+
+  /* AND FOR TEXT, A DOCUMENT, A URL, AN EMAIL OR A SECRET THE TYPED CHARACTERS ARE THE STORED VALUE,
+     which is why those types are not in `COMPOUND`: there is nothing to resolve, not nothing to write. */
+  return said;
+}
+
+/**
+ * The element a `has` clause is looking for, at the clock the rows are being read on.
+ *
+ * ONE WORD MOVES AND THE REST DO NOT. `elementValue` resolves everything it can at compile time and
+ * leaves a temporal word alone, because only `matches` knows what `now` is; this is the other half of
+ * that, and it is the same split `matches` already makes for a `before` clause's `day`.
+ */
+const elementWanted = (register: string, field: string, value: string, now: number): string => {
+  const of = REGISTERS[register]?.fields.find((f) => f.id === field)?.of;
+  return of === 'day' || of === 'instant' ? (resolveDay(value, now) ?? value) : value;
+};
+
+/**
+ * Why one element could not be resolved, in the record's own three sentences.
+ *
+ * THREE, BECAUSE THE KIND OF WRONG IS THE INSTRUCTION. "there is no learnings called Kiln" tells
+ * somebody to check the name of a row; "tags has no value urgent" tells them to check a declared set;
+ * "banana is not a value met can hold" tells them the shape is wrong. One sentence for all three would
+ * send a reader looking for the wrong thing, which is the argument the value branch below already makes.
+ */
+const refuseElement = (text: string, register: string, field: string, of: string, said: string): string => {
+  if (of === 'enum') return `${text}: ${field} has no value ${said}`;
+  if (of === 'ref') return `${text}: there is no ${REGISTERS[register]?.fields.find((f) => f.id === field)?.to ?? 'row'} called ${said}`;
+  return `${text}: ${said} is not a value ${field} can hold`;
+};
 
 export function compile(register: string, where: string | undefined): Where {
   const clauses: Clause[] = [];
@@ -365,13 +539,16 @@ export function compile(register: string, where: string | undefined): Where {
 
     const m = CLAUSE.exec(text);
     if (!m) {
-      /* THE REFUSAL NAMES THE FOUR THAT WORK. `21-AUTHORING` §4.2 publishes eleven operators and
-         four are implemented, so "not a predicate" told an agent it was wrong and nothing about
-         what to write — which is the one thing 10 §7's fourth rule asks a refusal to do. */
+      /* THE REFUSAL NAMES THE OPERATORS THAT WORK. `21-AUTHORING` §4.2 publishes eleven operators,
+         so "not a predicate" told an agent it was wrong and nothing about what to write — which is
+         the one thing 10 §7's fourth rule asks a refusal to do. */
       bad.push(cannotSay(text));
       continue;
     }
-    const [, name, said, rest] = m as unknown as [string, string, string, string];
+    /* `rest` IS UNDEFINED WHEN THE OPERAND IS NOT THERE, because `CLAUSE`'s third group is optional
+       now. Every branch below reads it as the empty string and refuses by naming what is missing. */
+    const [, name, said, operand] = m as unknown as [string, string, string, string | undefined];
+    const rest = operand ?? '';
     /* THE OPERATOR FOLDED ONCE, because `CLAUSE` matches case-insensitively and every test of it
        below is against a lower-case literal. `STATE IS Live` has worked since the regex took its
        `i`, and `STATE IS NOT Live` did not: `'IS NOT' === 'is not'` is false, so the negation fell
@@ -416,11 +593,67 @@ export function compile(register: string, where: string | undefined): Where {
         continue;
       }
       const word = rest.trim();
+      /* `(nothing)` RATHER THAN A GAP IN THE SENTENCE, which is the record's word for the same hole:
+         `due before` used to read ": is not a date", a refusal with a blank where the fault is. */
       if (resolveDay(word, Date.now()) === null) {
-        bad.push(`${text}: ${word} is not a date`);
+        bad.push(`${text}: ${word || '(nothing)'} is not a date`);
         continue;
       }
       clauses.push({ field, op, day: word });
+      continue;
+    }
+
+    /* ── has · lacks ─────────────────────────────────────────────────────── */
+    if (Object.hasOwn(LISTED, op)) {
+      const asked = LISTED[op]!;
+      /**
+       * AND THE FIELD HAS TO BE A LIST, which is the whole of the record's `operatorAllowed` row for
+       * these two: `has` and `lacks` on any other type are a refusal rather than a comparison. The
+       * table cannot be imported — `@braindog/where` is not a dependency of this app and the kernel
+       * does not re-export it — so it is written here and held against the record by driving both
+       * engines over every field of every register in `where.test.ts`, which is the only way a copy
+       * of a relation stays a copy.
+       */
+      if (decl?.type !== 'list') {
+        bad.push(`${text}: ${field} is a ${decl?.type ?? 'field'}, and ${op} is about lists`);
+        continue;
+      }
+
+      /* `has not` READ THE WAY `is not` IS, because somebody who learned one writes the other, and a
+         trailing bare `not` is not a search for the word. It inverts both ways: a clause answering
+         the opposite of the question is worse than one that refuses. */
+      const no = rest === 'not' || rest.startsWith('not ');
+      const wanted = (no ? rest.slice(3) : rest).trim();
+      if (!wanted) {
+        bad.push(`${text}: ${op}${no ? ' not' : ''} what?`);
+        continue;
+      }
+
+      /* AND `or` IS NOT READ HERE. The operator looks for ONE value in the list, so `tags has urgent
+         or soon` would otherwise look for a tag literally called `urgent or soon`: a clause that
+         parses, compiles and matches nothing, for ever, which is the failure this whole file is
+         written against. Two questions are two clauses, and the refusal says so. */
+      if (/\s+or\s+/i.test(wanted)) {
+        bad.push(`${text}: ${op} takes one value to look for in the list. Write a clause for each`);
+        continue;
+      }
+
+      /* `values` BEFORE `of`, so a `list<enum>` reads as an enum however it was declared: the record
+         reads the same marker first and for the same reason, and a hand-written schema that gives
+         `values` and no `of` is the fixture form. A list with neither is text, which is what the nine
+         `list<text>` fields in the mirror are. */
+      const of = decl.values ? 'enum' : (decl.of ?? 'text');
+      if (COMPOUND.includes(of)) {
+        bad.push(`${text}: ${field} is a list of ${of}, and this grammar has no way to write one`);
+        continue;
+      }
+
+      const held = elementValue(register, field, of, wanted, Date.now());
+      if (held === null) {
+        bad.push(refuseElement(text, register, field, of, wanted));
+        continue;
+      }
+      clauses.push({ field, op: no ? OPPOSITE[asked] : asked, values: [held] });
       continue;
     }
 
@@ -454,6 +687,14 @@ export function compile(register: string, where: string | undefined): Where {
      */
     if (op === 'is' && one === 'not') {
       bad.push(`${text}: is not what?`);
+      continue;
+    }
+    /* AND `state is` WITH NOTHING AFTER IT IS THE SAME QUESTION ONE WORD EARLIER. It used to fail the
+       grammar itself and get the sentence about the whole clause, which named four operators at a
+       reader whose operator was fine. `CLAUSE` reads the bare operator now, so the refusal is the
+       record's: the one thing missing. */
+    if (!one) {
+      bad.push(`${text}: ${op} what?`);
       continue;
     }
     /* `op === 'is'` AND NOT MERELY "not before or after". `before` and `after` are consumed above,
@@ -542,6 +783,41 @@ export function compile(register: string, where: string | undefined): Where {
       continue;
     }
 
+    /**
+     * AND A LIST TAKES NONE OF THE FOUR VALUE OPERATORS, WHICH IS THE OTHER HALF OF TEACHING IT `has`.
+     *
+     * The record's `operatorAllowed` gives `is`, `not`, `in` and `not_in` to every type EXCEPT `list`,
+     * and its compiler refuses the leaf by name: `repos is portage` is *"repos is a list, which cannot
+     * be asked \"is\""*. This side compiled it instead, into a comparison against `formsOf`, which
+     * reads the raw value through `String()` and through `display()` — and `display()` on a list is
+     * `listLine`, its elements joined with a comma and a space.
+     *
+     * SO IT WORKED OR DID NOT BY HOW MANY VALUES THE ROW HAPPENED TO HOLD, which is the worst of the
+     * three possible answers. Measured over the four rows of `things`: `repos` on the row holding one
+     * repository stringified to exactly that repository, so `repos is portage` matched it, while the
+     * row holding two stringified to
+     * `git.kiln.example/type/kiln-type,git.kiln.example/type/kiln-site` — so
+     * `repos is git.kiln.example/type/kiln-type` matched NOTHING on the row that holds it. One
+     * sentence, right on three rows and wrong on the fourth, with nothing on screen to tell them apart.
+     *
+     * THE NARROWING IS REAL AND IS THE POINT: `repos is portage` used to return that row and is a
+     * refusal now, and `repos has portage` is the sentence for it. A filter whose meaning is a
+     * formatting choice is what the `is <a date>` paragraph above refuses to have, and a filter that
+     * works on a list of one is that with a fuse in it.
+     *
+     * IT COMES AFTER THE ABSENCE BRANCH, because `34 §1.2` admits `empty` and `present` on every type
+     * there is: `repos is set` is a question a list can answer and `repos is portage` is not.
+     *
+     * THE OPERATOR IT NAMES IS THE STRUCTURED ONE, because that is the name the record's refusal
+     * carries and a reader comparing the two sentences must not find two vocabularies. One value is
+     * `is`, several are `in`, and each has its negation.
+     */
+    if (decl?.type === 'list') {
+      const asked = values.length === 1 ? (op === 'is not' ? 'not' : 'is') : op === 'is not' ? 'not_in' : 'in';
+      bad.push(`${text}: ${field} is a list, which cannot be asked "${asked}"`);
+      continue;
+    }
+
     /* AN OPERATOR IN THE VALUE SLOT IS AN OPERATOR, NOT A VALUE, and it is checked only AFTER the
        declared values, so an enum that really holds the word `present` still resolves.
 
@@ -555,7 +831,7 @@ export function compile(register: string, where: string | undefined): Where {
     );
     if (reach) {
       bad.push(
-        `${text}: "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads is · is not · before · after`,
+        `${text}: "${UNIMPLEMENTED.filter((w) => reach.toLowerCase().startsWith(w)).sort((a, b) => b.length - a.length)[0]}" is not an operator this build reads. It reads is · is not · before · after · has · lacks`,
       );
       continue;
     }
@@ -604,6 +880,31 @@ export function matches(entry: Entry, w: Where, now: number): boolean {
     if (c.op === 'empty' || c.op === 'present') {
       const absent = raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0);
       return c.op === 'empty' ? absent : !absent;
+    }
+
+    /**
+     * WHAT A LIST HOLDS, AND IT IS THE ELEMENTS RATHER THAN THE LINE THEY PRINT AS.
+     *
+     * `formsOf` below reads a list through `display()`, which is `listLine`: the elements joined with
+     * a comma and a space, with the record's own tags left out. That is the right string for a cell
+     * and the wrong one for a question — a row holding two repositories would answer `has` on neither
+     * of them and on the joined line nobody wrote. So this reads the array itself, one element at a
+     * time, and the clause carries the element as the column stores it.
+     *
+     * `String(v)` BECAUSE A LIST IS NOT ALL TEXT. A `list<ref>` in this mirror holds the target's
+     * `seq` as a number and a `list<bool>` holds a boolean, and `elementValue` resolved the written
+     * word to the same spelling; comparing the two as strings is what makes one comparison serve
+     * every element type. Case-sensitively, which is what the record does: `json_each.value = ?` is
+     * not `NOCASE` and its evaluator compares with `===`, so `repos has Portage` finds no row.
+     *
+     * A ROW WITH NOTHING IN THE FIELD `lacks` EVERYTHING, which is the record's line for line:
+     * `!Array.isArray(raw) || !raw.some(...)`. `has` is a positive operator and is false on it, and
+     * the negation is where a person means "and the ones with none".
+     */
+    if (c.op === 'has' || c.op === 'lacks') {
+      const wanted = elementWanted(w.register, c.field, c.values[0], now);
+      const holds = Array.isArray(raw) && raw.some((v) => String(v) === wanted);
+      return c.op === 'has' ? holds : !holds;
     }
 
     /* `'values' in c` rather than a check on `op`: the discriminant is spread across two literals
@@ -659,6 +960,23 @@ export const explain = (w: Where): string[] => w.bad;
 export function registerHref(register: string, where: string | undefined): string {
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
+
+  /**
+   * AND A CLAUSE ABOUT A LIST OPENS THE REGISTER WHOLE, because no chip can carry it yet.
+   *
+   * A chip is `<field>:<op>:<values>` and `whereOf` in `api.ts` reads four operators back out of one
+   * — `in`, `not-in`, `before`, `after` — with everything else falling through to `<field> is <value>`.
+   * So `repos:has:portage` would come back through that fallback as `repos is portage`, which this
+   * compiler and the record now both REFUSE: the link would open an empty grid under a block that had
+   * drawn three rows. Minting `repos:has:portage` and reading it here would not help either, because
+   * the reader is `whereOf` and not this file.
+   *
+   * The paragraph above is the rule and this keeps it: dropping the clause it cannot carry would
+   * produce a URL filtered by the half it understood — a list that looks narrowed and is not — so the
+   * honest wide address is the whole register until `whereOf` learns the word. The surface that owns
+   * the predicate still refuses, draws and explains in its own words; only the door is wide.
+   */
+  if (w.clauses.some((c) => c.op === 'has' || c.op === 'lacks')) return `/r/${register}`;
 
   /* A NEGATION BECOMES `not-in` RATHER THAN THE ENUM'S COMPLEMENT: the complement is only writable
      when the field declares its values, and a URL that silently lists them is a URL that breaks the

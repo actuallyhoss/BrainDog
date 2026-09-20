@@ -17,10 +17,14 @@
  * five registers: `things.repos`, `things.folders`, `people.handles`, `people.met`, `tools.args`,
  * `tools.needs`, `tools.hosts`, `session.tried` and `session.notes` are `list<text>`, and
  * `people.projects` and `skills.because` are `list<ref>`. The union named none of them, so the two
- * places that had to ask wrote a cast around the hole rather than filling it: `blocks.ts` has
+ * places that had to ask wrote a cast around the hole rather than filling it: `blocks.ts` had
  * `(f.type as string) !== 'list'` and the row form has `(f.type as string) === 'list'`. A cast that
  * launders a missing member is how a whole type goes unhandled quietly, because the next reader
  * writes the same cast instead of the same question.
+ *
+ * `blocks.ts`'s CAST IS GONE NOW, taken out when `where.ts` learned `has` and `lacks` — the operators
+ * only a list takes, which could not be taught until the type had a name. The row form's is still
+ * there, in `routes/r/[register]/[seq]/+page.svelte`, and is the last of the two.
  *
  * `url` AND `email` CAME OUT OF THE SAME MEASUREMENT and are the same defect one field wide:
  * `skills.source` is a `url` and `people.email` is an `email`, both drawn on shipped screens.
@@ -189,7 +193,21 @@ export const isMoney = (v: unknown): v is MoneyValue =>
 
 /* A LIST FIELD CARRIES SEVERAL VALUES: tags, and a field that points at more than one row. It is
    written back the way it was read, which is why the value here is a list as well as a single one. */
-export type Fields = Record<string, string | number | boolean | MoneyValue | readonly string[] | null>;
+/**
+ * AND ITS ELEMENTS ARE NOT ALL TEXT, which this said they were.
+ *
+ * `readonly string[]` is the shape of a `list<text>` and of nothing else. `34 §1.1` gives `list<int>`,
+ * `list<day>`, `list<ref>` and the rest, and the mirror beside this file holds one today: `skills.because`
+ * is a `list<ref>` and carries `[3, 4]` — the target rows' `seq`, because `data.ts` numbers the seed by
+ * position where the record keeps a ULID. A `list<bool>` holds booleans in both.
+ *
+ * It went unseen for the reason `blocks.ts`'s vanished cast went unseen, and through the same mechanism:
+ * `entriesOf` ends `fields: fields as Fields`, so the one place that builds every row of the sample
+ * launders whatever the seed actually holds past the type. The declaration widened when `where.ts`
+ * learned `has` and `lacks` and a test wrote a `list<int>` row by hand, which is the first thing in this
+ * build to hand the type a list of numbers without a cast in front of it.
+ */
+export type Fields = Record<string, string | number | boolean | MoneyValue | readonly (string | number | boolean)[] | null>;
 
 export type Entry = {
   /** The number you can say out loud. Per-register, and it is why renaming a register is refused. */
