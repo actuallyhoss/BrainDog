@@ -13,6 +13,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { currencyFor, display, metric, page, readBlock, values } from './api.ts';
 import { resolverOf } from './page-live.ts';
@@ -36,6 +39,30 @@ const eur = (amount: number) => ({ amount, currency: 'EUR' });
 const LEGS = Object.values(PAGES)
   .flatMap((p) => p.blocks)
   .find((b) => b.source === 'forecast.runway')!.from!;
+
+/* THE REFUSAL AND NOTHING ELSE. `packages/kernel/src/metrics.ts` writes `?? 'no unit'` in four
+   places, and two of them are the halves of a ratio: a different sentence with its own wording.
+   This reads only the two that render the mixed-unit refusal, so the pin below cannot be satisfied
+   by a match somewhere a reader of that sentence never goes. */
+const MARK = /these rows are in \$\{groups\.map\(\(g\) => g\.u \?\? '([^']+)'\)/gu;
+
+/**
+ * THE RECORD'S OWN COPY OF THE MIXED-UNIT SENTENCE, read out of the kernel instead of typed here.
+ *
+ * A sentence typed a second time is the whole of what went wrong: this file held the two web
+ * modules to each other and had no way to see the third spelling, which is the one a paying
+ * customer reads. `@braindog/kernel` is already a dependency of this app, and `metrics.ts` imports
+ * `across` and `targetFor` from it, but both words below are literals inside `aggregate` rather
+ * than exports, so the source text is where they can be seen at all. `deployment.test.ts` reads
+ * `tools/gates/*.mjs` from five directories up for the same reason.
+ */
+const KERNEL = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', 'packages', 'kernel', 'src', 'metrics.ts'),
+  'utf8',
+);
+
+/** Every mark the kernel writes for a row with no unit, taken from the refusal itself. */
+const RECORD_MARKS = [...new Set([...KERNEL.matchAll(MARK)].map((m) => m[1]!))];
 
 test('a total of one currency is a total; a total of two is a REFUSAL', () => {
   const one = total([gbp(100), gbp(250), null, gbp(50)]);
@@ -63,7 +90,7 @@ test('MONEY AND A BARE NUMBER TOGETHER IS MIXED TOO', () => {
   assert.deepEqual(plain.mixed, []);
 });
 
-test('AND THE SENTENCE SAYS SO, in the words the other two summing sites use', () => {
+test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', () => {
   /* `total()` saw the bare rows and refused over them, and then left them out of the set it hands
      to `mixedFix`, so a column of one sterling row and one plain number printed *"these rows are in
      GBP, and two currencies are never added"* — one currency named, two claimed, and nothing about
@@ -72,13 +99,42 @@ test('AND THE SENTENCE SAYS SO, in the words the other two summing sites use', (
      English there rather than as a currency code"*), `forecast.ts` does the same for the cash walk,
      and the kernel writes `no unit` into the same sentence. This was the site that did not. */
   const t = total([gbp(100), 250]);
-  assert.equal(mixedFix(t.mixed), 'these rows are in GBP and no currency, and two currencies are never added');
+  assert.equal(mixedFix(t.mixed), 'these rows are in GBP and no unit, and two units are never added');
 
   /* THE SAME TWO ROWS THROUGH `metrics.ts`, because one situation with two sentences is two
      situations as far as a reader is concerned, and these two drifted apart without a word. */
   const rows = [{ seq: 1, fields: { amount: gbp(100) } }, { seq: 2, fields: { amount: 250 } }] as unknown as Entry[];
   assert.equal(mixedFix([...currenciesRead(rows, { sum: 'amount' })].sort()), mixedFix(t.mixed));
   assert.equal(BARE, METRICS_BARE, 'the marker is spelled in two modules and the spellings have drifted');
+
+  /* AND THE THIRD SPELLING, WHICH IS THE ONE THAT WINS. The equality above holds the two web
+     modules to each other and can see nothing else, so it passed on the day the sample printed
+     *"these rows are in GBP and no currency"* about the same two rows the record described as
+     *"GBP and no unit"*: one situation, two sentences, and the assertion that was supposed to stop
+     exactly that looking straight through it. Measured against `packages/kernel/src/metrics.ts` as
+     it stands: two occurrences of the mixed-unit refusal, both writing `no unit`, so the marks come
+     back as one distinct word and the sample has to be spelling that one. */
+  assert.deepEqual(RECORD_MARKS, [BARE], 'the sample and the record name a unitless row differently');
+
+  /* AND THE TRAILING CLAUSE IS THE KERNEL'S TOO, rather than a third phrasing invented on this
+     side. One sterling row beside one plain number is not two currencies, so "two currencies are
+     never added" describes a failure that did not happen; the kernel already splits the two, giving
+     the unit case `QUANTITY_MIXED_UNIT` and its own words for the reason its comment gives, *"a
+     sentence about money attached to a figure about metres"*. Both clauses are read back out of it
+     so that a rewording there fails here rather than drifting again.
+
+     WHAT THESE TWO DO NOT PIN, SAID HERE SO NOBODY READS THEM AS MORE THAN THEY ARE: the kernel
+     chooses between its two clauses on the FIELD'S TYPE, at `metrics.ts:1072` and `:1077`, and a
+     money field holding a row with no currency goes down the money arm, so the record's sentence
+     for these same two rows is still *"and two currencies are never added"*. The second assertion
+     below is therefore satisfied by the `quantity` arm, which this mirror has no field type to
+     reach. The mark is one word across all three copies; this clause is two, and the line that
+     would make it one is in the kernel rather than in this app. */
+  assert.ok(KERNEL.includes('and two units are never added'), 'the kernel no longer carries the wording this sentence copies');
+  assert.ok(KERNEL.includes('and two currencies are never added'), 'the kernel no longer carries the money wording either');
+
+  /* AND TWO REAL CURRENCIES STILL SAY CURRENCIES, which is the half of the split that was right. */
+  assert.equal(mixedFix(['EUR', 'GBP']), 'these rows are in EUR and GBP, and two currencies are never added');
 });
 
 test('and the remainder bucket carries the marker, and carries it only when a bare row is really in it', () => {

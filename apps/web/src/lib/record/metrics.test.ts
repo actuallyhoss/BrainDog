@@ -17,6 +17,7 @@ import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
 import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, read, spokenWindow, targetLine, unreadable, windowMs, withParam, type MetricDecl } from './metrics.ts';
 import { applyFilters, metric } from './api.ts';
+import { compile, matches } from './where.ts';
 import { NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf } from './money.ts';
 
@@ -182,6 +183,96 @@ test('A FIXED DATE IS A DATE CLAUSE THAT DOES NOT MOVE, so it is not "no change"
   const relative = read({ ...fixed, metric: 'due-by-today', where: 'due before today' });
   assert.notEqual(relative.delta, null, 'a predicate that does move with the clock lost its delta');
   assert.match(relative.why, /before/);
+});
+
+/**
+ * A LIST OF DAYS ASKED ABOUT `today` IS A DATED PREDICATE, AND THE GATE COULD NOT SEE IT.
+ *
+ * The gate reads a clause as timeless when it carries `values`, which is the discriminant for the
+ * three non-day members of the union. `has` and `lacks` carry `values` too, by a deliberate choice
+ * `where.ts` records in full: the element sits in a `values` tuple precisely so `resolvedAt` does
+ * not go looking for a `day` key the clause has no room for. Everything about that is fine until
+ * the list holds days, because `matches` resolves the element against the clock it is handed
+ * (`elementWanted`, `of === 'day' || of === 'instant'`) and the gate does not.
+ *
+ * WHAT IT COSTS IS THE COMPARISON AND A SENTENCE THAT IS NOT TRUE. Driven on a register declared
+ * here, three rows, `days has today`, window `30d`, compare `previous`: `matches` answers row `a`
+ * at the clock and rows `b` and `c` thirty days back, so the two windows hold 1 row and 2, and the
+ * delta is a real −50 percent. The gate reported `delta: null`, `why: "the predicate does not
+ * mention time, so the window moves nothing"` and told the person *"nothing here is dated, so
+ * there is no before to compare with"* under a tile filtered to today.
+ *
+ * NO REGISTER IN THIS MIRROR CARRIES ONE TODAY, which is why it is declared here rather than found:
+ * eleven list fields over five registers, all of them `list<text>` or `list<ref>`, and none of the
+ * fifty-four declared metrics says `has` or `lacks` at all. `where.ts` recorded the hazard when it
+ * added the two operators and left it; a live record declaring `list<day>` reaches it on the first
+ * metric that asks, and the tile then says nothing is dated about a predicate that names today.
+ */
+const SIGHTINGS = {
+  id: 'sightings',
+  name: 'Sightings',
+  one: 'sighting',
+  title: 'name',
+  fields: [
+    { id: 'name', type: 'text' },
+    { id: 'days', type: 'list', of: 'day' },
+    /* A LIST THAT HOLDS NOTHING DATED, for the second half of the assertion below. Every list field
+       in the mirror is one of these, so the branch that has to keep answering "nothing here is
+       dated" is the one every register a person owns today would go down. */
+    { id: 'tags', type: 'list', of: 'text' },
+  ],
+} as unknown as (typeof REGISTERS)[string];
+
+test('A `has` OVER A LIST OF DAYS MOVES WITH THE CLOCK, and the comparison gate called it timeless', () => {
+  const DAY = 86_400_000;
+  const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+  const seen = (seq: number, at: number) => ({ seq, fields: { name: `row ${seq}`, days: [iso(at)], tags: ['ringed'] }, version: 1, created: iso(at), by: 'a person' });
+  const rows = [seen(1, NOW), seen(2, NOW - 30 * DAY), seen(3, NOW - 30 * DAY)];
+
+  REGISTERS.sightings = SIGHTINGS;
+  ROWS.sightings = rows;
+  try {
+    /* THE ROWS FIRST, because the claim is about the predicate and not about the tile: if `matches`
+       answered the same set at both clocks there would be nothing to compare and the gate would be
+       right. It does not. */
+    const w = compile('sightings', 'days has today');
+    assert.deepEqual(w.bad, [], 'the compiler could not read a `has` over a list of days');
+    assert.deepEqual(rows.filter((e) => matches(e, w, NOW)).map((e) => e.seq), [1]);
+    assert.deepEqual(rows.filter((e) => matches(e, w, NOW - 30 * DAY)).map((e) => e.seq), [2, 3]);
+
+    const decl: MetricDecl = {
+      metric: 'sightings-today',
+      name: 'Seen today',
+      source: 'register.sightings',
+      where: 'days has today',
+      value: { count: 'id' },
+      target: { gte: 1 },
+      window: '30d',
+      compare: 'previous',
+    };
+    const r = read(decl, NOW);
+    assert.deepEqual(r.refusals, [], 'the declaration itself was refused, so this measures nothing');
+    assert.equal(r.value, 1, 'the figure at the clock is not what is in question');
+    assert.equal(r.delta, -0.5, `one row against two is a half, and the gate reported ${r.delta}`);
+    assert.doesNotMatch(r.why, /moves nothing/, 'a predicate naming today was called unmoving');
+    assert.equal(r.unmeasured, null, `the person was told ${r.unmeasured} about a predicate that names today`);
+
+    /* AND THE OTHER WAY ROUND, WHICH NOTHING HELD. `dayAt` answers `null` for a `has` over a list
+       that is not days or instants, and that `null` is what chooses between the two sentences under
+       a tile with no comparison. Deleting the `of` test from it and running all 949 tests in
+       `apps/web/src/lib/record` left every one of them green, so the branch every list field in the
+       mirror actually goes down was resting on nobody having mutated one line. Without it,
+       `tags has ringed` reads as a predicate naming a fixed date and the person is told the tile
+       asks about one day, which is the same wrong sentence as above wearing the other hat. */
+    const tagged = read({ ...decl, metric: 'sightings-ringed', where: 'tags has ringed' }, NOW);
+    assert.deepEqual(tagged.refusals, [], 'the `list<text>` declaration itself was refused');
+    assert.equal(tagged.delta, null, 'a tag is the same tag at both clocks, so there is nothing to compare');
+    assert.match(tagged.why, /does not mention time/, `a predicate about a tag was read as dated: ${tagged.why}`);
+    assert.match(tagged.unmeasured ?? '', /nothing here is dated/, `the person was told ${tagged.unmeasured} about a predicate that names no day`);
+  } finally {
+    delete (REGISTERS as Record<string, unknown>).sightings;
+    delete (ROWS as Record<string, unknown>).sightings;
+  }
 });
 
 /* ── the comparison is against the window it names ───────────────────────── */
@@ -573,8 +664,13 @@ test('A METRIC REFUSES TO SUM MONEY WITH A UNITLESS NUMBER', () => {
   assert.ok(seen.has('GBP'));
   assert.ok(seen.has(BARE));
   /* AND THE SENTENCE SAYS SO. `mixedFix` is what the tile prints instead of a figure, and the
-     marker has to read as English there rather than as a currency code. */
-  assert.match(mixedFix([...seen].sort()), /no currency/);
+     marker has to read as English there rather than as a currency code.
+
+     READ OFF `BARE` RATHER THAN TYPED, because a word typed into a test is a fourth copy of the
+     word the sample and the record had already drifted on: this line said `/no currency/` and would
+     have gone red for the repair that made the two agree with the kernel, which is a test failing
+     at the change it exists to permit. `money.test.ts` is where the spelling itself is pinned. */
+  assert.ok(mixedFix([...seen].sort()).includes(BARE), 'the sentence does not name the rows with no unit');
 });
 
 test('and a blank field is absent, not unitless', () => {

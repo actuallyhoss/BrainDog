@@ -55,7 +55,7 @@ import { copy } from '../copy.ts';
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
 import { amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
-import type { Where } from './where.ts';
+import type { Clause, Where } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
@@ -419,8 +419,14 @@ function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
  *
  * A string that is not a currency code, so it cannot collide with one and cannot be printed as one:
  * `mixedFix` renders the set into a sentence, and this reads as what it is.
+ *
+ * AND IT IS THE RECORD'S WORD RATHER THAN THIS ENGINE'S. It read `no currency` while
+ * `packages/kernel/src/metrics.ts` wrote `no unit` into the same refusal, so the sample and a live
+ * record said different things about the same two rows; the assertion in `money.test.ts` that was
+ * written to catch that compared this constant with `money.ts`'s and could not see the third copy.
+ * It reads the kernel's source now, and all three are held to one word.
  */
-export const BARE = 'no currency';
+export const BARE = 'no unit';
 
 /** Every currency any operand of this value expression reads. */
 export function currenciesRead(rows: Entry[], value: Value): Set<string> {
@@ -550,24 +556,53 @@ export function hrefFor(decl: MetricDecl): string {
 }
 
 /**
- * The predicate as it RESOLVES at one clock: the same clauses, with every temporal word made a day.
+ * The day one clause turns on at one clock, or `null` when it turns on none.
  *
- * This is what the comparison actually depends on, and the check used to ask a different question.
- * It asked whether any clause was a DATE clause, and an absolute date is a date clause that does
- * not move. `due before 2026-10-01` over a thirty-day window compared 10,343,000 with itself and
- * reported `delta: 0`, so the tile read GBP 103,430.00 · no change on the 30 days before: a set
- * compared with itself, printed as a fact about the business. The relative form of the same
- * sentence, `due before today`, was right all along, which is why the gate looked like it worked.
+ * THE TWO READERS BELOW ARE THIS ONE FUNCTION, which is the whole reason it exists. `resolvedAt`
+ * decides whether the shifted window is a different question and the sentence under the tile
+ * decides what to tell the person about it, and they were two spellings of the same test:
+ * `'values' in c ? c : …` here and `w.clauses.every((c) => 'values' in c)` there. Two readings of
+ * one union drift, and this one had already drifted from `matches`.
  *
- * So the question is the kernel's: does the resolved predicate MOVE when the clock does? A word
- * like `today` or `+30d` resolves to a different day at a moved clock and a written-out date does
- * not, and no list of which spellings are which has to be kept anywhere.
+ * A LIST OF DAYS IS THE CLAUSE BOTH OF THEM READ WRONG. `has` and `lacks` carry their element in a
+ * `values` tuple, deliberately, so that a reader testing for `values` does not go looking for a
+ * `day` key they have no room for — `where.ts` says so at the union member. But `matches` resolves
+ * that element against the clock it is handed when the list holds days or instants
+ * (`elementWanted`), so `days has today` names a different day every day while both readers here
+ * called it timeless. Measured on a register declared in the test beside three rows: 1 row at the
+ * clock, 2 thirty days back, a real −50 percent, and the tile reported no delta at all under
+ * *"nothing here is dated, so there is no before to compare with"*.
+ *
+ * AND A WRITTEN-OUT DATE IS STILL A DATE THAT DOES NOT MOVE, which is the other half and was the
+ * reason this function was written. The check used to ask whether any clause was a DATE clause, and
+ * `due before 2026-10-01` is one: it resolves to the same day however far the clock is wound back,
+ * so the shifted window matched the same rows, the delta came out structurally zero and the tile
+ * read GBP 103,430.00 · no change on the 30 days before. A set compared with itself, printed as a
+ * fact about the business. So the question is the kernel's, for every kind of clause: what day does
+ * it turn on at this clock, and is that a different day at the other one.
+ *
+ * A WORD THAT WILL NOT RESOLVE KEEPS ITSELF rather than becoming `null`, because `null` is how this
+ * says "no day is mentioned here" and an unreadable day mentions one. `read` refuses such a clause
+ * long before this, through `explain`; the fallback is so that a caller which does not cannot be
+ * told that `due before wednesday` is a predicate about nothing.
  */
+const dayAt = (register: string, c: Clause, now: number): string | null => {
+  if (!('values' in c)) return resolveDay(c.day, now) ?? c.day;
+  if (c.op !== 'has' && c.op !== 'lacks') return null;
+  const of = REGISTERS[register]?.fields.find((f) => f.id === c.field)?.of;
+  if (of !== 'day' && of !== 'instant') return null;
+  return resolveDay(c.values[0], now) ?? c.values[0];
+};
+
+/** The predicate as it RESOLVES at one clock: the same clauses, each beside the day it turns on. */
 const resolvedAt = (w: Where, now: number): string =>
-  JSON.stringify(w.clauses.map((c) => ('values' in c ? c : { ...c, day: resolveDay(c.day, now) })));
+  JSON.stringify(w.clauses.map((c) => ({ ...c, at: dayAt(w.register, c, now) })));
 
 /** Does this predicate say anything different at the moved clock? Without that, the two sets are one set. */
 const moves = (w: Where, now: number, then: number): boolean => resolvedAt(w, now) !== resolvedAt(w, then);
+
+/** Does the predicate mention time at all? Read for the sentence under a tile that has no comparison. */
+const timeless = (w: Where, now: number): boolean => w.clauses.every((c) => dayAt(w.register, c, now) === null);
 
 /**
  * The same clock, one year earlier.
@@ -847,12 +882,17 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
        full is the case it let through, and that IS a date clause, so asking "is any clause a date
        clause" answered yes and the figure was compared with itself. Each gets the sentence that is
        true of it, because "nothing here is dated" under a tile filtered to `due before 2026-10-01`
-       is a sentence a person can see is wrong. */
-    const timeless = w.clauses.every((c) => 'values' in c);
-    why = timeless
+       is a sentence a person can see is wrong.
+
+       AND THE QUESTION IS ASKED WITH THE SAME FUNCTION THE LINE ABOVE ASKS IT WITH. This read
+       `w.clauses.every((c) => 'values' in c)`, which is a second reading of the union `resolvedAt`
+       was already reading, and the two could answer differently about one clause without anything
+       saying so. `dayAt` is that one reading. */
+    const dateless = timeless(w, now);
+    why = dateless
       ? 'the predicate does not mention time, so the window moves nothing'
       : 'the predicate names a fixed date, so the window moves nothing';
-    unmeasured = timeless
+    unmeasured = dateless
       ? 'nothing here is dated, so there is no before to compare with'
       : 'this asks about one fixed date, so the same rows are on both sides of the window';
   } else {

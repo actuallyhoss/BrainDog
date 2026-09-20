@@ -35,16 +35,26 @@ export const currencyOf = (value: unknown): string | null => (isMoney(value) ? v
 /**
  * The mark in a mixed set for "and some of these rows carried no currency at all".
  *
+ * IT IS THE RECORD'S WORD, AND IT USED TO BE THIS FILE'S OWN. `packages/kernel/src/metrics.ts`
+ * writes `g.u ?? 'no unit'` into the same refusal, twice, and that is the copy a paying customer
+ * reads; the sample said `no currency` and the two therefore described the same two rows in
+ * different words, one on the screen the product demonstrates itself on and one on the screen
+ * somebody works from. The equality assertion written to stop exactly that held only the two web
+ * modules to each other, so it passed the whole time. `money.test.ts` now reads the mark out of the
+ * kernel's source and pins all three.
+ *
+ * AND IT IS A UNIT RATHER THAN A CURRENCY BECAUSE THE SET IT JOINS IS UNITS. `GBP and no unit` is
+ * a list of two units, one of which is money; `GBP and no currency` is a list with a hole in it.
+ *
  * SPELLED HERE AND NOT IMPORTED, because `metrics.ts` imports this module and a constant cannot
  * travel back up that edge without an import cycle. `metrics.ts` declares the same string for its
- * own set and `forecast.ts` reads it from there; `money.test.ts` asserts the two spellings are
- * equal, so a change to either one fails rather than quietly giving one screen a different word.
+ * own set and `forecast.ts` reads it from there.
  *
  * THE SECOND COPY IS NOT PERMANENT. The edge runs metrics to money, so the way out is for
  * `metrics.ts` to delete its own line and re-export this one, and then the equality assertion has
  * nothing left to guard. That file belonged to another change when this one was written.
  */
-export const BARE = 'no currency';
+export const BARE = 'no unit';
 
 /**
  * A total, and what it is a total of.
@@ -94,9 +104,33 @@ export function total(values: Iterable<unknown>): Total {
   return { amount, currency: mixed.length ? null : currency, mixed, n };
 }
 
-/** The sentence a mixed total shows instead of a figure. */
+/**
+ * The sentence a mixed total shows instead of a figure.
+ *
+ * TWO OF THESE ARE NOT ALWAYS TWO CURRENCIES, and the trailing clause said they were. A set of one
+ * sterling row and one plain number holds two entries, one of which is not a currency at all, and
+ * the sentence still ended *"and two currencies are never added"*: one currency named, two claimed,
+ * and a reason given for a failure that did not happen. It sends whoever reads it looking for a
+ * second currency there is no trace of, which is the opposite of what a refusal is for.
+ *
+ * THE WORDING IS THE KERNEL'S, THE CHOICE OF WHEN TO SAY IT IS THIS SIDE'S, and the difference is
+ * worth writing down because it is what is still divergent. `packages/kernel/src/metrics.ts:1072`
+ * refuses a mixed `money` field with *"two currencies are never added"* and `:1077` a mixed
+ * `quantity` with *"two units are never added"* under `QUANTITY_MIXED_UNIT`, and the comment above
+ * the two gives the reason they were ever separated: *"a sentence about money attached to a figure
+ * about metres"*. It splits on the FIELD'S TYPE, though, and not on what the set turned out to
+ * hold: a money field with a row carrying no currency goes down the money arm, where
+ * `g.u ?? 'no unit'` names that row, so the sentence a live record prints for the rows below is
+ * *"these rows are in GBP and no unit, and two currencies are never added"*. This mirror declares
+ * no `quantity` type at all (`schema.ts:39`), so the kernel's second arm is not a case anything
+ * here can reach, and taking its clause is this file's own judgement that one sterling row and one
+ * plain number are not two currencies. What that leaves is the record saying "currencies" about
+ * the two rows this says "units" about, and the line that closes it is in the kernel's money arm
+ * rather than here. `money.test.ts` reads both clauses back out of the kernel, so a rewording there
+ * fails here rather than drifting again.
+ */
 export const mixedFix = (mixed: readonly string[]): string =>
-  `these rows are in ${mixed.join(' and ')}, and two currencies are never added`;
+  `these rows are in ${mixed.join(' and ')}, and two ${mixed.includes(BARE) ? 'units' : 'currencies'} are never added`;
 
 /** A money value built from an amount and the currency of the rows it came from. */
 export const asMoney = (amount: number, currency: string | null): MoneyValue | number =>
