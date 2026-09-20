@@ -6,7 +6,7 @@
  * this file writes, because stderr ends up in an agent's logs.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -59,10 +59,36 @@ export function readHosts(file: string): HostsFile {
  */
 export function saveHosts(file: string, hosts: HostsFile): void {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  const part = `${file}.tmp`;
-  writeFileSync(part, `${JSON.stringify(hosts, null, 2)}\n`, { mode: 0o600 });
-  chmodSync(part, 0o600);
-  renameSync(part, file);
+  writeFileSync(partOf(file), `${JSON.stringify(hosts, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(partOf(file), 0o600);
+  renameSync(partOf(file), file);
+}
+
+/** The scratch name `saveHosts` writes through. One place, so a caller clearing it cannot guess wrong. */
+export const partOf = (file: string): string => `${file}.tmp`;
+
+/**
+ * THE SCRATCH FILE, THROWN AWAY. A `login` killed between the write and the rename leaves a whole
+ * hosts document at `hosts.json.tmp`, holding every token the file held, and nothing consumes it
+ * unless a later write happens to run.
+ *
+ * WHICH MAKES IT `logout`'s, AND ONLY ON THE PATH THAT WRITES NOTHING. Every other path ends in
+ * `saveHosts`, whose write and rename consume the leftover on the way past; the nothing-to-remove
+ * path returns first, so it is the one case where `braindog logout` can finish with a live bearer
+ * still on the disk and a sentence on the screen saying there was nothing to remove. A command
+ * whose whole job is to end a login must not leave one behind.
+ *
+ * IT REMOVES ONLY THE NAME THIS MODULE WRITES, never `file` itself, and says nothing when there is
+ * nothing there. A failure is swallowed for the reason every other error path in this pair
+ * swallows one: the message would quote the path, and a caller who cannot delete it cannot be
+ * helped by being told twice.
+ */
+export function discardPart(file: string): void {
+  try {
+    rmSync(partOf(file), { force: true });
+  } catch {
+    /* Nothing to say. See above. */
+  }
 }
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);

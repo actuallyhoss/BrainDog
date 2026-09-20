@@ -15,7 +15,7 @@
 
 import { parseArgs } from 'node:util';
 
-import { hostKey, readHosts, sameHost, saveHosts } from './http.ts';
+import { discardPart, hostKey, readHosts, sameHost, saveHosts } from './http.ts';
 import type { Answering } from './json.ts';
 
 export type LogoutIo = {
@@ -142,8 +142,14 @@ export async function logout(args: string[], io: LogoutIo): Promise<number> {
   if (runners > 0) removed.push(count(runners, 'runner token', 'runner tokens'));
   if (grants > 0) removed.push(count(grants, 'vault grant', 'vault grants'));
 
-  /* NOTHING TO REMOVE IS THE STATE THAT WAS ASKED FOR, so it is 0, and the file is not rewritten. */
+  /* NOTHING TO REMOVE IS THE STATE THAT WAS ASKED FOR, so it is 0, and the file is not rewritten.
+     THE SCRATCH FILE IS STILL REMOVED, AND THIS IS THE ONLY PATH THAT HAS TO ASK. `saveHosts`
+     writes through `hosts.json.tmp` and renames, so every path below consumes a leftover on the way
+     past; this one returns first. A `login` killed between that write and that rename leaves a whole
+     hosts document there, tokens and all, so without this line `braindog logout` could finish with a
+     live bearer on the disk while saying there was nothing to remove. See `discardPart`. */
   if (removed.length === 0 && !wasDefault) {
+    discardPart(io.file);
     io.say(`No login to ${key} is kept on this machine, so there was nothing to remove.`);
     io.answer?.({ value: { host: key, tokens: 0, runners: 0, grants: 0, default_cleared: false } });
     return 0;

@@ -372,3 +372,38 @@ test('AS A REAL PROCESS: no host named anywhere is one sentence and exit 1', asy
   hidden(out);
   assert.equal(readFileSync(file, 'utf8'), before);
 });
+
+test('A SCRATCH FILE A KILLED LOGIN LEFT BEHIND DOES NOT SURVIVE A LOGOUT', async (t) => {
+  /* `saveHosts` writes `hosts.json.tmp` and renames it into place, so a run killed between those
+     two steps leaves a WHOLE hosts document beside the real one, tokens and all, at 0600. Every
+     path through this command that writes consumes it on the way past. The nothing-to-remove path
+     returns before the write, and it is the one that says out loud that nothing was left: a
+     logout that finishes with a live bearer on the disk while saying there is none is the exact
+     shape of failure this command exists to prevent. */
+  const { file } = config(t, { hosts: { [OTHER]: { token: held(OTHER_TOKEN) } } });
+  const part = `${file}.tmp`;
+  writeFileSync(part, `${JSON.stringify({ hosts: { [HOST]: { token: held(TOKEN) } } }, null, 2)}\n`, { mode: 0o600 });
+  assert.ok(existsSync(part), 'the fixture did not leave one');
+
+  const out = await call([HOST], file);
+
+  assert.equal(out.code, 0);
+  assert.equal(out.lines.at(-1), `No login to ${HOST} is kept on this machine, so there was nothing to remove.`);
+  assert.equal(existsSync(part), false, 'the scratch file outlived the logout that reported nothing to remove');
+  hidden(out);
+
+  /* AND THE REAL FILE IS UNTOUCHED, because the other host's login was not what was asked about. */
+  assert.deepEqual(readBack(file), { hosts: { [OTHER]: { token: held(OTHER_TOKEN) } } });
+});
+
+test('AND A LOGOUT THAT DOES REMOVE SOMETHING CONSUMES IT TOO, which is the path that always did', async (t) => {
+  const { file } = config(t, { hosts: { [HOST]: { token: held(TOKEN) } } });
+  const part = `${file}.tmp`;
+  writeFileSync(part, 'left behind by a killed login\n', { mode: 0o600 });
+
+  const out = await call([HOST], file);
+
+  assert.equal(out.code, 0);
+  assert.equal(existsSync(part), false);
+  hidden(out);
+});

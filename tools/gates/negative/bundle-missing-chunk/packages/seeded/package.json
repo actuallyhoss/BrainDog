@@ -1,5 +1,0 @@
-{
-  "//": "The gate walks `packages/*/src` for the staleness check and reads `packages/` unguarded, so this tree needs one. There is no `src/` beside it: a package that compiles into nothing is the case the gate already forgives, and it keeps the newest source at zero so this fixture can never read as stale.",
-  "name": "@braindog/seeded",
-  "private": true
-}

@@ -222,12 +222,19 @@ const CASES = [
      no sentence in it. The fixture names one chunk and does not put it there, and one finding is
      what proves the gate names the file rather than counting the manifest.
 
-     ITS TREE IS SHAPED BY TWO GUARDS UPSTREAM OF THE ONE UNDER TEST, and both of them are about
-     mtimes rather than contents, which is the only reason this fixture looks odd. The shell lives
-     under `apps/site/src/` and there is no `apps/web/src/` at all, because a checkout writes
+     ITS TREE IS SHAPED BY A GUARD UPSTREAM OF THE ONE UNDER TEST, which is about mtimes rather
+     than contents and is the only reason this fixture looks odd. The shell lives under
+     `apps/site/src/` and there is no `apps/web/src/` at all, because a checkout writes
      `.svelte-kit/` before `src/` and a source file newer than the manifest makes the gate skip as
-     stale before it reads a chunk. `packages/seeded/` is there because the staleness walk reads
-     `packages/` unguarded, and it carries no `src/`, which keeps the newest source at zero. */
+     stale before it reads a chunk.
+
+     AND THERE IS NO `packages/` HERE, WHICH IS A SECOND THING THIS FIXTURE NOW PROVES. It used to
+     carry a `packages/seeded/` holding nothing but a manifest, because the staleness walk read
+     `packages/` with a bare `readdir` and died on a tree without one. `85c44aa7` gave that walk the
+     `.catch` its sibling over `apps/` has always had, so the decoy came out: if the guard is ever
+     removed again, this fixture goes red with an ENOENT stack where its sentence should be. One
+     violation is still seeded and one finding is still asserted; the absent directory is a property
+     of the tree rather than a second violation. */
   { gate: 'bundle-missing-chunk', run: 'bundle', expect: /\bmanifest\b.*\bdid not emit\b/, findings: 1 },
   /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
      it (the missing code, and the family whose size no longer matches) and only the first can
