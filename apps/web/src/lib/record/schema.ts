@@ -9,23 +9,64 @@
  * saying a number out loud, and never add two currencies.
  */
 
-export type FieldType =
-  | 'text'
-  | 'document'
-  | 'money'
-  | 'day'
-  | 'instant'
-  | 'int'
-  | 'decimal'
-  | 'enum'
-  | 'bool'
-  | 'ref'
-  | 'secret'
-  | 'duration';
+/**
+ * WHAT A FIELD MAY BE, and the browser could not name three of the types its own registers declare.
+ *
+ * `list` IS THE ONE THAT COST SOMETHING. The record has had `list<text>`, `list<ref>`, `list<int>`
+ * and `list<day>` since it was written, and the mirror in `data.ts` carries eleven list fields over
+ * five registers: `things.repos`, `things.folders`, `people.handles`, `people.met`, `tools.args`,
+ * `tools.needs`, `tools.hosts`, `session.tried` and `session.notes` are `list<text>`, and
+ * `people.projects` and `skills.because` are `list<ref>`. The union named none of them, so the two
+ * places that had to ask wrote a cast around the hole rather than filling it: `blocks.ts` has
+ * `(f.type as string) !== 'list'` and the row form has `(f.type as string) === 'list'`. A cast that
+ * launders a missing member is how a whole type goes unhandled quietly, because the next reader
+ * writes the same cast instead of the same question.
+ *
+ * `url` AND `email` CAME OUT OF THE SAME MEASUREMENT and are the same defect one field wide:
+ * `skills.source` is a `url` and `people.email` is an `email`, both drawn on shipped screens.
+ * Thirteen fields in all, and `field-types.test.ts` is what counted them.
+ *
+ * AN ARRAY, BECAUSE A UNION CAN BE HELD AGAINST NOTHING. `CREDENTIAL_KINDS`, `LEVELS`, `REACHES`
+ * and `SCOPES` below are all written this way, under the sentence this file states twice: a closed
+ * list typed as `string` is a closed list nothing closes. A union is that failure one step on. It
+ * closes the code in this build and closes nothing at the boundary, where the declarations
+ * actually arrive, and there is no way to ask it at run time what it admits. As an array the test
+ * can hold it against `@braindog/kernel`'s own `FIELD_TYPES`, which is the authority: this list is
+ * a SUBSET of the record's eighteen, and `quantity`, `file` and `json` are not here because no
+ * register this app draws declares one.
+ */
+export const FIELD_TYPES = [
+  'text',
+  'document',
+  'money',
+  'day',
+  'instant',
+  'int',
+  'decimal',
+  'enum',
+  'bool',
+  'ref',
+  'secret',
+  'duration',
+  'url',
+  'email',
+  'list',
+] as const;
+
+export type FieldType = (typeof FIELD_TYPES)[number];
 
 export type FieldDecl = {
   id: string;
   type: FieldType;
+  /**
+   * `list` only: what ONE of its values is, as the kernel's `coerce.ts` declares the same key.
+   *
+   * A LIST OF LISTS IS NOT A SHAPE, which is why the element type excludes `list` here as it does
+   * there. And the element type is the one a reader needs: `list<text>` is a row of words and
+   * `list<ref>` is a row of links to other rows, and a renderer holding only `list` has to guess
+   * between them from the values it was handed.
+   */
+  of?: Exclude<FieldType, 'list'>;
   /** The label a person reads. Absent means the id with `_` as a space (50 §10). */
   label?: string;
   /** `enum` only. An unknown value at install is ENUM_VALUE_UNKNOWN. */
@@ -69,7 +110,7 @@ export type FieldDecl = {
    */
   deadline?: boolean;
   required?: boolean;
-  /** `ref` only: the register it points at. */
+  /** `ref` and `list<ref>`: the register it points at. `blocks.ts` reads that pair to draw a list of links. */
   to?: string;
   /**
    * How a `duration` is SAID. It is stored as integer seconds, because seconds is one unit and
@@ -545,13 +586,19 @@ export type PackInfo = {
  * each one is arithmetic over every row the predicate admitted, because a sum of the first page is
  * a wrong number rather than a short list. `limit:` cuts their GROUPS, never their rows.
  *
- * IT IS HERE, IN THE FILE THAT IMPORTS NOTHING, because two files need it and neither may import
- * the other: `api.ts` computes the count of what a block draws from the sample, and `page-live.ts`
- * refuses a live answer that came back short. The second of those held a SECOND copy of the list
- * until now, four kinds long, in the file whose whole job is refusing a partial sum: `progress` was
- * in the kernel's set and not in that one, so the kernel capped a progress block's rows at 200 and
- * the app drew the short answer without a word. Measured before the fix, through the kernel on a
- * record with 301 obligations: `progress rows 200 matched 301 refusals []`.
+ * IT IS HERE, AND NOT IMPORTED FROM THE RECORD THAT ALSO HOLDS IT, for the reason `REACHES` and
+ * `SCOPES` are written out further down: `packages/kernel/src/pages.ts` declares the same five as
+ * its own `SUMS` and `index.ts` does not publish that name, so there is nothing to import. Same
+ * argument, same remedy: `block-kinds.test.ts` holds this list against the record's, through the
+ * one set both packages do publish, and a kind added to one and not the other is a red test rather
+ * than a wrong figure on a screen.
+ *
+ * `page-live.ts` refuses a live answer that came back short of its own `matched`, and it held a
+ * SECOND copy of the list until this one was read in both, four kinds long, in the file whose whole
+ * job is refusing a partial sum: `progress` was in the kernel's set and not in that one, so the
+ * kernel capped a progress block's rows at 200 and the app drew the short answer without a word.
+ * Measured before the fix, through the kernel on a record with 301 obligations:
+ * `progress rows 200 matched 301 refusals []`.
  *
  * (The sentence here used to name `blocks.ts` as the second reader. It imports `Entry` from this
  * file and nothing else, and reads `matched` off the block it was handed, so the copy it was said
@@ -575,11 +622,19 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'prog
  * its count from `total` and says so in its own comment, so the number over a section is right
  * however few rows came back with it. Measured on the same 301 obligations, a section drew its
  * default 50 rows against `matched: 301` and was correct, so a section in `SUMS` would refuse a
- * heading that had nothing to be wrong about. `packages/kernel/src/pages.ts` carries the same five
- * for the same reason, and refuses there so that every consumer of the record gets the refusal and
- * not only this one.
+ * heading that had nothing to be wrong about.
+ *
+ * IT IS THE RECORD'S OWN SET NOW, AND IT WAS DECLARED HERE WHILE A DIFFERENT SET OF THE SAME NAME
+ * WAS DECLARED THERE. `@braindog/kernel` exported a `REDUCES` that was these six minus `section`,
+ * this file exported these six, both `ReadonlySet<string>`, and `page-live.ts` imports one of them:
+ * adding `import { REDUCES } from '@braindog/kernel'` to that file would have compiled and given a
+ * silently different answer about the one kind they differ on. Two sets under one name is worse
+ * than the duplication it was meant to end, so the kernel now names the refusing five `SUMS` and
+ * derives `REDUCES` from them, and this line reads it rather than writing a sixth copy of the
+ * vocabulary. `EventKind` above came in for the same reason, in the same words: a new kind is a
+ * kernel migration, so the kernel is where the list lives and everything else reads it.
  */
-export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
+export { REDUCES } from '@braindog/kernel';
 
 export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 

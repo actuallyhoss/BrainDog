@@ -351,14 +351,25 @@ const rowsFor = (register: string, where: string): string => {
     .join(',');
 };
 
-/** Whether it actually asserted anything — see the count at the call site. */
-const roundTrips = (register: string, where: string, from: string): boolean => {
+/**
+ * What one declared filter did, and it used to be a `boolean` that said `false` to two different
+ * things.
+ *
+ * "IT WAS A TEMPLATE" AND "THE RECORD CANNOT READ IT" ARE NOT THE SAME ANSWER, and collapsing them
+ * cost both callers below. The page test read a refusal as an absence and turned it into an
+ * off-by-one against a hard-coded number, which names neither the page nor the filter; the saved
+ * view test discards the return altogether, so a view whose filter the record refuses was reported
+ * by nobody at all. A refusal is its own verdict now and each caller prints the ones it found.
+ */
+type Verdict = 'checked' | 'template' | 'refused';
+
+const roundTrips = (register: string, where: string, from: string): Verdict => {
   /* A TEMPLATE'S `{{field}}` IS NOT A FILTER YET. `for:` expands it per row before anything draws.
      Most do not compile unexpanded, but `project is {{spoken}}` does, as a literal on a text field,
      so it is the placeholder that is checked and not whether it happens to compile. */
-  if (/\{\{\w+\}\}/.test(where)) return false;
+  if (/\{\{\w+\}\}/.test(where)) return 'template';
   const first = compile(register, where);
-  if (first.bad.length) return false;
+  if (first.bad.length) return 'refused';
   const said = saidPlainly(register, where);
   const back = compile(register, said);
   assert.deepEqual(back.bad, [], `${from}: the record refuses its own sentence — "${said}"`);
@@ -367,33 +378,92 @@ const roundTrips = (register: string, where: string, from: string): boolean => {
     rowsFor(register, where),
     `${from}: "${where}" and the "${said}" it prints select different rows`,
   );
-  return true;
+  return 'checked';
 };
 
-test('every filter a declared page prints is one the record reads back', () => {
-  /* THE COUNT IS OF ASSERTIONS, NOT OF BLOCKS. It incremented once per block whether or not
-     `roundTrips` asserted anything — and `roundTrips` returns early on a filter that does not
-     compile, which four of the twelve do because they are templates holding `{{name}}`. So the
-     floor of eight was satisfied by twelve blocks of which only eight were tested, and making every
-     filter in the seed refuse to compile left this green. `roundTrips` reports what it did. */
+/**
+ * Every `where:` a declared page carries, walked, with the refusals kept rather than counted.
+ *
+ * It takes the pages instead of reading `PAGES` itself so that the test below can walk a filter the
+ * record certainly cannot read through this exact code. A detector nobody has seen detect anything
+ * is the shape this test has already shipped twice.
+ */
+const walkPages = (pages: Record<string, { blocks?: readonly { source?: string; where?: string }[] }>) => {
+  const refused: string[] = [];
   let checked = 0;
-  for (const [slug, page] of Object.entries(PAGES)) {
+  for (const [slug, page] of Object.entries(pages)) {
     for (const block of page.blocks ?? []) {
       const source = String(block.source ?? '');
       if (!block.where || !source.startsWith('register.')) continue;
-      if (roundTrips(source.slice('register.'.length), block.where, `/p/${slug}`)) checked++;
+      const register = source.slice('register.'.length);
+      const verdict = roundTrips(register, block.where, `/p/${slug}`);
+      if (verdict === 'checked') checked++;
+      if (verdict === 'refused')
+        refused.push(`/p/${slug}: "${block.where}" is ${explain(compile(register, block.where)).join('; ')}`);
     }
   }
-  assert.equal(checked, 24, `${checked} declared page filters round-tripped; twenty-four compile today, Home's own, Work's, Projects' and the agents' tools and keys among them`);
+  return { checked, refused };
+};
+
+test('every filter a declared page prints is one the record reads back', () => {
+  /**
+   * THE NUMBER WAS THE TEST, AND THE NUMBER WENT STALE FIVE FILTERS AGO.
+   *
+   * `assert.equal(checked, 24)` was failing on a tree where every declared filter compiles. Walked:
+   * 38 page blocks carry a `where:` over a register, 9 of them are templates holding `{{name}}`,
+   * 29 round-trip and NONE is refused. The five that took the count past twenty-four are the four
+   * the ledger pack added to `/p/ledger` and Portfolio's `lane is building or earning, revenue is
+   * set`, all of which the record reads back exactly as printed.
+   *
+   * So the failure said "twenty-four compile today" on a tree where twenty-nine do, named no page
+   * and no filter, and invited one repair: type a bigger number. A test that has to be edited every
+   * time somebody ships a page is a test somebody eventually edits without reading.
+   *
+   * THE PROMISE WAS NEVER A COUNT. It is that no declared page filters on something the record
+   * cannot read, which is asserted directly now and names the page when it breaks. The floor stays,
+   * because deleting pages must not become a way to pass, and the exact number is gone, because
+   * adding one must not become a way to fail.
+   */
+  const { checked, refused } = walkPages(PAGES);
+  assert.deepEqual(refused, [], `a declared page filters on something the record cannot read:\n${refused.join('\n')}`);
+
+  /* THE FLOOR IS OF ASSERTIONS, NOT OF BLOCKS, which is the older lesson and still the right one.
+     It once incremented once per block whether or not `roundTrips` asserted anything, so a floor of
+     eight was satisfied by twelve blocks of which only eight were tested, and making every filter in
+     the seed refuse to compile left this green. `checked` counts only the filters that were carried
+     through `saidPlainly` and compared row for row. */
+  assert.ok(checked >= 24, `${checked} declared page filters round-tripped, and twenty-four is the floor`);
+
+  /**
+   * AND THE WALK IS MADE TO CATCH ONE, because an empty `refused` is worth reading only if an
+   * unreadable filter lands in it. Measured on the way in: with `is not` taken out of `where.ts`'s
+   * `CLAUSE`, this prints the eight declared filters that negate, three of `/p/work`'s among them,
+   * each with the refusal the record gave it, where the count gave the bare `29 !== 24` for a tree
+   * with nothing wrong in it at all.
+   */
+  const teeth = walkPages({ nowhere: { blocks: [{ source: 'register.tasks', where: 'frobnicate is wobbly' }] } });
+  assert.equal(teeth.checked, 0, 'a filter naming a field no register declares was walked through as readable');
+  assert.match(teeth.refused[0] ?? '', /no field called frobnicate/, 'the walk does not say what it refused');
 });
 
 test('and every filter a saved view prints', () => {
+  /* A VIEW'S REFUSAL WAS REPORTED BY NOBODY. This discarded `roundTrips`' answer, so a saved view
+     whose filter the record cannot read asserted nothing and passed: the same hole as the page test
+     above, one caller along, and the reason the verdict is three words rather than a boolean. Both
+     views compile today; the assertion is here so the day one does not is the day this goes red. */
+  const refused: string[] = [];
+  let checked = 0;
   for (const [id, view] of Object.entries(VIEWS)) {
     const where = view.filters
       .map((f) => `${f.field} ${f.op === 'in' ? 'is' : f.op} ${f.values.join(' or ')}`)
       .join(', ');
-    if (where) roundTrips(view.register, where, `/v/${id}`);
+    if (!where) continue;
+    const verdict = roundTrips(view.register, where, `/v/${id}`);
+    if (verdict === 'checked') checked++;
+    if (verdict === 'refused') refused.push(`/v/${id}: "${where}" is ${explain(compile(view.register, where)).join('; ')}`);
   }
+  assert.deepEqual(refused, [], `a saved view filters on something the record cannot read:\n${refused.join('\n')}`);
+  assert.ok(checked > 0, 'no saved view declares a filter, so nothing was proved');
 });
 
 test('a clause written with the label the screen shows is the same clause', () => {

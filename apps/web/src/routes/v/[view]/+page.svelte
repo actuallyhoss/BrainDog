@@ -15,6 +15,27 @@
   real record drew a filter somebody else wrote over rows from a register this record may not even
   declare. `views-live.ts` is the live half, built on the record's own `view` table, and the sample
   stays exactly where it was: the answer when there is no record to ask.
+
+  AND THERE IS NO `+page.ts` IN FRONT OF IT ANY MORE, which is why any of the above runs in a
+  browser. `88572488` put one here holding `redirect(307, viewMovedTo(...))`, so on a live record
+  every `/v/<key>` was answered before this file loaded and the live half was exercised only by
+  `views-live.test.ts`. Sixteen green tests over a module the product could not reach.
+
+  THE REDIRECT WAS NOT A CONVERGENCE, AND THAT IS WHAT SETTLED IT. A view and a page are still two
+  stores: the kernel has a `view` table (`migrations/0007_view.ts`, `VIEW_SELECT`) with `views`,
+  `view`, `saveView` and `retireView` routed on the record, and `rows-write.ts` separately writes a
+  view as a page declaration, which is what `⌥V` calls and why it lands on `/p/<slug>`. The redirect
+  could not bridge them even in principle: `viewMovedTo` maps a key to `/p/<key>` unchanged, a view
+  key is `<register>.<id>` and a view page's slug is `<register>-<base36 of Date.now()>`, so the two
+  shapes never coincide and every key this route could be handed on a record landed on a page that
+  cannot exist. `/p/[slug]` then said "There is no page called services.lapsing" and listed the
+  record's pages: the wrong question, answered confidently, which is the thing this product must
+  not do.
+
+  What the redirect was for was the sample's fictional views appearing on a real record, and that is
+  what `viewReader` now prevents by asking: `from: 'sample'` comes back for `UNREACHABLE` and
+  `UNAUTHORIZED` alone. A record that holds no view of that key gets its own sentence and its own
+  addresses. `views.ts` still exports `viewMovedTo` with nobody left to call it.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';

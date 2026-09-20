@@ -6,9 +6,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
-import { ROWS, VIEWS, columnsFor } from './api.ts';
+import { REGISTERS, ROWS, VIEWS, columnsFor } from './api.ts';
 import { addressOf, clausesOf, keptColumns, viewReader, type Fetch } from './views-live.ts';
 
 const BASE = 'http://record.test';
@@ -277,4 +277,111 @@ test('the view page draws the record’s view, its refusal and the view it does 
      `filter: null` draws no line rather than the label on its own. */
   assert.match(page, /\{#if filters\?\.length \|\| narrowed \|\| live\?\.search\}/u);
   assert.match(page, /\{#if filters && filters\.length \+ extra\.length > 0\}/u);
+});
+
+test('nothing stands in front of the route: /v/<key> is drawn on a record, never answered with a redirect', () => {
+  /**
+   * THE LIVE HALF ABOVE WAS UNREACHABLE AND EVERY TEST IN THIS FILE WAS GREEN.
+   *
+   * `+page.ts` on this route answered `redirect(307, viewMovedTo(...))` for every key on a live
+   * record, so `viewReader` ran here and in no browser. Sixteen passing tests over a module the
+   * product could not reach is the shape of failure this tree keeps finding: something
+   * complete-looking that reports success and does nothing.
+   *
+   * THE REDIRECT ALSO COULD NOT WORK, which is what settled it rather than the inconvenience.
+   * `viewMovedTo` maps a key to `/p/<key>` unchanged. A saved view's key is `<register>.<id>`
+   * (`addressOf` above, and `VIEW_ID` in the kernel); the slug `rows-write.ts` gives a view page is
+   * `<register>-<base36 of Date.now()>`. The two shapes never coincide, so every key this route can
+   * be handed on a record landed on a page that cannot exist, and `/p/[slug]` answered "There is no
+   * page called services.lapsing" with a list of pages: the wrong question answered confidently.
+   *
+   * The redirect was added to stop `/v/<key>` drawing the sample's fictional views on a real
+   * record. That is what `viewReader` does now, and it does it by asking the record: `from: 'sample'`
+   * comes back only for `UNREACHABLE` and `UNAUTHORIZED`, which the three tests above pin.
+   */
+  const dir = new URL('../../routes/v/[view]/', import.meta.url);
+  const files = readdirSync(dir);
+  assert.ok(!files.includes('+page.ts'), 'the route has a load again, and a load on this route existed only to redirect away from it');
+  /* THE IMPORT AND NOT THE WORD. The first version of this banned `redirect(` anywhere in the
+     directory and went red on the paragraph in `+page.svelte` explaining why there is no redirect,
+     which is a guard failing on its own documentation. Nothing can send a navigation away from
+     here without pulling one of these two in, and neither name can arrive by accident. */
+  for (const file of files) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    assert.ok(!/^\s*import\b[^;]*\bredirect\b/mu.test(src), `${file} imports redirect, and the live half is only reachable when nothing sends /v/<key> away`);
+    assert.ok(!/^\s*import\b[^;]*\bviewMovedTo\b/mu.test(src), `${file} asks where /v/<key> moved to, and it has not moved`);
+  }
+});
+
+test("a view over a list this record will not describe is the record's sentence, not the sample's view names", async () => {
+  /**
+   * THE SECOND WAY A LIVE VIEW REACHED THE SCREEN AS THE FICTIONAL STUDIO'S.
+   *
+   * `learn` swallows a refusal on purpose, because a ref map for a list this key may not read is
+   * better absent than fatal. A view is different: the register it filters is where the columns,
+   * the field labels and the name in the header all come from. Without it the route fell past
+   * every branch above into its 404, and drew "There is no saved view called shipments.lapsing"
+   * over `theseExist('Saved views', ...)` built from `VIEWS` — the sample's two names, on a record
+   * that holds the view and had just answered with it. Both halves of that screen were wrong.
+   *
+   * The register is not named in the answer, so the route offers Home alone rather than a button
+   * spelling a raw id nobody has a word for.
+   */
+  const saved = { ...SAVED, register: 'shipments' };
+  const fix = 'This key may not read shipments.';
+  const { io } = host((url) => {
+    if (url.pathname === '/api/view') return json(200, { ok: true, value: saved });
+    if (url.pathname === '/api/schema') return json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } });
+    if (url.pathname === '/api/list' && url.searchParams.get('register') === 'shipments')
+      return json(200, { ok: true, value: { rows: [row(2)], cursor: null, matched: 1 } });
+    return record(url);
+  });
+  assert.deepEqual(await viewReader(BASE, io).read('shipments.lapsing'), { from: 'refused', fix });
+});
+
+test('and a list only the record declares still draws: the guard above refuses an absence, never an unfamiliar name', async () => {
+  /**
+   * THE OTHER DIRECTION OF THE SAME GUARD, WHICH NOTHING PINNED.
+   *
+   * The test above proves a view over an undeclared register stops. Nothing proved it stops ONLY
+   * there, and the check it is built on reads `REGISTERS`, which ships the sample's lists: written
+   * a line earlier, or against a map this reader does not wait for, the same `if` refuses every
+   * register a use case invented and leaves only the fictional studio's five drawable. That is a
+   * worse screen than the one being fixed, because it refuses a view the record answered with.
+   *
+   * `consignments` IS NOT `shipments` ON PURPOSE. This test puts a register into the module-level
+   * `REGISTERS` by the only route that does, `learn`, and the test above asserts `shipments` is
+   * absent, so sharing one name between them would make the pair pass or fail on their order in
+   * this file. It is taken back out at the end for the same reason.
+   */
+  const decl = {
+    id: 'consignments',
+    name: 'Consignments',
+    one: 'consignment',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', label: 'Name' },
+      { id: 'state', type: 'text', label: 'State' },
+    ],
+  };
+  const saved = { ...SAVED, register: 'consignments' };
+  const { io } = host((url) => {
+    if (url.pathname === '/api/view') return json(200, { ok: true, value: saved });
+    if (url.pathname === '/api/schema' && url.searchParams.get('register') === 'consignments')
+      return json(200, { ok: true, value: decl });
+    if (url.pathname === '/api/list' && url.searchParams.get('register') === 'consignments')
+      return json(200, { ok: true, value: { rows: [row(2)], cursor: null, matched: 1 } });
+    return record(url);
+  });
+  try {
+    const out = await viewReader(BASE, io).read('consignments.lapsing');
+    assert.equal(out.from, 'live', out.from === 'refused' ? out.fix : out.from);
+    if (out.from !== 'live') return;
+    assert.equal(out.view.register, 'consignments');
+    /* AND THE DECLARATION IS THE RECORD'S, which is what the header, the columns and the labels
+       are drawn from: a `from: 'live'` with nothing in `REGISTERS` is the state that 404'd. */
+    assert.equal(REGISTERS.consignments?.name, 'Consignments');
+  } finally {
+    delete REGISTERS.consignments;
+  }
 });

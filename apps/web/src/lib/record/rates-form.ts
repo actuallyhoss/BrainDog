@@ -130,6 +130,27 @@ export function addressOf(d: RatesDraft): string {
   return s ? s.url(d.base) : d.url.trim();
 }
 
+/**
+ * The rows the poll would actually fill, which is the one notion of the row set this file has.
+ *
+ * IT IS `ratesPollPack`'s `quoted` JUDGEMENT, MADE ON THE FORM'S SIDE, because two of them disagreeing is what a
+ * caller reads. The pack drops the base and drops a repeat; the form did neither, so a draft naming EGP twice was
+ * measured to file a pack of one map under a Decide line reading "worth in EGP, EGP", and twenty-one rows naming
+ * twenty currencies were refused for being twenty-one when the pack would have built twenty. The repeat is matched
+ * by code, ignoring case and spaces, exactly as `quoted` matches it; the code itself is handed on as it was typed,
+ * so `ratesFault` can still say that `egp` is not a currency code rather than quietly correcting it.
+ */
+export function ratesRows(d: RatesDraft): { currency: string; path: string }[] {
+  const base = d.base.trim().toUpperCase();
+  const seen = new Map<string, { currency: string; path: string }>();
+  for (const r of d.rows) {
+    const key = r.currency.trim().toUpperCase();
+    if (key === base || seen.has(key)) continue;
+    seen.set(key, { currency: r.currency.trim(), path: r.path.trim() });
+  }
+  return [...seen.values()];
+}
+
 /** What is wrong with the draft, by the part it is about, or `null` when it can be filed. */
 export function ratesFault(d: RatesDraft): { at: 'url' | 'base' | 'rows'; fix: string } | null {
   if (!CODE.test(d.base)) return { at: 'base', fix: copy.ratesFaultBase };
@@ -140,7 +161,7 @@ export function ratesFault(d: RatesDraft): { at: 'url' | 'base' | 'rows'; fix: s
     url = null;
   }
   if (!url || url.protocol !== 'https:') return { at: 'url', fix: copy.pollFaultUrl };
-  const rows = d.rows.filter((r) => r.currency !== d.base);
+  const rows = ratesRows(d);
   if (rows.length === 0) return { at: 'rows', fix: copy.ratesFaultNone };
   /* THE RECORD TAKES TWENTY MAPS AND REFUSES THE TWENTY-FIRST (`POLL_MAPS_MOST`), and it refuses at install, which
      is after the owner has read the plan and approved the call out. Measured: twenty-one currencies planned as the
@@ -163,9 +184,15 @@ export function ratesFault(d: RatesDraft): { at: 'url' | 'base' | 'rows'; fix: s
  * table, or add a source above it, and a record whose money is in a currency the ECB never published would default
  * to an address that cannot price it. Coverage is asked rather than assumed, and the base is asked about too,
  * because an address that does not publish a currency cannot quote against it either.
+ *
+ * AND THE TABLE IS AN ARGUMENT SO THAT THE SENTENCE ABOVE CAN BE MEASURED. With only the module's own table to ask,
+ * the `every` below was dead code: open.er-api is the first row and names no `only`, so `find` settles on it for
+ * every possible input and the second row is never read. Changing `every` to `some` was measured to leave all eight
+ * tests in `rates-form.test.ts` green, which means the test covering provider choice could not tell a choice from a
+ * constant. The test now hands the table in reversed, and `some` goes red on the Egyptian pound.
  */
-export function sourceFor(currencies: readonly string[]): RatesSource | null {
-  return RATES_SOURCES.find((s) => s.only === undefined || currencies.every((c) => s.only!.includes(c))) ?? null;
+export function sourceFor(currencies: readonly string[], sources: readonly RatesSource[] = RATES_SOURCES): RatesSource | null {
+  return sources.find((s) => s.only === undefined || currencies.every((c) => s.only!.includes(c))) ?? null;
 }
 
 /**
@@ -219,7 +246,7 @@ export function ratesIdOf(url: string): string {
 /** The proposal the form files: a pack polling the address once a day into Money's exchange rates. */
 export function ratesProposal(d: RatesDraft) {
   const url = addressOf(d);
-  const rows = d.rows.filter((r) => r.currency !== d.base).map((r) => ({ currency: r.currency, path: r.path.trim() }));
+  const rows = ratesRows(d);
   const doc = ratesPollPack({ id: ratesIdOf(url), url, every: '1d', base: d.base, rates: rows });
   return {
     question: copy.ratesQuestion(new URL(url).host, d.base, rows.map((r) => r.currency).join(', ')),

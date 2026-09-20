@@ -159,7 +159,17 @@ const CAPPED: readonly (readonly [route: string, what: string, capped: RegExp])[
      which is the one state nobody would ever reach by accident. */
   ['r/[register]/+page.svelte', 'the register grid', /toRows\(id, result\.entries\.slice\(0, DOM_CAP\)/],
   ['r/[register]/+page.svelte', 'the register’s phone cards', /<RowCards[^>]*entries=\{result\.entries\.slice\(0, DOM_CAP\)\}/],
-  ['v/[view]/+page.svelte', 'the saved view, which is the same list', /result\.entries\.slice\(0, DOM_CAP\)/],
+  /* AND THE SAVED VIEW'S TWO, WHICH ARE ONE SLICE READ TWICE, so the guard has to name the binding
+     rather than the holder. This row said `result.entries.slice(0, DOM_CAP)` until the live half
+     landed and the answer stopped being called `result`: the cap never moved, the spelling did, and
+     the test went red on a rename. A guard that fails on a rename is a guard reporting something
+     other than the rule, so what is pinned now is that SOME name is the entries sliced to the cap
+     and that THAT name is what each body draws, which is `13 §4.3`'s sentence and not this file's
+     vocabulary. The backreference is the whole point: with `\1` replaced by `\w+` both rows stay
+     green while the cards are handed the uncapped list, which is the state the register's own pair
+     of rows exists to catch. */
+  ['v/[view]/+page.svelte', 'the saved view’s grid', /(\w+) = \$derived\(entries\.slice\(0, DOM_CAP\)\)[\s\S]*toRows\(register, \1,/],
+  ['v/[view]/+page.svelte', 'the saved view’s phone cards', /(\w+) = \$derived\(entries\.slice\(0, DOM_CAP\)\)[\s\S]*<RowCards[^>]*entries=\{\1\}/],
   ['audit/+page.svelte', 'the log, which grows with writes', /matched\.slice\(0, DOM_CAP\)/],
   ['inbox/+page.svelte', 'arrivals that matched no rule', /INBOX\.slice\(0, DOM_CAP\)/],
   ['decide/+page.svelte', 'every decision ever taken', /DECIDED\.slice\(0, DOM_CAP\)/],

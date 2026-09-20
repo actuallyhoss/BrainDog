@@ -30,7 +30,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { DOM_CAP, PAGE } from './api.ts';
+import { DOM_CAP, PAGE, REGISTERS } from './api.ts';
 import { noRecord } from './device.ts';
 import {
   entryOf,
@@ -99,6 +99,10 @@ export const liveWords = {
   /* A KEY WITH NO DOT IN IT NAMES NO REGISTER, and a view belongs to one: there is nothing for the
      record to look under. Said in the same form as the record's own `VIEW_UNKNOWN` sentence. */
   noAddress: (key: string): string => `There is no saved view called ${key}.`,
+  /* THE RECORD ANSWERED THE VIEW AND WOULD NOT DESCRIBE THE LIST IT FILTERS, and said nothing about
+     why. Used only where `schema` came back `ok` with no fields on it; a refusal carries the
+     record's own sentence and that is preferred over this one. */
+  noList: (register: string): string => `${register} is not a list this record describes, so the view over it cannot be drawn.`,
 } as const;
 
 /** `<register>.<id>`, split at the last dot, or nothing when the key names no register. */
@@ -293,6 +297,29 @@ export function viewReader(base: string, io?: Fetch): ViewReader {
       /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE: the view's list first, so its
          columns and its refs are known, and each register it points at before a row is drawn. */
       await learn(client.schema, saved.register, asked);
+
+      /**
+       * AND THE DECLARATION IS PART OF THE ANSWER HERE, WHICH IT IS NOT FOR A REF.
+       *
+       * `learn` swallows a refusal on purpose: a ref map for a list this key may not read is better
+       * absent than fatal, and the ref then draws as the id it arrived as. The view's OWN register
+       * is different, because the columns, the field labels and the name in the header all come
+       * from it. A live view over a register the record would not declare therefore came back
+       * `from: 'live'` with nothing to draw it with, and the route fell past every state it has
+       * into its 404: "There is no saved view called shipments.lapsing", over the sample's two view
+       * names, on a record that had just answered with the view. Both halves of that screen were
+       * wrong, and the second is the fictional studio on a real record.
+       *
+       * The record is asked once more, on this path only, because `learn` keeps no sentence and the
+       * record's own is the only one that can explain it. No register goes into the answer: the
+       * route's refusal offers `Open <register>` from it, and the only spelling available here is a
+       * raw id nobody has a word for.
+       */
+      if (!REGISTERS[saved.register]) {
+        const said = await client.schema(saved.register);
+        return said.ok ? { from: 'refused', fix: liveWords.noList(saved.register) } : missed(said);
+      }
+
       const refs = await refsFor(saved.register);
 
       /**

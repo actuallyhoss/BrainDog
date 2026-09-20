@@ -19,6 +19,7 @@ import {
   ratesIdOf,
   ratesProposal,
   ratesProposalFor,
+  ratesRows,
   rowsFor,
   sourceFor,
   type RatesDraft,
@@ -75,6 +76,10 @@ test('WHAT CANNOT BE FILED IS SAID: an address that does not quote a currency, n
    there are: `packages/kernel/test/ingest.test.ts`'s membership guard counts the real ones quoted in a file. */
 const many = (n: number): string[] => Array.from({ length: n }, (_, i) => `XX${String.fromCharCode(65 + i)}`);
 
+/** The maps of the one declaration a rates pack holds: one a currency, one row of `fx` each. */
+const mapsOf = (doc: unknown): Record<string, { value?: unknown; path?: unknown }>[] =>
+  (doc as { declarations: { map: Record<string, { value?: unknown; path?: unknown }>[] }[] }).declarations[0]!.map;
+
 test('MORE CURRENCIES THAN ONE POLL FILLS IS SAID HERE, not by install after the owner has approved the call out', () => {
   const at = (n: number) => ratesFault({ source: 'open-er-api', base: 'USD', url: '', rows: rowsFor('open-er-api', 'USD', many(n)) });
   assert.equal(at(20), null);
@@ -111,15 +116,47 @@ test('AND FILES NOTHING WHEN A CALL OUT WOULD BUY NOTHING, or when the record wo
 });
 
 test('THE ADDRESS CHOSEN QUOTES WHAT IT WAS CHOSEN FOR, whatever order the table is written in', () => {
-  for (const codes of [['EGP', 'USD'], ['EUR', 'GBP'], [...ECB_QUOTES]]) {
-    const s = sourceFor(codes);
-    assert.ok(s === null || s.only === undefined || codes.every((c) => s.only!.includes(c)), `${s?.id} was offered ${codes.join(', ')}`);
-  }
+  /* THE TABLE IS HANDED IN REVERSED, BECAUSE IN ITS WRITTEN ORDER THIS TEST CANNOT FAIL. open.er-api is the first
+     row and carries no `only`, so `find` settles on it for every possible input and never reads the second row:
+     changing `sourceFor`'s `every` to `some` was measured to leave all eight tests in this file green, which makes
+     the covered assertion below a test of a constant rather than of a choice. Reversed, Frankfurter is the row
+     asked first, so the ECB's coverage is what decides, and `some` goes red on the first line here. */
+  const ecbFirst = [...RATES_SOURCES].reverse();
+  assert.equal(sourceFor(['EGP', 'USD'], ecbFirst)?.id, 'open-er-api', 'the ECB never published the Egyptian pound, and it was offered anyway');
+  assert.equal(sourceFor(['EUR', 'GBP'], ecbFirst)?.id, 'frankfurter', 'an address that quotes both was passed over');
+  assert.equal(sourceFor([...ECB_QUOTES], ecbFirst)?.id, 'frankfurter');
+  /* AND NO ADDRESS AT ALL IS AN ANSWER. With the table as written it is unreachable, because the first row quotes
+     nearly everything, so the only way to reach `null` is to ask a table of addresses that all name their list. */
+  assert.equal(sourceFor(['EGP'], ecbFirst.filter((s) => s.only !== undefined)), null, 'an address that does not quote it was still offered');
+  assert.equal(sourceFor(['EGP', 'USD'])?.id, 'open-er-api', 'the table as written stopped covering the currency he holds');
   /* THE ONE THAT MATTERS FOR THIS RECORD: a draft filed for a currency the ECB never published must not come back
      with the ECB's address on it, which `ratesFault` would then refuse by name. */
   const draft = ratesDraftFor('EGP', ['USD', 'GBP']);
   assert.ok(draft);
   assert.equal(ratesFault(draft), null);
+});
+
+test('THE SAME CURRENCY ASKED FOR TWICE IS ONE ROW IN ALL THREE ANSWERS: the count, the question and the map', () => {
+  /* `ratesPollPack` DROPS A REPEAT AND THE FORM DID NOT, so the two disagreed about the same draft. Measured before
+     this test was written: a draft naming EGP twice filed a pack with one map under a Decide line that read "worth
+     in EGP, EGP", which is the owner approving a sentence the pack does not keep.
+     AND THE REPEAT IS WRITTEN DIFFERENTLY FROM THE ROW IT REPEATS, because a `Map` keyed by code drops a second row
+     whether or not `ratesRows` asks `seen.has` first, so two identical rows cannot tell first wins from last wins:
+     deleting that guard was measured to leave all nine tests in this file green. Spelled ` egp `, with a path the
+     poll must not read, the guard is what keeps `rates.EGP`, which is the row `quoted` keeps on the pack's side. */
+  const twice: RatesDraft = { source: 'open-er-api', base: 'USD', url: '', rows: [{ currency: 'EGP', path: 'rates.EGP' }, { currency: ' egp ', path: 'rates.wrong' }] };
+  assert.deepEqual(ratesRows(twice), [{ currency: 'EGP', path: 'rates.EGP' }], 'the one row set the count, the question and the map all read');
+  assert.equal(ratesFault(twice), null);
+  const p = ratesProposal(twice);
+  assert.equal(p.question, 'Fetch open.er-api.com every day for what one USD is worth in EGP?');
+  assert.equal(mapsOf(p.body.doc).length, 1);
+  /* AND A REPEAT DOES NOT SPEND ONE OF THE TWENTY. The same mistake counted rather than printed: twenty-one rows
+     naming twenty currencies build twenty maps, so refusing them refuses a request the record would have taken. */
+  const rows = [...many(20), 'XXA'].map((currency) => ({ currency, path: `rates.${currency}` }));
+  assert.equal(ratesFault({ ...twice, rows }), null, 'a repeat was counted against the ceiling the pack never reaches');
+  assert.equal(mapsOf(ratesProposal({ ...twice, rows }).body.doc).length, 20);
+  /* THE BASE ASKED FOR AGAINST ITSELF IS THE SAME JUDGEMENT, and `fx` would drop the row it wrote. */
+  assert.equal(ratesFault({ ...twice, rows: [{ currency: 'usd', path: 'rates.USD' }] })?.fix, copy.ratesFaultNone);
 });
 
 test('WHAT A SOURCE PUBLISHES IS A FACT ABOUT THE SOURCE, and the half of it that can be checked offline is', () => {
