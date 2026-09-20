@@ -45,6 +45,9 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'invoice-late': 'Chase late payments',
   'cash-stale': 'Keep balances current',
   'project-past-aim': 'Ask about a missed day',
+  'txn-categorise': 'Categorise what cleared',
+  'installment-due-soon': 'Say when a part falls due',
+  'recurring-missed': 'Catch a repeat that did not happen',
 };
 
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */

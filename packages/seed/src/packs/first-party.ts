@@ -49,6 +49,8 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   the Overview and the rule over them.
  * - portfolio 1.2.0: How they are going draws each part in its intent.
  * - money-core 1.1.0: the home currency is chosen from a list.
+ * - money-core 1.2.0: the ledger arrives: transactions, categories, recurring items, instalments and snapshots, with
+ *   the rules over them and the figures they carry. Five lists, so the step is a minor one and nothing is taken away.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
@@ -57,7 +59,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.2.0',
   people: '1.0.0',
-  'money-core': '1.1.0',
+  'money-core': '1.2.0',
   estate: '1.1.0',
   work: '1.4.0',
 };

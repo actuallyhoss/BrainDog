@@ -27,14 +27,28 @@ import { AGENTS_PACK, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument } from './pa
 export { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, RUNS_ON, agentsPackDocument, type PackManifest } from './packs/agents.ts';
 export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
-export { ACCOUNTS, OBLIGATIONS, cashSeries } from './modules/money.ts';
+export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashSeries, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
 export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
 import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
-import { ACCOUNTS, MONEY_HOME_SETTING, MONEY_METRICS, MONEY_PAGES, MONEY_REGISTERS, MONEY_RULES, OBLIGATIONS, targetConfigOf } from './modules/money.ts';
+import {
+  ACCOUNTS,
+  CATEGORIES,
+  INSTALLMENTS,
+  MONEY_HOME_SETTING,
+  MONEY_METRICS,
+  MONEY_PAGES,
+  MONEY_REGISTERS,
+  MONEY_RULES,
+  OBLIGATIONS,
+  RECURRING_ITEMS,
+  SNAPSHOTS,
+  TRANSACTIONS,
+  targetConfigOf,
+} from './modules/money.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
@@ -125,6 +139,11 @@ export const TOOLS: Fields[] = [
 export const ROWS: Record<string, readonly Fields[]> = {
   obligations: OBLIGATIONS,
   accounts: ACCOUNTS,
+  categories: CATEGORIES,
+  transactions: TRANSACTIONS,
+  recurring: RECURRING_ITEMS,
+  installments: INSTALLMENTS,
+  snapshots: SNAPSHOTS,
   services: SERVICES,
   things: THINGS,
   people: PEOPLE,
@@ -293,8 +312,27 @@ export type Seeded = { registers: number; rows: number; pages: number; metrics: 
  * yet — which is a property of the record and not a quirk of this file.
  *
  * `session` is the kernel's register, which the seed writes into and does not declare.
+ *
+ * `categories` BEFORE `transactions`, AND `obligations` BEFORE IT TOO, for the same reason: a ledger
+ * row points at the category it is for and at the promise it settled. `snapshots` last of Money's,
+ * because nothing points at one.
  */
-export const ORDER = ['things', 'people', 'tracks', 'obligations', 'accounts', 'services', 'tasks', 'session', 'updates'] as const;
+export const ORDER = [
+  'things',
+  'people',
+  'tracks',
+  'obligations',
+  'accounts',
+  'categories',
+  'transactions',
+  'recurring',
+  'installments',
+  'snapshots',
+  'services',
+  'tasks',
+  'session',
+  'updates',
+] as const;
 
 /**
  * Writes one agent run: THE ONE PLACE THE SEED SETS A FIELD ONLY THE RECORD WRITES.

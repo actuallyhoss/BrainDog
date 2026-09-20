@@ -33,6 +33,7 @@ const DECLARED: Record<string, string> = {
   'portfolio@1.1.0': 'a51dab345b11594b',
   'portfolio@1.2.0': '5e42170296fe76b4',
   'money-core@1.1.0': '5cb37a57b9de3499',
+  'money-core@1.2.0': '4f42a8e447293eaf',
   'work@1.1.0': 'b49e051fe7c26ac5',
   'work@1.2.0': '49a30d2ef8c1d672',
   'work@1.3.0': 'fb82e66d80644e3d',

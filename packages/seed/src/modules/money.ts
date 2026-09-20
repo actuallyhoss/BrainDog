@@ -3,6 +3,15 @@
  *
  * One module of the sample record, split out of `index.ts` so each first-party module's registers, rows,
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
+ *
+ * WHAT IS OWED IS NOT WHAT MOVED, and until now this module held only the first half. `obligations` and
+ * `accounts` were the whole of it: a dated promise and a typed balance, with nothing in between. So the
+ * record could say what was due and what was in the bank, and could not say that GBP 4,800 left the
+ * card on the 14th, what it was for, or which of the two balances it explains. Every figure on the
+ * Money page was therefore about intentions. `transactions` is the other half, and `categories`,
+ * `recurring`, `installments` and `snapshots` are what make a ledger readable once it exists: what
+ * money is for, what comes round without anybody deciding again, what is being paid off in parts, and
+ * what the whole position was on a night nobody was looking.
  */
 
 import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
@@ -117,6 +126,217 @@ export const ACCOUNTS: Fields[] = [
   { name: 'Tax reserve', kind: 'bank', balance: gbp(2_400_000), as_of: day(-9), liquid: true },
   { name: 'Company card', kind: 'card', balance: gbp(-124_000), as_of: day(-2), liquid: false },
 ];
+
+/* ── categories ──────────────────────────────────────────────────────────── */
+
+/**
+ * What money is for, as rows rather than as a fixed list.
+ *
+ * `obligations.category` IS AN ENUM AND THIS IS A REGISTER, and the two are deliberately not the same
+ * kind of thing yet. An enum is a pack's list: a person cannot add "Childcare" to it without a new
+ * declaration. A ledger is the opposite case, because the categories somebody actually uses are
+ * discovered over the first month and half of them are theirs alone. So the names below are the enum's
+ * names, one for one, and a later pass can move `obligations` onto the register with a mapping that is
+ * already written. Two lists that disagree would be the failure; two lists that agree row for row are
+ * one list waiting for a migration.
+ *
+ * `match` IS THE COUNTERPARTY EXACTLY AS THE BANK WRITES IT, and it is what `txn-categorise` links on.
+ * One string per category, because a rule's `link:` is an equality against one stored value and the
+ * record has no substring test a declaration can reach (`contains` is not in the sentence grammar, and
+ * `derive:` is published and unbuilt). Five of the ten carry one, and the three merchants no category
+ * names stay uncategorised, which is what the Ledger page counts and what a person fixes in one tap.
+ */
+export const CATEGORIES: Fields[] = [
+  { name: 'Client work', direction: 'in', state: 'live', note: 'Invoiced work, whatever it was called on the invoice.' },
+  { name: 'Licensing', direction: 'in', match: 'KILN STOREFRONT PAYOUT', state: 'live', note: '' },
+  { name: 'Contractors', direction: 'out', budget: gbp(700_000), state: 'live', note: '' },
+  { name: 'Software', direction: 'out', budget: gbp(60_000), match: 'FENWICK CLOUD', state: 'live', note: '' },
+  { name: 'Premises', direction: 'out', budget: gbp(165_000), match: 'LOWRY STREET STUDIOS', state: 'live', note: '' },
+  { name: 'Tax', direction: 'out', state: 'live', note: 'Paid from the tax reserve, which is what it is for.' },
+  { name: 'Professional fees', direction: 'out', budget: gbp(40_000), match: 'TALLYARD', state: 'live', note: '' },
+  { name: 'Production', direction: 'out', budget: gbp(90_000), state: 'live', note: '' },
+  { name: 'Travel', direction: 'out', budget: gbp(25_000), match: 'NORTHERN RAIL', state: 'live', note: '' },
+];
+
+/* ── the ledger ──────────────────────────────────────────────────────────── */
+
+/**
+ * Money that has actually moved: the rows a statement, an SMS or a person puts in.
+ *
+ * WRITTEN BY HAND WHERE IT MEANS SOMETHING. Four of these settle an obligation, which is the reconcile
+ * the record could not do at all before: `settles` is the link between a promise and the payment that
+ * discharged it, and the two paid invoices below are the same two amounts `cashSeries` walks back over.
+ * Two more are the legs of one transfer, on one day, the same amount both ways, so the page has a
+ * worked example of the thing a total must not count twice.
+ */
+const HAND_TRANSACTIONS: Fields[] = [
+  { what: 'HALDEN TYPE CO INV 2026-035', on: day(-51), direction: 'in', amount: gbp(620_000), account: 1, party: 1, category: 1, thing: 2, state: 'cleared', settles: 9, note: 'Matched to the invoice by its reference.' },
+  { what: 'RAVENSWORTH LTD INV 2026-038', on: day(-41), direction: 'in', amount: gbp(180_000), account: 1, party: 2, category: 1, thing: 2, state: 'cleared', settles: 8, note: '' },
+  { what: 'J OKONKWO JUNE SET', on: day(-63), direction: 'out', amount: gbp(126_000), account: 1, party: 3, category: 3, thing: 1, state: 'cleared', note: '' },
+  { what: 'HMRC VAT QUARTER TO 31 MAY', on: day(-84), direction: 'out', amount: gbp(688_000), account: 2, category: 6, state: 'cleared', note: 'Out of the reserve, which is what the reserve is for.' },
+  { what: 'PELL & VINE, HALF THE YEAR-END FEE', on: day(-72), direction: 'out', amount: gbp(72_500), account: 1, party: 4, category: 7, state: 'cleared', note: 'The other half is owed on the 22nd.' },
+  /* ONE TRANSFER, TWO ROWS, ONE DAY. Nothing was earned and nothing was spent; the money is in a
+     different account. Both legs are marked, and every figure on the Ledger page leaves them out. */
+  { what: 'TRANSFER TO TAX RESERVE', on: day(-30), direction: 'out', amount: gbp(400_000), account: 1, transfer: true, state: 'cleared', note: '' },
+  { what: 'TRANSFER FROM CURRENT', on: day(-30), direction: 'in', amount: gbp(400_000), account: 2, transfer: true, state: 'cleared', note: '' },
+  { what: 'COMPANY CARD, AUGUST BILL', on: day(-12), direction: 'out', amount: gbp(96_400), account: 1, transfer: true, state: 'cleared', note: 'Clears the card, so the card is not a second spend of what the card bought.' },
+  { what: 'S MARCHETTI, AUGUST', on: day(-8), direction: 'out', amount: gbp(496_000), account: 1, party: 6, category: 3, thing: 3, state: 'cleared', note: '' },
+  /* THE ONE ROW THAT HAS NOT LANDED, so Status means something on the list and in the figures: a
+     pending row is money the bank has taken and not yet settled, and it is not in what was spent. */
+  { what: 'GRANGEMOOR EVENTS, STAND DEPOSIT', on: day(-1), direction: 'out', amount: gbp(250_000), account: 1, category: 8, thing: 1, state: 'pending', note: 'Refundable to 30 days out.' },
+];
+
+/**
+ * The everyday tail, from its own fixed seed, so the grid is the same grid every time it is opened.
+ *
+ * NONE OF THESE CARRIES A CATEGORY, and that is the point of writing them this way. `txn-categorise`
+ * runs over them at the end of the install and links the five merchants a category names; the other
+ * three stay blank. So the sample shows a rule that has done something, a figure counting what is left,
+ * and a person with a job that takes a tap, rather than a ledger that arrives mysteriously tidy.
+ */
+function generatedTransactions(count: number): Fields[] {
+  const r = rng(20260904);
+  const merchants = [
+    { what: 'FENWICK CLOUD', direction: 'out', account: 3, low: 3_800, high: 5_200 },
+    { what: 'BRIDGE STREET COFFEE', direction: 'out', account: 3, low: 320, high: 1_140 },
+    { what: 'PAPERHAUS SUPPLIES', direction: 'out', account: 3, low: 2_400, high: 18_600 },
+    { what: 'NORTHERN RAIL', direction: 'out', account: 3, low: 1_900, high: 12_400 },
+    { what: 'LEDGER POST', direction: 'out', account: 3, low: 3_900, high: 3_900 },
+    { what: 'LOWRY STREET STUDIOS', direction: 'out', account: 1, low: 165_000, high: 165_000 },
+    { what: 'TALLYARD', direction: 'out', account: 1, low: 4_800, high: 4_800 },
+    { what: 'KILN STOREFRONT PAYOUT', direction: 'in', account: 1, low: 74_000, high: 121_000 },
+  ];
+  const out: Fields[] = [];
+  for (let i = 0; i < count; i++) {
+    const m = merchants[Math.floor(r() * merchants.length)]!;
+    out.push({
+      what: m.what,
+      on: day(-Math.floor(r() * 88) - 1),
+      direction: m.direction,
+      amount: gbp(Math.round(m.low + r() * (m.high - m.low))),
+      account: m.account,
+      state: 'cleared',
+      note: '',
+    });
+  }
+  return out;
+}
+
+export const TRANSACTIONS: Fields[] = [...HAND_TRANSACTIONS, ...generatedTransactions(26)];
+
+/* ── what comes round ────────────────────────────────────────────────────── */
+
+/**
+ * The pattern, not one of its dates.
+ *
+ * `obligations.repeats` SAYS A ROW COMES ROUND AND THE ROW IS STILL ONE DATED AMOUNT, which is what
+ * made the cash walk read it and the rest of the record read it wrong: "Studio rent, due the 28th,
+ * monthly" is twelve payments a year wearing one due date, so a list of what is outstanding counts it
+ * once and a person reading that list is short eleven months of rent. A repeating item belongs in its
+ * own list, where `next_due` moves as each one goes out and `ends` says when it stops.
+ *
+ * THREE FREQUENCIES AND NOT FIVE, because `LOOKUPS.per_month` knows three. A weekly or fortnightly row
+ * would be counted at nothing a month by every figure that reads the table, which is worse than
+ * refusing it: the importer leaves weekly and fortnightly rows out for the same reason
+ * (`loop/research-switch.md` §4).
+ */
+export const RECURRING_ITEMS: Fields[] = [
+  { what: 'Studio rent', direction: 'out', amount: gbp(165_000), every: 'monthly', next_due: day(28), started: day(-640), account: 1, category: 5, state: 'live', note: '' },
+  { what: 'Fenwick Cloud, Workers plan', direction: 'out', amount: gbp(4_200), every: 'monthly', next_due: day(9), started: day(-410), account: 3, category: 4, thing: 1, state: 'live', note: '' },
+  { what: 'Kiln storefront payout', direction: 'in', amount: gbp(93_000), every: 'monthly', next_due: day(12), started: day(-300), account: 1, category: 2, thing: 1, state: 'live', note: 'Money in that arrives without an invoice.' },
+  { what: 'Backend contract, S. Marchetti', direction: 'out', amount: gbp(496_000), every: 'monthly', next_due: day(27), started: day(-120), account: 1, party: 6, category: 3, thing: 3, state: 'live', note: 'Two days a week.' },
+  { what: 'VAT', direction: 'out', amount: gbp(742_000), every: 'quarterly', next_due: day(63), started: day(-730), account: 2, category: 6, state: 'live', note: '' },
+  { what: 'Studio insurance', direction: 'out', amount: gbp(38_400), every: 'yearly', next_due: day(41), started: day(-690), account: 1, category: 7, state: 'live', note: '' },
+  /* A ROW THAT IS PAST ITS DAY AND STILL LIVE, so `recurring-missed` has something to say and the page
+     is not a list where every item is in the happy state. */
+  { what: 'Ledger Post, sending plan', direction: 'out', amount: gbp(3_900), every: 'monthly', next_due: day(-4), started: day(-220), account: 3, category: 4, thing: 3, state: 'live', note: '' },
+  /* AND ONE THAT HAS STOPPED, so Status is worth a column: the Hobnail plan was cancelled in July and
+     the row stays, because a figure about last spring still needs it. */
+  { what: 'Hobnail plan', direction: 'out', amount: gbp(2_900), every: 'monthly', next_due: day(-58), started: day(-500), ends: day(-58), account: 3, category: 4, thing: 4, state: 'ended', note: 'Cancelled with the Tallow wind-down.' },
+];
+
+/* ── paid in parts ───────────────────────────────────────────────────────── */
+
+/**
+ * One row an instalment, which is what `docs/08-METRICS-AND-ANALYTICS.md` §2.3 walks and what the
+ * importer writes from the old tool's `obligations.schedule` (`loop/research-switch.md` §4).
+ *
+ * NOT ONE ROW A PLAN. A plan with a total and a count is a number somebody has to divide, and the thing
+ * a person and a forecast both want is the dated amount: which payment falls on which day, which have
+ * gone, and what is left. `plan` groups them, `number` of `parts` places one inside its plan, and the
+ * total is the sum of the rows rather than a second copy of it that can disagree.
+ */
+export const INSTALLMENTS: Fields[] = [
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+    what: `Proofing press, ${n} of 8`,
+    plan: 'Proofing press',
+    number: n,
+    parts: 8,
+    direction: 'out',
+    amount: gbp(187_500),
+    due: day(-30 * (5 - n)),
+    state: n <= 4 ? 'paid' : 'open',
+    ...(n <= 4 ? { settled: day(-30 * (5 - n) + 1) } : {}),
+    account: 1,
+    category: 8,
+    thing: 1,
+    /* `due: day(-30 * (5 - n))` PUTS PART FIVE ON `day(0)`, WHICH IS TODAY AND NOT LAST MONTH. The
+       note here said "due last month and still open" and the dates say otherwise: parts one to four
+       fall on day -120, -90, -60 and -30 and are paid, and part five is the first one still open,
+       falling today. It is what `installment-due-soon` fires on, so the note says that instead. */
+    note: n === 5 ? 'The first one still open: due today.' : '',
+  })),
+  ...[1, 2, 3, 4].map((n) => ({
+    what: `Halden licence, ${n} of 4`,
+    plan: 'Halden licence',
+    number: n,
+    parts: 4,
+    direction: 'in',
+    amount: gbp(240_000),
+    due: day(-90 * (3 - n)),
+    state: n <= 2 ? 'paid' : 'open',
+    ...(n <= 2 ? { settled: day(-90 * (3 - n) + 45) } : {}),
+    account: 1,
+    party: 1,
+    category: 2,
+    thing: 1,
+    note: '',
+  })),
+];
+
+/* ── what was true on a night ────────────────────────────────────────────── */
+
+/**
+ * The whole position on a day, as the nightly job would have written it.
+ *
+ * NOT THE SAME THING AS A METRIC'S `snapshot:`, and the difference is worth the register. `cash-now`
+ * remembers ONE figure a day into `series.cash-now`, which is how a sparkline under a tile is drawn. A
+ * money snapshot is the four figures together, on one row, so "the 14th" is a position a person can
+ * read across rather than four series a person has to line up by date, and so a note can be written
+ * against the night rather than against a number. the old tool writes exactly this, nightly.
+ *
+ * WORKED BACK FROM THE ROWS, as `cashSeries` is: the cash is the same walk, and the book each night is
+ * every obligation that had not been settled by then. A live record has no such history to show, and
+ * its first snapshot is the night after Money is installed.
+ */
+export function snapshotRows(days = 30): Fields[] {
+  const walk = new Map(cashSeries(90).map((p) => [p.at, p.value]));
+  const live = OBLIGATIONS.filter((o) => o.state !== 'written_off');
+  const out: Fields[] = [];
+  for (let offset = -days; offset <= -1; offset++) {
+    const at = day(offset);
+    const still = live.filter((o) => typeof o.settled !== 'string' || (o.settled as string) > at);
+    const side = (direction: string) =>
+      still.filter((o) => o.direction === direction).reduce((n, o) => n + (o.amount as { amount: number }).amount, 0);
+    const cash = walk.get(at) ?? 0;
+    const toMe = side('owed_to_me');
+    const byMe = side('owed_by_me');
+    out.push({ on: at, cash: gbp(cash), owed_to_me: gbp(toMe), owed_by_me: gbp(byMe), net: gbp(cash + toMe - byMe), taken: 'nightly', note: '' });
+  }
+  return out;
+}
+
+export const SNAPSHOTS: Fields[] = snapshotRows();
 
 export const MONEY_REGISTERS: Record<string, SeedRegister> = {
   obligations: {
@@ -252,6 +472,228 @@ export const MONEY_REGISTERS: Record<string, SeedRegister> = {
       { id: 'rate', type: 'decimal', required: true },
       { id: 'as_of', label: 'As of', type: 'day', index: true, required: true },
       { id: 'source', type: 'text' },
+    ],
+  },
+
+  /**
+   * WHAT MONEY IS FOR. A ledger with no categories is a list of amounts, and a list of amounts cannot
+   * answer the one question anybody asks of it. `budget` is what a person means by "no more than this
+   * a month", held on the category rather than typed into a figure, so changing it is an edit to a row.
+   */
+  categories: {
+    id: 'categories',
+    name: 'Categories',
+    icon: 'tag',
+    one: 'category',
+    holds: 'what money is for, so a ledger can be read by where it goes',
+    title: 'name',
+    mobile: ['name', 'direction', 'budget'],
+    state: 'state',
+    done: ['retired'],
+    pack: 'money-core',
+    fields: [
+      /* UNIQUE, because two categories with one name is how a month's spending ends up split across
+         two bars that a person reads as two different things. */
+      { id: 'name', type: 'text', required: true, unique: true, search: true },
+      /* WHICH WAY A CATEGORY IS FOR. `32-PARITY` §3.2's direction guard is this field: a rule pointing
+         at an income category has no business on a payment out, and a person filing by hand is offered
+         the ones that can be right. `both` is for the legs of a transfer, which are neither. */
+      {
+        id: 'direction',
+        label: 'Which way',
+        type: 'enum',
+        values: ['in', 'out', 'both'],
+        labels: { in: 'Money in', out: 'Money out', both: 'Either way' },
+        index: true,
+        required: true,
+      },
+      /* THE COUNTERPARTY EXACTLY AS THE BANK WRITES IT, which is what `txn-categorise` links on. */
+      { id: 'match', label: 'Matches', type: 'text', index: true },
+      /* `Most a month`, AND IT WAS `No more than, a month`. A page prints its own `where:` back using
+         each field's label, and the sentence grammar splits clauses on commas, so a label with a
+         comma in it could not be typed or pasted back: `no more than: categories has no field called
+         no`. The test that says every field is reachable by the name the screen shows caught it. */
+      { id: 'budget', label: 'Most a month', type: 'money' },
+      { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
+      { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * MONEY THAT HAS ACTUALLY MOVED, which is the register this module was missing and the reason none
+   * of its figures could be checked against anything. An obligation is a promise with a date; a
+   * transaction is a fact with a day, an account and a direction, and `settles` is the one field that
+   * joins them, so "paid" stops being a status somebody remembered to set.
+   *
+   * THE AMOUNT IS POSITIVE AND `direction` CARRIES THE SIGN, as it does on `obligations`: a column of
+   * signed amounts cannot be summed without knowing which way each one goes, and a table draws the
+   * sign from the field (`sign: { field: direction, minus: out }`) rather than from the column it is in.
+   */
+  transactions: {
+    id: 'transactions',
+    name: 'Ledger',
+    icon: 'rows',
+    one: 'transaction',
+    holds: 'money that has moved, with the day it moved, the account it moved through and what it was for',
+    title: 'what',
+    mobile: ['what', 'amount', 'on'],
+    state: 'state',
+    done: ['cleared', 'void'],
+    pack: 'money-core',
+    fields: [
+      { id: 'what', label: 'Description', type: 'text', required: true, search: true },
+      /* `Date` OVER THE COLUMN AND `on` IN A PREDICATE. A transaction has one day and it is never a
+         deadline, so this field wears no `deadline:`: nothing here can be late. */
+      { id: 'on', label: 'Date', type: 'day', index: true, required: true },
+      {
+        id: 'direction',
+        label: 'Which way',
+        type: 'enum',
+        values: ['in', 'out'],
+        labels: { in: 'Money in', out: 'Money out' },
+        index: true,
+        required: true,
+      },
+      { id: 'amount', type: 'money', required: true },
+      /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
+      { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
+      { id: 'category', type: 'ref', to: 'categories', index: true },
+      /* Not indexed, and this register is at the ceiling. `declare.ts`'s `INDEX_CEILING` is 8 and
+         counts `index: true` and `unique: true` alike; the eight spent here are `on`, `direction`,
+         `account`, `category`, `thing`, `state`, `transfer` and `settles`, which are the eight every
+         page and every figure below filters on. `party` is the one nothing filters on, so it pays
+         no write cost. A ninth would come back as INDEXES_OVER_CAP at the door. */
+      { id: 'party', label: 'Who', type: 'ref', to: 'people' },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      { id: 'state', label: 'Status', type: 'enum', values: ['pending', 'cleared', 'void'], default: 'cleared', index: true, required: true },
+      /**
+       * MOVING MONEY BETWEEN YOUR OWN ACCOUNTS IS NOT SPENDING IT, and a ledger that counts it as
+       * spending reports the same month twice. The mark is a field rather than a category, because a
+       * transfer has no category: it is not for anything. Every figure on the Ledger page says
+       * `transfer is false`, and the default is false so a row nobody marks is counted.
+       *
+       * A PERSON SETS IT, IN THIS BUILD. `02 §5`'s `pairs: { on, opposite, across, within, mark }` is
+       * the register option that would find the two legs and set it, and it is on the kernel's
+       * published-and-unbuilt list, so declaring it here would be refused. The field is the half that
+       * is real now, and it is the half `pairs:` would write into when it arrives.
+       */
+      { id: 'transfer', label: 'Between your own accounts', type: 'bool', default: false, index: true },
+      /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */
+      { id: 'settles', label: 'Settles', type: 'ref', to: 'obligations', index: true },
+      { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * WHAT COMES ROUND WITHOUT ANYBODY DECIDING AGAIN. `next_due` is the only date, because a repeating
+   * item is not a list of dates: it is a pattern, and the dates are what the forecast walks from it.
+   */
+  recurring: {
+    id: 'recurring',
+    name: 'Repeating',
+    icon: 'refresh',
+    one: 'repeating item',
+    holds: 'the money that comes in and goes out every month without anybody deciding again',
+    title: 'what',
+    mobile: ['what', 'amount', 'next_due'],
+    state: 'state',
+    done: ['ended'],
+    pack: 'money-core',
+    fields: [
+      { id: 'what', label: 'Description', type: 'text', required: true, search: true },
+      {
+        id: 'direction',
+        label: 'Which way',
+        type: 'enum',
+        values: ['in', 'out'],
+        labels: { in: 'Money in', out: 'Money out' },
+        index: true,
+        required: true,
+      },
+      { id: 'amount', type: 'money', required: true, qualifies: 'every' },
+      /* THREE, AND THEY ARE `LOOKUPS.per_month`'S THREE. A frequency the factor table does not know is
+         counted at nothing a month by every figure that reads this list, which is a silent zero. */
+      { id: 'every', label: 'How often', type: 'enum', values: ['monthly', 'quarterly', 'yearly'], index: true, required: true },
+      { id: 'next_due', label: 'Next', type: 'day', index: true, deadline: true, required: true, remind: ['-3d', '0d'] },
+      { id: 'started', label: 'Since', type: 'day' },
+      /* Empty means it does not stop, which is the normal case and is why there is no `forever` value. */
+      { id: 'ends', label: 'Ends', type: 'day' },
+      { id: 'account', type: 'ref', to: 'accounts', index: true },
+      { id: 'category', type: 'ref', to: 'categories', index: true },
+      { id: 'party', label: 'Who', type: 'ref', to: 'people' },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      { id: 'state', label: 'Status', type: 'enum', values: ['live', 'paused', 'ended'], default: 'live', index: true, required: true },
+      { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * SOMETHING PAID IN PARTS, one row a part. The plan is a name the rows share rather than a row of its
+   * own, so the total is the sum of the parts and cannot disagree with them.
+   */
+  installments: {
+    id: 'installments',
+    name: 'Instalments',
+    icon: 'calendar',
+    one: 'instalment',
+    holds: 'the parts of something paid over time, and the day each part falls due',
+    title: 'what',
+    mobile: ['what', 'amount', 'due'],
+    state: 'state',
+    done: ['paid', 'cancelled'],
+    pack: 'money-core',
+    fields: [
+      { id: 'what', label: 'Description', type: 'text', required: true, search: true },
+      { id: 'plan', type: 'text', index: true, required: true, search: true },
+      { id: 'number', label: 'Instalment', type: 'int', min: 1 },
+      { id: 'parts', label: 'Of', type: 'int', min: 1 },
+      {
+        id: 'direction',
+        label: 'Which way',
+        type: 'enum',
+        values: ['in', 'out'],
+        labels: { in: 'Money in', out: 'Money out' },
+        index: true,
+        required: true,
+      },
+      { id: 'amount', type: 'money', required: true },
+      { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
+      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'paid', 'cancelled'], default: 'open', index: true, required: true },
+      { id: 'settled', label: 'Paid on', type: 'day' },
+      { id: 'party', label: 'Who', type: 'ref', to: 'people' },
+      { id: 'account', type: 'ref', to: 'accounts', index: true },
+      { id: 'category', type: 'ref', to: 'categories', index: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      { id: 'note', type: 'text' },
+    ],
+  },
+
+  /**
+   * WHAT THE WHOLE POSITION WAS ON A NIGHT. One row a night, four figures across it, so a person can
+   * ask what things looked like on the 14th and get an answer rather than four charts to line up.
+   *
+   * `on` IS UNIQUE, which is the whole of the exactly-once rule: a job that runs twice writes one row,
+   * and a second reading for a night already taken is refused by name rather than quietly doubling a line.
+   */
+  snapshots: {
+    id: 'snapshots',
+    name: 'Snapshots',
+    icon: 'history',
+    one: 'snapshot',
+    holds: 'what the money was on a night, so a figure can be compared with the day it was true',
+    title: 'on',
+    mobile: ['on', 'cash', 'net'],
+    pack: 'money-core',
+    fields: [
+      { id: 'on', label: 'Date', type: 'day', unique: true, required: true },
+      { id: 'cash', label: 'Cash', type: 'money', required: true },
+      { id: 'owed_to_me', label: 'Owed to you', type: 'money' },
+      { id: 'owed_by_me', label: 'Owed by you', type: 'money' },
+      /* CASH PLUS WHAT IS OWED TO YOU LESS WHAT YOU OWE. Stored rather than derived, because a snapshot
+         is a reading and a reading recomputed later from rows that have changed is not one. */
+      { id: 'net', label: 'Net', type: 'money' },
+      { id: 'taken', label: 'Taken', type: 'enum', values: ['nightly', 'typed'], default: 'nightly', index: true, required: true },
+      { id: 'note', type: 'text' },
     ],
   },
 };
@@ -551,6 +993,113 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     target: { lte: 0 },
     window: '30d',
   },
+
+  /* ── what actually moved ─────────────────────────────────────────────────
+     Every figure over the ledger says `transfer is false` and `state is cleared`. The first leaves out
+     money moved between your own accounts, which is not spending; the second leaves out a payment the
+     bank has taken and not yet settled, which is not a fact yet. A figure that omitted either would be
+     a number about the same money counted twice, or about money that has not moved. */
+
+  'spent-30d': {
+    metric: 'spent-30d',
+    name: 'Spent, 30 days',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is out, on after -31d',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 1_500_000 },
+    window: '30d',
+    compare: 'previous',
+  },
+
+  'received-30d': {
+    metric: 'received-30d',
+    name: 'Received, 30 days',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is in, on after -31d',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'previous',
+  },
+
+  /* WHAT NOBODY HAS SAID THE PURPOSE OF. The one number on the Ledger page that is a job rather than a
+     fact, and the reason `txn-categorise` is worth declaring: it is what is left after the rule ran. */
+  'txn-uncategorised': {
+    metric: 'txn-uncategorised',
+    name: 'Without a category',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, category is empty, on after -91d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* ── what comes round ────────────────────────────────────────────────────
+     Each repeating item at its monthly share, the way `every-month-out` reads `obligations.repeats`.
+     Paused and ended items are left out: a figure about what leaves every month is about what leaves. */
+
+  'recurring-out-month': {
+    metric: 'recurring-out-month',
+    name: 'Repeating, out',
+    source: 'register.recurring',
+    where: 'state is live, direction is out',
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
+    lookups: { per_month: LOOKUPS.per_month! },
+    format: 'money.GBP',
+    target: { lte: 1_500_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'recurring-in-month': {
+    metric: 'recurring-in-month',
+    name: 'Repeating, in',
+    source: 'register.recurring',
+    where: 'state is live, direction is in',
+    value: { sum: { product: ['amount', { lookup: 'per_month', by: 'every' }] } },
+    lookups: { per_month: LOOKUPS.per_month! },
+    format: 'money.GBP',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* ── paid in parts ───────────────────────────────────────────────────────
+     What is left of every plan, and what falls due inside the month. Both are sums of the rows, never
+     a plan's total less what has gone, so a cancelled part is out of both by its status alone. */
+
+  'installments-left': {
+    metric: 'installments-left',
+    name: 'Left to pay',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 2_000_000 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'installments-due-30d': {
+    metric: 'installments-due-30d',
+    name: 'Instalments due, 30 days',
+    source: 'register.installments',
+    /* `direction is out` WAS MISSING AND THE FIGURE ADDED THE TWO DIRECTIONS TOGETHER. A plan runs
+       both ways: the proofing press goes out in eight parts and the Halden licence comes in in four,
+       and on this record one part of each falls due today, so the figure read 615000 where 375000 is
+       leaving. A number that is a payment plus a receipt is about nothing, and the figure above it
+       carried the clause already. */
+    where: 'state is open, direction is out, due before +31d',
+    value: { sum: 'amount' },
+    format: 'money.GBP',
+    target: { lte: 1_000_000 },
+    window: '30d',
+    compare: 'none',
+  },
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */
@@ -583,6 +1132,59 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     when: 'as_of before -7d',
     then: [{ suggest: { question: 'The balance of {{name}} was last set {{ago:as_of}}. Update it?', options: ['Update it', 'It has not changed'] } }],
     once_per: ['entry', 'as_of'],
+  },
+  /**
+   * THE ONE RULE HERE THAT ACTS, and it acts because there is nothing to decide.
+   *
+   * A row whose description is a merchant a category already names has its category filed by the
+   * record rather than asked about, which is the difference between a ledger somebody keeps and a
+   * ledger somebody abandons: the third time `FENWICK CLOUD` arrives, being asked what it is for is an
+   * insult. What the rule cannot reach is what the figure counts, so nothing is hidden by it.
+   *
+   * IT MATCHES THE WHOLE DESCRIPTION, EXACTLY. `link:` is an equality against one stored value, and a
+   * substring test is not reachable from a declaration in this build: `contains` is one of the
+   * nineteen operators and is not in the sentence grammar, and `derive: { normalise }` is published
+   * and read by nothing. So a category's `match` is the counterparty as the bank writes it, and a
+   * merchant that arrives under two spellings needs two categories or a person. That is a real limit
+   * and it is written here rather than discovered.
+   *
+   * `once_per: [entry]` means once a row, ever. A category cleared by hand afterwards stays cleared,
+   * which is `32-PARITY` §3.2's rule that a field a person set is never overwritten by a rule.
+   */
+  'txn-categorise': {
+    rule: 'txn-categorise',
+    pack: 'money-core',
+    register: 'transactions',
+    when: 'state is cleared, transfer is false, category is empty',
+    then: [{ link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}' } } }],
+    once_per: ['entry'],
+  },
+  /**
+   * AN INSTALMENT IS TOLD, NOT ASKED. The two rules above ask because there is a choice in front of
+   * the person: chase or wait, update or leave it. A part of a plan already agreed has no choice in
+   * it, so a question with two options would be a question whose answer is always the same, and the
+   * gate is the one place in this product that must never fill up with those.
+   */
+  'installment-due-soon': {
+    rule: 'installment-due-soon',
+    pack: 'money-core',
+    register: 'installments',
+    when: 'state is open, due before +8d',
+    then: [{ notify: { say: '{{what}} is due {{until:due}}: {{money:amount}}.' } }],
+    once_per: ['entry', 'due'],
+  },
+  /**
+   * A REPEATING ITEM WHOSE DAY HAS GONE AND WHICH IS STILL LIVE. Either it went out and nobody moved
+   * the date, or it did not go out at all, and those are different problems with one symptom. The
+   * record says which day it was and leaves the reading to the person.
+   */
+  'recurring-missed': {
+    rule: 'recurring-missed',
+    pack: 'money-core',
+    register: 'recurring',
+    when: 'state is live, next_due before today',
+    then: [{ notify: { say: '{{what}} was due {{ago:next_due}}, {{money:amount}}, and its next day has not moved.' } }],
+    once_per: ['entry', 'next_due'],
   },
 };
 
@@ -828,6 +1430,126 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). */
         stale: { field: 'as_of', after: '7d' },
         empty: 'No accounts yet. Add what is in the bank and this page starts from it.',
+      },
+    ],
+  },
+
+  /**
+   * THE LEDGER IS THE PAGE ABOUT WHAT HAPPENED, and Overview is the page about what is going to. They
+   * are separate because they answer different questions with different rows: Overview walks forward
+   * from a balance over promises, and this one looks back over payments that have cleared. Putting
+   * both on one page was what made the old Money page a list of everything and an answer to nothing.
+   *
+   * EVERY BLOCK LEAVES OUT TRANSFERS AND ANYTHING STILL PENDING, the same two clauses the figures
+   * carry, so a total on this page and the tile above it are about the same set of rows.
+   */
+  ledger: {
+    page: 'ledger',
+    title: 'Ledger',
+    nav: { section: 'Money', order: 20 },
+    icon: 'rows',
+    requires: ['register.transactions', 'register.accounts', 'register.categories', 'register.recurring', 'register.installments', 'register.snapshots'],
+    pack: 'money-core',
+    blocks: [
+      {
+        kind: 'stat',
+        lead: true,
+        heading: 'Last 30 days',
+        span: 12,
+        cells: [
+          { metric: 'spent-30d', label: 'Spent' },
+          { metric: 'received-30d', label: 'Received' },
+          { metric: 'recurring-out-month', label: 'Repeating, out', note: '{{recurring-in-month}} coming in' },
+          { metric: 'txn-uncategorised', label: 'Without a category' },
+        ],
+      },
+      {
+        /* A NOTE THAT DRAWS ONLY WHEN THERE IS SOMETHING TO DO, and says what is true rather than what
+           to do about it. The rule has already filed what it could; this is the remainder. */
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Rows with no category',
+        span: 12,
+        body: '{{txn-uncategorised}} payments in the last three months say nothing about what they were for, so the chart below leaves them in Uncategorised.',
+        when: { metric: 'txn-uncategorised', gt: 0 },
+      },
+      {
+        /* WHAT MOVED, NEWEST FIRST. The amount carries its own sign from the row, and the last column
+           says who wrote it, so a row a rule categorised and a row a person typed are told apart. */
+        kind: 'table',
+        heading: 'What moved',
+        span: 12,
+        source: 'register.transactions',
+        where: 'state is not void',
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'account', label: 'Account', width: 'minmax(10ch,16ch)' },
+          { field: 'category', label: 'For', width: 'minmax(8ch,14ch)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+          { field: 'on', label: 'Date', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'on', dir: 'desc' }],
+        limit: 12,
+        empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
+      },
+      {
+        /* WHERE THE YEAR'S MONEY WENT, from rows that cleared rather than from rows somebody meant to
+           pay. `Uncategorised` is drawn last and opens those rows, so the hole is a job and not a gap. */
+        kind: 'bar',
+        heading: 'Where it went, 12 months',
+        span: 7,
+        source: 'register.transactions',
+        where: 'state is cleared, transfer is false, direction is out, on after -12m',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 8,
+        unset: 'Uncategorised',
+        empty: 'Nothing has gone out in the last 12 months.',
+      },
+      {
+        /* MONTHLY ITEMS ONLY, and the heading is why. A quarterly and a yearly row summed beside a
+           monthly one is three units added together, which is the mistake `LOOKUPS.per_month` exists
+           to stop; the figure above draws all three at their monthly share, and this draws the ones
+           whose amount is already a month. */
+        kind: 'split',
+        heading: 'Every month, by what it is for',
+        span: 5,
+        source: 'register.recurring',
+        where: 'state is live, direction is out, every is monthly',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing repeats every month.',
+      },
+      {
+        kind: 'table',
+        heading: 'Still to pay, in parts',
+        span: 7,
+        source: 'register.installments',
+        where: 'state is open',
+        columns: [
+          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+        ],
+        order: [{ field: 'due', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing is being paid in parts.',
+      },
+      {
+        /* THE LAST WEEK OF NIGHTS. Four figures across one row is the shape a snapshot has, and a
+           person reading a week of them can see which of the four moved. */
+        kind: 'table',
+        heading: 'Night by night',
+        span: 5,
+        source: 'register.snapshots',
+        columns: [
+          { field: 'on', label: 'Date', width: '13ch' },
+          { field: 'cash', label: 'Cash', width: '14ch', align: 'end' },
+          { field: 'net', label: 'Net', width: '14ch', align: 'end' },
+        ],
+        order: [{ field: 'on', dir: 'desc' }],
+        limit: 7,
+        empty: 'No night has been recorded yet. The first is the night after Money goes in.',
       },
     ],
   },
