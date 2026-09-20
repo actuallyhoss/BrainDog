@@ -318,6 +318,63 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
   assert.ok(found.some((f) => f.check === 'Q'), 'a control that matches its own label was not refused');
 });
 
+/* ── the shape of the result, and not only its refusals ─────────────────── */
+
+test('EVERY CHECK REPORTS, PASS OR FAIL: 99 rows per scheme, counted here and nowhere quoted', () => {
+  /**
+   * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
+   *
+   * Nothing asserted either number, which is the whole of how they came to sit that far apart: the
+   * checks pushed a row only when something failed, so a passing theme produced an almost empty
+   * result and a deleted check produced the same almost empty result. A validator silent on a
+   * passing check cannot report that the check stopped running.
+   *
+   * SO THE NUMBER IS COUNTED RATHER THAN COPIED. 90 was never implemented and therefore has no
+   * authority; the arithmetic below is the seventeen checks as they are written, and it lands on
+   * 99. The table is spelled out per letter so that a change to any one check has to be argued for
+   * here, in the same commit, instead of quietly moving a total.
+   */
+  const PER_CHECK: Record<string, number> = {
+    A: 15, // three inks that are not `faint`, each on five surfaces
+    B: 5, //  `accent-text` on five surfaces
+    C: 5, //  `faint` on five surfaces
+    D: 30, // `edge` and `accent-edge` and four `-fill` roles, each on five surfaces
+    E: 6, //  the two ring tones against each other, then `focus-in` on five surfaces
+    F: 1, //  one summary row carrying the worst separation over the six intent pairs
+    G: 20, // four intents as text, each on five surfaces
+    H: 4, //  four rungs of the five-surface ladder
+    J: 1, //  one row for the palette: the most chroma any role gave up to the gamut
+    K: 2, //  a link against body ink, and against `danger`
+    M: 1, //  `line` against `edge`
+    N: 4, //  the APCA advisory, one row per ink
+    O: 1, //  one row for the palette: every value is shaped like a colour
+    P: 1, //  one row for the palette: no value holds a banned token
+    Q: 3, //  the control fill against its own label, at rest and on hover and on press
+  };
+  const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
+  assert.equal(PER_SCHEME, 99, 'the per-letter table no longer sums to the number in 39 §6.1');
+
+  for (const built of [HOUSE, HIGH_CONTRAST])
+    for (const scheme of ['dark', 'light'] as const) {
+      const found = checkScheme(built, scheme);
+      const byCheck: Record<string, number> = {};
+      for (const f of found) byCheck[f.check] = (byCheck[f.check] ?? 0) + 1;
+      assert.deepEqual(byCheck, PER_CHECK, `${built.id} ${scheme} did not report the checks it ran`);
+      assert.equal(found.length, PER_SCHEME, `${built.id} ${scheme} returned ${found.length} results, not ${PER_SCHEME}`);
+      assert.equal(refusals(found).length, 0, `${built.id} ${scheme} refuses a theme this package ships`);
+    }
+
+  /* AND THE WHOLE VALIDATOR IS THE TWO SCHEMES PLUS THREE. `checkElevation` answers once per
+     scheme and `checkForcedColors` once for the document, so `validate` is 99 + 99 + 2 + 1. */
+  const whole = validate(HOUSE, toCSS(HOUSE, HIGH_CONTRAST) + FORCED);
+  assert.equal(whole.length, PER_SCHEME * 2 + 3, `validate returned ${whole.length} results`);
+
+  /* THE POINT OF ALL OF IT: a letter that goes missing is now visible in the output. */
+  const spoke = new Set(whole.map((f) => f.check));
+  for (const letter of 'ABCDEFGHIJKLMNOPQ')
+    assert.ok(spoke.has(letter), `check ${letter} said nothing at all, so nothing can tell it apart from a deleted check`);
+});
+
 /* ── the checks that could not fail ──────────────────────────────────────── */
 
 test('CHECK I MEASURES THE LADDER THAT VARIES, which is the alpha and not the pixels', () => {

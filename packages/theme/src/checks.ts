@@ -64,6 +64,10 @@ const address = (id: string, scheme: Scheme, role: string) => `theme.${id}.roles
 
 const rgb = (s: string) => fromHex(s);
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/* FOUR PLACES FOR THE QUANTITIES THAT LIVE BELOW TWO. A contrast ratio and a delta-E are read at
+   two decimals, but relative luminance and OKLCH chroma are fractions of one: check H's rungs and
+   check J's clipping both round to 0.00 at `r2` and say nothing. */
+const r4 = (n: number) => Math.round(n * 10000) / 10000;
 const DEFS: Deficiency[] = ['protan', 'deutan', 'tritan'];
 const HEX = /^#[0-9A-F]{6}$/;
 const BANNED = ['url(', 'image(', 'element(', 'attr(', 'var(', '\\'];
@@ -93,6 +97,13 @@ function pairsAgainstSurfaces(
           at: address(id, scheme, role),
           fix: `theme: the pair (${role} on ${surface}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${role} further from the ground.`,
         });
+      /* AND A ROW WHEN IT PASSES, WHICH IS THE ONLY WAY A VALIDATOR CAN SAY IT STILL RAN. Every
+         check in this file used to be silent on success, so the output on a passing theme was the
+         same output a deleted check produces: delete the call to this helper for G and nothing in
+         the house theme's result changes. The pass carries the measurement, so a reader can see
+         how much headroom a pair has rather than only that it cleared. It carries no `at` and no
+         `fix`, because an address is where to make a change and a pass asks for none. */
+      else out.push({ check, scheme, level: 'pass', measured: r2(got) });
     }
   return out;
 }
@@ -151,6 +162,10 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       at: at('focus-in'),
       fix: `theme: the two focus-ring tones are ${r2(ringTones)}:1 apart in ${scheme}. They need 9:1, or the ring vanishes on one surface.`,
     });
+  /* THE RING'S OWN ROW, SEPARATE FROM THE FIVE BELOW IT. E is two questions and the pair helper
+     answers only the second, so without this the tone comparison stayed the one silent branch in
+     a check that otherwise reports five times. Six rows is what 39 §6.1 counts for E. */
+  else out.push({ check: 'E', scheme, level: 'pass', measured: r2(ringTones) });
   out.push(...pairsAgainstSurfaces(built.id, p, ['focus-in'], 3, 'E', scheme));
 
   /* F · intent x intent, delta-E 2000 after Brettel at severity 1.0, all three deficiencies.
@@ -227,11 +242,34 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         at: at(SURFACES[i]!),
         fix: `theme: the surface ladder turns back on itself at ${SURFACES[i]} in ${scheme}. Surfaces must only go one way.`,
       });
+    /* ONE ROW PER RUNG EITHER WAY, which is what makes the ladder's shape readable in the output
+       rather than only its faults. The measurement is the climb this rung made, and it is rounded
+       to four places rather than to `r2`'s two: the dark ladder steps 0.028 in OKLab L, which is
+       a few thousandths of relative luminance, and two decimals would report every rung as 0.00. */
+    else out.push({ check: 'H', scheme, level: 'pass', measured: r4(lum[i]! - lum[i - 1]!) });
   }
 
-  /* J · every emitted colour already in the sRGB gamut, and shaped like a colour */
+  /* J · every emitted colour already in the sRGB gamut, and shaped like a colour.
+
+     THESE THREE REPORT ONCE FOR THE PALETTE AND NOT ONCE PER ROLE, which is the shape 39 §6.1
+     gives I to Q. O, J and P each ask the same question of all 27 role values, so a pass row per
+     role would be 81 rows saying the same thing three ways and would bury the 30 rows of check D
+     that a reader is actually looking at. The refusals stay per role, because a refusal names the
+     one value to go and change.
+
+     AND THE SUMMARY IS WITHHELD WHEN THE CHECK REFUSED, rather than emitted beside its own
+     refusal. A pass row next to a fail row for the same letter is the validator contradicting
+     itself in its own output, and this package's rule is that saying the product did something it
+     did not is never the cheaper option. `worstClip` is tracked across the loop so the J summary
+     can carry the largest amount any role gave up, which is the number that would have refused. */
+  let hexOk = true;
+  let clipOk = true;
+  let bannedOk = true;
+  let worstClip = 0;
   for (const [role, value] of Object.entries(p)) {
-    if (!HEX.test(value))
+    worstClip = Math.max(worstClip, built.clipped?.[scheme]?.[role as Role] ?? 0);
+    if (!HEX.test(value)) {
+      hexOk = false;
       out.push({
         check: 'O',
         scheme,
@@ -240,6 +278,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         at: at(role),
         fix: `theme: ${role} is "${value}", which is not a colour this dialect accepts.`,
       });
+    }
     /* J · HOW MUCH THE GAMUT MAPPER HAD TO TAKE OFF, which is the only form of this question that
        has an answer. Asking a hex whether it is in sRGB is asking whether a number between 0 and 1
        is between 0 and 1 — `quantise` clamps and `fromHex` divides by 255 — and over all 4096
@@ -251,7 +290,8 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
        keeps 0.004 of the 0.014 it asked for — 72% lost, and correctly so, because near white there
        is almost no chroma to have. What is worth refusing is a saturated role giving up an amount a
        reader could see, and 0.02 is about where two OKLCH chromas stop being the same colour. */
-    else if ((built.clipped?.[scheme]?.[role as Role] ?? 0) > 0.02)
+    else if ((built.clipped?.[scheme]?.[role as Role] ?? 0) > 0.02) {
+      clipOk = false;
       out.push({
         check: 'J',
         scheme,
@@ -260,8 +300,10 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         at: at(role),
         fix: `theme: ${role} gave up ${(built.clipped?.[scheme]?.[role as Role] ?? 0).toFixed(3)} of chroma to the sRGB gamut, so ${value} is not the colour it was solved as.`,
       });
+    }
     for (const b of BANNED)
-      if (value.includes(b))
+      if (value.includes(b)) {
+        bannedOk = false;
         out.push({
           check: 'P',
           scheme,
@@ -270,7 +312,13 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
           at: at(role),
           fix: `theme: ${role} contains "${b}", which a token value may never hold.`,
         });
+      }
   }
+  /* THE COUNT IS THE MEASUREMENT FOR O AND P, because what those two assert is a property of the
+     whole set: all 27 values parsed, all 27 values held nothing banned. */
+  if (hexOk) out.push({ check: 'O', scheme, level: 'pass', measured: Object.keys(p).length });
+  if (clipOk) out.push({ check: 'J', scheme, level: 'pass', measured: r4(worstClip) });
+  if (bannedOk) out.push({ check: 'P', scheme, level: 'pass', measured: Object.keys(p).length });
 
   /* Q · a control's fill against ITS OWN LABEL, in every state it can be in.
      The generator solves hover and press to clear 4.5 against `accent-ink` and then nobody checked
@@ -312,6 +360,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         at: at('accent-text'),
         fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
       });
+    /* ONE ROW PER THING A LINK CAN BE CONFUSED WITH, passing or not, so the output says which two
+       comparisons K made. It is a closed list of two and a reader should be able to see both. */
+    else out.push({ check: 'K', scheme, level: 'pass', measured: r2(dL) });
   }
 
   /* M · line and edge not confusable — a judgement call, so it warns */
@@ -325,6 +376,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
       at: at('line'),
       fix: `theme: line and edge are ${r2(dLine)} apart in ${scheme}. A decorative hairline and a load-bearing boundary should not look the same.`,
     });
+  /* A JUDGEMENT CALL THAT CAME OUT THE OTHER WAY IS STILL AN ANSWER. M warns or it passes, and the
+     pass carries the separation so the install diff can show how close to the line a theme sat. */
+  else out.push({ check: 'M', scheme, level: 'pass', measured: r2(dLine) });
 
   /* N · APCA advisory: where WCAG 2 is known to pass a dark-on-dark pair that reads as mud */
   for (const role of INKS) {
@@ -339,6 +393,10 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         at: at(role),
         fix: `theme: ${role} on bg passes WCAG at ${r2(w)}:1 but scores Lc ${lc} under APCA. Advisory only.`,
       });
+    /* ONE ROW PER INK EVEN WHEN THERE IS NO ADVISORY, and the measurement is the APCA score
+       itself. N is the only check here that reads a second contrast model, so its four rows are
+       the place somebody comparing WCAG against APCA on this palette would look. */
+    else out.push({ check: 'N', scheme, level: 'pass', measured: lc });
   }
 
   return out;
@@ -367,8 +425,10 @@ export function checkElevation(built: Built): Finding[] {
   const out: Finding[] = [];
   for (const scheme of ['dark', 'light'] as Scheme[]) {
     const alphas = built.elevation[scheme].map((s) => Number(/\/\s*([\d.]+)\s*\)/.exec(s)?.[1] ?? NaN));
+    let ok = true;
     for (const [i, a] of alphas.entries())
-      if (!Number.isFinite(a))
+      if (!Number.isFinite(a)) {
+        ok = false;
         out.push({
           check: 'I',
           scheme,
@@ -376,8 +436,10 @@ export function checkElevation(built: Built): Finding[] {
           code: 'THEME_LADDER_ORDER',
           fix: `theme: elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
         });
+      }
     for (let i = 1; i < alphas.length; i++)
-      if (!(alphas[i]! > alphas[i - 1]!))
+      if (!(alphas[i]! > alphas[i - 1]!)) {
+        ok = false;
         out.push({
           check: 'I',
           scheme,
@@ -385,6 +447,13 @@ export function checkElevation(built: Built): Finding[] {
           code: 'THEME_LADDER_ORDER',
           fix: `theme: elevation level ${i + 1} is not above level ${i} in ${scheme}.`,
         });
+      }
+    /* ONE PASS ROW PER SCHEME, and it is the row that makes I auditable at all. The ladder was
+       compared on the pixel geometry for a long time, where the three numbers are literals in the
+       generator and the comparison could not fail; a check that never speaks is a check nobody
+       notices has stopped. The measurement is the total climb in alpha, which is the depth the
+       ladder actually spans. */
+    if (ok) out.push({ check: 'I', scheme, level: 'pass', measured: r2(alphas.at(-1)! - alphas[0]!) });
   }
   return out;
 }
@@ -397,8 +466,13 @@ export function checkElevation(built: Built): Finding[] {
  */
 export function checkForcedColors(css: string): Finding[] {
   const has = css.includes('forced-colors: active') && css.includes('CanvasText');
+  /* AND THE PASS IS A ROW TOO, WITH THE SAME ARBITRARY `dark` THE REFUSAL ALREADY CARRIES. L is
+     about the stylesheet rather than about either scheme, so neither value of `scheme` is true
+     here; the field is not optional, and picking the same one both ways is at least consistent.
+     The measurement is the length of the document the check read, which is the one fact that
+     separates "the block is there" from "the caller handed in an empty string". */
   return has
-    ? []
+    ? [{ check: 'L', scheme: 'dark', level: 'pass', measured: css.length }]
     : [
         {
           check: 'L',

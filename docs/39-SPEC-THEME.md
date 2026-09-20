@@ -244,18 +244,49 @@ type Built =
   | { ok: false; refusals: Refusal[]; results: CheckResult[] };
 ```
 
-Invariants: **specified and not implemented, and measured on September 20th 2026 rather than assumed.** `checkScheme`
-returns **6 results for the house theme in dark and 4 in light**, not 90: it emits a row only when something is
-notable, plus a summary pass for F and three for Q, and checks A to E and G to P emit nothing at all when they pass.
-Nothing asserts either number, which is how they came to sit this far apart. The specified shape is the better one,
-for the reason the gate directory acts on elsewhere: a validator silent on a passing check cannot report that the
-check stopped running, so deleting G would leave the output on a passing theme identical. It is additive and safe to
-build, because every consumer reads through `refusals()` or `warnings()`, which filter by level. The per-letter split
-below was written for four roles that have since moved and is kept only as the shape, not as the counts: A is 15 and
-not 20 (`faint` went to C), B is 5 and not 6 (`accent-ink` on `accent` moved into Q), D is 30 and not 20
-(`accent-edge` and `info-fill` arrived) and G is 20 and not 15 (`info` is a fourth intent). Do not copy the new
-numbers here when it is built; count them in a test. The shape: one row per pair for A–G, one per rung for H, one per
-check for I–Q, plus one `N` row per advisory; every letter A–Q appears at least once;
+Invariants: **`checkScheme` returns 99 results per scheme, and it is 99 and not 90.** The number is counted by
+`theme.test.ts` ("EVERY CHECK REPORTS, PASS OR FAIL"), per letter as well as in total, so a change to any one check
+has to be argued for in the same commit instead of quietly moving a sum. The arithmetic, which is the seventeen
+checks exactly as they are written:
+
+| Letter | How many | Why |
+|---|---|---|
+| A | 3 inks × 5 surfaces | 15 |
+| B | `accent-text` × 5 surfaces | 5 |
+| C | `faint` × 5 surfaces | 5 |
+| D | `edge` `accent-edge` and four `-fill` roles, 6 × 5 surfaces | 30 |
+| E | the two ring tones against each other, then `focus-in` × 5 surfaces | 6 |
+| F | one summary row carrying the worst separation over the six intent pairs | 1 |
+| G | 4 intents as text × 5 surfaces | 20 |
+| H | 4 rungs of the five-surface ladder | 4 |
+| J | one row for the palette: the most chroma any role gave up | 1 |
+| K | a link against body ink, and against `danger` | 2 |
+| M | `line` against `edge` | 1 |
+| N | the APCA advisory, one row per ink | 4 |
+| O | one row for the palette: every value is shaped like a colour | 1 |
+| P | one row for the palette: no value holds a banned token | 1 |
+| Q | the control fill against its own label, at rest and on hover and on press | 3 |
+
+`15 + 5 + 5 + 30 + 6 + 1 + 20 + 4 + 1 + 2 + 1 + 4 + 1 + 1 + 3 = 99`. `validate` adds `checkElevation`'s one row per
+scheme and `checkForcedColors`'s one row for the document, so it returns `99 + 99 + 2 + 1 = 201` for a theme that
+passes everything.
+
+**90 WAS NEVER IMPLEMENTED, SO IT HAS NO AUTHORITY.** Measured on September 20th 2026, before this was built,
+`checkScheme` returned 6 results in dark and 4 in light: it emitted a row only when something was notable, plus a
+summary pass for F and three for Q, and checks A to E and G to P emitted nothing at all when they passed. Nothing
+asserted either number, which is how the spec and the code came to sit that far apart. The specified shape was the
+better one, for the reason the gate directory acts on elsewhere: a validator silent on a passing check cannot report
+that the check stopped running, so deleting G left the output on a passing theme identical. Building it was additive
+and safe, because every consumer reads through `refusals()` or `warnings()`, which filter by level. The per-letter
+figures 90 was summed from were written for four roles that have since moved: A is 15 and not 20 (`faint` went to
+C), B is 5 and not 6 (`accent-ink` on `accent` moved into Q), D is 30 and not 20 (`accent-edge` and `info-fill`
+arrived), G is 20 and not 15 (`info` is a fourth intent), and F reports one summary row rather than one per pair.
+
+The shape: one row per pair for A to G, one per rung for H, one per check for I to Q, plus one `N` row per ink;
+every letter A to Q appears at least once in `validate`'s output, which is the property the test ends on. A pass
+carries the measurement and no `at` and no `fix`. A check that refuses does **not** also emit its pass row, because
+a validator contradicting itself in its own output is the fault this work exists to remove; F is the one exception
+and it predates this, its summary row being the worst separation it found rather than a verdict.
 `results` in `Built` is dark then light; `refusals` preserve `results` order, so a theme failing A in dark and F in
 light lists `CONTRAST_FLOOR` first, as the 28 §4.5 example does.
 
@@ -562,26 +593,26 @@ byte-stable, so nothing derived is ever persisted (§13 D15).
 ### 6.1 · The seventeen checks
 
 Letters, pairs, floors and policies are 28 §4.4's; the last two columns are this package's. *Pairs* counts results
-per palette.
+per palette, passing or failing, and they sum to the 99 of §4.4. A pass row carries the measurement and no `at`.
 
 | # | Check | Pair set (per scheme) | Floor | Policy | Code | Pairs |
 |---|---|---|---|---|---|---|
-| A | every ink role × every surface | `ink ink2 dim faint` × 5 surfaces | 4.5:1 | refuse | `CONTRAST_FLOOR` | 20 |
-| B | `accent` as text × every surface | `accent-text` × 5; `accent-ink` on `accent` | 4.5:1 | refuse | `CONTRAST_FLOOR` | 6 |
+| A | every ink role × every surface | `ink ink2 dim` × 5 surfaces (`faint` is C's, below) | 4.5:1 | refuse | `CONTRAST_FLOOR` | 15 |
+| B | `accent` as text × every surface | `accent-text` × 5 (`accent-ink` on `accent` is Q's) | 4.5:1 | refuse | `CONTRAST_FLOOR` | 5 |
 | C | `faint` used below 24 px | `faint` × 5 at the large-text floor; decides whether A's copy offers the 24 px route | 3:1 | refuse | `CONTRAST_FLOOR` | 5 |
-| D | `edge` × every surface | `edge earn-fill warn-fill danger-fill` × 5 (1.4.11) | 3:1 | refuse | `CONTRAST_FLOOR` | 20 |
+| D | `edge` × every surface | `edge accent-edge earn-fill warn-fill danger-fill info-fill` × 5 (1.4.11) | 3:1 | refuse | `CONTRAST_FLOOR` | 30 |
 | E | focus ring vs both neighbours, focused vs unfocused | `focus-in` on `focus-out` ≥ 9 (§5.2 composition); `focus-in` × 5 ≥ 3 | 3:1 (2.4.13) | refuse | `CONTRAST_FLOOR` | 6 |
-| F | intent × intent, ΔE2000 after Brettel, all three deficiencies | six pairs of `earn warn danger info`, `dist` of §5.5. **This row said `accent-text` and the code has never compared it here**: `INTENTS` is the four above, which is what this row’s own “intent × intent” means and what `build.ts`’s “Four intents need at least 10” says. `accent-text` is solved separately at generator step 6 by lightness clearance and is in no grid search, so §5’s description of a search over `(danger, warn, earn, accent-text)` is stale with it | ≥ 20 clear · 10–20 glyph · < 10 | refuse < 10; 10–20 **pass, band recorded** (§13 D6) | `INTENT_INSEPARABLE` | 6 |
-| G | intent as text × every surface | `earn warn danger` × 5 | 4.5:1 | refuse | `CONTRAST_FLOOR` | 15 |
+| F | intent × intent, ΔE2000 after Brettel, all three deficiencies | six pairs of `earn warn danger info`, `dist` of §5.5. **This row said `accent-text` and the code has never compared it here**: `INTENTS` is the four above, which is what this row’s own “intent × intent” means and what `build.ts`’s “Four intents need at least 10” says. `accent-text` is solved separately at generator step 6 by lightness clearance and is in no grid search, so §5’s description of a search over `(danger, warn, earn, accent-text)` is stale with it. **The count is 1 and not 6**: F reports one summary row per scheme carrying the worst separation it found over the six pairs, plus one refusal per pair below the floor | ≥ 20 clear · 10–20 glyph · < 10 | refuse < 10; 10–20 **pass, band recorded** (§13 D6) | `INTENT_INSEPARABLE` | 1 |
+| G | intent as text × every surface | `earn warn danger info` × 5 | 4.5:1 | refuse | `CONTRAST_FLOOR` | 20 |
 | H | surface ladder monotonic in relative luminance | four adjacent pairs `sunk<bg<s1<s2<s3`, strict | strict | refuse | `THEME_LADDER_ORDER` | 4 |
-| I | elevation ladder monotonic, both schemes | `e1 < e2 < e3` in alpha (geometry is fixed and ascending) | strict | refuse | `THEME_LADDER_ORDER` | 1 |
+| I | elevation ladder monotonic, both schemes | `e1 < e2 < e3` in alpha (geometry is fixed and ascending) | strict | refuse | `THEME_LADDER_ORDER` | 1 per scheme, from `checkElevation` |
 | J | how much chroma the gamut mapper took off | `built.clipped[scheme][role]` | > 0.02 refuses | refuse | `THEME_VALUE_INVALID` | 1 |
 
 J is the one row where the code deliberately answers a different question from the one this table asked, and its comment gives the reason: asking an emitted hex whether it is in sRGB is asking whether a number between 0 and 1 is between 0 and 1, because `quantise` clamps and `fromHex` divides by 255, and over all 4,096 three-digit values that branch was never false. What can be wrong is that the emitted colour is a clipped version of the one the palette was solved as. **The `auto-correct` policy this row used to name is implemented nowhere**: `Finding.level` is `pass | warn | refuse` and has no room for a correction, and no `corrected` row exists in the package. `checks.ts` opened "Three policies, not one" for the same reason and has been corrected to two.
 | K | hue-only encoding | `accent-text` vs `ink`, vs `ink2`: \|ΔL\*\| ≥ 8 (intents carry a glyph, 13 §2.3, so they pass structurally) | 8 L\* | refuse | `CONTRAST_FLOOR` | 2 |
 | L | `forced-colors` survival | `toCSS` text has only `--` declarations under `:root[data-scheme]`; `A11Y_FORCED_COLORS` declares `border: 1px solid CanvasText` for `.panel .grid .rows .table .media` | — | refuse | — (cannot fail on a parsed input; a CI assertion) | 1 |
 | M | `line` vs `edge` not confusable | \|L(line) − L(edge)\| in OKLab | 0.06 | warn | — | 1 |
-| N | APCA advisory | every A, B, G pair with `CR ≥ 4.5` and \|Lc\| < 60 | 60 Lc | warn | — | 0 + |
+| N | APCA advisory | every ink on `bg`, warning where `CR ≥ 4.5` and \|Lc\| < 60 | 60 Lc | warn | — | 4 |
 | O | every value parses and is re-serialised | enforced in `parseTheme`; here asserts every emitted value is `#RRGGBB` | — | refuse | `THEME_VALUE_INVALID` (at parse) | 1 |
 | P | banned in any value | `url( image( element( attr( var( \` — checked on the raw string before parsing; here asserts none in the emitted text | — | refuse | `THEME_VALUE_INVALID` (at parse) | 1 |
 | Q | a control’s fill × its own label, in every state | `accent` `accent-hover` `accent-press` × `accent-ink` | 4.5:1 | refuse | `CONTRAST_FLOOR` | 3 |
@@ -636,7 +667,7 @@ Warnings (M, N, F's band, the accent-text note, J's corrections) are not refusal
 | `toCSS` per scheme | ≤ 2,048 bytes | 809 dark · 810 light · 917 with the `prefers-contrast` wrapper | `new TextEncoder().encode(css).length` |
 | `TOKENS_CSS` | ≤ 300 bytes | 180 | same |
 | `toDTCG` | ≤ 24,576 bytes pretty-printed | 19,948 | same |
-| Results per palette | 90 + N advisories, **not implemented** (§6.1) | measured house dark 6 · house light 4 | `checkScheme().length` |
+| Results per palette | 99, every letter reporting whether it passed or failed (§4.4, §6.1) | house dark 99 · house light 99 · high-contrast 99 each | `checkScheme().length`, counted in `theme.test.ts` |
 | Source | ≤ 1,000 lines across five files | — | review |
 | Browser cost | inside the editor chunk's 80 KB gzip (22 §9); never in the entry chunk | — | apps/web's `bundle` gate (33 §8) |
 
@@ -745,7 +776,7 @@ Golden palettes (22 roles × two themes × two schemes):
 |---|---|
 | House passes | both schemes: 0 `refuse`, 0 `corrected`, 0 M warnings; F bands light `10.7 · 11.0 · 14.2 · 17.4 · 43.8 · 39.7` (good/warn, good/bad, good/info, warn/bad, warn/info, bad/info), dark `14.5 · 20.7 · 24.4 · 14.0 · 52.3 · 40.0`, ±0.1; N advisories: dark `dim faint accent-text warn danger` × 5 surfaces (25), light none |
 | High-contrast passes | both schemes: 0 refuse, 0 corrected, 0 M; F min light 10.1, dark 14.3; N advisories dark `accent-text warn danger` × 5 (15) |
-| Result shape | 90 results per palette before N rows; every letter present; A rows carry `lc` |
+| Result shape | 99 results per palette, N's 4 advisory rows among them; every letter A to Q present in `validate`'s output |
 | **midnight** — the 28 §4.5 failing theme | body `{ theme: "midnight", seed: { accent: "oklch(0.62 0.16 262)" }, roles: { dark: { s3: "#2B3239", faint: "#7D8A85" }, light: { earn: "#506020" } } }` → `ok: false`, exactly two refusals, in order: `CONTRAST_FLOOR` at `theme.midnight.roles.dark.faint`, rendered `theme.midnight — the pair (faint on s3) is 3.61:1. Body text needs 4.5:1. Lighten faint to at least #8E9C96, or use it only above 24px.`; `INTENT_INSEPARABLE` at `theme.midnight.roles.light.earn`, rendered `theme.midnight — good and bad are ΔE 6.2 apart to a deuteranope. Four intents need at least 10. Move one hue, or lower the chroma of the other.` Byte-equal |
 | Gamut correction | `roles.dark.accent: "oklch(0.7 0.5 30)"` → `ok: true`, `corrections = [{ role: 'accent', from: 'oklch(0.7 0.5 30)', to: '#FF5843' }]`, one J result `corrected` |
 | Ladder order | `roles.dark.s2: "#0B0D11"` → `THEME_LADDER_ORDER` at `roles.dark.s2`, found `s2 is not lighter than s1` |
