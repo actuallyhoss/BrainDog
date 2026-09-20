@@ -37,3 +37,7 @@ packages/theme/proof.txt
 # `BRAINDOG_VARIANT=<name> vite build` so the browser gates can measure the half
 # of every branch the shipped seed cannot draw. Never committed: it is a build.
 build-*/
+
+# The handoff wrapper writes here and neither belongs in the history.
+loop/handoff.log
+loop/STOP
