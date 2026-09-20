@@ -14,7 +14,7 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { arrive, extractField, extractOutcome, ingestDay, openRecord, type Arrived, type Declaration, type Kernel } from '../src/index.ts';
-import { EXPONENT, exponentOf } from '../src/ingest.ts';
+import { EXPONENT, exponentOf, UNVERIFIED } from '../src/ingest.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -1328,4 +1328,63 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
       found.push(`${rel} quotes ${held.size} real currency codes, which is a list of what currencies there are. Take membership from Intl.supportedValuesOf('currency'), or name this file above with what the list is for if Intl cannot answer it.`);
   }
   assert.deepEqual(found, [], `\n${found.join('\n')}\n`);
+});
+
+/* ── 12 section 3: unverified is stored, and never matched ──────────────── */
+
+test('AN UNVERIFIED ARRIVAL IS STORED AND NEVER MATCHED, however well the pattern fits', async () => {
+  /* The host has carried this flag since `/in/*` was built and the record had nowhere to read it
+     from, so the rule had a host half and no record half: a stranger holding the webhook URL and
+     sending a wrong token had the bytes matched, extracted and written into a register as though
+     the bank had sent them. The same bytes are sent twice here, once each way, so the only thing
+     that differs between the two runs is the flag. */
+  const { k, sql } = await record(HSBC());
+
+  const forged = value<Arrived>(
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'f1', verified: false }),
+  );
+  assert.equal(forged.state, 'untriaged', 'an unverified payload was matched');
+  assert.equal(forged.ingest, null);
+  assert.deepEqual(forged.wrote, []);
+  assert.equal(forged.reason, UNVERIFIED);
+  assert.equal(k.get('transactions#1'), null, 'a forgery wrote a row into the register');
+
+  // AND THE BYTES ARE IN THE RECORD, which is the rule no repair here may weaken: the row is
+  // readable, with the sentence saying why nothing was tried on it.
+  const row = sql.one<{ state: string; reason: string | null; body: string }>("SELECT state, reason, body FROM inbox_raw WHERE sha256 = 'f1'")!;
+  assert.equal(row.state, 'untriaged');
+  assert.equal(row.reason, UNVERIFIED);
+  assert.equal(row.body, MAIL);
+
+  // The same bytes, verified, do everything they always did.
+  const real = value<Arrived>(
+    k.arrive({ channel: 'email', headers: { From: 'alerts@hsbc.example', Subject: 'Your transaction alert' }, body: MAIL, sha256: 'f2', verified: true }),
+  );
+  assert.equal(real.state, 'matched');
+  assert.equal(real.wrote.length, 1);
+  sql.close();
+});
+
+test('and an arrival that says nothing about verification is not an unverified one', async () => {
+  /* Only the two channels that terminate at a public door can answer the question at all. Reading
+     silence as `false` would have made every connector answer and every pasted payload untriaged. */
+  const { k, sql } = await record(HSBC());
+  assert.equal(value<Arrived>(send(k)).state, 'matched');
+  sql.close();
+});
+
+test('THREE FORGERIES BUY NO MODEL CALL, which is the one way an unverified row could still spend money', async () => {
+  /* `3'` queues a draft at the third arrival of an unmatched shape, and a draft is a bill. Without
+     this the cheapest attack on a record's owner is to send the same unsigned payload three times
+     from an address nobody has a pattern for. */
+  const { k, sql } = await record();
+  for (const n of [1, 2, 3, 4])
+    k.arrive({ channel: 'email', headers: { From: 'alerts@cib.eg', Subject: 'Debit' }, body: `payment ${n}`, sha256: `u${n}`, verified: false });
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 0, 'three forgeries queued a draft somebody pays for');
+
+  // And a verified shape still earns its one draft, so this rations rather than switches off.
+  for (const n of [1, 2, 3])
+    k.arrive({ channel: 'email', headers: { From: 'alerts@nbe.eg', Subject: 'Debit' }, body: `payment ${n}`, sha256: `v${n}`, verified: true });
+  assert.equal(sql.all('SELECT 1 FROM outbox').length, 1);
+  sql.close();
 });

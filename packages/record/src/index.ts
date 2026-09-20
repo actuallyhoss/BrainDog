@@ -67,6 +67,8 @@ import {
   type MeetArgs,
   type Met,
   type Approved,
+  type Arrival,
+  type Arrived,
   type DeviceCode,
   type DeviceRow,
   type Exchanged,
@@ -94,6 +96,18 @@ export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SPARK_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SparkDraft, type SparkFormInput, type SparkModel, type SparkModelInput, type Usage } from './spark.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
+
+/**
+ * What proves a caller is the sender an ingest expects, as the record can answer it today.
+ *
+ * ONE MEMBER, AND IT IS A UNION ON PURPOSE. `@braindog/host`'s `IngestVerify` has three kinds and
+ * this answers the one a record with no declared verifier can honestly give; written as a union of
+ * one, the day `verify:` reaches the declaration grammar the other two are added here and every
+ * caller that switched on `kind` already compiles. The record may not import the host's type: the
+ * edge points the other way (`31 §2`), so this is structural and the door's parameter is what
+ * checks the two agree.
+ */
+export type IngestVerification = { kind: 'none' };
 
 /* ── who is asking ───────────────────────────────────────────────────────── */
 
@@ -3950,6 +3964,58 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async createRecord(args: CreateRecordArgs) {
       return tail(kernel.createRecord(args));
+    },
+
+    /**
+     * A payload arrives at `/in/*`. INTERNAL: a host calls it, and it is not in `ROUTES`.
+     *
+     * IT TAKES NO `CallContext` BECAUSE THERE IS NOBODY TO BUILD ONE FROM. The caller is a bank's
+     * server or a forwarding mail host, which holds no credential this record ever issued, and
+     * `30 §5` lists `arrive` as INTERNAL for exactly that reason. What stands in for a principal is
+     * `verified`: the host says whether anything proved the sender, and the record decides what an
+     * unproved payload is allowed to do, which is to be stored and nothing else (`12 §3`).
+     *
+     * SO THE HOST MUST NOT BE ABLE TO OMIT THE QUESTION BY ACCIDENT. `Arrival.verified` is optional
+     * in the kernel, because `pull`, `paste` and `api` arrive from a caller the record has already
+     * authenticated and have no verification to report; the two channels that terminate at a public
+     * door do, so this door requires the flag and the type says so. A host that forgot it would
+     * otherwise have every forgery matched, which is the failure this whole path is about.
+     *
+     * AND IT ANSWERS THE RECEIPT, not a sentence for the sender. `serveIngest` turns every outcome
+     * into 202 with an empty body: what comes back here is for the host's own logs and for the
+     * tests, and a stranger is told nothing about what their bytes did.
+     */
+    async arrive(args: Omit<Arrival, 'verified'> & { verified: boolean }): Promise<Result<Arrived>> {
+      return tail(kernel.arrive(args));
+    },
+
+    /**
+     * What verifies a webhook ingest, for a host's `/in/*` door. INTERNAL, and no route reaches it.
+     *
+     * `null` IS "NOBODY DECLARED THIS", WHICH THE DOOR ANSWERS 404 TO, and it is the only thing a
+     * stranger can learn here. A declared ingest and an undeclared one are one lookup apart, which
+     * is why the door rate-limits on the path before it asks: guessing ids costs 404s and no row.
+     *
+     * A `pull` OR `call` INGEST IS NOT A WEBHOOK AND ANSWERS `null` TOO. Those ids are a connector's,
+     * fetched by the record on a schedule; accepting a POST at one would let a stranger feed a
+     * connector's register through a door meant for a bank, which is the same id with none of the
+     * checks.
+     *
+     * WHAT IS NOT HERE IS THE MATERIAL, and it is missing at the source rather than here. `25 §3.2`
+     * writes a webhook ingest's `verify: { kind: hmac_sha256, header, grant }` and `12 §3` names a
+     * random path token as the other form; grepped on 2026-09-20, no `verify` key exists anywhere in
+     * `packages/kernel/src/declare.ts` or `packages/declare`, so no declaration in this build can
+     * carry one and `declare` would refuse it as an unknown key if it did. Until that lands the
+     * honest answer for an ingest somebody declared is that nothing verifies it, which stores every
+     * webhook arrival `untriaged` and matches none of them. That is `12 §3`'s own rule applied to a
+     * record that has declared no verifier, and it is a great deal better than the alternative of
+     * treating the URL as the proof.
+     */
+    async ingestVerify(args: { ingest: string }): Promise<IngestVerification | null> {
+      const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${args.ingest}`);
+      if (!row) return null;
+      const decl = JSON.parse(row.body) as { channel?: unknown };
+      return decl.channel === 'webhook' ? { kind: 'none' } : null;
     },
 
     /**

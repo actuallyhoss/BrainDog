@@ -210,6 +210,21 @@ export type Arrival = {
   body?: string;
   /** The bytes' hash. Supplied by the host, which has the bytes; the record has the text. */
   sha256: string;
+  /**
+   * Whether anything proved this payload came from the sender the ingest expects (`12 §3`, `49 §5.16`).
+   *
+   * `false` MAKES THE ROW INELIGIBLE TO MATCH, and that is the whole of the member. The host had
+   * carried this flag since `/in/*` was written and there was nowhere to put it, so the rule
+   * *"an unverified payload is stored `untriaged` and never matched"* had a host half and no record
+   * half: a stranger with the URL and a wrong token got the bytes stored, matched, extracted and
+   * written into a register, which is the forged bank alert `12 §3` exists to stop.
+   *
+   * ABSENT IS NOT `false`, AND THE DIFFERENCE IS LOAD BEARING. Only the two channels that terminate
+   * at a public door can answer this question at all; `pull`, `paste` and `api` arrive from a
+   * caller the record has already authenticated, and reading their silence as "unverified" would
+   * have made every connector answer and every pasted payload untriaged for ever.
+   */
+  verified?: boolean;
 };
 
 export type Arrived = {
@@ -536,6 +551,20 @@ function neighbours(day: string): [string, string] | undefined {
 }
 
 /**
+ * Why an arrival nothing vouched for is sitting in the inbox, written on the row itself.
+ *
+ * ON THE ROW, BECAUSE `inbox_raw` HAS NO `verified` COLUMN AND A SENTENCE IS WORTH MORE THAN A FLAG.
+ * `reason` is already the column that says why a row is where it is — `0001_kernel.ts` calls it
+ * *"why `skipped`, why `review` — the one place a wrong skip shows"* — and the person reading the
+ * inbox needs to know that the payload was not ignored by their pattern, it was never offered to
+ * one. A boolean column would have said the same thing to a query and nothing to a reader.
+ *
+ * AND `propose` READS IT BACK, which is the other reason it is one exact string and not prose that
+ * varies. Three forgeries from one address must not buy a model call.
+ */
+export const UNVERIFIED = 'nothing verified this arrival, so no pattern was offered it';
+
+/**
  * One payload through the pipeline.
  *
  * THE RAW IS STORED FIRST AND ALWAYS. Whatever happens after it, the bytes are in the record — which
@@ -606,13 +635,32 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       ts: at,
     };
 
+    /**
+     * `12 §3`: AN UNVERIFIED PAYLOAD IS STORED AND NEVER MATCHED, and the declarations are not even
+     * read for one.
+     *
+     * INELIGIBLE RATHER THAN MARKED, which is the difference between this and a `verified` column
+     * somebody has to remember to consult. The host has carried the flag since `/in/*` was built
+     * and the record had nowhere to read it from, so every check `12 §3` describes was on the far
+     * side of a seam: a stranger holding a webhook URL and sending a wrong token had the bytes
+     * stored, matched against every pattern on the record, extracted and written into a register
+     * as though the bank had sent them.
+     *
+     * NOT READING `ingests()` IS PART OF IT AND NOT AN OPTIMISATION. A flood of forgeries at one
+     * ingest then costs one INSERT each and no declaration parse, which matters because this door
+     * is the one surface a stranger reaches with no credential and still gets a write out of.
+     */
+    const unverified = arrival.verified === false;
+
     /* THE FIRST MATCHING INGEST WINS, and the order is the declaration order. Two patterns that both
        match one payload is a thing to notice rather than a thing to merge — merging two extractions
        produces a row neither declaration describes. */
-    const matched = deps
-      .ingests()
-      .filter((i) => i.channel === arrival.channel)
-      .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
+    const matched = unverified
+      ? undefined
+      : deps
+          .ingests()
+          .filter((i) => i.channel === arrival.channel)
+          .find((i) => i.match === undefined || evaluate(i.match, fields, INBOX_RAW));
 
     const store = (state: Arrived['state'], reason: string | null): void => {
       deps.sql.exec(
@@ -645,9 +693,13 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     if (!matched) {
       /* UNTRIAGED IS NOT AN ERROR. It is the state a payload is in before anybody has said what it
          means, and the reason `inbox_raw` exists at all: an ingest pipeline whose answer to "I do not
-         recognise this" is to drop it is a pipeline whose failures are invisible. */
-      store('untriaged', null);
-      return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [] });
+         recognise this" is to drop it is a pipeline whose failures are invisible.
+
+         AND AN UNVERIFIED ONE SAYS WHICH OF THE TWO SILENCES IT IS. Untriaged with no reason is "no
+         pattern here recognised this"; untriaged with `UNVERIFIED` on it is "nothing was tried",
+         and only the second is answered by fixing the sender's signature rather than the pattern. */
+      store('untriaged', unverified ? UNVERIFIED : null);
+      return ok<Arrived>({ raw, ingest: null, state: 'untriaged', wrote: [], ...(unverified ? { reason: UNVERIFIED } : {}) });
     }
 
     /* `43 §5.1` STEP 1, WHICH IS BEFORE THE SKIP LIST AND BEFORE ANY FIELD. `07 §2`: *two caps bound
@@ -1003,10 +1055,16 @@ export function propose(deps: ProposeDeps, channel: Channel, headers: Record<str
       /* `rowid` BREAKS THE TIE, because a burst arrives inside one millisecond and `ts` alone then
          orders them by nothing in particular — which would hand a person three examples in an order
          that is not the order they came in. */
+      /* AND AN UNVERIFIED ROW IS NOT AN EXAMPLE OF ANYTHING. `12 §3` makes it ineligible to match,
+         and a draft proposed from three of them is a pattern written to read a stranger's forgeries,
+         paid for by the record's owner: this is the one place an arrival nothing vouched for could
+         still spend money. The state and the reason together are the test, because `UNVERIFIED` is
+         the only reason an untriaged row ever carries. */
       `SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ?
-       AND ${WHO} IS NOT NULL ORDER BY ts DESC, rowid DESC LIMIT ?`,
+       AND (reason IS NULL OR reason <> ?) AND ${WHO} IS NOT NULL ORDER BY ts DESC, rowid DESC LIMIT ?`,
       channel,
       since,
+      UNVERIFIED,
       SCAN,
     )
     .filter((r) => shapeOf(channel, JSON.parse(r.headers ?? '{}') as Record<string, string>) === shape);
