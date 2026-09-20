@@ -237,8 +237,30 @@ for (const [what, list] of [['30 §6', table], ['REFUSAL_CODES', declared]]) {
  * the file `04 §5` is about, and the six checks added the same afternoon moved the number by zero.
  *
  * A gate whose predicate cannot reach the biggest input is the failure this whole tools directory
- * exists to catch, made by the tool. The names are `no`, `bad`, `refuse` and `at`, counted from the
- * source rather than remembered: a fifth is a finding, because the number below would silently drop.
+ * exists to catch, made by the tool.
+ *
+ * AND IT MADE IT A THIRD TIME, ON A FIFTH WAY OF RAISING ONE. The paragraph that used to sit here
+ * said the helper names were "counted from the source rather than remembered: a fifth is a finding".
+ * Nothing counted them. They are the four words written into the pattern below, and the sentence
+ * saying otherwise is the only thing that was ever checking. `@braindog/connect` arrived as the
+ * twelfth package and raises its refusals by constructing one: `throw new PullError('CODE', at, …)`.
+ * Eight sites, two codes, and this gate called both of them emitted by nothing, which is the exact
+ * verdict it exists to deliver and the exact verdict that was wrong. `refusal-fixtures` counted them
+ * and said 115 where this said 113, the two gates disagreed for a second time, and the difference
+ * was recorded as unexplained for a day rather than chased.
+ *
+ * So the pattern takes a constructor too, and the class name must have something in front of
+ * `Error`. `new Error('ECONNREFUSED')` is the language's own base class and its first argument is a
+ * MESSAGE: admitting it put two errno names into the invented list and would have spent half the
+ * budget on Node. A domain error whose first argument is a code is a different act, and it is the
+ * act this gate measures. Measured on 2026-09-20 over 815 files: 113 to 115 emitted, the invented
+ * list unmoved at four, and this gate now agrees with `refusal-fixtures` code for code.
+ *
+ * A SIXTH WAY WOULD STILL BE INVISIBLE, and this file cannot honestly claim otherwise. The names
+ * below are remembered, because a predicate that found refusal helpers by reading the source would
+ * be a fourth thing that can be wrong. What catches a sixth is the other gate: it asks the simpler
+ * question, is the code written as a string anywhere, and the two numbers are printed side by side
+ * on every run. Two gates disagreeing has now found this twice.
  *
  * AND IT MADE THE SAME MISTAKE A SECOND TIME, ON A `?`. Widened for `bad()` this still anchored the
  * code to the quote IMMEDIATELY after `code:`, and a refusal written
@@ -257,11 +279,31 @@ for (const [what, list] of [['30 §6', table], ['REFUSAL_CODES', declared]]) {
  * people learn to read past, the failure the budget below is written to avoid.
  */
 const EMITTED =
-  /(?:code:\s*|\b(?:no|bad|refuse|at)\s*(?:<[^>]*>)?\(\s*)(?:[^'"\n]{0,160}\?\s*)?'([A-Z][A-Z0-9_]{2,})'(?:\s*:\s*'([A-Z][A-Z0-9_]{2,})')?/g;
+  /(?:code:\s*|\bnew\s+\w+Error\s*\(\s*|\b(?:no|bad|refuse|at)\s*(?:<[^>]*>)?\(\s*)(?:[^'"\n]{0,160}\?\s*)?'([A-Z][A-Z0-9_]{2,})'(?:\s*:\s*'([A-Z][A-Z0-9_]{2,})')?/g;
+
+/**
+ * AND THE WHOLE-STRING PREDICATE, KEPT BESIDE THE CONSTRUCTOR ONE ON PURPOSE.
+ *
+ * This is `refusal-fixtures`' question, asked here too: is the code written as a string anywhere in
+ * first-party source? It is the cheap half and it cannot tell a throw from a comparison, which is
+ * why it is not the number this gate prints. It is here because the two predicates have now caught
+ * each other twice, and a disagreement a person has to notice across two printed lines is a
+ * disagreement that stood unexplained for a day.
+ *
+ * The invariant is exact and has no slack in it today: every code named in source is also
+ * constructed somewhere the pattern above can see. A code that is named and not constructed means
+ * one of two things and both are findings. Either the pattern has a hole, which is what the fifth
+ * way was, or a code is asserted on by a test and raised by nothing, which is a test that will pass
+ * for ever without exercising anything. The registry file itself is excluded, because it names all
+ * one hundred and twenty-six by definition and that is the one place naming is not evidence.
+ */
+const NAMED = /(['"])([A-Z][A-Z0-9_]{2,})\1/g;
+const REGISTRY = 'packages/ports/src/index.ts';
 
 const known = new Set(table);
 const invented = new Map();
 const emitted = new Set();
+const named = new Map();
 let scanned = 0;
 
 /**
@@ -316,7 +358,10 @@ function walk(dir) {
     if (!['.ts', '.svelte', '.mjs'].includes(extname(entry.name))) continue;
     scanned += 1;
     const where = rel(join(dir, entry.name));
-    for (const m of readable(readFileSync(join(dir, entry.name), 'utf8')).matchAll(EMITTED))
+    const text = readable(readFileSync(join(dir, entry.name), 'utf8'));
+    if (where !== REGISTRY)
+      for (const m of text.matchAll(NAMED)) if (known.has(m[2])) named.set(m[2], [...(named.get(m[2]) ?? []), where]);
+    for (const m of text.matchAll(EMITTED))
       /* BOTH ARMS OF A TERNARY, and `m[2]` is `undefined` for the ordinary one-code case. */
       for (const code of [m[1], m[2]]) {
         if (code === undefined) continue;
@@ -400,8 +445,9 @@ const codes = [...invented.keys()].sort();
  * reason teaches people to read past its output.
  *
  * IT WAS WRITTEN `scanned > 50`, WHICH IS A DIFFERENT CLAIM AND A SILENT ONE. Fifty is not a
- * property of anything: the real tree walks 814 files, sixteen times the threshold, so no real run
- * has ever come near it, and the number was really asking "am I pointed at a fixture?" in a
+ * property of anything: the real tree walks better than fifteen times the threshold and grows every
+ * week, so no real run has ever come near it, and the number was really asking "am I pointed at a
+ * fixture?" in a
  * spelling that could also answer yes to a walk that had broken. A root with fifty-one source
  * files measured the budget and went red; the same root with fifty went green and said nothing had
  * been dropped. One file decided whether two checks existed.
@@ -423,6 +469,17 @@ if (measured && codes.length > BUDGET) {
   for (const code of codes.slice(0, 30)) findings.push(`  \`${code}\`: ${[...new Set(invented.get(code))].slice(0, 3).join(', ')}`);
 }
 
+/* AND THE TWO PREDICATES HAVE TO AGREE, measured only on a whole-tree walk for the same reason the
+   budget is: a fixture root holds one package and the question means nothing there. */
+if (measured)
+  for (const [code, where] of [...named].sort())
+    if (!emitted.has(code))
+      findings.push(
+        `\`${code}\` is written in ${[...new Set(where)].slice(0, 3).join(', ')} and nothing here constructs it.\n` +
+          '        Either a refusal is raised by a shape the pattern above cannot see, or a test asserts on a code\n' +
+          '        no line ever raises. Read the sites, then widen the pattern or delete the assertion.',
+      );
+
 /* AND THE BUDGET IS NOT ALLOWED TO BE SLACK EITHER. A budget nobody lowers is a budget that stops
    meaning anything; when the count drops, this says so and asks for the number to come with it. */
 if (measured && codes.length < BUDGET)
@@ -431,7 +488,7 @@ if (measured && codes.length < BUDGET)
 if (findings.length === 0) {
   console.log(`  refusals: ${table.length} codes in ${FAMILIES.length} families, three sources agree`);
   /* AND THE DENOMINATOR IS PRINTED EITHER WAY. `scanned` was never in this output, so a run that
-     walked 814 files and a run that walked none read the same except for one clause tucked inside
+     walked the whole tree and a run that walked none read the same except for one clause tucked inside
      a green sentence. `refusal-fixtures` prints "N codes named across M sources" for this reason;
      a count with no denominator is a number nobody can check. */
   if (measured)
