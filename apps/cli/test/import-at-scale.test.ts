@@ -1,13 +1,14 @@
 /**
- * The import's two claims about re-running, measured at the size his record actually reaches.
+ * The import's claims about re-running, measured at the size his record actually reaches.
  *
  * WHY THIS FILE IS NOT IN `import.test.ts`. Those 499 lines drive `memoryRecord`, whose `list`
  * ignores `limit` and `cursor` and answers every row in one page, and whose `governance` ignores
- * `limit` and answers every suggestion ever opened. Both of the failures below are failures of
+ * `limit` and answers every suggestion ever opened. The first two failures below are failures of
  * PAGING, so the fake cannot hold either of them: it is green against an importer that reads one
  * page and calls it the whole list. The door here is the kernel this product ships, opened over an
  * in-memory SQLite, so the page sizes, the cursors and the two hundred row governance ceiling are
- * the record's own numbers and not this file's.
+ * the record's own numbers and not this file's. The third is the same read refusing outright, which
+ * `memoryRecord` never does either: its `governance` is a function that cannot fail.
  *
  * AND IT IS NOT IN `tools/gates/import.mjs` EITHER, which rehearses the whole switch against a real
  * self-host over HTTP and re-runs it. That gate is the right place for the end to end claim and it
@@ -65,15 +66,20 @@ async function record() {
 }
 
 /**
- * The importer's door, onto the kernel, with one fault it can be asked to inject.
+ * The importer's door, onto the kernel, with the faults it can be asked to inject.
  *
  * `refuseListAfter` IS WHAT A SELF-HOST REALLY ANSWERS when the bearer stops being known part way
  * through a run: `apps/selfhost/src/server.ts` `UNKNOWN`, verbatim. An import is hundreds of
  * requests and the command's own advice for a run that stopped part way is to run it again, so a
  * credential that is rotated, revoked or restarted underneath one is the ordinary case, not an
  * exotic one. Everything else on this door is the record answering for itself.
+ *
+ * `refuseDecide` IS THE SAME CREDENTIAL GOING STALE ONE READ LATER, when the rows are already
+ * written and the run has reached the Decide read. It is a separate switch because the two halves
+ * end differently on purpose: a list that cannot be read to the end throws and writes nothing,
+ * while a Decide read that cannot be made has nothing to undo and so must carry on without asking.
  */
-function doorOf(kernel: Kernel, o: { refuseListAfter?: number } = {}): { door: Door; lists: () => number } {
+function doorOf(kernel: Kernel, o: { refuseListAfter?: number; refuseDecide?: boolean } = {}): { door: Door; lists: () => number } {
   let lists = 0;
   const door: Door = {
     schema: async (register) =>
@@ -94,11 +100,13 @@ function doorOf(kernel: Kernel, o: { refuseListAfter?: number } = {}): { door: D
         ...(note === undefined ? {} : { note }),
       }),
     governance: async ({ register, status, limit, cursor }) =>
-      kernel.governance((register ?? 'suggestion') as never, {
-        ...(status === undefined ? {} : { status }),
-        ...(limit === undefined ? {} : { limit }),
-        ...(cursor === undefined ? {} : { cursor }),
-      }),
+      o.refuseDecide === true
+        ? { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' } }
+        : kernel.governance((register ?? 'suggestion') as never, {
+            ...(status === undefined ? {} : { status }),
+            ...(limit === undefined ? {} : { limit }),
+            ...(cursor === undefined ? {} : { cursor }),
+          }),
     propose: async (p) => kernel.propose(p as never, ACTOR),
   };
   return { door, lists: () => lists };
@@ -188,5 +196,41 @@ test('A LIST THE IMPORT COULD NOT READ TO THE END IS A REFUSAL, and nothing is w
   );
   assert.equal(lists(), 2, 'the read stopped at the page that was refused');
   assert.equal(kernel.count('things'), 620, 'rows the import could not see were added a second time');
+  sql.close();
+});
+
+/**
+ * THE THIRD WAY THE SAME CREDENTIAL CAN GO STALE, and the one that cannot be answered by throwing.
+ *
+ * `readAll` and `readDecide` are both reads the idempotency rests on, and a refusal to either one used to read as
+ * "there is nothing there". The list half ends the run, because nothing has been written yet. The Decide half cannot:
+ * by the time it runs the rows are already in the record, and an exception would take the report down with it. So the
+ * repair there is the opposite shape, and it is the shape nothing measured: carry on, ask NOTHING, and say which read
+ * failed. Reading an empty answer instead would file the question a second time under the one condition that makes a
+ * duplicate worst, which is that he has already answered the first copy.
+ */
+test('A DECIDE READ THAT REFUSES ASKS NOTHING RATHER THAN ASKING AGAIN, and the run says which read it could not make', async () => {
+  const { sql, kernel } = await record();
+  const rows = [project(1), project(2)];
+
+  const first = await applyPlan(plan(rows, [ASK]), doorOf(kernel).door, { dryRun: false });
+  assert.deepEqual(first.refused, []);
+  assert.equal(first.asked, 1);
+  assert.equal(onDecide(kernel).length, 1);
+
+  const again = await applyPlan(plan(rows, [ASK]), doorOf(kernel, { refuseDecide: true }).door, { dryRun: false });
+  assert.equal(again.asked, 0, 'a question was filed on a read that never said whether it had been asked');
+  assert.equal(again.alreadyAsked, 0, 'nothing was read, so nothing may be reported as found');
+  assert.equal(onDecide(kernel).length, 1, 'the question he has already been asked was asked a second time');
+  assert.deepEqual(
+    again.refused.map((r) => r.register),
+    ['Decide'],
+    'the run went quiet about a read it could not make',
+  );
+
+  /* AND THE ROWS STILL RECONCILE, because this failure is about the questions and not about the lists: the two
+     projects are found by their keys and updated in nothing, which is what a second import of the same export does. */
+  assert.equal(again.tally.things?.unchanged, 2);
+  assert.equal(kernel.count('things'), 2);
   sql.close();
 });
