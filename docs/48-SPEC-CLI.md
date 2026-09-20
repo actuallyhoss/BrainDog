@@ -33,8 +33,9 @@ else is `node:*`.
 
 ## 2 · Public API
 
-An app's public surface is its command tree, its config file and its environment. Every command but `mcp`
-takes the two globals `--json` and `--host <host>`; every command exits with one of four codes (§4.4).
+An app's public surface is its command tree, its config file and its environment. `--host <host>` is a global on
+every command but `mcp`. The second global, `--json`, is specified in §4.5 and **is not built**: no command in
+`apps/cli/src` accepts the flag today. Every command exits with one of four codes (§4.4).
 
 | Command | Arguments · flags | Calls | Prints | Exit |
 |---|---|---|---|---|
@@ -73,8 +74,9 @@ takes the two globals `--json` and `--host <host>`; every command exits with one
 Thirty commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
 (its two events in one row), `install`, `keys put` and `keys exec`, `skills sync`, `tools scan` and `tools write`,
 and the agent path's `logout`, `run`, `session` (its five verbs in one row) and `context`.
-`--json` puts exactly one JSON document on stdout (§4.5) and moves every progress line to stderr. `mcp` takes
-no `--json`, because its stdout is the protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
+`--json` **is not built.** §4.5 specifies it as exactly one JSON document on stdout with every progress line moved
+to stderr, and says what building it would take; `mcp` is excluded from it in any case, because its stdout is the
+protocol. `--host` beats `BRAINDOG_HOST`, which beats `hosts.json`'s
 `default`. A host is written `https://origin[/slug]`; a bare name means https, and plain http is refused
 except to this machine, because the bearer would cross the network in the clear.
 
@@ -204,11 +206,11 @@ apps/cli/
 │   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl, mirror
 │   ├── pack.ts           ~180 lines  source resolution (path · url · git · Kennel), lint, plan, install (--with-deps), uninstall, the diff screen
 │   ├── runner.ts         ~240 lines  enrol, the claim loop, the claude spawn, distil(), PROMPTS from @braindog/spark/prompts
-│   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block, the --json envelope
+│   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block; no --json envelope, which is not built (§4.5)
 └── test/
     ├── mock-host.ts      a node:http server answering canned Result envelopes and a .brainl body
     ├── make-brainl.ts    materialises the fixture record (40 §5.3), exportBrainl() to lines, appends a dog_sig row with a test key
-    ├── fixtures/         stream-json.ndjson · refusals → sentences · the golden --json per command
+    ├── fixtures/         stream-json.ndjson · refusals → sentences; no golden --json, because the flag is not built (§4.5)
     └── *.test.ts         §9
 ```
 
@@ -341,7 +343,25 @@ type Verified = { container: 'dog' | 'dogl'; format: number; tables: number; row
                   partial?: ('data' | 'origin' | 'governance')[] };
 ```
 
-One document, stdout, then exit. `value` is the reply type of §4.2, or for the offline commands: `verify` →
+**None of this is built, and this section says what building it would take.** No command accepts `--json`: there is
+no `json` option in any `parseArgs` call in `apps/cli/src`. Three measurements, taken on 2026-09-20, set the size
+of the work:
+
+- **The reply types are mostly unspecified.** §4.2 gives a `value` shape to `export`, `import`, `pack plan` and
+  `pack install`, `rule test` and `rule apply`, `token create` and `token list`, and the runner's claim. For every
+  other command the specification does not say what `value` would hold, so there is nothing yet to print.
+- **Fifty-three `io.out` call sites** across `apps/cli/src` write the readable output, and each one would need a
+  machine-readable counterpart beside it.
+- **Some commands can carry no value at all.** `mcp` is a transport and its stdout is the protocol. `keys exec` and
+  its alias `run` hand stdout to a child process. `hook start` and `hook end` print a briefing to a hook consumer
+  that reads text. `init` and `serve` spawn the self-host and pass its streams through.
+
+The flag stays specified rather than deleted, because a machine-readable surface is the right thing for this
+command to have. The condition for building it is the first measurement: the reply types are written down first,
+and the flag follows them.
+
+The specified behaviour, for when that happens. One document, stdout, then exit. `value` is the reply type of
+§4.2, or for the offline commands: `verify` →
 `Verified`; `pack lint` → `{ pack, version, declarations, checksum }`; `export` → `{ dogl, dog, verified: Verified,
 files?: { fetched: number; missing: string[] }, mirror?: { rows: number } }`.
 
@@ -354,8 +374,8 @@ files?: { fetched: number; missing: string[] }, mirror?: { rows: number } }`.
 1. `--version` or `-v` first: print `app ${__BUILD__} · format ${FORMAT_VERSION} · kernel ${KERNEL_MIGRATION} · primitives ${PRIMITIVES_VERSION}`; exit 0. Unbundled, `__BUILD__` is `dev+0000000`.
 2. Take the leading non-flag words as the command path (`pack install`); look it up; unknown → usage to stderr, exit 1.
 3. `parseArgs({ args: rest, options: { ...GLOBAL, ...command.options }, allowPositionals: true, strict: true })`; a parse error → its message and the command's usage line, exit 1.
-4. `await command.run(ctx, positionals, values)` → `{ value, human }`; `emit()` prints `human` to stdout, or the `Out` envelope under `--json`; exit 0.
-5. Catch by class: `Refused` → one sentence per refusal (§6), exit 1 · `Conflicted` → the conflict line, exit 2 · `Unreachable` → the unreachable line, exit 3 · anything else → `error: <message>`, exit 1. Under `--json` the same four are the envelope of §4.5.
+4. `await command.run(ctx, positionals, values)` → `{ value, human }`; `emit()` prints `human` to stdout; exit 0. The `Out` envelope under `--json` is specified and not built (§4.5).
+5. Catch by class: `Refused` → one sentence per refusal (§6), exit 1 · `Conflicted` → the conflict line, exit 2 · `Unreachable` → the unreachable line, exit 3 · anything else → `error: <message>`, exit 1. Under `--json` the same four would be the envelope of §4.5, once that flag is built.
 
 ### 5.2 · The HTTP client and the device flow (`http.ts`)
 
@@ -572,7 +592,8 @@ are [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md)'s to implement (§13 D5).
 `at` has a leading `declarations[<i>]` replaced by that declaration's `kind.id` when the CLI holds the pack
 (`lint`, `plan`, `install`). So `{ code: 'FIELD_TYPE_UNKNOWN', at: 'declarations[3].fields[4].type',
 found: 'currency', fix: "Did you mean 'money'?" }` prints as
-`register.invoices.fields[4].type 'currency' — did you mean 'money'?`. The code travels only in `--json`.
+`register.invoices.fields[4].type 'currency' — did you mean 'money'?`. The code itself is not printed: it would travel
+only in `--json`, which is not built (§4.5).
 
 | Situation | Rendering | Exit |
 |---|---|---|
@@ -583,7 +604,7 @@ found: 'currency', fix: "Did you mean 'money'?" }` prints as
 | `conflict` (409) | `<register>#<seq> was changed by <actor> — now version <n>; re-read and re-apply.` | 2 |
 | unreachable | `<host> unreachable — <cause>`: `ECONNREFUSED` · `ENOTFOUND` · `timeout after 30 s` · `HTTP 502` · `export stream ended before dog_sig — export again` | 3 |
 | `SCHEMA_MISMATCH` · `SCHEMA_NEWER` (503) | the host's sentence | 1 |
-| local error | `error: <message>` — no code; `--json` uses the `error` variant | 1 |
+| local error | `error: <message>`, with no code; the `error` variant of `--json` is specified and not built (§4.5) | 1 |
 
 **Codes the CLI raises itself**, offline, each with the `fix` a person reads:
 
@@ -658,7 +679,7 @@ test Ed25519 key held in `test/`. Golden files are compared as parsed JSON.
 | T1 | `--version` | → `app dev+0000000 · format 1 · kernel 1 · primitives 1`, exit 0 |
 | T2 | unknown command · unknown flag | `braindog frob` · `export --bogus` → usage on stderr, exit 1 |
 | T3 | refusal sentence | 30 §6's `FIELD_TYPE_UNKNOWN` object → `register.invoices.fields[4].type 'currency' — did you mean 'money'?` |
-| T4 | golden `--json`, every command | mock host answers the fixture reply → stdout equals `golden/<command>.json`. Seventeen commands |
+| T4 | golden `--json`, every command | **Not built**, because the flag is not (§4.5). When it is: mock host answers the fixture reply → stdout equals `golden/<command>.json`, one file per command |
 | T5 | exit codes | mock answers `ok` · `422` · `409` · closed socket → 0 · 1 · 2 · 3, for `rule apply` |
 | T6 | `login` approved | poll → pending, pending, token → `hosts.json` holds it, `default` set, mode `0600` (POSIX only), the token absent from stdout and stderr |
 | T7 | `login` expired · denied · foreign URI | `DEVICE_CODE_EXPIRED` → exit 1 · `DEVICE_CODE_TRIES` → exit 1 · `verification_uri` on another origin → refused before printing |
@@ -727,11 +748,11 @@ cover `mcp`. `brief.test.ts` covers the briefing with no host:
 - `ponytail:` the `.brainl` stays beside the `.brain` after export; add `--dogl-only` when disk matters.
 - `ponytail:` attachments fetch four at a time with no resume; a re-run skips files whose hash matches.
 - `ponytail:` the mirror writes markdown with plain values and verbatim `document` fields; no HTML, no `braindog-render`; add `--mirror-html` through `toHTML` when a browser-readable mirror is asked for.
-- `ponytail:` `--json` is one document at exit; no streaming progress protocol.
+- `ponytail:` `--json` is specified as one document at exit and is not built (§4.5); no streaming progress protocol either way.
 - `ponytail:` `hosts.json`'s `0600` is a no-op on Windows; an `icacls` call if a Windows report shows another user reading it.
 - `ponytail:` `init` and `dev` need `BRAINDOG_SELFHOST` outside a checkout; a published self-host binary would let the CLI find it.
 - `ponytail:` no `--model` on the runner; the customer's subscription and the `claude` default decide.
-- `ponytail:` no colour, no TTY detection, `✓` and `✗` always; `--json` is the machine surface.
+- `ponytail:` no colour, no TTY detection, `✓` and `✗` always; the machine surface would be `--json`, which is not built (§4.5).
 
 Eighteen, counted.
 
@@ -861,7 +882,7 @@ well-known URL of 03 §4 is `GET /.well-known/braindog-key` → `{ key_id, publi
 
 **D11 · Local errors have no code.** A CLI-local failure (bad file, missing tool, bad arguments) is an `error`
 with a sentence and exit 1 (or 3 when the host is the cause), never a refusal with an invented code; `--json`
-carries it as the fourth envelope variant. *Amend:* 33 §5.
+would carry it as the fourth envelope variant, and that flag is not built (§4.5). *Amend:* 33 §5.
 
 **D12 · Flags not in v1.** `export --with-grants` (03 §5), `pack install --force` (04 §5), the paste source
 (04 §3) — each a §10 ceiling. *Amend:* 03 §5 and 04 §3, §5 to say "CLI: later" beside each.

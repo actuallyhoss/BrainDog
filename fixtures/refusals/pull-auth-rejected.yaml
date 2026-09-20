@@ -1,5 +1,21 @@
 code:   PULL_AUTH_REJECTED
 via:    rpc
-raises: apps/web/src/lib/record/data.ts
-at:     credential
+raises: packages/connect/src/auth.ts
+at:     fetch.auth.token_url
 fix:    Reconnect the credential.
+
+# `raises:` AND `at:` BOTH NAMED SOMETHING THAT RAISES NOTHING. This fixture pointed at
+# `apps/web/src/lib/record/data.ts`, whose only use of this code is a demo sample row in the web
+# app's fake data (`data.ts:1269`), written so a drawn page has a failed connector to show. The code
+# is thrown in seven places in `packages/connect/src/auth.ts`, and the one `47 §6` describes is
+# line 263: the token endpoint answered 401 or 403. Its address is the `at` set at line 418, so this
+# fixture now carries `fetch.auth.token_url` instead of `credential`, which no emitter produces.
+
+# `via: rpc` IS NOT TRUE, AND THAT IS THE FINDING. No RPC call can reach this code. `40 §6`'s
+# `rpc` runner seeds a record and makes a `call:`, and a `PULL_` code is raised inside a scheduled
+# connector run, by the runner the Worker's alarm and the self-host's timer drive. The refusal is
+# written onto that run's ack as `result.error` and is never handed back to a caller, so nothing a
+# `call:` can express reaches it. The honest value is an eighth `via`, `pull`, driven from
+# `connect/test`. A fixture cannot mint one: `40 §6`'s table is the registry this value is checked
+# against, and five documents outside this directory count the `via`s as seven. That is a
+# vocabulary change and a decision rather than a repair.

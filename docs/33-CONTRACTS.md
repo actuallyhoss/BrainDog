@@ -485,7 +485,8 @@ response echoes the client's `X-Request-Id`, and both hosts log it. A request na
 ## 5 · The CLI — `braindog`
 
 One bundled file (`esbuild`), the `braindog-cli` package (Apache-2.0); `yaml` and `valibot` ride inside it through `declare`
-([ADR-046](16-DECISIONS.md), [ADR-063](16-DECISIONS.md)) and nothing else does. Every command has `--json`.
+([ADR-046](16-DECISIONS.md), [ADR-063](16-DECISIONS.md)) and nothing else does. `--json` is not built: it is specified
+in [48-SPEC-CLI](48-SPEC-CLI.md) §4.5, which also records what building it would take, and no command accepts the flag today.
 
 | Command | Does |
 |---|---|
@@ -509,9 +510,9 @@ its summary — the plan diff, the export scope, the token's scope — and the b
 within ten minutes, with `ctx.op` set. Nothing is written down, and `login`'s token is never widened.
 
 Refusals print as one sentence: `register.invoices.fields[4].type 'currency' — did you mean 'money'?`
-(`FIELD_TYPE_UNKNOWN`). A local error — a missing file, a bad flag — has no refusal code; `--json` carries it as a
-fourth envelope variant. Exit codes: 0 ok · 1 refused, or a local error · 2 conflict · 3 unreachable, or the host is
-the cause.
+(`FIELD_TYPE_UNKNOWN`). A local error — a missing file, a bad flag — has no refusal code; `--json` would carry it as a
+fourth envelope variant, and that flag is not built ([48-SPEC-CLI](48-SPEC-CLI.md) §4.5). Exit codes: 0 ok ·
+1 refused, or a local error · 2 conflict · 3 unreachable, or the host is the cause.
 
 ---
 

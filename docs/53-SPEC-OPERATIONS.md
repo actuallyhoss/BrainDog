@@ -58,7 +58,9 @@ where they call them (§5.4, §5.5).
 | `braindog runner enroll` · `runner run` | runner lifecycle | 26 §2.3 |
 | `braindog --version` | every support call | the tuple, 31 §6 |
 
-Exit codes: 0 ok · 1 refused · 2 conflict · 3 unreachable. Every command takes `--json`.
+Exit codes: 0 ok · 1 refused · 2 conflict · 3 unreachable. `--json` is not built: it is specified in
+[48-SPEC-CLI](48-SPEC-CLI.md) §4.5 and no command accepts the flag, so every procedure on this page reads the
+readable output.
 
 ### 2.2 · `wrangler` 4.128.0 (31 §3)
 
