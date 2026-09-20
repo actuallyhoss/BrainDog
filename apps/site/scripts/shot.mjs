@@ -64,12 +64,26 @@ const ROUTES = [
   ['changelog', '/changelog'],
 ];
 
+/**
+ * TWO WIDTHS, BECAUSE HE READS THIS ON A PHONE AND THE PAGE WAS ONLY EVER PHOTOGRAPHED ON A DESKTOP.
+ *
+ * 1440 is the width the design is drawn at and 390 is an iPhone. A marketing page that has never
+ * been photographed narrow is one whose narrow layout nobody has looked at, and the first thing a
+ * stranger does with a link is open it on the device in their hand. `deviceScaleFactor` stays at 1.5
+ * for both, so a phone shot is legible when it is opened on a phone.
+ */
+const WIDTHS = [
+  ['', 1440],
+  ['-390', 390],
+];
+
 const browser = await chromium.launch();
 let broken = 0;
 
+for (const [suffix, width] of WIDTHS)
 for (const scheme of ['light', 'dark']) {
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
+    viewport: { width, height: 900 },
     deviceScaleFactor: 1.5,
     colorScheme: scheme,
     /**
@@ -135,9 +149,9 @@ for (const scheme of ['light', 'dark']) {
       broken += blank.length;
     }
 
-    const file = join(OUT, `${name}-${scheme}.png`);
+    const file = join(OUT, `${name}-${scheme}${suffix}.png`);
     await page.screenshot({ path: file, fullPage: true });
-    console.log(`  shots/${name}-${scheme}.png`);
+    console.log(`  shots/${name}-${scheme}${suffix}.png`);
   }
   await context.close();
 }
