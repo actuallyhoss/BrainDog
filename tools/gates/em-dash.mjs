@@ -61,6 +61,49 @@ const ROOT = resolve(process.argv[2] ?? process.env.BRAINDOG_GATE_ROOT ?? proces
 const WORKSPACES = ['packages', 'apps'];
 
 /**
+ * AND THE README OF ANY PACKAGE THAT IS ACTUALLY PUBLISHED, which is one file today.
+ *
+ * `packages/render` ships to npm as `braindog-render` under MIT, and its README is the page a
+ * stranger reads first: not a contributor who already has the repository, but somebody who found
+ * the package and is deciding whether to use it. Every other README in this tree is read by people
+ * who cloned it, and the five of them carry forty-three spaced em dashes that are nobody's
+ * problem.
+ *
+ * READ OFF `private`, NOT OFF A LIST. A second published package inherits the rule the day its
+ * `package.json` says so, and a name written here would be a list that stops agreeing with what is
+ * on the registry.
+ */
+const publishedReadme = async (dir) => {
+  try {
+    const manifest = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
+    if (manifest.private === true) return null;
+  } catch {
+    return null;
+  }
+  const at = join(dir, 'README.md');
+  try {
+    await readFile(at, 'utf8');
+    return at;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Markdown's own two ways of saying "this is not prose": a fenced block and an inline span.
+ *
+ * FENCES FIRST, so their backticks are gone before spans are looked for. A `render` README draws
+ * what a document turns into, and the column that separates the source from the result is an em
+ * dash spaced on both sides. That is a drawing, and reading it as a sentence is the same mistake
+ * the first measurement of this rule made with HTML comments.
+ */
+const blankMarkdown = (text) =>
+  text
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/^```[\s\S]*?^```/gm, blank)
+    .replace(/`[^`\n]*`/g, blank);
+
+/**
  * Comments go, and the line numbers stay.
  *
  * BLANKED RATHER THAN REMOVED, for `secret-grep`'s reason: collapsing a twenty-line header into one
@@ -124,6 +167,8 @@ for (const workspace of WORKSPACES) {
     } catch {
       /* A member with no `src` ships no prose. */
     }
+    const readme = await publishedReadme(join(ROOT, workspace, m.name));
+    if (readme) files.push(readme);
   }
 }
 
@@ -141,8 +186,13 @@ for (const file of files) {
   const rel = relative(ROOT, file).replace(/\\/g, '/');
 
   /* Comments first, then the comments nested one language down inside what is left. */
-  let text = blankComments(source);
-  text = text.replace(LITERAL, (lit) => (holdsSql(lit) ? blankSqlComments(lit) : lit));
+  let text;
+  if (file.endsWith('.md')) {
+    text = blankMarkdown(source);
+  } else {
+    text = blankComments(source);
+    text = text.replace(LITERAL, (lit) => (holdsSql(lit) ? blankSqlComments(lit) : lit));
+  }
 
   const lines = source.split('\n');
   let line = 1;

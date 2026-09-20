@@ -1,10 +1,14 @@
 /**
- * The validator. Sixteen checks, 28 §4.4 — A–H are 13 §2.4's, I–P are 28's additions.
+ * The validator. Seventeen checks, 28 §4.4 and 39 §6.1: A to H are 13 §2.4's, I to P are 28's
+ * additions, and Q is this file's own.
  * Runs at install, in CI, and live in the theme editor. A failing theme is refused, naming the pair.
  *
- * Three policies, not one: mechanically correctable is auto-corrected and shown in the diff; a
- * breached floor is refused; a judgement call warns and installs (28 §4.5). Auto-correction never
- * crosses the WCAG line — there is no "we nudged your faint up to 4.5 for you."
+ * TWO POLICIES, NOT THREE, AND THE HEADER SAID THREE FOR AS LONG AS THERE WERE TWO. A breached floor
+ * is refused; a judgement call warns and installs (28 §4.5). The third, "mechanically correctable is
+ * auto-corrected and shown in the diff", is implemented nowhere: `Finding.level` below is
+ * `pass | warn | refuse` and has no room for a correction, no `corrected` row exists in this package,
+ * and check J, the one row `39 §6.2` marked auto-correct, refuses. Whether an out-of-gamut override
+ * should be corrected or refused is a decision; saying the product does something it does not is not.
  */
 
 import {

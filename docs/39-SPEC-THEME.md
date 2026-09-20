@@ -1,7 +1,7 @@
 # 39 · packages/theme — specification
 
 `@braindog/theme`, private, zero dependencies, position 4 in the total order of [31-STACK](31-STACK.md) §2. It turns
-the theme dialect of [28-THEMING](28-THEMING.md) §1 into a palette per scheme, runs the sixteen checks of 28 §4.4,
+the theme dialect of [28-THEMING](28-THEMING.md) §1 into a palette per scheme, runs the seventeen checks of 28 §4.4 and §6.1,
 and emits the two sinks of [22-FRONTEND](22-FRONTEND.md) §7 — CSS custom properties in `@layer theme` and a DTCG
 2025.10 document. Mode: ponytail. Colour mathematics is exact; scope is lazy. Every number below was computed by a
 reference prototype while this document was written; a builder who lands more than one 8-bit unit away from a
@@ -65,7 +65,7 @@ export const HIGH_CONTRAST: Profile;                   // the accessibility floo
 // ── generate · check · build ───────────────────────────────────────────────────
 /** Steps 0–7 of §5.7 for one scheme. Never throws for a parsed input. */
 export function generate(input: ThemeInput, scheme: Scheme, profile?: Profile): Palette;
-/** The sixteen checks over one palette. Never throws. 90 results plus one per APCA advisory. */
+/** The seventeen checks over one palette. Never throws. See §6.1 on what it returns and what it does not. */
 export function check(palette: Palette): CheckResult[];
 /** 'refuse' if any result refuses, else 'warn' if any warns, else 'pass'. */
 export function verdict(results: readonly CheckResult[]): 'pass' | 'warn' | 'refuse';
@@ -120,7 +120,7 @@ packages/theme/
 ├── src/
 │   ├── colour.ts           sRGB ↔ linear ↔ OKLab/OKLCH ↔ XYZ/CIELAB · WCAG · APCA · gamut map · Brettel · ΔE2000   ~230 lines
 │   ├── generate.ts         profiles · the solve · steps 0–7 · elevation · mark constants · nextAccentHue           ~220
-│   ├── check.ts            the sixteen checks · fix solver · toRefusals · the copy                                ~190
+│   ├── checks.ts           the seventeen checks · fix solver · toRefusals · the copy                                ~190
 │   ├── emit.ts             toCSS · TOKENS_CSS · A11Y_FORCED_COLORS · toDTCG                                        ~110
 │   └── index.ts            types · closed lists · parseTheme · build · re-exports                                 ~150
 └── test/
@@ -244,8 +244,18 @@ type Built =
   | { ok: false; refusals: Refusal[]; results: CheckResult[] };
 ```
 
-Invariants: `check()` returns exactly 90 results per palette plus one `N` row per advisory (A 20 · B 6 · C 5 · D 20 ·
-E 6 · F 6 · G 15 · H 4 · I 1 · J 1 · K 2 · L 1 · M 1 · O 1 · P 1 = 90); every letter A–P appears at least once;
+Invariants: **specified and not implemented, and measured on September 20th 2026 rather than assumed.** `checkScheme`
+returns **6 results for the house theme in dark and 4 in light**, not 90: it emits a row only when something is
+notable, plus a summary pass for F and three for Q, and checks A to E and G to P emit nothing at all when they pass.
+Nothing asserts either number, which is how they came to sit this far apart. The specified shape is the better one,
+for the reason the gate directory acts on elsewhere: a validator silent on a passing check cannot report that the
+check stopped running, so deleting G would leave the output on a passing theme identical. It is additive and safe to
+build, because every consumer reads through `refusals()` or `warnings()`, which filter by level. The per-letter split
+below was written for four roles that have since moved and is kept only as the shape, not as the counts: A is 15 and
+not 20 (`faint` went to C), B is 5 and not 6 (`accent-ink` on `accent` moved into Q), D is 30 and not 20
+(`accent-edge` and `info-fill` arrived) and G is 20 and not 15 (`info` is a fourth intent). Do not copy the new
+numbers here when it is built; count them in a test. The shape: one row per pair for A–G, one per rung for H, one per
+check for I–Q, plus one `N` row per advisory; every letter A–Q appears at least once;
 `results` in `Built` is dark then light; `refusals` preserve `results` order, so a theme failing A in dark and F in
 light lists `CONTRAST_FLOOR` first, as the 28 §4.5 example does.
 
@@ -549,7 +559,7 @@ byte-stable, so nothing derived is ever persisted (§13 D15).
 
 ## 6 · Refusals and errors
 
-### 6.1 · The sixteen checks
+### 6.1 · The seventeen checks
 
 Letters, pairs, floors and policies are 28 §4.4's; the last two columns are this package's. *Pairs* counts results
 per palette.
@@ -561,17 +571,20 @@ per palette.
 | C | `faint` used below 24 px | `faint` × 5 at the large-text floor; decides whether A's copy offers the 24 px route | 3:1 | refuse | `CONTRAST_FLOOR` | 5 |
 | D | `edge` × every surface | `edge earn-fill warn-fill danger-fill` × 5 (1.4.11) | 3:1 | refuse | `CONTRAST_FLOOR` | 20 |
 | E | focus ring vs both neighbours, focused vs unfocused | `focus-in` on `focus-out` ≥ 9 (§5.2 composition); `focus-in` × 5 ≥ 3 | 3:1 (2.4.13) | refuse | `CONTRAST_FLOOR` | 6 |
-| F | intent × intent, ΔE2000 after Brettel, all three deficiencies | six pairs of `earn warn danger accent-text`, `dist` of §5.5 | ≥ 20 clear · 10–20 glyph · < 10 | refuse < 10; 10–20 **pass, band recorded** (§13 D6) | `INTENT_INSEPARABLE` | 6 |
+| F | intent × intent, ΔE2000 after Brettel, all three deficiencies | six pairs of `earn warn danger info`, `dist` of §5.5. **This row said `accent-text` and the code has never compared it here**: `INTENTS` is the four above, which is what this row’s own “intent × intent” means and what `build.ts`’s “Four intents need at least 10” says. `accent-text` is solved separately at generator step 6 by lightness clearance and is in no grid search, so §5’s description of a search over `(danger, warn, earn, accent-text)` is stale with it | ≥ 20 clear · 10–20 glyph · < 10 | refuse < 10; 10–20 **pass, band recorded** (§13 D6) | `INTENT_INSEPARABLE` | 6 |
 | G | intent as text × every surface | `earn warn danger` × 5 | 4.5:1 | refuse | `CONTRAST_FLOOR` | 15 |
 | H | surface ladder monotonic in relative luminance | four adjacent pairs `sunk<bg<s1<s2<s3`, strict | strict | refuse | `THEME_LADDER_ORDER` | 4 |
 | I | elevation ladder monotonic, both schemes | `e1 < e2 < e3` in alpha (geometry is fixed and ascending) | strict | refuse | `THEME_LADDER_ORDER` | 1 |
-| J | every emitted colour in sRGB gamut | generated colours pass by construction; each override that was mapped is a `corrected` row with `from → to` for the install diff | ΔE_OK ≤ 0.02 | auto-correct | — | 1 |
+| J | how much chroma the gamut mapper took off | `built.clipped[scheme][role]` | > 0.02 refuses | refuse | `THEME_VALUE_INVALID` | 1 |
+
+J is the one row where the code deliberately answers a different question from the one this table asked, and its comment gives the reason: asking an emitted hex whether it is in sRGB is asking whether a number between 0 and 1 is between 0 and 1, because `quantise` clamps and `fromHex` divides by 255, and over all 4,096 three-digit values that branch was never false. What can be wrong is that the emitted colour is a clipped version of the one the palette was solved as. **The `auto-correct` policy this row used to name is implemented nowhere**: `Finding.level` is `pass | warn | refuse` and has no room for a correction, and no `corrected` row exists in the package. `checks.ts` opened "Three policies, not one" for the same reason and has been corrected to two.
 | K | hue-only encoding | `accent-text` vs `ink`, vs `ink2`: \|ΔL\*\| ≥ 8 (intents carry a glyph, 13 §2.3, so they pass structurally) | 8 L\* | refuse | `CONTRAST_FLOOR` | 2 |
 | L | `forced-colors` survival | `toCSS` text has only `--` declarations under `:root[data-scheme]`; `A11Y_FORCED_COLORS` declares `border: 1px solid CanvasText` for `.panel .grid .rows .table .media` | — | refuse | — (cannot fail on a parsed input; a CI assertion) | 1 |
 | M | `line` vs `edge` not confusable | \|L(line) − L(edge)\| in OKLab | 0.06 | warn | — | 1 |
 | N | APCA advisory | every A, B, G pair with `CR ≥ 4.5` and \|Lc\| < 60 | 60 Lc | warn | — | 0 + |
 | O | every value parses and is re-serialised | enforced in `parseTheme`; here asserts every emitted value is `#RRGGBB` | — | refuse | `THEME_VALUE_INVALID` (at parse) | 1 |
 | P | banned in any value | `url( image( element( attr( var( \` — checked on the raw string before parsing; here asserts none in the emitted text | — | refuse | `THEME_VALUE_INVALID` (at parse) | 1 |
+| Q | a control’s fill × its own label, in every state | `accent` `accent-hover` `accent-press` × `accent-ink` | 4.5:1 | refuse | `CONTRAST_FLOOR` | 3 |
 
 ### 6.2 · The four codes
 
@@ -623,7 +636,7 @@ Warnings (M, N, F's band, the accent-text note, J's corrections) are not refusal
 | `toCSS` per scheme | ≤ 2,048 bytes | 809 dark · 810 light · 917 with the `prefers-contrast` wrapper | `new TextEncoder().encode(css).length` |
 | `TOKENS_CSS` | ≤ 300 bytes | 180 | same |
 | `toDTCG` | ≤ 24,576 bytes pretty-printed | 19,948 | same |
-| Results per palette | 90 + N advisories | house dark 115 · house light 90 | `check().length` |
+| Results per palette | 90 + N advisories, **not implemented** (§6.1) | measured house dark 6 · house light 4 | `checkScheme().length` |
 | Source | ≤ 1,000 lines across five files | — | review |
 | Browser cost | inside the editor chunk's 80 KB gzip (22 §9); never in the entry chunk | — | apps/web's `bundle` gate (33 §8) |
 

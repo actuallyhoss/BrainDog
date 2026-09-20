@@ -43,10 +43,10 @@ toHTML(parse(markdown));
 ## Three invariants, none negotiable
 
 **1 · A malformed block degrades to a visible fence.** It never renders wrong and never renders
-nothing — it shows the author exactly what they typed, with the reason above it.
+nothing: it shows the author exactly what they typed, with the reason above it.
 
 > The parser has **no path that returns nothing.** Silent omission in a record whose value is
-> completeness is data loss with a tidy appearance — and when the author is an agent, the visible
+> completeness is data loss with a tidy appearance, and when the author is an agent, the visible
 > fence is the only feedback channel that exists.
 
 **2 · Column positions are fixed.** An unknown glyph draws no glyph rather than shifting the columns.
@@ -76,7 +76,7 @@ Kinds are declarations over primitives, so primitives compose and kinds do not h
 | `media` | a figure with a caption | `code` `tree` `diff` |
 
 A board is a **grid of lists**. A roadmap is a **list with dates**. A risk matrix is a **grid of
-inlines**. Which is why a third party can add a kind without asking a designer — a kind is not code,
+inlines**. Which is why a third party can add a kind without asking a designer: a kind is not code,
 it is a named composition of primitives shipped as data, and `PRIMITIVES_VERSION` is the integer a
 consumer checks.
 
@@ -96,7 +96,7 @@ there is no API that lets it.
 
 That is not fussiness. Simulate the four intent colours through a dichromat transform and measure the
 distance between the simulated pairs: **green and red are the same olive.** For roughly 8% of men,
-four intent words are one colour. And the mechanism is inescapable — tuning hues to the *same*
+four intent words are one colour. And the mechanism is inescapable: tuning hues to the *same*
 contrast target against the *same* ground necessarily gives them the *same luminance*, so any palette
 built the obvious, careful, correct-looking way has this property.
 
@@ -145,7 +145,7 @@ somebody checked this figure against that path *once*; the double brace says go 
 Four rules the formatter never bends:
 
 - A path that names nothing renders as the path, **marked**; a path whose value is missing renders an
-  em dash — never blank, never `undefined`, and **never a zero**. *A product that earns nothing and a
+  em dash: never blank, never `undefined`, and **never a zero**. *A product that earns nothing and a
   product nobody measured are not the same product.*
 - Long fields are unavailable. A paragraph interpolated mid-sentence is a worse lie than a stale
   number.
@@ -157,7 +157,7 @@ Four rules the formatter never bends:
 ## A hole is a task, not a value
 
 Eighty-five per cent of one currency's spending was uncategorised. Sorted by size, that row took the
-top of the chart and **set the bar scale**, making every real category a one-pixel stub — the chart
+top of the chart and **set the bar scale**, making every real category a one-pixel stub, the chart
 made unreadable by the thing it reports.
 
 > So it sits last, in `warn`, **outside the scale**, and it is the only row that is a button.
@@ -182,7 +182,7 @@ renders the same way.
 
 ## Tests
 
-`node --test src/render.test.ts` — 31 of them, no framework, including a property test that three
+`node --test src/render.test.ts`: 31 of them, no framework, including a property test that three
 hundred random byte strings parse and render without throwing.
 
 ---
