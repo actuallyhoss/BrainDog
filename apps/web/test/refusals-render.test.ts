@@ -24,8 +24,10 @@
  * rebuild it one fixture at a time.
  *
  * Nothing in this repository parses YAML (`42 §2` puts the one parser behind a `@braindog/declare`
- * subpath that does not exist yet), so the reader below is the same forty-line subset the gate
- * reads, plus literal block scalars. When the real parser lands these files are read unchanged.
+ * subpath that does not exist yet), so the corpus is read by the subset reader in
+ * `fixtures/corpus.ts`, which sits beside the fixtures and is shared with the `write` runner. It
+ * was a copy in each of them for one commit and its own header says what that cost. When the real
+ * parser lands these files are read unchanged.
  *
  * ─── WHAT IT ASSERTS, AND WHAT IT CANNOT ────────────────────────────────────────────────────────
  *
@@ -47,62 +49,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { parse, type Degraded, type Segment } from 'braindog-render';
 
-const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
-const HOME = join(ROOT, 'fixtures', 'refusals');
+import { family as familyOf } from '../../../fixtures/corpus.ts';
 
-type Fixture = { name: string; keys: Map<string, string> };
-
-/**
- * The header subset, and literal block scalars beneath it.
- *
- * The gate's own reader takes column-0 `key: value` lines and skips everything indented, because it
- * never needed a fixture's input. A runner does, and `40 §6`'s worked examples put that input in
- * nested blocks. `document:` is the only one this surface takes and it is a whole document, so `|`
- * is the form it arrives in: the block's own indentation comes off and every other character is the
- * author's, which matters when the document is itself made of backticks and pipes.
- */
-function read(text: string, where: string): Map<string, string> {
-  const keys = new Map<string, string>();
-  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    if (line.trim() === '' || line.startsWith('#') || /^\s/.test(line)) continue;
-    const m = /^([a-z_]+):(?:[ \t]+(.*))?$/.exec(line);
-    assert.ok(m, `${where}:${i + 1} is not a key line, and this reader reads column 0 only`);
-    const key = m![1]!;
-    assert.ok(!keys.has(key), `${where}:${i + 1} says \`${key}\` twice`);
-    const value = (m![2] ?? '').trim();
-    if (value !== '|' && value !== '|-') {
-      const quoted = /^(['"])([\s\S]*)\1$/.exec(value);
-      keys.set(key, quoted ? quoted[2]! : value);
-      continue;
-    }
-    const body: string[] = [];
-    let indent = '';
-    while (i + 1 < lines.length) {
-      const next = lines[i + 1]!;
-      if (next.trim() !== '' && !/^\s/.test(next)) break;
-      i++;
-      if (indent === '' && next.trim() !== '') indent = /^\s+/.exec(next)![0]!;
-      body.push(next.startsWith(indent) ? next.slice(indent.length) : next.trim());
-    }
-    while (body.length > 0 && body[body.length - 1]!.trim() === '') body.pop();
-    keys.set(key, value === '|' ? `${body.join('\n')}\n` : body.join('\n'));
-  }
-  return keys;
-}
-
-const corpus: Fixture[] = readdirSync(HOME)
-  .filter((name) => name.endsWith('.yaml'))
-  .map((name) => ({ name, keys: read(readFileSync(join(HOME, name), 'utf8'), `fixtures/refusals/${name}`) }));
-
-const family = corpus.filter((f) => f.keys.get('via') === 'render');
+const family = familyOf('render');
 
 const degradedIn = (segments: Segment[]): Degraded[] => segments.filter((s): s is Degraded => s.type === 'degraded');
 

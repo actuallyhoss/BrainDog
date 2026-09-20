@@ -70,23 +70,20 @@ const CASES = [
   { gate: 'css-rules-identifier-size', run: 'css-rules', expect: /two roles colliding/, findings: 1 },
   { gate: 'css-rules-icon-color', run: 'css-rules', expect: /currentColor only/, findings: 1 },
   { gate: 'css-rules-unemitted-class', run: 'css-rules', expect: /rename left the rule behind/, findings: 1 },
-  /* TWO VIOLATIONS AND SEVEN DECOYS, and the count is what proves the decoys are still forgiven.
-     One violation is a refusal sentence in `.ts` and the other is prose in the README of a package
-     whose `package.json` does not say `private`, because those are the two kinds of writing this
-     gate reads and a fixture that exercised one would not notice the other going quiet.
-
-     The decoys all hold an em dash spaced on both sides, which is the exact shape the gate refuses:
-     a block comment, a line comment, two SQL column annotations inside a schema literal, a fenced
-     code block, an inline code span and an HTML comment. A bare glyph and a heading rule sit there
-     too, unspaced. If any exemption stops working this goes to three or more rather than staying
-     green, and an exemption nothing tests is an exemption that quietly widens. */
   /* TWO FIXTURES AND ONE SENTENCE, because the rule has two halves and a count of one proves each.
      Both trees carry the line *"A seeded sentence — in prose, outside any fence."* in a README, and
      the only difference between them is `private` in the manifest. `em-dash` is private and its one
      finding is in the source, which says the README was forgiven; `em-dash-readme` is published and
      its one finding is the README, which says the same sentence is read when a stranger can reach
      it. Seeding both halves in one tree would have made the total two and `named()` one, which is
-     how this pair was born. */
+     how this pair was born.
+
+     THE DECOYS ARE THE OTHER HALF OF EACH COUNT. Every one of them holds an em dash spaced on both
+     sides, the exact shape the gate refuses, and is forgiven only for where it sits: a block
+     comment, a line comment and two SQL column annotations inside a schema literal in the source;
+     a fenced code block, an inline code span and an HTML comment in the README. A bare glyph and a
+     heading rule sit there too, unspaced. An exemption that stops working takes the count above
+     one rather than leaving it green, which is the only way an exemption gets tested at all. */
   { gate: 'em-dash', expect: /used as punctuation/, findings: 1 },
   { gate: 'em-dash-readme', run: 'em-dash', expect: /used as punctuation/, findings: 1 },
   { gate: 'css-rules-media-beaten', run: 'css-rules', expect: /wins on source order/, findings: 1 },
@@ -219,6 +216,19 @@ const CASES = [
      placeholder twice and the head placeholder once, so a count of one is what proves the gate
      reports the placeholder that is wrong rather than every placeholder it finds. */
   { gate: 'bundle-shell', run: 'bundle', expect: /a shell the build cannot substitute/, findings: 1 },
+  /* AND THE OTHER END OF THE SAME GATE: a manifest naming a chunk the build did not emit. Every
+     byte `bundle` reports is read by name out of that manifest, and the read had nothing between
+     it and the disk, so the gate died with a Node stack trace and `run.mjs` reported it red with
+     no sentence in it. The fixture names one chunk and does not put it there, and one finding is
+     what proves the gate names the file rather than counting the manifest.
+
+     ITS TREE IS SHAPED BY TWO GUARDS UPSTREAM OF THE ONE UNDER TEST, and both of them are about
+     mtimes rather than contents, which is the only reason this fixture looks odd. The shell lives
+     under `apps/site/src/` and there is no `apps/web/src/` at all, because a checkout writes
+     `.svelte-kit/` before `src/` and a source file newer than the manifest makes the gate skip as
+     stale before it reads a chunk. `packages/seeded/` is there because the staleness walk reads
+     `packages/` unguarded, and it carries no `src/`, which keeps the newest source at zero. */
+  { gate: 'bundle-missing-chunk', run: 'bundle', expect: /\bmanifest\b.*\bdid not emit\b/, findings: 1 },
   /* ONE LINE NAMES THE CODE, and the fixture drops exactly one. The gate reports two findings for
      it (the missing code, and the family whose size no longer matches) and only the first can
      name it, because the second is about a count. `findings` here is *lines that name the seeded

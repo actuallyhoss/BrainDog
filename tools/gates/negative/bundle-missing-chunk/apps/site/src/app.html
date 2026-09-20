@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  A CORRECT SHELL, because the seeded violation here is further down the gate.
+
+  `bundle` checks every `apps/*/src/app.html` in the workspace before it looks for a build, and a
+  tree with no shell at all is a finding of its own (`bundle-shell/` seeds that one). This spells
+  each placeholder exactly once so the gate gets past that check and reaches the manifest.
+
+  There is no `apps/web/src/` in this fixture on purpose. The staleness guard compares the newest
+  source file against the manifest's own mtime, and a checkout writes `.svelte-kit/` before `src/`
+  because that is where the two sort, so a shell under `apps/web/src/` would make this tree read as
+  a stale build and skip before the chunk is ever reached.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

@@ -11,6 +11,7 @@
  *   node tools/gates/bundle.mjs [--report]
  */
 
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join, relative } from 'node:path';
@@ -19,7 +20,11 @@ import { budget, skipDir } from './lib.mjs';
 
 const APP = join(process.cwd(), 'apps/web');
 const CLIENT = join(APP, '.svelte-kit/output/client');
+const MANIFEST = join(CLIENT, '.vite/manifest.json');
 const BUILD = join(APP, 'build');
+
+/** A path as a reader would type it, so a finding names the same file on both platforms. */
+const shown = (at) => relative(process.cwd(), at).split(/[\\/]/).join('/');
 
 const B = budget('bundle');
 
@@ -91,9 +96,8 @@ if (shellFindings.length > 0) {
 let manifest;
 let built;
 try {
-  const at = join(CLIENT, '.vite/manifest.json');
-  manifest = JSON.parse(await readFile(at, 'utf8'));
-  built = (await stat(at)).mtimeMs;
+  manifest = JSON.parse(await readFile(MANIFEST, 'utf8'));
+  built = (await stat(MANIFEST)).mtimeMs;
 } catch {
   /* EXIT 3 IS A SKIP, NOT A PASS. Exiting 0 with no build made `pnpm gates` report ten gates
      passed on a fresh checkout while three of them had examined nothing, the same silence the
@@ -192,10 +196,43 @@ const entries = Object.keys(manifest).filter((k) => /_app\/immutable\/entry\//.t
 const reachable = new Set();
 for (const e of entries) for (const k of reach(e)) reachable.add(k);
 
+/**
+ * A FILE THE MANIFEST NAMES AND THE BUILD DID NOT EMIT, WHICH IS A FINDING AND WAS A STACK TRACE.
+ *
+ * Every byte below is read by name out of `.vite/manifest.json`, and until now each of those reads
+ * was `readFile(join(CLIENT, node.file))` with nothing between it and the disk. A manifest naming a
+ * chunk that is not there threw ENOENT out of the top level, so the gate died with a Node stack
+ * trace and `run.mjs`, which reads any non-zero, non-3 exit as a failure, reported the bundle gate
+ * red with no sentence in it. A person then goes looking for a size regression that is not there.
+ *
+ * IT IS A FINDING AND NOT THE SKIP THE ADAPTER'S OUTPUT GETS, and the two cases differ in one way
+ * that decides it. `build/index.html` and the fonts are written by the adapter, which is a SECOND
+ * event after `vite build`, so a manifest with no shell beside it is an unfinished build and "you
+ * have not finished building" is not "you have broken something". A chunk is written by the SAME
+ * event that writes the manifest that names it. The two disagreeing is not a half-done build; it is
+ * the gate's own input contradicting itself, and there is no command a reader should be told to run.
+ *
+ * NEVER SILENTLY, EITHER, WHICH IS WHY THE SUM IS NOT SIMPLY ALLOWED TO SKIP THE FILE. A budget
+ * measured over the chunks that happen to exist is a smaller number than the truth and would report
+ * a pass for a build nobody could serve. So the missing ones are collected, named with the manifest
+ * that claims them, and the run ends before a single row is printed.
+ */
+const unemitted = [];
+
+/** The brotli size of a file the manifest names, or zero and a finding saying what named it. */
+async function measure(file, claimedBy) {
+  const at = join(CLIENT, file);
+  if (!existsSync(at)) {
+    unemitted.push(`${file}, named by \`${claimedBy}\` in ${shown(MANIFEST)}, was not emitted by the build`);
+    return 0;
+  }
+  return brotli(await readFile(at));
+}
+
 let js = 0;
 for (const key of reachable) {
   const node = manifest[key];
-  if (node.file?.endsWith('.js')) js += brotli(await readFile(join(CLIENT, node.file)));
+  if (node.file?.endsWith('.js')) js += await measure(node.file, key);
 }
 
 /**
@@ -205,15 +242,36 @@ for (const key of reachable) {
  */
 // SvelteKit numbers its route nodes and node 0 is the root layout, so `assets/0.*.css` is the
 // stylesheet every screen pays for. Everything else is a route's own.
-const allCss = [...new Set(Object.values(manifest).flatMap((n) => n.css ?? []))];
+/* THE CLAIMANT TRAVELS WITH THE FILE, because a stylesheet is named by a node and the finding above
+   has to say which one. A `Map` over the pairs dedupes by file the way the `Set` here used to. */
+const allCss = [...new Map(Object.entries(manifest).flatMap(([key, n]) => (n.css ?? []).map((f) => [f, key])))];
 const isMain = (f) => /assets\/0\.[^/]*\.css$/.test(f);
 
 let css = 0;
 let routeCss = 0;
-for (const f of allCss) {
-  const size = brotli(await readFile(join(CLIENT, f)));
+for (const [f, key] of allCss) {
+  const size = await measure(f, key);
   if (isMain(f)) css += size;
   else routeCss += size;
+}
+
+/**
+ * AND THE GATE STOPS HERE, BEFORE ANY NUMBER, if any of that was not on disk.
+ *
+ * `52 §9`'s rule, said the other way round: a gate that cannot find its input must say so, and the
+ * one thing it must never do is print a row. Both totals above are short by whatever was missing,
+ * so every row after this point would be a measurement of a build that does not exist.
+ */
+if (unemitted.length > 0) {
+  console.error(`\n  bundle: the manifest names ${unemitted.length} file(s) the build did not emit.\n`);
+  for (const f of unemitted) console.error(`    ${f}`);
+  console.error(
+    '\n  `vite build` writes the chunks and the manifest that names them in one event, so the two\n' +
+      '  disagreeing is not a half-finished build: it is this gate\'s own input contradicting itself.\n' +
+      '  Nothing below was printed, because a total over the chunks that happen to be there is\n' +
+      '  smaller than the truth and would report a pass for a build nobody can serve.\n',
+  );
+  process.exit(1);
 }
 
 /**

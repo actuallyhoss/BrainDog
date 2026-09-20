@@ -34,76 +34,30 @@
  * subpath that does not exist, and `refusal-fixtures.mjs` reads column-0 scalars with forty lines
  * of its own for exactly that reason. So the bodies here are YAML **flow** collections, which are
  * JSON, spread over several lines with every continuation indented. Three things hold at once:
- * the gate's reader sees one key line and skips the rest; this reader joins the lines and hands
- * them to `JSON.parse`; and the day `./yaml` lands, a real parser reads the same files unchanged
- * and gets the same mappings. A literal block scalar would have been easier to type and would have
- * made `declare` a string instead of a map, which is the one thing that would not survive.
+ * the gate's reader sees one key line and skips the rest; the corpus reader joins the lines so
+ * `JSON.parse` can have them; and the day `./yaml` lands, a real parser reads the same files
+ * unchanged and gets the same mappings. A literal block scalar would have been easier to type and
+ * would have made `declare` a string instead of a map, which is the one thing that would not
+ * survive.
  *
- * THE READER IS DUPLICATED IN `apps/web/test/refusals-render.test.ts`, and that is deliberate for
- * now. The two runners are in different packages with no shared test dependency between them, and
- * a workspace package created to hold fifty lines would have to build before either could run.
- * When `@braindog/declare`'s `./yaml` exists both copies go.
+ * THE READER IS IN `fixtures/corpus.ts`, WHICH IS WHERE THE FIXTURES ARE. It was a copy in this
+ * file and a second copy in `apps/web/test/refusals-render.test.ts` for one commit, differing only
+ * in which continuation each had reached for first, and that module's header records why one
+ * module beside the corpus beats a workspace package neither runner can depend on. What stays here
+ * is the one step after it: a flow collection is text until something calls `JSON.parse`.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { codeOf, conflicted, refused, type Result } from '@braindog/ports';
 
+import { family as familyOf, type Fixture, type Keys } from '../../../fixtures/corpus.ts';
 import { openRecord, type Entry, type RegisterDecl } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
-const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
-const HOME = join(ROOT, 'fixtures', 'refusals');
 const NOW = Date.UTC(2026, 8, 5, 12);
 const ACTOR = 'p_1';
-
-type Keys = Map<string, string>;
-
-/** Whether a brace-counting scan is inside a JSON string, which is the only place a brace is not one. */
-function balance(text: string, state: { depth: number; inString: boolean; escaped: boolean }) {
-  for (const c of text) {
-    if (state.escaped) { state.escaped = false; continue; }
-    if (state.inString) {
-      if (c === '\\') state.escaped = true;
-      else if (c === '"') state.inString = false;
-      continue;
-    }
-    if (c === '"') state.inString = true;
-    else if (c === '{' || c === '[') state.depth += 1;
-    else if (c === '}' || c === ']') state.depth -= 1;
-  }
-}
-
-function read(text: string, where: string): Keys {
-  const keys: Keys = new Map();
-  const lines = text.split('\n').map((line) => line.replace(/\r$/, ''));
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    if (line.trim() === '' || line.startsWith('#') || /^\s/.test(line)) continue;
-    const m = /^([a-z_]+):(?:[ \t]+(.*))?$/.exec(line);
-    assert.ok(m, `${where}:${i + 1} is not a key line, and this reader reads column 0 only`);
-    const key = m![1]!;
-    assert.ok(!keys.has(key), `${where}:${i + 1} says \`${key}\` twice`);
-    let value = (m![2] ?? '').trim();
-    if (value.startsWith('{') || value.startsWith('[')) {
-      const state = { depth: 0, inString: false, escaped: false };
-      balance(value, state);
-      while (state.depth > 0 && i + 1 < lines.length) {
-        i++;
-        value += `\n${lines[i]}`;
-        balance(lines[i]!, state);
-      }
-      assert.equal(state.depth, 0, `${where}'s \`${key}:\` never closes`);
-    }
-    const quoted = /^(['"])([\s\S]*)\1$/.exec(value);
-    keys.set(key, quoted ? quoted[2]! : value);
-  }
-  return keys;
-}
 
 const json = <T>(keys: Keys, key: string, where: string): T | undefined => {
   const raw = keys.get(key);
@@ -115,12 +69,7 @@ const json = <T>(keys: Keys, key: string, where: string): T | undefined => {
   }
 };
 
-type Fixture = { name: string; keys: Keys };
-
-const family: Fixture[] = readdirSync(HOME)
-  .filter((name) => name.endsWith('.yaml'))
-  .map((name) => ({ name, keys: read(readFileSync(join(HOME, name), 'utf8'), `fixtures/refusals/${name}`) }))
-  .filter((f) => f.keys.get('via') === 'write');
+const family: Fixture[] = familyOf('write');
 
 /* THE COUNT IS ASSERTED SO THAT A SIXTEENTH CANNOT ARRIVE UNDRIVEN. `40 §6`'s table says the write
    family is fifteen. A new one finds out here that it needs a body, rather than joining a family

@@ -26,6 +26,13 @@ packages/theme/proof.txt
 # the a11y gate writes its run here
 .a11y.log
 
+# AND ONE FAKE BUILD THAT IS KEPT, because a gate's negative fixture is a tree the gate reads and
+# `bundle` reads a build. `negative/bundle-missing-chunk/` is a manifest naming a chunk that is not
+# beside it, which is the input the gate used to die on, and a manifest can only be read from where
+# the real one lives. Nothing under it is output: no command produces it and nothing can regenerate
+# it, which is the whole of what line 4 is for.
+!tools/gates/negative/*/apps/*/.svelte-kit/
+
 # A variant build — the same output for a different record, written by
 # `BRAINDOG_VARIANT=<name> vite build` so the browser gates can measure the half
 # of every branch the shipped seed cannot draw. Never committed: it is a build.
