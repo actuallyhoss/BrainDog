@@ -30,8 +30,8 @@
  *   - `dev`. It needs a `Dispatch` port `start` does not have.
  */
 
-import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createPrivateKey, randomBytes, X509Certificate, type KeyObject } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { argv, env, exit, stderr } from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,7 @@ import { fixOf } from '@braindog/ports';
 
 import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
+import { nameChange, reachLine, reachOf } from './reach.ts';
 import { openSqlite, start } from './server.ts';
 
 /**
@@ -88,7 +89,12 @@ function bootLine(s: SignIn): string {
     case 'directory':
       return '  behind BRAINDOG_TOKEN; there is no directory here, so the app cannot sign anybody in, and the token works as a bearer';
     case 'insecure':
-      return `  behind BRAINDOG_TOKEN; ${s.origin} cannot hold a session cookie, so the app cannot sign anybody in. Serve it over https, or at localhost.`;
+      /* THE FIX IS NO LONGER IN THIS SENTENCE. It used to end "Serve it over https, or at localhost",
+         which restates the refusal to somebody who has just deliberately typed something that is
+         neither, and names none of the three shapes that work. `reachLine` says what to set, and it is
+         printed under this line by `serve` for every origin that has something wrong with it, not only
+         for this one case. */
+      return `  behind BRAINDOG_TOKEN; ${s.origin} cannot hold a session cookie, so the app cannot sign anybody in.`;
     case 'key':
       return '  behind BRAINDOG_TOKEN; there is no session key, so the app cannot sign anybody in';
     default:
@@ -383,6 +389,94 @@ function inhabitant(file: string): { id: string; slug: string; ownerId: string; 
 async function serve(): Promise<void> {
   const data = dataDir();
   const port = Number(env.PORT ?? 8080);
+  /* THE CERTIFICATE, BY PATH AND NEVER BY VALUE, for the reason `keys.ts` gives about the KEK: a private
+     key in the environment is a private key in every `ps`, every crash dump and every child process that
+     inherits it. `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY` name files, as `BRAINDOG_KEK_FILE` does.
+
+     AND WITHOUT BOTH THERE IS NO HALF MEASURE. A certificate with no key serves no handshake and a key
+     with no certificate names no host, so one of the two alone is a typo, and starting on plain http
+     after the operator asked for TLS is the one outcome nobody wants: it looks like it worked.
+
+     AND IT IS THE FIRST THING `serve` DOES, before the record is even looked for. Read where it is used,
+     it reported "There is no record in <data>" to somebody whose TLS was also misconfigured, so they
+     fixed one thing, ran again, and got the second refusal. Neither of these two checks needs a record,
+     and `init` makes the same argument one function up about doing every refusal before any work. */
+  const certFile = env.BRAINDOG_TLS_CERT;
+  const tlsKeyFile = env.BRAINDOG_TLS_KEY;
+  if ((certFile === undefined) !== (tlsKeyFile === undefined))
+    return refuse(
+      'BRAINDOG_TLS_CERT and BRAINDOG_TLS_KEY go together. Set both to serve https from this process, or neither to serve plain http.',
+    );
+  let tls: { cert: string; key: string } | undefined;
+  if (certFile !== undefined && tlsKeyFile !== undefined) {
+    const read = (path: string): string | null => {
+      try {
+        return readFileSync(path, 'utf8');
+      } catch {
+        return null;
+      }
+    };
+    /* READ SEPARATELY SO THE SENTENCE NAMES THE FILE. One `try` around both would report whichever failed
+       first as "the certificate", and the two are usually in different places with different permissions. */
+    const cert = read(certFile);
+    if (cert === null) return refuse(`BRAINDOG_TLS_CERT names ${certFile}, which could not be read.`);
+    const tlsKey = read(tlsKeyFile);
+    if (tlsKey === null) return refuse(`BRAINDOG_TLS_KEY names ${tlsKeyFile}, which could not be read.`);
+
+    /* AND THAT THEY ARE A CERTIFICATE AND ITS OWN KEY, SAID HERE, WHERE THE TWO PATHS ARE STILL IN HAND.
+       MEASURED before this check existed, with a record already in place so nothing else refused first: a
+       certificate file holding anything that is not PEM ended the process on
+       `error:0480006C:PEM routines::no start line`, and a well formed key belonging to some other
+       certificate on `error:05800074:x509 certificate routines::key values mismatch`. Both are thrown
+       several frames down inside `node:crypto`, one from `certificateNames` and one from `createServer`,
+       and neither names a file, a variable, or TLS at all. The note at the foot of this file is that
+       nothing reaches the operator as a stack trace, and an OpenSSL error code is the same promise broken
+       more quietly.
+
+       `checkPrivateKey` IS THE COMPARISON THE HANDSHAKE WOULD HAVE MADE, done now while there is still a
+       sentence to attach it to. It throws rather than answering false when the two are different kinds of
+       key altogether, an RSA key against this EC certificate, so the throw is a mismatch as well. */
+    let carried: X509Certificate;
+    try {
+      carried = new X509Certificate(cert);
+    } catch {
+      return refuse(`BRAINDOG_TLS_CERT names ${certFile}, which is not a PEM certificate.`);
+    }
+    let held: KeyObject;
+    try {
+      held = createPrivateKey(tlsKey);
+    } catch {
+      return refuse(`BRAINDOG_TLS_KEY names ${tlsKeyFile}, which is not a PEM private key.`);
+    }
+    let pairs = false;
+    try {
+      pairs = carried.checkPrivateKey(held);
+    } catch {
+      pairs = false;
+    }
+    if (!pairs)
+      return refuse(
+        `BRAINDOG_TLS_KEY names ${tlsKeyFile}, which is a private key and is not the one in ${certFile}. A handshake needs the key that certificate was made for.`,
+      );
+
+    /* THE MODE IS SAID AND NOT REFUSED, which is the one place this parts company with the KEK.
+       `keys.ts` refuses a group-readable key file because `49 §4.4` does and because that key opens the
+       whole record. This one does not open anything: it lets somebody who already has it impersonate
+       this host, which is serious and is not the same thing. And the most ordinary correct deployment
+       on Linux, a certificate renewed by an ACME client, hands the key out as `root:ssl-cert 0640` on
+       purpose, so refusing would stop the exact setup this feature exists to support. On Windows the
+       bit is advisory and the ACL is the permission, so there is nothing to read. */
+    if (process.platform !== 'win32') {
+      let mode = -1;
+      try {
+        mode = statSync(tlsKeyFile).mode & 0o777;
+      } catch {
+        mode = -1;
+      }
+      if (mode >= 0 && (mode & 0o007) !== 0) say(`  ${tlsKeyFile} is mode ${mode.toString(8)}: anybody on this machine can read the key this host's TLS is built on.`);
+    }
+    tls = { cert, key: tlsKey };
+  }
 
   /* AN EXPLICIT FILE STILL WINS, because every test and every `braindog dev` in this repository
      opens a bare file with no data directory behind it. */
@@ -448,6 +542,7 @@ async function serve(): Promise<void> {
     ...(env.BRAINDOG_HOST === undefined ? {} : { host: env.BRAINDOG_HOST }),
     ...(existsSync(dirFile) ? { directory: dirFile } : {}),
     ...(env.BRAINDOG_ORIGIN === undefined ? {} : { origin: env.BRAINDOG_ORIGIN }),
+    ...(tls === undefined ? {} : { tls }),
     ...(shell === undefined ? {} : { shell }),
     ...(env.BRAINDOG_CATALOGUE === undefined ? {} : { catalogue: env.BRAINDOG_CATALOGUE }),
     sessionKey,
@@ -466,6 +561,26 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
+
+  /* AND WHAT IS WRONG WITH THE ORIGIN, WHENEVER SOMETHING IS, rather than only when sign-in is off.
+     MEASURED: at `BRAINDOG_ORIGIN=https://192.168.1.50:8443` a second boot reports
+     `ways: ['the server key']`, so the line above reads "sign in at https://192.168.1.50:8443/signin
+     with the server key" and is perfectly true. What it does not say is that the passkey button is
+     missing and will never appear, because `relyingParty` refuses an address: the operator types the
+     server key for ever and has no way to learn why. A first boot at the same origin reports
+     `ways: []` and the equally unhelpful "has no way in to offer yet". One line, under both. */
+  const wrong = reachLine(reachOf(running.signIn.origin));
+  if (wrong) say(`  ${wrong}`);
+
+  /* AND WHETHER THE NAME MOVED SINCE LAST TIME, which nothing anywhere used to say. A passkey is bound to
+     the hostname it was made at, so changing `BRAINDOG_ORIGIN` or swapping the certificate for one naming
+     a tunnel silently retires every passkey on every device at once, and the sign-in screen that results
+     looks exactly like a working one. Only where there is a Directory: it is the half that holds the
+     credentials, so a host without one has no passkey to retire. */
+  if (existsSync(dirFile)) {
+    const moved = nameChange(join(data, 'served-at'), running.signIn.origin);
+    if (moved) say(`  ${moved}`);
+  }
 
   /* THE NIGHTLY COPY, beside the record in `snapshots/`, at `BRAINDOG_BACKUP_AT` (HH:MM in UTC, 03:20 unless set, `off`
      for none). It is taken the first time the host looks after that time, so a machine that was asleep catches up. */

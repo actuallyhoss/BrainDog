@@ -11,7 +11,8 @@
  * across `packages/**`: the kernel may not ask which runtime it is in, and a host must.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
@@ -41,6 +42,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import { readFileSync as readWhole, existsSync as present, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom } from './catalogue.ts';
+import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, type FileSnapshots } from './snapshots.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { createDirectory, type Directory } from '@braindog/record/directory';
@@ -451,6 +453,18 @@ export async function start(options: {
    * (a passkey made at one origin answers nothing at another), and the `Origin` every write must carry.
    */
   origin?: string | undefined;
+  /**
+   * The certificate and key this process serves TLS with, `BRAINDOG_TLS_CERT` and `BRAINDOG_TLS_KEY`. Absent: plain http.
+   *
+   * BECAUSE THE ONE DEVICE THIS HAS TO WORK ON IS A PHONE, and a phone is never at loopback. Without this
+   * the only reachable self-host is one with another daemon in front of it holding the certificate, and the
+   * operator who has a certificate already had nowhere to put it. `reach.ts` has the measurements.
+   *
+   * THE ORIGIN COMES FROM THE CERTIFICATE WHEN IT IS NOT GIVEN, and a given one that the certificate does
+   * not name is refused before anything listens: the relying party id and the name a browser will accept
+   * without a warning are the same name, and two places to write it down is one place to get it wrong.
+   */
+  tls?: { cert: string; key: string } | undefined;
   /** The built app to serve for every path that is not `/api`, `/auth` or `/mcp`. Absent: those paths are 404. */
   shell?: string | undefined;
   /** A folder of published use cases served read-only under `/catalogue/` (`catalogue.ts`), or none. */
@@ -528,6 +542,15 @@ export async function start(options: {
     if (!parsed || parsed.origin === 'null')
       throw new Error('BRAINDOG_ORIGIN is an origin, such as https://studio.example or http://localhost:8080, and this is not one.');
   }
+  /* AND THE CERTIFICATE IS READ HERE, FOR THE SAME REASON THE ORIGIN IS: a certificate Node cannot parse, or
+     one naming a host `BRAINDOG_ORIGIN` does not, has to be a sentence before the socket exists rather than
+     after. The only report of a mismatch otherwise is a certificate warning on the phone, which is the one
+     device the operator is not looking at while they read this process's output.
+
+     `port: 443` IS A PLACEHOLDER AND NEVER ESCAPES. The real port is not known until `listen` returns, and
+     neither refusal depends on it: a configured origin carries its own port, and an unusable set of names is
+     unusable at every port. `originFor` is pure, so calling it twice costs a parse and cannot disagree. */
+  if (options.tls !== undefined) originFor({ configured: options.origin, names: certificateNames(options.tls.cert), port: 443 });
   const shell = options.shell === undefined ? null : shellOf(options.shell);
 
   const sql = openSqlite(options.file);
@@ -804,7 +827,7 @@ export async function start(options: {
 
      The 500 says what happened in one sentence and the socket is closed, which is the promise
      `serveApi` makes one layer down and the one this layer was breaking. */
-  const server = createServer((req, res) => {
+  const answering: RequestListener = (req, res) => {
     /* `/.well-known/braindog-build`, AS THE WORKER ANSWERS IT: which build this process is, before any door and with
        no credential, `null` when it was never told. A deployment is not a record, so a deleted record does not change
        the answer, and a gate comparing hosts reads the same shape from both. */
@@ -836,13 +859,22 @@ export async function start(options: {
         res.destroy();
       }
     });
-  });
+  };
+  /* TLS IS TERMINATED HERE WHEN THERE IS A CERTIFICATE TO DO IT WITH, and it is the same listener either
+     way: `https.Server` differs from `http.Server` in the handshake and in nothing this file does. Both
+     refusals a certificate can cause were already made above, before this socket existed. */
+  const names = options.tls === undefined ? [] : certificateNames(options.tls.cert);
+  const server =
+    options.tls === undefined ? createServer(answering) : createTlsServer({ cert: options.tls.cert, key: options.tls.key }, answering);
   await new Promise<void>((resolve) => server.listen(options.port, host, resolve));
 
   /* THE ORIGIN IS KNOWN ONLY NOW, when the port is, and `port: 0` is how every test starts one. Nothing
      between here and `site = …` awaits, so no request is answered before it is set. */
   const port = (server.address() as AddressInfo).port;
-  const origin = new URL(options.origin ?? `http://localhost:${port}`).origin;
+  const origin =
+    options.tls === undefined
+      ? new URL(options.origin ?? `http://localhost:${port}`).origin
+      : originFor({ configured: options.origin, names, port });
   const mode = cookieMode(origin);
   const rp = relyingParty(origin);
 
@@ -876,8 +908,14 @@ export async function start(options: {
   ledger = directory;
   const loopback = [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
   /* THE ORIGINS THIS PROCESS ANSWERS FOR, WRITTEN ONCE. Open mode's cross-origin check and the app's own key
-     doors ask the same question, and two lists of the same addresses would be two rules that drift. */
-  const origins = new Set([...loopback.map((h) => `http://${h}`), origin]);
+     doors ask the same question, and two lists of the same addresses would be two rules that drift.
+
+     THE SCHEME IS THE SOCKET'S. These were `http://` unconditionally, which was true of every self-host
+     until this one could hold a certificate: a TLS process would have listed three origins no browser can
+     ever send, and a page it served from `https://localhost:8443` would have had its own writes refused as
+     cross-origin. A hard-coded scheme beside a configurable socket is a rule that was only ever right by
+     coincidence. */
+  const origins = new Set([...loopback.map((h) => `${options.tls === undefined ? 'http' : 'https'}://${h}`), origin]);
   site = {
     usage: directory.usage,
     /* THE ONE RECORD THIS PROCESS HOLDS, AND ONLY THAT ONE. `switcherRows` asks every record the
