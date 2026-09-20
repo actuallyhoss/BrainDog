@@ -13,11 +13,11 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
-import { openRecord, type Arrived, type Declaration, type Kernel } from '@braindog/kernel';
+import { openRecord, type Arrived, type Declaration, type Kernel, type Leg } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, installSeed } from '../src/index.ts';
+import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, installSeed } from '../src/index.ts';
 import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, nightOf } from '../src/modules/money.ts';
 
 function openSqlite(): Sql {
@@ -564,4 +564,132 @@ test('THE SAME BYTES TWICE ARE ONE ROW, and the same movement in two wordings is
   const near = MONEY_INGESTS['bank-card-out']!.dedupe;
   assert.deepEqual(near, { near: { on: ['amount', 'account'], day: 'on', prefix: { field: 'what', chars: 12 } } });
   assert.equal(MONEY_INGESTS['bank-card-in']!.dedupe, near, 'the two patterns dedupe on different keys, so one bank would write both rows');
+});
+
+/* ── every list that holds a dated amount is in the cash walk ────────────── */
+
+/**
+ * The money page's walk, read off the declaration rather than retyped here.
+ *
+ * THE DEFECT BELOW WAS A MISSING ENTRY IN `from:`, so a test carrying its own copy of the legs could
+ * not have seen it: it would have walked the four legs it wrote down and reported a healthy runway
+ * while the page on screen walked two.
+ */
+const cashWalk = (): { from: Leg[]; horizon: number } => {
+  const blocks = PAGES.money!.blocks as readonly { kind?: string; from?: unknown; horizon?: unknown }[];
+  const block = blocks.find((b) => b.kind === 'forecast');
+  assert.ok(block, 'the money page draws a cash walk');
+  assert.ok(Array.isArray(block.from) && typeof block.horizon === 'number', 'and the walk names its legs and its horizon');
+  return { from: block.from as Leg[], horizon: block.horizon as number };
+};
+
+/** What one leg of a walk moves over the horizon, in minor units, and how many steps it moves it in. */
+function contribution(k: Kernel, opening: number, legs: readonly Leg[], horizon: number, register: string) {
+  const out = k.runway(opening, legs, horizon);
+  assert.ok(out.ok, sayOf(out));
+  assert.deepEqual(out.value.refusals, [], 'a walk that refuses is money missing from the answer');
+  const mine = out.value.steps.filter((s) => s.source === register);
+  return { steps: mine.length, total: mine.reduce((n, s) => n + s.delta, 0), walk: out.value };
+}
+
+test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the balance it drew stood GBP 2,700.00 above the record', async () => {
+  const k = await seeded();
+  const opening = reading(k, 'cash-now');
+  assert.ok(opening !== null);
+  const { from, horizon } = cashWalk();
+
+  assert.ok(from.some((leg) => leg.register === 'installments'), 'the cash walk reads the instalments list');
+
+  /* ONE ROW A DATED PART, WHICH IS WHY THIS LEG CARRIES NO `every:`. `installments` is already
+     expanded: the proofing press is eight rows on eight days, and a frequency over the top of that
+     would charge it eight times eight. The step count below is the assertion of exactly that. */
+  const ahead = INSTALLMENTS.filter((row) => row.state === 'open');
+  const expected = ahead.reduce((n, row) => n + (row.direction === 'in' ? 1 : -1) * minor(row.amount), 0);
+
+  const got = contribution(k, opening, from, horizon, 'installments');
+  assert.equal(got.steps, ahead.length, 'every open part is one step, and a part wearing a frequency would be many');
+  assert.equal(got.total, expected);
+  /* MEASURED ON THE SHIPPED RECORD: four parts of the proofing press leaving at GBP 1,875.00 and two
+     of the Halden licence arriving at GBP 2,400.00, GBP 2,700.00 net out that was in no cash walk. */
+  assert.equal(expected, -270_000);
+
+  const without = contribution(k, opening, from.filter((leg) => leg.register !== 'installments'), horizon, 'installments');
+  assert.equal(without.steps, 0, 'and with the leg taken out the same walk sees none of it');
+  assert.equal(
+    (without.walk.steps.at(-1)?.balance ?? opening) - (got.walk.steps.at(-1)?.balance ?? opening),
+    270_000,
+    'the walk without the leg ends better off than the record does, which is the direction a runway must never be wrong in',
+  );
+  /* AND THE CROSSING DAY DOES NOT MOVE, WHICH IS WORTH KNOWING AND IS WHY THIS TEST SAYS BALANCE AND
+     NOT DAYS. Measured over the 365 day horizon: 30 October, 57 days, with the leg and without it,
+     because the same obligation crosses on that day either way. What the missing leg cost was the
+     line and the thirty-day bridge under it rather than the headline figure, so a reader who repairs
+     this block expecting the runway to shorten has the wrong expectation. */
+  assert.equal(got.walk.crossed?.day, without.walk.crossed?.day, 'the six parts land either side of a crossing they do not cause, on this record');
+  assert.equal(got.walk.days, without.walk.days, 'so the days figure beside the chart reads the same, and the balance under it does not');
+
+  /* THE THIRTY-DAY BRIDGE IS THIS WALK OVER A SHORTER HORIZON. A leg added to one and not the other
+     is two answers about the same thirty days, one block apart on one screen. */
+  const bridge = (PAGES.money!.blocks as readonly { kind?: string; from?: unknown }[]).find((b) => b.kind === 'bridge');
+  assert.ok(bridge, 'the money page draws a thirty-day bridge');
+  assert.deepEqual(bridge.from, from, 'the bridge walks the legs the walk above it walks');
+});
+
+/**
+ * WHY THERE IS NO `recurring` LEG, kept as a measurement rather than as a memory.
+ *
+ * The obvious reading of "every list that holds a dated amount" adds `recurring` too, and on this
+ * record that is a second copy of money the walk already has. The five names below are one amount,
+ * on one day, at one cycle, written in both lists, and adding the leg moved the crossing day from
+ * 30 October to 1 October on money that does not exist. This test builds the leg and proves it.
+ */
+test('A REPEATING OBLIGATION AND A REPEATING ITEM ARE THE SAME MONEY HERE, so the walk reads one of the two lists and not both', async () => {
+  const k = await seeded();
+  const opening = reading(k, 'cash-now');
+  assert.ok(opening !== null);
+  const { from, horizon } = cashWalk();
+
+  assert.ok(!from.some((leg) => leg.register === 'recurring'), 'the walk does not add the repeating list on top of the obligations already carrying it');
+
+  /* THE LEG AS IT WOULD BE WRITTEN, with the two field names that differ: `recurring` dates from
+     `next_due` and cycles on `every`, where `obligations` dates from `due` and cycles on `repeats`. */
+  const repeating: Leg = {
+    register: 'recurring',
+    on: 'next_due',
+    amount: 'amount',
+    where: 'state is live',
+    incoming: { field: 'direction', is: 'in' },
+    every: { field: 'every', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+  };
+  const both = contribution(k, opening, [...from, repeating], horizon, 'recurring');
+  assert.equal(both.total, -9_919_600, 'the repeating list moves this much over the horizon');
+
+  const byLabel = (register: string): Map<string, number> => {
+    const out = new Map<string, number>();
+    for (const s of both.walk.steps) if (s.source === register) out.set(s.label, (out.get(s.label) ?? 0) + s.delta);
+    return out;
+  };
+  const items = byLabel('recurring');
+  const promises = byLabel('obligations');
+  /* THE SAME MONEY UNDER TWO DESCRIPTIONS. The obligation is the one the walk keeps, because
+     `every-month-out` reads `obligations.repeats` for a reason already argued in `money.ts` and
+     because no use case seeds `recurring` at all. */
+  const shared: readonly (readonly [string, string])[] = [
+    ['Studio rent', 'Studio rent'],
+    ['Kiln storefront payout', 'Kiln storefront payout'],
+    ['Backend contract, S. Marchetti', 'Backend contract, September'],
+    ['VAT', 'VAT quarter to 31 Aug'],
+    ['Studio insurance', 'Studio insurance, annual'],
+  ];
+  let twice = 0;
+  for (const [item, promise] of shared) {
+    const a = items.get(item);
+    const b = promises.get(promise);
+    assert.ok(a !== undefined, `${item} is in the repeating list`);
+    assert.ok(b !== undefined, `${promise} is in the obligations`);
+    assert.equal(a, b, `${item} and ${promise} are the same money over the horizon`);
+    twice += a;
+  }
+  assert.equal(twice, -9_822_400, 'and that is all but a hundredth of what the leg would add');
+  assert.equal(both.total - twice, -97_200, 'what only the repeating list holds is the two plans no obligation carries');
 });

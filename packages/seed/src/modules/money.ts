@@ -1594,6 +1594,26 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
         recorded: 'cash-now',
+        /**
+         * THE LEGS ARE THE LISTS THAT HOLD A DATED AMOUNT, and `installments` was not among them.
+         *
+         * Measured on the shipped record before the leg was added: six open parts, four of the
+         * proofing press going out at GBP 1,875.00 and two of the Halden licence coming in at
+         * GBP 2,400.00, GBP 2,700.00 net out inside ninety days, in the register and in no walk.
+         * A runway that is too high is the direction this block must never be wrong in, because a
+         * person reads it to decide what to shut down.
+         *
+         * AND `recurring` IS DELIBERATELY NOT A LEG, WHICH IS A MEASUREMENT AND NOT AN OVERSIGHT.
+         * Adding it moved the crossing day from 30 October to 1 October, and GBP 98,224.00 of the
+         * GBP 99,196.00 it added was a second copy of money the obligations leg already walks:
+         * Studio rent, the Kiln storefront payout, the Marchetti backend contract, VAT and the
+         * studio insurance are one amount on one day at one cycle written in both lists, step for
+         * step and total for total. The walk reads the obligations copy for the reason
+         * `every-month-out` reads it: no use case seeds `recurring`, so a walk pointed there is a
+         * walk that answers nothing on every record but this one. Which of the two shapes a
+         * repeating cost really lives in is the seed question already parked in `loop/BACKLOG.md`,
+         * and `test/money.test.ts` builds the leg and asserts the overlap so this stays a number.
+         */
         from: [
           {
             register: 'obligations',
@@ -1610,6 +1630,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
             where: 'state is not cancelled',
             every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
           },
+          {
+            register: 'installments',
+            on: 'due',
+            amount: 'amount',
+            /* `state is open` AND THE PAID PARTS STAY OUT, the way a settled obligation does: the
+               money already moved and Cash now is standing on the far side of it. */
+            where: 'state is open',
+            incoming: { field: 'direction', is: 'in' },
+            /* NO `every:`, AND THAT IS THE WHOLE TRAP OF THIS REGISTER. An instalment row is
+               already one dated part, so a frequency over the top of it would charge the proofing
+               press eight times eight. `INSTALLMENTS` in this file is `[1..8].map`, one row a
+               payment, for exactly this reason. */
+          },
         ],
         horizon: 365,
         knobs: ['horizon', 'late', 'spend', 'leave'],
@@ -1621,7 +1654,11 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       },
       {
         /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
-           that lands. It walks the same legs as the table below, over a shorter horizon. */
+           that lands. It walks the same legs as the table below, over a shorter horizon.
+           THE SAME LEGS MEANS THE SAME LEGS, WORD FOR WORD, and the instalments leg had to be added
+           here too: the two blocks sit one above the other on one screen, so a leg in the walk and
+           not in the bridge is two answers about the same thirty days, GBP 1,350.00 apart on this
+           record. `test/money.test.ts` compares the two arrays rather than trusting the reminder. */
         kind: 'bridge',
         heading: 'The next 30 days',
         span: 5,
@@ -1642,6 +1679,13 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
             amount: 'cost',
             where: 'state is not cancelled',
             every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
+          },
+          {
+            register: 'installments',
+            on: 'due',
+            amount: 'amount',
+            where: 'state is open',
+            incoming: { field: 'direction', is: 'in' },
           },
         ],
         horizon: 30,
