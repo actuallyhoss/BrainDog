@@ -741,6 +741,40 @@ export function unansweredBy(register: string, held: Fields): { id: string; labe
 export type { Filter };
 
 /**
+ * The `f=` chips of an address, as the filters every reader of this app takes.
+ *
+ * IT WAS FOUR LINES INSIDE THE REGISTER ROUTE and a copy of those four lines in five tests
+ * (`api.test.ts` twice, `metrics.test.ts`, `pages.test.ts`, `where.test.ts`), which is the shape
+ * that lets a parser be wrong in the route and right in every test of it. The route imports this
+ * now, so what a test drives is what the page reads.
+ *
+ * THE CHIP IS THREE PIECES AT THE FIRST TWO COLONS, AND THE REST OF THE STRING IS THE VALUE. It
+ * used to be `raw.split(':')` taking the third piece, and a list element is not a word:
+ * `people.handles` holds `git:jokonkwo` and `tools.needs` holds
+ * `header:Authorization=credentials#1`, so every value of two of the mirror's eleven list fields
+ * carries a colon. `handles:has:git:jokonkwo` parsed as the value `git`, which nobody holds, and the
+ * grid came back empty — the one answer indistinguishable from a filter that worked. `registerHref`
+ * does encode the value, and `URLSearchParams` hands the colon straight back, so the encoding never
+ * reached the split.
+ *
+ * A COMMA STILL SEPARATES VALUES and that is not the same hole. `compile` splits the `where`
+ * sentence on the comma too and says so in place, so a value carrying one cannot be written in
+ * either language: a known limitation rather than a silent one, and `list-chips.test.ts` drives the
+ * refusal both engines answer with.
+ */
+export const chipsOf = (params: URLSearchParams): Filter[] =>
+  params.getAll('f').map((raw) => {
+    const at = raw.indexOf(':');
+    if (at === -1) return { field: raw, op: 'is', values: [''] };
+    const then = raw.indexOf(':', at + 1);
+    return {
+      field: raw.slice(0, at),
+      op: then === -1 ? raw.slice(at + 1) : raw.slice(at + 1, then),
+      values: (then === -1 ? '' : raw.slice(then + 1)).split(','),
+    };
+  });
+
+/**
  * The URL's filter chips, as a `where` sentence.
  *
  * There were two filter languages in this product and they disagreed. `where.ts` resolves dates,
@@ -769,7 +803,25 @@ export const whereOf = (filters: Filter[]): string =>
           ? `${f.field} is not ${f.values.join(' or ')}`
           : f.op === 'before' || f.op === 'after'
             ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
-            : `${f.field} is ${f.values[0] ?? ''}`,
+            : /**
+               * `has` AND `lacks`, THE TWO OPERATORS ONLY A LIST TAKES, and until they were written
+               * here nothing outside `where.ts` could spell either one.
+               *
+               * They fell to the line below and came back as `repos is portage`, which both engines
+               * now refuse: *"repos is a list, which cannot be asked \"is\""*. So the one shape a
+               * list filter could arrive in — a chip, from a link, from a metric or a saved view —
+               * was the one shape that could not be read, and `registerHref` answers the whole
+               * register for any predicate carrying a list clause because of it.
+               *
+               * ONE VALUE, WHICH IS THE GRAMMAR'S RULE AND NOT A NARROWING CHOSEN HERE. `where.ts`
+               * types the clause `values: [string]` because the operator looks for a single element
+               * inside a list, and `tags has urgent or soon` would otherwise look for a tag
+               * literally called `urgent or soon`. Joining the rest on ` or ` would have written a
+               * sentence the compiler refuses by name, so the first value is the value.
+               */
+              f.op === 'has' || f.op === 'lacks'
+              ? `${f.field} ${f.op} ${f.values[0] ?? ''}`
+              : `${f.field} is ${f.values[0] ?? ''}`,
     )
     .join(', ');
 

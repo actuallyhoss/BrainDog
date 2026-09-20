@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { columnsFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, seqWidth, dirOf, display, DOM_CAP, iconFor, identityFor, identityOf, inheritedFrom, labelOf, noticed, PAGES, readableFields, toRows, unansweredBy, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -93,12 +93,10 @@
     const [field, dir] = (sortParam ?? '').split(':');
     return field ? { field, dir: (dir === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc' } : undefined;
   });
-  const filters = $derived.by((): Filter[] =>
-    page.url.searchParams.getAll('f').map((raw) => {
-      const [field = '', op = 'is', values = ''] = raw.split(':');
-      return { field, op, values: values.split(',') };
-    }),
-  );
+  /* THE CHIP PARSER IS `api.ts`'S NOW. It was these four lines and a copy of them in six tests, so
+     the thing every test of a chip drove was a copy of the route rather than the route: the colon
+     inside `git:jokonkwo` fell off the end of a value here and in none of them. See `chipsOf`. */
+  const filters = $derived(chipsOf(page.url.searchParams));
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
@@ -1590,6 +1588,49 @@
       if (values.length) p.append('f', `${field}:${op}:${values.join(',')}`);
     });
 
+  /**
+   * A LIST CLAUSE, WHICH THE PILLS CANNOT DRAW AND THE BAR THEREFORE DREW NOTHING FOR AT ALL.
+   *
+   * Every control in the bar comes from a field's `values ?? []`, and `isOn` answers a question
+   * about an enum's declared set. A list has no declared set: `things.repos` holds whatever
+   * repositories that thing has, so there is no row of pills to light and never will be. Arriving
+   * at `?f=repos:has:portage` therefore narrowed four rows to one with nothing above the grid
+   * saying so, and the bar's own rule, written on `data-on`, is that which filters are on is the
+   * whole of what the grid underneath is showing.
+   *
+   * CLEAR FILTERS WAS DRAWN AND IT IS NOT A WAY OFF THIS ONE CLAUSE. It keys off `filters.length`,
+   * so it was there; it is a link to `/r/<register>`, so pressing it drops the search box and every
+   * other chip along with the clause somebody meant. An earlier draft of this comment said there
+   * was no way back but the address bar, which was wrong: there was a way back to the whole
+   * register, and none to this list without this one narrowing.
+   *
+   * AND THIS IS THE LIST HALF ONLY. A `before` or `after` chip has no pill either, and
+   * `registerHref` in `where.ts` mints `due:before:today` for the money tiles, so arriving from one
+   * still narrows the grid with nothing above it naming the narrowing. Held to `list` here because
+   * a date clause wants a date control rather than a word with a cross on it.
+   *
+   * THE CLAUSE ITSELF IS THE CONTROL, because it is the only honest one: its field's name, the
+   * operator, and the element it is looking for. Pressing it takes it off, which is what
+   * `aria-pressed` on every segment in this bar already promises.
+   *
+   * THE INDEX RATHER THAN THE TEXT, so taking one off is exact. Rebuilding the chip from the parsed
+   * filter would have to spell the value back the way the URL held it, and `chipsOf` deliberately
+   * keeps a value's colons: `handles:has:git:jokonkwo` rebuilt and compared would match, and a
+   * value the encoder had spelled differently would not, leaving a chip that cannot be pressed off.
+   */
+  const listed = $derived(
+    filters
+      .map((f, at) => ({ f, at, field: decl?.fields.find((d) => d.id === f.field) }))
+      .filter((c) => (c.f.op === 'has' || c.f.op === 'lacks') && c.field?.type === 'list'),
+  );
+
+  const dropFilter = (at: number) =>
+    setParam((p) => {
+      const rest = p.getAll('f').filter((_, i) => i !== at);
+      p.delete('f');
+      for (const v of rest) p.append('f', v);
+    });
+
   function onkeydown(e: KeyboardEvent) {
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
@@ -2252,6 +2293,18 @@
           </div>
         {/each}
       {/if}
+
+      <!-- A LIST CLAUSE, AS THE ONE CONTROL A LIST CAN HAVE. See `listed`: there is no declared set
+           to draw pills from, so the clause is the chip and pressing it takes it off. It sits after
+           the pills and before Clear because it is the narrowing a reader did not choose here: it
+           arrived in the address, from a block, a metric or a saved view. -->
+      {#each listed as c (c.at)}
+        <button type="button" class="sift listed tap" data-on aria-pressed="true" onclick={() => dropFilter(c.at)}>
+          <span class="sift-name">{c.field ? labelOf(c.field) : c.f.field} {c.f.op}</span>
+          <span class="sift-chosen">{c.f.values[0] ?? ''}</span>
+          <Icon name="close" size="s" />
+        </button>
+      {/each}
 
       {#if (q || filters.length) && !(rowsAsCards() && enums.length)}
         <Button weight="bare" href="/r/{id}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
@@ -3311,6 +3364,24 @@
     text-overflow: ellipsis;
   }
 
+  /* A LIST CLAUSE IS A PILL THAT IS ALREADY ON, drawn in the same track as the rest of the bar so it
+     reads as one of them rather than as a message. A repository is a URL and a handle is
+     `git:jokonkwo`, so the element gives way with an ellipsis before Display is pushed off a phone,
+     which is the same treatment the phone's own filter button gets and for the same reason. */
+  .listed {
+    min-inline-size: 0;
+    border: 0;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .listed .sift-chosen {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .filter-n {
     margin-inline-start: auto;
     color: var(--dim);
@@ -4008,7 +4079,8 @@
 
     /* The one control allowed to shrink, so a long list of chosen values ends in an ellipsis
        inside the phone rather than past its edge. */
-    .bar-rest > .sift-sheet {
+    .bar-rest > .sift-sheet,
+    .bar-rest > .listed {
       flex: 0 1 auto;
     }
   }

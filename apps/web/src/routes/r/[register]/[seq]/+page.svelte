@@ -291,7 +291,15 @@
   function patchOf(f: FieldDecl): Fields {
     if (f.type === 'bool') return { [f.id]: ticked };
     const raw = draft.trim();
-    if ((f.type as string) === 'list' || Array.isArray(row?.fields[f.id])) return { [f.id]: listFromDraft(raw, row?.fields[f.id]) };
+    /* THE CAST IS GONE BECAUSE THE TYPE ARRIVED, and this was the last one in the tree. `FieldType`
+       named fifteen of the record's eighteen and `list` was not among them, so this line read
+       `(f.type as string) === 'list'` — a cast that launders a missing member, which is how a whole
+       type goes unhandled quietly, because the next reader writes the same cast instead of the same
+       question. `schema.ts` names `list` now, and `blocks.ts` lost its copy when `where.ts` learned
+       `has` and `lacks`. The `Array.isArray` beside it stays: it is about the ROW rather than the
+       declaration, and a register that has since stopped declaring a field as a list still has rows
+       holding an array in it. */
+    if (f.type === 'list' || Array.isArray(row?.fields[f.id])) return { [f.id]: listFromDraft(raw, row?.fields[f.id]) };
     if (f.type !== 'money') return { [f.id]: raw };
     if (raw === '') return { [f.id]: null };
     const currency = currencyOf(row?.fields[f.id]) ?? currencyFor(id, f.id) ?? 'GBP';

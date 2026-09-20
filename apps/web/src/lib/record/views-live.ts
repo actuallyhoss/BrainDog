@@ -60,10 +60,10 @@ type Said = { code: string; fix: string; allowed?: readonly string[] };
  * filtered on state alone, so 28 rows were drawn under the word and 24 of them were not overdue. A
  * printed predicate that is not the predicate is worse than none, because it is checkable and wrong.
  *
- * AND THE REFUSED SET IS TWELVE TESTS WIDE, not the four it is easy to name. `@braindog/where`
- * declares twenty operators (`OPERATORS`, `index.ts:39`) and `clauseOf` below reads eight, so on
+ * AND THE REFUSED SET IS TEN TESTS WIDE, not the four it is easy to name. `@braindog/where`
+ * declares twenty operators (`OPERATORS`, `index.ts:39`) and `clauseOf` below reads ten, so on
  * top of `any` and `none` groups and a hop through `via`, every one of `gt`, `gte`, `lt`, `lte`,
- * `between`, `contains`, `matches`, `starts`, `ends`, `has`, `lacks` and `near` comes back `null`
+ * `between`, `contains`, `matches`, `starts`, `ends` and `near` comes back `null`
  * and takes the whole Filter line with it. That is the safe direction and it is not a small set:
  * `copy.filterClause` would write `Cost is 100` for `{ field: 'cost', gt: 100 }`, a clause that
  * reads as an equality over a bound, which is the Overdue failure again in one leaf.
@@ -126,11 +126,21 @@ function valuesOf(v: unknown): string[] | null {
 /**
  * One leaf of the record's predicate as one of this app's chips, or nothing.
  *
- * THE OPERATORS ARE THE ONES `copy.filterClause` CAN WRITE, and no more. It knows `before`, `after`,
- * `not-in` and everything-else-is-`is`, so a `contains` leaf handed to it would be printed as
- * "Note is invoice" — a clause that reads as an equality over a substring test. `empty` and
- * `present` become the words the register's own filter grammar uses for them (`where.ts`: "points at
- * is empty", "points at is set"), so the sentence a live view prints is one a person could type back.
+ * THE OPERATORS ARE THE ONES THE CHIPS CAN RUN, and every one of them is checked against the
+ * printer beside it. `copy.filterClause` knows `before`, `after`, `not-in` and
+ * everything-else-is-`is`, so a `contains` leaf handed to it would be printed as "Note is invoice" —
+ * a clause that reads as an equality over a substring test. `empty` and `present` become the words
+ * the register's own filter grammar uses for them (`where.ts`: "points at is empty", "points at is
+ * set"), so the sentence a live view prints is one a person could type back.
+ *
+ * `has` AND `lacks` ARE READ NOW, AND THE PRINTER IS THE HALF STILL OWED. A view whose filter is
+ * `{ field: 'repos', has: 'portage' }` answered `null`, which takes the whole Filter line with it,
+ * so the view drew its rows under no sentence at all and its chips reached neither `whereOf` nor
+ * `treeOf`. `whereOf` spells both words now and the mock answers them, so the chips RUN. What
+ * `copy.filterClause` writes for them is `Repositories is portage`, the equality the record itself
+ * refuses by name, and the two words have to reach that function before the reading line is right.
+ * It is named here rather than worked around, because a printer narrower than the chips it prints
+ * is exactly the defect the paragraph above is about, one operator along.
  */
 function clauseOf(leaf: Record<string, unknown>): Filter | null {
   const field = typeof leaf.field === 'string' ? leaf.field : '';
@@ -146,6 +156,10 @@ function clauseOf(leaf: Record<string, unknown>): Filter | null {
     ['not_in', 'not-in'],
     ['before', 'before'],
     ['after', 'after'],
+    /* THE RECORD'S OWN TWO WORDS, unchanged on the way through, because `where.ts` took them from
+       the record rather than translating them: there is nothing here for either side to swap. */
+    ['has', 'has'],
+    ['lacks', 'lacks'],
   ];
   for (const [key, op] of ops) {
     if (!(key in leaf)) continue;

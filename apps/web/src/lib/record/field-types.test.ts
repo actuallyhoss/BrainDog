@@ -4,8 +4,14 @@
  * `FieldType` in `schema.ts` was a TypeScript union and nothing else, so it could not be held
  * against anything: the one place the browser writes down what a field may be was unreadable by any
  * test, and a type missing from it cost nothing until a cast was needed. Two were written:
- * `blocks.ts` has `(f.type as string) !== 'list'` and the row form has `(f.type as string) ===
+ * `blocks.ts` had `(f.type as string) !== 'list'` and the row form had `(f.type as string) ===
  * 'list'`, and a cast that launders a missing member is how a whole type goes unhandled quietly.
+ *
+ * BOTH ARE GONE NOW AND THE TREE HOLDS NONE. `blocks.ts`'s went when `where.ts` learned `has` and
+ * `lacks` — the operators only a list takes, which could not be taught until the type had a name —
+ * and the row form's went with the chip that spells them. The claim above was written in the
+ * present tense and outlived both of them by a commit each, which is the ordinary way a comment
+ * about another file goes wrong; the assertions below are what actually hold the union closed.
  *
  * MEASURED OVER THE MIRROR'S OWN REGISTERS, the union was short by three of the fifteen types in
  * use: eleven `list` fields over five registers (`things.repos`, `things.folders`,
