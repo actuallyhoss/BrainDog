@@ -708,7 +708,10 @@ Workers AI, Email, Secrets Store. Each control, where it sits, and what never tr
    or a Secrets Store binding of that name, holding 32 bytes as 64 hex characters or base64url; the fingerprint is the
    self-host's, so one root key names itself the same way on both hosts. A bound value that is not 32 bytes is a
    refusal and never an absent store. Unbound, `/api/vault/deposit` and `/api/vault/open` check the vault grant and
-   answer `NOT_IN_THIS_BUILD`, and `/auth/provision` makes records without wrapped keys, exactly as before. Bound,
+   answer `NOT_IN_THIS_BUILD`, and `/auth/provision` answers `NOT_IN_THIS_BUILD` too rather than making a record with
+no wrapped keys, unless the deployment declares `PROVISION_WITHOUT_KEYS: yes`. Amending this rule in the revision
+that added `src/keyless.ts`: it read "exactly as before", and before was a record that could never seal a grant,
+run a connector, hold a model key or sign an export, with no call that could ever repair it. Bound,
    provisioning wraps a new record's three keys (`recordKeys`), and the doors seal and open in `src/vault.ts` through
    `packages/host/src/vault.ts`: the record's `depositGrant` calls the Worker's `seal` back over RPC, so the value
    stays in the Worker and only sealed bytes reach the object, and a read is answered once with `no-store`. A record

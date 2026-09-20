@@ -943,3 +943,81 @@ test('THE HEADER OF A SIGNATURE IS CHECKED, not taken', async () => {
   assert.equal(await code([...lines, lines[at]!]), 'SIGNATURE_INVALID');
   sql.close();
 });
+
+test('`dog_meta.keys` IS RECOMPUTED ON IMPORT, because a header row about the vault is not identity', async () => {
+  /**
+   * THE HEADER ALWAYS TRAVELS AND THE VAULT DOES NOT, so one row of the header was arriving as a
+   * confident lie.
+   *
+   * `dog_meta` is the record's identity and is deliberately adopted whole: opening a file into an
+   * empty record means becoming that record, and skipping the header left a record that could not
+   * say its own name. `keys` was added to that table to answer a real question — a `vault_key` row
+   * travels SEALED, so "no keys" and "keys I cannot open" look alike from outside — and it is not
+   * identity. It is a count of rows in another table, and `vault_key` is in `NEEDS_IDENTITY`, so a
+   * `sections: ['data']` file carries the claim and not the thing claimed.
+   *
+   * The result was worse than the silence it replaced: a fresh record with an empty vault, saying
+   * it holds three keys. A reader who believes it seals a grant against a key that is not there.
+   *
+   * RECOMPUTED RATHER THAN SKIPPED, because an absent row is ambiguous between "this build never
+   * wrote one" and "there are none", and the whole point of the row is to tell those apart. The
+   * target's own `vault_key` is the only thing that knows, and it is known by the end of the
+   * transaction whether the file carried keys or not.
+   */
+  const source = await filled();
+  for (const purpose of ['connector', 'record', 'signing'])
+    source.sql.exec(
+      "INSERT OR REPLACE INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES (?, 'x', 'y', 'kek', 'k1', NULL, NULL)",
+      purpose,
+    );
+  source.sql.exec("INSERT OR REPLACE INTO dog_meta (key, value) VALUES ('keys', 'connector,record,signing')");
+  const lines = value<string[]>(await source.k.export({ sections: ['data'] }));
+  assert.ok(
+    lines.some((l) => l.includes('"keys"') && l.includes('connector,record,signing')),
+    'the claim did not travel, so this test is about nothing',
+  );
+
+  const sql = openSqlite();
+  const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
+  assert.ok(((await target.import(lines)) as { ok: boolean }).ok, 'the import was refused');
+
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 0, 'the vault travelled after all');
+  assert.equal(
+    sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'keys'")?.value,
+    'none',
+    'a record with an empty vault says it holds three keys',
+  );
+
+  /* AND THE IDENTITY IS STILL ADOPTED, which is the thing this must not break. */
+  assert.equal(
+    sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'record_slug'")?.value,
+    source.sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'record_slug'")?.value,
+  );
+  sql.close();
+  source.sql.close();
+});
+
+test('AND A FILE THAT DOES CARRY THE VAULT IS BELIEVED, because then the claim and the thing agree', async () => {
+  /* The recompute reads the target after the import, so a full export puts the rows in and the row
+     counts them. Asserting it separately, because a fix that answered `none` unconditionally would
+     pass the test above and lose the answer the row exists to give. */
+  const source = await filled();
+  for (const purpose of ['record', 'signing'])
+    source.sql.exec(
+      "INSERT OR REPLACE INTO vault_key (purpose, wrapped, nonce, wrapped_by, kek_id, salt, rewrapped_at) VALUES (?, 'x', 'y', 'kek', 'k1', NULL, NULL)",
+      purpose,
+    );
+  /* THE ROW IS `provision`'s TO WRITE and this reader's only to correct, so the source carries one:
+     a record made by any current build has it, and a file from an older one is the case the
+     round-trip test above covers. */
+  source.sql.exec("INSERT OR REPLACE INTO dog_meta (key, value) VALUES ('keys', 'record')");
+  const lines = value<string[]>(await source.k.export());
+
+  const sql = openSqlite();
+  const target = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
+  assert.ok(((await target.import(lines)) as { ok: boolean }).ok, 'the import was refused');
+  assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n, 2, 'the vault did not travel');
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM dog_meta WHERE key = 'keys'")?.value, 'record,signing');
+  sql.close();
+  source.sql.close();
+});

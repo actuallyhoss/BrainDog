@@ -41,7 +41,10 @@ export type CreateRecordArgs = {
   tz: string;
   locale: string;
   owner: { id: string; email?: string | null; name?: string | null };
-  /** The record, connector and signing keys, wrapped. Absent until there is something to wrap. */
+  /**
+   * The record, connector and signing keys, wrapped. Absent until there is something to wrap, and then absent
+   * for good: they are written once, and `dog_meta.keys` is where the record says which of them it got.
+   */
   keys?: Partial<Record<'record' | 'connector' | 'signing', WrappedKey>>;
 };
 
@@ -154,6 +157,22 @@ export function createRecord(
       );
     }
 
+    /* AND WHETHER IT HAS ANY, WHICH IS A FACT THE RECORD COULD NOT PREVIOUSLY STATE. A record
+       created before its host had a key store gets no `vault_key` rows, and the loop above is the
+       only moment they are ever written — so it reads, writes and signs people in, and refuses only
+       at the first attempt to seal a grant or sign an export, which may be weeks later and reads
+       like a fault rather than like the ordering mistake it is. A reader looking at an exported
+       file cannot tell either: `brainl.ts` carries `vault_key` SEALED, so "no keys" and "keys I
+       cannot open" look alike from outside.
+
+       READ BACK FROM THE TABLE, NEVER FROM `args.keys`. A second create of the same id is the
+       ordinary case here — a retried signup, a restore — and it arrives with no keys in hand while
+       the record holds three, so writing the argument would have stamped `none` on a record that is
+       fully keyed. */
+    const held = sql
+      .all<{ purpose: string }>('SELECT purpose FROM vault_key ORDER BY purpose')
+      .map((row) => row.purpose);
+
     /* THE HEADER A FILE CARRIES. `dog_meta` is what makes an exported `.brain` say which record it is a
        copy of, and when. Written here rather than at export, because a fact about the record that is
        computed at export time is a fact the file cannot be checked against. */
@@ -164,6 +183,7 @@ export function createRecord(
       ['tz', args.tz],
       ['locale', args.locale],
       ['created_at', at],
+      ['keys', held.length === 0 ? 'none' : held.join(',')],
     ] as const)
       sql.exec('INSERT OR REPLACE INTO dog_meta (key, value) VALUES (?, ?)', key, value);
 

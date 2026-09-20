@@ -790,6 +790,34 @@ export function importBrainl(
       )
     )
       execScript(sql, SEAT_SESSION);
+
+    /**
+     * AND `dog_meta.keys` IS RECOMPUTED, because it is the one header row that is not identity.
+     *
+     * The header travels whatever else does and is adopted whole, for the reason written at the
+     * skip above: opening a file into an empty record means becoming that record. `keys` was added
+     * to answer a question the header could not otherwise answer — a `vault_key` row travels
+     * SEALED, so "no keys" and "keys I cannot open" look alike from outside — and it is a count of
+     * rows in another table rather than a fact about who this record is. `vault_key` is in
+     * `NEEDS_IDENTITY`, so a `sections: ['data']` file carries the claim and leaves the thing
+     * claimed behind: a fresh record with an empty vault, saying it holds three keys. That is worse
+     * than the silence the row replaced, because somebody acts on it.
+     *
+     * RECOMPUTED AND NOT SKIPPED. An absent row is ambiguous between "no keys" and "written by a
+     * build that never wrote the row", which is the ambiguity the row exists to end. By here the
+     * target's own `vault_key` holds whatever the file put there, if anything, so it is the only
+     * thing that knows and it is asked.
+     *
+     * CORRECTED AND NEVER MINTED, which is the difference between this and one more `INSERT OR
+     * REPLACE`. `provision` writes the row when a record is made; a file from a build older than
+     * that carries none, and adding one here would mean an export of the imported record no longer
+     * matched the file it came from. The round trip is the only proof this reader is complete, and
+     * a correction that changes what a file says about itself is not a correction.
+     */
+    if (sql.one("SELECT 1 AS x FROM dog_meta WHERE key = 'keys'")) {
+      const held = sql.all<{ purpose: string }>('SELECT purpose FROM vault_key ORDER BY purpose').map((r) => r.purpose);
+      sql.exec("UPDATE dog_meta SET value = ? WHERE key = 'keys'", held.length === 0 ? 'none' : held.join(','));
+    }
     return { tables: touched.size, rows };
   });
   }

@@ -273,7 +273,14 @@
         "DEMO_RECORD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
-        "AUTH_MAIL_FROM": ""
+        "AUTH_MAIL_FROM": "",
+        /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
+           the default is a refusal: with no `KEK` bound, `/auth/provision` answers
+           `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
+           record is given its keys once and the moment is the create. `yes` and nothing else turns
+           that off, for a host that seals nothing. Set here or with
+           `--var PROVISION_WITHOUT_KEYS:yes` on the deploy, as `DEMO_RECORD` above is set. */
+        "PROVISION_WITHOUT_KEYS": ""
       },
 
       "durable_objects": {
@@ -367,7 +374,14 @@
         "DEMO_RECORD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
-        "AUTH_MAIL_FROM": ""
+        "AUTH_MAIL_FROM": "",
+        /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
+           the default is a refusal: with no `KEK` bound, `/auth/provision` answers
+           `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
+           record is given its keys once and the moment is the create. `yes` and nothing else turns
+           that off, for a host that seals nothing. Set here or with
+           `--var PROVISION_WITHOUT_KEYS:yes` on the deploy, as `DEMO_RECORD` above is set. */
+        "PROVISION_WITHOUT_KEYS": ""
       },
 
       "durable_objects": {
@@ -426,8 +440,13 @@
      never is: 32 bytes as 64 hex characters or base64url, a different value per environment, put at the prompt with
      `wrangler secret put KEK --env <environment>`, or bound from Secrets Store by the drafted
      `secrets_store_secrets` block above under the same name, never both. Without it `/api/vault/*` answers
-     `NOT_IN_THIS_BUILD` after checking the grant, and `/auth/provision` makes records with no wrapped keys. With it,
-     records provisioned from then on get their three keys, and one made before keeps none. It is deliberately not
+     `NOT_IN_THIS_BUILD` after checking the grant, and `/auth/provision` REFUSES rather than making a keyless record.
+     With it, records provisioned from then on get their three keys, and one made before keeps none. Amend 12 §6,
+     51 §8 rule 3 and 16 ADR-062 in the same revision: all three said provisioning carried on without keys, which
+     was true until the guard in `src/keyless.ts` landed. The reason for the change is that the mistake cannot be
+     undone — a record created with no `vault_key` rows never gets them, because a second create would overwrite the
+     DEK every sealed grant was made under — so the only repair is to throw the Directory name away, and 52 §13 has
+     no undo for one. `PROVISION_WITHOUT_KEYS` in `vars` is the deliberate exception. It is deliberately not
      listed under `secrets.required`: that key fails the first deploy of an environment while the secret is unset,
-     and unset is a supported state. `KEK_PREV` is not read yet. */
+     and unset is a supported state for every door but that one. `KEK_PREV` is not read yet. */
 }

@@ -1396,9 +1396,11 @@ answers `NOT_IN_THIS_BUILD` until it has a key store bound.
 RPC boundary. `apps/worker/src/keys.ts` reads the root key only from the `KEK` binding, a Worker secret or a
 Secrets Store binding. With it bound, provisioning wraps a new record's three keys, and the key doors seal and open
 in the Worker exactly as the self-host does: the Durable Object's `depositGrant` calls the Worker's `seal` back over
-RPC, so the object receives sealed bytes and performs no crypto. Unbound, nothing changes. A record provisioned
-before the binding has no wrapped keys and its doors say so in one sentence
-([51-SPEC-WORKER](51-SPEC-WORKER.md) §8 rule 3).
+RPC, so the object receives sealed bytes and performs no crypto. Unbound, `/auth/provision` refuses: "nothing
+changes" was this ADR's own wording and it is amended here, in the revision that added the guard, because what
+changed was unrecoverable and silent. A record provisioned before the binding has no wrapped keys and its doors say
+so in one sentence ([51-SPEC-WORKER](51-SPEC-WORKER.md) §8 rule 3); a record provisioned after it is not made at
+all, unless the deployment sets `PROVISION_WITHOUT_KEYS: yes` to say it seals nothing on purpose.
 
 **Rejected:** decryption inside the object. It would give the record a `KeyStore` port and make a
 compromised record a compromised vault; today a compromised record yields ciphertext.

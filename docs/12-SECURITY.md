@@ -315,7 +315,12 @@ FOR" is structural rather than remembered.
    *(Added September 15th 2026, later the same day: the Worker's key store. `apps/worker/src/keys.ts` reads the
    root key only from the `KEK` binding, a Worker secret or a Secrets Store binding of that name, holding 32 bytes
    as 64 hex characters or base64url, with the self-host's fingerprint. Unbound, both doors check the grant and
-   answer `NOT_IN_THIS_BUILD`, and records are provisioned without wrapped keys. Bound, provisioning wraps a new
+   answer `NOT_IN_THIS_BUILD`, and `/auth/provision` REFUSES rather than making a record that can never hold a
+   key. That is an amendment, made in the revision that added the guard: this paragraph used to say provisioning
+   carried on without them. A record is given its keys once and the moment is the create, so a record made on an
+   unbound deployment never gets them, and the only repair is to throw the Directory name away. A deployment that
+   seals nothing says so with the var `PROVISION_WITHOUT_KEYS: yes`, which is read from the deployment rather than
+   from the request because that is where `KEK` itself is decided, once, by the person who knows. Bound, provisioning wraps a new
    record's three keys, and the Worker seals and opens exactly as the self-host does: the record's `depositGrant`
    calls the Worker's `seal` back over RPC, so the Durable Object receives only sealed bytes. A record created
    before the binding answers "Keys need a record created after this host key store was bound, and this record is

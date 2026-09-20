@@ -177,6 +177,39 @@ test('the wrapped keys are stored and never read', async () => {
   sql.close();
 });
 
+test('AND A RECORD MADE WITHOUT THEM SAYS SO IN ITS HEADER, rather than leaving a later reader to guess', async () => {
+  /* A RECORD WITH NO KEYS IS NOT A RECORD WITH A PROBLEM IT CAN REPORT: it reads, writes and signs
+     people in, and it refuses only at the one moment somebody tries to seal a grant or sign an
+     export, which may be weeks later. `dog_meta` is the header an export carries, and `vault_key`
+     travels sealed, so this row is the one place "this record has no keys" can be read without the
+     key store in front of you.
+
+     IT IS COMPUTED FROM `vault_key` AND NOT FROM `args.keys`. A second create of the same id is the
+     ordinary case here — a retried signup, a restore — and it arrives with no keys in hand, so
+     writing the argument would have said `none` about a record that holds three. */
+  const bare = await record();
+  value(bare.k.createRecord(MADE));
+  assert.equal(meta(bare.sql, 'keys'), 'none', 'a keyless record does not say that it is one');
+  bare.sql.close();
+
+  const b = (n: number) => new Uint8Array([n, n + 1, 2, 3]);
+  const keyed = await record();
+  value(
+    keyed.k.createRecord({
+      ...MADE,
+      keys: {
+        record: { wrapped: b(1), nonce: b(9), kek_id: 'kek_2f' },
+        connector: { wrapped: b(3), nonce: b(8), kek_id: 'kek_2f' },
+        signing: { wrapped: b(5), nonce: b(7), kek_id: 'kek_2f' },
+      },
+    }),
+  );
+  assert.equal(meta(keyed.sql, 'keys'), 'connector,record,signing');
+  value(keyed.k.createRecord(MADE));
+  assert.equal(meta(keyed.sql, 'keys'), 'connector,record,signing', 'a second create said a record holding three keys has none');
+  keyed.sql.close();
+});
+
 /* ── the sweep ───────────────────────────────────────────────────────────── */
 
 async function withRows(): Promise<{ k: Kernel; sql: NodeSql; clock: Clockish }> {
