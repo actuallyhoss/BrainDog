@@ -83,8 +83,40 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
  * switch. There is a flash of the house accent on a cold load as a result, for as long as the
  * module takes to run, and that is the honest trade: the alternative was a palette a reader who
  * needs it could not turn on.
+ *
+ * AND A STORED COLOUR THE VALIDATOR NOW REFUSES IS DROPPED HERE, WHICH IS THE ONLY PLACE IT CAN BE.
+ * A preference outlives the floors that accepted it: check R arrived after the swatch row had
+ * already written real cookies, and the four colours this product suggested until then come no
+ * closer than 2.55:1, 2.84:1, 2.92:1 and 2.94:1 as a fill against a dark surface, measured through
+ * `recordTheme` against a 3:1 floor, so it refuses all four. This used to ignore that
+ * refusal, which meant the same failure on every load for ever, no adopted sheet, and a settings
+ * screen reading a hex that matches no swatch: `accent = held.theme ?? null` there, so the tick sat
+ * on neither a colour nor House and the picker showed nothing chosen at all.
+ *
+ * SO IT IS CLEARED, AND THAT IS WHAT MAKES THE ACCOUNT WORTH ONE LINE. Holding a value that can
+ * never be built again is not remembering a preference, it is remembering a failure; once the
+ * cookie is back to House the message is said once rather than on every load, which is the
+ * difference between an account and noise. The refusal also comes back to the caller in the shape
+ * `apply` answers in, because the shell could say it in words through `copy.accentRefused` and had
+ * no way to hear it while this returned `void`.
  */
-export function restore(): void {
+export function restore(): { ok: true } | { ok: false; refusals: string[]; codes: string[] } {
   const held = pref.read().theme;
-  if (held) apply(held);
+  if (!held) return { ok: true };
+
+  const out = apply(held);
+  if (out.ok) return out;
+
+  /* HOUSE FIRST, THEN THE SENTENCE, so that the sentence is true in the past tense by the time
+     anybody reads it. `apply(null)` is the same path the House control takes: it empties the sheet
+     if one was ever adopted and takes `theme` out of the cookie without touching the other
+     preferences beside it. */
+  apply(null);
+  /* THE AUTHOR'S SENTENCE AND NOT THE READER'S, deliberately: this goes to a console, and the one
+     thing a console is read by is somebody who can act on "2.92:1 against s1 in dark". The reader's
+     version of the same refusal is `copy.accentRefused`, built from `codes` by the screen that has a
+     swatch on it, and that is what the returned result is for. */
+  const why = out.refusals[0] ?? `${out.codes.join(', ')}.`;
+  console.warn(`${held} can no longer be this record's colour. ${why} It is back to the house colour.`);
+  return out;
 }
