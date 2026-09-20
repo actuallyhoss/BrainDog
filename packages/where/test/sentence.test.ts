@@ -29,6 +29,14 @@ const OBLIGATIONS: Schema = {
     tags: { type: 'list' },
     /* A `list<enum>`, which the schema tells apart from a plain list by declaring `values`. */
     chased: { type: 'list', values: ['email', 'phone', 'letter'], label: 'How chased' },
+    /* AND THE LISTS OF EVERYTHING ELSE, which the schema tells apart by `of`. A shipped register
+       declares four `list<ref>` fields, and until `of` travelled with the schema this half of the
+       grammar handed the typed word straight back. */
+    projects: { type: 'list', of: 'ref', to: 'things', label: 'Met in' } as never,
+    seats: { type: 'list', of: 'int' } as never,
+    dates: { type: 'list', of: 'day' } as never,
+    flags: { type: 'list', of: 'bool' } as never,
+    handles: { type: 'list', of: 'text' } as never,
   },
 };
 
@@ -416,6 +424,66 @@ test('A `list<enum>` IS WRITTEN IN THE WORDS A SCREEN SHOWS, and a word it canno
      what is on the screen. */
   assert.deepEqual(good('how chased has phone'), { field: 'chased', has: 'phone' });
   assert.deepEqual(good('How Chased lacks phone'), { field: 'chased', lacks: 'phone' });
+});
+
+test('A LIST OF SOMETHING OTHER THAN TEXT IS ASKED ABOUT IN THAT SOMETHING, not in the word typed', () => {
+  /**
+   * THE ELEMENT TYPE IS THE TYPE THE QUESTION IS ABOUT. `has` and `lacks` look for one value INSIDE
+   * a list, so the value they carry is an element, and an element of a `list<ref>` is a row id. This
+   * branch read `decl.type`, which is `list` on every one of them, so everything that was not a
+   * `list<enum>` fell through to the raw word: `projects has Kiln` compiled to a search for the four
+   * letters `Kiln` in a column holding `01ABCDEFGHJKMNPQRSTVWXYZ00`. It parsed, it compiled, and it
+   * matched nothing, for ever — which is the failure the whole module is written against, and four
+   * fields in the shipped seed are `list<ref>`.
+   *
+   * IT IS THE SAME COERCION THE SCALAR HALF ALREADY DID. `thing is Kiln` resolved to the id, because
+   * that branch reads a `ref` and this one read a `list`. Two renderings of one grammar giving
+   * different answers over the same word is the disagreement this file exists to catch.
+   */
+  assert.deepEqual(good('projects has Kiln'), { field: 'projects', has: THINGS.Kiln });
+  assert.deepEqual(good('projects lacks Marlow & Co'), { field: 'projects', lacks: THINGS['Marlow & Co'] });
+  /* AND A ROW THAT IS NOT THERE IS `REF_UNKNOWN`, which `declare` treats as survivable, rather than
+     a clause that quietly looks for a title in a column of ids. */
+  assert.equal(bad('projects has Nowhere Ltd').code, 'REF_UNKNOWN');
+
+  /* A NUMBER IS A NUMBER. SQLite compares `3 = '3'` across storage classes and answers false, so the
+     row holding three was the one row `seats has 3` could not find. */
+  assert.deepEqual(good('seats has 3'), { field: 'seats', has: 3 });
+  assert.equal(bad('seats has three').code, 'VALUE_MALFORMED');
+
+  /* A DAY READS THE WORDS THE REST OF THE GRAMMAR READS, as `before` and `after` already do. */
+  assert.deepEqual(good('dates has today'), { field: 'dates', has: '2026-09-05' });
+  assert.deepEqual(good('dates lacks 2026-10-01'), { field: 'dates', lacks: '2026-10-01' });
+
+  /* AND A BOOLEAN IS A BOOLEAN AND NOT THE WORD `true`, because `compile` reads a JSON list's
+     element kind from `json_each.type` and asks for text when it is handed text. */
+  assert.deepEqual(good('flags has yes'), { field: 'flags', has: true });
+  assert.deepEqual(good('flags lacks false'), { field: 'flags', lacks: false });
+  assert.equal(bad('flags has maybe').code, 'VALUE_MALFORMED');
+
+  /* A `list<text>` IS UNCHANGED, which is the half that always worked and the half most lists are. */
+  assert.deepEqual(good('handles has @sam'), { field: 'handles', has: '@sam' });
+  assert.deepEqual(good('tags has urgent'), { field: 'tags', has: 'urgent' });
+});
+
+test('AND THE TWO RENDERINGS AGREE OVER THE SAME ROWS, which is the only proof that matters', () => {
+  /* A clause that compiles is not a clause that matches. `evaluate` walks the row in JavaScript and
+     the SQL walks it in SQLite, and a coercion applied in one and not the other is the same bug
+     wearing the other coat. */
+  const rows = [
+    { id: 'kiln', fields: { projects: [THINGS.Kiln], seats: [3, 5], flags: [true], dates: ['2026-09-05'] } },
+    { id: 'other', fields: { projects: [THINGS['Marlow & Co']], seats: [4], flags: [false], dates: ['2026-10-01'] } },
+  ];
+  const matching = (text: string) => rows.filter((r) => evaluate(good(text)!, r.fields, OBLIGATIONS, r)).map((r) => r.id);
+  assert.deepEqual(matching('projects has Kiln'), ['kiln']);
+  assert.deepEqual(matching('projects lacks Kiln'), ['other']);
+  assert.deepEqual(matching('seats has 3'), ['kiln']);
+  assert.deepEqual(matching('flags has yes'), ['kiln']);
+  assert.deepEqual(matching('dates has today'), ['kiln']);
+
+  /* AND EVERY ONE OF THEM COMPILES, because a refusal would make the line above vacuously true. */
+  for (const text of ['projects has Kiln', 'seats has 3', 'flags has yes', 'dates has today'])
+    assert.equal(compile(good(text), OBLIGATIONS).bad.length, 0, text);
 });
 
 test('THE WORDS ARE THE OPERATORS THEMSELVES, so a printed clause is a clause that parses back', () => {

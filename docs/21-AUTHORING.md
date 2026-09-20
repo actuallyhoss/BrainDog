@@ -445,9 +445,11 @@ restatement in §13 is a read, and nothing round-trips through English.
 
 What is genuinely missing is a grammar for the spoken form. There is no word list and no EBNF for it
 anywhere in these documents, only examples, which is a fair part of how a whole field type came to be
-reachable from one surface and not the other: `tags has 2` parses to `{ has: '2' }` and `tags has true`
-to `{ has: 'true' }`, because the sentence has no way to carry an element's type and `Schema.fields`
-publishes one only for `list<enum>`.
+reachable from one surface and not the other: `tags has 2` parsed to `{ has: '2' }` and `projects has
+Kiln` to the four letters `Kiln`, because the schema the sentence reads published an element type for
+a `list<enum>` and for nothing else. That one is closed — the schema carries `of` now, and `has` and
+`lacks` narrow a list to its element before the value is read — but it was reachable because nobody
+had written the grammar down, and the next one will be reachable the same way.
 
 Two property tests are the entire safety story:
 

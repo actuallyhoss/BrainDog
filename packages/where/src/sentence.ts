@@ -43,7 +43,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
-import { addressable, KERNEL_FIELDS, operatorAllowed, type Predicate, type Schema } from './index.ts';
+import { addressable, KERNEL_FIELDS, operatorAllowed, type FieldSpec, type Predicate, type Schema } from './index.ts';
 
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -266,7 +266,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
      * after: '-7d'} })` answering and `list({ where: 'created_at after -7d' })` refusing, from one
      * grammar with one register behind it. That is the second language this file's header is about.
      */
-    let decl: { type: string; values?: readonly string[]; label?: string } | undefined = Object.hasOwn(
+    let decl: FieldSpec | undefined = Object.hasOwn(
       schema.fields,
       field,
     )
@@ -387,9 +387,34 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         continue;
       }
 
-      const held = resolve(schema, field, decl, wanted, deps);
+      /**
+       * ASKED IN THE TYPE OF AN ELEMENT, BECAUSE THAT IS WHAT THE VALUE IS.
+       *
+       * `has` and `lacks` look for ONE value inside a list, so the word carries an element and not a
+       * list. This passed `decl` straight down, and `decl.type` is `list` on every list there is, so
+       * everything that was not a `list<enum>` fell through `resolve`'s last line and came back as
+       * the raw word. `projects has Kiln` compiled to a search for the four letters `Kiln` in a
+       * column holding `01ABCDEFGHJKMNPQRSTVWXYZ00`: parsed, compiled, matched nothing, for ever.
+       * Four fields in the shipped seed are `list<ref>`. The scalar half already coerced — `thing is
+       * Kiln` resolves to the id — so the two renderings of one grammar disagreed over one word.
+       *
+       * `values` BEFORE `of`, so nothing that works today changes. A `list<enum>` is declared
+       * `of: 'enum', values: [...]`, and both readings send it to the same branch; a hand-written
+       * schema that gives `values` and no `of` is the fixture form and stays an enum. A list with
+       * neither is text, which is what it always was.
+       */
+      const element = { ...decl, type: decl.values ? 'enum' : (decl.of ?? 'text') };
+
+      /* A BOOLEAN ELEMENT IS A BOOLEAN AND NOT THE WORD. `resolve` hands back `'true'` because the
+         SCALAR half wants a string — `bind(value, 'bool')` turns it into the 1 the column holds. A
+         list element is read by `json_each.type`, and `compile` asks for `'text'` when it is handed
+         text, so the string would compile to a clause no JSON boolean can satisfy. */
+      const held =
+        element.type === 'bool'
+          ? ({ true: true, yes: true, false: false, no: false }[wanted.toLowerCase()] ?? null)
+          : resolve(schema, field, element, wanted, deps);
       if (held === null) {
-        bad.push(refuseValue(sentence, schema, field, decl, wanted));
+        bad.push(refuseValue(sentence, schema, field, element, wanted));
         continue;
       }
       clauses.push({ field, [no ? OPPOSITE[asked] : asked]: held } as Predicate);
@@ -515,15 +540,17 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
 function resolve(
   schema: Schema,
   field: string,
-  decl: { type: string; values?: readonly string[]; to?: string; labels?: Readonly<Record<string, string>> },
+  decl: FieldSpec,
   said: string,
   deps: SentenceDeps,
 ): string | number | null {
   /* A `list<enum>` IS AN ENUM HERE, AND `values` IS HOW THE SCHEMA SAYS SO. It is the same marker
-     `compile`'s own `checkEnum` reads, for the same reason: `Schema.fields` carries no `of`, so a
-     list that declares values is a `list<enum>` and nothing else is. Read `decl.type` alone and
-     `chased has post` hands `post` straight back, and a literal the field cannot hold compiles
-     clean and matches nothing. */
+     `compile`'s own `checkEnum` reads, for the same reason: a list that declares values is a
+     `list<enum>` and nothing else is. Read `decl.type` alone and `chased has post` hands `post`
+     straight back, and a literal the field cannot hold compiles clean and matches nothing.
+     THE `has`/`lacks` CALLER NOW NARROWS `list` TO ITS ELEMENT TYPE before calling, so this line is
+     the one that catches a fixture declaring `values` and no `of`, and the caller's own reading
+     catches every other element type. Both orderings agree on the shipped form. */
   if (decl.type === 'enum' || (decl.type === 'list' && decl.values)) {
     /* AND IN THE LABEL THE SCREEN SHOWS, where a value has one: `direction is money in`. */
     const folded = said.replace(/[\s_]+/g, ' ').trim().toLowerCase();
@@ -587,7 +614,7 @@ function refuseValue(
   sentence: string,
   schema: Schema,
   field: string,
-  decl: { type: string; values?: readonly string[]; to?: string },
+  decl: FieldSpec,
   said: string,
 ): Refusal {
   if (decl.type === 'enum' || (decl.type === 'list' && decl.values))

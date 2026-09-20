@@ -759,23 +759,42 @@ test('and `null` is not a value a list can be asked about, because it is not a s
   }
 });
 
-test('and the spoken form can ask about none of this, because it spells every operand as text', () => {
-  /* MEASURED RATHER THAN ASSUMED, and it is the gap the structured form above does not have:
-     `tags has 2` resolves to the STRING `'2'` and `tags has true` to the string `'true'`, so a
-     list of numbers and a list of booleans are unaskable in words. Both renderings agree that
-     nothing matches, so this is a question the sentence cannot put rather than two answers to one
-     question, and closing it needs the element type: `Schema.fields` carries `values` for a
-     `list<enum>` and nothing at all for the other ten `T` of `38 §4.3`, so `resolve` has nothing
-     to read. Recorded here so that the day it is closed, this test is the one that says so. */
-  const said = (text: string): Predicate | undefined => {
-    const out = parseWhere(text, SCHEMA, { nowMs: NOW });
+test('AND THE SPOKEN FORM ASKS IN THE ELEMENT TYPE, which it could not do until `of` travelled', () => {
+  /**
+   * THIS TEST USED TO RECORD THE GAP AND NOW RECORDS THE FIX, which was the point of writing it.
+   *
+   * It read: `tags has 2` resolves to the STRING `'2'` and `tags has true` to the string `'true'`,
+   * so a list of numbers and a list of booleans are unaskable in words — and closing it needs the
+   * element type, which `Schema.fields` published for a `list<enum>` and for none of the other ten
+   * `T` of `38 §4.3`. `of` is in `FieldSpec` now and the kernel puts it there, so the words follow
+   * the declaration.
+   *
+   * THE UNDECLARED LIST IS UNCHANGED, AND THAT IS NOT THE OLD BEHAVIOUR SURVIVING. `tags` here
+   * declares no `of`, and a list that says nothing about its elements is a `list<text>`: `'2'` is
+   * the right answer to `tags has 2` asked of it. What changed is that it is now text BY
+   * DECLARATION rather than because the parser had nothing to read.
+   */
+  const asked = (schema: Schema, text: string): Predicate | undefined => {
+    const out = parseWhere(text, schema, { nowMs: NOW });
     assert.deepEqual(out.bad, [], out.bad[0]?.fix);
     return out.predicate;
   };
-  assert.deepEqual(said('tags has 2'), { field: 'tags', has: '2' });
-  assert.deepEqual(said('tags has true'), { field: 'tags', has: 'true' });
-  assert.deepEqual(kindsBoth(said('tags has 2')), ['mixed', 'words']);
-  assert.deepEqual(kindsBoth(said('tags has true')), []);
+  assert.deepEqual(asked(SCHEMA, 'tags has 2'), { field: 'tags', has: '2' });
+  assert.deepEqual(asked(SCHEMA, 'tags has true'), { field: 'tags', has: 'true' });
+  assert.deepEqual(kindsBoth(asked(SCHEMA, 'tags has 2')), ['mixed', 'words']);
+  assert.deepEqual(kindsBoth(asked(SCHEMA, 'tags has true')), []);
+
+  /* AND THE SAME ROWS, ASKED OF A SCHEMA THAT SAYS WHAT THE LIST HOLDS. The rows do not move; the
+     declaration does, and the two renderings move together, which is the only thing worth
+     asserting about a coercion. */
+  const ints: Schema = { ...SCHEMA, fields: { ...SCHEMA.fields, tags: { type: 'list', of: 'int' } } };
+  assert.deepEqual(asked(ints, 'tags has 2'), { field: 'tags', has: 2 });
+  assert.deepEqual(fieldedBoth(KINDS, asked(ints, 'tags has 2')), ['ints', 'mixed']);
+  assert.equal(parseWhere('tags has two', ints, { nowMs: NOW }).bad[0]?.code, 'VALUE_MALFORMED');
+
+  const bools: Schema = { ...SCHEMA, fields: { ...SCHEMA.fields, tags: { type: 'list', of: 'bool' } } };
+  assert.deepEqual(asked(bools, 'tags has true'), { field: 'tags', has: true });
+  assert.deepEqual(fieldedBoth(KINDS, asked(bools, 'tags has true')), ['bools', 'mixed']);
 });
 
 /** A row an import leaves behind, holding the CHARACTERS of a list where the list belongs. */

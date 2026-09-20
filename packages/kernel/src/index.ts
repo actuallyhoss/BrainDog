@@ -1043,6 +1043,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           f.id,
           {
             type: f.type,
+            /* AND THE ELEMENT TYPE OF A LIST, because `list` is not a type on its own. `where`'s
+               `has` and `lacks` carry one element, and without this every list looked like a
+               `list<text>` to them: `projects has Kiln` searched a column of row ids for a title. */
+            ...(f.of ? { of: f.of } : {}),
             ...(f.values ? { values: f.values } : {}),
             ...(f.to ? { to: f.to } : {}),
             ...(f.label ? { label: f.label } : {}),
@@ -1169,6 +1173,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
                 f.id,
                 {
                   type: f.type,
+                  /* The element type too, for `schemaOf`'s reason: a rule installed in this batch
+                     is linted against this schema, and a `has` over a `list<ref>` read without it
+                     compiles clean and fires on nothing. */
+                  ...(f.of ? { of: f.of } : {}),
                   ...(f.values ? { values: f.values } : {}),
                   ...(f.to ? { to: f.to } : {}),
                   ...(f.label ? { label: f.label } : {}),

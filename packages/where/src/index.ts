@@ -52,6 +52,28 @@ export type Node = Group | Leaf;
 export type Predicate = Node;
 
 /** What the predicate is allowed to name, and what each field can hold. */
+/**
+ * WHAT A SCHEMA SAYS ABOUT ONE FIELD, IN ONE PLACE.
+ *
+ * This shape was written out by hand in five places across two files, each one listing the keys
+ * its own caller happened to read. They drifted, silently and in the direction that matters: the
+ * kernel has always put `of` and `to` here, four of them named neither, and `sentence.ts` read
+ * `to` through a sixth hand-written copy that did. A `list` is not a type on its own — `list<ref>`
+ * and `list<text>` take different values — so a narrowing that drops `of` turns a filter over a
+ * `list<ref>` into a search of a column of row ids for a title: it parses, it compiles, and it
+ * matches nothing for ever. One name, and a key added to it reaches every reader at once.
+ */
+export type FieldSpec = {
+  type: string;
+  /** The element type of a `list`, which is the type `has` and `lacks` carry a value in. */
+  of?: string;
+  /** The register a `ref` points at, which is how a title is resolved to the id the column holds. */
+  to?: string;
+  values?: readonly string[];
+  label?: string;
+  labels?: Readonly<Record<string, string>>;
+};
+
 export type Schema = {
   register: string;
   /**
@@ -76,7 +98,17 @@ export type Schema = {
    * THE SENTENCE FORM IS FOR PEOPLE AND THE STRUCTURED FORM IS FOR MACHINES, which is `38 §1`'s own
    * division: a sentence somebody can be shown and cannot type back is not a sentence.
    */
-  fields: Record<string, { type: string; values?: readonly string[]; label?: string; labels?: Readonly<Record<string, string>> }>;
+  /**
+   * AND `of` AND `to` ARE PART OF THE TYPE, not two keys that happen to be in the object.
+   *
+   * `list` is not a type on its own — `list<ref>` and `list<text>` take different values, and this
+   * record published neither the element type nor the register a ref points at. Both were already
+   * being put here by the kernel and read by `sentence.ts` through a hand-written parameter type,
+   * which is a structural read of an undeclared key: it works until somebody trims the object to
+   * what the type says, and then a filter over a `list<ref>` silently goes back to searching a
+   * column of ids for a title. A key two files depend on belongs in the type they share.
+   */
+  fields: Record<string, FieldSpec>;
   /**
    * WHICH FIELD THE RECORD MIRRORS ONTO THE `state` COLUMN, AND WHY IT IS NOT JUST THE WORD.
    *
@@ -320,7 +352,7 @@ export const mirrorsState = (schema: Schema, field: string): boolean =>
  * names exist, and the disagreement is invisible until a rule fires on a row the list then does
  * not show.
  */
-const specOf = (schema: Schema, field: string): { type: string; values?: readonly string[]; label?: string } | undefined =>
+const specOf = (schema: Schema, field: string): FieldSpec | undefined =>
   Object.hasOwn(schema.fields, field)
     ? schema.fields[field]
     : schema.subject !== 'inbox_raw' && Object.hasOwn(KERNEL_FIELDS, field)
