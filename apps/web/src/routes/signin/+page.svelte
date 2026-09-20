@@ -35,6 +35,7 @@
   } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
   import { stateOf, type How, type Step, type Ways } from '$lib/signin.ts';
+  import { actable, firstDoor, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -68,34 +69,68 @@
   const view = $derived(stateOf({ methods: asked, entered, link, step, secure: here.secure, webauthn: here.webauthn, now }));
   const asking = $derived(step.at === 'asking' ? step.how : null);
 
-  /** The ways in drawn under the message, or none. A send that is locked out leaves the others open. */
+  /**
+   * The ways in drawn under the message, or none. A send that is locked out leaves the others open.
+   *
+   * `actable` IS WHAT MAKES "none" MEAN NONE. `stateOf` carries a `Ways` whenever the host NAMED a
+   * method, and on a brand new record's first run all three of its ways are false at once, because
+   * the passkey button is switched off where no passkey exists yet. Read as a set of doors, that
+   * object drew an empty block and the lede above it. See `first-door.ts` for the measured answer.
+   */
   const doors = $derived.by((): Ways | null => {
     switch (view.name) {
       case 'signed-out':
       case 'asking':
       case 'rejected':
       case 'link-expired':
-        return view.ways;
+        return actable(view.ways);
       case 'locked':
-        return view.how === 'send' && view.ways ? { ...view.ways, magic: false } : null;
+        return view.how === 'send' && view.ways ? actable({ ...view.ways, magic: false }) : null;
       default:
         return null;
     }
   });
+
+  /** What the host answered, or null while it is out or it did not answer at all. */
+  const host = $derived(asked && asked.ok ? asked.value : null);
+
+  /**
+   * A record with no way into it yet, which is a fact about the record and not about this browser.
+   *
+   * ONLY IN `signed-out`, the state that would otherwise draw the doors. A claim link in the address
+   * puts the screen in `link-landing` with a button to press, and a spent one in `link-expired` with
+   * its own sentence; neither of those is a record nobody can reach.
+   *
+   * THE NOTE GOES IN BECAUSE SIGNING OUT LOOKS THE SAME FROM HERE. `leave()` sets `me` to null and
+   * leaves `firstRun` alone, which is the shape of a record nobody has opened; `note: 'out'` is what
+   * says somebody just did. See `first-door.ts`.
+   */
+  const noDoor = $derived(view.name === 'signed-out' && host !== null && noDoorYet(host, doors, view.note));
 
   /** Whether a way in other than a passkey is drawn, so a sentence never points at one that is not there. */
   const otherWays = (ways: Ways | null): boolean => ways !== null && (ways.magic || ways.key);
   /** How many ways in are drawn: after one is refused, "another" is only true when there is more than one. */
   const wayCount = (ways: Ways | null): number => (ways ? [ways.passkey, ways.magic, ways.key].filter(Boolean).length : 0);
 
+  /* AND IT IS RIGHT NOT TO READ `methods.demo`, which was checked and nearly changed: see `first-door.ts`. */
   const demo = $derived(view.name !== 'loading' && view.name !== 'signed-in' && view.name !== 'open');
-  /** The demo is the filled button where it is the only thing on the screen that can be pressed. */
+  /**
+   * The demo is the filled button where it is the only thing on the screen that can be pressed.
+   *
+   * `noDoor` BELONGS IN THIS LIST BY THE RULE THE LIST ALREADY STATES. A record with no way into it
+   * yet draws a sentence and no control, so the pill under it is the one thing there is to press.
+   */
   const demoLeads = $derived(
-    !doors && (view.name === 'no-host' || view.name === 'not-configured' || view.name === 'insecure' || view.name === 'locked'),
+    !doors &&
+      (noDoor || view.name === 'no-host' || view.name === 'not-configured' || view.name === 'insecure' || view.name === 'locked'),
   );
 
+  /* `noDoor` TAKES THE NOTE AWAY, and that is the repair. `stateOf` says `unsupported` whenever no
+     way can act, and on the first run it said so about a browser that was working perfectly. The
+     only note it can swallow is that one: `noDoorYet` refuses `out`, so the confirmation somebody
+     gets for pressing Sign out still arrives on a record that holds no passkey. */
   const note = $derived(
-    view.name !== 'signed-out'
+    view.name !== 'signed-out' || noDoor
       ? null
       : view.note === 'cancelled'
         ? copy.passkeyCancelled
@@ -319,6 +354,10 @@
           </Button>
         </div>
         {#if view.out === 'failed'}<p class="status" role="status">{copy.signOutFailed}</p>{/if}
+      {:else if noDoor}
+        <!-- THE FIRST RUN, AND NOTHING CAN SIGN ANYBODY IN YET. The claim link is the way through,
+             and it is in the terminal of whoever provisioned the record rather than in an inbox. -->
+        <div class="said"><Empty kind="no-permission" title={firstDoor.title} body={firstDoor.why} /></div>
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
