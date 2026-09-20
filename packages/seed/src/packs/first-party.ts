@@ -59,6 +59,21 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   `last4`, the two three-column tables at the foot of Ledger are half and half instead of 7 and a 5 the clamp widened
  *   to 6, and `owed-by-you` is the fourth of the four figures a snapshot holds. Two fields and one figure added and
  *   nothing taken away, so the step is a minor one.
+ * - money-core 1.4.0: NOTHING NEW IS DECLARED AT 1.4.0, and that is the point of it. The declarations under the label
+ *   1.3.0 were rewritten five times in the seven hours and forty-seven minutes after the label was set, and the last but
+ *   one of those, `491e7e05`, added `recurring-ended`, the rule that moves a schedule to `ended` once its last day is
+ *   past. A record that installed any earlier 1.3.0 is never offered that rule, so it goes on counting a stopped row at
+ *   its full monthly share, GBP 249.00 a month on the row that commit measured. 1.3.0 therefore names five different
+ *   sets of declarations and cannot be asked what a record holds, so it is retired and 1.4.0 names what the pack
+ *   declares today. Minor and not major by the rule above, which asks a major step for a list or a field taken away: the
+ *   two declarations 1.3.0 lost are figures, `recurring-out-month` and `recurring-in-month`, and both registers they read
+ *   are still here. They were NOT a second name for `every-month-out` and `every-month-in`, and it is worth saying so
+ *   because the short version of this reads as though nothing was lost. They read a different list over a different
+ *   filter and gave a different answer to the same question: `62511a98` measured GBP 10,416.16 off `obligations.repeats`
+ *   against GBP 9,196.33 off `recurring`, on two pages two clicks apart, and dropped the second because a reader had no
+ *   way to tell which one the record meant. So a record on the 17:53 to 18:52 build of 1.3.0 does lose two figures at
+ *   1.4.0, and what it loses is the half of a contradiction this pack has since decided against.
+ *   `test/pack-versions.test.ts` records all five resets and refuses a sixth.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
@@ -67,7 +82,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.3.0',
   people: '1.0.0',
-  'money-core': '1.3.0',
+  'money-core': '1.4.0',
   estate: '1.1.0',
   work: '1.4.0',
 };
