@@ -55,6 +55,20 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const build = join(root, 'apps', 'web', 'build');
 
+/**
+ * THE TWO PREREQUISITES, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). This is
+ * the only gate that declares two, and `host` is the only prerequisite in the table that is not a
+ * file on disk: nothing on a developer's machine can answer whether the internet is serving this
+ * tree, which is why this gate is named in `--allow-skip` everywhere but `deploy.yml`.
+ *
+ * THE SKIP LINE BELOW STAYS, AND IT SAYS MORE THAN THE RUNNER'S. It names only the prerequisite
+ * actually absent, because on a developer's machine the build is usually there and the variable
+ * never is, and a constant sentence sent people off to rebuild what they had already built. The
+ * runner's refusal names the unmet ones one line each, which is the same distinction made from the
+ * other side; this file's version is what answers `node tools/gates/deploy-parity.mjs` run by hand.
+ */
+export const needs = ['web-build', 'host'];
+
 /** 52 §181: the live shell and the build id, compared as bytes rather than as text. */
 const PATHS = ['/', '/_app/version.json'];
 

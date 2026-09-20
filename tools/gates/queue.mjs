@@ -75,6 +75,13 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 
+/* THE PREREQUISITE, AND THIS IS THE OTHER GATE THAT PROVED IT HAD TO LEAVE THIS FILE. It exited 0
+   with no build and was counted as a gate that passed, so a fresh checkout reported the queue
+   driven green having never pressed an option. `52 §5.1` step 2 gives the question to `run.mjs`,
+   which reads this line before spawning anything. The `stat(ROOT)` below stays for a person
+   running the file by hand. */
+export const needs = ['web-build'];
+
 /* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
    gate that passed: a fresh checkout reported the queue driven green having never pressed anything.
    A skip is the one thing the runner can be red about under CI, where the build always happened, so

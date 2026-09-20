@@ -52,6 +52,14 @@ import { forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 
+/* THE PREREQUISITE, AND THIS IS ONE OF THE TWO GATES THAT PROVED IT HAD TO LEAVE THIS FILE. This
+   gate exited 0 with no build for the whole of its first life: the ceremony reported green having
+   never opened a browser, because the runner could read nothing but the exit code. `52 §5.1` step
+   2 moves the question to `run.mjs`, which reads this line before it spawns anything, so there is
+   no exit code in that path for this file to get wrong. The `stat(ROOT)` below stays for a person
+   running the file by hand. */
+export const needs = ['web-build'];
+
 /** The one person `startRecord` puts in the Directory, and so the email the door must come back with. */
 const OWNER = 'owner@the-studio.example';
 

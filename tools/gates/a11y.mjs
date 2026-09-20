@@ -38,6 +38,16 @@ import { routesOf } from './routes.mjs';
 const REPO = join(import.meta.dirname, '..', '..');
 
 /**
+ * AND WHY THIS GATE DECLARES NO `needs`, WHICH IS THE QUESTION A READER OF `layout.mjs` ARRIVES
+ * WITH. `52 §5.1` step 2 lets a gate name a prerequisite the runner checks, and `layout` names
+ * `web-build` because it exits 3 on `apps/web/build` alone. This gate does not: `APPS` below holds
+ * two builds, each skipped by name on its own, and a tree with the marketing site built and the
+ * record app not still gets a real contrast audit of the shop window. A declaration of `web-build`
+ * here would be the runner refusing a run that had something to measure, which is a worse failure
+ * than the one step 2 exists to fix, because it is silent in the direction of measuring less.
+ */
+
+/**
  * BOTH APPS. The record app is where the interesting failures are, but the marketing site is the
  * first page anybody ever sees and the only one they meet before deciding whether to trust the
  * rest. A contrast failure there is a contrast failure in the shop window. It is prerendered

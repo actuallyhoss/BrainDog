@@ -6,10 +6,14 @@
  * A gate that only warns is a gate that is ignored, so each one exits non-zero and this runner
  * reports every failure rather than stopping at the first. A run that names one problem when there
  * are four costs four runs.
+ *
+ * AND A GATE DOES NOT GET TO SAY WHETHER IT COULD RUN. `52 §5.1` step 2: a gate declares what it
+ * cannot run without, this file reads every declaration before it spawns anything, and a gate whose
+ * prerequisite is unmet is refused here rather than asked. See `NEEDS` below for what that fixes.
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
@@ -257,6 +261,118 @@ if (SELECTED.length === 0) {
 }
 const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
 
+/**
+ * WHAT A GATE CANNOT RUN WITHOUT, READ BEFORE ANY GATE HAS RUN. `52 §5.1` step 2.
+ *
+ * THE DEFECT THIS CLOSES SHIPPED TWICE. Until this existed the runner spawned every gate and read
+ * the EXIT CODE, so the only account of an unmet prerequisite was the gate's own. `passkey` and
+ * `queue` each found no build and exited 0, which is a pass, and each one's header claimed in
+ * prose that it printed a skip. A gate is the worst-placed thing in the tree to report that it
+ * could not run, because the report and the thing being reported on are the same program: the
+ * report is written by the code that did not run.
+ *
+ * SO THE PREREQUISITE IS THE RUNNER'S QUESTION NOW. A gate whose declared need is unmet is not
+ * spawned at all, and the line that arrives is this file's rather than the gate's. There is no
+ * exit code in that path for a gate to get wrong.
+ *
+ * WHY IT IS READ AS TEXT AND NOT BY `import()`, which is what `52 §5.1` step 2 says. Measured:
+ * `node -e "import('./tools/gates/em-dash.mjs').then(m => console.log(m.needs))"` prints
+ * `em-dash: 0 em dashes used as punctuation, over 415 files` and then `undefined`. Every gate in
+ * this directory does its work at module top level, so importing one RUNS it, which is precisely
+ * what asking before running is for; and reading `needs` off the namespace would mean reading it
+ * after the gate had finished, which is not a prerequisite check but an epilogue. Step 3 of that
+ * section is the version where `import()` is safe, because there every gate is a default-exported
+ * function and nothing happens on import. That is a rewrite of every gate in this directory, and
+ * it is worth doing. This is step 2 on the tree that exists, and it holds the property step 2 is
+ * for: nothing the gate can say decides whether the gate runs.
+ *
+ * A DECLARATION THIS CANNOT READ IS A REFUSAL AND NEVER AN EMPTY LIST. The whole mechanism turns
+ * on a missing declaration meaning "no prerequisites", so a declaration that was present and
+ * unparsed would silently mean the same thing and put the gate straight back in charge of its own
+ * verdict. What is readable is a LITERAL list of quoted lower-case names, over one line or several;
+ * what is not is a value computed at runtime, `export const needs = needsOf(root)`, which cannot be
+ * read before the gate runs by construction. That one is exit 2 naming the file, and so is a name
+ * no key of `NEEDS` defines, because a prerequisite nothing knows how to check is one nothing can
+ * find unmet.
+ */
+const NEEDS = {
+  'web-build': {
+    met: () => existsSync(join(root, 'apps', 'web', 'build')),
+    what: 'a built web app at apps/web/build',
+    how: 'pnpm --filter @braindog/web build',
+  },
+  /* THE ONE PREREQUISITE THAT IS NOT A FILE. `deploy-parity` asks whether the internet is serving
+     this tree, and nothing on a developer's machine can answer that. */
+  host: {
+    met: () => Boolean(process.env.DEPLOY_HOST),
+    what: 'DEPLOY_HOST naming the host to compare against',
+    how: 'DEPLOY_HOST=<host> node tools/gates/run.mjs --only deploy-parity',
+  },
+};
+
+/* `52 §5.1` ALSO NAMES `pack-build`, AND NOTHING DECLARES IT. Its one gate is `licence-closure`,
+   which that section specifies and this tree has never had. A key here that no gate asks for would
+   be a third account of the same fact, kept in step with nothing, so the name arrives with the gate
+   that needs it and an unknown name is loud in the meantime. */
+
+/** A literal list of single-quoted members, over one line or several. */
+const DECLARATION = /^export const needs = \[([^\]]*)\];$/mu;
+const MEMBER = /^'([a-z][a-z-]*)'$/u;
+
+/** The script a GATES entry runs, wherever it lives: `theme` is not a file in this directory. */
+const scriptOf = (argv) =>
+  (Array.isArray(argv) ? argv.find((a) => typeof a === 'string' && a.endsWith('.mjs')) : undefined) ?? null;
+
+const refuse = (line) => {
+  console.error(`  ${line}`);
+  process.exit(2);
+};
+
+function declaredNeeds(name, file) {
+  /* `typecheck` IS `pnpm -r run typecheck` AND HAS NO FILE TO ASK. It also has no prerequisite: a
+     tree that cannot typecheck is the finding. */
+  if (file === null) return [];
+  /* AND A REGISTERED GATE'S FILE CAN BE ABSENT, WHICH READING ONE MADE FATAL. Measured: delete
+     `bundle.mjs` and leave its `GATES` line, and `readFileSync` threw `ENOENT` from here, so the run
+     ended in a stack trace with none of the other twenty-nine gates spawned. This file's own rule is
+     that it reports every failure rather than stopping at the first, and one gate's file going
+     missing is the weakest reason there is to stop. So the question is not asked: the gate is spawned
+     as it was before any of this existed, and the spawn's own non-zero exit names it. A RENAME is
+     loud without this, because the new name is in the directory and in no `GATES` entry; a deletion
+     leaves nothing in the directory for that scan to see. */
+  if (!existsSync(file)) return [];
+  const source = readFileSync(file, 'utf8');
+  if (!source.includes('export const needs')) return [];
+  const found = DECLARATION.exec(source);
+  if (found === null)
+    refuse(
+      `${name} names \`export const needs\` and this runner cannot read it. It must be a literal ` +
+        `list of quoted names, \`export const needs = ['web-build'];\`, because a prerequisite ` +
+        `computed at runtime cannot be read before the gate runs, and an unread one would mean no ` +
+        `prerequisites and hand the gate back the verdict on itself.`,
+    );
+  return found[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((member) => {
+      const m = MEMBER.exec(member);
+      if (m === null) refuse(`${name} declares ${member} as a prerequisite, and a prerequisite is a quoted lower-case name.`);
+      if (!Object.hasOwn(NEEDS, m[1]))
+        refuse(`${name} declares the prerequisite ${m[1]}, and this runner knows ${Object.keys(NEEDS).join(' and ')}.`);
+      return m[1];
+    });
+}
+
+/* ASKED ONCE FOR THE WHOLE RUN, not once per gate. A build that appears halfway through must not
+   give two gates with the same declaration two different verdicts. */
+const met = new Map(Object.entries(NEEDS).map(([need, spec]) => [need, spec.met()]));
+const unmetOf = new Map();
+for (const [name, [, argv]] of SELECTED) {
+  const unmet = declaredNeeds(name, scriptOf(argv)).filter((need) => !met.get(need));
+  if (unmet.length > 0) unmetOf.set(name, unmet);
+}
+
 const failed = [];
 
 /**
@@ -272,11 +388,27 @@ const failed = [];
  *
  * UNDER `CI` A SKIP IS RED, because CI builds first: a skip there means the build did not happen and
  * the gates that look at the shipped product were not among the ones that ran.
+ *
+ * AND NOW IT HOLDS TWO KINDS, COUNTED THE SAME AND SAYING DIFFERENT THINGS. A gate that exited 3
+ * ran and found nothing to read. A gate this runner refused over an unmet `needs` never ran at all,
+ * and its line says so in the runner's voice. Both are "could not run", which is what `--allow-skip`
+ * and the `CI` rule are about, so neither needs its own counter; the difference is in the sentence a
+ * reader gets, and it is the difference between a report and no report.
  */
 const skipped = [];
 
 for (const [name, [cmd, args, opts]] of SELECTED) {
   process.stdout.write(`\n▸ ${name}\n`);
+  /* THE RUNNER'S REFUSAL, AND IT READS DIFFERENTLY FROM A GATE'S SKIP ON PURPOSE. Nothing was
+     spawned, so nobody measured anything and nobody reported on it. It joins `skipped` because
+     that is what a gate that could not run is, and `--allow-skip` and the CI rule below apply to
+     it unchanged: CI builds first, so a refusal there says the build did not happen. */
+  const unmet = unmetOf.get(name);
+  if (unmet) {
+    for (const need of unmet) console.log(`  ${name} was not run: it needs ${NEEDS[need].what}. \`${NEEDS[need].how}\``);
+    skipped.push(name);
+    continue;
+  }
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
   if (r.status === 3) skipped.push(name);
   else if (r.status !== 0) failed.push(name);

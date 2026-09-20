@@ -75,6 +75,14 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
+
+/* AND WHY THIS GATE DECLARES NO `needs`, although it drives a browser like the four that do.
+   `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is unmet, and a refusal means
+   the gate is never spawned. Half of this one reads `pref.ts` as text and is RED when the covered
+   list and the type have drifted, which is a finding with nothing to do with whether anybody has
+   run a build; the check below is deliberately placed after it for exactly that reason, and exits
+   1 rather than 3 when the drift is there. Declaring `web-build` would throw that half away on
+   every run at a desk, which is where the drift is found. */
 const PORT = budget('prefs').port;
 
 /**

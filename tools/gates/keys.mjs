@@ -47,6 +47,12 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
 
 const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
+
+/* THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). Every
+   question this gate asks is asked by pressing a key in a browser over the built app, so with no
+   build there is nothing here that can be answered from source, and `run.mjs` refuses the gate
+   before spawning it. The `stat(ROOT)` below stays for the person running this file directly. */
+export const needs = ['web-build'];
 /* `bindings.ts` AND NOT `keys.svelte.ts`. The registry used to live in the module that dispatches
    it, which uses runes, so nothing loadable by `node --test` could import it and the list of chords
    a browser owns had no test at all. The data is a plain module now and the dispatcher re-exports

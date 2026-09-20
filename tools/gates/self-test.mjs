@@ -560,9 +560,13 @@ function budgetsAreRead() {
  * browser gate into nineteen minutes of silence followed by a dump. That is a rewrite of the runner
  * and a worse terminal, to catch a defect a grep catches for nothing.
  *
- * IT DOES NOT REPLACE `52 §5.1`, which specifies a runner that reads each gate's declared `needs`
- * and checks them itself, so a gate never gets the chance to mis-report an unmet one. That design
- * is the better one and it is not built. This is the guard for the tree that exists.
+ * IT SITS BESIDE `52 §5.1` STEP 2, WHICH IS NOW BUILT, AND THE TWO CATCH DIFFERENT THINGS. The
+ * runner reads each gate's declared `needs` before it spawns anything and refuses a gate whose
+ * prerequisite is unmet, so an unmet prerequisite is never the gate's account any more. What that
+ * cannot reach is a gate exiting 0 early for a reason it did NOT declare: a file it could not
+ * read, a fixture directory that is empty, a list that came back with nothing in it. `needs` names
+ * the prerequisites the runner can check from outside; this grep covers every other early
+ * return, which is why both are here.
  *
  * A COMMENT MAY DISCUSS THE DEFECT WITHOUT SPELLING IT, and the ones that do already say "exited
  * 0" rather than writing the call. The grep reads comments too, on purpose: a directory where the

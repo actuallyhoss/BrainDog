@@ -40,6 +40,22 @@ const REPO = join(import.meta.dirname, '..', '..');
 const ROOT = join(REPO, 'apps', 'web', 'build');
 
 /**
+ * WHAT THIS GATE CANNOT RUN WITHOUT, DECLARED SO THE RUNNER DECIDES INSTEAD OF THIS FILE.
+ *
+ * `52 §5.1` step 2: `run.mjs` reads this before it spawns anything, and refuses to spawn this gate
+ * when there is no build, so the sentence a reader gets comes from the runner rather than from a
+ * gate that did not run. The `stat(ROOT)` below is still here and still exits 3, because it is
+ * what answers a person who runs `node tools/gates/layout.mjs` by hand; it is no longer the only
+ * account of the prerequisite, which is what let `passkey` and `queue` exit 0 with no build twice.
+ *
+ * ONE NEED AND NOT TWO, although this gate sweeps two builds. `apps/site/build` is measured when
+ * it is there and named when it is not, one variant at a time, and the gate has always exited 3
+ * on `apps/web/build` alone. The declaration says what the gate already does rather than widening
+ * it, because a need that stops a run is the wrong place to change what gets measured.
+ */
+export const needs = ['web-build'];
+
+/**
  * A SECOND RECORD, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
  *
  * The app renders one seed, so a screen that branches on a fact about the record has a side no gate

@@ -23,6 +23,18 @@ const CLIENT = join(APP, '.svelte-kit/output/client');
 const MANIFEST = join(CLIENT, '.vite/manifest.json');
 const BUILD = join(APP, 'build');
 
+/**
+ * THE PREREQUISITE, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). `run.mjs`
+ * reads this before it spawns anything and refuses the gate when there is no build, so the account
+ * of an unmet prerequisite no longer comes from the program that did not run.
+ *
+ * IT IS THE BUILD'S EXISTENCE AND NOT ITS FRESHNESS. The two exit-3 paths below are different
+ * questions and both stay here: a manifest with no shell beside it, and a build older than the
+ * source it claims to be. Neither is decidable from a directory listing, and a runner that tried
+ * to decide them would be a second copy of this gate's judgement kept in step by hand.
+ */
+export const needs = ['web-build'];
+
 /** A path as a reader would type it, so a finding names the same file on both platforms. */
 const shown = (at) => relative(process.cwd(), at).split(/[\\/]/).join('/');
 
