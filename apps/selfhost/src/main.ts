@@ -322,10 +322,12 @@ async function init(args: readonly string[]): Promise<void> {
   }
 
   /* THE INBOUND TOKEN, `49 §5.16` step 2: the self-host has no MX, so email arrives forwarded to
-     `/in/email/<token>`. Nothing reads it until that route exists, and `49 §5.1` step 5.5 already
-     says "if present" — but it is one file, and a record created without one would need a second
-     command nobody has written to get one. `wx` so nothing quietly reissues it, and `EEXIST` is
-     "there already", not a stack trace. */
+     `/in/email/<token>`. `server.ts` reads this file once at boot and keeps only its SHA-256, so a
+     token written here after a server started takes a restart to be served, and a record made
+     before this line existed takes no forwarded mail at all rather than taking it from anybody.
+     `49 §5.1` step 5.5 says "if present", and it is one file: a record created without one would
+     need a second command nobody has written to get one. `wx` so nothing quietly reissues it, and
+     `EEXIST` is "there already", not a stack trace. */
   const inbound = join(dir, 'inbound.token');
   try {
     writeFileSync(inbound, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });

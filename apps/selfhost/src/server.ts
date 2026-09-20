@@ -18,8 +18,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import {
-  handlersFor, hintsOf, httpStatus, serveApi, serveKeys, serveVault, servesKeys, servesVault, sessionOf, withSession,
-  type Handler, type KeysDoor, type VaultDoor,
+  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveVault, servesKeys, servesVault, sessionOf, withSession,
+  type Handler, type IngestDoor, type KeysDoor, type VaultDoor,
 } from '@braindog/host';
 import {
   clearCookie,
@@ -175,6 +175,8 @@ type Site = {
   vault: VaultDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
+  /** `/in/*`: the arrival door (`49 §5.16`), one record and one process. Its mail half is the half that can be absent. */
+  arrivals: IngestDoor;
   /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
   /** The copies kept beside the record file, `<slug>/snapshots/` (`53 §5.4`); absent for a database in memory. */
   snapshots: FileSnapshots | undefined;  usage: AccountDoor['usage'];
@@ -331,6 +333,115 @@ async function contextFor(request: Request, host: string, site: Site): Promise<S
  * second ladder [09-ALARMS] spends a paragraph forbidding.
  */
 export type Deliver = (job: OutboxRow) => Promise<void>;
+
+/* ── /in/*: the arrival door ─────────────────────────────────────────────── */
+
+/**
+ * What one ingest may spend in a minute, and how many distinct paths are counted at once.
+ *
+ * A BUDGET IS NOT OPTIONAL HERE AND `IngestDoor` MAKES IT REQUIRED, which is the whole reason this
+ * constant exists rather than being left to a deployment: `/in/*` is the one surface a stranger
+ * reaches with no credential and still gets a write out of, and a host cannot open it without
+ * having decided what a sender is allowed to spend.
+ *
+ * IN MEMORY AND NOT IN THE RECORD, because a self-host is one process and a counter that costs a
+ * row would be a stranger writing to the database to be told they may not write to the database.
+ * It resets on a restart, which is the honest cost: the ceiling is per process, as the poller's is.
+ *
+ * AND THE KEY TABLE IS BOUNDED, because the key is a path a stranger types. Without the ceiling a
+ * flood of invented ingest ids is a map that grows until the process dies, which is a denial of
+ * service paid for with no credential at all.
+ */
+const IN_PER_MINUTE = 120;
+const IN_WINDOW_MS = 60_000;
+const IN_KEYS_MOST = 1_000;
+
+/** The SHA-256 of a token, in hex: the only shape of an inbound token this process keeps after boot. */
+async function digestOf(text: string): Promise<string> {
+  const out = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(out)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Spend one arrival against `key`: the whole seconds to wait, or `null` to let it through.
+ *
+ * A FULL TABLE EVICTS AND DOES NOT REFUSE, and the difference is the whole availability of `/in/*`.
+ * The first cut answered an unknown key with a window's wait once the map held `IN_KEYS_MOST`
+ * entries, on the reasoning that the keys already in it were the configured senders. They are not:
+ * the key is built from the path, so every key in the map is one a caller chose. Measured on
+ * 2026-09-20 end to end against this server, 1,000 POSTs to `/in/webhook/invented-<n>` cost no
+ * credential, stored no row, filled the map, and then refused 429 both the next arrival at a real
+ * ingest and the next forwarded message, for the rest of the window and again every window after.
+ * Anybody who can reach the port could hold the arrival door shut.
+ *
+ * SO THE CEILING IS A MEMORY BOUND AND NOTHING ELSE NOW, which is what it was always for. Evicting
+ * the entry that was inserted first costs a flooder the per-key count of whatever it displaced, so a
+ * sustained flood of invented ids can keep a real sender's counter near zero. That is the trade and
+ * it is the right way round: a reset counter lets good mail through, and a refusal does not.
+ */
+function ingestBudget(now: () => number): (key: string) => number | null {
+  const seen = new Map<string, { n: number; until: number }>();
+  return (key) => {
+    const at = now();
+    /* SWEPT ON EVERY CALL, so a window that has passed is gone before the ceiling is counted. The
+       map is at most `IN_KEYS_MOST` entries, so this is a walk of a thousand and no timer. */
+    for (const [k, row] of seen) if (row.until <= at) seen.delete(k);
+    const row = seen.get(key);
+    if (row === undefined) {
+      /* INSERTION ORDER IS THE EVICTION ORDER, which a `Map` gives for nothing: every entry carries
+         the same window, so the one added first is the one closest to expiring anyway. */
+      while (seen.size >= IN_KEYS_MOST) {
+        const oldest = seen.keys().next();
+        if (oldest.done === true) break;
+        seen.delete(oldest.value);
+      }
+      seen.set(key, { n: 1, until: at + IN_WINDOW_MS });
+      return null;
+    }
+    row.n += 1;
+    return row.n > IN_PER_MINUTE ? Math.max(1, Math.ceil((row.until - at) / 1000)) : null;
+  };
+}
+
+/**
+ * The self-host's half of `/in/*`: one record, one process, and `49 §5.16`'s two shapes.
+ *
+ * THE CLOUD'S WEBHOOK SHAPE IS DECLINED HERE, and that is what `verify` answering `null` to an ask
+ * carrying a `rec` means. `/in/webhook/<rec>/<ingest>/<token>` is a URL for a Worker serving every
+ * record, and a self-host serving one record has nothing to resolve the first segment against: it
+ * would either ignore the id, which makes two URLs one door, or compare it, which tells whoever
+ * holds the URL what this record's id is. 404 says neither.
+ *
+ * THE MAIL DOOR EXISTS ONLY WHERE `init` WROTE A TOKEN. `<slug>/inbound.token` is 32 random bytes
+ * written 0600 at `init` (`49 §5.22`), and a record installed before that file existed takes no
+ * forwarded mail rather than taking it from anybody: `serveIngest` answers 404 for the whole
+ * `/in/email/*` surface when `inbound` is absent, the way `/auth/provision` answers `off()`.
+ *
+ * WHAT THE DOOR NEVER SEES IS THE TOKEN. `serveIngest` hands across the SHA-256 of what the caller
+ * sent, and this compares it against the digest of the file read at boot, so nothing in this
+ * process holds a comparable copy of the secret after start-up and no index here is a credential.
+ */
+function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: string | null): IngestDoor {
+  return {
+    verify: async (ask) => (ask.rec === undefined ? api.ingestVerify({ ingest: ask.ingest }) : null),
+    /* THE RECORD TAKES THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. `rec` is this process's
+       one record and `ingest` is checked above; neither is a fact about the payload. */
+    arrive: (arrival) =>
+      api.arrive({
+        channel: arrival.channel,
+        headers: arrival.headers,
+        body: arrival.body,
+        sha256: arrival.sha256,
+        verified: arrival.verified,
+      }),
+    limit: async (ask) => spend(`${ask.channel}:${ask.key}`),
+    ...(inbound === null
+      ? {}
+      : {
+          inbound: async (hash: string) => ((await sameKey(hash, inbound)) ? (api.kernel.identity()?.id ?? null) : null),
+        }),
+  };
+}
 
 export type Started = Awaited<ReturnType<typeof start>>;
 
@@ -863,6 +974,26 @@ export async function start(options: {
   /* TLS IS TERMINATED HERE WHEN THERE IS A CERTIFICATE TO DO IT WITH, and it is the same listener either
      way: `https.Server` differs from `http.Server` in the handshake and in nothing this file does. Both
      refusals a certificate can cause were already made above, before this socket existed. */
+  /**
+   * The inbound mail token, read once at boot and kept only as a digest (`49 §5.1` step 5, `§5.22`).
+   *
+   * READ ONCE AND NOT PER REQUEST, because a file read on a path a stranger can reach is a stranger
+   * deciding how often this process touches the disk. A token rotated on disk takes a restart, which
+   * is the same rule the server key already follows.
+   *
+   * ABSENT IS A HOST THAT TAKES NO FORWARDED MAIL: a record made before `init` wrote the file, and a
+   * database in memory, which has no directory to hold one. `/in/email/*` is then 404 for everybody
+   * rather than open to anybody.
+   *
+   * BEFORE `listen` AND NOT AFTER IT, WHICH IS THE ONLY REASON IT IS THIS FAR UP. It needs nothing
+   * the port tells us, and the line below `listen` says in so many words that nothing between there
+   * and `site = …` awaits. A digest does await: read there, a request arriving in that window found
+   * `site` still `null` and was answered 503 by a server that had already accepted the connection.
+   */
+  const inboundFile = joinPath(dirOf(options.file), 'inbound.token');
+  const inboundHash =
+    options.file === ':memory:' || !present(inboundFile) ? null : await digestOf(readWhole(inboundFile, 'utf8').trim());
+
   const names = options.tls === undefined ? [] : certificateNames(options.tls.cert);
   const server =
     options.tls === undefined ? createServer(answering) : createTlsServer({ cert: options.tls.cert, key: options.tls.key }, answering);
@@ -916,6 +1047,7 @@ export async function start(options: {
      cross-origin. A hard-coded scheme beside a configurable socket is a rule that was only ever right by
      coincidence. */
   const origins = new Set([...loopback.map((h) => `${options.tls === undefined ? 'http' : 'https'}://${h}`), origin]);
+
   site = {
     usage: directory.usage,
     /* THE ONE RECORD THIS PROCESS HOLDS, AND ONLY THAT ONE. `switcherRows` asks every record the
@@ -941,6 +1073,8 @@ export async function start(options: {
     origins,
     vault: vaultDoor(api, options.keys),
     keys: keysDoor(api, options.keys, origins),
+    /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
+    arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundHash),
     snapshots: kept,
     door: {
       on: 'selfhost',
@@ -1045,6 +1179,25 @@ async function write(res: ServerResponse, out: Response, cookie?: string): Promi
  */
 export const BODY_MOST_BYTES = 100 * 1024 * 1024;
 
+/**
+ * The most a body at `/in/*` may weigh before this process stops reading it.
+ *
+ * A HUNDRED MEBIBYTES IS THE RIGHT NUMBER FOR A SIGNED-IN OWNER CALLING `/api/import` AND THE WRONG
+ * ONE FOR A STRANGER. `/in/*` is the only path on this server with no credential anywhere on it, and
+ * the weighing above happens before routing, so measured on 2026-09-20 an 8 MiB POST to
+ * `/in/webhook/<a declared ingest>` from anybody who could reach the port was read whole into memory
+ * and only then compared against the one mebibyte the channel allows. On a host bound to `0.0.0.0`,
+ * which is the default once a token is set, that is a hundred megabytes of this process per
+ * connection for free.
+ *
+ * SIX AND NOT FIVE, so the door still answers the refusal rather than the reader. `serveIngest`'s own
+ * ceilings are 1 MiB for a webhook and 5 MiB for a forwarded message, and its 413 carries the exact
+ * number a sender can act on; the reader's carries nothing. A mebibyte of slack means everything up
+ * to the largest channel ceiling reaches the door and gets the useful sentence, and only a body past
+ * every ceiling this route has is cut off unread.
+ */
+const IN_BODY_MOST_BYTES = 6 * 1024 * 1024;
+
 /** A 413 for a body past the cap, and the connection closed, so nothing more of it is read. */
 async function tooLarge(req: IncomingMessage, res: ServerResponse): Promise<void> {
   /* DESTROYED ONCE THE ANSWER HAS LEFT, or the socket closes under it and the caller reads a reset instead of the 413. */
@@ -1072,14 +1225,17 @@ async function answer(
   if (/^\/+mcp\/*$/.test(path)) return write(res, await agent(req, url, method, headers, site));
 
   /* A BODY IS WEIGHED AS IT ARRIVES, BEFORE ANYBODY IS KNOWN. Every byte was held in memory before the credential was
-     read, so anybody who could reach a host bound to every interface could send it gigabytes with no key at all. */
+     read, so anybody who could reach a host bound to every interface could send it gigabytes with no key at all.
+     AND `/in/*` IS WEIGHED AGAINST ITS OWN, SMALLER CEILING, because it is the one path here with no credential on
+     it at any point: the owner's hundred mebibytes is a number a signed-in person earns. */
+  const cap = /^\/+in(?:\/|$)/.test(path) ? IN_BODY_MOST_BYTES : BODY_MOST_BYTES;
   const said = Number(req.headers['content-length'] ?? Number.NaN);
-  if (Number.isFinite(said) && said > BODY_MOST_BYTES) return tooLarge(req, res);
+  if (Number.isFinite(said) && said > cap) return tooLarge(req, res);
   const chunks: Buffer[] = [];
   let weight = 0;
   for await (const chunk of req) {
     weight += (chunk as Buffer).length;
-    if (weight > BODY_MOST_BYTES) return tooLarge(req, res);
+    if (weight > cap) return tooLarge(req, res);
     chunks.push(chunk as Buffer);
   }
   const request = new Request(url, { method, headers, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) });
@@ -1089,6 +1245,14 @@ async function answer(
     return write(res, await serveAuth(request, { ...site.door, ip: ipOf(req, trustProxy), reached: req.headers.host ?? '' }));
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */
   if (/^\/+account(?:\/|$)/.test(path)) return write(res, await serveAccount(request, { origin: site.origin, auth: site.auth, usage: site.usage, records: site.records }));
+  /* `/in/*`: SOMETHING ARRIVES FROM OUTSIDE, AND NOBODY IS ASKED WHO IT IS (`49 §5.16`, `12 §3`).
+     It is taken before the `/api` fallback below and not after, because that fallback hands every
+     path it does not recognise to the app shell: without this line `POST /in/webhook/x` answered
+     `index.html` and a 200, which is worse than a 404 because a sender's retry logic reads it as
+     delivered. `serveIngest` holds the whole order, including the 404 for a shape this host does
+     not serve, and it is the same function the Worker calls. */
+  if (/^\/+in(?:\/|$)/.test(path)) return write(res, await serveIngest(request, site.arrivals));
+
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(res, shell ? shell(request) : json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'A record method is at /api/<method>.' } }));
 

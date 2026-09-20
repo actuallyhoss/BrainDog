@@ -28,10 +28,25 @@
  * NOTHING HERE LOGS, and nothing echoes. A token is compared as a digest and never returned; a record's
  * own refusal is replaced with one sentence of this file's own, because the caller is a stranger.
  *
- * WHAT IS NOT HERE: the record's half. `kernel.arrive` takes `{ channel, headers, body, sha256 }` and
- * has no `verified` on it, so "unverified stays untriaged and never matches" has a host side and no
- * record side yet. The door below carries the flag so that the half which lands next has somewhere to
- * read it from rather than a signature change to negotiate.
+ * THE RECORD'S HALF LANDED ON 2026-09-20 AND THIS FILE DID NOT CHANGE FOR IT, which is what the flag
+ * below was carried for. `kernel.arrive` now takes `verified`, and `false` makes the row ineligible:
+ * the declarations are not read at all for one, so "unverified stays untriaged and never matches" is
+ * a property of the record rather than a note on a row. Measured before the change, against the same
+ * bytes sent twice: with `verified: false` the payload was matched, extracted and written into a
+ * register, and three unverified arrivals of one shape queued a model draft somebody pays for.
+ *
+ * WHAT IS STILL NOT HERE IS THE MATERIAL A `verify` ANSWERS WITH. `25 §3.2` writes a webhook ingest's
+ * `verify: { kind: hmac_sha256, header, grant }` and `12 §3` names a random path token as the other
+ * form; grepped on 2026-09-20, no `verify` key exists in `packages/kernel/src/declare.ts` or in
+ * `packages/declare`, so no declaration in this build can carry one. Both hosts therefore answer
+ * `{ kind: 'none' }` for an ingest somebody declared, every webhook arrival is stored `untriaged`,
+ * and none is matched. That is `12 §3` applied to a record that has declared no verifier, and it is
+ * the right way round: the pipeline is reachable, and nothing is trusted that nobody vouched for.
+ *
+ * SO FORWARDED MAIL IS THE ONLY CHANNEL THAT CAN BE ELIGIBLE TODAY, and `forwarderPassed` below is
+ * where that whole decision lives. It has been wrong twice, once by believing a verdict the sender
+ * wrote itself and once by believing a real verdict that was about somebody else's domain, and its
+ * own header says what each of the two cost.
  */
 
 import type { Refusal, Result } from '@braindog/ports';
@@ -328,27 +343,185 @@ function headLines(raw: string): (readonly [string, string])[] {
 }
 
 /**
+ * A domain out of an address, lower-cased, or `null` for text that is not one.
+ *
+ * THE SHAPE TEST AT THE END IS THE POINT OF THE FUNCTION. Everything this reads is a stranger's
+ * typing, and the value is about to decide whether a bank alert is believed, so anything that is not
+ * a plain dotted name answers `null` rather than a best guess: `bank.example>` and `bank.example (by
+ * us)` and an empty string all become "no domain", and "no domain" never aligns with anything.
+ */
+function domainOf(address: string): string | null {
+  const open = address.lastIndexOf('<');
+  const close = open === -1 ? -1 : address.indexOf('>', open);
+  const one = open !== -1 && close !== -1 ? address.slice(open + 1, close) : address;
+  const at = one.lastIndexOf('@');
+  if (at === -1) return null;
+  let domain = one.slice(at + 1).trim().toLowerCase();
+  /* A TRAILING DOT IS THE SAME NAME. `bank.example.` is the fully qualified spelling of one domain,
+     and a sender writing it that way would otherwise fail to align with itself. */
+  while (domain.endsWith('.')) domain = domain.slice(0, -1);
+  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(domain) ? domain : null;
+}
+
+/**
+ * Anything in an address line that cannot be part of an address, so what is left are the candidates.
+ *
+ * ANGLE BRACKETS ALONE ARE NOT ENOUGH, and the parentheses are the reason this is a character class
+ * rather than a `split('<')`. `From: bot@evil.example (alerts@bank.example)` is RFC 5322's comment
+ * form and spells two addresses with no angle bracket anywhere; a split that stopped at `<` and `>`
+ * would have read one of them and handed the other to the record unexamined.
+ */
+const NOT_ADDRESS = /[^a-z0-9!#$%&'*+\-/=?^_`{|}~.@]+/gi;
+
+/**
+ * Every domain a `From:` line spells, and not only the one a mail client would deliver to.
+ *
+ * THE CHECK AND THE `match:` READ DIFFERENT STRINGS, WHICH IS WHAT THIS CLOSES. Alignment reads the
+ * address, and a record's `match:` reads the whole header value as text, so a domain sitting in the
+ * display name is invisible to the first and decisive for the second. Measured end to end on
+ * 2026-09-20 against the self-host, with alignment already in place: a message signed correctly by
+ * `evil.example` and carrying `From: "alerts@hsbc.example" <bot@evil.example>` aligned, because the
+ * delivered address really is `evil.example`, and a pattern written `from contains
+ * "alerts@hsbc.example"` then matched it and wrote EGP 9,999.00 at the attacker's merchant into the
+ * register. Every domain on the line has to be covered, or the two readings disagree and the
+ * disagreement is the forgery.
+ *
+ * A TOKEN THAT IS NOT A DOMAIN IS DROPPED AND NOT REFUSED, because a display name may hold a bare
+ * `@` or a word with one in it, and quarantining every sender who writes `Bank @ Home` would cost
+ * more mail than it saves. What is dropped cannot make a `pass`: only a whole dotted name is kept,
+ * and every name kept has to align.
+ */
+function fromDomains(value: string): string[] {
+  const out: string[] = [];
+  for (const token of value.replace(NOT_ADDRESS, ' ').split(' ')) {
+    if (!token.includes('@')) continue;
+    const domain = domainOf(token);
+    if (domain !== null) out.push(domain);
+  }
+  return out;
+}
+
+/** The identity an `Authentication-Results` property names, which may be a domain, `@domain`, or an address. */
+const authDomain = (value: string | undefined): string | null =>
+  value === undefined ? null : domainOf(value.includes('@') ? value : `x@${value}`);
+
+/**
+ * Whether a domain a forwarder authenticated covers the `From:` a person will read.
+ *
+ * RELAXED, AND IN ONE DIRECTION ONLY. A bank signs with `d=bank.example` and sends
+ * `From: alerts@e.bank.example`, so the From being a subdomain of the signer has to pass or ordinary
+ * bank mail is quarantined. The other direction is refused: a signature by `e.bank.example` does not
+ * speak for `bank.example`, because a subdomain is the part of a name an attacker most often gets.
+ */
+const aligns = (auth: string | null, from: string): boolean => auth !== null && (auth === from || from.endsWith(`.${auth}`));
+
+/**
+ * Whether one authenticated identity covers EVERY domain the `From:` line spells.
+ *
+ * `every` AND NOT `some`, and an empty list is no. One verdict has to answer for the whole line,
+ * because the record matches on the whole line: a verdict that covers one of two addresses on it
+ * leaves the other one vouched for by nothing and readable by a `contains`.
+ */
+const covers = (auth: string | null, claimed: readonly string[]): boolean =>
+  claimed.length > 0 && claimed.every((one) => aligns(auth, one));
+
+/**
+ * The parenthesised comments of a header value removed, so a verdict cannot be hidden inside one.
+ *
+ * RFC 8601 PUTS THE HUMAN EXPLANATION IN PARENTHESES, and a forwarder writes
+ * `dkim=fail (body hash did not verify)`. Those characters are not a result and must not be scanned
+ * as one. Escapes inside a comment are not handled, because the only effect of getting one wrong is
+ * that a few more characters are dropped, and dropped characters cannot make a `pass` appear.
+ */
+function uncommented(text: string): string {
+  let depth = 0;
+  let out = '';
+  for (const ch of text) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (depth === 0) out += ch;
+  }
+  return out;
+}
+
+type Resinfo = { method: string; result: string; props: Record<string, string> };
+
+/**
+ * One `Authentication-Results` value split into its per-method verdicts.
+ *
+ * THE FIRST CHUNK IS THE `authserv-id` AND IS DROPPED, which is what the `slice(1)` is. It names the
+ * MTA that wrote the line and carries no verdict, and reading it as one would make a forwarder called
+ * `dkim=pass.example` a verdict of its own.
+ *
+ * PROPERTIES AND NOT JUST RESULTS, because the result on its own is the hole this function was
+ * written to close: `dkim=pass` means somebody's key signed the bytes, and `header.d` is the only
+ * part that says whose.
+ */
+function results(value: string): Resinfo[] {
+  const out: Resinfo[] = [];
+  for (const chunk of uncommented(value).split(';').slice(1)) {
+    const [verdict, ...rest] = chunk.trim().split(/\s+/).filter((part) => part !== '');
+    if (verdict === undefined) continue;
+    const eq = verdict.indexOf('=');
+    if (eq <= 0) continue;
+    const props: Record<string, string> = {};
+    for (const part of rest) {
+      const i = part.indexOf('=');
+      if (i > 0) props[part.slice(0, i).toLowerCase()] = part.slice(i + 1).replaceAll('"', '').toLowerCase();
+    }
+    out.push({ method: verdict.slice(0, eq).toLowerCase(), result: verdict.slice(eq + 1).toLowerCase(), props });
+  }
+  return out;
+}
+
+/**
  * Whether a forwarder said this message is who it claims to be.
  *
- * `dkim=pass` OR `spf=pass`, WHICH IS `49 §5.16` step 2 AND NOT `51 §5.4` step 3, and the two specs
- * disagree: the Worker's says both must pass, the self-host's says either, and the self-host's own
- * acceptance row (`49 §770`) passes a message carrying `dkim=pass` and no SPF result at all. Either is
- * taken here, because a forwarding MTA rewrites the envelope sender and SPF therefore fails for
- * perfectly good mail: requiring both would quarantine the ordinary case this route exists for.
- *
- * THE TOP ONE AND ONLY THE TOP ONE, because every `Authentication-Results` below it was typed by
+ * THE TOP `Authentication-Results` AND ONLY THE TOP ONE, because every line below it was typed by
  * somebody this record has no reason to trust. Measured on 2026-09-20 against the first cut, which
  * searched the joined value of every hop: a message whose own head carried
  * `Authentication-Results: anything-the-sender-typed; dkim=pass`, forwarded by an MTA that had just
- * written `dkim=fail ... spf=fail` above it, was stored `verified: true`. `12 §3` makes that flag the
- * difference between a row that gets matched and one that sits untriaged, so the hole was a stranger
- * who knows the address a record forwards from getting a fake bank alert triaged as a real one. The
- * first line of the head is the last MTA to touch the message, which is the forwarder we configured;
- * an absent one is `false`, and the row is stored and left untriaged either way.
+ * written `dkim=fail ... spf=fail` above it, was stored `verified: true`.
+ *
+ * AND THE VERDICT MUST BE ABOUT THE `From:` THAT A PERSON WILL READ, which is the forgery after that
+ * one and the reason this function stopped being a substring search. DKIM says "the holder of the key
+ * for `header.d` signed these bytes" and says nothing at all about the `From:` line: a stranger who
+ * owns `evil.example`, signs with it correctly, and writes `From: alerts@hsbc.example` collects a
+ * genuine `dkim=pass` from the forwarder. Measured on 2026-09-20 end to end against the self-host,
+ * that message was stored `matched`, extracted, and written into the record's register as a bank
+ * debit of the attacker's chosen amount at the attacker's chosen merchant. So a verdict counts only
+ * when the identity it authenticated aligns with the From domain, which is DMARC's own question.
+ *
+ * AND WITH EVERY DOMAIN THE LINE SPELLS, NOT ONLY THE ONE IT DELIVERS TO. Alignment against the
+ * address alone reads a different string from the one a record's `match:` reads, and the gap is
+ * wide enough to drive the same forgery through: measured on 2026-09-20 with alignment in place,
+ * `From: "alerts@hsbc.example" <bot@evil.example>` signed by `evil.example` aligned, and a pattern
+ * written `from contains "alerts@hsbc.example"` matched it and wrote the attacker's amount into the
+ * register. `fromDomains` reads the whole line and `covers` makes one verdict answer for all of it.
+ *
+ * `spf=pass` IS STILL TAKEN AND WILL ALMOST NEVER APPLY, and that is honest rather than a change of
+ * mind. `49 §5.16` step 2 says either method may carry it and `51 §5.4` step 3 says both must, and
+ * the self-host's own acceptance row passes `dkim=pass` with no SPF result; SPF authenticates the
+ * envelope sender, a forwarding MTA rewrites it to its own bounce address, and the rewritten address
+ * does not align with the From. So the rule is unchanged and the outcome is that forwarded mail is
+ * carried by DKIM, which is what forwarded mail has always been carried by.
+ *
+ * NO `From:`, OR TWO OF THEM, IS `false`. RFC 5322 allows exactly one, and a message with two is one
+ * where this function cannot say which address the alignment was against and the record cannot say
+ * which one its `match:` read. An absent verdict is `false` too, and the row is stored either way.
  */
 const forwarderPassed = (head: (readonly [string, string])[]): boolean => {
-  const said = (head.find(([name]) => name === 'authentication-results')?.[1] ?? '').toLowerCase();
-  return said.includes('dkim=pass') || said.includes('spf=pass');
+  const from = head.filter(([name]) => name === 'from');
+  const claimed = from.length === 1 && from[0] !== undefined ? fromDomains(from[0][1]) : [];
+  if (claimed.length === 0) return false;
+  const said = head.find(([name]) => name === 'authentication-results')?.[1];
+  if (said === undefined) return false;
+  return results(said).some(
+    (r) =>
+      r.result === 'pass' &&
+      ((r.method === 'dkim' && covers(authDomain(r.props['header.d'] ?? r.props['header.i']), claimed)) ||
+        (r.method === 'spf' && covers(authDomain(r.props['smtp.mailfrom'] ?? r.props['smtp.helo']), claimed))),
+  );
 };
 
 /* ── the door ────────────────────────────────────────────────────────────── */

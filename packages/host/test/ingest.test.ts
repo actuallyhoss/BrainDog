@@ -324,11 +324,37 @@ test('NO AUTHENTICATION-RESULTS IS QUARANTINED RATHER THAN REFUSED', async () =>
   assert.equal(saw.arrivals[0]?.body, plain);
 });
 
-test('a forwarder that passed SPF and not DKIM is eligible too', async () => {
+test('a forwarder that passed SPF on the From domain and not DKIM is eligible too', async () => {
   const { door: d, saw } = door({ inbound: async () => 'rec_1' });
-  const message = ['Authentication-Results: fwd.example; dkim=none; spf=pass', 'Subject: hi', '', 'body'].join('\r\n');
+  const message = [
+    'Authentication-Results: fwd.example; dkim=none; spf=pass smtp.mailfrom=alerts@bank.example',
+    'From: Bank <alerts@bank.example>',
+    'Subject: hi',
+    '',
+    'body',
+  ].join('\r\n');
   await serveIngest(ask('/in/email/tok', { body: message }), d);
   assert.equal(saw.arrivals[0]?.verified, true);
+});
+
+/**
+ * SPF AUTHENTICATES THE ENVELOPE AND A FORWARDER REWRITES THE ENVELOPE, so an `spf=pass` on a
+ * forwarded message is very often the forwarder vouching for its own bounce address. That is not a
+ * statement about the `From:` a person reads, and it is exactly the shape a stranger gets for free:
+ * send from your own domain, let the forwarder rewrite the envelope to itself, put the bank's
+ * address on the `From:` line. The result is `pass` and it belongs to nobody the record trusts.
+ */
+test('and an SPF pass belonging to the forwarder is not a pass for the From it carries', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=none; spf=pass smtp.mailfrom=srs0=abc@fwd.example',
+    'From: Bank <alerts@bank.example>',
+    'Subject: hi',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
 });
 
 test('a message with no blank line is all headers and no body, and is still stored', async () => {
@@ -394,12 +420,177 @@ test('the top forwarder passing is still believed when a lower hop failed', asyn
   const message = [
     'Authentication-Results: fwd.example; dkim=pass header.i=@bank.example',
     'Authentication-Results: relay.example; dkim=fail; spf=fail',
+    'From: Bank <alerts@bank.example>',
     'Subject: hi',
     '',
     'body',
   ].join('\r\n');
   await serveIngest(ask('/in/email/tok', { body: message }), d);
   assert.equal(saw.arrivals[0]?.verified, true);
+});
+
+/* ── whose signature was it ──────────────────────────────────────────────── */
+
+/**
+ * THE FORGERY AFTER THE `Authentication-Results` ONE, and the reason the check above stopped being a
+ * substring search. Reading only the top hop stops a sender writing its own verdict; it does not stop
+ * a sender EARNING one. DKIM says "the holder of the key for `header.d` signed these bytes" and says
+ * nothing whatever about the `From:` line, so a stranger who owns `evil.example`, signs with it
+ * perfectly correctly, and writes `From: alerts@bank.example` collects a real `dkim=pass` from the
+ * forwarder. Measured on 2026-09-20 end to end against the self-host with this exact shape: the
+ * message was stored `matched`, extracted, and written into the register as a bank debit of the
+ * attacker's amount at the attacker's merchant. A verdict now counts only where the identity it
+ * authenticated aligns with the From domain, which is DMARC's question and not DKIM's.
+ */
+test('A REAL SIGNATURE BY THE WRONG DOMAIN IS NOT A PASS FOR THIS From', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const forged = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=evil.example; spf=fail',
+    'From: Bank <alerts@bank.example>',
+    'Subject: You spent EGP 9000.00',
+    '',
+    'pay me',
+  ].join('\r\n');
+  const res = await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  assert.equal(res.status, 202, 'a forgery must still be stored, or nobody can see it was tried');
+  assert.equal(saw.arrivals[0]?.verified, false);
+  assert.equal(saw.arrivals[0]?.body, forged);
+});
+
+/**
+ * THE SAME FORGERY WITH THE BANK'S ADDRESS MOVED INTO THE DISPLAY NAME, which the alignment check
+ * above does not see at all. It reads the address a mail client would deliver to, and the record's
+ * `match:` reads the whole `From:` line as text, so the two are asking about different strings.
+ * Measured end to end on 2026-09-20 against the self-host with alignment already in place: a
+ * message signed correctly by `evil.example`, carrying
+ * `From: "alerts@hsbc.example" <bot@evil.example>`, aligned (the delivered address really is
+ * `evil.example`), and a pattern written `from contains "alerts@hsbc.example"` then matched it,
+ * extracted it, and wrote EGP 9,999.00 at a merchant the attacker chose into the register. That is
+ * the forgery the alignment repair was for, arriving through the half of the line it did not read.
+ */
+test('AND A BANK ADDRESS HIDDEN IN THE DISPLAY NAME IS STILL AN ADDRESS THIS VERDICT DOES NOT COVER', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const forged = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=evil.example',
+    'From: "alerts@bank.example" <bot@evil.example>',
+    '',
+    'pay me',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: forged }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+test('and the same address spelled in a comment is read the same way', async () => {
+  /* `From: bot@evil.example (alerts@bank.example)` is the comment form of the line above, and a
+     split that stops at angle brackets alone would have let the parenthesised half through. */
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=evil.example',
+    'From: bot@evil.example (alerts@bank.example)',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+test('and a bank writing its own address in the comment form is still eligible', async () => {
+  /* `From: alerts@bank.example (Bank Alerts)` is RFC 5322's other spelling of one sender, and
+     quarantining it would refuse ordinary mail for the shape of its display name. */
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=bank.example',
+    'From: alerts@bank.example (Bank Alerts)',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, true);
+});
+
+test('and a bank signing its parent domain for a subdomain sender still aligns', async () => {
+  /* Banks sign with `d=bank.example` and send `From: alerts@e.bank.example`. Refusing that would
+     quarantine the ordinary case this route exists for. The other direction is refused below. */
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=bank.example',
+    'From: Bank <alerts@e.bank.example>',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, true);
+});
+
+test('and a subdomain does not speak for its parent', async () => {
+  /* A subdomain is the part of a name an attacker most often gets: a hijacked `mail.bank.example`
+     must not be able to sign for `bank.example` itself. */
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=mail.bank.example',
+    'From: Bank <alerts@bank.example>',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+/**
+ * THE COMMENT CARRIES A WHOLE SECOND CHUNK, AND THAT IS WHAT MAKES THIS TEST BITE. The first cut of
+ * it read `dkim=fail (body hash did not verify, wanted dkim=pass header.d=bank.example)`, which is
+ * green whether or not comments are stripped: the only verdict outside the parentheses is a
+ * failure, and the text inside cannot become a `pass` chunk because it holds no `;`. Measured on
+ * 2026-09-20 by replacing `uncommented(value)` with `value`: the whole file stayed green. The
+ * fixture below carries the semicolon, so the unstripped reading really does produce a second
+ * `pass` chunk, and dropping the strip turns this one red.
+ */
+test('and a verdict inside a parenthesised comment is not a verdict', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=fail (no key; dkim=pass header.d=bank.example was wanted)',
+    'From: Bank <alerts@bank.example>',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+/**
+ * THE NAME HAS TO CARRY A PROPERTY TOO, or the `authserv-id` being scanned changes nothing. The
+ * first cut of this test used `Authentication-Results: dkim=pass.example; dkim=fail`: reading the
+ * first chunk as a verdict gives the result `pass.example`, which is not `pass`, and with no
+ * `header.d` beside it there is nothing to align either. Measured on 2026-09-20 by deleting the
+ * `slice(1)`: the whole file stayed green. Below, the first chunk is a complete forged verdict, so
+ * the drop is the only thing standing between it and `verified: true`.
+ */
+test('and a forwarder whose own name reads like a verdict is still only a name', async () => {
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: dkim=pass header.d=bank.example; dkim=fail',
+    'From: Bank <alerts@bank.example>',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+});
+
+test('and two From headers is a message nobody can align, so it is stored and left alone', async () => {
+  /* RFC 5322 allows exactly one. With two, this file cannot say which address the signature covered
+     and the record cannot say which one its `match:` read, and those two disagreeing is the bug. */
+  const { door: d, saw } = door({ inbound: async () => 'rec_1' });
+  const message = [
+    'Authentication-Results: fwd.example; dkim=pass header.d=bank.example',
+    'From: Bank <alerts@bank.example>',
+    'From: Somebody <hello@evil.example>',
+    '',
+    'body',
+  ].join('\r\n');
+  await serveIngest(ask('/in/email/tok', { body: message }), d);
+  assert.equal(saw.arrivals[0]?.verified, false);
+  assert.equal(saw.arrivals[0]?.headers.from, 'Bank <alerts@bank.example>, Somebody <hello@evil.example>');
 });
 
 /**

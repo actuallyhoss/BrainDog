@@ -20,11 +20,11 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-import { INVITE_GONE, ulids, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
-import { createRecordApi, type CallContext, type Deposited, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
+import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Sql, Who } from '@braindog/ports';
 
@@ -40,10 +40,11 @@ import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
 import { consume, pump } from './pump.ts';
-import { copyAsked, copyRefusal, drained, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesMcp } from './route.ts';
+import { cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesMcp, type CloudIngestDeps } from './route.ts';
 import { bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { httpFor } from './http.ts';
 import { isBound, keyStoreOf, recordKeys, type KekBinding } from './keys.ts';
+import { keylessRefusal } from './keyless.ts';
 import { fleetFailure, nightlyWalk } from './nightly.ts';
 import { workerSigner } from './sign.ts';
 import { dumpOf, r2Snapshots, type Dump } from './snapshots.ts';
@@ -95,11 +96,21 @@ type Env = {
   /** The operator's bearer for `/auth/provision` and `/auth/claim/mint`, a secret too. Unset: both are 404. */
   PROVISION_KEY?: string;
   /**
+   * `yes` to allow a record to be provisioned on a deployment with no `KEK` bound. Anything else, including
+   * unset, and `/auth/provision` refuses while the key store is missing (`keyless.ts` holds the argument).
+   *
+   * A VAR AND NOT A SECRET, because it is a statement about what this host is for rather than a value anybody
+   * could use. It exists for a test host that seals nothing; on a host that ever will, the record it makes is
+   * keyless for as long as it exists.
+   */
+  PROVISION_WITHOUT_KEYS?: string;
+  /**
    * The root key agents' keys are wrapped under, `12 §6`: 32 bytes written as 64 hex characters or base64url, put with
    * `wrangler secret put KEK --env <environment>`, or a Secrets Store binding of the same name. A different value per
-   * environment. Unset, and the key doors answer `NOT_IN_THIS_BUILD` and provisioning makes records without wrapped
-   * keys, as before. Set, and every record provisioned from then on is made with its three keys wrapped under it.
-   * `keys.ts` is the only reader.
+   * environment. Unset, and the key doors answer `NOT_IN_THIS_BUILD` and provisioning REFUSES rather than making a
+   * record that can never be given keys (`keyless.ts`, and `PROVISION_WITHOUT_KEYS` for a host that means it). Set,
+   * and every record provisioned from then on is made with its three keys wrapped under it. `keys.ts` is the only
+   * reader.
    */
   KEK?: KekBinding;
   /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
@@ -454,6 +465,40 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const broken = api.kernel.refused();
     return broken ? { ok: false, refusal: broken } : api.devicePoll(args);
+  }
+
+  /**
+   * A payload arrived at `/in/*` for this record. `/in/webhook/<rec>/<ingest>/<token>` is the only way here.
+   *
+   * AN RPC AND NEVER A ROUTE, and this is the one of the four where that matters most: `arrive` performs no
+   * authorisation of its own, because there is nobody to authorise. The caller is a bank's server holding no
+   * credential this record ever issued, and what stands in for a principal is `verified` (`30 §5`, `12 §3`).
+   * `router-groups` is what keeps it off the table.
+   *
+   * A SUSPENDED RECORD REFUSES AND THE SENDER IS TOLD TO COME BACK, which is what the neighbours above do and
+   * is right for a different reason here: the door turns every refusal into 503 with a sentence of its own, so
+   * a bank retries and nothing about this record's state crosses to whoever is holding the URL.
+   */
+  async arrive(args: Omit<Arrival, 'verified'> & { verified: boolean }): Promise<Result<Arrived>> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.arrive(args);
+  }
+
+  /**
+   * What verifies one webhook ingest on this record, for the `/in/*` door. AN RPC AND NEVER A ROUTE.
+   *
+   * A RECORD THAT CANNOT ANSWER RIGHT NOW MUST NOT ANSWER `null`, WHICH IS WHY THIS THROWS. `null` is the
+   * door's 404, and a 404 is what every webhook provider treats as "this endpoint is gone": GitHub, Stripe and
+   * Twilio all disable or back off a hook that answers one. A record suspended for an afternoon would come
+   * back to a sender that had stopped sending. Throwing reaches `serveIngest`'s own catch, which answers 503
+   * and the word retry, and that is the difference between an outage and a disconnection.
+   */
+  async ingestVerify(args: { ingest: string }): Promise<IngestVerification | null> {
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    if (broken) throw new Error(broken.fix);
+    return api.ingestVerify(args);
   }
 
   /** A vault grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `vaultGrant` is INTERNAL. */
@@ -1028,6 +1073,14 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (servesAccount(url.pathname)) return account(request, env);
     /* AN AGENT'S MCP CLIENT, BEFORE ANY DOOR IS ASKED, so neither the cookie nor the demo is ever read for it. */
     if (servesMcp(url.pathname)) return agent(request, env);
+    /* `/in/*`: SOMETHING ARRIVES FROM OUTSIDE AND NOBODY IS ASKED WHO IT IS (`33 §4`, `51 §5.4`, `12 §3`).
+       BEFORE EVERY DOOR, so neither the cookie nor the public demo is read for it: an arrival is above the
+       auth gate by design, and what stands in for a principal is whether the payload was verified, which
+       decides only whether the stored row may match. It is also before `servesApi`'s `ROUTE_UNKNOWN`, which
+       returns for everything it does not recognise, and before the app shell, which would answer a bank's
+       webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
+       whole order from here, including the 404 for the shape this host does not serve. */
+    if (servesIn(url.pathname)) return serveIngest(request, cloudIngest(arrivals(env)));
     /* THE KEY DOORS, before any door is asked: their bearer is a vault grant, and neither a cookie nor a login
        token may reach them. */
     if (servesVault(url.pathname)) return keyDoor(request, env);
@@ -1085,6 +1138,44 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        what a caller may do is inside `createRecordApi`, so the CLI and the MCP server answer to the same ladder
        as the browser. `inward` writes the context over whatever the caller sent and drops the bearer. */
     return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
+}
+
+/**
+ * What every `/in/*` arrival on this isolate is counted against.
+ *
+ * AT MODULE SCOPE ON PURPOSE, AND IT IS THE ONLY MUTABLE STATE THIS FILE KEEPS THERE. A counter built per
+ * request counts to one and refuses nothing; the budget has to outlive the request to be a budget at all.
+ * What it holds is a count and a deadline per path, so an evicted isolate loses a brake and never a row,
+ * and nothing about one record is readable from it by another. `route.ts`'s own header says plainly what
+ * this does and does not promise: it is per isolate, which makes it a brake on a loop and not a quota.
+ */
+const spendArrival = ingestBudget(() => Date.now());
+
+/**
+ * The Cloud's half of the arrival door: the Directory, the object, and the brake above.
+ *
+ * THE DIRECTORY ANSWERS FIRST AND IT IS NOT A FORMALITY. `idFromName` on a name nobody has CREATES the
+ * object, and this is the one surface reached with no credential, so an unchecked id in the path is a
+ * stranger minting empty records until the account's storage runs out. `knows` also excludes a closed
+ * record, so a deleted record's old webhook URL answers 404 without waking anything.
+ */
+function arrivals(env: Env): CloudIngestDeps {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return {
+    knows: (rec) => directory.knows(rec),
+    verifies: (rec, ingest) => env.RECORD.get(env.RECORD.idFromName(rec)).ingestVerify({ ingest }),
+    /* THE BYTES AND THE FLAG, AND NOTHING ELSE OF THE URL. The record id was the address and the token was
+       the proof; neither is a fact about the payload, and a raw row is kept for ever. */
+    arrives: (rec, arrival) =>
+      env.RECORD.get(env.RECORD.idFromName(rec)).arrive({
+        channel: arrival.channel,
+        headers: arrival.headers,
+        body: arrival.body,
+        sha256: arrival.sha256,
+        verified: arrival.verified,
+      }),
+    spends: async (ask) => spendArrival(`${ask.channel}:${ask.key}`),
+  };
 }
 
 /**
@@ -1280,14 +1371,19 @@ const letter = (link: string): string =>
  *
  * THE RECORD BEFORE THE NAME, `51 §13 D21`: a Directory row never points at a record that failed to be made.
  *
- * WITH ITS THREE KEYS WRAPPED WHEN `KEK` IS BOUND, and without them when it is not. `createRecord` takes the keys
+ * WITH ITS THREE KEYS WRAPPED WHEN `KEK` IS BOUND, and refused when it is not. `createRecord` takes the keys
  * wrapped, and absent until there is something to wrap them with. A record made without them reads, writes and signs
- * people in; it cannot seal a grant or sign an export, and binding `KEK` later does not give it keys.
+ * people in; it cannot seal a grant or sign an export, and binding `KEK` later does not give it keys. That is the one
+ * provisioning mistake with no repair short of throwing the record away, and the Directory never reissues its name,
+ * so `keylessRefusal` answers for it here instead of letting it through in silence.
  *
- * THE STORE IS OPENED FIRST, so a bound value that is not a key refuses before the Directory writes anything.
+ * THE STORE IS OPENED FIRST, so a bound value that is not a key refuses before the Directory writes anything, and so
+ * the keyless guard decides before `prepare` has minted a person and claimed a slug.
  */
 async function provision(env: Env, args: { slug: string; email: string; name?: string }): Promise<Result<Provisioned>> {
   const store = await keyStoreOf(env.KEK);
+  const keyless = keylessRefusal(store, env.PROVISION_WITHOUT_KEYS);
+  if (keyless) return { ok: false, refusal: keyless };
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const ready = await directory.prepare(args.slug, args.email, args.name ?? null);
   if (ready.refusal) return { ok: false, refusal: ready.refusal };
