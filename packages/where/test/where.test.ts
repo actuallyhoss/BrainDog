@@ -1058,6 +1058,56 @@ test('A LOWER-CASE CURRENCY IS THE SAME CURRENCY, because the write path upper-c
   assert.deepEqual(both({ field: 'effort', is: { value: 2, unit: 'DAYS' } }), []);
 });
 
+/* ── the empty string, which is not a short string ───────────────────────── */
+
+test('AN EMPTY STRING IS MISSING, SO NO LEAF TAKES ONE AS A VALUE', () => {
+  /* `38 §4.1` invariant 6 has said this since before the compiler existed: the `string` terminal
+     is non-empty, because `""` is MISSING (`34 §1.3`) and the shape for missing is `empty: true`.
+     `34 §7` closes it from the other end — a write stores none of `null`, `""` or `[]`, the key is
+     dropped — so no row in the record holds one.
+
+     NOTHING ENFORCED IT, AND THE TWO WAYS IT COMPILED FAILED IN OPPOSITE DIRECTIONS, which is why
+     the differential at the foot of this file never saw either: both renderings agreed, and both
+     were wrong. `is: ''` was `what = ''`, true of no row. `contains: ''` was
+     `instr(lower(what), lower(''))`, and SQLite answers 1 for an empty needle, so it was true of
+     every row with anything in the field. A silently empty list and a silently complete one, from
+     one missing check. */
+  for (const leaf of [
+    { field: 'what', is: '' },
+    { field: 'what', not: '' },
+    { field: 'what', contains: '' },
+    { field: 'what', starts: '' },
+    { field: 'what', ends: '' },
+    { field: 'tags', has: '' },
+    { field: 'tags', lacks: '' },
+    { field: 'state', in: ['open', ''] },
+    { field: 'state', not_in: [''] },
+    { field: 'due', between: ['', '2026-10-01'] },
+  ]) {
+    const c = compile(leaf as never, SCHEMA);
+    assert.equal(c.bad[0]?.code, 'VALUE_MALFORMED', `${JSON.stringify(leaf)} was not refused`);
+    assert.match(c.bad[0]?.fix ?? '', /empty string/, `${JSON.stringify(leaf)} was refused for something else`);
+  }
+
+  /* AND THE REFUSAL NAMES THE WORD THAT WOULD HAVE WORKED. A person who typed `''` meant one of
+     two things, and the repair is a different word for each; `empty` is the one the leaf could
+     not spell, so the sentence spells it. */
+  assert.match(compile({ field: 'what', is: '' }, SCHEMA).bad[0]?.fix ?? '', /write what empty/);
+  assert.deepEqual(both({ field: 'tags', empty: true }), ['c', 'd']);
+
+  /* AND `evaluate` AGREES WITHOUT BEING TOLD, because it asks the compiler before it walks: what
+     `compile` refuses is false of every row, by construction rather than by a check written twice.
+     Before this, `contains: ''` was true of every row carrying a `what`. */
+  for (const r of ROWS) {
+    assert.equal(evaluate({ field: 'what', contains: '' }, r.fields, SCHEMA, r), false, `${r.id} matched`);
+    assert.equal(evaluate({ field: 'what', is: '' }, r.fields, SCHEMA, r), false, `${r.id} matched`);
+  }
+
+  /* AND A VALUE OF ONE BYTE IS STILL A VALUE, so the rule refuses the empty string and nothing
+     next to it. */
+  assert.deepEqual(both({ field: 'what', contains: 'Invoice' }), ['a']);
+});
+
 /* ── an instant, against the day a person named ──────────────────────────── */
 
 test('AN INSTANT IS COMPARED BY ITS DAY, and `is` matched nothing while `not` matched everything', () => {

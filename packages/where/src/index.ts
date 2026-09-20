@@ -830,6 +830,46 @@ export function compile(where: Predicate | undefined, schema: Schema): Compiled 
     }
 
     const value = leaf[op];
+
+    /**
+     * THE `string` TERMINAL IS ONE BYTE OR MORE, and `""` is not a short string.
+     *
+     * `34 §1.1` writes it into the grammar — *"string = byte { byte }"* — and `34 §1.3` says why:
+     * the empty string is MISSING. `34 §7` closes it from the other end, because a write stores
+     * none of `null`, `""` or `[]`; the key is dropped. So no row in the record holds `""`, and a
+     * leaf asking about one is asking a question of nothing.
+     *
+     * BOTH WAYS IT COMPILED WERE WRONG, AND IN OPPOSITE DIRECTIONS. `is: ""` became `field = ''`
+     * and matched no row, ever. `contains: ""` became `instr(lower(field), lower(''))`, and SQLite
+     * answers 1 for an empty needle, so it matched every row that had anything in the field. One
+     * silently empty list and one silently complete one, from the same missing check — the pair of
+     * failures this module exists to prevent, and `38 §4.1` invariant 6 has named them since
+     * before the compiler was written.
+     *
+     * THE REFUSAL NAMES THE REPAIR, because a person who typed `""` meant one of two things and
+     * the word is different for each: `empty: true` to ask for the rows that hold nothing, or a
+     * value to ask for the rows that hold it.
+     *
+     * IT RUNS OVER EVERY VALUE THE OPERATOR TAKES, for the reason `carriesUnit` below is a
+     * function rather than one comparison: `in` carries a list and `between` carries two, and a
+     * rule that read only the scalar would leave `in: ['open', '']` compiling to a member that
+     * nothing can match. `empty` and `present` are outside it — they carry the literal `true`, and
+     * a rule whose repair is "write `empty`" has nothing to tell the leaf that already did.
+     */
+    if (op !== 'empty' && op !== 'present') {
+      const carried = Array.isArray(value) ? value : [value];
+      if (carried.some((v) => v === '')) {
+        bad.push(
+          refuse(
+            'VALUE_MALFORMED',
+            `${field} ${op} was given an empty string, and a value is one byte or more. An empty string is missing, so no row holds one: to ask for the rows with nothing in ${field}, write ${field} empty.`,
+            field,
+          ),
+        );
+        return '';
+      }
+    }
+
     /* AND THE MIRRORED STATE READS ITS COLUMN, which is `02 §1`'s decision and was in no line of
        this file: every leaf went through `json_extract(fields, '$.state')`, so `entry_state` was
        an index the compiler could not reach. See `fieldSqlIn`. */
