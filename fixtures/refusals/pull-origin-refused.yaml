@@ -1,5 +1,11 @@
 code:   PULL_ORIGIN_REFUSED
 via:    rpc
 raises: packages/host/src/actions.ts
-at:     source
 fix:    Call only an origin an installed declaration names; nothing was sent.
+
+# NO `at:`, AND THAT IS THE FINDING. This one is raised by `refuse(code, fix)` at
+# `packages/host/src/actions.ts:326`, whose whole envelope is `{ code, fix }`: an action's outcome is
+# recorded on a run, not returned to a caller with a path into their input. This fixture used to
+# claim `at: source`, which named a key nothing here can carry, so a reader was being told to expect
+# a field the envelope has no room for. Adding one is a change to `ActionAnswer`, and that is a
+# decision rather than a repair.
