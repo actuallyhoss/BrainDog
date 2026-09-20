@@ -741,6 +741,23 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
+   * The record a forwarded message's token names, by the token's SHA-256 in hex, or `null`.
+   *
+   * `/in/email/<token>` IS THE ONE ARRIVAL WHOSE PATH NAMES NO RECORD, so this is the whole of the
+   * routing for it: `arrivals` hands what comes back through the same two refusals a webhook's path
+   * segment goes through before it can become an argument to `idFromName`.
+   *
+   * IT IS ASKED WITH A DIGEST AND NEVER WITH THE TOKEN, and that is not a courtesy to the Directory.
+   * The digest is what `serveIngest` computes from the path, so the tenant map stores and is queried
+   * with 64 hex characters that open nothing: a copy of the Directory's storage is not a set of
+   * mailbox keys. Answering is not an oracle either, for `knows`'s reason above: the answer is 26
+   * random characters, and whoever asked already had the token that produced it.
+   */
+  recordFor(tokenHash: string): string | null {
+    return this.#directory().recordFor(tokenHash);
+  }
+
+  /**
    * Every record on this deployment that is still open, a page at a time. `51 §5.12` step 1.
    *
    * THE CURSOR IS THE LAST ID AND NOT AN OFFSET. A keyset page is stable while the walk runs: a
@@ -1175,6 +1192,14 @@ function arrivals(env: Env): CloudIngestDeps {
         verified: arrival.verified,
       }),
     spends: async (ask) => spendArrival(`${ask.channel}:${ask.key}`),
+    /* AND THE MAIL DOOR, WHICH WAS THE ONE KEY MISSING AND THEREFORE THE WHOLE SURFACE. `cloudIngest`
+       spreads no `inbound` when this object has none, and `serveIngest` then answers 404 for all of
+       `/in/email/*`, the way `/auth/provision` answers `off()` with no operator key set. That is what
+       the hosted Worker gave every forwarded message until 2026-09-21, measured against it: four keys
+       were written here where five were needed, with the dispatch, the parse, the budget and the
+       record's own `arrive` finished and green above them. `route.test.ts` now reads this file for the
+       key, because the fault was invisible to every test that supplied an index of its own. */
+    inbound: { recordFor: (h) => directory.recordFor(h) },
   };
 }
 

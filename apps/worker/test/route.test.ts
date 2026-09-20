@@ -17,7 +17,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import type { Refusal, Result } from '@braindog/ports';
 import { serveIngest, type IngestArrival } from '@braindog/host';
+import { createDirectory, type Directory } from '@braindog/record/directory';
+
+import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 
 import { cloudIngest, servesApi, servesAuth, servesIn, servesMcp, type CloudIngestDeps, type InboundIndex } from '../src/route.ts';
 
@@ -63,10 +67,12 @@ test('THE ARRIVAL DOOR IS ANSWERED BEFORE ANY DOOR IS ASKED, because an arrival 
  * is the whole of the lookup, and whatever the index answers becomes the argument to `idFromName`.
  * So the cases below are mostly about the answers that must NOT become an address.
  *
- * THE INDEX IS A TEST DOUBLE BECAUSE THE DIRECTORY HAS NO SUCH INDEX YET. `InboundIndex` is the
- * narrow shape the Worker needs from it, and everything on this side of that shape is finished and
- * exercised here; the Directory's table, the RPC over it and the wiring in `index.ts` are the other
- * half, and none of the three is in this agent's files.
+ * THE INDEX IS A SPY IN THE CASES ABOVE AND THE REAL DIRECTORY IN THE ONES BELOW THEM. `InboundIndex`
+ * is the narrow shape the Worker needs, and a double is what lets a test assert the call that was NOT
+ * made: that a rate-limited message never reached the Directory, that an unresolved digest cost no
+ * second read. The last section drives `createDirectory`'s own `dir_inbound` through the same door,
+ * because a shape both halves agree with and neither implements is how this surface spent a week
+ * answering 404 with both halves called finished.
  */
 
 const REC = 'rec_01J8ZC0000000000000000000A';
@@ -94,7 +100,9 @@ type Seen = {
 /**
  * A Cloud door whose Directory is three spies, so a test can assert the call that was NOT made.
  *
- * `wiring.index === false` IS A DEPLOYMENT WITH NO INDEX AT ALL, which is every deployment today.
+ * `wiring.index === false` IS A DEPLOYMENT WITH NO INDEX AT ALL, which is a shape `CloudIngestDeps`
+ * still allows and no longer describes the Cloud: `arrivals(env)` passes one as of 2026-09-21, and the
+ * test named for that key is what holds it there.
  */
 function mailDoor(
   wiring: { recordFor?: (hash: string) => string | null; knows?: (rec: string) => boolean; index?: boolean; wait?: number | null } = {},
@@ -237,11 +245,20 @@ test('A SPENT BUDGET COSTS NO DIRECTORY READ AT ALL, which is what keeps a flood
   assert.deepEqual(seen.arrives, []);
 });
 
-test('A DEPLOYMENT WITH NO INDEX TAKES NO MAIL AT ALL, and that is every deployment until the Directory has one', async () => {
-  /* WHICH IS THE BEHAVIOUR THIS BUILD SHIPS. `index.ts` passes no `inbound`, so `serveIngest` sees a
-     door without one and answers 404 for the whole `/in/email/*` surface, the way `/auth/provision`
-     answers `off()` with no operator key set. The half above is finished and unreachable until the
-     Directory can answer `recordFor`. */
+test('A DEPLOYMENT WITH NO INDEX TAKES NO MAIL AT ALL, AND THE CLOUD IS NO LONGER ONE OF THOSE', async () => {
+  /* THE SHAPE IS STILL A REAL ONE AND THE CLOUD NO LONGER HAS IT. `cloudIngest` spreads no `inbound`
+     when its deps carry no index, and `serveIngest` then answers 404 for the whole `/in/email/*`
+     surface, the way `/auth/provision` answers `off()` with no operator key set. This test pinned
+     that as the Cloud's own behaviour until 2026-09-21, because `arrivals(env)` in `index.ts` passed
+     four keys and no `inbound`: measured against the hosted Worker, every `POST /in/email/<token>`
+     was 404 with the dispatch and the whole door above it finished. The assertion below is what now
+     keeps the wiring and this refusal from being the same sentence again. */
+  assert.match(
+    SOURCE,
+    /inbound:\s*\{\s*recordFor:/u,
+    'arrivals(env) passes no `inbound`, so the hosted Worker answers 404 to every forwarded message',
+  );
+
   const { door, seen } = mailDoor({ index: false });
   /* THE KEY IS ABSENT AND NOT A METHOD ANSWERING `null`, and nothing below would notice the
      difference. Checked by mutation on 2026-09-20: replacing `cloudIngest`'s conditional spread
@@ -272,4 +289,170 @@ test('ONLY A SHA-256 IN HEX IS EVER USED AS A LOOKUP KEY', async () => {
 
   assert.equal(await door.inbound(TOKEN_SHA), REC);
   assert.deepEqual(seen.looked, [TOKEN_SHA]);
+});
+
+/* ── the Directory's own index, under the same door ──────────────────────── */
+
+/**
+ * `dir_inbound`, driven through `cloudIngest` and `serveIngest` rather than called directly.
+ *
+ * THE SPY ABOVE CANNOT CATCH THE FAULT THAT KEPT THIS SURFACE AT 404. Every test above this line
+ * passed while the hosted Worker answered 404 to every forwarded message, because each one supplied
+ * its own index and the deployment supplied none. What is exercised below is the real reader over
+ * real SQLite, behind the real door, so "the digest resolves" and "the record it resolves to is the
+ * one somebody registered" are the same assertion rather than two halves nobody joined.
+ *
+ * IT IS `node:sqlite` AND THE DURABLE OBJECT RUNS THE SAME SQLITE, which is what makes the schema
+ * decision below evidence rather than an opinion: the table is created by `SCHEMA` on every open and
+ * by no migration step, and the test that drops it and reopens is the one that says whether that is
+ * true for a directory that already exists.
+ */
+
+const NOW = Date.UTC(2026, 8, 21, 9);
+/** A second token, in the repository for the same reason the first one is: it opens nothing. */
+const OTHER = 'not-a-secret-either-the-second-token';
+/** The SHA-256 of `OTHER`, written out rather than computed. */
+const OTHER_SHA = '1b381c1ae489876b0751fb805a98057bbb17476b472940d69d38b1424d372c76';
+
+const value = <T>(r: Result<T>): T => {
+  if (r.ok) return r.value;
+  return assert.fail('refusal' in r ? `${r.refusal.code}: ${r.refusal.fix}` : 'the write conflicted');
+};
+
+const refused = (r: Result<unknown>): Refusal => {
+  assert.equal(r.ok, false, 'this was supposed to be refused');
+  return (r as { ok: false; refusal: Refusal }).refusal;
+};
+
+/** One record in a fresh directory, and the `Sql` under it, so a test can take the table away again. */
+function studio(): { d: Directory; record: string; sql: ReturnType<typeof openSqlite> } {
+  const sql = openSqlite();
+  const d = createDirectory(sql, fixedClock(NOW));
+  value(d.person$('ada@example.com', 'Ada'));
+  return { d, record: value(d.provision({ slug: 'the-studio', email: 'ada@example.com' })).record, sql };
+}
+
+/**
+ * The Cloud's door with the Directory itself behind it.
+ *
+ * THE TWO SPIES STAY, because what they record is the shape of the call and not its answer: `arrivals`
+ * asks `recordFor` and then `knows` over two RPCs to the same object, and the lists are how a test says
+ * which of the two refused. Both now answer out of `createDirectory`.
+ */
+const overDirectory = (d: Directory) => mailDoor({ recordFor: (h) => d.recordFor(h), knows: (r) => d.knows(r) });
+
+test('A DIGEST THE DIRECTORY HOLDS IS AN ADDRESS, AND IT NAMES THE RECORD SOMEBODY REGISTERED IT FOR', async () => {
+  const { d, record } = studio();
+  value(d.inbound$(record, TOKEN_SHA));
+
+  const { door, seen } = overDirectory(d);
+  const res = await serveIngest(mail(TOKEN), door);
+
+  assert.equal(res.status, 202);
+  assert.equal(await res.text(), '');
+  assert.deepEqual(seen.looked, [TOKEN_SHA]);
+  assert.equal(seen.arrives[0]?.[0], record, 'the message went to a record nobody registered this address for');
+  assert.equal(seen.arrives[0]?.[1].channel, 'email');
+
+  /* AND A DIGEST NOBODY REGISTERED IS NOTHING, asked of the reader directly: 64 hex characters are a
+     well-formed key and a well-formed key is not a row. */
+  assert.equal(d.recordFor('0'.repeat(64)), null);
+});
+
+test('THE DIRECTORY REFUSES TO HOLD ANYTHING THAT WOULD OPEN THE DOOR', () => {
+  const { d, record } = studio();
+
+  /* THE TOKEN ITSELF IS THE ONE VALUE THIS TABLE MUST NEVER CONTAIN. A real inbound token is 43
+     base64url characters and every shape below fails the digest test, so the mistake that would turn
+     the index into a set of mailbox keys is a refusal with a sentence rather than a row. */
+  for (const bad of [TOKEN, OTHER, TOKEN_SHA.toUpperCase(), `${TOKEN_SHA}00`, TOKEN_SHA.slice(0, 63), ''])
+    assert.equal(refused(d.inbound$(record, bad)).code, 'VALUE_MALFORMED', bad);
+  assert.equal(d.recordFor(TOKEN_SHA), null, 'a refused registration wrote a row anyway');
+
+  /* AND A RECORD THAT IS NOT OPEN TAKES NO ADDRESS. Registering one for a closed record would put a
+     live forwarding address in the index for storage nobody can reach. */
+  assert.equal(refused(d.inbound$('rec_01J8ZC0000000000000000000A', TOKEN_SHA)).at, 'record');
+  value(d.close(record));
+  assert.equal(refused(d.inbound$(record, TOKEN_SHA)).code, 'OUT_OF_BOUNDS');
+});
+
+test('ROTATION REPLACES AND REVOCATION EMPTIES, which is `write the file` and `rm` on the self-host', async () => {
+  const { d, record } = studio();
+  value(d.inbound$(record, TOKEN_SHA));
+  value(d.inbound$(record, OTHER_SHA));
+
+  /* THE OLD ADDRESS STOPS WORKING AT THE MOMENT THE NEW ONE IS WRITTEN, and that is the whole point
+     of rotating: a forwarding address is handed to third parties by definition, so the answer to a
+     leaked one is a new one rather than two live ones. */
+  assert.equal(d.recordFor(TOKEN_SHA), null, 'the rotated address still resolves, so rotation revokes nothing');
+  assert.equal(d.recordFor(OTHER_SHA), record);
+  const { door } = overDirectory(d);
+  assert.equal((await serveIngest(mail(TOKEN), door)).status, 404);
+  assert.equal((await serveIngest(mail(OTHER), door)).status, 202);
+
+  /* AND `null` IS THE DELETION, which is what a record that takes no mail at all looks like. */
+  value(d.inbound$(record, null));
+  assert.equal(d.recordFor(OTHER_SHA), null);
+  assert.equal((await serveIngest(mail(OTHER), door)).status, 404);
+});
+
+test('ONE DIGEST IS ONE ADDRESS, AND THE SECOND RECORD TO ASK FOR IT IS REFUSED RATHER THAN THROWN AT', () => {
+  const { d, record } = studio();
+  const second = value(d.provision({ slug: 'the-other-studio', email: 'ada@example.com' })).record;
+  value(d.inbound$(record, TOKEN_SHA));
+  value(d.inbound$(second, OTHER_SHA));
+
+  /* THE COLLISION GUARD IS LOAD-BEARING AND NOTHING WAS WATCHING IT. `token_sha256` is the primary
+     key and `inbound$` deletes only the asking record's own row, so the INSERT below is the one place
+     a caller can reach a `SQLITE_CONSTRAINT`. Measured by mutation on 2026-09-21: with the
+     `ALREADY_KNOWN` branch disabled, this call throws `UNIQUE constraint failed:
+     dir_inbound.token_sha256` out of a function whose whole contract is a `Result`, which across the
+     Directory's RPC boundary is a bare 500, and every other test in this file passed against that
+     mutant. Two minted tokens do not collide, so the only way here is a caller handing one digest
+     twice. */
+  assert.equal(refused(d.inbound$(second, TOKEN_SHA)).code, 'ALREADY_KNOWN');
+
+  /* AND THE REFUSAL COST NEITHER RECORD THE ADDRESS IT HELD, which is what "every refusal happens
+     before the first write" has to mean: the asking record's `DELETE` runs after this check, so a
+     check moved below it would revoke a working address in order to report that nothing happened. */
+  assert.equal(d.recordFor(TOKEN_SHA), record);
+  assert.equal(d.recordFor(OTHER_SHA), second, 'the refused call revoked the address the asking record already held');
+});
+
+test('A CLOSED RECORD TAKES NO MAIL, AND THE READER IS WHERE THAT IS DECIDED', async () => {
+  const { d, record } = studio();
+  value(d.inbound$(record, TOKEN_SHA));
+  value(d.close(record));
+
+  /* CLOSING DOES NOT DELETE THE ROW AND DOES NOT NEED TO. `resolve` and `slugOf` in the same file
+     both join `dir_record` rather than trusting `close` to have swept, after two of four readers
+     were found not doing it; this reader is the fifth and joins for the same reason. */
+  assert.equal(d.recordFor(TOKEN_SHA), null);
+
+  const { door, seen } = overDirectory(d);
+  assert.equal((await serveIngest(mail(TOKEN), door)).status, 404);
+  assert.deepEqual(seen.knows, [], 'the reader let a closed record through and only `knows` caught it');
+  assert.deepEqual(seen.arrives, []);
+});
+
+test('THE TABLE ARRIVES ON A DIRECTORY THAT ALREADY EXISTS, WITH NO MIGRATION STEP AND NO VERSION BUMP', async () => {
+  const { d, record, sql } = studio();
+
+  /* A DIRECTORY WRITTEN BEFORE TODAY, MADE BY TAKING THE TABLE AWAY. Every `TO_n` in `directory.ts`
+     exists because `CREATE TABLE IF NOT EXISTS` cannot add a COLUMN to a table that is already
+     there; a table that is not there at all is exactly what that statement is for, and this is the
+     difference asserted rather than assumed. If it were wrong, `dir_inbound` would exist only in
+     directories created after the deploy and every record that predated it would keep answering 404. */
+  sql.exec('DROP TABLE dir_inbound');
+  assert.equal(sql.one("SELECT name FROM sqlite_master WHERE name = 'dir_inbound'"), undefined);
+
+  const reopened = createDirectory(sql, fixedClock(NOW));
+  value(reopened.inbound$(record, TOKEN_SHA));
+  assert.equal(reopened.recordFor(TOKEN_SHA), record);
+  /* AND THE ROW THAT SAYS WHICH BUILD WROTE THIS DIRECTORY DID NOT MOVE. A bump would refuse this
+     directory to every older build for a table no older build reads. */
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM dir_meta WHERE key = 'version'")?.value, '4');
+
+  const { door } = overDirectory(d);
+  assert.equal((await serveIngest(mail(TOKEN), door)).status, 202);
 });

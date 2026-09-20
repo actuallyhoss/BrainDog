@@ -55,6 +55,17 @@ const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 /** The address `provision` writes, when the caller has already created the object it names. */
 const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
 
+/**
+ * A SHA-256 in hex, lower-cased: the only shape of an inbound mail token this file will store.
+ *
+ * WHAT IT REFUSES IS THE TOKEN. An inbound token is `randomBytes(32).toString('base64url')`, which is
+ * 43 characters and fails this test, so a caller that handed the raw value where the digest belongs
+ * is refused with a sentence instead of writing a live credential into the tenant map. The Worker
+ * checks the same shape at its own door (`apps/worker/src/route.ts`) because that one is reached by
+ * a stranger; this one is here because a row outlives the request that wrote it.
+ */
+const DIGEST = /^[0-9a-f]{64}$/;
+
 /** Names the platform owns, or that would read as one. A slug is a path segment before it is a name. */
 const RESERVED = new Set([
   /* 33 §4's own top-level surface, first: a slug that shadowed one of these would be a name the
@@ -211,6 +222,32 @@ CREATE TABLE IF NOT EXISTS dir_usage_run (
   PRIMARY KEY (record, event)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS dir_usage_run_at ON dir_usage_run(record, at);
+
+-- FORWARDED MAIL: WHICH RECORD AN /in/email/<token> ADDRESS IS FOR.
+--
+-- THE DIGEST IS THE KEY AND THE TOKEN IS NOWHERE IN THIS FILE. That URL carries no record id, so the
+-- token IS the lookup key, and a lookup key held in the clear is a credential in whatever index holds
+-- it: anybody who could read this table would be able to read the mail of every record in it. The
+-- host digests what the caller sent and hands across 64 hex characters that open nothing, which is the
+-- same division a self-host makes by keeping only the digest of the file init wrote.
+--
+-- THE DIGEST IS THE PRIMARY KEY BECAUSE IT IS AN ADDRESS. Two records holding one digest would be two
+-- records at one address, and the reader would have to pick; a primary key makes that unwritable
+-- rather than a tie broken by LIMIT 1. One record holds at most one, which is what makes rotation a
+-- replacement: see inbound$ below.
+--
+-- AND IT IS CREATED HERE AND IN NO MIGRATION STEP, which is the difference every TO_n below turns on.
+-- CREATE TABLE IF NOT EXISTS cannot add a COLUMN to a table that already exists, and that is why TO_2,
+-- TO_3 and TO_4 are written out statement by statement; a table that does not exist at all is
+-- precisely what this statement is for, so the script creates it on the next open of a directory at
+-- any version. DIRECTORY_VERSION therefore did not move: an older build reads no column here it does
+-- not know about and answers nothing differently for the table being present, and a bump would refuse
+-- every older build a directory it can still read correctly.
+CREATE TABLE IF NOT EXISTS dir_inbound (
+  token_sha256 TEXT PRIMARY KEY,           -- 64 lower-case hex. Never the token.
+  record       TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS dir_inbound_record ON dir_inbound(record);
 `;
 
 export type Person = { id: string; email: string; name: string | null; created_at: string };
@@ -519,6 +556,74 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      */
     knows: (record: string): boolean =>
       sql.one<{ n: number }>('SELECT 1 AS n FROM dir_record WHERE id = ? AND closed_at IS NULL', record) !== undefined,
+
+    /**
+     * The record an inbound mail token names, by the token's SHA-256 in hex, or `null`.
+     *
+     * THE OTHER WAY A NAME BECOMES AN ADDRESS, and the only one where the name was minted rather than
+     * chosen. `resolve` turns a slug into a `rec_id`; this turns the digest of a forwarding token into
+     * one, for `/in/email/<token>`, which is the single arrival whose URL names no record. What it
+     * answers becomes the argument to `idFromName`, so it is the same tenant boundary `resolve` draws.
+     *
+     * A CLOSED RECORD RESOLVES TO NOTHING, FOR THE REASON `resolve` GIVES THREE LINES OF ITS OWN TO.
+     * Closing a record releases its names in one transaction and does not touch this table, so a bank
+     * that still holds a deleted record's forwarding address would keep posting mail at it. Joining
+     * here is what makes that a 404 rather than a write into storage nobody can reach, and it is the
+     * fifth reader in this file to have to remember it: two of the first four did not.
+     *
+     * THE SHAPE OF THE KEY IS NOT CHECKED HERE. A value that is not a digest matches no row, and the
+     * answer is the same `null` either way; the shape is refused where it would be STORED, in
+     * `inbound$`, and at the Worker's door where a stranger supplies it.
+     */
+    recordFor: (tokenHash: string): string | null =>
+      sql.one<{ record: string }>(
+        `SELECT i.record AS record FROM dir_inbound i
+           JOIN dir_record r ON r.id = i.record AND r.closed_at IS NULL
+          WHERE i.token_sha256 = ?`,
+        tokenHash,
+      )?.record ?? null,
+
+    /**
+     * A record's forwarding address is registered, rotated or taken away.
+     *
+     * ONE VERB FOR ALL THREE, BECAUSE THE SELF-HOST HAS ONE. There a record's inbound token is a file:
+     * writing it registers, writing it again rotates, and `rm` revokes, with no command to learn
+     * (91cda54d). A digest here replaces whatever that record had, and `null` leaves it holding none.
+     * Keeping the old row alongside the new one would be the one thing rotation exists to prevent: a
+     * forwarding address is handed to third parties by definition, so the answer to a leaked one is a
+     * new one, and a rotation that left both live answers nothing.
+     *
+     * IT TAKES A DIGEST AND CANNOT BE HANDED A TOKEN. `DIGEST` above says what that costs and buys.
+     * This method therefore cannot mint anything, show anybody an address, or read one back: minting
+     * is the caller's, and what reaches here is the half that opens nothing.
+     *
+     * EVERY REFUSAL HAPPENS BEFORE THE FIRST WRITE. `transactionSync` commits whatever the function
+     * returns, refusal included, so a check after the `DELETE` would revoke a working address and then
+     * report that nothing happened.
+     */
+    inbound$: (record: string, tokenHash: string | null): Result<null> =>
+      sql.transactionSync(() => {
+        if (tokenHash !== null && !DIGEST.test(tokenHash))
+          return no<null>(
+            'VALUE_MALFORMED',
+            'A forwarding address is registered by the SHA-256 of its token, written as 64 lower-case hex characters. The token itself is never stored here.',
+            { at: 'tokenHash' },
+          );
+        if (!sql.one('SELECT 1 AS x FROM dir_record WHERE id = ? AND closed_at IS NULL', record))
+          return no<null>('OUT_OF_BOUNDS', `There is no open record ${record}.`, { at: 'record' });
+        /* AND AN ADDRESS ANOTHER RECORD HOLDS IS REFUSED RATHER THAN STOLEN. Two random tokens do not
+           collide, so this is the caller handing the same digest twice, and the `INSERT` below would
+           otherwise throw a `SQLITE_CONSTRAINT` out of a function whose whole contract is a `Result`,
+           across a Durable Object RPC boundary, as a bare 500. That is the hazard `person$` and
+           `provision` each spend a paragraph on. */
+        const held = tokenHash === null ? undefined : sql.one<{ record: string }>('SELECT record FROM dir_inbound WHERE token_sha256 = ?', tokenHash);
+        if (held !== undefined && held.record !== record)
+          return no<null>('ALREADY_KNOWN', 'That forwarding address belongs to another record. Mint a new token for this one.', { at: 'tokenHash' });
+
+        sql.exec('DELETE FROM dir_inbound WHERE record = ?', record);
+        if (tokenHash !== null) sql.exec('INSERT INTO dir_inbound (token_sha256, record) VALUES (?, ?)', tokenHash, record);
+        return ok(null);
+      }),
 
     /** One person, by id. */
     person: (id: string): Person | null =>
