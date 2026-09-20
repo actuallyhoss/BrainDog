@@ -214,6 +214,13 @@ test('and the sentence takes the operator on exactly the types the structured fo
     for (const [sentence, leaf] of [
       ['f is empty', { field: 'f', empty: true }],
       ['f is set', { field: 'f', present: true }],
+      /* AND `has` AND `lacks`, WHICH GO THE OTHER WAY: `34 §1.2` gives them to `list<T>` and to no
+         other type, so this loop is refusals on seventeen of the eighteen and the equality has to
+         hold in both directions there too. Before the sentence form learned the two words it was
+         eighteen refusals out of eighteen, and the one type that can only be asked what it HOLDS
+         could only be asked whether it holds anything at all. */
+      ['f has x', { field: 'f', has: 'x' }],
+      ['f lacks x', { field: 'f', lacks: 'x' }],
     ] as const) {
       const spoken = parseWhere(sentence, schema, { nowMs: NOW });
       const structured = compile(leaf, schema);
@@ -230,6 +237,30 @@ test('and the sentence takes the operator on exactly the types the structured fo
 test('has and lacks look inside a list', () => {
   assert.deepEqual(both({ field: 'tags', has: 'urgent' }), ['a']);
   assert.deepEqual(both({ field: 'tags', lacks: 'urgent' }), ['b', 'c', 'd', 'e']);
+});
+
+test('AND THE SENTENCE SAYS THEM, over the same rows, which is the claim rather than that it parses', () => {
+  /**
+   * `c` holds `tags: []` and `d` has no `tags` key at all, and `lacks` answers both the same way it
+   * answers `b` and `e`, which hold a list without the value. `34 §1.3` makes the three one state,
+   * absent, and a `lacks` that split them would be reporting a difference a person cannot see.
+   */
+  const say = (text: string): Predicate | undefined => {
+    const out = parseWhere(text, SCHEMA, { nowMs: NOW });
+    assert.deepEqual(out.bad, [], out.bad[0]?.fix);
+    return out.predicate;
+  };
+  assert.deepEqual(both(say('tags has urgent')), ['a']);
+  assert.deepEqual(both(say('tags lacks urgent')), ['b', 'c', 'd', 'e']);
+  assert.deepEqual(both(say('tags has not urgent')), ['b', 'c', 'd', 'e']);
+
+  /* A `list<enum>` READS ITS DECLARED VALUES, and a word the field cannot hold is the refusal the
+     structured form already gives rather than a clause that compiles and matches nothing. */
+  assert.deepEqual(say('chased has email'), { field: 'chased', has: 'email' });
+  assert.equal(parseWhere('chased has post', SCHEMA, { nowMs: NOW }).bad[0]?.code, 'ENUM_VALUE_UNKNOWN');
+
+  // And it ANDs on the comma like any other clause.
+  assert.deepEqual(both(say('state is open, tags has urgent')), ['a']);
 });
 
 /* ── money carries its currency ──────────────────────────────────────────── */

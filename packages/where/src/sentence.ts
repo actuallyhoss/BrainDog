@@ -13,6 +13,8 @@
  *     points at is empty                the field holds nothing: no value, '' or []
  *     points at is set                  and it holds something. `is not empty` is the second of
  *                                       those two and `is not set` is the first
+ *     tags has urgent                   a LIST holds the value
+ *     tags lacks urgent                 and it does not. `has not` is the second of those two
  *     state is live, cycle is monthly   clauses are ANDed on the comma
  *
  * IT COMPILES TO THE SAME PREDICATE THE STRUCTURED FORM PRODUCES, and that is the whole reason it
@@ -182,6 +184,28 @@ const ABSENCE: Record<string, 'empty' | 'present'> = { empty: 'empty', set: 'pre
 const INVERSE = { empty: 'present', present: 'empty' } as const;
 
 /**
+ * `has` AND `lacks`: the two operators ONLY a list takes, and the two no sentence could say.
+ *
+ * `38 §2.1` publishes both among the nineteen, `operatorAllowed` admits them on `list` and on no
+ * other type, `compile` carries a `case` for each and `evaluate` answers both. So every list field
+ * in the record was filterable in JSON and unreachable from the words the pages, the register's own
+ * filter chips and every `where:` in the seed are written in. That is this file's header read from the
+ * other side, for the one type where `is`, `not`, `in` and `not_in` are all refused. A list field
+ * could be asked whether it holds ANYTHING and never what it holds.
+ *
+ * THE WORDS ARE THE OPERATORS' OWN. `before` and `after` are already shared verbatim between the
+ * two surfaces, and `has` and `lacks` are ordinary English before they are anything else, so there
+ * is nothing to translate in either direction and nothing for a printer to choose. `contains` was
+ * the other candidate and is the one word that may not be used: it is already one of the nineteen,
+ * meaning a substring of a text, and one word with two meanings decided by the field's type is the
+ * ambiguity a person reading a sentence back cannot resolve.
+ */
+const LISTED: Record<string, 'has' | 'lacks'> = { has: 'has', lacks: 'lacks' };
+
+/** And the negation inverts, for the reason the one above it does. `has not` is `lacks`. */
+const OPPOSITE = { has: 'lacks', lacks: 'has' } as const;
+
+/**
  * One sentence into one predicate.
  *
  * An empty sentence is `undefined` — every row — rather than an empty `all`, because the caller
@@ -324,6 +348,54 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
       continue;
     }
 
+    /* ── has · lacks ─────────────────────────────────────────────────────── */
+    if (Object.hasOwn(LISTED, verb)) {
+      const asked = LISTED[verb]!;
+      /* ASKED OF THE STRUCTURED COMPILER'S OWN TABLE rather than of a second one written here.
+         `38 §4.3` is one relation over operators and types, and a relation kept in two places is
+         two relations the day one is edited. `MATCH_OP_UNSUPPORTED` is the code that table's
+         refusal already carries, in the sentence the `before` branch above already gives. */
+      if (!operatorAllowed(asked, decl.type)) {
+        bad.push({
+          code: 'MATCH_OP_UNSUPPORTED',
+          fix: `${sentence}: ${field} is a ${decl.type}, and ${verb} is about lists.`,
+          at: field,
+        });
+        continue;
+      }
+
+      /* `has not` READ THE SAME WAY `is not` IS, because somebody who learned one writes the other,
+         and a trailing bare `not` is not a search for the word. It inverts both ways: a clause that
+         answers the opposite of the question is worse than one that refuses. */
+      const no = rest === 'not' || rest.startsWith('not ');
+      const wanted = (no ? rest.slice(3) : rest).trim();
+      if (!wanted) {
+        bad.push({ code: 'REQUIRED_MISSING', fix: `${sentence}: ${verb}${no ? ' not' : ''} what?`, at: field });
+        continue;
+      }
+
+      /* AND `or` IS NOT READ HERE. The operator looks for ONE value in the list, so `tags has
+         urgent or soon` would otherwise look for a tag literally called `urgent or soon`: a clause
+         that parses, compiles and matches nothing, for ever, which is the failure this whole module
+         is written against. Two questions are two clauses, and the refusal says so. */
+      if (/ or /i.test(wanted)) {
+        bad.push({
+          code: 'VALUE_MALFORMED',
+          fix: `${sentence}: ${verb} takes one value to look for in the list. Write a clause for each.`,
+          at: field,
+        });
+        continue;
+      }
+
+      const held = resolve(schema, field, decl, wanted, deps);
+      if (held === null) {
+        bad.push(refuseValue(sentence, schema, field, decl, wanted));
+        continue;
+      }
+      clauses.push({ field, [no ? OPPOSITE[asked] : asked]: held } as Predicate);
+      continue;
+    }
+
     /* ── is · is not ─────────────────────────────────────────────────────── */
     if (verb !== 'is') {
       bad.push({
@@ -332,9 +404,9 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
            every one of them inside error copy, where the reader is already stuck — and the control
            that produced the thing is labelled *Filter*. The word for what a person wrote is the word
            on the button they pressed. */
-        fix: `${sentence}: ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before or after.`,
+        fix: `${sentence}: ${verb || '(nothing)'} is not something a filter can say. Write is, is not, before, after, has or lacks.`,
         at: field,
-        allowed: ['is', 'is not', 'before', 'after', 'on'],
+        allowed: ['is', 'is not', 'before', 'after', 'on', 'has', 'lacks'],
       });
       continue;
     }
@@ -447,7 +519,12 @@ function resolve(
   said: string,
   deps: SentenceDeps,
 ): string | number | null {
-  if (decl.type === 'enum') {
+  /* A `list<enum>` IS AN ENUM HERE, AND `values` IS HOW THE SCHEMA SAYS SO. It is the same marker
+     `compile`'s own `checkEnum` reads, for the same reason: `Schema.fields` carries no `of`, so a
+     list that declares values is a `list<enum>` and nothing else is. Read `decl.type` alone and
+     `chased has post` hands `post` straight back, and a literal the field cannot hold compiles
+     clean and matches nothing. */
+  if (decl.type === 'enum' || (decl.type === 'list' && decl.values)) {
     /* AND IN THE LABEL THE SCREEN SHOWS, where a value has one: `direction is money in`. */
     const folded = said.replace(/[\s_]+/g, ' ').trim().toLowerCase();
     const labelled = Object.entries(decl.labels ?? {}).find(([, label]) => label.replace(/[\s_]+/g, ' ').trim().toLowerCase() === folded);
@@ -513,7 +590,7 @@ function refuseValue(
   decl: { type: string; values?: readonly string[]; to?: string },
   said: string,
 ): Refusal {
-  if (decl.type === 'enum')
+  if (decl.type === 'enum' || (decl.type === 'list' && decl.values))
     return {
       code: 'ENUM_VALUE_UNKNOWN',
       fix: `${sentence}: ${schema.register}.${field} has no value ${said}.`,

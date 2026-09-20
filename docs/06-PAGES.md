@@ -54,6 +54,11 @@ gives it, so the worked example above declares two keys that do nothing today. `
 legal spellings — the tree above, **and** the sentence `state is sent or part` — because `predicateOf`
 (`kernel/src/metrics.ts`) takes `Predicate | string` and hands a string to `parseWhere`
 ([38-SPEC-WHERE](38-SPEC-WHERE.md)); every page the seed ships is written in the sentence form.
+**The sentence says `is`, `is not`, `before`, `after`, `on`, `is empty`, `is set`, `has` and `lacks`**, with `or`
+between alternatives and a comma between clauses. `has` and `lacks` are the two words §1.2 of
+[34-GRAMMARS](34-GRAMMARS.md) gives `list<T>` and [21-AUTHORING](21-AUTHORING.md) §4.2 already phrases in English,
+so nothing is translated in either direction and a page prints the sentence the record takes back. `has not` is
+read as `lacks` and never printed, the way `is present` is read as `is set`.
 
 **The other form is the source view, and it is a summary rather than a round trip.** What a person
 opens as *"how this is built"* — and downloads as `<page>.dog`, one page to one file — is printed by

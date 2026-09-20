@@ -26,6 +26,9 @@ const OBLIGATIONS: Schema = {
     n: { type: 'int' },
     thing: { type: 'ref', to: 'things' } as never,
     urgent: { type: 'bool' },
+    tags: { type: 'list' },
+    /* A `list<enum>`, which the schema tells apart from a plain list by declaring `values`. */
+    chased: { type: 'list', values: ['email', 'phone', 'letter'], label: 'How chased' },
   },
 };
 
@@ -369,6 +372,120 @@ test('AND A VALUE THE REGISTER DECLARES COMES FIRST, or that register is unfilte
 
   /* AND TWO VALUES ARE A LIST TO COMPARE AGAINST, not a question about absence. */
   assert.deepEqual(parseWhere('note is empty or set', BOXES, boxes).predicate, { field: 'note', in: ['empty', 'set'] });
+});
+
+/* ── what a list holds ──────────────────────────────────────────────────── */
+
+test('`has` AND `lacks` ARE SENTENCES, and a list field was unreachable from this half of the grammar', () => {
+  /**
+   * `38 §2.1` publishes `has` and `lacks`, `operatorAllowed` admits them on `list` and on nothing
+   * else, `compile` carries a `case` for each and `evaluate` answers both. There was no way to SAY
+   * either, so every list field in the record could be filtered in JSON and not in the words the
+   * pages, the filter chips and every `where:` in the seed are written in.
+   */
+  assert.deepEqual(good('tags has urgent'), { field: 'tags', has: 'urgent' });
+  assert.deepEqual(good('tags lacks urgent'), { field: 'tags', lacks: 'urgent' });
+
+  /* `has not` IS THE NEGATION THE REST OF THE GRAMMAR TEACHES, so it is read rather than trapped:
+     somebody who learned `is not` writes it. It inverts, both ways, which is the defect this file
+     has been bitten by twice. */
+  assert.deepEqual(good('tags has not urgent'), { field: 'tags', lacks: 'urgent' });
+  assert.deepEqual(good('tags lacks not urgent'), { field: 'tags', has: 'urgent' });
+
+  // An ordinary clause, so it ANDs on the comma like any other.
+  assert.deepEqual(good('state is open, tags has urgent'), {
+    all: [
+      { field: 'state', is: 'open' },
+      { field: 'tags', has: 'urgent' },
+    ],
+  });
+});
+
+test('A `list<enum>` IS WRITTEN IN THE WORDS A SCREEN SHOWS, and a word it cannot hold is refused', () => {
+  /* `values` is how the schema says a list is a `list<enum>`, which is the marker `compile`'s own
+     `checkEnum` reads. A literal the field cannot hold is the failure the whole evaluator exists
+     for: it compiles clean and matches nothing, for ever. */
+  assert.deepEqual(good('chased has email'), { field: 'chased', has: 'email' });
+  assert.deepEqual(good('chased lacks letter'), { field: 'chased', lacks: 'letter' });
+
+  const out = bad('chased has post');
+  assert.equal(out.code, 'ENUM_VALUE_UNKNOWN');
+  assert.deepEqual(out.allowed, ['email', 'phone', 'letter']);
+
+  /* BY THE LABEL TOO, because a page prints its own filter with the label and a person types back
+     what is on the screen. */
+  assert.deepEqual(good('how chased has phone'), { field: 'chased', has: 'phone' });
+  assert.deepEqual(good('How Chased lacks phone'), { field: 'chased', lacks: 'phone' });
+});
+
+test('THE WORDS ARE THE OPERATORS THEMSELVES, so a printed clause is a clause that parses back', () => {
+  /**
+   * This package parses and does not print: the printer is the app's `saidPlainly`, which rewrites
+   * the clause shapes it knows and hands back verbatim the ones it does not. Either way
+   * `tags has urgent` comes out as `tags has urgent`, because `has` and `lacks` are the operator's
+   * own words and there is nothing for a printer to choose. That is the whole argument for these
+   * two words over `contains` or `includes`, so it is worth asserting rather than believing: the
+   * one spelling the grammar has parses back to the predicate it was printed from.
+   */
+  const printed = (p: Record<string, unknown>): string =>
+    `${String(p.field)} ${'has' in p ? 'has' : 'lacks'} ${String(p.has ?? p.lacks)}`;
+  for (const p of [
+    { field: 'tags', has: 'urgent' },
+    { field: 'tags', lacks: 'urgent' },
+    { field: 'chased', has: 'email' },
+    { field: 'chased', lacks: 'letter' },
+  ])
+    assert.deepEqual(good(printed(p)), p, printed(p));
+
+  /* AND `has not` IS PARSE-ONLY, the way `is present` is: it is read, never printed, so the two
+     surfaces keep one spelling between them and cannot drift apart on a second. */
+  const alias = good('tags has not urgent') as Record<string, unknown>;
+  assert.deepEqual(alias, { field: 'tags', lacks: 'urgent' });
+  assert.deepEqual(good(printed(alias)), alias);
+});
+
+test('and `has` on something that is not a list is refused rather than asked of a scalar', () => {
+  const out = bad('state has open');
+  assert.equal(out.code, 'MATCH_OP_UNSUPPORTED');
+  assert.match(out.fix, /is a enum, and has is about lists/);
+
+  assert.equal(bad('tags has').code, 'REQUIRED_MISSING');
+  assert.equal(bad('tags lacks not').code, 'REQUIRED_MISSING');
+
+  /* `or` IS NOT READ HERE, and the refusal says so rather than looking for a tag called
+     `urgent or soon`. The operator takes one value; two questions are two clauses. */
+  const many = bad('tags has urgent or soon');
+  assert.equal(many.code, 'VALUE_MALFORMED');
+  assert.match(many.fix, /one value/);
+});
+
+test('`lacks` OVER AN ABSENT LIST AND OVER A LIST THAT DOES NOT HOLD IT ARE ONE ANSWER', () => {
+  /**
+   * `K2`: JSON null, the empty string and the empty list are ONE state, absent. A `lacks` that
+   * answered false on the row with no list and true on the row with an empty one would split that
+   * state in two, and a person cannot see which of the two a row is in.
+   */
+  const rows = [
+    { id: 'holds', fields: { tags: ['urgent', 'later'] } },
+    { id: 'other', fields: { tags: ['later'] } },
+    { id: 'none', fields: { tags: [] } },
+    { id: 'null', fields: { tags: null } },
+    { id: 'absent', fields: {} },
+  ];
+  const of = (text: string): string[] =>
+    rows.filter((r) => evaluate(good(text), r.fields as Record<string, unknown>, OBLIGATIONS)).map((r) => r.id);
+
+  assert.deepEqual(of('tags has urgent'), ['holds']);
+  assert.deepEqual(of('tags lacks urgent'), ['other', 'none', 'null', 'absent']);
+
+  // The four absent shapes and the present-without-it shape are the same answer, stated directly.
+  const lacks = good('tags lacks urgent');
+  for (const fields of [{ tags: ['later'] }, { tags: [] }, { tags: null }, {}])
+    assert.equal(evaluate(lacks, fields as Record<string, unknown>, OBLIGATIONS), true, JSON.stringify(fields));
+
+  // And it compiles, rather than being refused by the operator table for the type it is.
+  assert.deepEqual(compile(lacks, OBLIGATIONS).bad, []);
+  assert.deepEqual(compile(good('tags has urgent'), OBLIGATIONS).params, ['urgent']);
 });
 
 /* ── the sentence a page prints back ─────────────────────────────────────── */
