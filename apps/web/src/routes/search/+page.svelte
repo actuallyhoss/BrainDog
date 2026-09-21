@@ -24,6 +24,7 @@
   import { copy } from '$lib/copy.ts';
   import type { SearchResult } from '$lib/record/api.ts';
   import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
+  import { shownState } from './shown.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -39,6 +40,10 @@
      draws per list and says where the rest is; the record caps its own answer at a hundred. */
   let finder: Searcher | null = null;
   let answer = $state<Found | null>(null);
+  /* WHICH QUERY `answer` WAS COMPUTED FOR. Without it a verdict computed for the last query is
+     printed under the words in the box now: `copy.searchNone(q)` interpolates what is being typed
+     into a conclusion about something else, and then tells the reader to check their spelling. */
+  let answeredFor = $state<string | null>(null);
   let asked = 0;
 
   async function ask(want: string) {
@@ -47,7 +52,10 @@
     finder ??= searcher(location.origin);
     const out = await finder.find(want);
     closed(mine !== asked || out.from !== 'refused', at);
-    if (mine === asked) answer = out;
+    if (mine === asked) {
+      answer = out;
+      answeredFor = want;
+    }
   }
 
   $effect(() => {
@@ -57,6 +65,11 @@
 
   const NOTHING: SearchResult = { hits: [], total: 0, groups: [] };
   const found = $derived(answer && answer.from !== 'refused' ? answer.value : NOTHING);
+  /* THE FIVE ARMS, DECIDED IN ONE PLACE. A list of hits is content and a reader can see it is about
+     something, so hits from the last query stay while the next answer is out; a verdict is a claim
+     about the words in the box, so it waits. `shown.ts` says which arm, and is where the rule is
+     held to a test. */
+  const shown = $derived(shownState(q, answer, answeredFor));
 
   /* TEN A LIST. Enough to recognise the one you meant, few enough that nine matching lists is a page
      rather than a scroll — and every list carries the door to its own remainder. */
@@ -126,19 +139,19 @@
     />
   </label>
 
-  {#if !q}
+  {#if shown === 'idle'}
     <!-- NOT AN ERROR AND NOT A RESULT. Arriving here with no query is the ordinary way in from the
          nav, and `19 §6`'s `no-data-yet` is the state for a surface waiting on you rather than on
          the record. -->
     <Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} />
-  {:else if !answer}
+  {:else if shown === 'waiting'}
     <!-- Bars until the first answer, so the sample never shows over a live record. -->
     <Waiting />
-  {:else if answer.from === 'refused'}
+  {:else if shown === 'refused' && answer?.from === 'refused'}
     <Empty kind="error" title={answer.fix}>
       {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
-  {:else if found.total === 0}
+  {:else if shown === 'none'}
     <Empty kind="no-results" title={copy.searchNone(q)} body={copy.searchNoneNext}>
       {#snippet actions()}
         <Button weight="primary" onclick={clearSearch}>{copy.searchClear}</Button>
