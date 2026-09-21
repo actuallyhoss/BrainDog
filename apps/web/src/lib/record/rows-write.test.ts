@@ -179,6 +179,26 @@ test('a number typed into a box goes as a number, an emptied box as null, and a 
   assert.deepEqual(outbound('obligations', { party: 12 }, none), { party: 12 });
 });
 
+/* A READ-SIDE REPAIR LANDED AND THE WRITE SIDE DID NOT KNOW ABOUT IT, so every edit of a `list<ref>`
+   cell on a live row page came back `VALUE_MALFORMED: because[0] takes a row id or a spoken id`. The
+   assertion is over a list because a single ref was already covered above: the pair is the point. */
+test('a LIST of refs resolves element by element, exactly as a single ref does', () => {
+  const idOf = new Map([
+    [3, '01JBQ0000000000000000003'],
+    [4, '01JBQ0000000000000000004'],
+  ]);
+  const refs = new Map([['things', { idOf, seqOf: new Map(), labelOf: new Map() }]]) as never;
+
+  assert.deepEqual(outbound('people', { projects: [3, 4] }, refs), {
+    projects: ['01JBQ0000000000000000003', '01JBQ0000000000000000004'],
+  });
+  assert.deepEqual(outbound('people', { projects: ['4'] }, refs), { projects: ['01JBQ0000000000000000004'] });
+  /* One the map does not hold goes as it was, which is the single ref's own rule: the record names it
+     rather than the browser guessing at it. */
+  assert.deepEqual(outbound('people', { projects: [3, 9] }, refs), { projects: ['01JBQ0000000000000000003', 9] });
+  assert.deepEqual(outbound('people', { projects: [] }, refs), { projects: [] });
+});
+
 test('archiving sets deleted_at at the version read, and restoring sends it back as null', async () => {
   const { io, sent } = host((url, body) => {
     const walked = refs(url);

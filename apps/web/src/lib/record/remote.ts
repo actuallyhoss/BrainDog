@@ -52,10 +52,50 @@ export type RecordRow = {
   created_at: string;
 };
 
+/**
+ * The register one field points at, whether it holds ONE ref or a LIST of them.
+ *
+ * A `list<ref>` DECLARES `type: 'list', of: 'ref'`, AND EVERY WALK HERE ASKED ONLY ABOUT `type`. That
+ * is one condition and it decided two things a live screen cannot work without, so both were wrong in
+ * the same way: `targetsOf` never named the register a list of refs points at, and `entryOf` never
+ * turned its elements into the numbers a person says.
+ *
+ * MEASURED ON A SEEDED SELF-HOST ON 127.0.0.1:5996, with the register screen's own refs:
+ *
+ *     /r/skills?f=because:has:4    asked the record {"field":"because","has":"4"}    0 rows, and the sample answers 2
+ *
+ * ONE ADDRESS AND NOT TWO, because `/r/people?f=projects:has:1` answers 0 rows whether this walk is
+ * right or wrong: every seeded person holds `projects: null`, so that address proves nothing and was
+ * dropped from this paragraph rather than left reading like a second symptom.
+ *
+ * `valueOf` below resolves a ref element to the target row's ULID out of that register's `RefMap`, and
+ * `refsFor` in `data/record.ts` builds one map per `targetsOf` entry, so the one register the elements
+ * had to resolve through was the one register never loaded. The element then went to the record as the
+ * characters somebody typed, `json_each.value = '4'` matched nothing, and the grid came back empty,
+ * which is the answer a filter gives when it is working. Three commits fixed a real half of this
+ * feature each and none of them reached here, because all three were measured against the sample,
+ * where `ROWS` holds the row numbers already.
+ *
+ * `remote.test.ts` DRIVES `because:has:4` AGAINST A REAL KERNEL AND PASSED THROUGHOUT, which is worth
+ * saying because it is the reason this survived, and the reason is NOT that its map comes from the
+ * seed's `ORDER`: `learnings` is not on `ORDER` at all, it is on `AGENTS_ORDER`. The one test over
+ * this field puts `learnings` into the map BY HAND (`remote.test.ts:175`, whose own comment says why:
+ * `skills` is not on `ORDER`'s walk either), so it loaded the register the screen never asked for.
+ * The sweep beside it, over every element of every list, walks `ORDER` alone and reads its elements
+ * off the sample's `ROWS`, so it never reached `skills`, and the one `list<ref>` on `ORDER` it did
+ * reach, `people.projects`, holds no elements in the seed: that sweep asked about no list of refs at
+ * all. A test that builds its own map cannot see a screen whose map is built by `targetsOf`.
+ */
+const refTargetOf = (f: { type?: string; of?: string; to?: string }): string | undefined =>
+  f.to && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) ? f.to : undefined;
+
 /** The registers this one's refs point at, in declared order, each once. */
 export function targetsOf(register: string): string[] {
   const out: string[] = [];
-  for (const f of REGISTERS[register]?.fields ?? []) if (f.type === 'ref' && f.to && !out.includes(f.to)) out.push(f.to);
+  for (const f of REGISTERS[register]?.fields ?? []) {
+    const to = refTargetOf(f);
+    if (to && !out.includes(to)) out.push(to);
+  }
   return out;
 }
 
@@ -236,6 +276,17 @@ export function treeOf(register: string, filters: readonly Filter[], q: string, 
  * `identityOf`, the sort) looks its target up by sequence. A ref whose target is not in the map
  * stays the ULID it arrived as, and draws as that id rather than as a wrong name.
  *
+ * AND THE HALF OF THAT RULE ABOUT A LIST WAS NEVER APPLIED, for the reason `refTargetOf` above has the
+ * measurement for: this read `f.type === 'ref'` alone, so a `list<ref>` element stayed the ULID the
+ * column holds. `display` sends an array straight to `listLine`, which joins the elements with a comma
+ * and never consults `names`, so four skills on the seeded record drew a cell of 26-character
+ * identifiers where the sample drew two row numbers. It is the same defect as the filter's, seen from
+ * the cell rather than from the bar: the chip a person gets is minted out of the element the cell holds.
+ *
+ * AN ELEMENT WHOSE TARGET IS NOT IN THE MAP KEEPS ITS ULID, one element at a time rather than the whole
+ * list, which is the single-ref rule applied per element: a row pointing at one row the walk did not
+ * reach still says the rest by number.
+ *
  * `by` IS EMPTY BECAUSE `list` DOES NOT SAY. The row's history does, and nothing on the list reads it.
  */
 export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
@@ -243,9 +294,10 @@ export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
   const fields: Fields = {};
   for (const [key, value] of Object.entries(row.fields)) {
     const f = decl?.fields.find((x) => x.id === key);
-    const to = f?.type === 'ref' ? f.to : undefined;
-    const seq = to !== undefined && typeof value === 'string' ? refs.get(to)?.seqOf.get(value) : undefined;
-    fields[key] = (seq ?? value) as Fields[string];
+    const to = f === undefined ? undefined : refTargetOf(f);
+    const map = to === undefined ? undefined : refs.get(to);
+    if (map && Array.isArray(value)) fields[key] = value.map((v) => (typeof v === 'string' ? (map.seqOf.get(v) ?? v) : v)) as Fields[string];
+    else fields[key] = ((map && typeof value === 'string' ? map.seqOf.get(value) : undefined) ?? value) as Fields[string];
   }
   return { seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '' };
 }

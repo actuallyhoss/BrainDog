@@ -47,6 +47,13 @@ const isRow = (v: unknown): v is RecordRow => v !== null && typeof v === 'object
  * A REF GIVEN AS A NUMBER BECOMES ITS ROW'S ULID; one the map does not hold goes as it is, and the record names it. An
  * enum goes in its declared spelling. A number typed into a box arrives as text and goes as a number, unless it is not
  * one, in which case the record gets the text and says what is wrong with it.
+ *
+ * AND A `list<ref>` IS A REF EIGHT TIMES OVER, which this function did not know until a read-side repair made it
+ * matter. The reader learned to resolve a list of row numbers back to their rows; this path still only resolved a
+ * SINGLE ref, so a `because` cell holding `[3, 4]` drew as `3, 4`, and dropping one element sent `{because: ['4']}`
+ * and came back `VALUE_MALFORMED: because[0] takes a row id or a spoken id like learnings#41`. Nothing was corrupted,
+ * because the record refused, and every edit of every `list<ref>` cell on every live row page failed until this line.
+ * Measured on a seeded kernel through the row page's own chain, `listFromDraft` then `outbound` then `update`.
  */
 export function outbound(register: string, fields: Fields, refs: ReadonlyMap<string, RefMap>): Record<string, unknown> {
   const decl = REGISTERS[register];
@@ -56,6 +63,12 @@ export function outbound(register: string, fields: Fields, refs: ReadonlyMap<str
     if (value === null || value === '') out[key] = null;
     else if (f?.type === 'ref' && f.to && (typeof value === 'number' || (typeof value === 'string' && /^\d+$/u.test(value))))
       out[key] = refs.get(f.to)?.idOf.get(Number(value)) ?? value;
+    else if (f?.type === 'list' && f.of === 'ref' && f.to && Array.isArray(value))
+      out[key] = value.map((one) =>
+        typeof one === 'number' || (typeof one === 'string' && /^\d+$/u.test(one))
+          ? (refs.get(f.to as string)?.idOf.get(Number(one)) ?? one)
+          : one,
+      );
     else if (f?.type === 'enum' && typeof value === 'string') out[key] = declaredValue(register, key, value);
     else if ((f?.type === 'int' || f?.type === 'decimal') && typeof value === 'string')
       out[key] = Number.isFinite(Number(value)) ? Number(value) : value;
