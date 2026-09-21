@@ -40,6 +40,16 @@
       toasts.push(out.said);
       read = await readExamples(client);
       asking = false;
+      /* THE RAIL IS DRAWN FROM `boot`, WHICH IS KEPT FOR THE TAB, so `invalidateAll` alone re-ran
+         the layout's load against the answer from before the clear, and asked the record nothing.
+         Measured on a self-host set up through `/start` as New project guide, pressing this and
+         watching every call: `clearExamples`, `examples`, `page`, `list`, `whatsNew`, and no
+         `boot`. The rail still read `Guide · Say what it is and who it is for · Milestones 6 ·
+         Choices 1 · Resources 1 · Steps 3` over a record holding none of it, and the entry named
+         after a deleted example row was a live link to `/p/say-what-it-is-and-who-it-is-for`,
+         which answers "There is no page called say-what-it-is-and-who-it-is-for." Only a reload
+         put it right. `/start` calls this for the same reason. */
+      (await import('$lib/record/boot-live.ts')).forget();
       await invalidateAll();
     } finally {
       busy = false;

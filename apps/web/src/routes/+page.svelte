@@ -95,7 +95,10 @@
   const capped = $derived(news ? news.sinceCapped : data.sinceCapped);
 
   $effect(() => {
-    if (!data.live) return;
+    /* A RECORD THAT REFUSED `boot` REFUSES THESE TOO, and each of them is a refusal written into its
+       log. Home asked for the declared page, the figures and the feed on every load a refused
+       reader gave it, and threw all three answers away. */
+    if (!data.live || data.refused) return;
     const me = data.me.person;
     const slug = declares;
     const lists = data.lists;
@@ -203,6 +206,22 @@
 
 <div class="page">
   <div class="primary">
+    {#if data.refused}
+      <!--
+        THE RECORD WOULD NOT ANSWER THIS READER, WHICH IS NOT THE SAME THING AS AN EMPTY RECORD.
+
+        Measured on a self-host holding 19 lists and 230 rows: a colleague invited with `Adds only`,
+        and one invited to a single list, accept through the product's own link and land here.
+        `boot` answers 403 `LEVEL_REQUIRED`, "This needs read, and you have append access. Ask an
+        owner to raise your access.", the shell carries it (`boot-live.ts` `refused`), and until it
+        did this screen took its "never started" branch: "Nothing in the record yet." over 230 rows,
+        with one control, `Start here`, which leads to the four tiles that set up a brand new
+        record. The record's own sentence stands here instead, the way `/spark` already says what
+        the record said, and there is no action, because the reader cannot do anything about it from
+        this screen and the sentence names the person who can.
+      -->
+      <Empty kind="no-permission" title={data.refused.fix} />
+    {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain, and loudly once rows of the owner's own sit beside them. -->
     {#if data.live}<ClearExamples />{/if}
     <!--
@@ -324,8 +343,13 @@
       {/if}
     </Section>
     {/if}
+    {/if}
   </div>
 
+  <!-- AND NOT "Nothing new since you last looked." EITHER, over a record that would not answer:
+       `whatsNew` is part of `boot`, so a reader who was refused has not been told there is nothing
+       new, they have been told nothing at all. The one sentence above is the whole screen. -->
+  {#if !data.refused}
   <aside class="secondary">
     <Section title={said('since_away')} count={fresh.length}>
       {#snippet aside()}
@@ -360,6 +384,7 @@
       {/if}
     </Section>
   </aside>
+  {/if}
 </div>
 
 <style>

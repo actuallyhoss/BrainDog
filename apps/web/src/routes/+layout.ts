@@ -42,7 +42,12 @@ export async function load({ url, fetch }): Promise<Shell> {
       ? live.layoutOf(booted.boot)
       : booted.from === 'sample'
         ? live.sampleShell(boot(), INBOX.length)
-        : live.refusedShell();
+        : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
+             module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
+             in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own
+             mark reaches) nulls it, and a colleague who may not read the record would be told the
+             record is empty instead. The answer is right here, so it is passed. */
+          live.refusedShell(booted.from === 'refused' ? { code: booted.code, fix: booted.fix } : null);
   /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one (`loop/research-spark.md` S8). */
   if (booted.from === 'live') {
     const words = voice.labels();

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { forget, layoutOf, newsOf, readBoot, signsIn, type Fetch } from './boot-live.ts';
+import { forget, layoutOf, newsOf, readBoot, refusedShell, signsIn, type Fetch } from './boot-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -410,4 +410,57 @@ test('and a second template over one list draws its own five, rather than nothin
   const shell = layoutOf({ ...BOOT, pages: [...perRow('things', 'Projects', 27), ...perRow('things', 'Clients', 26, 'client')] } as never);
   const under = (section: string) => shell.nav.filter((n) => n.section === section).length;
   assert.deepEqual([under('Projects'), under('Clients')], [5, 5]);
+});
+
+/**
+ * A RECORD THAT REFUSED IS NOT AN EMPTY RECORD, and until the shell carried the refusal nothing
+ * downstream could tell them apart.
+ *
+ * Measured against a provisioned self-host holding 19 lists and 230 rows: a colleague invited with
+ * `Adds only` accepts, and `boot` answers 403
+ * `{"code":"LEVEL_REQUIRED","fix":"This needs read, and you have append access. Ask an owner to
+ * raise your access.","allowed":["propose","append"]}`. The shell drawn over that answer had zero
+ * registers and nothing else, so Home took its "never started" branch and offered `Start here`, the
+ * onboarding of a record that already exists and that this reader may not open: 50 words and one
+ * control, against the owner's 489 and 27 on the same record at the same minute.
+ */
+test('A RECORD THAT REFUSED SAYS SO IN THE SHELL, so Home can tell nothing here from nothing for you', async () => {
+  forget();
+  const fix = 'This needs read, and you have append access. Ask an owner to raise your access.';
+  const { io } = host(() => json(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix } }));
+  assert.deepEqual(await readBoot(BASE, io), { from: 'refused', code: 'LEVEL_REQUIRED', fix });
+  const shell = refusedShell();
+  assert.deepEqual(shell.refused, { code: 'LEVEL_REQUIRED', fix });
+  assert.equal(shell.index.registers.length, 0, 'the rail is still empty over a refusal');
+  forget();
+});
+
+/**
+ * AND THE SENTENCE IS DROPPED BY THE NEXT READ, not only by `forget()`.
+ *
+ * THE FIRST VERSION OF THIS TEST CALLED `forget()` BETWEEN THE TWO READS and so proved nothing
+ * about the read: commenting out `refusal = null` in `readBoot` left all twenty-seven tests green,
+ * which is a test passing against the code it is named after being broken. `forget()` has its own
+ * test above. A refused `boot` leaves `kept` null on purpose, so the next read goes to the record
+ * again with no `forget()` in front of it, and that is the path a colleague takes the minute an
+ * owner raises their access: the refusal must not outlive it.
+ */
+test('and a shell over a record that answered, or over no record at all, carries no refusal', async () => {
+  forget();
+  const { io } = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } }));
+  assert.equal((await readBoot(BASE, io)).from, 'refused');
+  const live = host(() => json(200, { ok: true, value: BOOT }));
+  assert.equal((await readBoot(BASE, live.io)).from, 'live');
+  assert.equal(layoutOf(BOOT as never).refused, undefined);
+  assert.equal(refusedShell().refused, undefined, 'a refusal from a read that came back was still being carried');
+
+  /* AND OVER NO RECORD AT ALL. A tab can go from a record that refused to a host that has none, and
+     the sample's shell is drawn there; nothing should be holding the other host's sentence. */
+  forget();
+  const again = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } }));
+  assert.equal((await readBoot(BASE, again.io)).from, 'refused');
+  const none = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
+  assert.equal((await readBoot(BASE, none.io)).from, 'sample');
+  assert.equal(refusedShell().refused, undefined, 'a refusal from another host was still being carried');
+  forget();
 });

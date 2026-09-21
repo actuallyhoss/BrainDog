@@ -55,6 +55,22 @@ export type Shell = Omit<Sample, 'me'> & {
    */
   recordsRefused?: string | undefined;
   /**
+   * WHY THE RECORD ITSELF WOULD NOT ANSWER `boot`, when it would not.
+   *
+   * AN EMPTY RECORD AND A RECORD YOU MAY NOT READ ARE NOT THE SAME FACT AND MUST NOT DRAW THE SAME
+   * SCREEN. Measured against a provisioned self-host holding 19 lists and 230 rows, with a colleague
+   * invited at `Adds only` accepting through the product's own link: `boot` answers 403
+   * `LEVEL_REQUIRED`, "This needs read, and you have append access. Ask an owner to raise your
+   * access." The shell drawn over that carried nothing of it, so it was a shell with zero registers,
+   * which is exactly what a record nobody has started looks like. Home then printed "Nothing in the
+   * record yet." with `Start here`, offering the onboarding of a record that already exists and that
+   * this reader cannot open: 50 words and one control, beside the owner's 489 and 27 on that same
+   * record in the same minute.
+   *
+   * Absent on every shell drawn over a record that answered, and on the sample.
+   */
+  refused?: { code: string; fix: string } | undefined;
+  /**
    * EVERY LIST THE RECORD HOLDS, the empty ones too, for the places that put something INTO a list.
    *
    * `index.registers` is the rail's, and the rail draws only lists that hold something. Filing an arrival and giving
@@ -82,15 +98,27 @@ export type Shell = Omit<Sample, 'me'> & {
 
 let kept: Promise<Booted> | null = null;
 
+/**
+ * THE LAST REFUSAL THIS MODULE READ, kept beside the answer it keeps.
+ *
+ * `refusedShell()` is called with nothing to say, by the root layout, one tick after `readBoot`
+ * resolved. Everything the screen under it needs to be honest was in hand at line 93 and was thrown
+ * away there, and this is the file that had it. Cleared the moment the record answers, so a shell
+ * over a record that came back never carries a sentence about a read that is over.
+ */
+let refusal: { code: string; fix: string } | null = null;
+
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   kept ??= (async (): Promise<Booted> => {
     const client = createClient({ base, ...(io ? { fetch: io } : {}) });
     const out = await client.boot();
+    refusal = null;
     if (out.ok) return { from: 'live', boot: out.value };
-    const refusal = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
-    if (noRecord(refusal.code)) return { from: 'sample' };
+    const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
+    if (noRecord(said.code)) return { from: 'sample' };
     kept = null;
-    return { from: 'refused', code: refusal.code, fix: refusal.fix };
+    refusal = { code: said.code, fix: said.fix };
+    return { from: 'refused', code: said.code, fix: said.fix };
   })();
   return kept;
 }
@@ -104,9 +132,10 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
  */
 export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).signIn !== false;
 
-/** Drop the kept answer, so the next screen asks the record again. */
+/** Drop the kept answer, and the refusal beside it, so the next screen asks the record again. */
 export function forget(): void {
   kept = null;
+  refusal = null;
 }
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. The reader's own
@@ -476,8 +505,18 @@ export function layoutOf(b: Boot): Shell {
   };
 }
 
-/** The shell over a record that refused `boot`: nothing in the rail, and the screen says why. */
-export const refusedShell = (): Shell => layoutOf({ registers: [], now: new Date().toISOString() });
+/**
+ * The shell over a record that refused `boot`: nothing in the rail, and the record's own sentence
+ * for the screen to say.
+ *
+ * THE COMMENT HERE READ "the screen says why" AND THE SCREEN SAID THE RECORD WAS EMPTY, which is a
+ * sentence nobody had run the code to check. `said` is the refusal, and the last one this module
+ * read when the caller has none to hand.
+ */
+export const refusedShell = (said: { code: string; fix: string } | null = refusal): Shell => ({
+  ...layoutOf({ registers: [], now: new Date().toISOString() }),
+  ...(said ? { refused: said } : {}),
+});
 
 /** The sample's shell, with what only a shell carries. */
 export const sampleShell = (sample: Sample, inbox: number): Shell => ({
