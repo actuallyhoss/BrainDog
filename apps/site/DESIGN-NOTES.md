@@ -408,6 +408,9 @@ nothing is overwritten truncating its own sentences.
 | Types and markup | `svelte-check`, 287 files | 0 errors, 0 warnings |
 | The site's own tests | `pnpm --filter @braindog/site test` | 14 pass |
 | Screenshots | `node apps/site/scripts/shot.mjs` | 20, five routes in both schemes at 1440 and 390 |
+| Accessibility | `tools/gates/a11y.mjs`, axe-core over the app and the site | 244 page-runs, 0 rules with findings |
 
-The browser gates (`layout`, `a11y`) were not re-run in this pass and are the next thing to run
-against it, which is said here rather than left for somebody to assume either way.
+`tools/gates/layout.mjs` was NOT re-run against this pass. It declares `needs: ['web-build']` and
+the record app was mid-edit by nine other agents while this ran, so a build then would have been a
+build of a moving tree. It is the next thing to run against the page, said here rather than left
+for somebody to assume either way.
