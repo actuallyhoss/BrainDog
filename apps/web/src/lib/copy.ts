@@ -315,8 +315,20 @@ export const copy = {
    * away, and it says the same thing the chip says. The past tense goes with the claim.
    */
   archived: (id: string) => `${id} would be archived. Nothing was saved yet.`,
-  restored: (id: string) => `${id} is back. Nothing had been saved.`,
-  marked: (id: string, state: string) => `${id} would be ${state}. Nothing was saved yet.`,
+  /**
+   * AND ITS TWO TWINS ARE GONE, because both were reworded in place while the screens that would
+   * have said them had moved on. `restored` read "`x` is back. Nothing had been saved." and `marked`
+   * read "`x` would be `state`. Nothing was saved yet.", and `research-selfaudit.md` §28 recorded
+   * that neither had a call site. Putting a row back is a chip on the row, `writeMarkRestored`
+   * (`r/[register]/+page.svelte:2005`), and a restored BACKUP is `restoredTo`
+   * (`settings/[area]/+page.svelte:1046`) under a `restoreThis` button drawn at `:2551`. Marking one
+   * row is `setRowState`, which says `notWritten` over the state in the register's own words
+   * (`r/[register]/+page.svelte:1153`), because the schema's word is the only right one there.
+   *
+   * `dead-copy` excused both, and its excuse for `restored` named a restore control that does not
+   * exist. It exists, and it is the second file named above. An excuse nobody re-derives is how a
+   * list of eighteen becomes a list of forty.
+   */
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
 
@@ -570,7 +582,11 @@ export const copy = {
      reason is. */
   rowFieldProblem: (names: string[]): string =>
     `${list(names)} cannot be stored as typed. The reason is under the field.`,
-  noFilters: 'Nothing here can be filtered yet.',
+  /* `noFilters` WAS HERE, READING "Nothing here can be filtered yet." IT HAD NO SURFACE AND WANTS
+     NONE. The bar is drawn at eight rows (`r/[register]/+page.svelte:2195`, `ENOUGH_TO_SIFT`), and
+     what it always carries is the search box and Display; the pills come from the declared enums a
+     reader can sift on, so a list that declares none simply has none. A line announcing that is the
+     interface explaining itself, which is the rule at the top of this file. */
   /**
    * WHAT THE SEARCH BOX READS, SAID WHERE A SEARCH HAS FOUND NOTHING, because that is where somebody
    * is when it matters. It was also said under the bar on every visit, which is a screen explaining
@@ -586,7 +602,10 @@ export const copy = {
    */
   searchesOnly: (fields: string[]): string => `This box reads ${list(fields)}. For anything else, use the filters above.`,
 
-  displayOptions: 'Display',
+  /* `displayOptions` SAT ON THIS LINE HOLDING THE WORD BELOW IT. One string, two keys, and the
+     screen reads the second: `display` is the bar's button and the title of the sheet it opens
+     (`r/[register]/+page.svelte:2329` and `:2938`). `dead-copy` excused it as a menu that names its
+     sections directly, which is true of the menu and was never what the key was waiting for. */
   display: 'Display',
   displayNote: 'Only affects your view of this list.',
   columns: 'Columns',
@@ -945,17 +964,36 @@ export const copy = {
   copyId: 'Copy number',
   copyLink: 'Copy link',
   includesExample: 'includes 1 example',
-  example: 'example',
+  /* `example`, THE BARE LOWER-CASE WORD, IS THE RECORD'S AND NOT THIS FILE'S. It is the tag a seeded
+     row carries in its `tags` field, declared once in `record/tags.ts` as `EXAMPLE`, and it reaches
+     a reader from the record rather than from here: `shownTags` keeps it on a plain example row and
+     the row page draws the list through `listLine` (`r/[register]/[seq]/+page.svelte:225`). The one
+     sentence this file types near it is `markExample` below, and that is a narrower thing than the
+     excuse claimed: it is the receipt chip on the single row the empty state's offer writes
+     (`r/[register]/+page.svelte:1116` into `addLanded` at `:930`), and `receipts` is emptied
+     whenever the question changes (`:270`), so no seeded example row has ever worn it. Held here as
+     well, the bare word was a second name for a value the record defines, which is how the chip and
+     the data drift apart. `dead-copy` excused it as the chip that mark would render. */
 
   /* states */
   offline: 'Offline. New records only.',
   live: 'Live',
   polling: 'Polling',
   stale: 'Stale',
-  saved: 'Saved',
-  reloaded: 'Reloaded',
+  /* `saved` AND `reloaded` WERE HERE, AND BOTH HAD SURFACES ALREADY. The word a landed write shows
+     is `writeMarkSaved`, the same five letters, on the row the write touched. `reloaded` is
+     `50 §6`'s one-word conflict toast, and what this app says when somebody else got there first
+     names the row and what to do about it: `writeConflict`, `pageRowConflict`, `decideConflict` and
+     `writeRaced`, all of them rendered. The four words above are the ones still owed a transport:
+     `+layout.svelte:279` holds the live state as a constant and its chip at `:379` is `aria-hidden`
+     with no text in it, so none of them has ever been said out loud. */
   screenshotOn: 'Screenshot mode is on.',
   screenshotOff: 'Screenshot mode is off.',
+  /* `Stopped.` IS THE ASSISTANT'S, NOT THE TRANSPORT'S, whatever its position in this block says.
+     `23 §7` Cancel: Escape stops the answer instantly and the typed text survives, and the toast is
+     this word. So it is absent for the same reason `askBrainDog` is, which `23 §3.1` settles: with no
+     model the assistant is not there rather than greyed out. `dead-copy` files it under the offline
+     surface, which would have it waiting on a socket it has nothing to do with. */
   stopped: 'Stopped.',
   suggestedPage: '1 suggested page.',
   holdingPen: 'Not placed. Nothing moved.',
@@ -1199,7 +1237,11 @@ export const copy = {
   catalogueNothing: 'Nothing else differs.',
 
   /* settings */
-  appearance: 'Appearance',
+  /* `appearance` WAS THE FIRST LINE OF THIS SECTION AND THE SCREEN NEVER READ IT. Settings names its
+     own areas: `{ id: 'appearance', label: 'Appearance', icon: 'sun' }` is typed into
+     `settings/[area]/+page.svelte:473` with the other seven. `dead-copy` excused the key as an area
+     id being title-cased, and nothing title-cases anything there. The label being in the route and
+     not here is a finding about that file rather than a reason to keep a second copy of the word. */
   scheme: 'Colour scheme',
   schemeLight: 'Light',
   schemeSystem: 'System',

@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from './copy.ts';
+import { EXAMPLE, FORMED } from './record/tags.ts';
 
 test('THE CAPTURE FIELD SPELLS ITS OWN ARTICLE, and it said "Add a item" on the first list in the rail', () => {
   /* The nine the seed ships. `item` is Money's and `update` is Updates', and both were wrong. */
@@ -95,4 +96,56 @@ test('UNINSTALL IS UNDONE RATHER THAN ASKED, and says what installing it again b
   assert.equal(copy.uninstalled('Money'), 'Money is uninstalled. Its rows stay, and installing it again within 30 days brings back its settings and schedules.');
   assert.equal(copy.reinstalled('Money'), 'Money is back, with its settings and schedules.');
   for (const s of [copy.uninstalled('Money'), copy.reinstalled('Money'), copy.reinstallApprove('Money')]) assert.doesNotMatch(s, /—|Are you sure/u);
+});
+
+/** Every key of `copy` holding this exact string, nested tables and lists of words included. */
+function keysHolding(said: string): string[] {
+  const found: string[] = [];
+  const walk = (table: Record<string, unknown>, path: string): void => {
+    for (const [key, value] of Object.entries(table)) {
+      const at = path === '' ? key : `${path}.${key}`;
+      if (value === said) found.push(at);
+      else if (Array.isArray(value)) value.forEach((v, i) => void (v === said && found.push(`${at}[${i}]`)));
+      else if (value !== null && typeof value === 'object') walk(value as Record<string, unknown>, at);
+    }
+  };
+  walk(copy, '');
+  return found;
+}
+
+/**
+ * TWO WORDS THIS FILE TYPED TWICE, AND THE SECOND COPY OF EACH WAS RENDERED BY NOTHING.
+ *
+ * `dead-copy` reported both as debts waiting on a surface, and neither was: `displayOptions` sat one
+ * line above `display`, which is what `/r/<list>` draws on its Display button and on the sheet that
+ * button opens (`r/[register]/+page.svelte:2329` and `:2938`); `saved` sat in a block of transport
+ * words, and the word a landed write actually shows is `writeMarkSaved`, the chip a stored edit puts
+ * on its own row (`r/[register]/+page.svelte:1317`). So the allow-list carried two entries for
+ * sentences that were not missing anything, which is how a list of eighteen becomes a list of forty.
+ *
+ * NOT A RULE AGAINST EVERY REPEATED WORD, and the measurement is why: with these two gone this file
+ * stores 847 strings over 811 distinct sentences, so 27 sentences are still typed more than once,
+ * and most of them are one-word labels in unrelated lanes that happen to share a verb. `Done` is five keys because five screens
+ * finish five different things. The two below are different: each had a renderer already, and the
+ * twin was a second name for it.
+ */
+test('THE DISPLAY MENU AND A LANDED WRITE ARE EACH ONE WORD, TYPED ONCE', () => {
+  assert.deepEqual(keysHolding('Display'), ['display']);
+  assert.deepEqual(keysHolding('Saved'), ['writeMarkSaved']);
+});
+
+/**
+ * A VALUE THE RECORD STORES IS NOT A SENTENCE THIS FILE TYPES.
+ *
+ * `example` was a key here, lower case and bare, excused as "the chip that mark would render". What
+ * the bare word is is the tag the record keeps, declared in `record/tags.ts` and travelling in the
+ * row's `tags` field, and a reader meets it through `shownTags` and `listLine` rather than through
+ * any sentence typed here. `markExample` reads `Example` and is a narrower thing than the excuse
+ * claimed: the receipt chip on the one row the empty state's offer writes, cleared when the question
+ * changes, so no seeded example row has ever worn it. Two names for it in two files is how the chip
+ * and the data drift apart, which is what the assertion below holds shut.
+ */
+test('THE RECORD’S OWN TAGS ARE NOT KEYS OF `copy`', () => {
+  for (const tag of [EXAMPLE, FORMED]) assert.deepEqual(keysHolding(tag), [], `\`${tag}\` is the record's word, not a sentence`);
+  assert.equal(copy.markExample, 'Example');
 });

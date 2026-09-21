@@ -68,30 +68,28 @@ const MODULES = [
  * thing that lets the next reader tell them apart without re-deriving the whole surface.
  */
 const ALLOWED = new Map([
+  /* EIGHT LEFT THIS LIST ON 21 SEPTEMBER AND NOT ONE OF THEM GOT A SURFACE. A pass read every excuse
+     against the code and found these eight wrong: the sentence was superseded or typed twice, so the
+     key was deleted from `copy.ts` and the excuse went with it. An excuse that outlives its reason is
+     the same defect as a sentence with no renderer, one direction along, and eighteen is how a list
+     of ten becomes a list of forty. `restored`, `marked`, `noFilters`, `displayOptions`, `example`,
+     `saved`, `reloaded` and `appearance` were the eight. */
   ['copy.askBrainDog', 'CORRECT. 23 §3.1: with no model the assistant is absent, not disabled. The sentence waits.'],
-  ['copy.restored', 'UNBUILT:Settings → backups (53 §5.4). No restore control exists.'],
   /* `markAllRead` LEFT THIS LIST WHEN IT GOT A SURFACE, and the gate is what noticed: an excuse that
      outlives its reason is the same defect as a sentence with no renderer, one direction along.
      `marked` is the per-item form and stays. The browser's mark is one instant, not a flag a row.
      `copy.rankedBy` left it the same way, and its excuse had been wrong twice over: it read "19 §6's
      For You ordering", and what `19 §8` risk 6 asks for is the queue ranked by cost of being wrong,
      which `/decide` now says over the list it ranks. */
-  ['copy.marked', 'UNBUILT:the PER-ROW read mark. Home marks the whole feed with one instant instead.'],
-  ['copy.noFilters', 'UNBUILT:the filter bar\'s own empty state; the bar is hidden under 8 rows instead.'],
-  ['copy.displayOptions', 'UNBUILT:the display menu names its sections directly.'],
   ['copy.saveAsView', 'UNBUILT:a saved view is seeded, never created from the grid.'],
   ['copy.includesExample', 'UNBUILT. 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
-  ['copy.example', 'UNBUILT:the chip that mark would render.'],
   ['copy.offline', 'UNBUILT:19 §6\'s "Offline and stale" surface.'],
   ['copy.live', 'UNBUILT:same surface.'],
   ['copy.polling', 'UNBUILT:same surface.'],
   ['copy.stale', 'UNBUILT:same surface.'],
-  ['copy.saved', 'UNBUILT:same surface.'],
-  ['copy.reloaded', 'UNBUILT:same surface.'],
   ['copy.stopped', 'UNBUILT:same surface.'],
   ['copy.screenshotOn', 'UNBUILT:19 §6\'s screenshot mode.'],
   ['copy.screenshotOff', 'UNBUILT:same.'],
-  ['copy.appearance', 'UNBUILT:`/settings/[area]` title-cases the area id rather than naming it.'],
 ]);
 
 /**
