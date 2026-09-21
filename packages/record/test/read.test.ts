@@ -159,6 +159,32 @@ test('THE LOG PAGES NEWEST FIRST, with no line twice and a null cursor only at t
   sql.close();
 });
 
+test("A COLLEAGUE SCOPED TO ONE LIST HAS A READ MARK, and the owner's People screen stops calling them a stranger", async () => {
+  /**
+   * `markRead` MOVED THE `'*'` ROW AND A SCOPED MEMBER HAS NONE. Somebody invited to one list holds
+   * member rows for that list alone, so the mark landed nowhere and was read back as nothing: the
+   * People screen told the owner that colleague had never opened the record however much they had
+   * read, and `unreadFrom` answered them the first event the record ever held. The column is per
+   * person and per register; the mark is about the person, so it moves on all of their rows.
+   */
+  const { api, sql } = await record();
+  value(await api.invite({ person: 'p_9', name: 'Wren', registers: { obligations: 'read' } }, owner));
+  value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner));
+  const held = api.kernel.access('p_9')!;
+  const reader: CallContext = { principal: { kind: 'person', id: 'p_9', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+
+  const before = api.kernel.members().find((m) => m.person_id === 'p_9');
+  assert.equal(before?.seen_at ?? null, null, 'a colleague who has not read has no mark');
+
+  const marked = value<{ seen_at: string | null }>(await api.markRead(undefined, reader));
+  assert.ok(marked.seen_at, 'the mark landed nowhere for a scoped member');
+  assert.ok(
+    api.kernel.members().some((m) => m.person_id === 'p_9' && m.seen_at === marked.seen_at),
+    'the People screen reads this column, and it is what said they had never opened the record',
+  );
+  sql.close();
+});
+
 test('SOMEBODY WHO MAY ONLY FILE ROWS DOES NOT READ THEM BACK THROUGH THE LOG', async () => {
   const { api, sql } = await record();
   value(await api.invite({ person: 'p_3', registers: { obligations: 'read', diary: 'append' } }, owner));

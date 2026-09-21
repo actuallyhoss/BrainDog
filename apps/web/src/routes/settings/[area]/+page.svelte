@@ -49,7 +49,7 @@
   import { mintsMail } from '$lib/record/inbound-door.ts';
   /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
   import {
-    addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
+    addException, alsoKnown, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
     type ExportKind, type Wrote,
   } from '$lib/record/settings-write.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
@@ -1746,9 +1746,9 @@
                   <span class="who-detail">
                     {#if peopleFrom === 'live'}
                       <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
-                      {p.email || p.id} · {p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
+                      {#if alsoKnown(p)}{alsoKnown(p)}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, peopleNow())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, peopleNow()))}{/if}
                     {:else}
-                    {p.email} · {p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
+                    {#if alsoKnown(p)}{alsoKnown(p)}{' · '}{/if}{p.since ? copy.sinceWhen(relative(p.since, NOW)) : copy.inviteOut}{#if p.since}{' · '}{p.seen ? copy.lastLooked(since(p.seen, NOW)) : copy.neverLooked}{/if}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, NOW))}{/if}
                     {/if}
                   </span>
                   <span class="who-do">

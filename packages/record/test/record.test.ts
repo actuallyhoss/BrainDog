@@ -1246,11 +1246,11 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   };
 
   /* THE METHODS THAT ARE ABOUT THE RECORD REFUSE. Somebody who holds only named registers holds
-     none of the record, and these three are about the record rather than about rows. */
+     none of the record, and these two are about the record, and about the other people in it, rather
+     than about rows. */
   for (const [name, call] of [
     ['members', () => api.members(them)],
     ['whoami', () => api.whoami(them)],
-    ['markRead', () => api.markRead(undefined, them)],
   ] as const) {
     const out = await call();
     assert.equal((out as { refusal?: { code: string } }).refusal?.code, 'FORBIDDEN', name);
@@ -1260,6 +1260,7 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
      filter in them dead code — which is how a ceiling stops being enforced by being enforced twice —
      and made a scoped member unable to see even their own registers' figures. */
   assert.equal(refusal(await api.boot(them)).code, 'LEVEL_REQUIRED', 'append reads, and it must not');
+  assert.equal(refusal(await api.markRead(undefined, them)).code, 'LEVEL_REQUIRED', 'somebody who may only file has read nothing to mark');
 
   /* AND A SCOPED READER SEES THEIR OWN REGISTERS AND NOT THE OTHERS. Refusing this outright made
      every ceiling filter in these methods dead code — which is how a ceiling stops being enforced by
@@ -1273,6 +1274,12 @@ test('A METHOD THAT NAMES NO REGISTER IS ABOUT THE RECORD, and a scoped member h
   };
   const seen = value<{ registers: { id: string }[] }>(await api.boot(they));
   assert.deepEqual(seen.registers.map((r) => r.id), ['obligations'], 'a scoped reader saw the wrong set of registers');
+
+  /* AND A SCOPED READER MAY MARK WHAT THEY HAVE READ. `whatsNew` answers them, so refusing this left
+     their first screen showing the same "since you were away" lines for ever, with a button under
+     them that refused every press. */
+  const own = value<{ seen_at: string | null }>(await api.markRead(undefined, they));
+  assert.ok(own.seen_at, 'a scoped reader could not say they had read');
 
   // And the register they WERE invited to is still theirs to write into.
   assert.equal(refusal(await api.list({ register: 'obligations' }, them)).code, 'LEVEL_REQUIRED', 'append does not read');

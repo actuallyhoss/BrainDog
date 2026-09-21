@@ -167,10 +167,14 @@ export function members(sql: Sql): Member[] {
         suspended_at: person?.suspended_at ?? null,
       } satisfies Member);
 
-    if (row.register === RECORD) {
-      held.level = row.level;
-      held.seen_at = row.seen_at;
-    } else held.scoped.push({ register: row.register, level: row.level });
+    if (row.register === RECORD) held.level = row.level;
+    else held.scoped.push({ register: row.register, level: row.level });
+    /* THE FURTHEST MARK ON ANY OF THEIR ROWS, and not the `'*'` row's alone. A level is about a
+       register, so it belongs to the row it is on; a read mark is about the person, and `markRead`
+       moves it on every row they hold. Reading it off `'*'` meant a colleague invited to one list
+       had no mark here however much they had read, and the People screen told the owner, of every
+       one of them, that they had never opened the record. */
+    if (row.seen_at !== null && (held.seen_at === null || row.seen_at > held.seen_at)) held.seen_at = row.seen_at;
     out.set(row.person_id, held);
   }
   return [...out.values()];

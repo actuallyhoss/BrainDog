@@ -55,6 +55,19 @@ export const personOf = (m: Member): Person => ({
   seen: m.seen_at,
 });
 
+/**
+ * The second way of naming somebody, for the line under their name — or `''`, when there is no second way.
+ *
+ * `personOf` FALLS BACK TO THE EMAIL FOR THE NAME, because a row has to be called something, and the
+ * detail line then printed the email again: a colleague the record holds no name for was drawn as
+ * `ben@ashgrove.co.uk` with `ben@ashgrove.co.uk · has not opened it` directly beneath. The email is
+ * there to tell two people with one name apart, which is work it cannot do when it IS the name.
+ */
+export const alsoKnown = (p: Person): string => {
+  const second = p.email || p.id;
+  return second === p.name ? '' : second;
+};
+
 export type PeopleRead =
   | { from: 'live'; people: Person[] }
   | { from: 'sample' }

@@ -10,6 +10,7 @@ import type { Fetch } from './boot-live.ts';
 import type { Person } from './schema.ts';
 import {
   addException,
+  alsoKnown,
   backUpNow,
   deleteRecordNow,
   downloadSnapshot,
@@ -76,6 +77,17 @@ test("the people are the record's members, drawn as the screen's persons", async
     await readPeople(BASE, host(() => json(403, { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app.' } })).io),
     { from: 'refused', fix: 'Open this from the app.' },
   );
+});
+
+test('THE SECOND NAME IS ONLY THERE WHEN IT IS A SECOND NAME, and the email was printed twice in two lines', () => {
+  /* `personOf` FALLS BACK TO THE EMAIL FOR THE NAME, so a colleague the record holds no name for was
+     drawn with the same address in the name slot and again in the line under it, where the email is
+     supposed to be the thing that tells two people with one name apart. */
+  assert.equal(alsoKnown(bo), 'bo@example.test', 'somebody with a name of their own is told apart by their address');
+  assert.equal(alsoKnown({ ...bo, name: 'bo@example.test' }), '', 'the address was printed twice in two lines');
+  /* AND A RECORD WITH NEITHER SAYS THE ID ONCE. */
+  assert.equal(alsoKnown({ ...bo, email: '', name: 'p_bo' }), '', 'the id was printed twice in two lines');
+  assert.equal(alsoKnown({ ...bo, email: '', name: 'Bo' }), 'p_bo');
 });
 
 test('a level change sends the whole of what they would hold, exceptions included', async () => {

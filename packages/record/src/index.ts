@@ -986,11 +986,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * The guard for a read that names no register AND FILTERS BY THE CEILING ITSELF.
    *
-   * TWO KINDS OF REGISTER-LESS METHOD, and treating them alike broke one of them. `members`,
-   * `whoami` and `markRead` are about the RECORD: somebody who holds only named registers holds none
-   * of it, and `guard` refusing a `null` level is right. But `boot`, `search`, `page`, `metric`,
-   * `governance` and `digestToday` are about ROWS, and every one of them already filters what it
-   * returns to the caller's ceiling — refusing them outright made a scoped member unable to see even
+   * TWO KINDS OF REGISTER-LESS METHOD, and treating them alike broke one of them. `members` and
+   * `whoami` are about the RECORD, and about the other people in it: somebody who holds only named
+   * registers holds none of that, and `guard` refusing a `null` level is right. But `boot`, `search`,
+   * `page`, `metric`, `governance`, `whatsNew` and `digestToday` are about ROWS, and every one of them
+   * already filters what it returns to the caller's ceiling — refusing them outright made a scoped member unable to see even
    * their own registers' figures, and made every one of those filters dead code, which is how a
    * ceiling stops being enforced by being enforced twice.
    *
@@ -2640,8 +2640,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        that event's own `ts`; without it the mark was the wall clock at the moment of the call —
        *when you pressed the button*, not *how far you have read*. Omitting it marks everything,
        which is what the button on the home screen means and what the client sent before. */
+    /* AND A SCOPED READER MAY MARK, which `guard` refused. `whatsNew` is `scoped`, so a colleague
+       invited to one list is shown "since you were away" and could never clear it: the read half
+       answered and the write half refused, so their first screen kept the same lines for ever and the
+       button under them refused every press. A read mark is about the caller's own attention and
+       nobody else's rows, so it asks what `whatsNew` asks — and `append` alone still refuses, because
+       somebody who may only file has read nothing to mark. */
     async markRead(args: { upTo?: number } | undefined, ctx: CallContext) {
-      const stop = guard(ctx, 'read');
+      const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person')
         /* `FORBIDDEN` with the sentence carrying the reason — the same move as `allows` above. */

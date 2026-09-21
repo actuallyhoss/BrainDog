@@ -4390,15 +4390,21 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     markRead: (person: string, upTo: number): string | null => {
       transaction(() => {
+        /* EVERY ROW THIS PERSON HAS, AND NOT THE `'*'` ROW ALONE. A colleague invited to one list has
+           member rows for that list and no `'*'` row at all, so the mark landed nowhere and the read
+           below found nothing: the People screen then told the owner that colleague had never opened
+           the record, however much they had read, and `unreadFrom` answered them the first event the
+           record ever held. The column is per person and per register; the mark is about the person,
+           so it moves on all of their rows and is read back as the furthest of them. */
         sql.exec(
           `UPDATE member SET seen_at = MAX(COALESCE(seen_at, ''), COALESCE((SELECT ts FROM event WHERE rowid = ?), ''))
-            WHERE person_id = ? AND register = '*'`,
+            WHERE person_id = ?`,
           upTo,
           person,
         );
       });
       return (
-        sql.one<{ seen_at: string | null }>("SELECT seen_at FROM member WHERE person_id = ? AND register = '*'", person)
+        sql.one<{ seen_at: string | null }>('SELECT MAX(seen_at) AS seen_at FROM member WHERE person_id = ?', person)
           ?.seen_at ?? null
       );
     },
@@ -4478,7 +4484,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       Number(
         sql.one<{ v: number }>(
           `SELECT COALESCE(MIN(rowid), (SELECT COALESCE(MAX(rowid), 0) + 1 FROM event)) AS v FROM event
-            WHERE ts > COALESCE((SELECT seen_at FROM member WHERE person_id = ? AND register = '*'), '')`,
+            WHERE ts > COALESCE((SELECT MAX(seen_at) FROM member WHERE person_id = ?), '')`,
           person ?? '',
         )?.v ?? 1,
       ),
