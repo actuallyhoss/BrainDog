@@ -96,10 +96,13 @@ export async function sparkEngineFor(
  * `loop/research-batch-five-audit.md` is the absence, and it reproduces exactly. Re-measured on 2026-09-21 with
  * `throw new Error(…)` on the first line of `sparkEngineFor`: `node --test --experimental-strip-types
  * "apps/selfhost/test/*.test.ts"` is 204 tests, 202 pass, 0 fail, 2 skipped, which is byte for byte the
- * unmutated tally. Not one test in this app reaches its own builder, so the three reds the mutation does
- * produce are all in `apps/worker/test/spark.test.ts`, two of them driving THIS file's builder from the other
- * app's suite. Three passes added the dependency, then the builder, then the door below; `grep -rn sparkDoor
- * apps` finds this declaration and no call, which is the same sentence the audit wrote about `sparkEngineFor`.
+ * unmutated tally. Not one test in this app reaches its own builder, so the two reds the mutation does produce
+ * are both in `apps/worker/test/spark.test.ts`, at `:206` and `:238`, driving THIS file's builder from the
+ * other app's suite. A THREE-red tally wants both builders throwing at once and not this one alone, which is
+ * the arithmetic `apps/worker/src/spark.ts`'s own memo got wrong before it was re-measured here: mutate either
+ * builder by itself and that suite is 177 pass, 2 fail, never 176 and 3. Three passes added the dependency, then
+ * the builder, then the door below; `grep -rn sparkDoor apps` finds this declaration and no call, which is the
+ * same sentence the audit wrote about `sparkEngineFor`.
  *
  * AND THE PRODUCT ANSWERS A 404, which is the measurement that settles it and which no grep can give. A real
  * `start({ file, port: 0, spark: { url, model, key, send } })` reports `spark: true` at `/api/version` and

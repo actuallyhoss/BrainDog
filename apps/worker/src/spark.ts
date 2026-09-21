@@ -102,15 +102,19 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
  * added the dependency, then the builder, then a door; none added the branch in `Record$.#answer` that hands a
  * request to one.
  *
- * AND THE TALLY THIS MEMO CARRIED WAS WRONG, measured on 2026-09-21 by putting `throw new Error(…)` on the
- * first line of `workerSparkEngine` and running `node --test --experimental-strip-types
- * "apps/worker/test/*.test.ts"`: 179 tests, 176 pass, 3 fail, not the "179 of 179" written here. The audit's
- * 172 was `apps/worker/test/*.test.ts` LESS `spark.test.ts`, and dropping that exclusion turned a true
- * sentence about every OTHER suite into a false one about this app. The three reds are all in
- * `apps/worker/test/spark.test.ts`, at `:153`, `:206` and `:238`, which is the audit's point rather than a
- * refutation of it: the only callers of either builder are the tests that name them. `apps/selfhost` is the
- * cleaner measurement, because with `sparkEngineFor` throwing its suite is 204 tests, 202 pass, 0 fail,
- * 2 skipped, exactly as an unmutated run: no test in that app reaches its own builder at all.
+ * AND THE TALLY THIS MEMO CARRIED WAS WRONG TWICE OVER, so each mutation is written out on its own. Every
+ * figure below is `node --test --experimental-strip-types "apps/worker/test/*.test.ts"`, whose unmutated run
+ * is 179 tests, 179 pass. A `throw new Error(…)` on the first line of `workerSparkEngine` ALONE is 177 pass,
+ * 2 fail, at `spark.test.ts:153` and `:238`. On the first line of `sparkEngineFor` alone it is also 177 pass,
+ * 2 fail, but at `:206` and `:238`, because `:206` drives the SELF-HOST's builder out of this app's suite.
+ * Only BOTH builders throwing is 176 pass, 3 fail at `:153`, `:206` and `:238`. The revision of this memo that
+ * replaced a "179 of 179" reading hung that three-red tally on the single mutation, which no run produces, so
+ * the correction needed correcting. Every reading carries the audit's point rather than refuting it: the only
+ * callers of either builder are the tests that name them. The audit's 172 was this same glob LESS
+ * `spark.test.ts`, and dropping that exclusion turned a true sentence about every OTHER suite into a false one
+ * about this app. `apps/selfhost` is the cleaner measurement, because with `sparkEngineFor` throwing its own
+ * suite is 204 tests, 202 pass, 0 fail, 2 skipped, exactly as an unmutated run: no test in that app reaches
+ * its own builder at all.
  *
  * WHAT A REQUEST ACTUALLY MEETS TODAY, measured rather than reasoned about: a real self-host started with a
  * `SPARK_ENDPOINT` and a key answers `spark: true` at `/api/version` and 404 `ROUTE_UNKNOWN` "There is no
