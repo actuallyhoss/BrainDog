@@ -3,3 +3,11 @@ via:    where
 raises: packages/where/src/sentence.ts
 at:     thing
 fix:    Write the row before the rule that names it.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "thing", "type": "ref", "to": "things" }
+    ]
+  }
+predicate: thing is Kiln

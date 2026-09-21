@@ -3,3 +3,11 @@ via:    where
 raises: packages/where/src/index.ts
 at:     amount
 fix:    Give the comparison a currency, or it matches every currency in the register.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "amount", "type": "money" }
+    ]
+  }
+predicate: { "field": "amount", "gt": 100000 }

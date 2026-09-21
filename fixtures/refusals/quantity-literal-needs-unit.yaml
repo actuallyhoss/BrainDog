@@ -3,3 +3,11 @@ via:    where
 raises: packages/where/src/index.ts
 at:     effort
 fix:    Give the comparison a unit, or it matches every unit in the register.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true },
+      { "id": "effort", "type": "quantity" }
+    ]
+  }
+predicate: { "field": "effort", "gt": 3 }

@@ -3,3 +3,10 @@ via:    where
 raises: packages/where/src/index.ts
 at:     what
 fix:    Shorten the literal to forty bytes.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true }
+    ]
+  }
+predicate: { "field": "what", "contains": "the whole sentence somebody typed in here" }

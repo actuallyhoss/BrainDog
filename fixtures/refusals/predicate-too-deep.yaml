@@ -3,3 +3,16 @@ via:    where
 raises: packages/where/src/index.ts
 at:     all
 fix:    Flatten the predicate, which nests three groups deep counting the outermost as the first.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true }
+    ]
+  }
+predicate: { "all": [
+    { "all": [
+      { "all": [
+        { "all": [ { "field": "what", "is": "Invoice 41" } ] }
+      ] }
+    ] }
+  ] }

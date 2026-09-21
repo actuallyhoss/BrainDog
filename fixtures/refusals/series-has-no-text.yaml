@@ -3,3 +3,11 @@ via:    where
 raises: packages/where/src/index.ts
 at:     campaign
 fix:    Filter the register on its key fields or its numbers.
+register: {
+    "id": "readings", "name": "Readings", "title": "campaign", "series": true,
+    "fields": [
+      { "id": "campaign", "type": "text", "required": true },
+      { "id": "value", "type": "decimal" }
+    ]
+  }
+predicate: { "field": "campaign", "contains": "kiln" }

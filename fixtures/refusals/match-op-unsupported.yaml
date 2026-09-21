@@ -3,3 +3,10 @@ via:    where
 raises: packages/where/src/index.ts
 at:     what
 fix:    Use an operator this field's type supports.
+register: {
+    "id": "obligations", "name": "Obligations", "title": "what",
+    "fields": [
+      { "id": "what", "type": "text", "required": true }
+    ]
+  }
+predicate: { "field": "what", "before": "2026-09-21" }
