@@ -1026,6 +1026,7 @@ export const FIRST_PARTY_LISTS: ReadonlyMap<string, string> = new Map([
   ['accounts', 'money-core'],
   ['categories', 'money-core'],
   ['fx', 'money-core'],
+  ['holdings', 'money-core'],
   ['installments', 'money-core'],
   ['obligations', 'money-core'],
   ['recurring', 'money-core'],

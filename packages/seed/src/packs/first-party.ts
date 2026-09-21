@@ -78,6 +78,10 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   way to tell which one the record meant. So a record on the 17:53 to 18:52 build of 1.3.0 does lose two figures at
  *   1.4.0, and what it loses is the half of a contradiction this pack has since decided against.
  *   `test/pack-versions.test.ts` records all five resets and refuses a sixth.
+ * - money-core 1.5.0: a register for what you hold. Gold, a saving certificate and an insurance policy each have a
+ *   cost, a day they were acquired and sometimes a day they mature, and until now the only list that would take them was
+ *   an account with a balance, which counts a policy as cash somebody could spend. `holdings` is the list that does not.
+ *   One list added and nothing taken away, so the step is a minor one.
  * - work 1.1.0: tasks gain an owner, an agent, a priority, steps, a done day and a Backlog status; the Overview and the
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
@@ -91,7 +95,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
-  'money-core': '1.4.0',
+  'money-core': '1.5.0',
   estate: '1.1.0',
   work: '1.5.0',
 };

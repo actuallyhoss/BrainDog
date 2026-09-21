@@ -54,7 +54,7 @@ export const MODULE_LISTS: Readonly<Record<(typeof MODULES)[number], { name: str
   people: { name: 'People', lists: ['people'] },
   'money-core': {
     name: 'Money',
-    lists: ['accounts', 'categories', 'fx', 'installments', 'obligations', 'recurring', 'snapshots', 'transactions'],
+    lists: ['accounts', 'categories', 'fx', 'holdings', 'installments', 'obligations', 'recurring', 'snapshots', 'transactions'],
   },
   estate: { name: 'Estate', lists: ['services'] },
   work: { name: 'Work', lists: ['tasks', 'tracks', 'updates'] },

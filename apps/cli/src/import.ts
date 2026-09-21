@@ -107,6 +107,11 @@ const NAMES: Readonly<Record<string, string>> = {
      reading the report has the same two words over the page the import filled. */
   fx: 'Exchange rates',
   accounts: 'Accounts',
+  /* AND THE THIRD TIME THIS FILE HAS BEEN THE ONE A NEW REGISTER FORGOT, which the paragraph above predicted in so many
+     words: `ORDER` gained `holdings` in `legacy.ts`, an agent's own file, and this map is a file away and was another
+     agent's. `Holdings` is what money-core puts over the list (`packages/seed/src/modules/money.ts:533`), so a person
+     reading the report has the same word over the page the import filled. */
+  holdings: 'Holdings',
   categories: 'Categories',
   obligations: 'Money in and out',
   /* THE WORDS money-core PUTS OVER THESE FOUR LISTS AND NOTHING ELSE (`packages/seed/src/modules/money.ts`), which is
