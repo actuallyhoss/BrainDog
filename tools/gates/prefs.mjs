@@ -93,7 +93,8 @@ import { answers, forward, forwards, startRecord } from './record.mjs';
  * one got for nothing: the process ending closed whatever it held. In this process a server left on
  * `budgets.json`'s `prefs.port` is the next run failing to bind, and a browser left running is a
  * runner that never exits. The two returns that come before any of that is started need no cleanup,
- * which is the other reason the drift check is first.
+ * which is the other reason the drift check is first. Everything after it hands all three back in ONE
+ * `finally`, so a case that throws costs the run its answer and nothing else.
  *
  * THE ROOT IS AN ARGUMENT, defaulting to this file's own two directories up, which is what the
  * constant it replaces computed. Nothing here has ever read `process.cwd()`.
@@ -415,122 +416,155 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
   /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
   const record = await startRecord();
 
-  const server = createServer(async (req, res) => {
-    if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
-    const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
-    if (rel.includes('..')) return res.writeHead(400).end();
-    for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-      const file = join(ROOT, candidate);
-      if ((await stat(file).catch(() => null))?.isFile()) {
-        res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
-        return createReadStream(file).pipe(res);
-      }
-    }
-    if (!Object.hasOwn(TYPES, extname(rel))) {
-      res.writeHead(200, { 'content-type': TYPES['.html'] });
-      return createReadStream(join(ROOT, 'index.html')).pipe(res);
-    }
-    res.writeHead(404).end();
-  });
-  await new Promise((r) => server.listen(PORT, r));
-  await answers(`http://localhost:${PORT}`);
-
-  const browser = await chromium.launch();
-  const findings = [];
-  /** Loads that never drew, kept apart from the findings so neither sentence is read as the other. */
-  const unsettled = [];
-  let checked = 0;
-
-  for (const test of CASES) {
-    const seen = new Map();
-    /* A CASE IS COMPARED ONLY IF EVERY LOAD IN IT WAS REAL. Two probes of two screens, one of which
-       was never there, is not a comparison of a preference. */
-    let comparable = true;
-    for (const value of test.values) {
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
-      /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
-         script before first paint, so setting it is exactly what the product does. It keeps this
-         gate about whether the preference REACHES the DOM rather than about the control that sets it,
-         which the a11y and layout gates already drive. */
-      await context.addCookies([
-        { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
-      ]);
-      if (test.sample) await context.route(/\/(?:api|auth)(?:\/|$)/, (route) => route.abort());
-      const page = await context.newPage();
-      await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
-      const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
-      if (unmeasured) {
-        unsettled.push(unmeasured);
-        comparable = false;
-        process.stdout.write('~');
-        await context.close();
-        continue;
-      }
-      /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
-         tokens the checks read, which is exactly the shape of the bug this gate is named after (a
-         preference reaching the cookie and a constant reaching the page), and the run must go red. */
-      if (process.env.BRAINDOG_GATE_SEED === 'prefs')
-        await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
-      await page.waitForTimeout(120);
-      seen.set(JSON.stringify(value), await page.evaluate(test.probe));
-      await context.close();
-      checked++;
-      process.stdout.write('.');
-    }
-
-    if (!comparable) continue;
-
-    /* EVERY VALUE DISTINCT, not merely "some pair differs". Three settings where two agree is a
-       control with a step that does nothing, which is the same defect one notch smaller. */
-    const answers = [...seen.entries()];
-    const distinct = new Set(answers.map(([, v]) => v));
-    if (distinct.size < answers.length) {
-      findings.push(
-        `${test.name}: ${answers.length} values, ${distinct.size} distinct. ${test.what}\n` +
-          answers.map(([k, v]) => `        ${k} -> ${v}`).join('\n'),
-      );
-      process.stdout.write('!');
-    }
-  }
-
-  process.stdout.write('\n');
-  await browser.close();
-  server.close();
-  await record.close();
-
-  console.log(
-    `  prefs: ${checked} page-runs over ${CASES.length} of Pref's ${FIELDS.length} preferences, ` +
-      `${findings.length + drift.length} finding(s)` +
-      (unsettled.length ? `, ${unsettled.length} load(s) on a page that never drew` : ''),
-  );
-
-  if (drift.length) sayDrift();
-
-  if (findings.length) {
-    console.error('\n  a preference that reaches the cookie and not the page:');
-    for (const f of findings) console.error(`      ${f}`);
-  }
-
-  /* NOT UNDER THE HEADING ABOVE. "A preference that reaches the cookie and not the page" is a claim
-     about the app, and a page that never drew is a claim about the load: printing the second under the
-     first is how somebody ends up editing a probe to silence a host that was not answering. */
-  if (unsettled.length) {
-    console.error('\n  a preference whose screen was never there to measure:');
-    for (const u of unsettled) console.error(`      ${u}`);
-  }
-
   /**
-   * AND A RUN WHERE NO SCREEN DREW IS RED even when every case came back distinct.
+   * AND FROM HERE EVERY HANDLE IS GIVEN BACK EVEN WHEN THE RUN THROWS, which it was not.
    *
-   * Three of the ten cases read tokens off `documentElement` and `body`, which `app.html` sets from
-   * the cookie before first paint and which are true of an empty document as well as a full one. Those
-   * three would pass over a product that drew nothing at all, so the aggregate is what keeps a clean
-   * `prefs` run from meaning less than it says.
+   * The three closes used to stand together below the case loop on the straight-line path, with no
+   * `try` above them, so anything that threw in between skipped all three: `context.addCookies`,
+   * `page.evaluate(test.probe)` on a probe that is wrong about the DOM, `chromium.launch()` where no
+   * browser is installed. `run.mjs` calls this gate IN-PROCESS, so what was skipped stayed open for the
+   * rest of the run. Measured on 21 September against `keys.mjs`, which had the identical shape: a
+   * throw after the launch left its port answering **HTTP 200**, the rebind every later gate needs came
+   * back **EADDRINUSE**, and the machine went from 18 browser processes to 21. With the `finally` the
+   * same throw rebinds free and the process count comes back to 18.
+   *
+   * `let`, BECAUSE THE FINALLY HAS TO SEE THEM HALF-BUILT: the run that dies before the browser exists
+   * is the run this is for, and a `const` inside the block is out of scope for the hand-back.
    */
-  const blind = ready.nothingDrawn();
-  if (blind) console.error(`\n  ${blind}`);
+  let server = null;
+  let browser = null;
+  try {
+    server = createServer(async (req, res) => {
+      if (forwards(new URL(req.url ?? '/', 'http://x').pathname)) return forward(req, res, record.base);
+      const rel = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(1);
+      if (rel.includes('..')) return res.writeHead(400).end();
+      for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
+        const file = join(ROOT, candidate);
+        if ((await stat(file).catch(() => null))?.isFile()) {
+          res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+          return createReadStream(file).pipe(res);
+        }
+      }
+      if (!Object.hasOwn(TYPES, extname(rel))) {
+        res.writeHead(200, { 'content-type': TYPES['.html'] });
+        return createReadStream(join(ROOT, 'index.html')).pipe(res);
+      }
+      res.writeHead(404).end();
+    });
+    await new Promise((r) => server.listen(PORT, r));
+    await answers(`http://localhost:${PORT}`);
 
-  if (findings.length || unsettled.length || blind || drift.length) return 1;
+    browser = await chromium.launch();
+    const findings = [];
+    /** Loads that never drew, kept apart from the findings so neither sentence is read as the other. */
+    const unsettled = [];
+    let checked = 0;
+
+    for (const test of CASES) {
+      const seen = new Map();
+      /* A CASE IS COMPARED ONLY IF EVERY LOAD IN IT WAS REAL. Two probes of two screens, one of which
+         was never there, is not a comparison of a preference. */
+      let comparable = true;
+      for (const value of test.values) {
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+        /* THE COOKIE, NOT A CLICK. `50 §4.7` has the shell read `bd_pref` in a one-statement inline
+           script before first paint, so setting it is exactly what the product does. It keeps this
+           gate about whether the preference REACHES the DOM rather than about the control that sets it,
+           which the a11y and layout gates already drive. */
+        await context.addCookies([
+          { name: 'bd_pref', value: encodeURIComponent(JSON.stringify(value)), url: `http://localhost:${PORT}` },
+        ]);
+        if (test.sample) await context.route(/\/(?:api|auth)(?:\/|$)/, (route) => route.abort());
+        const page = await context.newPage();
+        await page.goto(`http://localhost:${PORT}${test.route}`, { waitUntil: 'networkidle' });
+        const unmeasured = ready.check(`${test.name} ${JSON.stringify(value)}`, test.route, await ready.settled(page));
+        if (unmeasured) {
+          unsettled.push(unmeasured);
+          comparable = false;
+          process.stdout.write('~');
+          await context.close();
+          continue;
+        }
+        /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
+           tokens the checks read, which is exactly the shape of the bug this gate is named after (a
+           preference reaching the cookie and a constant reaching the page), and the run must go red. */
+        if (process.env.BRAINDOG_GATE_SEED === 'prefs')
+          await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
+        await page.waitForTimeout(120);
+        seen.set(JSON.stringify(value), await page.evaluate(test.probe));
+        await context.close();
+        checked++;
+        process.stdout.write('.');
+      }
+
+      if (!comparable) continue;
+
+      /* EVERY VALUE DISTINCT, not merely "some pair differs". Three settings where two agree is a
+         control with a step that does nothing, which is the same defect one notch smaller. */
+      const answers = [...seen.entries()];
+      const distinct = new Set(answers.map(([, v]) => v));
+      if (distinct.size < answers.length) {
+        findings.push(
+          `${test.name}: ${answers.length} values, ${distinct.size} distinct. ${test.what}\n` +
+            answers.map(([k, v]) => `        ${k} -> ${v}`).join('\n'),
+        );
+        process.stdout.write('!');
+      }
+    }
+
+    process.stdout.write('\n');
+
+    console.log(
+      `  prefs: ${checked} page-runs over ${CASES.length} of Pref's ${FIELDS.length} preferences, ` +
+        `${findings.length + drift.length} finding(s)` +
+        (unsettled.length ? `, ${unsettled.length} load(s) on a page that never drew` : ''),
+    );
+
+    if (drift.length) sayDrift();
+
+    if (findings.length) {
+      console.error('\n  a preference that reaches the cookie and not the page:');
+      for (const f of findings) console.error(`      ${f}`);
+    }
+
+    /* NOT UNDER THE HEADING ABOVE. "A preference that reaches the cookie and not the page" is a claim
+       about the app, and a page that never drew is a claim about the load: printing the second under the
+       first is how somebody ends up editing a probe to silence a host that was not answering. */
+    if (unsettled.length) {
+      console.error('\n  a preference whose screen was never there to measure:');
+      for (const u of unsettled) console.error(`      ${u}`);
+    }
+
+    /**
+     * AND A RUN WHERE NO SCREEN DREW IS RED even when every case came back distinct.
+     *
+     * Three of the ten cases read tokens off `documentElement` and `body`, which `app.html` sets from
+     * the cookie before first paint and which are true of an empty document as well as a full one. Those
+     * three would pass over a product that drew nothing at all, so the aggregate is what keeps a clean
+     * `prefs` run from meaning less than it says.
+     */
+    const blind = ready.nothingDrawn();
+    if (blind) console.error(`\n  ${blind}`);
+
+    if (findings.length || unsettled.length || blind || drift.length) return 1;
+  } finally {
+    /**
+     * ALL THREE, AND ONE FAILURE MAY NOT COST THE OTHER TWO.
+     *
+     * `await browser.close()` first and unguarded would be the same defect one layer in: a browser that
+     * had already crashed rejects there, the rejection leaves the `finally`, and the record and the port
+     * stay open exactly as before. Each hand-back is its own statement and swallows its own failure.
+     * None of them is a second close either, which matters more than it looks: two closes of one record
+     * reach `sql.close()` on a database already closed (`apps/selfhost/src/server.ts:72`) and throw
+     * `ERR_INVALID_STATE` from inside `net`'s close callback, where no `await` can catch it, and the run
+     * dies. Driven on 21 September.
+     */
+    await browser?.close().catch(() => {});
+    /* AWAITED, unlike the bare `server.close()` this replaces: the callback is the moment the listening
+       socket is actually gone, and the next gate in the run wants this exact port. */
+    if (server !== null) await new Promise((r) => server.close(() => r()));
+    await record.close().catch(() => {});
+  }
 }
 
 /* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=prefs` and
