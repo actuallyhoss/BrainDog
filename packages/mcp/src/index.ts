@@ -199,7 +199,15 @@ export const TOOLS: readonly Tool[] = [
       {
         register: str('A register id.'),
         where: { type: 'object', description: 'A predicate tree. Omit for everything.' },
-        limit: int('1 to 200. Default 25.'),
+        /* THE RECORD'S OWN TWO NUMBERS, AND THEY WERE "1 to 200. Default 25.", which is neither.
+           `kernel.list` is `Math.min(Math.max(1, Math.floor(Number(q.limit)) || 50), 500)`
+           (`packages/kernel/src/index.ts:1608`) and this tool forwards `limit` untouched, so nothing
+           anywhere made either figure true. Driven over `POST /mcp` with 260 rows in one register: no
+           `limit` answered 50 rows, and `limit: 300` answered all 260, straight past the ceiling the
+           description named. An agent that trusted "Default 25" reasoned about 50 rows believing it
+           had asked for 25, and one that wanted 400 paged twice for what the record gives in one go.
+           Same length in tokens, so the ceiling `budget.test.ts` measures does not move. */
+        limit: int('1 to 500. Default 50.'),
         cursor: str('From a previous answer.'),
       },
       ['register'],
@@ -209,7 +217,11 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     description: 'Rows whose text matches, across every register you can see. Every word is a prefix.',
-    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: int('1 to 50. Default 20.') }, ['q']),
+    /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
+       `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
+       130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
+       told it could not ask for. The default of 20 was right and is unchanged. */
+    input: obj({ q: str('What to look for. Plain words; the operators are not read.'), limit: int('1 to 100. Default 20.') }, ['q']),
     writes: false,
   },
   {

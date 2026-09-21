@@ -183,6 +183,73 @@ test('list takes a predicate, which is why there is not a filter tool per regist
   sql.close();
 });
 
+/**
+ * THE PAGE A READ ADVERTISES IS THE PAGE THE RECORD GIVES, and on both of these reads it was not.
+ *
+ * `list` read "1 to 200. Default 25." and the record does neither. `kernel.list` is
+ * `Math.min(Math.max(1, Math.floor(Number(q.limit)) || 50), 500)` (`packages/kernel/src/index.ts:1608`),
+ * and the tool layer forwards `limit` untouched, so nothing anywhere made 200 or 25 true. Driven over
+ * `POST /mcp` on a self-host on port 5994 with 260 rows in one register: no `limit` came back with 50
+ * rows, and `limit: 300` came back with all 260, straight past the ceiling the description named as
+ * the most an agent could ask for. `search` read "1 to 50" over a ceiling of 100
+ * (`packages/kernel/src/fts.ts:116`), measured against 130 rows all matching one word: `limit: 80`
+ * answered 80 hits and `limit: 200` answered 100. Its default of 20 was the one figure of the four
+ * that was right.
+ *
+ * WHICH WAY IT MATTERS IS THE DEFAULT. An agent that trusts "Default 25", reads a page and reasons
+ * about what it holds is reasoning about 50 rows while believing it asked for 25, and the two answers
+ * are indistinguishable from inside the payload. An understated ceiling is cheaper and still wrong: it
+ * sends an agent that wants 400 rows on two round trips for a page the record gives in one.
+ *
+ * THE NUMBERS ARE READ OUT OF THE DESCRIPTIONS RATHER THAN WRITTEN HERE AGAIN, so this fails whichever
+ * side moves. A cap named in prose and a cap enforced in code are two copies of one fact, and the copy
+ * an agent reads is the prose.
+ *
+ * AND THE ANSWER AT `list`'s CAP IS NOT SILENT, which is the half that was already right: `matched` is
+ * the whole count and `cursor` is the way down, so a page is never mistaken for the lot.
+ */
+test('THE LIMITS `list` AND `search` ADVERTISE ARE THE ONES THE RECORD KEEPS, ceiling and default', async () => {
+  /** What the tool tells an agent it may ask for, read off the argument an agent reads. */
+  const advertised = (name: string) => {
+    const limit = (TOOLS.find((t) => t.name === name)?.input as { properties: { limit: { description: string } } }).properties.limit;
+    const read = /^1 to ([0-9]+)\. Default ([0-9]+)\.$/.exec(limit.description);
+    assert.ok(read, `${name}'s limit reads ${JSON.stringify(limit.description)}, which names no range and no default`);
+    return { ceiling: Number(read[1]), fallback: Number(read[2]) };
+  };
+  const listed = advertised('list');
+  const found = advertised('search');
+
+  const { mcp, api, sql } = await agent();
+  /* SEARCHABLE, because one register has to answer both reads: two would be two fixtures for one fact. */
+  assert.ok(
+    (
+      await api.kernel.install([
+        {
+          id: 'register.notes',
+          kind: 'register' as const,
+          body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true, search: true }] } as never,
+        },
+      ])
+    ).ok,
+  );
+  /* Past the higher of the two ceilings, so "it gave me fewer" is never the register running out. */
+  const held = Math.max(listed.ceiling, found.ceiling) + 20;
+  for (let i = 1; i <= held; i += 1) value(await api.create({ register: 'notes', fields: { what: `zebrafish note ${String(i)}` } }, owner));
+
+  const page = value<{ rows: unknown[]; matched: number; cursor: string | null }>(await mcp.call('list', { register: 'notes' }, owner));
+  assert.equal(page.rows.length, listed.fallback, `list with no limit answered ${String(page.rows.length)} rows and promises ${String(listed.fallback)}`);
+  assert.equal(page.matched, held, 'a page did not say how many rows the predicate matched');
+  assert.ok(page.cursor, 'a page short of the whole register offered no way down');
+  const most = value<{ rows: unknown[] }>(await mcp.call('list', { register: 'notes', limit: listed.ceiling + 100 }, owner));
+  assert.equal(most.rows.length, listed.ceiling, `list answered ${String(most.rows.length)} rows for a ceiling it puts at ${String(listed.ceiling)}`);
+
+  const hits = value<unknown[]>(await mcp.call('search', { q: 'zebrafish' }, owner));
+  assert.equal(hits.length, found.fallback, `search with no limit answered ${String(hits.length)} hits and promises ${String(found.fallback)}`);
+  const every = value<unknown[]>(await mcp.call('search', { q: 'zebrafish', limit: found.ceiling + 50 }, owner));
+  assert.equal(every.length, found.ceiling, `search answered ${String(every.length)} hits for a ceiling it puts at ${String(found.ceiling)}`);
+  sql.close();
+});
+
 test('a note changes nothing and is still a write, so it lands in the history', async () => {
   const { mcp, sql } = await agent();
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'a' } }, owner));
