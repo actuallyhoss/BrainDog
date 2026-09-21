@@ -11,9 +11,11 @@
  * cannot run without, this file reads every declaration before it spawns anything, and a gate whose
  * prerequisite is unmet is refused here rather than asked. See `NEEDS` below for what that fixes.
  *
- * AND EIGHT OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1` step
- * 3, half done on purpose: see `IMPORTED OR SPAWNED` below for what it buys, what it costs, and why
- * the other twenty-two keep the dialect they have.
+ * AND SIXTEEN OF THEM ARE NOW FUNCTIONS THIS FILE CALLS RATHER THAN SCRIPTS IT SPAWNS. `52 §5.1`
+ * step 3: see `IMPORTED OR SPAWNED` below for what it buys, what it costs, and why the other fourteen
+ * keep the dialect they have. Which of the two a gate is in is DECLARED by its entry here, with
+ * `call(...)`, and never guessed from the gate's text, which is the trap the first half of that step
+ * left behind.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -75,10 +77,10 @@ const GATES = [
   /* THE OTHER HALF OF `31 §3`. `stack` is layer 4: the runtime surface a package may not name.
      This is layers 3 and 5: the seventeen-row order, acyclicity, and the relative import that
      climbs out of its own package, which pnpm resolves happily and which nothing else can see. */
-  ['graph', ['node', [join(here, 'graph.mjs')]]],
+  ['graph', call(join(here, 'graph.mjs'))],
   /* THE ONE THAT GUARDS THE PROMISE THE PRODUCT IS BUILT ON: a credential never goes in the record,
      and never in a log. It is a grep, so it belongs beside the other greps and costs nothing. */
-  ['secret-grep', ['node', [join(here, 'secret-grep.mjs')]]],
+  ['secret-grep', call(join(here, 'secret-grep.mjs'))],
   /* THE ONE LIST LARGE ENOUGH TO HAVE DRIFTED THREE TIMES (52 §5.2). Four of its five sources are
      not code, so nothing but a gate can notice that a document gained a kind the database refuses. */
   ['event-kinds', ['node', [join(here, 'event-kinds.mjs')]]],
@@ -117,14 +119,14 @@ const GATES = [
      over HTTP and looks for every planned row in the record. About a second, which is a grep's
      price, and it needs no build and no browser. */
   ['import', ['node', [join(here, 'import.mjs')]]],
-  ['refusals', ['node', [join(here, 'refusals.mjs')]]],
+  ['refusals', call(join(here, 'refusals.mjs'))],
 
   /* AND THE OTHER HALF OF `30 §6`'s LAST PARAGRAPH: *"every `code` has a fixture that produces
      it."* `refusals` counts which codes the tree emits and says 37 are emitted by nothing; this
      holds the other 75 to a file each, keyed by the `via` that raises it, which is what turns that
      37 from a search into a burn-down. Beside `refusals` because they are two halves of one
      sentence. */
-  ['refusal-fixtures', ['node', [join(here, 'refusal-fixtures.mjs')]]],
+  ['refusal-fixtures', call(join(here, 'refusal-fixtures.mjs'))],
   /* A FLAG IS A DECISION THAT HAS NOT BEEN TAKEN, and the failure it becomes is permanent
      branching. This asks six questions of the list, of which the load-bearing one is whether the
      flag is read at all. `dead-copy`'s own hole is that a statically-false `{#if}` counts as
@@ -133,50 +135,50 @@ const GATES = [
   /* THE RULE THE WHOLE ADDITIVE STORY RESTS ON (02 §1). A register the kernel ships is a name no
      pack can own, and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', ['node', [join(here, 'no-declarations-in-kernel.mjs')]]],
-  ['css-rules', ['node', [join(here, 'css-rules.mjs')]]],
-  ['colour-grep', ['node', [join(here, 'colour-grep.mjs')]]],
+  ['css-rules', call(join(here, 'css-rules.mjs'))],
+  ['colour-grep', call(join(here, 'colour-grep.mjs'))],
   /* `50 §3` says one file holds every sentence so the copy is reviewable in one place. That is true
      only while the file and the product hold the same sentences, and 26 of 212 were reviewable and
      unrendered, including the five that define the words the product is built out of. */
-  ['dead-copy', ['node', [join(here, 'dead-copy.mjs')]]],
+  ['dead-copy', call(join(here, 'dead-copy.mjs'))],
   /* AND THE ONE HOUSE RULE ABOUT THOSE SENTENCES THAT NOTHING ENFORCED. `LOOP.md`: "no em dashes
      and no flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
-  ['em-dash', ['node', [join(here, 'em-dash.mjs')]]],
+  ['em-dash', call(join(here, 'em-dash.mjs'))],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
   // Needs a build. It exits 3 when there is not one, which is a skip here and not a pass, so
   // `pnpm gates` is useful on a fresh checkout; CI builds first, and then it is a real gate.
-  ['bundle', ['node', [join(here, 'bundle.mjs')]]],
+  ['bundle', call(join(here, 'bundle.mjs'))],
   /* A PREFERENCE THAT CHANGES NOTHING IS A CONTROL THAT LIES (`25 §1`'s `series` class). The Text
      setting shipped inert for the life of the build because the 128-configuration matrix is widths,
      schemes and directions. No preference but `scheme` is an axis of it, so nothing ever asked. */
-  ['prefs', ['node', [join(here, 'prefs.mjs')]]],
+  ['prefs', call(join(here, 'prefs.mjs'))],
   /* AND EVERY KEY THE PRODUCT PRINTS IS A KEY THAT DOES SOMETHING. `19 §4`'s whole argument for a
      registry is that the sheet documents by READING it, so it cannot drift. It had drifted three
      ways, found by a sweep rather than by anything here. */
-  ['keys', ['node', [join(here, 'keys.mjs')]]],
+  ['keys', call(join(here, 'keys.mjs'))],
   // Last three because they are the slow ones: a real browser over every route.
-  ['layout', ['node', [join(here, 'layout.mjs')]]],
-  ['a11y', ['node', [join(here, 'a11y.mjs')]]],
+  ['layout', call(join(here, 'layout.mjs'))],
+  ['a11y', call(join(here, 'a11y.mjs'))],
   /* THE ONE BROWSER GATE THAT DRIVES A DOOR RATHER THAN MEASURING A SCREEN. Both halves of sign-in were
      tested and the join between them never was: the verifier against a software authenticator, the client
      against a fake `navigator.credentials`, and nothing at all against a browser's own WebAuthn stack over
      the challenge, origin and RP ID a real record issued. It comes in by the server key, adds a passkey,
      signs out and comes back in with it. On its own ephemeral port, so it does not join the queue for 5189
      the two above share. */
-  ['passkey', ['node', [join(here, 'passkey.mjs')]]],
+  ['passkey', call(join(here, 'passkey.mjs'))],
   /* AND THE OTHER ONE THAT DRIVES A BLOCK RATHER THAN MEASURING IT. `queue` was tested at every seam
      and in screenshots and nothing had ever pressed one: an option word that goes nowhere and a count
      of what is left that goes nowhere both pass every unit test there is. It presses an option and
      checks the gate it lands on, presses the count and checks it reaches Decide. Its own ephemeral
      port, for the reason `passkey` has one. */
-  ['queue', ['node', [join(here, 'queue.mjs')]]],
+  ['queue', call(join(here, 'queue.mjs'))],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The twenty-seven above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to
      ask. Everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
-  ['deploy-parity', ['node', [join(here, 'deploy-parity.mjs')]]],
+  ['deploy-parity', call(join(here, 'deploy-parity.mjs'))],
 ];
 
 /**
@@ -299,9 +301,13 @@ const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
  * `em-dash: 0 em dashes used as punctuation, over 415 files` and then `undefined`. A gate that does
  * its work at module top level RUNS when it is imported, which is precisely what asking before
  * running is for; and reading `needs` off the namespace would mean reading it after the gate had
- * finished, which is not a prerequisite check but an epilogue. That is still true of twenty-two of
- * the thirty gates below, and this reader is for those. The eight that export a function are asked by
- * `importedNeeds` instead, off the module: see `IMPORTED OR SPAWNED`. Either way the property step 2
+ * finished, which is not a prerequisite check but an epilogue. That is still true of fourteen of
+ * the thirty gates below, and this reader is for those. The sixteen registered with `call(...)` are
+ * asked by `importedNeeds` instead, off the module, and none of the fourteen this reader covers
+ * declares anything today: every gate that has a prerequisite is one of the sixteen, so this reader
+ * now guards the next script gate that grows one rather than any gate in the table. It stays for that
+ * reason, and because a gate may be registered as a script for as long as its author likes:
+ * see `IMPORTED OR SPAWNED`. Either way the property step 2
  * is for holds, and it is the only one that matters here: nothing the gate can say decides whether
  * the gate runs.
  *
@@ -385,8 +391,14 @@ function declaredNeeds(name, file) {
 }
 
 /**
- * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the eight that need no build and no
- * browser; the other twenty-two are spawned exactly as they were.
+ * IMPORTED OR SPAWNED, one gate at a time. `52 §5.1` step 3, on the sixteen registered with
+ * `call(...)`; the other fourteen are spawned exactly as they were.
+ *
+ * THE SECOND HALF OF STEP 3 IS THE GATES THAT NEED A BUILD OR A BROWSER, AND THEY ARE THE HALF THAT
+ * MAKES STEP 2 WORTH ANYTHING. Every prerequisite in `NEEDS` belongs to one of them: `passkey` and
+ * `queue` are the two gates that found no build and exited 0, and the paragraph above `NEEDS` is
+ * written about them. Called, their declaration is the value the module holds, read before a line of
+ * the gate has run, so the account the runner acts on and the account the gate acts on are one thing.
  *
  * WHY IT IS WORTH DOING AT ALL, AND IT IS THE STEP 2 DEFECT ONE LEVEL DOWN. Reading a declaration
  * out of source text means the declaration and the code can disagree: the text is one account of a
@@ -402,29 +414,70 @@ function declaredNeeds(name, file) {
  * refuses it; read off the module it is an ordinary value, computed by the gate and read before the
  * gate is called.
  *
- * THE DIALECT IS A QUESTION ABOUT THE TEXT, AND IT IS THE LAST ONE THIS FILE ASKS OF IT. The runner
- * cannot import a gate to find out whether it is importable, because importing a gate that does its
- * work at module top level RUNS it, which is the hazard this whole section is about. So the text is
- * asked one question, `export default`, and the two ways of getting it wrong are both loud: a file
- * that says so and hands back something that is not a function is exit 2 naming the file, and a
- * migrated gate this misses is spawned, which is the dialect it goes on working in. Neither can turn
- * into a gate that passed without being asked, which is the property that matters.
+ * THE DIALECT IS DECLARED IN `GATES` AND IS NEVER GUESSED FROM THE TEXT, AND THE FIRST VERSION OF
+ * THIS GOT THAT WRONG IN A WAY THAT WAS ONE COMMIT FROM COSTING SOMETHING. It asked the text one
+ * question, `EXPORTS_DEFAULT = /^export default\b/mu`, and IMPORTED any file that matched. A gate
+ * that is still a script does its work at module top level, so a script that happened to match, for
+ * any reason at all, would have run its whole body inside that import: above its own header line,
+ * outside the timing and the capture, and before the `needs` check whose entire purpose is to stop a
+ * gate running without what it needs. Measured with a two-line stub in `test/dialect.test.mjs`
+ * (`console.log(...)` and then a line beginning `export default`): the stub's output printed ABOVE
+ * `▸ bundle · imported` and the run reported `1 of 1 gates passed`. No gate in the tree matched by
+ * accident, and the next person to migrate one was the person who would have found out.
  *
- * WHAT IT COSTS IS ISOLATION, AND THAT IS WHY THIS IS HALF A MIGRATION. A spawned gate that throws,
- * leaks a handle or runs a browser costs one exit code and one process; an imported one that throws
- * would take this runner and every gate after it down with it, so the call is wrapped and a throw is
- * that gate's failure. The gates left spawned are the ones where the process boundary is doing real
- * work: a browser on a port, `pnpm -r`, a gate that builds a record. Nothing goes red for staying.
+ * SO A TEXT MATCH CAN NOW ONLY REFUSE, AND IT CAN NEVER CAUSE AN IMPORT. `call(file)` in the table
+ * above is the declaration, and the file's own text is read afterwards to check that the two accounts
+ * AGREE, because a disagreement is exactly where both hazards live and neither is visible in a run:
+ *
+ *   * A call whose file does not carry the entry guard `if (import.meta.main)` is refused BEFORE it is
+ *     imported. That guard is a gate saying, in the language rather than in a comment, that importing
+ *     it does nothing, and it is the line every migrated gate here already ends with, because
+ *     `self-test` spawns each gate file directly and a called gate has to keep working that way too.
+ *   * A call whose file names no `export default` is refused before it is imported, for the same
+ *     reason: the registration says import and the text says script, and finding out by importing it
+ *     is the trap above.
+ *   * A script whose file DOES name `export default` is refused as well. Half a migration is a
+ *     function nobody calls, and `node stack.mjs` then defines it, calls nothing and exits 0, which
+ *     this runner reads as a gate that passed. That is the silence this whole directory exists to
+ *     break, so it is the one direction that may not be waved through.
+ *   * And a file that says `export default` and hands back something that is not a function is exit 2
+ *     naming the file, which is the one disagreement only the import itself can find.
+ *
+ * WHAT IT COSTS IS ISOLATION, AND THE SIX GATES THAT DRIVE A BROWSER ARE WHERE THAT BILL ARRIVES. A
+ * spawned gate that throws, leaks a socket or leaves a browser running costs one exit code and one
+ * process, and the process ending hands all of it back; a called one that throws would take this
+ * runner and every gate after it down with it, so the call is wrapped and a throw is that gate's
+ * failure. A handle is the part no wrapper can fix from out here: a server left on
+ * `budgets.json`'s `layout.port` is the next gate failing to bind, and a browser left running is a
+ * runner that never exits. So each of those gates closes what it opened on every path out of itself,
+ * including its early returns, and each one's header says so where somebody editing it will read it.
+ *
+ * THE FOURTEEN LEFT SPAWNED ARE NOT A DESIGN, WITH THREE EXCEPTIONS. `typecheck` is `pnpm -r` through
+ * a shell, `self-test` spawns every gate itself and would be this runner's work done twice in one
+ * process, and `theme` passes `--check` to a script outside this directory, which a call cannot carry.
+ * Of the other eleven, nine are greps over source that nobody has migrated yet, and `spark-actor` and
+ * `import` are the two that build a record, which their own entries above say plainly, so calling
+ * them "greps" here would be this file disagreeing with itself two hundred lines apart. Nothing goes
+ * red for any of the eleven: a script gate is a supported dialect, not a gate waiting to be fixed.
  *
  * THE OTHER THING THE PROCESS BOUNDARY WAS DOING IS CONTAINING `process.exit`, and that one is
  * caught below rather than argued away: see `inside` at the run loop.
  *
  * AND AN IMPORTED GATE TAKES THE ROOT AS AN ARGUMENT. A spawned one was handed it as the child's
- * working directory and half of them default to `process.cwd()`; in this process that is wherever
+ * working directory and some of them default to `process.cwd()`; in this process that is wherever
  * the operator was standing, so `node ../../tools/gates/run.mjs` from inside a package would have
- * pointed eight gates at that package. The root is this file's own, derived from `import.meta.url`.
+ * pointed those gates at that package. The root is this file's own, derived from `import.meta.url`.
  */
+/** What a file has to carry to be a gate this runner CALLS, checked before it is ever imported. */
 const EXPORTS_DEFAULT = /^export default\b/mu;
+/**
+ * The entry guard, which is a gate saying that importing it does nothing.
+ *
+ * ANCHORED AT THE START OF A LINE because a mention of `import.meta.main` inside a comment or a
+ * string is prose about the rule rather than the rule, and this check decides whether a file is safe
+ * to import. Every migrated gate in this directory ends with exactly this statement.
+ */
+const ENTRY_GUARD = /^if \(import\.meta\.main\)/mu;
 
 /** What `mod.needs` may be: absent, or a list of names `NEEDS` defines. */
 function importedNeeds(name, needs) {
@@ -440,23 +493,91 @@ function importedNeeds(name, needs) {
 }
 
 const dialects = new Map();
-for (const [name, [, argv]] of SELECTED) {
+for (const [name, [cmd, argv]] of SELECTED) {
   const file = scriptOf(argv);
-  if (file === null || !existsSync(file) || !EXPORTS_DEFAULT.test(readFileSync(file, 'utf8'))) {
+  /* THE TEXT, OR NOTHING TO READ. A registered gate's file can be absent, and that is a failure the
+     spawn reports one gate at a time rather than a reason to end the run: see `declaredNeeds`. */
+  const source = file !== null && existsSync(file) ? readFileSync(file, 'utf8') : '';
+  if (cmd !== CALL) {
+    /* A SCRIPT THAT DECLARES A GATE IS THE HALF-MIGRATION, and spawning it would check nothing while
+       reporting a pass. The two accounts have to agree, and this is the direction where the
+       disagreement is silent. */
+    if (EXPORTS_DEFAULT.test(source))
+      refuse(
+        `${name} is registered as a script and its file names \`export default\`. In this directory a ` +
+          `default export is a gate this runner CALLS, so spawning it may define a function and never ` +
+          `run it, which reads here as a gate that passed. Register it with \`call(...)\`, or take the ` +
+          `default export out.`,
+      );
     dialects.set(name, { how: 'spawned' });
     continue;
   }
-  /* AN ENTRY THAT PASSES FLAGS CANNOT BE IMPORTED, and dropping them silently is the failure worth
+  /* AN ENTRY THAT PASSES FLAGS CANNOT BE CALLED, and dropping them silently is the failure worth
      naming: `theme` runs `theme.mjs --check`, and a call takes the root and nothing else, so the day
-     a gate like that grows a default export the two accounts of how to run it would differ by one
+     a gate like that is registered as a call the two accounts of how to run it would differ by one
      argument and the gate would check the other thing. */
   const extra = argv.filter((a) => typeof a === 'string' && a !== file);
-  if (extra.length > 0)
+  if (file === null || extra.length > 0)
     refuse(
-      `${name} exports a default and its GATES entry also passes ${extra.join(' ')}. An imported gate is ` +
-        `called with the root and nothing else, so those would be dropped without a word.`,
+      `${name} is registered as a call and its GATES entry passes ${[file, ...extra].filter(Boolean).join(' ') || 'no file'}. ` +
+        `A called gate is handed the root and nothing else, so anything else here would be dropped without a word.`,
     );
-  const mod = await import(pathToFileURL(file).href);
+  /* A CALLED GATE'S FILE CAN BE ABSENT, AND THAT IS ONE GATE'S FAILURE RATHER THAN THE RUN'S, which
+     is the argument `declaredNeeds` makes about the spawned half: a deletion leaves nothing in the
+     directory for the unregistered-gate scan to see, and ending the run here would mean the
+     twenty-nine gates beside it were never asked over one missing file. A spawn gets that for
+     nothing, because the child's non-zero exit is the report; there is no child here, so the report
+     is a gate that says so and returns 1. */
+  if (!existsSync(file)) {
+    dialects.set(name, {
+      how: 'imported',
+      gate: () => {
+        console.error(`  ${basename(file)} is registered as a call and is not there, so there was no gate to call.`);
+        return 1;
+      },
+    });
+    continue;
+  }
+  /* BOTH READ BEFORE THE IMPORT, because importing is the thing being decided. */
+  if (!EXPORTS_DEFAULT.test(source))
+    refuse(
+      `${name} is registered as a call and names no \`export default\`. Importing it to find out is what ` +
+        `runs a script gate's whole body inside this runner, so it is refused instead. Give it a default ` +
+        `export, or register it as a script.`,
+    );
+  if (!ENTRY_GUARD.test(source))
+    refuse(
+      `${name} is registered as a call and has no \`if (import.meta.main)\` guard, which is how a gate says ` +
+        `that importing it does nothing. Without it a body at module top level would run inside this ` +
+        `import, above the gate's own line and before its prerequisites are read. It is also what keeps ` +
+        `the gate runnable by hand and spawnable by \`self-test\`.`,
+    );
+  /**
+   * AND AN IMPORT THAT THROWS IS THAT GATE'S FAILURE, NOT THE RUN'S, which is the argument the call
+   * itself already got and this line did not.
+   *
+   * IT MATTERS MORE NOW THAN IT DID AN HOUR AGO. The eight gates step 3 started with import `lib.mjs`
+   * and nothing else. The six added since import `@playwright/test`, `axe-core`'s bundle by path,
+   * `record.mjs` (which reaches into `apps/selfhost` and two packages) and, in `passkey`, a `.ts`
+   * module that Node strips types from as it loads. Any of those can fail to resolve in a tree that is
+   * half installed, and an uncaught rejection here ends the process with a stack trace where the
+   * summary should be, with every gate below this one never asked. That is the shape of failure this
+   * file opens by refusing to have.
+   */
+  let mod;
+  try {
+    mod = await import(pathToFileURL(file).href);
+  } catch (cause) {
+    const said = cause?.stack ?? cause;
+    dialects.set(name, {
+      how: 'imported',
+      gate: () => {
+        console.error(`  ${name} could not be imported, so it was never asked anything: ${said}`);
+        return 1;
+      },
+    });
+    continue;
+  }
   if (typeof mod.default !== 'function')
     refuse(
       `${name} names \`export default\` and it is not a function this runner can call. A gate is either a ` +
@@ -591,9 +712,9 @@ const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could no
 /* AND A RUN THAT WAS ASKED FOR LESS SAYS SO. "14 of 14 gates passed" beside a nineteen-gate corpus
    is the sentence a subset would otherwise print, and it reads as the whole thing. */
 const unasked = omitted.length === 0 ? '' : '\n  ' + omitted.length + ' were not asked for: ' + omitted.join(', ') + '.';
-/* AND THE SPLIT BETWEEN THE TWO DIALECTS, once, at the bottom. `52 §5.1` step 3 is half done by
-   design, so the number that says how far is worth printing rather than counting by eye up the
-   screen: it is how anybody notices a gate that quietly fell back to being spawned. */
+/* AND THE SPLIT BETWEEN THE TWO DIALECTS, once, at the bottom. Fourteen gates are still scripts, so
+   the number that says how many were called is worth printing rather than counting by eye up the
+   screen: it is how anybody notices a gate that quietly changed dialect, in either direction. */
 const byImport = SELECTED.filter(([name]) => dialects.get(name).how === 'imported').map(([name]) => name);
 const how =
   '\n  ' +

@@ -27,7 +27,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -45,7 +45,8 @@ function copy(name, stub) {
   mkdirSync(to, { recursive: true });
   for (const file of readdirSync(gates))
     if (file.endsWith('.mjs') || file === 'budgets.json') cpSync(join(gates, file), join(to, file));
-  writeFileSync(join(to, `${name}.mjs`), stub);
+  if (stub === null) unlinkSync(join(to, `${name}.mjs`));
+  else writeFileSync(join(to, `${name}.mjs`), stub);
   return root;
 }
 
@@ -139,7 +140,38 @@ test('a gate registered as a script whose file declares a gate is refused, not s
   assert.match(out, /stack/u);
 });
 
-/* AND THE TWENTY-TWO THAT ARE STILL SCRIPTS ARE SPAWNED EXACTLY AS THEY WERE, which is the control
+/**
+ * AND A CALL WHOSE FILE IS GONE IS STILL ONE GATE'S FAILURE, which the spawned half gets for nothing
+ * because the child's non-zero exit is the report. `needs.test.mjs` records what this cost when the
+ * runner read declarations with `readFileSync`: an ENOENT thrown from the reader ended the run with
+ * NOT ONE of the other gates asked. A call has no child to take an exit code from, so the same
+ * property has to be written down, and the gate beside it is what proves it.
+ */
+test('a call whose file was deleted is named, and the gates beside it still run', () => {
+  const { status, out } = run(copy('bundle', null), 'bundle,em-dash');
+  assert.match(out, /bundle\.mjs is registered as a call and is not there/u);
+  assert.match(out, /▸ em-dash/u, `the gate beside the missing one was never asked:\n${out}`);
+  assert.match(out, /gates failed: bundle/u);
+  assert.equal(status, 1);
+});
+
+/**
+ * AND A GATE THAT CANNOT BE IMPORTED IS ONE GATE'S FAILURE TOO. The six gates step 3 added import
+ * Playwright, `axe-core` by path, the self-host and, in one case, a `.ts` module Node strips types
+ * from as it loads. In a tree that is half installed any of those throws, and an uncaught rejection in
+ * the runner's import loop would end the process with a stack trace where the summary should be and
+ * every gate below it never asked.
+ */
+test('a gate whose import throws is named, and the gates beside it still run', () => {
+  const stub = `import 'node:nonesuch/not-a-module';\nexport default function bundle() {}\nif (import.meta.main) process.exitCode = bundle() ?? 0;\n`;
+  const { status, out } = run(copy('bundle', stub), 'bundle,em-dash');
+  assert.match(out, /bundle could not be imported/u);
+  assert.match(out, /▸ em-dash/u, `the gate beside the one that would not load was never asked:\n${out}`);
+  assert.match(out, /gates failed: bundle/u);
+  assert.equal(status, 1);
+});
+
+/* AND THE FOURTEEN THAT ARE STILL SCRIPTS ARE SPAWNED EXACTLY AS THEY WERE, which is the control
    for every test above: the mechanism refuses two disagreements and changes nothing else. */
 test('a script gate with no default export is spawned and its exit code is read', () => {
   const stub = `console.log('  stack: ${RAN}');\nprocess.exitCode = 1;\n`;

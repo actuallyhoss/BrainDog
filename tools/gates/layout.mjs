@@ -36,479 +36,410 @@ import { budget, readiness, skipDir } from './lib.mjs';
 import { answers, forward, forwards, recordFor, startRecord } from './record.mjs';
 import { routesOf } from './routes.mjs';
 
-const REPO = join(import.meta.dirname, '..', '..');
-const ROOT = join(REPO, 'apps', 'web', 'build');
-
 /**
  * WHAT THIS GATE CANNOT RUN WITHOUT, DECLARED SO THE RUNNER DECIDES INSTEAD OF THIS FILE.
  *
- * `52 §5.1` step 2: `run.mjs` reads this before it spawns anything, and refuses to spawn this gate
+ * `52 §5.1` step 2: `run.mjs` reads this before it runs anything, and refuses to run this gate
  * when there is no build, so the sentence a reader gets comes from the runner rather than from a
- * gate that did not run. The `stat(ROOT)` below is still here and still exits 3, because it is
+ * gate that did not run. The `stat(ROOT)` below is still here and still answers 3, because it is
  * what answers a person who runs `node tools/gates/layout.mjs` by hand; it is no longer the only
  * account of the prerequisite, which is what let `passkey` and `queue` exit 0 with no build twice.
  *
+ * AND STEP 3 READS IT OFF THE MODULE RATHER THAN OUT OF THIS TEXT. `run.mjs` imports this file and
+ * reads `mod.needs` before it calls the gate, so the declaration it acts on is the value this file
+ * holds. Nothing happens on that import, because everything below is inside the function.
+ *
  * ONE NEED AND NOT TWO, although this gate sweeps two builds. `apps/site/build` is measured when
- * it is there and named when it is not, one variant at a time, and the gate has always exited 3
+ * it is there and named when it is not, one variant at a time, and the gate has always skipped
  * on `apps/web/build` alone. The declaration says what the gate already does rather than widening
  * it, because a need that stops a run is the wrong place to change what gets measured.
  */
 export const needs = ['web-build'];
 
 /**
- * A SECOND RECORD, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
+ * THE WHOLE SWEEP, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
  *
- * The app renders one seed, so a screen that branches on a fact about the record has a side no gate
- * can reach. `/settings/backups` and `/settings/billing` branch on the host, and the Cloud side
- * shipped **eight sentences that drew nowhere**: invisible to `svelte-check`, which says nothing
- * about a branch that cannot be taken, and counted as rendered by `dead-copy`, which greps source.
+ * IT OWNS A PORT, A RECORD AND A BROWSER, AND A CALLED GATE HAS TO GIVE THEM BACK, which a spawned
+ * one got for nothing: the process ending closed whatever it held. In this process a server left on
+ * `budgets.json`'s `layout.port` is the next run failing to bind, and a browser left running is a
+ * runner that never exits. The two returns above the record are the only ones that need no cleanup.
  *
- * `pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
- * the routes that branch are measured on it too; if it is not, the run says so rather than quietly
- * covering less. It is the same rule as `unsampled`: "we did not check this" must not look like
- * "there was nothing here".
+ * THE ROOT IS AN ARGUMENT, defaulting to this file's own two directories up, which is what the
+ * constant it replaces computed. Nothing here has ever read `process.cwd()`, so a run from inside a
+ * package measures the same tree it always did.
+ *
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
  */
-const VARIANTS = [
+export default async function layout(root = join(import.meta.dirname, '..', '..')) {
+  const ROOT = join(root, 'apps', 'web', 'build');
+
   /**
-   * THE MARKETING SITE, which no layout gate has ever measured.
+   * A SECOND RECORD, FOR THE HALF OF EVERY BRANCH THE FIRST ONE CANNOT DRAW.
    *
-   * `a11y` serves it and runs `wcag21aa`; `target-size` is `wcag22aa` and axe has no overflow rule,
-   * so the one surface a stranger sees FIRST was checked for neither of the two things this gate
-   * exists for. A review applied the rule by hand and found the document scrolling sideways at 320px
-   * with the call-to-action entirely off the screen.
+   * The app renders one seed, so a screen that branches on a fact about the record has a side no gate
+   * can reach. `/settings/backups` and `/settings/billing` branch on the host, and the Cloud side
+   * shipped **eight sentences that drew nowhere**: invisible to `svelte-check`, which says nothing
+   * about a branch that cannot be taken, and counted as rendered by `dead-copy`, which greps source.
    *
-   * It sits in this list because a second build root is exactly what the variant pass already does.
-   * It is not a variant of the record. It is a different app, and the mechanism does not care.
+   * `pnpm --filter @braindog/web build` writes `build-cloud/`. If it is there,
+   * the routes that branch are measured on it too; if it is not, the run says so rather than quietly
+   * covering less. It is the same rule as `unsampled`: "we did not check this" must not look like
+   * "there was nothing here".
    */
-  /* `prerendered` IS A FACT ABOUT THIS ROOT AND NOT A WAIVER. The site makes no call, so it has
-     nothing to settle and no `data-screen` to carry, and holding it to the readiness contract would
-     be six ten-second timeouts on three pages that were finished when the document loaded. Every
-     other root here is the record app with a different record inside it. */
-  { name: 'site', root: join(REPO, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], prerendered: true },
-  { name: 'cloud', root: join(REPO, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
-  /* A record nobody has connected anything to: the two designed empty states on `/settings/agents`,
-     which `13 §5.2` gives a content contract and which no gate could reach. */
-  { name: 'quiet', root: join(REPO, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'] },
-  /* Enough decided questions for `/search` to have to cut a group that has no door: the disclosure
-     written to close *"the exact defect this route exists to fix, one door along"*. */
-  { name: 'busy', root: join(REPO, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'] },
-];
-const L = budget('layout');
-const PORT = L.port;
+  const VARIANTS = [
+    /**
+     * THE MARKETING SITE, which no layout gate has ever measured.
+     *
+     * `a11y` serves it and runs `wcag21aa`; `target-size` is `wcag22aa` and axe has no overflow rule,
+     * so the one surface a stranger sees FIRST was checked for neither of the two things this gate
+     * exists for. A review applied the rule by hand and found the document scrolling sideways at 320px
+     * with the call-to-action entirely off the screen.
+     *
+     * It sits in this list because a second build root is exactly what the variant pass already does.
+     * It is not a variant of the record. It is a different app, and the mechanism does not care.
+     */
+    /* `prerendered` IS A FACT ABOUT THIS ROOT AND NOT A WAIVER. The site makes no call, so it has
+       nothing to settle and no `data-screen` to carry, and holding it to the readiness contract would
+       be six ten-second timeouts on three pages that were finished when the document loaded. Every
+       other root here is the record app with a different record inside it. */
+    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: ['/', '/pricing', '/changelog'], prerendered: true },
+    { name: 'cloud', root: join(root, 'apps', 'web', 'build-cloud'), routes: ['/settings/backups', '/settings/billing'] },
+    /* A record nobody has connected anything to: the two designed empty states on `/settings/agents`,
+       which `13 §5.2` gives a content contract and which no gate could reach. */
+    { name: 'quiet', root: join(root, 'apps', 'web', 'build-quiet'), routes: ['/settings/agents'] },
+    /* Enough decided questions for `/search` to have to cut a group that has no door: the disclosure
+       written to close *"the exact defect this route exists to fix, one door along"*. */
+    { name: 'busy', root: join(root, 'apps', 'web', 'build-busy'), routes: ['/search?q=renewal', '/decide'] },
+  ];
+  const L = budget('layout');
+  const PORT = L.port;
 
-/**
- * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
- *
- * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` (the shared page,
- * the only surface a non-user ever sees), and neither list was compared to the route directory, so a
- * route added tomorrow was audited by neither and nothing noticed. The derivation also found
- * `/[id]`, the spoken-id resolver, which neither list had ever covered.
- *
- * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
- * track), because one sample proves the route renders and a second proves the DECLARATION does.
- */
-const { routes: ROUTES, unsampled } = await routesOf(join(REPO, 'apps', 'web'), ['/p/estate', '/p/work', '/p/kiln', '/t/3', '/nowhere']);
-if (unsampled.length) {
-  for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
-  process.exit(1);
-}
-
-/**
- * THE CONTROLS THAT DO NOT EXIST UNTIL SOMEBODY DOES SOMETHING, and this gate has never seen one.
- *
- * The sweep below measures a page AT REST: it opens a route, waits for it to settle, and reads
- * the geometry. That is the right default and it is not the whole product. Two of the targets a
- * phone actually presses are conditional markup, and both were under 44px for as long as they
- * have existed:
- *
- *   * `.capture-go`, the submit control of the register's capture line, measured 48x24. It is
- *     drawn inside `{#if capture.trim()}`, so at rest it is not in the document at all.
- *   * `.filter-value`, in the Display sheet, measured 358x34. It is the only way to sort a list
- *     or hide a column on a phone, and the sheet is closed at rest.
- *
- * Both were found by a person reading the CSS, not by this gate, on a run that reported zero
- * findings over 572 page-runs. A rule that cannot see a control cannot enforce anything about it.
- *
- * ONLY AT THE FLOOR WIDTHS, AND ONLY WHERE THERE IS AN ACT. The target-size rule turns on the
- * pointer and the pointer is emulated below 640, so a state opened at 1180px would be measured
- * against a rule that does not apply there. Three widths and two acts is six extra page-runs on
- * a sweep of five hundred and seventy-two.
- *
- * AN ACT THAT DOES NOT TAKE IS A FINDING AND NOT A SKIP. A `catch` here would give exactly the
- * green this block exists to stop being: the gate would report the state measured and have
- * measured the page behind it.
- */
-const ACTS = {
-  '/r/obligations': [
-    {
-      name: 'capture typed',
-      run: async (page) => {
-        await page.fill('#capture', 'a');
-        await page.waitForSelector('.capture-go', { timeout: 4000 });
-      },
-    },
-    {
-      name: 'Display open',
-      run: async (page) => {
-        await page.getByRole('button', { name: 'Display' }).click({ timeout: 4000 });
-        await page.waitForSelector('.filter-value', { timeout: 4000 });
-      },
-    },
-  ],
-};
-
-/** The narrowest phone still in the wild, one bigger phone, one common tablet. */
-const FLOOR = L.floorWidths;
-
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
-
-/** Every source file that could hold a media query. */
-async function* sources(dir) {
-  for (const e of await readdir(dir, { withFileTypes: true })) {
-    if (skipDir(e.name)) continue;
-    const p = join(dir, e.name);
-    if (e.isDirectory()) yield* sources(p);
-    else if (/\.(css|svelte)$/.test(e.name)) yield p;
+  /**
+   * Every route the app has, derived from the tree, plus a few extra addresses of the same routes.
+   *
+   * IT WAS TYPED OUT, AND THE TWO GATES DISAGREED. `a11y` was missing `/s/[token]` (the shared page,
+   * the only surface a non-user ever sees), and neither list was compared to the route directory, so a
+   * route added tomorrow was audited by neither and nothing noticed. The derivation also found
+   * `/[id]`, the spoken-id resolver, which neither list had ever covered.
+   *
+   * THE EXTRAS ARE SECOND ADDRESSES OF ROUTES ALREADY IN THE LIST (a different page, a different
+   * track), because one sample proves the route renders and a second proves the DECLARATION does.
+   */
+  const { routes: ROUTES, unsampled } = await routesOf(join(root, 'apps', 'web'), ['/p/estate', '/p/work', '/p/kiln', '/t/3', '/nowhere']);
+  if (unsampled.length) {
+    for (const u of unsampled) console.error(`  a route with no sample address: ${u}`);
+    return 1;
   }
-}
 
-/** The pixel widths inside `@media` conditions, in every syntax this repo uses. */
-async function breakpoints() {
-  const found = new Set();
-  for (const dir of [join(REPO, 'apps', 'web', 'src'), join(REPO, 'packages', 'skin')]) {
-    for await (const file of sources(dir)) {
-      const text = await readFile(file, 'utf8');
-      for (const m of text.matchAll(/(?:width\s*[<>]=?\s*|(?:min|max)-width:\s*)(\d+)px/g)) {
-        found.add(Number(m[1]));
-      }
+  /**
+   * THE CONTROLS THAT DO NOT EXIST UNTIL SOMEBODY DOES SOMETHING, and this gate has never seen one.
+   *
+   * The sweep below measures a page AT REST: it opens a route, waits for it to settle, and reads
+   * the geometry. That is the right default and it is not the whole product. Two of the targets a
+   * phone actually presses are conditional markup, and both were under 44px for as long as they
+   * have existed:
+   *
+   *   * `.capture-go`, the submit control of the register's capture line, measured 48x24. It is
+   *     drawn inside `{#if capture.trim()}`, so at rest it is not in the document at all.
+   *   * `.filter-value`, in the Display sheet, measured 358x34. It is the only way to sort a list
+   *     or hide a column on a phone, and the sheet is closed at rest.
+   *
+   * Both were found by a person reading the CSS, not by this gate, on a run that reported zero
+   * findings over 572 page-runs. A rule that cannot see a control cannot enforce anything about it.
+   *
+   * ONLY AT THE FLOOR WIDTHS, AND ONLY WHERE THERE IS AN ACT. The target-size rule turns on the
+   * pointer and the pointer is emulated below 640, so a state opened at 1180px would be measured
+   * against a rule that does not apply there. Three widths and two acts is six extra page-runs on
+   * a sweep of five hundred and seventy-two.
+   *
+   * AN ACT THAT DOES NOT TAKE IS A FINDING AND NOT A SKIP. A `catch` here would give exactly the
+   * green this block exists to stop being: the gate would report the state measured and have
+   * measured the page behind it.
+   */
+  const ACTS = {
+    '/r/obligations': [
+      {
+        name: 'capture typed',
+        run: async (page) => {
+          await page.fill('#capture', 'a');
+          await page.waitForSelector('.capture-go', { timeout: 4000 });
+        },
+      },
+      {
+        name: 'Display open',
+        run: async (page) => {
+          await page.getByRole('button', { name: 'Display' }).click({ timeout: 4000 });
+          await page.waitForSelector('.filter-value', { timeout: 4000 });
+        },
+      },
+    ],
+  };
+
+  /** The narrowest phone still in the wild, one bigger phone, one common tablet. */
+  const FLOOR = L.floorWidths;
+
+  const TYPES = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.woff2': 'font/woff2',
+    '.json': 'application/json',
+  };
+
+  /** Every source file that could hold a media query. */
+  async function* sources(dir) {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      if (skipDir(e.name)) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) yield* sources(p);
+      else if (/\.(css|svelte)$/.test(e.name)) yield p;
     }
   }
-  return [...found];
-}
 
-if (!(await stat(ROOT).catch(() => null))) {
-  /* EXIT 3 IS A SKIP, NOT A PASS. See the note in `bundle.mjs`. */
-  console.log('  layout: no build to check. `pnpm build` first, and CI does.');
-  process.exit(3);
-}
-
-/* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
-const record = await startRecord();
-
-/**
- * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
- *
- * It used to be `waitForSelector('#main *').catch(() => {})`, and the swallow is the part that
- * mattered: a page that had rendered nothing was measured anyway, and an empty document never
- * scrolls sideways and holds no control under 44px, so the gate would have printed `0 finding(s)`
- * over 627 page-runs of chrome and exited 0. Built from `ROOT` because the contract is a property
- * of the record app's shell and every variant of it is the same shell.
- */
-const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT);
-
-const bps = (await breakpoints()).sort((a, b) => a - b);
-/* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
-   different layouts that both have to hold. */
-const widths = [...new Set([...FLOOR, ...bps.flatMap((b) => [b - 1, b])])].sort((a, b) => a - b);
-
-/* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement. A second server
-   would be a second port, and this file already knows what a port collision costs. */
-let serving = ROOT;
-
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', 'http://x');
-  if (forwards(url.pathname)) return forward(req, res, record.base);
-  const rel = decodeURIComponent(url.pathname).slice(1);
-  if (rel.includes('..')) return res.writeHead(400).end();
-  for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-    const file = join(serving, candidate);
-    const info = await stat(file).catch(() => null);
-    if (!info?.isFile()) continue;
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
-    return createReadStream(file).pipe(res);
-  }
-  // The same SPA fallback the app is deployed behind, keyed on extensions we actually serve.
-  if (!Object.hasOwn(TYPES, extname(rel))) {
-    res.writeHead(200, { 'content-type': TYPES['.html'] });
-    return createReadStream(join(serving, 'index.html')).pipe(res);
-  }
-  res.writeHead(404).end();
-});
-await new Promise((r) => server.listen(PORT, r));
-await answers(`http://localhost:${PORT}`);
-
-const present = [];
-for (const v of VARIANTS) if (await stat(v.root).catch(() => null)) present.push(v);
-if (present.length < VARIANTS.length)
-  console.log(
-    `  layout: ${VARIANTS.length - present.length} variant(s) not built. ` +
-      `\`BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build\` measures the other half of every host branch.`,
-  );
-
-const browser = await chromium.launch();
-/**
- * WHAT ONE PAGE IS MEASURED FOR, hoisted so the variant pass runs the identical check.
- *
- * It was an inline arrow inside the width loop, which is fine while there is one loop. A second
- * pass over a second record with a COPY of this would be two rules wearing one name, the exact
- * shape this repo keeps finding. It is named once and passed to both.
- */
-const MEASURE = ([w, slack, COARSE]) => {
-      const hits = [];
-      if (document.documentElement.scrollWidth > w + slack) {
-        hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
-      }
-      /* A table wider than the page is the design. A heading wider than the page is a bug. The
-         difference is whether anything above it scrolls or clips. */
-      /* THE WALK STOPS AT THE SURFACE, and that is the whole rule. It went all the way to `body`,
-         and the shell's own `.body` panel is `overflow-y: auto`, which computes `overflow-x` to
-         `auto` as well, so EVERY element inside `#main` had a scrolling ancestor and every one of
-         them was excused. The gate could only ever see the nav and the tab bar; a 2000px heading in
-         the middle of a page was contained by the thing that makes the page scroll at all.
-
-         It went green on its own seeded violation the day a second surface got a scroll container,
-         which is the self-test doing exactly what it is for. */
-      /* THE THREE ROOTS THE SELECTOR BELOW WALKS FROM, and a `nav` INSIDE `#main` is not one of them.
-         Stopping at every `nav` excused nothing and accused plenty: the settings tab strip is a
-         `<nav>` with `overflow-x: auto`, doing exactly what a horizontal scroller does, and reading
-         it as a surface root meant its own scrolling never counted: twenty-four findings about a
-         control working as designed. A surface is where the measurement starts, not any element that
-         happens to share its tag. */
-      const surface = (el) =>
-        el.id === 'main' || el.classList.contains('tab-slot') || (el.tagName === 'NAV' && !el.closest('#main'));
-      const contained = (el) => {
-        for (let a = el.parentElement; a && a !== document.body && !surface(a); a = a.parentElement) {
-          const ox = getComputedStyle(a).overflowX;
-          if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+  /** The pixel widths inside `@media` conditions, in every syntax this repo uses. */
+  async function breakpoints() {
+    const found = new Set();
+    for (const dir of [join(root, 'apps', 'web', 'src'), join(root, 'packages', 'skin')]) {
+      for await (const file of sources(dir)) {
+        const text = await readFile(file, 'utf8');
+        for (const m of text.matchAll(/(?:width\s*[<>]=?\s*|(?:min|max)-width:\s*)(\d+)px/g)) {
+          found.add(Number(m[1]));
         }
-        return false;
-      };
-      for (const el of document.querySelectorAll('#main *, nav *, .tab-slot *')) {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.right <= w + 1) continue;
-        if (getComputedStyle(el).position === 'fixed' || contained(el)) continue;
-        hits.push(
-          `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px`,
-        );
       }
-      /**
-       * AND EVERY CONTROL IS 44 x 44, WHICH NOTHING MEASURED.
-       *
-       * `packages/skin/a11y.css` states the rule and names the exact failure it is written against:
-       * *"Both axes: a control grown only in height measures 38x44 and fails."* `13 §7` designs the
-       * targets at 44 x 44 CSS px counting `::before`, and `REPORT.md` has claimed for weeks that
-       * every route was measured on a phone with no target under 44px. Measured by hand, once, with
-       * no gate behind it. A review then found the six-option level segment on `/settings/people` at
-       * **43 x 36**, on the primary control of that screen.
-       *
-       * WCAG 2.5.8 is 24px and this product designs to 44. The gate holds the product's number.
-       *
-       * The box is the union of the element and its `::before`, because a chevron drawn as a 20px
-       * glyph inside a 44px pseudo-element is a 44px target and the element's own rect is not.
-       * Anything with zero area is not on screen and is not a target.
-       */
-      /**
-       * COARSE ONLY, AND THAT IS THE DESIGN RATHER THAN A GAP IN THE GATE.
-       *
-       * A review suggested running this on both pointers, and doing so reports every segmented
-       * control in the product: `--ctl-h` is 44 on a coarse pointer and **36 on a fine one**, and
-       * `05 §6` is explicit that density follows the pointer. 36px under a mouse is what this
-       * product chose, not a defect. WCAG 2.5.8 asks 24 and this design gives 36 there and 44 under a
-       * thumb.
-       *
-       * The skip link, which is what prompted it, is a different argument and is fixed at the
-       * control rather than here: its audience reaches it by keyboard, and it takes `--tap`.
-       */
-      if (COARSE) {
-        const box = (el) => {
-          /* A CHECKBOX OR RADIO INSIDE ITS OWN LABEL IS PRESSED THROUGH THE LABEL. The browser toggles the input on a
-             press anywhere in a wrapping `<label>`, so that box is the target, the way a `::before` is below. Only the
-             wrapping form counts: a `for=` label elsewhere on the screen is not round the control. A native box is
-             drawn at the size of the element, so a 44px input would be a 44px square of chrome; `/packs/share` gives
-             its rows `min-block-size: var(--tap)` and this is the rule that sees it. */
-          const around = el.matches('input[type="checkbox"], input[type="radio"]') ? el.closest('label') : null;
-          if (around) {
-            const l = around.getBoundingClientRect();
-            return [l.width, l.height];
-          }
-          const r = el.getBoundingClientRect();
-          const b = getComputedStyle(el, '::before');
-          const w = parseFloat(b.width);
-          const h = parseFloat(b.height);
-          return [Math.max(r.width, Number.isFinite(w) ? w : 0), Math.max(r.height, Number.isFinite(h) ? h : 0)];
-        };
-        const small = [];
-        /* THE WHOLE DOCUMENT, not `#main`. Scoping to the main region excused the shell: the skip
-           link, which is the first target a keyboard user reaches on every route, and the palette's
-           own text field. A target is a target wherever it is drawn. */
-        for (const el of document.querySelectorAll('button, a[href], [role="button"], input:not([type="hidden"]), select, summary')) {
-          if (el.closest('[hidden], [aria-hidden="true"]')) continue;
-          const [w2, h2] = box(el);
-          if (w2 === 0 || h2 === 0) continue;
-          /* HALF A PIXEL OF SLACK. A 44px control measures 43.99 whenever a border, a transform or a
-             fractional font metric lands between the box and the device pixel. `/audit`'s spoken-id
-             links reported 44x44 and failed on the raw comparison. The rule is 44 CSS px; a gate
-             that fires on rounding is a gate somebody switches off. */
-          if (w2 >= 43.5 && h2 >= 43.5) continue;
-          const name = `${el.tagName.toLowerCase()}.${String(el.className || '').split(' ').filter(Boolean).slice(0, 2).join('.')}`;
-          small.push(`${name} is ${Math.round(w2)}x${Math.round(h2)} ("${(el.textContent ?? '').trim().slice(0, 24)}")`);
-        }
-        for (const s of [...new Set(small)].slice(0, 3)) hits.push(`a target under 44px on a coarse pointer: ${s}`);
-      }
-      return [...new Set(hits)].slice(0, 4);
-};
+    }
+    return [...found];
+  }
 
-const findings = [];
-let checked = 0;
+  if (!(await stat(ROOT).catch(() => null))) {
+    /* EXIT 3 IS A SKIP, NOT A PASS. See the note in `bundle.mjs`. */
+    console.log('  layout: no build to check. `pnpm build` first, and CI does.');
+    return 3;
+  }
 
-/**
- * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE.
- *
- * `self-test.mjs` runs this whole gate a second time with `BRAINDOG_GATE_SEED` set, to prove it goes
- * red on a 2000px heading inside `#main`. It was proving that over **627 page-runs** (the full
- * sweep, every route, every width, four records and the marketing site) to establish one fact. The
- * browser work therefore ran twice on every `pnpm gates`: about 1,966 page-runs for a tree whose
- * real sweep is 627 of them, and roughly an hour of wall clock, which is this loop's binding
- * constraint.
- *
- * The seeded heading is 2000px wide, so it overflows at every width on every route: the first route
- * at the floor width proves exactly what the full sweep proved. This narrowing applies ONLY when the
- * seed is set. A real run is never scoped, so the gate cannot be quietened by an environment
- * variable.
- */
-/**
- * AND ONE VARIANT PAGE-RUN, WHICH USED TO BE NONE.
- *
- * `present.length = 0` was the line here, so the seeded run never entered the variant pass at all.
- * The pass has its own copy of the wait, its own copy of the preparation and its own copy of the
- * seed, and the comment beside that seed says it is *"what makes this pass answerable by
- * `self-test`"*. It was not: the block could not execute under the only environment that sets the
- * variable, so the second half of this gate had never once been asked to go red. That half is the
- * half that measures the marketing site and the three records the shipped seed cannot draw, which
- * is to say the half nothing else in the suite covers.
- *
- * ONE VARIANT AND ONE OF ITS ROUTES, for the reason the paragraph above gives about the main loop:
- * a 2000px heading overflows at every width on every route, so the first of each proves what the
- * whole sweep proves and the rest is wall clock. Which variant it is depends on what has been
- * built, and the pass is the same code whichever it is.
- *
- * A RUN WITH NO VARIANT BUILT SAYS SO, because "we did not check this" must not look like "there
- * was nothing here". `self-test` reads that sentence and reports the variant half as unproved
- * rather than counting it.
- */
-if (process.env.BRAINDOG_GATE_SEED) {
-  widths.length = 1;
-  ROUTES.length = 1;
-  present.length = Math.min(present.length, 1);
-  if (present.length === 0) console.log('  layout: no variant is built, so the variant pass is not under test on this run.');
-  else present[0] = { ...present[0], routes: present[0].routes.slice(0, 1) };
-}
+  /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
+  const record = await startRecord();
 
-for (const width of widths) {
   /**
-   * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
+   * WHAT THIS GATE IS ALLOWED TO CALL A MEASUREMENT.
    *
-   * `05 §6` and `13 §7`: density follows the POINTER, never the width. `--ctl-h` is 44 on a coarse
-   * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
-   * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
-   * measure every width this product has and never once see the size a thumb gets.
+   * It used to be `waitForSelector('#main *').catch(() => {})`, and the swallow is the part that
+   * mattered: a page that had rendered nothing was measured anyway, and an empty document never
+   * scrolls sideways and holds no control under 44px, so the gate would have printed `0 finding(s)`
+   * over 627 page-runs of chrome and exited 0. Built from `ROOT` because the contract is a property
+   * of the record app's shell and every variant of it is the same shell.
    */
-  const context = await browser.newContext({
-    viewport: { width, height: L.viewportHeightPx },
-    reducedMotion: 'reduce',
-    hasTouch: width < 640,
-    isMobile: width < 640,
+  const ready = readiness('layout', budget('ready').settleTimeoutMs, ROOT);
+
+  const bps = (await breakpoints()).sort((a, b) => a - b);
+  /* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
+     different layouts that both have to hold. */
+  const widths = [...new Set([...FLOOR, ...bps.flatMap((b) => [b - 1, b])])].sort((a, b) => a - b);
+
+  /* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement. A second server
+     would be a second port, and this file already knows what a port collision costs. */
+  let serving = ROOT;
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', 'http://x');
+    if (forwards(url.pathname)) return forward(req, res, record.base);
+    const rel = decodeURIComponent(url.pathname).slice(1);
+    if (rel.includes('..')) return res.writeHead(400).end();
+    for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
+      const file = join(serving, candidate);
+      const info = await stat(file).catch(() => null);
+      if (!info?.isFile()) continue;
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+      return createReadStream(file).pipe(res);
+    }
+    // The same SPA fallback the app is deployed behind, keyed on extensions we actually serve.
+    if (!Object.hasOwn(TYPES, extname(rel))) {
+      res.writeHead(200, { 'content-type': TYPES['.html'] });
+      return createReadStream(join(serving, 'index.html')).pipe(res);
+    }
+    res.writeHead(404).end();
   });
-  const page = await context.newPage();
-  process.stdout.write(`    ${String(width).padStart(4)}px `);
+  await new Promise((r) => server.listen(PORT, r));
+  await answers(`http://localhost:${PORT}`);
 
-  for (const route of ROUTES) {
-    await recordFor(page, route);
-    await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-    /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
-       served off disk is a script tag that imports the client, and `#main` does not exist until it
-       has run. This wait is the only thing between the gate and an empty document, which is why its
-       expiry is a finding and not a `catch`. */
-    const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
-    if (unmeasured) {
-      findings.push(unmeasured);
-      process.stdout.write('!');
-      continue;
-    }
-    // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
-    await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-    /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
-       is put into `#main` (the exact bug this gate is named after) and the run must go red. It is
-       here rather than in a fixture tree because the thing under test is a real browser over a real
-       build, and there is no smaller way to hold that. */
-    if (process.env.BRAINDOG_GATE_SEED)
-      await page.evaluate(() => {
-        const h = document.createElement('h2');
-        h.textContent = 'seeded';
-        h.style.cssText = 'width:2000px;white-space:nowrap';
-        document.getElementById('main')?.prepend(h);
-      });
-    await page.waitForTimeout(L.settleMs);
+  const present = [];
+  for (const v of VARIANTS) if (await stat(v.root).catch(() => null)) present.push(v);
+  if (present.length < VARIANTS.length)
+    console.log(
+      `  layout: ${VARIANTS.length - present.length} variant(s) not built. ` +
+        `\`BRAINDOG_VARIANT=cloud pnpm --filter @braindog/web build\` measures the other half of every host branch.`,
+    );
 
-
-    const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
-
-    checked++;
-    process.stdout.write(out.length ? '!' : '.');
-    for (const o of out) findings.push(`${route} @${width}  ${o}`);
-
-    /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` is the phone
-       set; above it the pointer is fine and a 34px control is the density this product means. */
-    if (FLOOR.includes(width))
-      for (const act of ACTS[route] ?? []) {
-        try {
-          await act.run(page);
-        } catch (e) {
-          findings.push(`${route} @${width}  could not reach "${act.name}": ${String(e).split('\n')[0]}`);
-          process.stdout.write('!');
-          continue;
+  const browser = await chromium.launch();
+  /**
+   * WHAT ONE PAGE IS MEASURED FOR, hoisted so the variant pass runs the identical check.
+   *
+   * It was an inline arrow inside the width loop, which is fine while there is one loop. A second
+   * pass over a second record with a COPY of this would be two rules wearing one name, the exact
+   * shape this repo keeps finding. It is named once and passed to both.
+   */
+  const MEASURE = ([w, slack, COARSE]) => {
+        const hits = [];
+        if (document.documentElement.scrollWidth > w + slack) {
+          hits.push(`the DOCUMENT scrolls sideways (${document.documentElement.scrollWidth}px)`);
         }
-        await page.waitForTimeout(L.settleMs);
-        const after = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
-        checked++;
-        process.stdout.write(after.length ? '!' : ':');
-        for (const o of after) findings.push(`${route} @${width} (${act.name})  ${o}`);
-        /* BACK TO REST, because the acts share one page and the next one must not open its sheet
-           over the last one's. A reload is cheaper to reason about than an undo per act. */
-        await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-        await ready.settled(page);
-        await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-      }
+        /* A table wider than the page is the design. A heading wider than the page is a bug. The
+           difference is whether anything above it scrolls or clips. */
+        /* THE WALK STOPS AT THE SURFACE, and that is the whole rule. It went all the way to `body`,
+           and the shell's own `.body` panel is `overflow-y: auto`, which computes `overflow-x` to
+           `auto` as well, so EVERY element inside `#main` had a scrolling ancestor and every one of
+           them was excused. The gate could only ever see the nav and the tab bar; a 2000px heading in
+           the middle of a page was contained by the thing that makes the page scroll at all.
+
+           It went green on its own seeded violation the day a second surface got a scroll container,
+           which is the self-test doing exactly what it is for. */
+        /* THE THREE ROOTS THE SELECTOR BELOW WALKS FROM, and a `nav` INSIDE `#main` is not one of them.
+           Stopping at every `nav` excused nothing and accused plenty: the settings tab strip is a
+           `<nav>` with `overflow-x: auto`, doing exactly what a horizontal scroller does, and reading
+           it as a surface root meant its own scrolling never counted: twenty-four findings about a
+           control working as designed. A surface is where the measurement starts, not any element that
+           happens to share its tag. */
+        const surface = (el) =>
+          el.id === 'main' || el.classList.contains('tab-slot') || (el.tagName === 'NAV' && !el.closest('#main'));
+        const contained = (el) => {
+          for (let a = el.parentElement; a && a !== document.body && !surface(a); a = a.parentElement) {
+            const ox = getComputedStyle(a).overflowX;
+            if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+          }
+          return false;
+        };
+        for (const el of document.querySelectorAll('#main *, nav *, .tab-slot *')) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.right <= w + 1) continue;
+          if (getComputedStyle(el).position === 'fixed' || contained(el)) continue;
+          hits.push(
+            `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} reaches ${Math.round(r.right)}px`,
+          );
+        }
+        /**
+         * AND EVERY CONTROL IS 44 x 44, WHICH NOTHING MEASURED.
+         *
+         * `packages/skin/a11y.css` states the rule and names the exact failure it is written against:
+         * *"Both axes: a control grown only in height measures 38x44 and fails."* `13 §7` designs the
+         * targets at 44 x 44 CSS px counting `::before`, and `REPORT.md` has claimed for weeks that
+         * every route was measured on a phone with no target under 44px. Measured by hand, once, with
+         * no gate behind it. A review then found the six-option level segment on `/settings/people` at
+         * **43 x 36**, on the primary control of that screen.
+         *
+         * WCAG 2.5.8 is 24px and this product designs to 44. The gate holds the product's number.
+         *
+         * The box is the union of the element and its `::before`, because a chevron drawn as a 20px
+         * glyph inside a 44px pseudo-element is a 44px target and the element's own rect is not.
+         * Anything with zero area is not on screen and is not a target.
+         */
+        /**
+         * COARSE ONLY, AND THAT IS THE DESIGN RATHER THAN A GAP IN THE GATE.
+         *
+         * A review suggested running this on both pointers, and doing so reports every segmented
+         * control in the product: `--ctl-h` is 44 on a coarse pointer and **36 on a fine one**, and
+         * `05 §6` is explicit that density follows the pointer. 36px under a mouse is what this
+         * product chose, not a defect. WCAG 2.5.8 asks 24 and this design gives 36 there and 44 under a
+         * thumb.
+         *
+         * The skip link, which is what prompted it, is a different argument and is fixed at the
+         * control rather than here: its audience reaches it by keyboard, and it takes `--tap`.
+         */
+        if (COARSE) {
+          const box = (el) => {
+            /* A CHECKBOX OR RADIO INSIDE ITS OWN LABEL IS PRESSED THROUGH THE LABEL. The browser toggles the input on a
+               press anywhere in a wrapping `<label>`, so that box is the target, the way a `::before` is below. Only the
+               wrapping form counts: a `for=` label elsewhere on the screen is not round the control. A native box is
+               drawn at the size of the element, so a 44px input would be a 44px square of chrome; `/packs/share` gives
+               its rows `min-block-size: var(--tap)` and this is the rule that sees it. */
+            const around = el.matches('input[type="checkbox"], input[type="radio"]') ? el.closest('label') : null;
+            if (around) {
+              const l = around.getBoundingClientRect();
+              return [l.width, l.height];
+            }
+            const r = el.getBoundingClientRect();
+            const b = getComputedStyle(el, '::before');
+            const w = parseFloat(b.width);
+            const h = parseFloat(b.height);
+            return [Math.max(r.width, Number.isFinite(w) ? w : 0), Math.max(r.height, Number.isFinite(h) ? h : 0)];
+          };
+          const small = [];
+          /* THE WHOLE DOCUMENT, not `#main`. Scoping to the main region excused the shell: the skip
+             link, which is the first target a keyboard user reaches on every route, and the palette's
+             own text field. A target is a target wherever it is drawn. */
+          for (const el of document.querySelectorAll('button, a[href], [role="button"], input:not([type="hidden"]), select, summary')) {
+            if (el.closest('[hidden], [aria-hidden="true"]')) continue;
+            const [w2, h2] = box(el);
+            if (w2 === 0 || h2 === 0) continue;
+            /* HALF A PIXEL OF SLACK. A 44px control measures 43.99 whenever a border, a transform or a
+               fractional font metric lands between the box and the device pixel. `/audit`'s spoken-id
+               links reported 44x44 and failed on the raw comparison. The rule is 44 CSS px; a gate
+               that fires on rounding is a gate somebody switches off. */
+            if (w2 >= 43.5 && h2 >= 43.5) continue;
+            const name = `${el.tagName.toLowerCase()}.${String(el.className || '').split(' ').filter(Boolean).slice(0, 2).join('.')}`;
+            small.push(`${name} is ${Math.round(w2)}x${Math.round(h2)} ("${(el.textContent ?? '').trim().slice(0, 24)}")`);
+          }
+          for (const s of [...new Set(small)].slice(0, 3)) hits.push(`a target under 44px on a coarse pointer: ${s}`);
+        }
+        return [...new Set(hits)].slice(0, 4);
+  };
+
+  const findings = [];
+  let checked = 0;
+
+  /**
+   * A SEEDED RUN IS A NEGATIVE, AND A NEGATIVE NEEDS ONE PAGE.
+   *
+   * `self-test.mjs` runs this whole gate a second time with `BRAINDOG_GATE_SEED` set, to prove it goes
+   * red on a 2000px heading inside `#main`. It was proving that over **627 page-runs** (the full
+   * sweep, every route, every width, four records and the marketing site) to establish one fact. The
+   * browser work therefore ran twice on every `pnpm gates`: about 1,966 page-runs for a tree whose
+   * real sweep is 627 of them, and roughly an hour of wall clock, which is this loop's binding
+   * constraint.
+   *
+   * The seeded heading is 2000px wide, so it overflows at every width on every route: the first route
+   * at the floor width proves exactly what the full sweep proved. This narrowing applies ONLY when the
+   * seed is set. A real run is never scoped, so the gate cannot be quietened by an environment
+   * variable.
+   */
+  /**
+   * AND ONE VARIANT PAGE-RUN, WHICH USED TO BE NONE.
+   *
+   * `present.length = 0` was the line here, so the seeded run never entered the variant pass at all.
+   * The pass has its own copy of the wait, its own copy of the preparation and its own copy of the
+   * seed, and the comment beside that seed says it is *"what makes this pass answerable by
+   * `self-test`"*. It was not: the block could not execute under the only environment that sets the
+   * variable, so the second half of this gate had never once been asked to go red. That half is the
+   * half that measures the marketing site and the three records the shipped seed cannot draw, which
+   * is to say the half nothing else in the suite covers.
+   *
+   * ONE VARIANT AND ONE OF ITS ROUTES, for the reason the paragraph above gives about the main loop:
+   * a 2000px heading overflows at every width on every route, so the first of each proves what the
+   * whole sweep proves and the rest is wall clock. Which variant it is depends on what has been
+   * built, and the pass is the same code whichever it is.
+   *
+   * A RUN WITH NO VARIANT BUILT SAYS SO, because "we did not check this" must not look like "there
+   * was nothing here". `self-test` reads that sentence and reports the variant half as unproved
+   * rather than counting it.
+   */
+  if (process.env.BRAINDOG_GATE_SEED) {
+    widths.length = 1;
+    ROUTES.length = 1;
+    present.length = Math.min(present.length, 1);
+    if (present.length === 0) console.log('  layout: no variant is built, so the variant pass is not under test on this run.');
+    else present[0] = { ...present[0], routes: present[0].routes.slice(0, 1) };
   }
-  process.stdout.write('\n');
-  await context.close();
-}
 
-/**
- * The variants, at the widths that matter for them.
- *
- * Only the routes that branch, and only on a phone and a desktop. The point is that the OTHER half
- * of the branch is drawn at all and holds together, not a second full sweep of a build that differs
- * from the first by one constant.
- */
-/* The floor and a desktop. `FLOOR` is the gate's own. A numeric literal here would be the
-   thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
-const variantWidths = [...FLOOR, bps[bps.length - 1] ?? 1_200];
-/* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
-   what four of them prove, and the other three are three browser contexts on every `pnpm gates`. */
-if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
-
-for (const v of present) {
-  serving = v.root;
-  for (const width of variantWidths) {
+  for (const width of widths) {
+    /**
+     * A COARSE POINTER AT PHONE WIDTHS, because that is the axis the target-size rule turns on.
+     *
+     * `05 §6` and `13 §7`: density follows the POINTER, never the width. `--ctl-h` is 44 on a coarse
+     * pointer and **36** on a fine one, measured in the built page. (Two comments in this repo say 32,
+     * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
+     * measure every width this product has and never once see the size a thumb gets.
+     */
     const context = await browser.newContext({
       viewport: { width, height: L.viewportHeightPx },
       reducedMotion: 'reduce',
@@ -516,22 +447,27 @@ for (const v of present) {
       isMobile: width < 640,
     });
     const page = await context.newPage();
-    process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
-    for (const route of v.routes) {
+    process.stdout.write(`    ${String(width).padStart(4)}px `);
+
+    for (const route of ROUTES) {
+      await recordFor(page, route);
       await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
-      /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
-         over nothing. The site is prerendered and says so in `VARIANTS`. */
-      const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
+      /* `domcontentloaded` IS WORTH NOTHING ON ITS OWN HERE and never was: `ssr = false`, so the shell
+         served off disk is a script tag that imports the client, and `#main` does not exist until it
+         has run. This wait is the only thing between the gate and an empty document, which is why its
+         expiry is a finding and not a `catch`. */
+      const unmeasured = ready.check(`${route} @${width}`, route, await ready.settled(page));
       if (unmeasured) {
         findings.push(unmeasured);
         process.stdout.write('!');
         continue;
       }
-      /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
-         rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
-         `self-test`, which otherwise passes on the main loop alone however little the variant pass
-         measures. */
+      // An un-laid-out rowgroup has no geometry: it cannot overflow, and it cannot be measured.
       await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+      /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. With `BRAINDOG_GATE_SEED=1` a 2000px heading
+         is put into `#main` (the exact bug this gate is named after) and the run must go red. It is
+         here rather than in a fixture tree because the thing under test is a real browser over a real
+         build, and there is no smaller way to hold that. */
       if (process.env.BRAINDOG_GATE_SEED)
         await page.evaluate(() => {
           const h = document.createElement('h2');
@@ -540,41 +476,130 @@ for (const v of present) {
           document.getElementById('main')?.prepend(h);
         });
       await page.waitForTimeout(L.settleMs);
+
+
       const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+
       checked++;
       process.stdout.write(out.length ? '!' : '.');
-      for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
+      for (const o of out) findings.push(`${route} @${width}  ${o}`);
+
+      /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` is the phone
+         set; above it the pointer is fine and a 34px control is the density this product means. */
+      if (FLOOR.includes(width))
+        for (const act of ACTS[route] ?? []) {
+          try {
+            await act.run(page);
+          } catch (e) {
+            findings.push(`${route} @${width}  could not reach "${act.name}": ${String(e).split('\n')[0]}`);
+            process.stdout.write('!');
+            continue;
+          }
+          await page.waitForTimeout(L.settleMs);
+          const after = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+          checked++;
+          process.stdout.write(after.length ? '!' : ':');
+          for (const o of after) findings.push(`${route} @${width} (${act.name})  ${o}`);
+          /* BACK TO REST, because the acts share one page and the next one must not open its sheet
+             over the last one's. A reload is cheaper to reason about than an undo per act. */
+          await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+          await ready.settled(page);
+          await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+        }
     }
     process.stdout.write('\n');
     await context.close();
   }
+
+  /**
+   * The variants, at the widths that matter for them.
+   *
+   * Only the routes that branch, and only on a phone and a desktop. The point is that the OTHER half
+   * of the branch is drawn at all and holds together, not a second full sweep of a build that differs
+   * from the first by one constant.
+   */
+  /* The floor and a desktop. `FLOOR` is the gate's own. A numeric literal here would be the
+     thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
+  const variantWidths = [...FLOOR, bps[bps.length - 1] ?? 1_200];
+  /* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
+     what four of them prove, and the other three are three browser contexts on every `pnpm gates`. */
+  if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
+
+  for (const v of present) {
+    serving = v.root;
+    for (const width of variantWidths) {
+      const context = await browser.newContext({
+        viewport: { width, height: L.viewportHeightPx },
+        reducedMotion: 'reduce',
+        hasTouch: width < 640,
+        isMobile: width < 640,
+      });
+      const page = await context.newPage();
+      process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
+      for (const route of v.routes) {
+        await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded' });
+        /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
+           over nothing. The site is prerendered and says so in `VARIANTS`. */
+        const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
+        if (unmeasured) {
+          findings.push(unmeasured);
+          process.stdout.write('!');
+          continue;
+        }
+        /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
+           rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
+           `self-test`, which otherwise passes on the main loop alone however little the variant pass
+           measures. */
+        await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+        if (process.env.BRAINDOG_GATE_SEED)
+          await page.evaluate(() => {
+            const h = document.createElement('h2');
+            h.textContent = 'seeded';
+            h.style.cssText = 'width:2000px;white-space:nowrap';
+            document.getElementById('main')?.prepend(h);
+          });
+        await page.waitForTimeout(L.settleMs);
+        const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+        checked++;
+        process.stdout.write(out.length ? '!' : '.');
+        for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
+      }
+      process.stdout.write('\n');
+      await context.close();
+    }
+  }
+  serving = ROOT;
+
+  await browser.close();
+  server.close();
+  await record.close();
+
+  console.log(
+    `  layout: ${checked} page-runs over ${widths.length} widths ` +
+      `(${bps.join(', ')} + floor), ${findings.length} finding(s)`,
+  );
+
+  for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);
+  if (findings.length > L.findingsShown) console.error(`      ...and ${findings.length - L.findingsShown} more`);
+
+  /**
+   * AND A SWEEP THAT NEVER SAW THE RECORD IS RED, however clean every page in it was.
+   *
+   * This is the one thing the per-page check cannot say. A host answering nothing draws the error card
+   * on every route and a record with nothing in it draws the empty one, and both of those sweep to
+   * `0 finding(s)`: an `Empty` card is `max-inline-size: 56ch` and cannot overflow at any width. The
+   * gate exists to measure a table, a card list and a row, so a run that measured none of them is a
+   * run that asserted nothing about the thing it is for.
+   */
+  const blind = ready.nothingDrawn();
+  if (blind) console.error(`  ${blind}`);
+
+  /* ONE ANSWER AT THE END RATHER THAN TWO WRITES TO `process.exitCode`, because a called gate returns
+     once and a gate that returned twice would return the first one. The two conditions are the two
+     that were there: a finding at any width, or a sweep that never saw the record. */
+  if (findings.length || blind) return 1;
 }
-serving = ROOT;
 
-await browser.close();
-server.close();
-await record.close();
-
-console.log(
-  `  layout: ${checked} page-runs over ${widths.length} widths ` +
-    `(${bps.join(', ')} + floor), ${findings.length} finding(s)`,
-);
-
-for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);
-if (findings.length > L.findingsShown) console.error(`      ...and ${findings.length - L.findingsShown} more`);
-if (findings.length) process.exitCode = 1;
-
-/**
- * AND A SWEEP THAT NEVER SAW THE RECORD IS RED, however clean every page in it was.
- *
- * This is the one thing the per-page check cannot say. A host answering nothing draws the error card
- * on every route and a record with nothing in it draws the empty one, and both of those sweep to
- * `0 finding(s)`: an `Empty` card is `max-inline-size: 56ch` and cannot overflow at any width. The
- * gate exists to measure a table, a card list and a row, so a run that measured none of them is a
- * run that asserted nothing about the thing it is for.
- */
-const blind = ready.nothingDrawn();
-if (blind) {
-  console.error(`  ${blind}`);
-  process.exitCode = 1;
-}
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=1` and the
+   header documents `node tools/gates/layout.mjs`. `?? 0` because a pass returns nothing. */
+if (import.meta.main) process.exitCode = (await layout()) ?? 0;

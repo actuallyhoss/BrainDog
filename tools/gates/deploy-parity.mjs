@@ -52,9 +52,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const build = join(root, 'apps', 'web', 'build');
-
 /**
  * THE TWO PREREQUISITES, FOR THE RUNNER TO CHECK RATHER THAN THIS FILE (`52 §5.1` step 2). This is
  * the only gate that declares two, and `host` is the only prerequisite in the table that is not a
@@ -74,130 +71,153 @@ const PATHS = ['/', '/_app/version.json'];
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-/** `/` on the host is `index.html` in the build; the other path is itself. */
-const localOf = (path) => join(build, path === '/' ? 'index.html' : path.slice(1));
+/**
+ * THE WHOLE GATE, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
+ *
+ * `needs` IS READ OFF THE MODULE NOW, WHICH MATTERS MORE HERE THAN ANYWHERE ELSE IN THE DIRECTORY.
+ * This is the only gate that declares two prerequisites and the only one whose prerequisite is not a
+ * file, and the runner reads both off this module before it calls anything: the value the gate holds
+ * rather than a line read out of its text.
+ *
+ * THE ROOT IS AN ARGUMENT, and it defaults to this file's own two directories up, which is what the
+ * constant it replaces computed. Nothing here has ever read `process.cwd()`, so the default is the
+ * same answer the gate gave when it was a script.
+ *
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default async function deployParity(root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')) {
+  const build = join(root, 'apps', 'web', 'build');
 
-const host = process.env.DEPLOY_HOST;
-const expected = process.env.BRAINDOG_BUILD;
+  /** `/` on the host is `index.html` in the build; the other path is itself. */
+  const localOf = (path) => join(build, path === '/' ? 'index.html' : path.slice(1));
 
-let local;
-try {
-  local = new Map(PATHS.map((path) => [path, readFileSync(localOf(path))]));
-} catch {
-  local = null;
-}
+  const host = process.env.DEPLOY_HOST;
+  const expected = process.env.BRAINDOG_BUILD;
 
-/* THE PREREQUISITES, NAMED IN THE SKIP so the sentence that arrives says what to do about it
-   (52 §4). `BRAINDOG_BUILD` is not in this condition: a deploy always sets it, and a run that has
-   the host and the build without it should say so as a finding rather than disappear as a skip.
-
-   ONLY THE ONES ACTUALLY ABSENT ARE NAMED. The line was a constant reading 'needs DEPLOY_HOST and
-   apps/web/build', and on a developer's machine the build is usually there and the variable never
-   is: the sentence sent a person off to rebuild what they had already built, to fix something else.
-   A skip is worth printing only if the next thing the reader does is the thing that removes it. */
-const want = [];
-if (!host) want.push('DEPLOY_HOST to name the host to compare against');
-if (!local) want.push('a local build, from `pnpm --filter @braindog/web build`');
-if (want.length > 0) {
-  console.log(`  deploy-parity: nothing was compared, because this needs ${want.join(' and ')}.`);
-  process.exit(3);
-}
-
-/** One fetch, uncached, with the budget's own ceiling rather than the runtime's default of none. */
-const fetchOnce = (path) =>
-  fetch(`https://${host}${path}`, {
-    headers: { 'Cache-Control': 'no-cache' },
-    signal: AbortSignal.timeout(20_000),
-    redirect: 'manual',
-  });
-
-/** The two byte comparisons want the body or nothing, so anything but a 2xx is the finding itself. */
-const get = async (path) => {
-  const out = await fetchOnce(path);
-  if (!out.ok) throw new Error(`${out.status} from https://${host}${path}`);
-  return out;
-};
-
-const BUILD = '/.well-known/braindog-build';
-
-/** Everything this gate asks the host, once. Returns the findings of that single look. */
-const look = async () => {
-  const seen = [];
-
-  for (const path of PATHS) {
-    try {
-      const out = await get(path);
-      const live = sha256(Buffer.from(await out.arrayBuffer()));
-      const built = sha256(local.get(path));
-      if (live !== built) {
-        seen.push(`live ${path} differs: host serves ${live.slice(0, 12)}, build is ${built.slice(0, 12)}`);
-      }
-    } catch (err) {
-      seen.push(`live ${path} differs: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  /* AND THE WORKER'S OWN ANSWER. The two hashes above can both match while the code serving them is
-     last week's, because assets and code are one version only if the version is the one deployed. */
+  let local;
   try {
-    /* WHATEVER COMES BACK IS READ, INCLUDING A REFUSAL, which is why this one does not go through
-       `get`. A host still serving the version before this route existed answers the router's 404
-       here, and the code in that body is a far more useful sentence than the status alone. */
-    const out = await fetchOnce(BUILD);
-    const said = await out.json();
-    const app = typeof said?.app === 'string' ? said.app : '';
-    /* A REFUSAL IS NOT A FAILED DEPLOY, and printing it as one sends whoever is on call to the wrong
-       place entirely. Read as an absent tuple, a refusal is word for word what a deploy which never
-       landed looks like, and it is the more alarming of the two readings. The gate cannot tell you
-       the deploy is good in this case, and it must not imply the opposite. This path takes no
-       credential, so the refusal to expect here is a host whose version predates the route rather
-       than one asking for a bearer, and the two are told apart by the code the host itself names. */
-    const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
-    if (refused) seen.push(`live app tuple went unread: the host refused ${BUILD} with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
-    else if (!out.ok) seen.push(`live app tuple is unreadable: ${out.status} from https://${host}${BUILD}`);
-    else if (!expected) seen.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
-    else if (app !== expected) seen.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
-  } catch (err) {
-    seen.push(`live app tuple is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+    local = new Map(PATHS.map((path) => [path, readFileSync(localOf(path))]));
+  } catch {
+    local = null;
   }
 
-  return seen;
-};
+  /* THE PREREQUISITES, NAMED IN THE SKIP so the sentence that arrives says what to do about it
+     (52 §4). `BRAINDOG_BUILD` is not in this condition: a deploy always sets it, and a run that has
+     the host and the build without it should say so as a finding rather than disappear as a skip.
 
-/* THE SETTLE WINDOW, AND WHY ASKING ONCE WAS WRONG.
-   `wrangler deploy` returning is not the host being consistent. The deploy of `c96a962` uploaded
-   correctly and this gate, asking one second later, was handed the previous version's bytes and
-   called a good deploy broken. Both paths matched the build exactly when asked again a few minutes
-   afterwards, so the first failure this gate ever reported against production was its own timing.
+     ONLY THE ONES ACTUALLY ABSENT ARE NAMED. The line was a constant reading 'needs DEPLOY_HOST and
+     apps/web/build', and on a developer's machine the build is usually there and the variable never
+     is: the sentence sent a person off to rebuild what they had already built, to fix something else.
+     A skip is worth printing only if the next thing the reader does is the thing that removes it. */
+  const want = [];
+  if (!host) want.push('DEPLOY_HOST to name the host to compare against');
+  if (!local) want.push('a local build, from `pnpm --filter @braindog/web build`');
+  if (want.length > 0) {
+    console.log(`  deploy-parity: nothing was compared, because this needs ${want.join(' and ')}.`);
+    return 3;
+  }
 
-   A HOST THAT HAS NOT PROPAGATED YET AND A HOST SERVING STALE BYTES FOREVER ARE THE SAME PICTURE AT
-   ONE SECOND. Only the second is the failure this gate was written to catch, and the only thing that
-   tells them apart is elapsed time. So the gate asks until the answer settles or the window closes.
-   It still goes red if the host never catches up, which is the entire point of it, and a deploy that
-   needed the wait says so in its output rather than passing silently, because a host that takes a
-   minute to serve what it was given is worth knowing about even when it gets there. */
-const WINDOW_MS = 120_000;
-const GAP_MS = 10_000;
+  /** One fetch, uncached, with the budget's own ceiling rather than the runtime's default of none. */
+  const fetchOnce = (path) =>
+    fetch(`https://${host}${path}`, {
+      headers: { 'Cache-Control': 'no-cache' },
+      signal: AbortSignal.timeout(20_000),
+      redirect: 'manual',
+    });
 
-const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+  /** The two byte comparisons want the body or nothing, so anything but a 2xx is the finding itself. */
+  const get = async (path) => {
+    const out = await fetchOnce(path);
+    if (!out.ok) throw new Error(`${out.status} from https://${host}${path}`);
+    return out;
+  };
 
-const startedAt = Date.now();
-let findings = await look();
-let settled = 0;
+  const BUILD = '/.well-known/braindog-build';
 
-while (findings.length > 0 && Date.now() - startedAt + GAP_MS < WINDOW_MS) {
-  await sleep(GAP_MS);
-  findings = await look();
-  settled = Math.round((Date.now() - startedAt) / 1000);
+  /** Everything this gate asks the host, once. Returns the findings of that single look. */
+  const look = async () => {
+    const seen = [];
+
+    for (const path of PATHS) {
+      try {
+        const out = await get(path);
+        const live = sha256(Buffer.from(await out.arrayBuffer()));
+        const built = sha256(local.get(path));
+        if (live !== built) {
+          seen.push(`live ${path} differs: host serves ${live.slice(0, 12)}, build is ${built.slice(0, 12)}`);
+        }
+      } catch (err) {
+        seen.push(`live ${path} differs: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* AND THE WORKER'S OWN ANSWER. The two hashes above can both match while the code serving them is
+       last week's, because assets and code are one version only if the version is the one deployed. */
+    try {
+      /* WHATEVER COMES BACK IS READ, INCLUDING A REFUSAL, which is why this one does not go through
+         `get`. A host still serving the version before this route existed answers the router's 404
+         here, and the code in that body is a far more useful sentence than the status alone. */
+      const out = await fetchOnce(BUILD);
+      const said = await out.json();
+      const app = typeof said?.app === 'string' ? said.app : '';
+      /* A REFUSAL IS NOT A FAILED DEPLOY, and printing it as one sends whoever is on call to the wrong
+         place entirely. Read as an absent tuple, a refusal is word for word what a deploy which never
+         landed looks like, and it is the more alarming of the two readings. The gate cannot tell you
+         the deploy is good in this case, and it must not imply the opposite. This path takes no
+         credential, so the refusal to expect here is a host whose version predates the route rather
+         than one asking for a bearer, and the two are told apart by the code the host itself names. */
+      const refused = typeof said?.refusal?.code === 'string' ? said.refusal.code : '';
+      if (refused) seen.push(`live app tuple went unread: the host refused ${BUILD} with ${refused}, so this check never got in. That is not evidence either way about the deploy`);
+      else if (!out.ok) seen.push(`live app tuple is unreadable: ${out.status} from https://${host}${BUILD}`);
+      else if (!expected) seen.push(`live app tuple is ${app || 'absent'}, and BRAINDOG_BUILD was not set to compare it against`);
+      else if (app !== expected) seen.push(`live app tuple is ${app || 'absent'}, expected ${expected}`);
+    } catch (err) {
+      seen.push(`live app tuple is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    return seen;
+  };
+
+  /* THE SETTLE WINDOW, AND WHY ASKING ONCE WAS WRONG.
+     `wrangler deploy` returning is not the host being consistent. The deploy of `c96a962` uploaded
+     correctly and this gate, asking one second later, was handed the previous version's bytes and
+     called a good deploy broken. Both paths matched the build exactly when asked again a few minutes
+     afterwards, so the first failure this gate ever reported against production was its own timing.
+
+     A HOST THAT HAS NOT PROPAGATED YET AND A HOST SERVING STALE BYTES FOREVER ARE THE SAME PICTURE AT
+     ONE SECOND. Only the second is the failure this gate was written to catch, and the only thing that
+     tells them apart is elapsed time. So the gate asks until the answer settles or the window closes.
+     It still goes red if the host never catches up, which is the entire point of it, and a deploy that
+     needed the wait says so in its output rather than passing silently, because a host that takes a
+     minute to serve what it was given is worth knowing about even when it gets there. */
+  const WINDOW_MS = 120_000;
+  const GAP_MS = 10_000;
+
+  const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+  const startedAt = Date.now();
+  let findings = await look();
+  let settled = 0;
+
+  while (findings.length > 0 && Date.now() - startedAt + GAP_MS < WINDOW_MS) {
+    await sleep(GAP_MS);
+    findings = await look();
+    settled = Math.round((Date.now() - startedAt) / 1000);
+  }
+
+  for (const what of findings) console.log(`  ${what}`);
+
+  if (findings.length > 0) {
+    console.log(`  none of this settled in the ${Math.round(WINDOW_MS / 1000)}s allowed, so it is the deploy rather than propagation`);
+  } else if (settled > 0) {
+    console.log(`  the host needed ${settled}s to serve what it was given, which is slow but correct`);
+  }
+
+  console.log(`  deploy-parity: ${host}, ${PATHS.length + 1} path(s), ${findings.length} finding(s)`);
+  if (findings.length > 0) return 1;
 }
 
-for (const what of findings) console.log(`  ${what}`);
-
-if (findings.length > 0) {
-  console.log(`  none of this settled in the ${Math.round(WINDOW_MS / 1000)}s allowed, so it is the deploy rather than propagation`);
-} else if (settled > 0) {
-  console.log(`  the host needed ${settled}s to serve what it was given, which is slow but correct`);
-}
-
-console.log(`  deploy-parity: ${host}, ${PATHS.length + 1} path(s), ${findings.length} finding(s)`);
-if (findings.length > 0) process.exitCode = 1;
+/* AND IT IS STILL A SCRIPT, because the header documents `node tools/gates/deploy-parity.mjs` and
+   `deploy.yml` is entitled to run the file directly. `?? 0` because a pass returns nothing. */
+if (import.meta.main) process.exitCode = (await deployParity()) ?? 0;

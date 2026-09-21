@@ -19,8 +19,13 @@
  * so nothing else in the copy is ever executed: the other files are there because the runner reads
  * the directory to check that every gate file is registered.
  *
- * `bundle` IS THE STAND-IN because it is a registered gate that declares `web-build`, and because
- * `--only bundle` selects it alone. The stub's content is what varies from test to test.
+ * `stack` IS THE STAND-IN, AND IT USED TO BE `bundle`, WHICH IS A FACT ABOUT THE RUNNER RATHER THAN
+ * ABOUT THESE TESTS. Every case here is about the SPAWNED half of the runner: the declaration read
+ * out of a gate's text before the gate is spawned. `52 §5.1` step 3 made `bundle` a gate the runner
+ * CALLS, and a called gate's declaration is read off the module instead, so a script stub written
+ * over `bundle.mjs` is now a disagreement the runner refuses rather than a prerequisite it reads.
+ * `stack` is a gate that is still spawned, `--only stack` selects it alone, and the stub supplies
+ * the declaration, which is the only thing these cases ever needed from the name.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -48,7 +53,7 @@ function copy({ stub = null, build = false, drop = null }) {
   for (const name of readdirSync(gates)) {
     if (name.endsWith('.mjs') || name === 'budgets.json') cpSync(join(gates, name), join(to, name));
   }
-  if (stub !== null) writeFileSync(join(to, 'bundle.mjs'), stub);
+  if (stub !== null) writeFileSync(join(to, 'stack.mjs'), stub);
   if (drop !== null) unlinkSync(join(to, drop));
   if (build) mkdirSync(join(root, 'apps', 'web', 'build'), { recursive: true });
   return root;
@@ -59,7 +64,7 @@ function copy({ stub = null, build = false, drop = null }) {
  * are about is whether the gate was RUN, not what a skip costs. Leaving the ambient variable in
  * would make the exit code mean two things at once and the suite pass or fail by where it ran.
  */
-function run(root, args = ['--only', 'bundle']) {
+function run(root, args = ['--only', 'stack']) {
   const r = spawnSync(process.execPath, [join(root, 'tools', 'gates', 'run.mjs'), ...args], {
     cwd: root,
     encoding: 'utf8',
@@ -71,10 +76,10 @@ function run(root, args = ['--only', 'bundle']) {
 
 test('a gate that declares a prerequisite it does not have is never spawned', () => {
   const { status, out } = run(
-    copy({ stub: `export const needs = ['web-build'];\nconsole.log('  bundle: ${RAN}');\n` }),
+    copy({ stub: `export const needs = ['web-build'];\nconsole.log('  stack: ${RAN}');\n` }),
   );
   assert.ok(!out.includes(RAN), `the gate was spawned although its prerequisite was unmet:\n${out}`);
-  assert.match(out, /could not run: bundle/u);
+  assert.match(out, /could not run: stack/u);
   assert.equal(status, 0);
 });
 
@@ -86,7 +91,7 @@ test('the refusal names the prerequisite and the command that meets it', () => {
 
 test('a met prerequisite runs the gate as before', () => {
   const { status, out } = run(
-    copy({ stub: `export const needs = ['web-build'];\nconsole.log('  bundle: ${RAN}');\n`, build: true }),
+    copy({ stub: `export const needs = ['web-build'];\nconsole.log('  stack: ${RAN}');\n`, build: true }),
   );
   assert.ok(out.includes(RAN), `the gate was not spawned although its prerequisite was met:\n${out}`);
   assert.match(out, /1 of 1 gates passed/u);
@@ -94,9 +99,9 @@ test('a met prerequisite runs the gate as before', () => {
 });
 
 test('a gate that declares nothing is spawned and its own exit 3 is still a skip', () => {
-  const { status, out } = run(copy({ stub: `console.log('  bundle: ${RAN}');\nprocess.exit(3);\n` }));
+  const { status, out } = run(copy({ stub: `console.log('  stack: ${RAN}');\nprocess.exit(3);\n` }));
   assert.ok(out.includes(RAN), `a gate with no declaration must still run:\n${out}`);
-  assert.match(out, /could not run: bundle/u);
+  assert.match(out, /could not run: stack/u);
   assert.equal(status, 0);
 });
 
@@ -110,7 +115,7 @@ test('a declaration the runner cannot read is the runner refusing, not an empty 
     copy({ stub: `const needed = () => ['web-build'];\nexport const needs = needed();\nconsole.log('${RAN}');\n` }),
   );
   assert.ok(!out.includes(RAN), `an unreadable declaration was treated as no prerequisites:\n${out}`);
-  assert.match(out, /bundle/u);
+  assert.match(out, /stack/u);
   assert.equal(status, 2);
 });
 
@@ -119,7 +124,7 @@ test('a declaration spelt over several lines is read rather than refused', () =>
     copy({ stub: `export const needs = [\n  'web-build',\n];\nconsole.log('${RAN}');\n` }),
   );
   assert.ok(!out.includes(RAN), `the gate was spawned although its prerequisite was unmet:\n${out}`);
-  assert.match(out, /could not run: bundle/u);
+  assert.match(out, /could not run: stack/u);
   assert.equal(status, 0);
 });
 
@@ -141,13 +146,13 @@ test('a prerequisite nobody defined is the runner refusing', () => {
    unregistered-gate check names it and exits 1 before any of this. A file deleted leaves nothing in
    the directory to notice, and the only reader left is this one.
 
-   `--only bundle,em-dash` BECAUSE THE FINDING IS ABOUT THE OTHER GATE. That one gate cannot run is
+   `--only stack,em-dash` BECAUSE THE FINDING IS ABOUT THE OTHER GATE. That one gate cannot run is
    a sentence; that the twenty-nine beside it were never spawned is the defect, and a selection of
    one could not tell the two apart. */
 test('a registered gate whose file was deleted is named, and the gates beside it still run', () => {
-  const { status, out } = run(copy({ drop: 'bundle.mjs' }), ['--only', 'bundle,em-dash']);
+  const { status, out } = run(copy({ drop: 'stack.mjs' }), ['--only', 'stack,em-dash']);
   assert.ok(!/at readFileSync/u.test(out), `the runner died reading a gate that was not there:\n${out}`);
   assert.match(out, /▸ em-dash/u, `a gate beside the missing one was never spawned:\n${out}`);
-  assert.match(out, /gates failed: bundle/u);
+  assert.match(out, /gates failed: stack/u);
   assert.equal(status, 1);
 });

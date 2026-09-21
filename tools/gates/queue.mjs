@@ -72,249 +72,272 @@ import { chromium } from '@playwright/test';
 import { budget, readiness } from './lib.mjs';
 import { answers, forward, forwards, startRecord } from './record.mjs';
 
-const REPO = join(import.meta.dirname, '..', '..');
-const ROOT = join(REPO, 'apps', 'web', 'build');
-
 /* THE PREREQUISITE, AND THIS IS THE OTHER GATE THAT PROVED IT HAD TO LEAVE THIS FILE. It exited 0
    with no build and was counted as a gate that passed, so a fresh checkout reported the queue
    driven green having never pressed an option. `52 §5.1` step 2 gives the question to `run.mjs`,
    which reads this line before spawning anything. The `stat(ROOT)` below stays for a person
-   running the file by hand. */
+   running the file by hand.
+
+   AND `run.mjs` READS IT OFF THE MODULE NOW RATHER THAN OUT OF THIS TEXT (`52 §5.1` step 3), which
+   is the same fact with one fewer thing that can disagree: the value this file holds is the value
+   the runner acts on, read before a line of the gate has run. */
 export const needs = ['web-build'];
 
-/* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
-   gate that passed: a fresh checkout reported the queue driven green having never pressed anything.
-   A skip is the one thing the runner can be red about under CI, where the build always happened, so
-   a skip there says the build did not and no option was ever pressed. */
-if (!(await stat(ROOT).catch(() => null))?.isDirectory()) {
-  console.log('  queue: no apps/web/build to drive, so nothing was driven. Run `pnpm --filter @braindog/web build` first.');
-  process.exit(3);
-}
+/**
+ * THE WHOLE DRIVE, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
+ *
+ * IT OWNS A PORT, A RECORD AND A BROWSER, AND A CALLED GATE HAS TO GIVE THEM BACK. A spawned gate got
+ * that for nothing, because the process ending closed whatever it held; in this process a socket left
+ * listening or a browser left running is a runner that never exits. The `finally` below is what makes
+ * that true on every path out, and it was already there for a different reason.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to this file's own two directories up, which is what the
+ * constant it replaces computed. Nothing here has ever read `process.cwd()`.
+ *
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default async function queue(root = join(import.meta.dirname, '..', '..')) {
+  const ROOT = join(root, 'apps', 'web', 'build');
 
-/** Every way this run fell short, said in the order it happened. Collected, never thrown on first. */
-const findings = [];
-
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
-
-/* THE RECORD FIRST, the seed's own `governance.open` rows and nothing invented here. */
-const record = await startRecord();
-
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', 'http://x');
-  if (forwards(url.pathname)) return forward(req, res, record.base);
-  const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
-  if (rel.includes('..')) return res.writeHead(400).end();
-  for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
-    const file = join(ROOT, candidate);
-    const info = await stat(file).catch(() => null);
-    if (!info?.isFile()) continue;
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
-    return createReadStream(file).pipe(res);
+  /* EXIT 3 IS A SKIP, NOT A PASS. This exited 0 with no build, and 0 is what `run.mjs` counts as a
+     gate that passed: a fresh checkout reported the queue driven green having never pressed anything.
+     A skip is the one thing the runner can be red about under CI, where the build always happened, so
+     a skip there says the build did not and no option was ever pressed. */
+  if (!(await stat(ROOT).catch(() => null))?.isDirectory()) {
+    console.log('  queue: no apps/web/build to drive, so nothing was driven. Run `pnpm --filter @braindog/web build` first.');
+    return 3;
   }
-  /* THE SPA FALLBACK the deployed host serves, for the same reason `a11y.mjs` serves it: without it
-     `/decide/<id>` and `/p/agents` 404 on a direct load instead of letting the router decide. */
-  const shell = join(ROOT, 'index.html');
-  const asset = Object.hasOwn(TYPES, extname(rel));
-  if (!asset && (await stat(shell).catch(() => null))?.isFile()) {
-    res.writeHead(200, { 'content-type': TYPES['.html'] });
-    return createReadStream(shell).pipe(res);
+
+  /** Every way this run fell short, said in the order it happened. Collected, never thrown on first. */
+  const findings = [];
+
+  const TYPES = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.woff2': 'font/woff2',
+    '.json': 'application/json',
+  };
+
+  /* THE RECORD FIRST, the seed's own `governance.open` rows and nothing invented here. */
+  const record = await startRecord();
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', 'http://x');
+    if (forwards(url.pathname)) return forward(req, res, record.base);
+    const rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
+    if (rel.includes('..')) return res.writeHead(400).end();
+    for (const candidate of [rel, `${rel}.html`, join(rel, 'index.html')]) {
+      const file = join(ROOT, candidate);
+      const info = await stat(file).catch(() => null);
+      if (!info?.isFile()) continue;
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+      return createReadStream(file).pipe(res);
+    }
+    /* THE SPA FALLBACK the deployed host serves, for the same reason `a11y.mjs` serves it: without it
+       `/decide/<id>` and `/p/agents` 404 on a direct load instead of letting the router decide. */
+    const shell = join(ROOT, 'index.html');
+    const asset = Object.hasOwn(TYPES, extname(rel));
+    if (!asset && (await stat(shell).catch(() => null))?.isFile()) {
+      res.writeHead(200, { 'content-type': TYPES['.html'] });
+      return createReadStream(shell).pipe(res);
+    }
+    res.writeHead(404).end();
+  });
+  await new Promise((r) => server.listen(0, r));
+  const PORT = server.address().port;
+  const ORIGIN = `http://127.0.0.1:${PORT}`;
+
+  /* PROOF THE FORWARD IS WIRED, not just that a server answered something. A gate that forgot to
+     forward `/api/*` would have the register screen fall back to its own in-browser sample, which
+     would draw a queue too and pass silently over a broken record. */
+  await answers(ORIGIN);
+
+  const ready = readiness('queue', budget('ready').settleTimeoutMs, ROOT);
+
+  /* THE RECORD'S OWN RANKING, loaded from source the way `spark-actor.mjs` loads its module: the gate
+     asserts the ORDER a person sees matches the function that decided it, so it must be that function
+     and not a transcription of it. `weigh.ts` imports nothing, so this costs one file. */
+  const { COSTS, costRank } = await import(pathToFileURL(join(root, 'packages', 'kernel', 'src', 'weigh.ts')).href);
+
+  const browser = await chromium.launch();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  /** Load a route by address and report what it settled into. */
+  async function open(route) {
+    await page.goto(`${ORIGIN}${route}`, { waitUntil: 'networkidle' });
+    return ready.settled(page);
   }
-  res.writeHead(404).end();
-});
-await new Promise((r) => server.listen(0, r));
-const PORT = server.address().port;
-const ORIGIN = `http://127.0.0.1:${PORT}`;
 
-/* PROOF THE FORWARD IS WIRED, not just that a server answered something. A gate that forgot to
-   forward `/api/*` would have the register screen fall back to its own in-browser sample, which
-   would draw a queue too and pass silently over a broken record. */
-await answers(ORIGIN);
+  /** The queue block agents.ts names `heading: 'Waiting on you'`, found by the name its region carries. */
+  const waitingOnYou = () => page.getByRole('region', { name: 'Waiting on you', exact: true });
 
-const ready = readiness('queue', budget('ready').settleTimeoutMs, ROOT);
+  try {
+    const first = await open('/p/agents');
+    const unmeasuredFirst = ready.check('queue /p/agents', '/p/agents', first);
+    if (unmeasuredFirst) findings.push(unmeasuredFirst);
 
-/* THE RECORD'S OWN RANKING, loaded from source the way `spark-actor.mjs` loads its module: the gate
-   asserts the ORDER a person sees matches the function that decided it, so it must be that function
-   and not a transcription of it. `weigh.ts` imports nothing, so this costs one file. */
-const { COSTS, costRank } = await import(pathToFileURL(join(REPO, 'packages', 'kernel', 'src', 'weigh.ts')).href);
+    /* CHEAP, WHILE THE PAGE IS OPEN ANYWAY: the empty sentence never sits beside cards that are
+       actually drawn. `queuePlan` only ever prints one or the other. */
+    if ((await page.locator('.queue-empty').count()) > 0)
+      findings.push('the seeded Agents page draws .queue-empty even though its queue holds questions.');
 
-const browser = await chromium.launch();
-const context = await browser.newContext();
-const page = await context.newPage();
-
-/** Load a route by address and report what it settled into. */
-async function open(route) {
-  await page.goto(`${ORIGIN}${route}`, { waitUntil: 'networkidle' });
-  return ready.settled(page);
-}
-
-/** The queue block agents.ts names `heading: 'Waiting on you'`, found by the name its region carries. */
-const waitingOnYou = () => page.getByRole('region', { name: 'Waiting on you', exact: true });
-
-try {
-  const first = await open('/p/agents');
-  const unmeasuredFirst = ready.check('queue /p/agents', '/p/agents', first);
-  if (unmeasuredFirst) findings.push(unmeasuredFirst);
-
-  /* CHEAP, WHILE THE PAGE IS OPEN ANYWAY: the empty sentence never sits beside cards that are
-     actually drawn. `queuePlan` only ever prints one or the other. */
-  if ((await page.locator('.queue-empty').count()) > 0)
-    findings.push('the seeded Agents page draws .queue-empty even though its queue holds questions.');
-
-  const block = waitingOnYou();
-  if ((await block.count()) === 0) {
-    findings.push('the seeded Agents page draws no "Waiting on you" queue region, so nothing here could be driven.');
-  } else {
-    /* AND CHEAP AGAIN: no option is a control that presses to nothing. `Queue.svelte`'s own rule is
-       a `button.queue-act` where the host can act, plain words otherwise, never a third thing. */
-    const noOp = await block.evaluate((el) =>
-      [...el.querySelectorAll('.queue-option')]
-        .filter((opt) => !opt.querySelector('button.queue-act'))
-        .flatMap((opt) => {
-          const pressable = opt.querySelector('a[href], [role="button"], [tabindex]:not([tabindex="-1"])');
-          return pressable ? [pressable.outerHTML.slice(0, 80)] : [];
-        }),
-    );
-    for (const p of noOp) findings.push(`a queue option that cannot act is still a focusable control: ${p}`);
-
-    /* ── THREE: THE CARDS ARRIVE DEAREST FIRST ──
-       The bands off the DOM, in the order the browser laid them out, against the record's own
-       ranking function rather than a copy of the order written here: a gate holding its own list of
-       four words would be a second answer to the question `weigh.ts` exists to answer once. A card
-       with no chip is a question whose body this build cannot read, which is allowed and sorts
-       last. `costRank` says so, so it needs no branch here. */
-    /* THE GATE'S OWN PROOF THAT THIS LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=queue` puts the cheapest
-       band at the top and the dearest at the bottom, which is the rule read backwards, and creates
-       the chip where a card has none so the seed does not depend on what the seed record happens to
-       hold. A queue drawing one card is cloned first, because an order needs two things to be in it
-       and a seed that quietly exercises nothing is how a self-test passes a blind gate. */
-    if (process.env.BRAINDOG_GATE_SEED === 'queue')
-      await block.evaluate((el) => {
-        const first = el.querySelector('.queue-card');
-        if (!first) return;
-        if (el.querySelectorAll('.queue-card').length === 1) first.after(first.cloneNode(true));
-        const all = [...el.querySelectorAll('.queue-card')];
-        const chip = (card, band) => {
-          let c = card.querySelector('.queue-cost');
-          if (!c) {
-            c = document.createElement('span');
-            c.className = 'queue-cost';
-            (card.querySelector('.queue-by') ?? card).append(c);
-          }
-          c.dataset.cost = band;
-        };
-        chip(all[0], 'call');
-        chip(all[all.length - 1], 'undo');
-      });
-
-    const bands = await block.evaluate((el) => [...el.querySelectorAll('.queue-card')].map((c) => c.querySelector('.queue-cost')?.dataset.cost ?? ''));
-    for (const band of bands) if (band !== '' && !COSTS.includes(band)) findings.push(`a queue card is chipped with a cost band this build has no word for: "${band}".`);
-    for (let i = 1; i < bands.length; i += 1)
-      if (costRank(bands[i]) < costRank(bands[i - 1]))
-        findings.push(`the queue is not ranked by cost of being wrong: "${bands[i]}" is drawn below "${bands[i - 1]}" (${bands.join(' then ')}).`);
-    if (bands.every((b) => b === ''))
-      /* NOT A FINDING, AND SAID OUT LOUD. A seed whose open questions all carry bodies this build
-         cannot read draws no chips at all, and a silent pass over an empty list is how a gate goes
-         blind. */
-      console.log('queue: no card on the seeded Agents page carries a cost band, so the ranking could not be exercised.');
-
-    /* ── ONE: PRESS AN OPTION THAT IS NOT THE RECOMMENDATION, AND LAND ON ITS GATE HIGHLIGHTED ── */
-    const cards = block.locator('.queue-card');
-    if ((await cards.count()) === 0) {
-      findings.push('the seeded "Waiting on you" queue draws no cards, so nothing here could be pressed.');
+    const block = waitingOnYou();
+    if ((await block.count()) === 0) {
+      findings.push('the seeded Agents page draws no "Waiting on you" queue region, so nothing here could be driven.');
     } else {
-      /* A CARD CARRYING A RECOMMENDATION IS THE STRONGER PROOF, because pressing its OTHER option
-         and finding the recommendation still un-highlighted is exactly the failure mode the gate's
-         rule is written against. The record's own rules open questions of their own between the
-         three drawn here and the seed's two that carry one, so a run of this seed may draw three
-         cards with none: the check still holds on whichever card is drawn, because it presses
-         whatever that card offers rather than a card this run assumes exists. */
-      const withRec = block.locator('.queue-card:has(.queue-option[data-recommended])').first();
-      const card = (await withRec.count()) > 0 ? withRec : cards.first();
-      const questionText = (await card.locator('.queue-question').innerText()).trim();
-      let press = card.locator('.queue-option:not([data-recommended]) button.queue-act').first();
-      if ((await press.count()) === 0) press = card.locator('button.queue-act').first();
-      if ((await press.count()) === 0) {
-        findings.push(`the card "${questionText}" has no pressable option.`);
+      /* AND CHEAP AGAIN: no option is a control that presses to nothing. `Queue.svelte`'s own rule is
+         a `button.queue-act` where the host can act, plain words otherwise, never a third thing. */
+      const noOp = await block.evaluate((el) =>
+        [...el.querySelectorAll('.queue-option')]
+          .filter((opt) => !opt.querySelector('button.queue-act'))
+          .flatMap((opt) => {
+            const pressable = opt.querySelector('a[href], [role="button"], [tabindex]:not([tabindex="-1"])');
+            return pressable ? [pressable.outerHTML.slice(0, 80)] : [];
+          }),
+      );
+      for (const p of noOp) findings.push(`a queue option that cannot act is still a focusable control: ${p}`);
+
+      /* ── THREE: THE CARDS ARRIVE DEAREST FIRST ──
+         The bands off the DOM, in the order the browser laid them out, against the record's own
+         ranking function rather than a copy of the order written here: a gate holding its own list of
+         four words would be a second answer to the question `weigh.ts` exists to answer once. A card
+         with no chip is a question whose body this build cannot read, which is allowed and sorts
+         last. `costRank` says so, so it needs no branch here. */
+      /* THE GATE'S OWN PROOF THAT THIS LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=queue` puts the cheapest
+         band at the top and the dearest at the bottom, which is the rule read backwards, and creates
+         the chip where a card has none so the seed does not depend on what the seed record happens to
+         hold. A queue drawing one card is cloned first, because an order needs two things to be in it
+         and a seed that quietly exercises nothing is how a self-test passes a blind gate. */
+      if (process.env.BRAINDOG_GATE_SEED === 'queue')
+        await block.evaluate((el) => {
+          const first = el.querySelector('.queue-card');
+          if (!first) return;
+          if (el.querySelectorAll('.queue-card').length === 1) first.after(first.cloneNode(true));
+          const all = [...el.querySelectorAll('.queue-card')];
+          const chip = (card, band) => {
+            let c = card.querySelector('.queue-cost');
+            if (!c) {
+              c = document.createElement('span');
+              c.className = 'queue-cost';
+              (card.querySelector('.queue-by') ?? card).append(c);
+            }
+            c.dataset.cost = band;
+          };
+          chip(all[0], 'call');
+          chip(all[all.length - 1], 'undo');
+        });
+
+      const bands = await block.evaluate((el) => [...el.querySelectorAll('.queue-card')].map((c) => c.querySelector('.queue-cost')?.dataset.cost ?? ''));
+      for (const band of bands) if (band !== '' && !COSTS.includes(band)) findings.push(`a queue card is chipped with a cost band this build has no word for: "${band}".`);
+      for (let i = 1; i < bands.length; i += 1)
+        if (costRank(bands[i]) < costRank(bands[i - 1]))
+          findings.push(`the queue is not ranked by cost of being wrong: "${bands[i]}" is drawn below "${bands[i - 1]}" (${bands.join(' then ')}).`);
+      if (bands.every((b) => b === ''))
+        /* NOT A FINDING, AND SAID OUT LOUD. A seed whose open questions all carry bodies this build
+           cannot read draws no chips at all, and a silent pass over an empty list is how a gate goes
+           blind. */
+        console.log('queue: no card on the seeded Agents page carries a cost band, so the ranking could not be exercised.');
+
+      /* ── ONE: PRESS AN OPTION THAT IS NOT THE RECOMMENDATION, AND LAND ON ITS GATE HIGHLIGHTED ── */
+      const cards = block.locator('.queue-card');
+      if ((await cards.count()) === 0) {
+        findings.push('the seeded "Waiting on you" queue draws no cards, so nothing here could be pressed.');
       } else {
-        const pressedLabel = (await press.innerText()).trim();
-        await press.click();
-        await page.waitForURL(/\/decide\//, { timeout: budget('ready').settleTimeoutMs });
-        const gateState = await ready.settled(page);
-        const unmeasuredGate = ready.check('queue press-option gate', new URL(page.url()).pathname, gateState);
-        if (unmeasuredGate) findings.push(unmeasuredGate);
-
-        const gateTitle = (await page.locator('h1.title span[dir="auto"]').innerText()).trim();
-        if (gateTitle !== questionText)
-          findings.push(`pressing "${pressedLabel}" landed on "${gateTitle}", not the question it was pressed from ("${questionText}").`);
-
-        const onCards = page.locator('.cards .card[data-on]');
-        const onCount = await onCards.count();
-        if (onCount !== 1) {
-          findings.push(`the gate arrived with ${onCount} option(s) marked highlighted; expected exactly the one pressed.`);
+        /* A CARD CARRYING A RECOMMENDATION IS THE STRONGER PROOF, because pressing its OTHER option
+           and finding the recommendation still un-highlighted is exactly the failure mode the gate's
+           rule is written against. The record's own rules open questions of their own between the
+           three drawn here and the seed's two that carry one, so a run of this seed may draw three
+           cards with none: the check still holds on whichever card is drawn, because it presses
+           whatever that card offers rather than a card this run assumes exists. */
+        const withRec = block.locator('.queue-card:has(.queue-option[data-recommended])').first();
+        const card = (await withRec.count()) > 0 ? withRec : cards.first();
+        const questionText = (await card.locator('.queue-question').innerText()).trim();
+        let press = card.locator('.queue-option:not([data-recommended]) button.queue-act').first();
+        if ((await press.count()) === 0) press = card.locator('button.queue-act').first();
+        if ((await press.count()) === 0) {
+          findings.push(`the card "${questionText}" has no pressable option.`);
         } else {
-          const highlightedTitle = (await onCards.first().locator('.card-title').innerText()).trim();
-          if (highlightedTitle !== pressedLabel)
-            findings.push(`the gate highlighted "${highlightedTitle}", not the option pressed ("${pressedLabel}").`);
-        }
+          const pressedLabel = (await press.innerText()).trim();
+          await press.click();
+          await page.waitForURL(/\/decide\//, { timeout: budget('ready').settleTimeoutMs });
+          const gateState = await ready.settled(page);
+          const unmeasuredGate = ready.check('queue press-option gate', new URL(page.url()).pathname, gateState);
+          if (unmeasuredGate) findings.push(unmeasuredGate);
 
-        /* NOTHING IS CHOSEN. `committing` is null until a card's own Choose button is pressed, and
-           the only thing on screen that says otherwise is the commit step this checks for. */
-        if ((await page.locator('section.commit').count()) > 0)
-          findings.push('the gate arrived with a commit step already open, as though an option were already chosen.');
+          const gateTitle = (await page.locator('h1.title span[dir="auto"]').innerText()).trim();
+          if (gateTitle !== questionText)
+            findings.push(`pressing "${pressedLabel}" landed on "${gateTitle}", not the question it was pressed from ("${questionText}").`);
+
+          const onCards = page.locator('.cards .card[data-on]');
+          const onCount = await onCards.count();
+          if (onCount !== 1) {
+            findings.push(`the gate arrived with ${onCount} option(s) marked highlighted; expected exactly the one pressed.`);
+          } else {
+            const highlightedTitle = (await onCards.first().locator('.card-title').innerText()).trim();
+            if (highlightedTitle !== pressedLabel)
+              findings.push(`the gate highlighted "${highlightedTitle}", not the option pressed ("${pressedLabel}").`);
+          }
+
+          /* NOTHING IS CHOSEN. `committing` is null until a card's own Choose button is pressed, and
+             the only thing on screen that says otherwise is the commit step this checks for. */
+          if ((await page.locator('section.commit').count()) > 0)
+            findings.push('the gate arrived with a commit step already open, as though an option were already chosen.');
+        }
       }
     }
-  }
 
-  /* ── TWO: PRESS THE COUNT OF WHAT IS LEFT, AND LAND ON DECIDE ── */
-  const second = await open('/p/agents');
-  const unmeasuredSecond = ready.check('queue /p/agents (2)', '/p/agents', second);
-  if (unmeasuredSecond) findings.push(unmeasuredSecond);
+    /* ── TWO: PRESS THE COUNT OF WHAT IS LEFT, AND LAND ON DECIDE ── */
+    const second = await open('/p/agents');
+    const unmeasuredSecond = ready.check('queue /p/agents (2)', '/p/agents', second);
+    if (unmeasuredSecond) findings.push(unmeasuredSecond);
 
-  const more = waitingOnYou().locator('.queue-more');
-  if ((await more.count()) === 0) {
-    /* NOT A FINDING. A queue that draws everything it holds writes no `more` row at all
-       (`packages/render/src/queue.ts`), and this half of the gate has nothing to press then. Said
-       plainly rather than invented. */
-    console.log('queue: the seeded Agents queue draws no "N more" row, so pressing the count of what is left could not be exercised.');
-  } else {
-    const tag = await more.evaluate((el) => el.tagName);
-    if (tag !== 'A') {
-      findings.push(`the queue holds more than it draws but "${(await more.innerText()).trim()}" is a <${tag.toLowerCase()}>, not a link: the evaluator supplied no address, or the block ignored it.`);
+    const more = waitingOnYou().locator('.queue-more');
+    if ((await more.count()) === 0) {
+      /* NOT A FINDING. A queue that draws everything it holds writes no `more` row at all
+         (`packages/render/src/queue.ts`), and this half of the gate has nothing to press then. Said
+         plainly rather than invented. */
+      console.log('queue: the seeded Agents queue draws no "N more" row, so pressing the count of what is left could not be exercised.');
     } else {
-      const href = await more.getAttribute('href');
-      const label = (await more.innerText()).trim();
-      await more.click();
-      await page.waitForURL('**/decide', { timeout: budget('ready').settleTimeoutMs });
-      const path = new URL(page.url()).pathname;
-      if (path !== '/decide') findings.push(`pressing the queue's "${label}" link (href="${href}") landed on ${path}, not /decide.`);
-      const decideState = await ready.settled(page);
-      const unmeasuredDecide = ready.check('queue more-link decide', '/decide', decideState);
-      if (unmeasuredDecide) findings.push(unmeasuredDecide);
+      const tag = await more.evaluate((el) => el.tagName);
+      if (tag !== 'A') {
+        findings.push(`the queue holds more than it draws but "${(await more.innerText()).trim()}" is a <${tag.toLowerCase()}>, not a link: the evaluator supplied no address, or the block ignored it.`);
+      } else {
+        const href = await more.getAttribute('href');
+        const label = (await more.innerText()).trim();
+        await more.click();
+        await page.waitForURL('**/decide', { timeout: budget('ready').settleTimeoutMs });
+        const path = new URL(page.url()).pathname;
+        if (path !== '/decide') findings.push(`pressing the queue's "${label}" link (href="${href}") landed on ${path}, not /decide.`);
+        const decideState = await ready.settled(page);
+        const unmeasuredDecide = ready.check('queue more-link decide', '/decide', decideState);
+        if (unmeasuredDecide) findings.push(unmeasuredDecide);
+      }
     }
+  } catch (e) {
+    findings.push(`the queue drive stopped: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+  } finally {
+    await browser.close();
+    await new Promise((r) => server.close(r));
+    await record.close();
   }
-} catch (e) {
-  findings.push(`the queue drive stopped: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
-} finally {
-  await browser.close();
-  await new Promise((r) => server.close(r));
-  await record.close();
+
+  const blind = ready.nothingDrawn();
+  if (blind) findings.push(blind);
+
+  if (findings.length === 0) {
+    console.log('queue: pressed a queue option to its gate (highlighted, not chosen), the count of what is left to /decide, and the cards arrived dearest first.');
+  } else {
+    console.error('\n  the queue block, driven in a real browser:');
+    for (const f of findings) console.error(`      ${f}`);
+    return 1;
+  }
 }
 
-const blind = ready.nothingDrawn();
-if (blind) findings.push(blind);
-
-if (findings.length === 0) {
-  console.log('queue: pressed a queue option to its gate (highlighted, not chosen), the count of what is left to /decide, and the cards arrived dearest first.');
-} else {
-  console.error('\n  the queue block, driven in a real browser:');
-  for (const f of findings) console.error(`      ${f}`);
-  process.exitCode = 1;
-}
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns this file with `BRAINDOG_GATE_SEED=queue` and
+   the header documents `node tools/gates/queue.mjs`. `?? 0` because a pass returns nothing. */
+if (import.meta.main) process.exitCode = (await queue()) ?? 0;
