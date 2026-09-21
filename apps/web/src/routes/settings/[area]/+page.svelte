@@ -32,6 +32,9 @@
     REGISTERS, SIGNING_KEY, SNAPSHOTS, SNAPSHOTS_KEPT, SOURCES, TOKENS, pages,
   } from '$lib/record/api.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
+  /* WHETHER THE PERSON READING THIS MAY USE WHAT IS ON IT, which nothing here asked. `../levels.ts`
+     carries what was measured: seven colleagues, every area, the owner's controls in all of them. */
+  import { ownsRecord, words as levelWords } from '../levels.ts';
   import {
     CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, connectLines, noRecord, reachKey, revocable, sampleMachines,
     reportKeyOf, sampleTokens, standing, type Answer, type DeviceRow, type TokenRow,
@@ -81,6 +84,24 @@
   const RECORD = $derived(shell.index.name);
   const SLUG = $derived(shell.index.slug);
   const me = $derived(shell.me);
+
+  /**
+   * WHETHER THIS IS AN OWNER, WHICH IS THE ONE QUESTION EVERY AREA BELOW WAS DRAWN WITHOUT ASKING.
+   *
+   * Measured on a real self-host with a colleague at each of the five levels: a `read` colleague was
+   * offered 3 controls on People, 4 on Agents, 1 on Backups, 6 on Export and 2 on Delete, and one of
+   * the sixteen said it was off. `write` and `decide` were offered the same sixteen, because every
+   * settings write in this product is an ADMIN method and none of them is reachable below `owner`.
+   *
+   * ONE DERIVED AND NOT A CHECK PER CONTROL. `loop/research-second-person.md` finding 7: "It is one
+   * predicate on `AREAS` and one per section … rather than eleven times." The predicate itself is in
+   * `../levels.ts` with what it costs, and `levels.test.ts` holds this file to it.
+   *
+   * THE SAMPLE IS UNTOUCHED, and that is deliberate rather than lucky: `api.ts` gives the demo's `me`
+   * `level: 'owner'` and `owner: true`, so every screenshot, gate and demo visit draws exactly what
+   * it drew before.
+   */
+  const anOwner = $derived(ownsRecord(me));
 
   /* THE PAGES THIS PERSON HID FROM THEIR NAV, by the name the rail gave them, and the way back. */
   const hiddenPages = $derived(navPrefs.hidden.map((href) => ({ href, title: shell.nav.find((e) => e.href === href)?.title ?? href })));
@@ -367,9 +388,22 @@
     /* THE ADDRESS NAMES THIS ORIGIN, and `readAgents` is the only other place that reads it: a person
        who lands straight on `/settings/ingest` has never been through that function. */
     origin = location.origin;
-    /* AND THE HOST IS ASKED WHAT IT SERVES BEFORE ANYTHING IS OFFERED, once. Read through `untrack`
-       so the answer landing does not re-run this effect and ask again. */
-    if (untrack(() => mintsHere) === null) void askMailDoor();
+    /**
+     * AND THE HOST IS ASKED WHAT IT SERVES BEFORE ANYTHING IS OFFERED, once.
+     *
+     * THE CALL IS MADE INSIDE `untrack` AND NOT ONLY THE READ, and without that this effect asked
+     * for ever. Driven on a real self-host: `/settings/ingest` sent `GET /api/inbound/mint` five
+     * times in five seconds and threw `effect_update_depth_exceeded` on every pass, so the section
+     * drew 36 words, neither control, and none of the sentence that explains why there is no
+     * control. `askMailDoor` calls `opened()` on its first line, synchronously, and `opened()` does
+     * `s.pending++` on `screen.svelte.ts`'s `$state`: an increment READS what it writes, so the
+     * effect depended on the thing it changed and Svelte re-ran it until it gave up. `Empty.svelte`
+     * records the same failure in the same words, and `readAgents`, `readPeopleNow`, `readInvites`
+     * and `readCopies` are each already called this way for exactly this reason.
+     */
+    untrack(() => {
+      if (mintsHere === null) void askMailDoor();
+    });
   });
 
   /**
@@ -748,7 +782,7 @@
      * already said which way it goes. What the second half is for is how much would happen, and
      * that is one per list in either direction. The kinds are untouched in the log and the API.
      */
-    toasts.push(copy.notWritten(copy.levelWouldMove(who.name, levelSaid(who.level), levelSaid(to))), { intent: 'warn' });
+    cannotWrite(copy.levelWouldMove(who.name, levelSaid(who.level), levelSaid(to)));
   };
 
   /* A RECORD KEEPS AT LEAST ONE OWNER — `LEVEL_REQUIRED`, and its fix sentence verbatim (45 §5.6).
@@ -789,6 +823,25 @@
   }
 
   /**
+   * A PRESS THAT CANNOT BE SENT, AND THE TWO CASES THIS SCREEN USED TO CONFLATE.
+   *
+   * `loop/research-second-person.md` finding 4. Six presses here branched on `peopleFrom !== 'live'`
+   * and pushed `copy.notWritten` — the SAMPLE's sentence — so a colleague the record had refused
+   * read, on a real record, in a real session: *"A single-use link would be made, bound to that one
+   * address and good for 24 hours, but nothing was saved yet."* That says the press did nothing
+   * because the product is a mock-up, and never says the one fact that matters, which is that they
+   * are not the owner. Measured as a `read` colleague on a self-host, on the form under a section
+   * already drawing the record's refusal four inches above.
+   *
+   * `sample` IS THE ONLY ARM THAT MAY SAY "YET". It is the public demo, where there is no record and
+   * nothing anybody presses is saved. Every other arm is a record that answered, so the record's own
+   * sentence is what is said (`13 §6`), and `readPeople` has already put it in `peopleRefusal`.
+   */
+  function cannotWrite(would: string): void {
+    toasts.push(peopleFrom === 'sample' ? copy.notWritten(would) : peopleRefusal || copy.recordNotReached, { intent: 'warn' });
+  }
+
+  /**
    * One write to who may see the record, then the list read again, so what is drawn is what the record holds.
    * A refusal is the record's sentence; a race reads again too, before anybody presses twice.
    */
@@ -815,7 +868,7 @@
 
   function startException(p: Person) {
     if (peopleFrom !== 'live') {
-      toasts.push(copy.notWritten(copy.exceptionWouldBeAdded(p.name)), { intent: 'warn' });
+      cannotWrite(copy.exceptionWouldBeAdded(p.name));
       return;
     }
     picking = p.id;
@@ -832,13 +885,13 @@
   }
 
   function takeAway(p: Person) {
-    if (peopleFrom !== 'live') toasts.push(copy.notWritten(copy.accessWouldGo(p.name)), { intent: 'warn' });
+    if (peopleFrom !== 'live') cannotWrite(copy.accessWouldGo(p.name));
     else void settle(() => removeAccess(location.origin, p), copy.accessRemoved(p.name));
   }
 
   function backToLevel(p: Person, register: string) {
     const list = REGISTERS[register]?.name ?? lists.find((l) => l.id === register)?.name ?? register;
-    if (peopleFrom !== 'live') toasts.push(copy.notWritten(copy.exceptionWouldGo(list, levelSaid(p.level))), { intent: 'warn' });
+    if (peopleFrom !== 'live') cannotWrite(copy.exceptionWouldGo(list, levelSaid(p.level)));
     else void settle(() => dropException(location.origin, p, register), copy.exceptionRemoved(list, levelSaid(p.level)));
   }
 
@@ -872,7 +925,7 @@
     const email = inviteTo.trim();
     if (!email || inviting) return;
     if (peopleFrom !== 'live') {
-      toasts.push(copy.notWritten('A single-use link would be made, bound to that one address and good for 24 hours'), { intent: 'warn' });
+      cannotWrite('A single-use link would be made, bound to that one address and good for 24 hours');
       return;
     }
     inviting = true;
@@ -897,7 +950,7 @@
   /** Withdraw one. Its link stops working at once, and the list is read again. */
   async function withdraw(inv: Invitation) {
     if (peopleFrom !== 'live') {
-      toasts.push(copy.notWritten(copy.inviteWithdrawn(inv.email)), { intent: 'warn' });
+      cannotWrite(copy.inviteWithdrawn(inv.email));
       return;
     }
     const done = await settle(() => withdrawInvite(location.origin, inv.id), copy.inviteWithdrawn(inv.email));
@@ -1070,7 +1123,7 @@
 
   /* THE FORM OPENS ONLY ON A RECORD. The sample keeps the sentence it always said. */
   function startErase() {
-    if (peopleFrom !== 'live') toasts.push(copy.notWritten('Erasing asks which person, and on what basis, before anything is removed'), { intent: 'warn' });
+    if (peopleFrom !== 'live') cannotWrite('Erasing asks which person, and on what basis, before anything is removed');
     else eraseOpen = true;
   }
 
@@ -1838,6 +1891,19 @@
         </Section>
       {/if}
 
+      <!--
+        AND THE FORM IS THE OWNER'S, DRAWN TO THE OWNER.
+
+        `loop/research-second-person.md` findings 7 and 4: this form was drawn in full, four inches
+        under a section already saying *"This needs owner, and you have read access"*, to every
+        colleague at every level. Driven again here as a `read` colleague: the address field, the
+        five-option level select and `Invite a person`, none of them disabled, and the press answered
+        with the sample's "nothing was saved yet".
+
+        NOTHING IS SAID IN ITS PLACE, because the section above it is already saying it. The record's
+        own refusal is on this screen, in the record's own words, over the list this form adds to.
+      -->
+      {#if anOwner}
       <Section title={copy.inviteTitle}>
         <p class="hint">{copy.inviteHow}</p>
         <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
@@ -1897,10 +1963,13 @@
           </ul>
         {/if}
       </Section>
+      {/if}
 
       <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
            candidate for a red, irreversible "Erase a person" is the person reading it. -->
-      {#if !alone}
+      <!-- AND IT IS THE OWNER'S: `erase` is an ADMIN method, so for anybody else this was a red
+           button and three fields over a cascade the record would refuse. -->
+      {#if !alone && anOwner}
         <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
              that is not about access at all — it is `02 §10`'s cascade over sixteen stores, in one
              transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
@@ -2132,6 +2201,14 @@
         THE FIELD COMES FIRST, because a machine prints this address: the person arriving is holding six
         digits and looking for the box. A `<form>`, so Enter sends it.
       -->
+      <!--
+        AND APPROVING A MACHINE IS THE OWNER'S, which this screen never asked.
+
+        `deviceApprove` needs `owner`, and a `read` colleague was offered the six-digit field and the
+        `Approve` button beside it. The two sections below already draw the record's own refusal over
+        the lists they cannot read, so this one is taken away rather than explained twice.
+      -->
+      {#if anOwner}
       <Section title={copy.approveTitle}>
         <form class="code-form" onsubmit={tryCode} novalidate>
           <label class="code-label" for="user-code">{copy.codeLabel}</label>
@@ -2165,6 +2242,7 @@
           {/if}
         </form>
       </Section>
+      {/if}
 
       <!-- Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). -->
       <Section title={copy.machines} count={machines.length}>
@@ -2232,6 +2310,11 @@
           CONNECT AN AGENT. The bearer is drawn once, from `minted`, which Done and leaving the area both
           empty; nothing else on this screen holds it. The two lines carry no token (`48 §2`).
         -->
+        <!-- AND MINTING ONE IS THE OWNER'S TOO. `createToken` needs `owner`, and `SparkDaily` below
+             already draws nothing on a record the caller does not own: this is that rule, applied to
+             the control above it rather than only to the one under it. The section keeps its heading
+             and its count, because what is in the list is still a fact about this record. -->
+        {#if anOwner}
         {#if minted}
           {@const bearer = minted.bearer}
           <div class="code-form" role="status">
@@ -2308,6 +2391,7 @@
             </div>
             <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>{mintRefusal}</p>
           </form>
+        {/if}
         {/if}
       </Section>
       <!-- SPARK LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
@@ -2424,9 +2508,32 @@
         reload put the pair back. `mintsHere` is the host's own answer to one GET, and neither control exists
         until it lands.
       -->
+      <!--
+        AND WHETHER THE PERSON READING IT MAY, WHICH IS THE OTHER HALF OF THE SAME QUESTION.
+
+        The section above states that this is an owner's screen, and until now it stated it to
+        everybody and then drew the two controls anyway. The host is asked first and the person
+        second, in that order and not the other, because a host with no door has none for an owner
+        either: `mintsHere === false` is true of every reader, and only after that does it matter
+        who is asking.
+      -->
       <Section title={mailWords.title}>
         <p class="hint">{mailWords.how}</p>
-        {#if mintsHere === true}
+        {#if mintsHere === false}
+          <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the
+               address and what writing and deleting that file do, so the person leaves with the thing
+               they came for instead of a control that cannot work. Nothing is said about a fresh
+               sign-in, because there is no door here for a sign-in to open. -->
+          <p class="hint">{mailWords.unrouted}</p>
+        {:else if mintsHere === true && !anOwner}
+          <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
+               says. Written as a bare `{:else if !anOwner}` this arm also caught the moment before
+               the probe lands, where `mintsHere` is still `null`: a colleague on a host with no door
+               read "Only an owner of this record can do this", and then watched it be replaced by
+               the sentence about `inbound.token` when the GET came back. The section says one thing
+               or says nothing, and an owner has always been drawn nothing until the door answers. -->
+          <p class="hint">{levelWords.ownersOnly}</p>
+        {:else if mintsHere === true}
           <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
                rather than leaving a blank where a value would go and letting it read as "you have none". -->
           <p class="hint">{mailWords.unknown}</p>
@@ -2464,12 +2571,6 @@
             </div>
           {/if}
           <p class="hint">{mailWords.freshWhy}</p>
-        {:else if mintsHere === false}
-          <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the address
-               and what writing and deleting that file do, so the person leaves with the thing they came for
-               instead of a control that cannot work. Nothing is said about a fresh sign-in, because there is
-               no door here for a sign-in to open. -->
-          <p class="hint">{mailWords.unrouted}</p>
         {/if}
       </Section>
     {:else if area === 'notifications'}
@@ -2556,9 +2657,15 @@
             </li>
           {/each}
         </ul>
+        <!-- AND TAKING ONE IS THE OWNER'S. `snapshot` needs `owner`, and a `read` colleague was
+             offered this button over a list already drawing the record's refusal: pressing it
+             answered with three toasts at once, one of them about restoring, which was not pressed.
+             The refusal above this is the record's own sentence, so nothing is said twice. -->
+        {#if anOwner}
         <div class="row-actions">
           <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
         </div>
+        {/if}
       </Section>
 
       <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
@@ -2651,7 +2758,18 @@
         <p class="hint">{DEPLOYMENT.kind === 'self-host' ? copy.billingSelfHost : copy.billingCloud}</p>
         <div class="row-actions">
           <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
-          <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
+          <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
+               `owner`, so offering a colleague *Export the record* here is an invitation to a screen
+               where all four buttons refuse. Usage is the account's rather than the record's and
+               stays.
+
+               NOTHING IS SAID IN ITS PLACE HERE, AND THAT IS THE ONE EXCEPTION ON THIS SCREEN. The
+               act lives on `/settings/export`, which is still in the rail and now says in its own
+               words who may do it: a second copy of that sentence under a row holding an unrelated
+               link would be a sentence with no clear subject. -->
+          {#if anOwner}
+            <Button weight="quiet" href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
+          {/if}
         </div>
       </Section>
     {:else if area === 'delete'}
@@ -2675,6 +2793,23 @@
         specifies HOW to do — `49 §4.2`'s `authed_at` is the only lever the documents give — so the
         screen says it will be asked for rather than inventing a mechanism.
       -->
+      <!--
+        AND IT IS THE OWNER'S, WHICH IS THE ONE PLACE THAT COST THE MOST TO GET WRONG.
+
+        Driven as a `read` colleague: this screen drew *"Delete studio. Deleting studio removes every
+        list, page and row in it. It cannot be undone."*, the confirm field and the red button, to
+        somebody who cannot change a single row. One control said it was off and nothing on the
+        screen said why, so the field read as the way to turn the button on.
+
+        THE SENTENCE REPLACES THE WHOLE BLOCK rather than standing beside a disabled one, because
+        there is nothing here for a colleague to fill in: `deleteRecord` needs `owner`, and a person
+        who is not one has no second step to take on this screen except asking somebody.
+      -->
+      {#if !anOwner}
+        <Section title={copy.deleteRecord(RECORD)}>
+          <Empty kind="no-permission" title={levelWords.ownersOnly} />
+        </Section>
+      {:else}
       <Section title={copy.deleteRecord(RECORD)}>
         <div class="danger">
           <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
@@ -2708,6 +2843,7 @@
           {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
         </div>
       </Section>
+      {/if}
 
     {:else if area === 'export'}
       <Section title={copy.yourData}>
@@ -2727,12 +2863,26 @@
              a file, which is what somebody means when they open the source of a page. The three
              layers are unchanged — only the name on the container moved. -->
         <p class="hint">{copy.exportWhat}</p>
+        <!--
+          AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
+
+          `export` needs `owner`, so all four export buttons refused a colleague at the press. What
+          does not need the record at all is `Check a file`: `checkBrainl` runs in this browser over
+          a file the person already holds, sends nothing anywhere and asks the record nothing, so it
+          stays exactly as it is for every reader. That split is the whole point of asking per
+          control rather than per screen.
+        -->
+        {#if !anOwner}
+          <p class="hint">{levelWords.ownersOnly}</p>
+        {/if}
         <div class="row-actions">
+          {#if anOwner}
           <Button
             disabled={exporting !== null}
             aria-busy={exporting === 'record'}
             onclick={() => takeCopy('record', 'The whole record would be written to one .brain file, a SQLite database you can open with sqlite3')}
           >{copy.export}</Button>
+          {/if}
           <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
                import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
           <Button weight="bare" disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{copy.verifyFile}</Button>
@@ -2766,6 +2916,9 @@
       <Section title={copy.takeAway}>
         <p class="hint">{copy.takeAwayWhat}</p>
         <div class="row-actions">
+          <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record.
+               `Share setup` stays, because it is a link to a screen that explains itself. -->
+          {#if anOwner}
           <Button
             weight="quiet"
             disabled={exporting !== null}
@@ -2778,6 +2931,7 @@
             aria-busy={exporting === 'rows'}
             onclick={() => takeCopy('rows', 'The rows would be written without where each one came from, which is a clean handover')}
           >{copy.exportRows}</Button>
+          {/if}
           <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
           <Button weight="bare" href="/packs/share">{copy.shareSetup}</Button>
         </div>
