@@ -42,9 +42,10 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { noRecord } from './device.ts';
-import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam } from './metrics.ts';
+import { format, fxNote, hrefFor, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
+import { compile } from './where.ts';
 import { labels, relabel } from '../voice.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -52,6 +53,19 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
 export const liveWords = {
   cannot: 'This block cannot be drawn from the record yet.',
   changed: 'The page changed while it was being read.',
+  /**
+   * WHAT A REDUCING FIGURE SAYS WHEN THE FIELD IT ADDS UP IS ONE NOBODY HAS FILLED IN.
+   *
+   * It is the tile's half of the sentence the bar beside it already draws, *"No project in play says
+   * what it earns. Put a year on one and it draws here."* That bar can name the field because a
+   * declaration wrote its `empty:` for one block; this line is said under any figure, so it names
+   * what happened rather than what to type.
+   *
+   * IT BELONGS IN `copy.ts` AND IS HERE BECAUSE THAT FILE IS ANOTHER AGENT'S THIS RUN. `liveWords`
+   * is already the two sentences this path says for itself, so a third sits beside them rather than
+   * being written twice; moving it is a rename and nothing else.
+   */
+  unsaid: 'No row has filled this in yet.',
 } as const;
 
 /** A refusal as the record sends one, and only the keys read here. */
@@ -248,7 +262,51 @@ const columnsOf = (b: Answered) => {
  * `{rows: 0, held: 40}`, Home answered `tone: "good"` with a link and this answered no verdict and no
  * link. One figure, two screens, two answers — and the project page is the screen the kernel's own
  * narrowing of `held` was written for, so it was the screen most likely to be asked.
+ *
+ * AND THERE IS A THIRD STATE BETWEEN THOSE TWO, which `unsaid` below is: a list that holds rows where
+ * not one of them carries the field the figure adds up. Its own paragraph says what that drew.
  */
+/** The four aggregations that reduce a FIELD to one number. A count reads rows and is not one of them. */
+const REDUCING = ['sum', 'avg', 'min', 'max'] as const;
+
+/** The fields a figure adds up, averages or takes a bound of, both halves of a pair included. */
+function reducedFields(value: MetricDecl['value']): string[] {
+  const halves: unknown[] = 'diff' in value ? [value.diff.of, value.diff.per] : 'ratio' in value ? [value.ratio.of, value.ratio.per] : [value];
+  return halves.flatMap((half) => {
+    const said = isObject(half) ? half : {};
+    return REDUCING.flatMap((word) => {
+      const operand = said[word];
+      if (typeof operand === 'string') return [operand];
+      /* A ROW-LEVEL PRODUCT reduces over the field it multiplies, which is the first half of `product`. */
+      const product = isObject(operand) && Array.isArray(operand.product) ? operand.product[0] : null;
+      return typeof product === 'string' ? [product] : [];
+    });
+  });
+}
+
+/**
+ * WHETHER A FIGURE'S OWN PREDICATE REQUIRES THE FIELD IT REDUCES OVER TO BE FILLED IN.
+ *
+ * THIS IS THE LINE BETWEEN THE TWO ZEROES, and it is narrow on purpose. `out-30d` sums `amount`
+ * where the obligation is open and due inside a month: nothing matched over forty obligations is
+ * GBP 0.00 owed, which is the answer that figure exists to give, and it keeps its verdict and its
+ * door. `projects-earning` sums `revenue` where `revenue is set`: nothing matched means no row
+ * carries the number being added up, so its zero is the absence of an answer rather than one.
+ *
+ * `compile` IS ASKED RATHER THAN THE SENTENCE BEING READ A SECOND TIME. The same rule written twice
+ * is what `metrics.ts` and the kernel's `scopeOf` are still paying for (`50 §1`), and the grammar
+ * spells this clause three ways, `is set`, `is present` and `is not empty`, all of which compile to
+ * one `present` clause. A register the app has no declaration for compiles to no clauses, so the
+ * tile answers as it did before rather than guessing.
+ */
+function overUnsaidField(decl: MetricDecl): boolean {
+  const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
+  if (register === null) return false;
+  const reduced = reducedFields(decl.value);
+  if (reduced.length === 0) return false;
+  return compile(register, decl.where).clauses.some((c) => c.op === 'present' && reduced.includes(c.field));
+}
+
 const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
   typeof v === 'object' && v !== null && (typeof (v as { lte?: unknown }).lte === 'number' || typeof (v as { gte?: unknown }).gte === 'number');
 
@@ -277,7 +335,32 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
-  const met = empty ? null : r.met;
+  /**
+   * AND THE STATE BETWEEN THE TWO: THE LIST HOLDS ROWS, AND NOT ONE OF THEM HAS SAID.
+   *
+   * The rule above is the kernel's, written for a COUNT, and its own words are that zero matched
+   * over rows that exist is good news (`packages/kernel/src/metrics.ts`). A REDUCING figure turns
+   * that sentence over. A sum of no values is zero and the kernel means it to be, so `GBP 0.00` is
+   * the same number whether a portfolio earned nothing or nobody has written down what it earns,
+   * and `target: { gte: 0 }` on a money sum is met by every value such a sum can take, which is the
+   * decoration a target is refused at install for being. So `met: true` carried no measurement and
+   * the tile drew a tick anyway.
+   *
+   * MEASURED AT HIS SIZE, on the record `loop/research-at-scale.md` §1 built: 27 projects, 14 in
+   * play, a monthly figure held for three of them and `revenue` unset on every row, because the
+   * importer files a monthly figure as a reading and has no year to write. After `a89bc072` put
+   * `revenue is set` on the Earning figures the reading is `rows: 0, held: 27`, and this renderer
+   * answered `tone: "good"` with `href: /r/things?f=lane:in:building,earning&f=revenue:is:set` —
+   * a green GBP 0.00 with a door into a list of no rows, on the first screen he opens about his
+   * portfolio, in the same block row as a bar correctly drawing "No project in play says what it
+   * earns." One page, two blocks, two answers.
+   *
+   * THE TONE AND THE DOOR GO AND THE SENTENCE ARRIVES, which is what `api.ts` already does for the
+   * empty register a few lines from its own `held === 0`. The figure itself stays: a total of
+   * nothing is zero, and it is the verdict on it that was invented.
+   */
+  const unsaid = !empty && r.rows === 0 && decl !== undefined && overUnsaidField(decl);
+  const met = empty || unsaid ? null : r.met;
   /* THE LINE IS THE RECORD'S SERIES, and only numbers and gaps are drawn: anything else is not a day. */
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   return {
@@ -293,9 +376,9 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    note: [said(decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
+    note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    ...(decl && !empty ? { href: hrefFor(decl) } : {}),
+    ...(decl && !empty && !unsaid ? { href: hrefFor(decl) } : {}),
   };
 }
 

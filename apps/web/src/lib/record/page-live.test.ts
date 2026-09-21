@@ -733,3 +733,53 @@ test('AND A LIVE SECTION COUNTS THE WHOLE MATCH, because the sample does and the
   assert.equal(drawn.total, 301);
   assert.equal(drawn.shown, 301, 'a section drew a slice line over rows it never draws');
 });
+
+test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and says so in the note', () => {
+  /**
+   * THE THIRD STATE, DRIVEN. `projects-earning` sums `revenue` where `revenue is set`, so `rows: 0`
+   * over `held: 27` is not GBP 0.00 earned, it is nobody having written down what is earned. Before
+   * this, the tile came through `met: true`, `tone: 'good'` and a door into a list of no rows.
+   *
+   * THE TWO CASES BESIDE IT ARE WHAT KEEPS THE RULE NARROW. `out-30d` sums `amount` where the
+   * obligation is open and due inside a month, a predicate that says nothing about `amount`: nothing
+   * matched there IS the answer, so its verdict and its door stay. And `projects-earning` over rows
+   * that did say keeps both as well.
+   *
+   * THIS TEST WAS RE-AUTHORED BY THE CALLER after the run that wrote it lost the file: a concurrent
+   * agent restoring its own mutations checked these two paths back to HEAD, and only the source
+   * survived in a backup. The three assertions below are the three the original's mutation proof
+   * named, and each was driven red here by hand before being left green.
+   */
+  const earning = (reading: { rows: number; held: number }) =>
+    blockOf(
+      {
+        kind: 'stat',
+        cells: [{ metric: 'projects-earning' }, { metric: 'projects-earning-before' }],
+        readings: [
+          { metric: 'projects-earning', reading: { value: 0, unit: 'GBP', met: true, refusals: [], ...reading } },
+          { metric: 'projects-earning-before', reading: { value: 0, unit: 'GBP', met: true, refusals: [], ...reading } },
+        ],
+        rows: [],
+        matched: 0,
+        refusals: [],
+      } as never,
+      new Map(),
+      AT,
+    );
+  const unsaid = earning({ rows: 0, held: 27 }).metrics?.[0];
+  assert.equal(unsaid?.value, 'GBP 0.00', 'a total of nothing is still zero');
+  assert.equal(unsaid?.tone, undefined, 'a total of nothing is not good news');
+  assert.equal((unsaid as { href?: string } | undefined)?.href, undefined, 'no door into a list of no rows');
+  assert.equal(unsaid?.note, liveWords.unsaid);
+
+  /* A FIGURE WHOSE PREDICATE SAYS NOTHING ABOUT THE FIELD IT SUMS IS UNTOUCHED: the clause on
+     `projects-earning-before` is `revenue is set` and it sums `earned_before`, so its zero is a
+     measured zero over the projects that did say. */
+  const other = earning({ rows: 0, held: 27 }).metrics?.[1];
+  assert.equal(other?.tone, 'good');
+  assert.notEqual(other?.note, liveWords.unsaid);
+
+  const said = earning({ rows: 3, held: 27 }).metrics?.[0];
+  assert.equal(said?.tone, 'good', 'rows that said keep their verdict');
+  assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
+});
