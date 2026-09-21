@@ -35,13 +35,33 @@
   deliberately not restated. The 6.4 above came from a tool this pass does not have, and a second
   figure from a different syllable counter would not be comparable to it, which is worse than
   leaving the first one standing as the record of what was measured when.
+
+  AND THE ENTRIES HAVE LEFT THIS FILE, which is the only structural change since. They are
+  `./entries.ts`, each one naming the commits it is drawn from, because while they were literals in
+  a component the only thing that could tell whether this page was still true was a person opening
+  it, and that is precisely the check that failed for six days. `../../../scripts/changelog.mjs`
+  holds them against `git log` now: the dates are derived from the commits rather than typed, a day
+  the repository committed on and this page says nothing about is a finding, and so is a body over
+  three sentences. The rule deciding which commits earn an entry is written at the top of
+  `entries.ts`, where somebody arguing with it can find it. That pass added 31 entries on days that
+  already existed and made the page LONGER, which is a deliberate reversal of the cut recorded
+  above: four of the seventeen days were carrying one entry each against 90, 90, 44 and 25 commits,
+  and a page a stranger can skim through is worth less than nothing if what he skims under-reports
+  the week.
+
+  WHAT THAT COST, COUNTED ON THE ENTRIES THEMSELVES AND NOT ON THE BUILT PAGE. This pass did not
+  build the site, and a figure measured a different way would not be comparable to the 3,135 above,
+  which is the reason the reading grade is left alone one paragraph up. Titles and bodies together:
+  4,327 words over 88 entries against 2,864 over 57. The bodies did not grow to get there, which is
+  the part worth measuring rather than asserting: 37.5 words to a body against 38.9, and the longest
+  body added is 43 words where the longest already on the page is 51. All 57 earlier entries are
+  still here by title and none of them was edited to make room.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import type { Hue } from '$lib/icons.ts';
   import { APP, SOURCE, site } from '$lib/copy.ts';
-
-  type Entry = { date: string; title: string; body: string; kind: 'shipped' | 'changed' | 'fixed' };
+  import { ENTRIES, type Entry } from './entries.ts';
 
   const STATUS = {
     title: 'The app is live. Nothing is for sale yet.',
@@ -69,525 +89,6 @@
       'Signing in works; there is no sign-up, no billing, and no record to look at yet.',
   };
 
-  const ENTRIES: Entry[] = [
-    /* ── The five days this page was missing ─────────────────────────────────
-       The newest entry below was 2026-09-16 and the tree was on the 21st, with 585 commits in
-       between (`git rev-list --count --since=2026-09-17 HEAD`). The first pass of the redesign
-       would not write these, because writing them means making claims about commits nobody had
-       read, and a changelog that overstates what shipped is worse than one that is stale.
-
-       So they were read. Every entry below names one commit or two, its body says only what that
-       commit's own message and diff support, and where the state was less finished than the
-       subject line sounded, the body says the smaller thing. Nineteen entries for 585 commits is
-       deliberate: most of that week is tests, gates, specifications and documents, and this page
-       is for what a reader can see. */
-    {
-      date: '2026-09-21',
-      kind: 'shipped',
-      title: 'A forwarded message can reach a hosted record, on an address you mint',
-      body:
-        'The Cloud had a mail door and no way to get an address for it. Minting one stores only ' +
-        'the hash of the token and hands you the token once. Rotating it is minting again, and ' +
-        'revoking it is writing nothing in its place.',
-    },
-    {
-      date: '2026-09-21',
-      kind: 'changed',
-      title: 'This site was rebuilt around what fills a page rather than around its colour',
-      body:
-        'Four reference sites were measured in a browser and this one beside them. Almost half of ' +
-        'the home page held nothing but a one pixel rule. It has seven layouts now, six changes ' +
-        'of ground, and the record photographed at the width of the screen.',
-    },
-    {
-      date: '2026-09-21',
-      kind: 'fixed',
-      title: 'A project with no invoices stops being told that none of them are overdue',
-      body:
-        'A figure can tell an empty register from an empty match. One narrowed to a single ' +
-        'project could not, so the emptiest screen in the product drew the one sentence that ' +
-        'field exists to prevent. The count is taken where the narrowing happens now.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'shipped',
-      title: 'Money moves: a ledger, categories, rules, recurring items and instalments',
-      body:
-        'Money declared accounts and bills and nothing else. It carries transactions, categories, ' +
-        'recurring items, instalments and periodic snapshots now, with the rules and figures over ' +
-        'them. A check found one figure adding what you are owed to what you owe.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'shipped',
-      title: 'A message sent in from outside reaches the record, and both hosts open the door',
-      body:
-        'An arrival lands on a route of its own and is read for what it holds. One that nothing ' +
-        'understands is kept whole rather than dropped. A sender can no longer talk the check out ' +
-        'of its verdict by writing its own headers.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'shipped',
-      title: 'Spark asks a model, accounts for what it spent, and cites what it read',
-      body:
-        'The engine behind it is a package of its own: the triage shapes, the pattern draft and ' +
-        'the proposal door. Every ask is written down as a row, the refused ones included. A ' +
-        "stranger's message goes to the model inside its own fence.",
-    },
-    {
-      date: '2026-09-20',
-      kind: 'shipped',
-      title: 'A self-host can be reached from a phone, over https, on a name that stays',
-      body:
-        'It could not hold a session, so nobody could sign in away from the desk. It serves https ' +
-        'with a certificate you supply, and prints the origin a passkey is bound to. Changing ' +
-        'that name stops every passkey already registered, and the file says so.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'changed',
-      title: 'Every command takes --json, which the specification has promised since it was written',
-      body:
-        'Not one command accepted the flag, so four written that week had to refuse it. It is ' +
-        'decided in one place now: the answer goes to one stream and everything else to the ' +
-        'other. A refusal is as readable by a machine as a success is.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'shipped',
-      title: 'The hosted Worker writes the nightly copy the self-host already wrote',
-      body:
-        'A nightly job walks the directory, and each record signs its whole file into object ' +
-        'storage. Thirty are kept, which is what a self-host has done for a week. The copy ' +
-        'refuses to write until an operator sets a real key to seal it.',
-    },
-    {
-      date: '2026-09-20',
-      kind: 'fixed',
-      title: 'Two currencies were added together in the two places nothing was looking',
-      body:
-        'A connector took the amount off a money row and left its currency behind. A hundred ' +
-        'Egyptian pounds and two and a half dollars were written down as one number. A reading ' +
-        'like that is refused whole now, because a total that is quietly short is worse than none.',
-    },
-    {
-      date: '2026-09-19',
-      kind: 'shipped',
-      title: 'A connector fetches from a provider on a schedule and writes back what it gets',
-      body:
-        'A connector could be declared and nothing could run one. Eight kinds of credential open ' +
-        'from a sealed grant and are never logged. Paging stops on its own terms, and a resumed ' +
-        'run reads back what it left rather than starting again.',
-    },
-    {
-      date: '2026-09-19',
-      kind: 'shipped',
-      title: "Reading a stranger's message: the anchors, the extractors, money and dates",
-      body:
-        'The package for this had a long specification and no code. It has eighty-one tests now, ' +
-        'one for each row of that document. The currency is found before the number is read, ' +
-        'because 1.250 is one amount in Cairo and a different one in London.',
-    },
-    {
-      date: '2026-09-19',
-      kind: 'fixed',
-      title: 'A hosted run counts what it may spend before it spends it',
-      body:
-        'Cloudflare allows eight hundred outward requests to one invocation, and a connector at ' +
-        'forty pages can make eighty-six. Passing that ceiling ends the work of every other ' +
-        'record in the same run. Each job reserves its worst case now, and one run always goes.',
-    },
-    {
-      date: '2026-09-17',
-      kind: 'shipped',
-      title: 'A the old tool export moves into BrainDog with one command',
-      body:
-        'It reads the export and maps projects, tasks, people, numbers, questions, accounts and ' +
-        'bills onto Solo founder. Each row keeps its old key in its tags, so a second run updates ' +
-        'and never adds. No key value is read, and a row shaped like one is left out whole.',
-    },
-    {
-      date: '2026-09-17',
-      kind: 'shipped',
-      title: 'Money in more than one currency stops refusing to answer',
-      body:
-        'A figure over two currencies used to refuse outright. With no home currency it answers ' +
-        'one amount for each and names the pair it lacks. With one set, it converts at the rate ' +
-        "for each row's own day and says as of when.",
-    },
-    {
-      date: '2026-09-17',
-      kind: 'shipped',
-      title: 'A use case can be shared as a signed file, and a later version is offered',
-      body:
-        'A catalogue holds versions that never change, a bump it works out for itself, and a ' +
-        'checksum. The web lists add-ons beside use cases and says which key signed each one. A ' +
-        'newer version of what a record holds is filed as a proposal and installed only if it is ' +
-        'accepted.',
-    },
-    {
-      date: '2026-09-17',
-      kind: 'changed',
-      title: 'Work, Projects and Team lead with what is waiting on you',
-      body:
-        'A task gains an owner, an agent, a part it belongs to and a day it was done. Work draws ' +
-        'the queue waiting on you, what is due soon, and what agents hold. It was tested on a ' +
-        'real record, with an agent taking work and handing it back.',
-    },
-    {
-      date: '2026-09-17',
-      kind: 'fixed',
-      title: 'A report key is held to six hundred rows a minute on both hosts',
-      body:
-        'A key with no ceiling on it can fill a record with text. It is refused with how long to ' +
-        'wait now, and the answer carries that time in its own header.',
-    },
-    {
-      date: '2026-09-17',
-      kind: 'fixed',
-      title: 'Every control a thumb reaches is 44 pixels on a phone',
-      body:
-        "A question's link was 43 pixels tall and a folded field was 21. Decide drew its box in a " +
-        'way the layout gate cannot read, so it is drawn the way every other hit area is. A ' +
-        'checkbox inside its own label is measured through that label now.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'shipped',
-      title: 'Signing in works, and there is still nothing to sign in to',
-      body:
-        'The one secret sessions are built on is set on production, so passkeys and first run ' +
-        'work. No record can be made yet, and a record is made by the operator rather than by a ' +
-        'visitor.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'changed',
-      title: 'The status report said the writing had not started, and six modules of it had landed',
-      body:
-        'The row for the app writing anything down read nothing started. Six write ' +
-        'modules and their tests were already in the tree. The row is a count now: of 52 ' +
-        'gestures that say nothing was saved, 15 still want a write path.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'shipped',
-      title: 'A page is a file you can pull, edit and push back',
-      body:
-        'A .dog file is one page\'s source, and a .brain holds the whole record. The command ' +
-        'line pulls a page, checks it against the grammar and pushes it back. A file carrying ' +
-        'typed rows is refused, because the printed form keeps only how many there were.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'changed',
-      title: 'The rail collapses to its glyphs instead of being taken away',
-      body:
-        'Collapsing used to remove every row and leave one button in an empty gutter. The rail ' +
-        'narrows to its glyphs now, and each glyph hands its name back on hover and on focus. A ' +
-        'top bar and a menu are shapes you can ask for.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'shipped',
-      title: 'The record switcher lists every record you can reach',
-      body:
-        'It held the one record you were already inside. The directory is asked which records ' +
-        'are open to you, then each of those records is asked about itself. A row is kept only ' +
-        'where the record itself answers with a level.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'shipped',
-      title: 'A row is edited a field at a time, and what points at it is read from the record',
-      body:
-        'Each field writes through on its own, rather than the whole row or nothing. What points ' +
-        'at a row is read from the record too. A key goes into the vault from the browser now.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'changed',
-      title: 'A saved view is a row the record holds, not a URL',
-      body:
-        'A view was a filter sitting in an address, lost when the tab closed. It is a row on a ' +
-        'list now, with its filter, search, order, columns and who saved it. Saving one is an ' +
-        'owner-level act, because everyone sees the list.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'fixed',
-      title: 'The first row you type is written down, instead of being told it went nowhere',
-      body:
-        'The button that commits your first row had no live path at all: it printed that nothing ' +
-        'was saved. On a record the row is written now, and pressing again corrects it rather ' +
-        'than leaving a second one behind.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'shipped',
-      title: 'The app deploys itself, and a gate checks that the deploy landed',
-      body:
-        'A pipeline deploys the commit the checks measured, once they finish, and queues rather ' +
-        'than cancels. A gate then asks the running server which version it believes it is. This ' +
-        'site is meant to follow in the same run and can be a day behind.',
-    },
-    {
-      date: '2026-09-16',
-      kind: 'fixed',
-      title: 'Three screens drew invented rows under your own heading',
-      body:
-        'All three drew the built-in demo whatever record was open, with nothing saying so. The ' +
-        'thread view asks the record now. The other two have no way to read at all, and each ' +
-        'says so rather than inventing rows.',
-    },
-    {
-      date: '2026-09-15',
-      kind: 'shipped',
-      title: 'The app writes to a real record, and most of its screens read one',
-      body:
-        'Until this week every screen drew a made-up business. Nine screens read the record now, ' +
-        'and the app writes to it: rows, cells, states, decisions, arrivals, cards, levels, ' +
-        'tokens and packs. Archiving offers an undo rather than a confirmation.',
-    },
-    {
-      date: '2026-09-14',
-      kind: 'changed',
-      title: 'Everything is a module, and the first question is who are you',
-      body:
-        'On the owner\'s instruction: every module can be turned off and on again, People ' +
-        'included. Setting up a record asks who you are first, and fills the first person in ' +
-        'People with the answer.',
-    },
-    {
-      date: '2026-09-11',
-      kind: 'shipped',
-      title: 'Agents reach the record, and a session can ask where it stands',
-      body:
-        'An agent gets the same typed surface a person does, over MCP, from the command line and ' +
-        'from both hosts. One call returns its run, its project, the last handoff and what is ' +
-        'waiting on the owner.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'changed',
-      title: 'Seventeen renames, and not one of them an id',
-      body:
-        'The product says the word a reader would say and the API keeps its own. Track became ' +
-        'Thread, Estate became Services, Thing became Project, State became Status. Nothing ' +
-        'renamed is an id, a document or a format.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'fixed',
-      title: 'A page made of figures named no register, and was handed to everybody',
-      body:
-        'A table block names the list it draws and a block of figures does not, so a page of ' +
-        'figures was treated as prose. It was handed to every caller, including a read token ' +
-        'whose reach is one list. Fifty-two requests on six routes answered 500 rather than a ' +
-        'refusal.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'fixed',
-      title: 'A sheet destroyed while open took the keyboard with it',
-      body:
-        'A sheet destroyed while open never gave the keyboard lock back, so every bare key in ' +
-        'the product died for the rest of the session. Two clicks from the front page reach it. ' +
-        'The audit log can be narrowed by when as well now.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'fixed',
-      title: 'The two engines were asked the same questions and disagreed sixteen times',
-      body:
-        'Both engines were driven over the same record: 336 measurements, 3,563 filter ' +
-        'sentences, 38 searches, 16 cash walks. Sixteen live disagreements, twelve of which the ' +
-        'browser had right. A sum of sterling invoices declared in dollars was printed rather ' +
-        'than refused.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'fixed',
-      title: 'A money average was stored ten thousand times too large',
-      body:
-        'Two rows at 101 and 102 pounds averaged to 101.5 and were written as 1,015,000, which ' +
-        'every surface renders as ten thousand pounds. The value and the currency are decided ' +
-        'together now. Twenty-two findings in the same pass.',
-    },
-    {
-      date: '2026-09-10',
-      kind: 'fixed',
-      title: 'Eight controls that drew, announced themselves and did nothing',
-      body:
-        'Every segmented control dropped the value you chose: the form held it in one place and ' +
-        'read it from another. The drawer added the row twice on one press. A second edit of a ' +
-        'cell opened on the original value, and the rail folded nothing.',
-    },
-    {
-      date: '2026-09-09',
-      kind: 'shipped',
-      title: 'The app is deployed, from two hostnames and one build',
-      body:
-        'Every push to the main branch builds and deploys the record app. A second hostname ' +
-        'takes the same build from a branch that only moves forward, and wears its own accent, ' +
-        'badge and word in the tab.',
-    },
-    {
-      date: '2026-09-09',
-      kind: 'fixed',
-      title: 'Four gates were asked what input would make them fire',
-      body:
-        'A gate that has never failed may not work. Each source gate was asked what input would ' +
-        'make it fire. The answers were 1 of 7, 3 of 10, a check blind to its own file, and 2 ' +
-        'of 16.',
-    },
-    {
-      date: '2026-09-09',
-      kind: 'fixed',
-      title: 'Six dependency advisories to zero',
-      body:
-        'Three packages moved off version ranges with known holes, and the audit reports ' +
-        'nothing. Nothing published inside the last twenty-four hours installs here.',
-    },
-    {
-      date: '2026-09-08',
-      kind: 'shipped',
-      title: 'The empty record, which nothing had ever looked at',
-      body:
-        'The screen somebody sees the hour they install went six audits unmeasured. It called ' +
-        'their finances healthy, four green ticks over four zeroes, under 996 pixels of the same ' +
-        'three sentences repeated four times.',
-    },
-    {
-      date: '2026-09-08',
-      kind: 'fixed',
-      title: 'No list renders more than it admits to',
-      body:
-        'On 2,614 rows the first paint was 4,001 rows and 102,681 nodes, and eight seconds to ' +
-        'settle. It is 201 rows and 3,137 nodes now, paging to the cap as you scroll.',
-    },
-    {
-      date: '2026-09-08',
-      kind: 'fixed',
-      title: 'The module that decides who can see your business had no test',
-      body:
-        'Nothing anywhere exercised the module every call checks, and it had already shipped two ' +
-        'authorisation defects. Twenty-five mutations are caught now, and one found a last-owner ' +
-        'guard that could never fire.',
-    },
-    {
-      date: '2026-09-08',
-      kind: 'shipped',
-      title: 'Somewhere to type the code every machine prints',
-      body:
-        'The settings area a signing-in machine sends you to had no input in it at all. Its ' +
-        'Approve button asked for a six-digit code no control on the page could take.',
-    },
-    {
-      date: '2026-09-07',
-      kind: 'changed',
-      title: 'Usability is a lens every iteration, not a phase',
-      body:
-        'Twelve settings screens called themselves a mock-up, and a phone read a money page ' +
-        'through a 356-pixel window onto a 450-pixel table. A gate measures every route on a ' +
-        'phone now: no clipping, no sideways scroll, no target under 44 pixels.',
-    },
-    {
-      date: '2026-09-06',
-      kind: 'shipped',
-      title: 'A record can create itself, and says who wrote it',
-      body:
-        'Nothing in this repository could make a new record until this week. A record file ' +
-        'records which build wrote it, and refuses to open if it does not say.',
-    },
-    {
-      date: '2026-09-05',
-      kind: 'shipped',
-      title: 'The backend, from the schema up',
-      body:
-        'Fourteen iterations: the schema, the ledger, the sixteen types, the write path, who may ' +
-        'ask what, search, the vault, rules and the export.',
-    },
-    {
-      date: '2026-09-04',
-      kind: 'shipped',
-      title: 'Order and span, and a page that is about one project',
-      body:
-        'Arranging a page is two operations and no more. The money page walks the runway to the ' +
-        'first day the balance goes under, and names the row that crosses it.',
-    },
-    {
-      date: '2026-09-04',
-      kind: 'shipped',
-      title: 'brain.dog, which is this site',
-      body:
-        'Prerendered, every page finished HTML on disk, and readable with scripting off. It ' +
-        'imports the record app\'s design system rather than resembling it.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'changed',
-      title: 'One skin, because there are two apps now',
-      body:
-        'Tokens, element defaults, the accessibility layer, the palette and the mark moved into ' +
-        'one package both apps import. A second copy of a type scale is a type scale that ' +
-        'drifts.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'shipped',
-      title: 'The new-row form is generated from the declaration',
-      body:
-        'A register declares its fields, so the field type picks the control. A pack that adds a ' +
-        'field gets a form field, and a secret field is absent rather than disabled.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'shipped',
-      title: 'The toast stack, and the undo that is the reason for it',
-      body:
-        'A destructive action here is undone, not confirmed. A confirmation asks its question ' +
-        'when the reader knows the least they ever will. Ten seconds, paused under the pointer.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'changed',
-      title: 'The red is a third quieter, and it is the accent again',
-      body:
-        'The first house red read as an alarm going off on a screen where nothing was wrong. ' +
-        'Same hue, a third less chroma. The old value is the band the overdue chip is struck ' +
-        'from.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'fixed',
-      title: 'A link and an overdue figure were the same colour',
-      body:
-        'The accent and the overdue red share a hue, and in the light scheme they landed one ' +
-        'value apart. The generator walks the link until it is eight L* clear of body ink and of ' +
-        'the overdue red.',
-    },
-    {
-      date: '2026-09-03',
-      kind: 'shipped',
-      title: 'The theme generator, and a palette that had to argue for itself',
-      body:
-        'Themes are generated by solving for contrast rather than picking lightness, so most of ' +
-        'the sixteen accessibility checks become tautologies. A theme that fails is refused, ' +
-        'naming the pair and what to move.',
-    },
-    {
-      date: '2026-09-02',
-      kind: 'shipped',
-      title: 'The design set closed, after an adversarial review changed it',
-      body:
-        'Four reviewers audited consistency, feasibility, usability and the thesis. The roadmap ' +
-        'was roughly three times optimistic, and the index model would have failed at the ' +
-        'twelfth installed pack.',
-    },
-  ];
-
   const LABEL = { shipped: 'shipped', changed: 'changed', fixed: 'fixed' } as const;
 
   /* The word is the meaning and the hue agrees with it: green for new work, blue for a repair, amber
@@ -603,9 +104,10 @@
    * the left edge, and the page had no unit larger than one paragraph: no way to see that a day
    * happened, no way to skim to a day, nothing between the heading and the whole log.
    *
-   * The entries are already in date order in the array above and this preserves that order
-   * exactly rather than sorting: the order is editorial, most-important-first inside a day, and a
-   * sort by date would silently reshuffle it.
+   * The entries arrive in date order from `entries.ts` and this preserves that order exactly
+   * rather than sorting: the order is editorial, most-important-first inside a day, and a sort by
+   * date would silently reshuffle it. That the dates descend is check 5 of `changelog.mjs`, so a
+   * day reopened after it ended is a finding rather than a second heading nobody notices.
    */
   const DAYS: { date: string; entries: Entry[] }[] = [];
   for (const entry of ENTRIES) {
@@ -614,7 +116,7 @@
     else DAYS.push({ date: entry.date, entries: [entry] });
   }
 
-  /** How many of each kind, counted from the list above so the numbers cannot drift from it. */
+  /** How many of each kind, counted from `entries.ts` so the numbers cannot drift from it. */
   const KINDS = ['shipped', 'fixed', 'changed'] as const;
   const COUNT: Record<Entry['kind'], number> = { shipped: 0, changed: 0, fixed: 0 };
   for (const entry of ENTRIES) COUNT[entry.kind] += 1;

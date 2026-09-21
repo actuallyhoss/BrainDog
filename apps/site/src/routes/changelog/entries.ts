@@ -1,0 +1,953 @@
+/**
+ * The changelog's entries, and the rule that decides which ones exist.
+ *
+ * THEY LEFT `+page.svelte` SO SOMETHING OTHER THAN A READER COULD CHECK THEM. Every entry was a
+ * literal inside a Svelte component, which meant the only thing that could tell whether this page
+ * was still true was a person opening it. That is exactly the check that failed: the page said
+ * *nothing has shipped yet* for six days after something had, and it went on saying it because no
+ * run of anything looked. `../../../scripts/changelog.mjs` imports this file and holds it against
+ * `git log`, so the page is checked rather than remembered.
+ *
+ * ── WHAT EARNS AN ENTRY ──────────────────────────────────────────────────────────────────────
+ *
+ * One entry per thing somebody outside this repository could point at: a capability that did not
+ * exist, a surface that behaves differently, or a defect that made one of those wrong. Forty
+ * commits toward one capability are one entry, and the entry is named after the capability rather
+ * than after the commit that finished it.
+ *
+ * NOTHING IS EARNED BY SIZE. Tests, gates, specifications, design documents, status reports,
+ * backlogs, comment repairs, bookkeeping and refactors nobody outside meets earn no entry however
+ * large the diff, because this page is read by somebody deciding whether the product is alive and
+ * a gate is not a thing he can open. That rule is why the log was 1,288 commits on 2026-09-21 and
+ * this list is 88 entries: read over the whole history, most of those commits are the loop's own
+ * paperwork. The 1,288 moves every hour and the 88 does not, which is the point of the rule.
+ *
+ * AND NOTHING IS INVENTED. Every entry names the commits it is drawn from, its body says only what
+ * those commits' own messages and diffs support, and where the state was less finished than a
+ * subject line sounded, the body says the smaller thing. If a commit cannot be read for what
+ * shipped, it gets no entry rather than a guess.
+ *
+ * ── WHY `commits` IS NOT DECORATION ──────────────────────────────────────────────────────────
+ *
+ * It is the field the checker works from, and it turns three of the promises above into arithmetic:
+ *
+ *   - `date` IS NOT TYPED, IT IS DERIVED. The checker requires `date` to equal the author date of
+ *     the FIRST commit in `commits`, so a date cannot drift, be guessed, or be carried over from
+ *     the entry above while somebody edits around it. Later hashes are supporting evidence and may
+ *     be any day, which is how a thing that shipped over two days keeps one date.
+ *   - AN INVENTED ENTRY HAS NOWHERE TO POINT. Each hash must resolve, unambiguously, to one commit
+ *     in the log the checker was pointed at.
+ *   - THE FIRST HASH IS AN ANCHOR AND SO IT IS UNIQUE. Two entries anchored to one commit is the
+ *     shape of a day written up twice, which is how a changelog grows entries the history does not
+ *     have. Supporting hashes may repeat.
+ *
+ * ── HOW THE THIN DAYS WERE FOUND, AND WHAT IT COST ───────────────────────────────────────────
+ *
+ * The page had 57 entries over the 17 days this repository has committed on, so nothing was
+ * MISSING a day. What it was missing was proportion. Counted against `git log --format=%ad`:
+ * 2026-09-05 was 90 commits behind one entry, 2026-09-06 another 90 behind one, 2026-09-07 44
+ * behind one, and 2026-09-15 25 behind one. The single 09-05 entry named nine things in one
+ * sentence ("the schema, the ledger, the sixteen types, the write path, who may ask what, search,
+ * the vault, rules and the export") and a reader would call at least six of those separate shipped
+ * things, because each is a capability he could go and use.
+ *
+ * So 31 entries were added, all of them on days that already existed, and the page got longer
+ * rather than shorter. That is a deliberate reversal of the pass recorded at the top of
+ * `+page.svelte`, which cut this page from 4,458 words to 1,893 for good measured reasons. The
+ * trade it makes: a page a stranger can skim and that under-reports four of its seventeen days is
+ * worse than a slightly longer page that does not, because a skimmable page with holes in it is
+ * still the artefact whose only job is proof of life. The day headings are what keeps it skimmable,
+ * and none of the new bodies is longer than the bodies beside them.
+ *
+ * ── THE WRITING RULES, WHICH THE CHECKER NOW ALSO HOLDS ──────────────────────────────────────
+ *
+ * The title is the entry and the body is the evidence: at most three sentences, no sentence over
+ * 25 words, and no URL, because the one link a changelog usually carries is to a releases page and
+ * this repository tags without publishing GitHub Releases.
+ */
+
+export type Entry = {
+  date: string;
+  title: string;
+  body: string;
+  kind: 'shipped' | 'changed' | 'fixed';
+  /**
+   * The commits this entry is drawn from, newest-relevant first. The FIRST one sets the date and
+   * must be unique across the list; the rest are evidence. Short hashes are fine and are resolved
+   * by prefix, so an ambiguous one is a finding rather than a coin toss.
+   */
+  commits: string[];
+};
+
+/**
+ * Newest first, and inside a day the order is EDITORIAL rather than chronological: the thing a
+ * reader would care about most goes at the top of its day. `+page.svelte` groups consecutive
+ * entries that share a date and does not sort, so this order is the order on the page, and the
+ * checker only requires that a day never reappears after it has ended.
+ */
+export const ENTRIES: Entry[] = [
+  {
+    date: '2026-09-21',
+    kind: 'shipped',
+    title: 'A forwarded message can reach a hosted record, on an address you mint',
+    body:
+      'The Cloud had a mail door and no way to get an address for it. Minting one stores only ' +
+      'the hash of the token and hands you the token once. Rotating it is minting again, and ' +
+      'revoking it is writing nothing in its place.',
+    commits: ['f96fc499', 'e9539e83', '95e1055f'],
+  },
+  {
+    date: '2026-09-21',
+    kind: 'changed',
+    title: 'This site was rebuilt around what fills a page rather than around its colour',
+    body:
+      'Four reference sites were measured in a browser and this one beside them. Almost half of ' +
+      'the home page held nothing but a one pixel rule. It has seven layouts now, six changes ' +
+      'of ground, and the record photographed at the width of the screen.',
+    commits: ['8d6bcc9c', '164ad664'],
+  },
+  {
+    date: '2026-09-21',
+    kind: 'fixed',
+    title: 'A project with no invoices stops being told that none of them are overdue',
+    body:
+      'A figure can tell an empty register from an empty match. One narrowed to a single ' +
+      'project could not, so the emptiest screen in the product drew the one sentence that ' +
+      'field exists to prevent. The count is taken where the narrowing happens now.',
+    commits: ['72751ef6'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'shipped',
+    title: 'Money moves: a ledger, categories, rules, recurring items and instalments',
+    body:
+      'Money declared accounts and bills and nothing else. It carries transactions, categories, ' +
+      'recurring items, instalments and periodic snapshots now, with the rules and figures over ' +
+      'them. A check found one figure adding what you are owed to what you owe.',
+    commits: ['a015a9f3', '4da40586'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'shipped',
+    title: 'A message sent in from outside reaches the record, and both hosts open the door',
+    body:
+      'An arrival lands on a route of its own and is read for what it holds. One that nothing ' +
+      'understands is kept whole rather than dropped. A sender can no longer talk the check out ' +
+      'of its verdict by writing its own headers.',
+    commits: ['a94764dd', '77f82ccb', '5d0468f3'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'shipped',
+    title: 'Spark asks a model, accounts for what it spent, and cites what it read',
+    body:
+      'The engine behind it is a package of its own: the triage shapes, the pattern draft and ' +
+      'the proposal door. Every ask is written down as a row, the refused ones included. A ' +
+      "stranger's message goes to the model inside its own fence.",
+    commits: ['2435d947'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'shipped',
+    title: 'A self-host can be reached from a phone, over https, on a name that stays',
+    body:
+      'It could not hold a session, so nobody could sign in away from the desk. It serves https ' +
+      'with a certificate you supply, and prints the origin a passkey is bound to. Changing ' +
+      'that name stops every passkey already registered, and the file says so.',
+    commits: ['9066cb63'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'changed',
+    title: 'Every command takes --json, which the specification has promised since it was written',
+    body:
+      'Not one command accepted the flag, so four written that week had to refuse it. It is ' +
+      'decided in one place now: the answer goes to one stream and everything else to the ' +
+      'other. A refusal is as readable by a machine as a success is.',
+    commits: ['f6d64d8a', '5252ca3d'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'shipped',
+    title: 'The hosted Worker writes the nightly copy the self-host already wrote',
+    body:
+      'A nightly job walks the directory, and each record signs its whole file into object ' +
+      'storage. Thirty are kept, which is what a self-host has done for a week. The copy ' +
+      'refuses to write until an operator sets a real key to seal it.',
+    commits: ['c64eb36c', 'e85bd55c'],
+  },
+  {
+    date: '2026-09-20',
+    kind: 'fixed',
+    title: 'Two currencies were added together in the two places nothing was looking',
+    body:
+      'A connector took the amount off a money row and left its currency behind. A hundred ' +
+      'Egyptian pounds and two and a half dollars were written down as one number. A reading ' +
+      'like that is refused whole now, because a total that is quietly short is worse than none.',
+    commits: ['d76cd016'],
+  },
+  {
+    date: '2026-09-19',
+    kind: 'shipped',
+    title: 'A connector fetches from a provider on a schedule and writes back what it gets',
+    body:
+      'A connector could be declared and nothing could run one. Eight kinds of credential open ' +
+      'from a sealed grant and are never logged. Paging stops on its own terms, and a resumed ' +
+      'run reads back what it left rather than starting again.',
+    commits: ['9b7be06a', '74d4c8cb', 'fb96f41d'],
+  },
+  {
+    date: '2026-09-19',
+    kind: 'shipped',
+    title: "Reading a stranger's message: the anchors, the extractors, money and dates",
+    body:
+      'The package for this had a long specification and no code. It has eighty-one tests now, ' +
+      'one for each row of that document. The currency is found before the number is read, ' +
+      'because 1.250 is one amount in Cairo and a different one in London.',
+    commits: ['799849f4'],
+  },
+  {
+    date: '2026-09-19',
+    kind: 'fixed',
+    title: 'A hosted run counts what it may spend before it spends it',
+    body:
+      'Cloudflare allows eight hundred outward requests to one invocation, and a connector at ' +
+      'forty pages can make eighty-six. Passing that ceiling ends the work of every other ' +
+      'record in the same run. Each job reserves its worst case now, and one run always goes.',
+    commits: ['9fc671fa'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'shipped',
+    title: 'A the old tool export moves into BrainDog with one command',
+    body:
+      'It reads the export and maps projects, tasks, people, numbers, questions, accounts and ' +
+      'bills onto Solo founder. Each row keeps its old key in its tags, so a second run updates ' +
+      'and never adds. No key value is read, and a row shaped like one is left out whole.',
+    commits: ['7f4489af'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'shipped',
+    title: 'Money in more than one currency stops refusing to answer',
+    body:
+      'A figure over two currencies used to refuse outright. With no home currency it answers ' +
+      'one amount for each and names the pair it lacks. With one set, it converts at the rate ' +
+      "for each row's own day and says as of when.",
+    commits: ['a33c44b1', '5edb45af'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'shipped',
+    title: 'A use case can be shared as a signed file, and a later version is offered',
+    body:
+      'A catalogue holds versions that never change, a bump it works out for itself, and a ' +
+      'checksum. The web lists add-ons beside use cases and says which key signed each one. A ' +
+      'newer version of what a record holds is filed as a proposal and installed only if it is ' +
+      'accepted.',
+    commits: ['b027b418', 'c0cc921c', '858aa3fd'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'changed',
+    title: 'Work, Projects and Team lead with what is waiting on you',
+    body:
+      'A task gains an owner, an agent, a part it belongs to and a day it was done. Work draws ' +
+      'the queue waiting on you, what is due soon, and what agents hold. It was tested on a ' +
+      'real record, with an agent taking work and handing it back.',
+    commits: ['a960c968', 'e7fa8abb', '8f18de1c'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'fixed',
+    title: 'A report key is held to six hundred rows a minute on both hosts',
+    body:
+      'A key with no ceiling on it can fill a record with text. It is refused with how long to ' +
+      'wait now, and the answer carries that time in its own header.',
+    commits: ['d0e1ab53', 'c697dc3a'],
+  },
+  {
+    date: '2026-09-17',
+    kind: 'fixed',
+    title: 'Every control a thumb reaches is 44 pixels on a phone',
+    body:
+      "A question's link was 43 pixels tall and a folded field was 21. Decide drew its box in a " +
+      'way the layout gate cannot read, so it is drawn the way every other hit area is. A ' +
+      'checkbox inside its own label is measured through that label now.',
+    commits: ['96671762'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'shipped',
+    title: 'Signing in works, and there is still nothing to sign in to',
+    body:
+      'The one secret sessions are built on is set on production, so passkeys and first run ' +
+      'work. No record can be made yet, and a record is made by the operator rather than by a ' +
+      'visitor.',
+    commits: ['a78b44c8', '746d6fc2'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'changed',
+    title: 'The status report said the writing had not started, and six modules of it had landed',
+    body:
+      'The row for the app writing anything down read nothing started. Six write ' +
+      'modules and their tests were already in the tree. The row is a count now: of 52 ' +
+      'gestures that say nothing was saved, 15 still want a write path.',
+    commits: ['c8ebfbf1'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'shipped',
+    title: 'A page is a file you can pull, edit and push back',
+    body:
+      "A .dog file is one page's source, and a .brain holds the whole record. The command " +
+      'line pulls a page, checks it against the grammar and pushes it back. A file carrying ' +
+      'typed rows is refused, because the printed form keeps only how many there were.',
+    commits: ['9384ebe7', '1dd8c7a8'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'changed',
+    title: 'The rail collapses to its glyphs instead of being taken away',
+    body:
+      'Collapsing used to remove every row and leave one button in an empty gutter. The rail ' +
+      'narrows to its glyphs now, and each glyph hands its name back on hover and on focus. A ' +
+      'top bar and a menu are shapes you can ask for.',
+    commits: ['714c393e', '3702f40e', '419095b2'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'shipped',
+    title: 'The record switcher lists every record you can reach',
+    body:
+      'It held the one record you were already inside. The directory is asked which records ' +
+      'are open to you, then each of those records is asked about itself. A row is kept only ' +
+      'where the record itself answers with a level.',
+    commits: ['f76d68c6', '142653f6', '69e5f2a1'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'shipped',
+    title: 'A row is edited a field at a time, and what points at it is read from the record',
+    body:
+      'Each field writes through on its own, rather than the whole row or nothing. What points ' +
+      'at a row is read from the record too. A key goes into the vault from the browser now.',
+    commits: ['49caaac6'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'changed',
+    title: 'A saved view is a row the record holds, not a URL',
+    body:
+      'A view was a filter sitting in an address, lost when the tab closed. It is a row on a ' +
+      'list now, with its filter, search, order, columns and who saved it. Saving one is an ' +
+      'owner-level act, because everyone sees the list.',
+    commits: ['475e7b88', '1bc91a70'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'fixed',
+    title: 'The first row you type is written down, instead of being told it went nowhere',
+    body:
+      'The button that commits your first row had no live path at all: it printed that nothing ' +
+      'was saved. On a record the row is written now, and pressing again corrects it rather ' +
+      'than leaving a second one behind.',
+    commits: ['a1efab09', 'aa929f32'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'shipped',
+    title: 'The app deploys itself, and a gate checks that the deploy landed',
+    body:
+      'A pipeline deploys the commit the checks measured, once they finish, and queues rather ' +
+      'than cancels. A gate then asks the running server which version it believes it is. This ' +
+      'site is meant to follow in the same run and can be a day behind.',
+    commits: ['37163f41', '5f01aa2d'],
+  },
+  {
+    date: '2026-09-16',
+    kind: 'fixed',
+    title: 'Three screens drew invented rows under your own heading',
+    body:
+      'All three drew the built-in demo whatever record was open, with nothing saying so. The ' +
+      'thread view asks the record now. The other two have no way to read at all, and each ' +
+      'says so rather than inventing rows.',
+    commits: ['9efa49e3', '51d3836a'],
+  },
+  {
+    date: '2026-09-15',
+    kind: 'shipped',
+    title: 'The app writes to a real record, and most of its screens read one',
+    body:
+      'Until this week every screen drew a made-up business. Nine screens read the record now, ' +
+      'and the app writes to it: rows, cells, states, decisions, arrivals, cards, levels, ' +
+      'tokens and packs. Archiving offers an undo rather than a confirmation.',
+    commits: ['a95f127f', '8aa26631'],
+  },
+  {
+    date: '2026-09-15',
+    kind: 'shipped',
+    title: 'The record calls other services on a schedule, and counts what that costs',
+    body:
+      'A call or a poll can run on a schedule, and a private address is refused. Usage is ' +
+      'counted per account against a plan limit. An install says what it will call before ' +
+      'anybody approves it.',
+    commits: ['37ccbb3f', '47b15455', '0fea83ef'],
+  },
+  {
+    date: '2026-09-15',
+    kind: 'shipped',
+    title: 'A machine signs itself in from the command line, and Settings approves it',
+    body:
+      'braindog login signs a machine in, and onboarding opens by asking who you are. Settings ' +
+      'approves the machine and opens the key doors. Device sign-in sits in the kernel, so both ' +
+      'hosts get it.',
+    commits: ['f0c9af3f', '301843d1', '72befe0b'],
+  },
+  {
+    date: '2026-09-15',
+    kind: 'shipped',
+    title: 'A pack can be switched off, and a proposal says what it would change',
+    body:
+      'Every pack has a switch, and a page can inherit from another. A proposal names the rows ' +
+      'it would change before anybody accepts it. A pack pointing at a list that does not ' +
+      'exist is refused.',
+    commits: ['24836773', 'a6b3cb15', 'c0c04b67'],
+  },
+  {
+    date: '2026-09-14',
+    kind: 'changed',
+    title: 'Everything is a module, and the first question is who are you',
+    body:
+      "On the owner's instruction: every module can be turned off and on again, People " +
+      'included. Setting up a record asks who you are first, and fills the first person in ' +
+      'People with the answer.',
+    commits: ['118baee5'],
+  },
+  {
+    date: '2026-09-11',
+    kind: 'shipped',
+    title: 'Agents reach the record, and a session can ask where it stands',
+    body:
+      'An agent gets the same typed surface a person does, over MCP, from the command line and ' +
+      'from both hosts. One call returns its run, its project, the last handoff and what is ' +
+      'waiting on the owner.',
+    commits: ['b291dcf0', 'd92523ec'],
+  },
+  {
+    date: '2026-09-11',
+    kind: 'shipped',
+    title: 'Signing in works end to end on a self-host',
+    body:
+      'Sign-in worked in halves, so nobody could get all the way in on a self-host. It works ' +
+      'end to end now, and its page was rebuilt around it. The landing page dropped its ' +
+      'screenshots and reads its first list from a record.',
+    commits: ['d7459d26', '4464966e'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'changed',
+    title: 'Seventeen renames, and not one of them an id',
+    body:
+      'The product says the word a reader would say and the API keeps its own. Track became ' +
+      'Thread, Estate became Services, Thing became Project, State became Status. Nothing ' +
+      'renamed is an id, a document or a format.',
+    commits: ['66fda93a'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'fixed',
+    title: 'A page made of figures named no register, and was handed to everybody',
+    body:
+      'A table block names the list it draws and a block of figures does not, so a page of ' +
+      'figures was treated as prose. It was handed to every caller, including a read token ' +
+      'whose reach is one list. Fifty-two requests on six routes answered 500 rather than a ' +
+      'refusal.',
+    commits: ['08bbafcf'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'fixed',
+    title: 'A sheet destroyed while open took the keyboard with it',
+    body:
+      'A sheet destroyed while open never gave the keyboard lock back, so every bare key in ' +
+      'the product died for the rest of the session. Two clicks from the front page reach it. ' +
+      'The audit log can be narrowed by when as well now.',
+    commits: ['cad41358'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'fixed',
+    title: 'The two engines were asked the same questions and disagreed sixteen times',
+    body:
+      'Both engines were driven over the same record: 336 measurements, 3,563 filter ' +
+      'sentences, 38 searches, 16 cash walks. Sixteen live disagreements, twelve of which the ' +
+      'browser had right. A sum of sterling invoices declared in dollars was printed rather ' +
+      'than refused.',
+    commits: ['384e097e'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'fixed',
+    title: 'A money average was stored ten thousand times too large',
+    body:
+      'Two rows at 101 and 102 pounds averaged to 101.5 and were written as 1,015,000, which ' +
+      'every surface renders as ten thousand pounds. The value and the currency are decided ' +
+      'together now. Twenty-two findings in the same pass.',
+    commits: ['c27c5015'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'fixed',
+    title: 'Eight controls that drew, announced themselves and did nothing',
+    body:
+      'Every segmented control dropped the value you chose: the form held it in one place and ' +
+      'read it from another. The drawer added the row twice on one press. A second edit of a ' +
+      'cell opened on the original value, and the rail folded nothing.',
+    commits: ['160b3e8c', '06bdbd92'],
+  },
+  {
+    date: '2026-09-10',
+    kind: 'changed',
+    title: 'The record got a face somebody opens rather than a wireframe',
+    body:
+      'Indigo controls, a near-black ground, Geist, and lists without boxes. The rows carry the ' +
+      'colour the record already held. The list went back above the fold on a phone.',
+    commits: ['1cfea41b', '6d93ad92', '275f5d5a'],
+  },
+  {
+    date: '2026-09-09',
+    kind: 'shipped',
+    title: 'The app is deployed, from two hostnames and one build',
+    body:
+      'Every push to the main branch builds and deploys the record app. A second hostname ' +
+      'takes the same build from a branch that only moves forward, and wears its own accent, ' +
+      'badge and word in the tab.',
+    commits: ['4e6f0eb3', '413d90e1', 'f0a54383'],
+  },
+  {
+    date: '2026-09-09',
+    kind: 'fixed',
+    title: 'Four gates were asked what input would make them fire',
+    body:
+      'A gate that has never failed may not work. Each source gate was asked what input would ' +
+      'make it fire. The answers were 1 of 7, 3 of 10, a check blind to its own file, and 2 ' +
+      'of 16.',
+    commits: ['471c5ba9', 'b209da0b', '8c7600ef', '1fa00fbe'],
+  },
+  {
+    date: '2026-09-09',
+    kind: 'fixed',
+    title: 'Seven surfaces said something untrue, and one navigated away from its own outcome',
+    body:
+      'A palette nobody could turn on, and a screen that left before showing what it had done. ' +
+      'The app stopped claiming writes that had not happened. The live marketing site had its ' +
+      'dead links and its untrue sentences taken off.',
+    commits: ['c573a825', '098c7533', '2af68035'],
+  },
+  {
+    date: '2026-09-09',
+    kind: 'shipped',
+    title: 'The palette became a panel you reach objects through',
+    body:
+      'It ran commands and could not reach a row. A changed row stays where it was and carries ' +
+      "its verbs on it. The capture line adds an incomplete row, and the register's own states " +
+      'sit on the row menu.',
+    commits: ['315b34dc', '040e692f', '26f4ccce'],
+  },
+  {
+    date: '2026-09-09',
+    kind: 'fixed',
+    title: 'Six dependency advisories to zero',
+    body:
+      'Three packages moved off version ranges with known holes, and the audit reports ' +
+      'nothing. Nothing published inside the last twenty-four hours installs here.',
+    commits: ['87734420'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'shipped',
+    title: 'The empty record, which nothing had ever looked at',
+    body:
+      'The screen somebody sees the hour they install went six audits unmeasured. It called ' +
+      'their finances healthy, four green ticks over four zeroes, under 996 pixels of the same ' +
+      'three sentences repeated four times.',
+    commits: ['41ae2d41'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'fixed',
+    title: 'No list renders more than it admits to',
+    body:
+      'On 2,614 rows the first paint was 4,001 rows and 102,681 nodes, and eight seconds to ' +
+      'settle. It is 201 rows and 3,137 nodes now, paging to the cap as you scroll.',
+    commits: ['2ad19bf8'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'shipped',
+    title: 'Search, and a list that pages by key instead of by counting',
+    body:
+      'A list paged by offset, which shifts under any row somebody adds while you read it. It ' +
+      'pages by key now, and /search exists. A review of the day-old paging found six defects ' +
+      'in it.',
+    commits: ['fe3538af', 'ddca3517'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'fixed',
+    title: 'The module that decides who can see your business had no test',
+    body:
+      'Nothing anywhere exercised the module every call checks, and it had already shipped two ' +
+      'authorisation defects. Twenty-five mutations are caught now, and one found a last-owner ' +
+      'guard that could never fire.',
+    commits: ['a75ec720'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'fixed',
+    title: 'Eleven settings areas were measured by nothing, and the permission check failed open',
+    body:
+      'The check answered yes where it could not answer at all. Eleven settings areas had ' +
+      'nothing measuring them and the screens were wrong. Three of them now carry what the ' +
+      'documents place on them.',
+    commits: ['c4de8942', 'b03b63b2', '57744904'],
+  },
+  {
+    date: '2026-09-08',
+    kind: 'shipped',
+    title: 'Somewhere to type the code every machine prints',
+    body:
+      'The settings area a signing-in machine sends you to had no input in it at all. Its ' +
+      'Approve button asked for a six-digit code no control on the page could take.',
+    commits: ['160b4af1'],
+  },
+  {
+    date: '2026-09-07',
+    kind: 'changed',
+    title: 'Usability is a lens every iteration, not a phase',
+    body:
+      'Twelve settings screens called themselves a mock-up, and a phone read a money page ' +
+      'through a 356-pixel window onto a 450-pixel table. A gate measures every route on a ' +
+      'phone now: no clipping, no sideways scroll, no target under 44 pixels.',
+    commits: ['791978ed', '0ddd1591', '9c018494'],
+  },
+  {
+    date: '2026-09-07',
+    kind: 'shipped',
+    title: 'Day one, which was the one state this product could not show',
+    body:
+      'Seven settings areas said the same sentence and it was about the build. Two areas an ' +
+      'earlier draft had dropped are back. The first day of a record is a state the product ' +
+      'draws now.',
+    commits: ['c1d692b3', 'd03dba77', 'dcb55c5e'],
+  },
+  {
+    date: '2026-09-07',
+    kind: 'fixed',
+    title: 'The root key survived every boot, in a pool Node hands to the next caller',
+    body:
+      'Node hands a reused buffer to whoever asks for one next, and the root key was sitting ' +
+      'in it. It is wiped now.',
+    commits: ['430e7b78'],
+  },
+  {
+    date: '2026-09-07',
+    kind: 'fixed',
+    title: 'The words this product is built out of were defined in a file nothing imported',
+    body:
+      'Row, page and block were each defined once, in a module no screen read. The audit log ' +
+      'was printed in assignment notation and the inbox in a small language. Both read as ' +
+      'English now.',
+    commits: ['f1245e98', '96d059d1'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'shipped',
+    title: 'A record can create itself, and says who wrote it',
+    body:
+      'Nothing in this repository could make a new record until this week. A record file ' +
+      'records which build wrote it, and refuses to open if it does not say.',
+    commits: ['56bd93c5', '0445f5b0'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'shipped',
+    title: 'Packs: a plan somebody wrote is a thing you install',
+    body:
+      'A pack is a file holding lists, pages, rules and figures. Installing one adds and never ' +
+      "replaces. The product's own modules are written in that format, so the format carries " +
+      'the shape of the product.',
+    commits: ['f0efcae9', 'f019c6c1', '0da56912'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'shipped',
+    title: 'A level per register, so a bookkeeper sees the books and nothing else',
+    body:
+      'One level over a whole record cannot invite a bookkeeper in. A level is per register ' +
+      'now, and an agent carries a token of its own. Four more permission holes closed, and ' +
+      'the central act says what it would write.',
+    commits: ['759026c4', 'be9918a8', 'ee18fd99'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'shipped',
+    title: 'Both hosts authenticate, and a record is created with the keys it needs',
+    body:
+      "Neither host did the record's half of signing somebody in. Both do it now. A record was " +
+      'being created without its key-encrypting key and two others, so its vault could hold ' +
+      'nothing.',
+    commits: ['885d23ff', 'be4a04a2'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'shipped',
+    title: 'The record notices things, and what it noticed reaches a person',
+    body:
+      'The loop that watches a record reached nobody at all. Its output arrives now, it grades ' +
+      'itself, and it remembers what it asked. A prediction it got wrong comes back to the ' +
+      'person who set it.',
+    commits: ['24c3cab7', '678a7923', '6c8b492e'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'fixed',
+    title: 'Removal did not revoke, and a revoked token was a promotion',
+    body:
+      'Taking somebody off a record left their token working. Revoking one widened what it ' +
+      "could reach rather than closing it. Six holes in this product's central promise closed " +
+      'in the same pass.',
+    commits: ['df447e1b', 'f671b982'],
+  },
+  {
+    date: '2026-09-06',
+    kind: 'fixed',
+    title: 'A pack could put SQL in a query, and money was read a thousand times too small',
+    body:
+      'A field id out of a pack reached the query instead of being refused at install. The ' +
+      'record stored one minor unit and drew another. Both are refused at the door now.',
+    commits: ['8ddbed06', '00acb8a6', '428c9ec3'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'The backend, from the schema up',
+    body:
+      'Fourteen iterations: the schema, the ledger, the sixteen types, the write path, who may ' +
+      'ask what, search, the vault, rules and the export.',
+    commits: ['fd3a41c7', '8fbdb65d', '546d8f48', '6b935f33'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'Rules: a declaration that says what happens when a row looks a certain way',
+    body:
+      'A rule reads the shape of a row and says what to do about it. It can make a matrix of ' +
+      'rows, or ask rather than act. You can see what one would do before anybody turns it on.',
+    commits: ['5cda46fd', 'f932a01b', 'f2c5a1a5'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'The vault: what a key opens, never the key',
+    body:
+      'A record needs credentials and must never hold one in the open. The vault indexes what ' +
+      'each key opens and keeps the key sealed. Four tools an agent can ask were added, and ' +
+      'none of them reads a credential.',
+    commits: ['309be377', '17183da0'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'The Directory, the doorbell, and the first thing that goes all the way out',
+    body:
+      'The Directory answers which record a name belongs to, and the doorbell is the other end ' +
+      'of it. The outbox has an alarm driving it. The digest is the first thing this product ' +
+      'sends to somebody outside it.',
+    commits: ['9405a142', '82228a7b', '8c8920cb'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'A figure is a question, and a series is its answers',
+    body:
+      'A metric declares the question and the record answers it over time. The nine it ships ' +
+      'with are read two ways and the readings compared. One number is drawn over the same ' +
+      'rows the page behind it lists.',
+    commits: ['8d956d41', 'e7fb105b', 'a02f3ccd'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'A payload arrives from outside and the record fills itself',
+    body:
+      'Ingest takes what arrives and writes rows out of it. The pull command exists, and all ' +
+      'ten kinds of schedule are handled.',
+    commits: ['b5934c99', '9abaac2c'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'shipped',
+    title: 'The pages are documents the record holds, and it reads its own',
+    body:
+      'A page was markup in the app. It is a document in the record now, and the record reads ' +
+      'its own pages like any other.',
+    commits: ['1612cd17', '0ea90d5a'],
+  },
+  {
+    date: '2026-09-05',
+    kind: 'fixed',
+    title: 'Five ways the loop stopped working and reported that it was fine',
+    body:
+      'An audit drove the loop, the rules and the figures over a day of work. It found five ' +
+      'ways the loop stopped while reporting success. It also found four rules acting wrongly ' +
+      'unobserved, and four numbers that came out plausible and wrong.',
+    commits: ['7f9a53e7', '0b2a00f1', 'cb82e087'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'shipped',
+    title: 'Order and span, and a page that is about one project',
+    body:
+      'Arranging a page is two operations and no more. The money page walks the runway to the ' +
+      'first day the balance goes under, and names the row that crosses it.',
+    commits: ['93b07862', '99a6c460', 'e59d74bf'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'shipped',
+    title: 'brain.dog, which is this site',
+    body:
+      'Prerendered, every page finished HTML on disk, and readable with scripting off. It ' +
+      "imports the record app's design system rather than resembling it.",
+    commits: ['615520e0', '3ea59462'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'shipped',
+    title: 'Every key the keymap advertised is bound to something',
+    body:
+      'Five keys were advertised and bound to nothing, and a guard was eating four of the nine ' +
+      'grid keys. Every registered key is live now. The row menu and the phone came in the ' +
+      'same pass.',
+    commits: ['3ec8d944', 'c92f1622', 'b7c57461'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'shipped',
+    title: 'The block picker, and binding a block without promising more than it does',
+    body:
+      'Every tile in the picker is drawn rather than named. Binding a block is the smallest ' +
+      'wizard that does not lie about what it did. The page shows where the block is going to ' +
+      'land.',
+    commits: ['46960c9b', '6d78967c', '99c40090'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'shipped',
+    title: 'Tracks: the line of work a session can be pinned to',
+    body:
+      'A session had no way to say which line of work it belonged to. A track is a row you pin ' +
+      'it to, and the track page is what the pin was for.',
+    commits: ['cc91805f', '233e1b20'],
+  },
+  {
+    date: '2026-09-04',
+    kind: 'fixed',
+    title: 'Ten controls that did nothing at all, and a gate that found five more',
+    body:
+      'Ten controls drew, announced themselves and acted on nothing. An accessibility gate ' +
+      'reads both apps and every state now, and it found five real defects on its first run. ' +
+      'A layout gate takes its widths from the stylesheets rather than from a list.',
+    commits: ['6d007e5f', 'c394b6df', '2e2126a4'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'changed',
+    title: 'One skin, because there are two apps now',
+    body:
+      'Tokens, element defaults, the accessibility layer, the palette and the mark moved into ' +
+      'one package both apps import. A second copy of a type scale is a type scale that ' +
+      'drifts.',
+    commits: ['4b0fa4b4'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'shipped',
+    title: 'Nineteen screens: the spine, the gate, the grid, and a page that is a row',
+    body:
+      'The app was a shell, a renderer and Home. It has nineteen screens now, including the ' +
+      'grid and a page that is one row. The renderer is components rather than one function.',
+    commits: ['b74e381e', '63b5e894'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'shipped',
+    title: 'The new-row form is generated from the declaration',
+    body:
+      'A register declares its fields, so the field type picks the control. A pack that adds a ' +
+      'field gets a form field, and a secret field is absent rather than disabled.',
+    commits: ['64ec9e2c'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'shipped',
+    title: 'The toast stack, and the undo that is the reason for it',
+    body:
+      'A destructive action here is undone, not confirmed. A confirmation asks its question ' +
+      'when the reader knows the least they ever will. Ten seconds, paused under the pointer.',
+    commits: ['f6722c4c'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'changed',
+    title: 'The red is a third quieter, and it is the accent again',
+    body:
+      'The first house red read as an alarm going off on a screen where nothing was wrong. ' +
+      'Same hue, a third less chroma. The old value is the band the overdue chip is struck ' +
+      'from.',
+    commits: ['59ebd308', 'fa06766b'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'fixed',
+    title: 'A link and an overdue figure were the same colour',
+    body:
+      'The accent and the overdue red share a hue, and in the light scheme they landed one ' +
+      'value apart. The generator walks the link until it is eight L* clear of body ink and of ' +
+      'the overdue red.',
+    commits: ['dadc7045'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'fixed',
+    title: 'A record switcher that switched nothing, and three hover states you could not see',
+    body:
+      'The switcher in the rail drew a list of records and changed nothing. Three hover states ' +
+      'rendered at an ink nobody could tell from rest. A shared page drew two headings with ' +
+      'nothing under them.',
+    commits: ['1df8affb', 'fedd2140', '9dee446e'],
+  },
+  {
+    date: '2026-09-03',
+    kind: 'shipped',
+    title: 'The theme generator, and a palette that had to argue for itself',
+    body:
+      'Themes are generated by solving for contrast rather than picking lightness, so most of ' +
+      'the sixteen accessibility checks become tautologies. A theme that fails is refused, ' +
+      'naming the pair and what to move.',
+    commits: ['fceeda06'],
+  },
+  {
+    date: '2026-09-02',
+    kind: 'shipped',
+    title: 'The design set closed, after an adversarial review changed it',
+    body:
+      'Four reviewers audited consistency, feasibility, usability and the thesis. The roadmap ' +
+      'was roughly three times optimistic, and the index model would have failed at the ' +
+      'twelfth installed pack.',
+    commits: ['7b2cda95', '46cd6e48'],
+  },
+];
