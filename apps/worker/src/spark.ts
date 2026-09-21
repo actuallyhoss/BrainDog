@@ -20,9 +20,9 @@
  * come to mean one thing for the record's model and another for the package's engine.
  *
  * AND `workerSparkDoor` IS THE THIRD NAME HERE, because a builder is not a caller: `POST /api/spark/read` is
- * what a request reaches. Neither is reached on this Worker today. `index.ts` has yet to mount the door, so
- * the door has no caller either and the engine is built by nothing at all, not even a test;
- * `workerSparkDoor`'s own memo below carries the measurement and the field and branch the mount wants.
+ * what a request reaches. BOTH ARE REACHED NOW: `index.ts` keeps a `#spark` field on `Record$` and hands a
+ * request to `serveSpark` when `servesSpark` names the path, which landed on 21 September.
+ * `workerSparkDoor`'s own memo below carries what a real socket answers through the self-host's mirror of it.
  */
 
 import { sparkFromEnv, sparkInferenceOf, sparkModelOf, sparkRecord, type SparkHostDeps } from '@braindog/host/spark';
@@ -96,11 +96,10 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
 /**
  * `POST /api/spark/read` for this record's object: the door `@braindog/host` serves, over the builder above.
  *
- * THIS IS THE CALLER THE BUILDER HAD NOT GOT, AND NOTHING CALLS IT EITHER, so say both. Finding 2 of
- * `loop/research-batch-five-audit.md` is the absence, and `grep -rn workerSparkDoor apps` still finds this
- * declaration and no call, which is the same sentence the audit wrote about `workerSparkEngine`. Three passes
- * added the dependency, then the builder, then a door; none added the branch in `Record$.#answer` that hands a
- * request to one.
+ * THIS WAS THE CALLER THE BUILDER HAD NOT GOT, and finding 2 of `loop/research-batch-five-audit.md` is that
+ * absence. Three passes added the dependency, then the builder, then a door, and none added the branch in
+ * `Record$.#answer` that hands a request to one; the fourth added it, so `grep -rn workerSparkDoor apps` now
+ * finds this declaration and the branch that calls it.
  *
  * AND THE TALLY THIS MEMO CARRIED WAS WRONG TWICE OVER, so each mutation is written out on its own. Every
  * figure below is `node --test --experimental-strip-types "apps/worker/test/*.test.ts"`, whose unmutated run
@@ -116,11 +115,16 @@ export async function workerSparkEngine(env: SparkEnv, api: () => RecordApi, dep
  * suite is 204 tests, 202 pass, 0 fail, 2 skipped, exactly as an unmutated run: no test in that app reaches
  * its own builder at all.
  *
- * WHAT A REQUEST ACTUALLY MEETS TODAY, measured rather than reasoned about: a real self-host started with a
- * `SPARK_ENDPOINT` and a key answers `spark: true` at `/api/version` and 404 `ROUTE_UNKNOWN` "There is no
- * method called spark/read." at `POST /api/spark/read`, because `serveApi` is the only thing behind `/api` on
- * either host. The door is reachable from no product surface, on either host, whatever this file or
- * `spark-ask.ts` exports.
+ * WHAT A REQUEST MET BEFORE THE MOUNT, measured rather than reasoned about: a real self-host started with a
+ * `SPARK_ENDPOINT` and a key answered `spark: true` at `/api/version` and 404 `ROUTE_UNKNOWN` "There is no
+ * method called spark/read." at `POST /api/spark/read`, because `serveApi` was the only thing behind `/api` on
+ * either host.
+ *
+ * WHAT IT MEETS NOW, on the self-host, driven over a real socket on 21 September: 200 on one model call, with an
+ * EMPTY read. A record holding three rows in `things` asked the name of one of them answers `rows: []` while its
+ * fold claims `{"register":"things","rows":0,"predicate":"all"}`. This Worker's mount is the same door over the
+ * same builder and has not been driven against a deployed object, so it is not claimed here. Both sentences and
+ * the drive are in `loop/BACKLOG.md`.
  *
  * IT IS BUILT INSIDE THE OBJECT AND NOT IN THE ROUTER, unlike `/api/keys/*`, and the difference is what each
  * door needs: the key doors need the `KEK` binding alone, so the Worker answers them without waking the record,

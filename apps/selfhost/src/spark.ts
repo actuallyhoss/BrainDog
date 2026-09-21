@@ -16,9 +16,9 @@
  * decision cannot live in `@braindog/host/spark`, a module every host loads.
  *
  * AND `sparkDoor` IS THE THIRD NAME HERE, because a builder is not a caller: `POST /api/spark/read` is what a
- * request reaches. Neither is reached in this process today. `server.ts` has yet to mount the door, so the door
- * has no caller either and the engine is built by nothing in this app at all; `sparkDoor`'s own memo below
- * carries the measurement, the three edits `server.ts` wants, and what happened when they were driven.
+ * request reaches. BOTH ARE REACHED NOW: `server.ts:1167` mounts this door in the site literal and dispatches
+ * `servesSpark(path)` ahead of `servesKeys(path)`, which landed on 21 September. `sparkDoor`'s own memo below
+ * carries what a real socket answers through it, and what that answer does not contain.
  */
 
 import { SPARK_KEY_LABEL, sparkFromEnv as fromEnv, sparkInferenceOf, sparkModelOf, sparkRecord, type SparkHostConfig } from '@braindog/host/spark';
@@ -101,14 +101,22 @@ export async function sparkEngineFor(
  * other app's suite. A THREE-red tally wants both builders throwing at once and not this one alone, which is
  * the arithmetic `apps/worker/src/spark.ts`'s own memo got wrong before it was re-measured here: mutate either
  * builder by itself and that suite is 177 pass, 2 fail, never 176 and 3. Three passes added the dependency, then
- * the builder, then the door below; `grep -rn sparkDoor apps` finds this declaration and no call, which is the
- * same sentence the audit wrote about `sparkEngineFor`.
+ * the builder, then the door below, and the fourth mounted it; before that mount `grep -rn sparkDoor apps` found
+ * this declaration and no call, which was the same sentence the audit wrote about `sparkEngineFor`.
  *
- * AND THE PRODUCT ANSWERS A 404, which is the measurement that settles it and which no grep can give. A real
- * `start({ file, port: 0, spark: { url, model, key, send } })` reports `spark: true` at `/api/version` and
- * answers `POST /api/spark/read` with 404 `ROUTE_UNKNOWN` "There is no method called spark/read.", from
- * `serveApi`, because nothing stands in front of it. Every path this process serves is unmoved by the engine
- * either way.
+ * THE PRODUCT ANSWERED A 404 UNTIL IT WAS MOUNTED, and that is the measurement that settled the absence: a real
+ * `start({ file, port: 0, spark: { url, model, key, send } })` reported `spark: true` at `/api/version` and
+ * answered `POST /api/spark/read` with 404 `ROUTE_UNKNOWN` "There is no method called spark/read.", from
+ * `serveApi`, because nothing stood in front of it.
+ *
+ * WHAT IT ANSWERS SINCE, DRIVEN OVER A REAL SOCKET ON 21 SEPTEMBER: 200, on exactly one model call, for an owner
+ * signed in with the server key. And the answer is empty. On a record holding three rows in `things`, one of them
+ * named Kiln, the single word `Kiln` comes back `{"predicate":null,"q":"Kiln","read":[{"register":"things",
+ * "rows":0,"predicate":"all"}, ...],"rows":[]}`, and a draft in the grammar's own shape (`state is open`) lands as
+ * `predicate: null` exactly as a malformed one does. So the door is reached and the read is blind, which is a
+ * different sentence from the one this memo used to carry and is written up in `loop/BACKLOG.md` with the drive
+ * that produced it. Whether the projection is reading as nobody or reading an index that a direct
+ * `api.kernel.create` does not reach is NOT settled here.
  *
  * THE MOUNT IS THREE EDITS TO `server.ts` AND THEY WERE DRIVEN GREEN, in memory through a `node:module`
  * `registerHooks` load hook so that no file outside this pass's own list was written: one `openSqlite` for

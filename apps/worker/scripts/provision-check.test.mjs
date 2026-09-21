@@ -26,6 +26,7 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -106,7 +107,30 @@ test('one missing thing is named once, and the list is in the order to repair it
   assert.equal(ordered[1].what, 'the route says it is not set', 'the first sentence about a thing is the one kept');
 });
 
-test('whether the serving commit refuses a keyless record is decided against the commit itself', () => {
+/**
+ * WHETHER THIS CLONE HOLDS A COMMIT AT ALL, which is not the same question as what the commit says.
+ *
+ * CI CLONES SHALLOW. `git show` on a commit outside the fetched depth fails, `guardsKeylessRecords`
+ * answers `unknown`, which is its correct answer, and the three readings below have nothing to be
+ * measured against. On 21 September this test was wired into `pnpm -C apps/worker test` and CI went
+ * red on the first line of it for exactly that reason, which is a defect in the test's reach rather
+ * than in the function: a run that cannot see the history cannot be asked about it.
+ */
+const holds = (sha) => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+test('whether the serving commit refuses a keyless record is decided against the commit itself', (t) => {
+  const missing = ['77f82cc', 'aca6355', 'a2814b0'].filter((sha) => !holds(sha));
+  if (missing.length > 0) {
+    t.skip(`this clone does not hold ${missing.join(', ')}, so there is no history to decide against; \`unknown\` is what the function answers and the case below cannot be driven`);
+    return;
+  }
   assert.equal(guardsKeylessRecords('77f82cc', root), 'yes');
   assert.equal(guardsKeylessRecords('aca6355', root), 'no');
   /* THE COMMIT THAT CARRIES THE GUARD AND CALLS IT FROM NOWHERE. `no` is the true answer for a host
