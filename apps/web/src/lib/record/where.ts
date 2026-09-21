@@ -548,6 +548,28 @@ const cannotSay = (text: string): string =>
  * carries the row number, so this engine has to read one sentence the record never parses. The record
  * sees `leafOf`'s structured tree with a ULID in it instead. The superset is exactly the row number,
  * on both operators, and that is the whole of it.
+ *
+ * AND THE COMMIT THAT CHANGED ALL OF THIS IS FILED IN THE LOG AS A COMMENT REPAIR, SO THE ACCOUNT
+ * LIVES HERE INSTEAD. `61f65e6a`'s subject is *"Three comments that stated the opposite of the code
+ * beside them"* and its body is three sentences about three comments, and what it actually did to
+ * this file is two behaviour changes: this function resolves a `list<ref>` element by row number as
+ * well as by title, comparing numbers, and `spokenElement` below keeps the number when the target
+ * row's title holds a comma. Those move what the sample answers for `skills.because`, which is the one
+ * of the mirror's two `list<ref>` fields whose rows hold any values at all, and what `registerHref`
+ * mints for both of them. A comment repair earns no changelog entry however large the diff, which
+ * `apps/site/src/routes/changelog/entries.ts` says in prose and whoever writes the entries applies
+ * from the commit's own message, since `apps/site/scripts/changelog.mjs` parses every subject and
+ * checks none of them. A commit message cannot be rewritten, so somebody asking the log when
+ * `because has 4` started drawing rows on the sample finds nothing at all. It started at `61f65e6a`.
+ *
+ * AND THREE THINGS THAT COMMIT LEFT BEHIND WERE MUTATED ONE AT A TIME, AND ONLY TWO OF THEM WERE
+ * HELD, WHICH IS WHY THE THIRD NOW HAS A TEST. Each was mutated on its own in a mirror of `c32c545c`
+ * and the whole directory run against it. Dropping the row-number resolution fails four, two in
+ * `list-ref-element.test.ts` and two in `list-ref-target.test.ts`; dropping `spokenElement`'s comma
+ * fallback fails two, one in each. Making the comparison the characters, `String(e.seq) === said`,
+ * failed nothing: 980 tests, 979 pass, 0 fail, 1 skipped, the unmutated tally to the test. So the
+ * paragraph beside that line was the only thing keeping the leading zero out, and `where.test.ts`'s
+ * *"A LEADING ZERO ON A `list<ref>` ELEMENT IS THE SAME ADDRESS"* is the assertion it went without.
  */
 function elementValue(register: string, field: string, of: string, said: string, now: number): string | null {
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
@@ -574,10 +596,14 @@ function elementValue(register: string, field: string, of: string, said: string,
        mean two rows on two engines, which is the divergence this pair of files exists to stop.
 
        AND THE COMPARISON IS THE NUMBER'S AND NOT THE CHARACTERS', for the same reason one line along.
-       It read `String(e.seq) === said`, and `04` is not the characters `4`: measured against the
-       mirror, `because has 04` came back *"there is no learnings called 04"* here while `treeOf` sent
-       the live record `{because: has: <learnings#4's id>}`, because `Number('04')` is `4`. One address
-       and two answers is the whole defect, and a leading zero is enough to make one.
+       This paragraph used to say the line READ `String(e.seq) === said`, and that is not a state it
+       was ever in: `git show 61f65e6a^:apps/web/src/lib/record/where.ts` has no `seq` comparison in
+       this branch at all, so the characters are a mutation of the line and not a version it was
+       repaired from. Under that mutation, measured on the mirror, `because has 4` still answers
+       skills#1 and #4 while `because has 04` comes back *"there is no learnings called 04"* here,
+       and `treeOf` sends the live record `{because: has: <learnings#4's id>}` for either spelling
+       because `Number('04')` is `4`. One address and two answers is the whole defect, and a leading
+       zero is enough to make one.
 
        AND THE NUMBER STILL HAS TO NAME A ROW. `because has 999` is a refusal rather than a comparison
        against the characters `999`, which is exactly what `allowed` does with a `seq` on the scalar
@@ -1098,6 +1124,12 @@ export const explain = (w: Where): string[] => w.bad;
  * to prevent. Percent-encoding does not help, because `URLSearchParams` decodes before `chipsOf` ever
  * sees the value. Three of the mirror's seven `learnings` titles carry a comma and none of its four
  * `things` titles do, which is why a test over `people.projects` alone could not see this.
+ *
+ * THAT COMMA FALLBACK ARRIVED IN `61f65e6a`, whose message says nothing about it, and `elementValue`
+ * above carries the account of why a reader will not find it in the log. Removing the
+ * `!said.includes(',')` guard here fails two tests, `list-ref-element.test.ts`'s minted-chip case and
+ * `list-ref-target.test.ts`'s *"AND THE ADDRESS A PREDICATE MINTS OPENS THE ROWS THE PREDICATE
+ * ADMITTED, on the record"*, measured in a mirror of `c32c545c`. So this one is held, twice.
  */
 const spokenElement = (register: string, field: string, held: string): string => {
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);

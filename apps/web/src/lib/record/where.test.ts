@@ -285,6 +285,64 @@ test('a ref value that names no row is refused', () => {
   assert.equal(keep('tasks', 'thing is Atlantis').length, 0);
 });
 
+test('A LEADING ZERO ON A `list<ref>` ELEMENT IS THE SAME ADDRESS, and it was the one line of the three with nothing under it', () => {
+  /**
+   * THE DEFECT THIS HOLDS IS ONE ADDRESS ANSWERING DIFFERENTLY ON TWO ENGINES, which is the whole
+   * reason `where.ts` and `remote.ts` are kept against each other. `elementValue` resolved a
+   * `list<ref>` element by its title alone until `61f65e6a`, so the sample refused `because has 4`
+   * and `because has 04` alike while `valueOf` in `remote.ts` reads
+   * `/^\d+$/u.test(said) ? Number(said) : titled(f.to, said)` and sent the record learnings#4's ULID
+   * for either spelling. Two lists under one sentence, both plausible, neither marked.
+   *
+   * AND `String(e.seq) === said` IS A MUTATION OF THAT LINE AND NOT A STATE IT WAS EVER IN, which is
+   * worth writing down because the comment beside the comparison in `where.ts` stated it as history
+   * and now says otherwise. Measured: `git show 61f65e6a^:apps/web/src/lib/record/where.ts` holds one
+   * line in that branch, `rows.find((e) => String(e.fields[title] ?? '') === said)`, and
+   * `git log -S` over the file for those characters names that one commit only, for the copy inside
+   * its own new comment. The number path arrived comparing numbers, so the characters are the
+   * half-repaired engine this test is written against rather than the one the commit replaced.
+   *
+   * AND IT IS HERE BECAUSE THE COMMIT THAT BUILT IT ARGUED IT OVER FIVE LINES AND ASSERTED NOTHING.
+   * Measured against a mirror of `c32c545c` taken with `git archive`: mutating that one comparison to
+   * `String(e.seq) === said` left all 980 tests in this directory green, 979 pass, 0 fail, 1 skipped,
+   * which is the unmutated tally to the test. The other two behaviour changes the same commit made to
+   * the same pair of functions were reverted the same way and both go red, four tests and two, so
+   * this was the only unheld one of the three.
+   */
+  const four = compile('skills', 'because has 4');
+  assert.deepEqual(four.bad, []);
+  assert.deepEqual(four.clauses, [{ field: 'because', op: 'has', values: ['4'] }]);
+  assert.deepEqual(keep('skills', 'because has 4').map((e) => e.seq), [1, 4]);
+
+  for (const said of ['04', '004']) {
+    const sentence = `because has ${said}`;
+    const w = compile('skills', sentence);
+    assert.deepEqual(w.bad, [], `${sentence} was refused, so the element was compared as characters`);
+    assert.deepEqual(w.clauses, four.clauses, `${sentence} compiled to a different element from because has 4`);
+    assert.deepEqual(
+      keep('skills', sentence).map((e) => e.seq),
+      keep('skills', 'because has 4').map((e) => e.seq),
+      `${sentence} draws a different list from because has 4, which is the divergence itself`,
+    );
+  }
+
+  /* AND THE NUMBER STILL HAS TO NAME A ROW, so this does not pass by taking every string of digits:
+     `Number('099')` is 99 and the mirror holds seven learnings. Without this line the test above is
+     also green against an `elementValue` that accepts anything numeric, which is a worse engine than
+     the one the commit replaced. */
+  assert.deepEqual(compile('skills', 'because has 099').bad, ['because has 099: there is no learnings called 099']);
+
+  /* AND THE SCALAR `is` BESIDE IT STILL COMPARES THE CHARACTERS, which is written down here rather
+     than asserted, because an assertion would go red on the day somebody closes it. `allowed` returns
+     `String(e.seq)` and tests membership on the characters, so `thing is 01` is refused on the sample,
+     while `valueOf` in `remote.ts` runs the same `Number(said)` for `is` as for `has` and resolves it
+     to the ULID of things#1. That is the same leading-zero divergence one operator along, on the chip
+     path only: a real record refuses the sentences `thing is 1` and `thing is 01` alike, measured,
+     because `refByTitle` reads titles. Nothing mints `01`, so only a hand-edited URL reaches it, and
+     widening `allowed` would widen the superset `elementValue`'s comment says is exactly the row
+     number. Reported, not repaired. */
+});
+
 test('every value in an `or` is checked, not just the first', () => {
   const w = compile('obligations', 'state is open or nonsense');
   assert.ok(w.bad.length, 'a bad value hid behind a good one');
@@ -1402,14 +1460,22 @@ test('a list filter mints the narrow address now, and it opens the rows the bloc
   );
 
   /**
-   * AND A `list<ref>` CARRIES THE TITLE, NOT THE NUMBER THE COLUMN HOLDS.
+   * AND A `list<ref>` CARRIES THE TITLE WHERE IT CAN, NOT THE NUMBER THE COLUMN HOLDS.
    *
    * `elementValue` resolves a ref element to the target row's `seq`, so the compiled clause holds
-   * `values: ['2']` where the sentence said a name. Minting that number would have written
-   * `because:has:2`, which comes back as `because has 2` and is refused by both engines: *"there is
-   * no learnings called 2"*, the record's own sentence, because no chip can carry `has` so no number
-   * arrives from anywhere. So the chip is written in the words somebody typed, which is the same rule
-   * `declaredValue` keeps for a scalar one operator along.
+   * `values: ['1']` where the sentence said a name, and minting that number would write
+   * `because:has:1`.
+   *
+   * THIS PARAGRAPH USED TO SAY THAT NUMBER WAS REFUSED BY BOTH ENGINES, and half of that stopped
+   * being true at `61f65e6a` without this comment being reread. Measured at `c32c545c`:
+   * `compile('skills', 'because has 2').bad` is `[]`, because `elementValue` resolves a row number
+   * now, while a real record still answers `because has 2: there is no learnings called 2.` from
+   * `refByTitle`. So the number is refused by ONE engine's sentence, not both, and the reason the
+   * title is what travels is no longer a refusal at all: a title is the readable spelling of the two,
+   * and it is the one the record's own `where:` string takes. `spokenElement` falls back to the number
+   * for the three seed titles whose comma a chip's value slot cannot carry, and
+   * `list-ref-element.test.ts` drives that fallback; `where.ts`'s `elementValue` carries the account
+   * of what else that commit changed, since its message does not.
    */
   const ref = registerHref('skills', 'because has Run the mastering pass before signing off an axis instance.');
   assert.match(ref, /f=because:has:Run%20the%20mastering/, `the title did not reach the URL: ${ref}`);
