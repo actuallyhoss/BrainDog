@@ -8,7 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { ROWS } from './api.ts';
+import { copy } from '../copy.ts';
+import { REGISTERS, ROWS } from './api.ts';
 import { rowReader, type Fetch } from './row-live.ts';
 
 const BASE = 'http://record.test';
@@ -105,6 +106,79 @@ test('a row the record does not hold is no row, not the sample row of that numbe
   assert.deepEqual(await rowReader(BASE, io).read('services', 99), { from: 'live', entry: null, names: new Map() });
 });
 
+/**
+ * A HOST FOR ONE RECORD-DECLARED LIST THAT HOLDS ROWS AND DOES NOT HOLD THE ROW ASKED FOR.
+ *
+ * `matched: 400` and a row in the answer because the asymmetry only shows on a list that is plainly
+ * there: on the record the usability survey drove, `Assignments` held 400 rows in the rail while
+ * `/r/assignments/9999` denied the list itself.
+ */
+function stocked(declared: Record<string, unknown>) {
+  return host((url) => {
+    const asked = url.searchParams.get('register') ?? '';
+    if (url.pathname === '/api/schema') return declared[asked] ? json(200, { ok: true, value: declared[asked] }) : json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${asked}.` } });
+    if (url.pathname === '/api/get') return json(200, { ok: true, value: null });
+    if (url.pathname === '/api/list')
+      return json(200, { ok: true, value: { rows: [{ id: '01JTEACHER0000000000000001', seq: 1, fields: { name: 'Mrs Auerbach' } }], cursor: null, matched: 400 } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no such method.' } });
+  });
+}
+
+/** The two branches of `r/[register]/[seq]/+page.svelte:538`, so the sentence asserted below is the drawn one. */
+const sentence = (register: string, seq: number): string => {
+  const decl = REGISTERS[register];
+  return decl ? copy.noSuchNumber(decl.one, seq) : copy.noSuch('list', register);
+};
+
+/**
+ * THE SENTENCE CONTRADICTED THE BUTTON UNDER IT, AND THE READING WAS THAT SOMETHING HAD BEEN DESTROYED.
+ *
+ * `/r/courses/9999` on a student record answered *There is no list called courses.* with *Back to
+ * courses* beneath it, while `courses` sat in the rail holding rows. `read` returned at the absent
+ * row before `learn` ran, so `REGISTERS[register]` stayed empty, and the page's `decl` was undefined
+ * on the one screen that had just proved the list answers: the schema call succeeds, the list call
+ * succeeds, only the row is missing. `/r/session/9999` never had the fault because `session` ships in
+ * the bundle, which is why one register said *There is no run #9999.* and every record-declared one
+ * denied the list. 390 and 1440 are the two numbers the survey typed.
+ */
+for (const seq of [390, 1440])
+  test(`a missing row on a record-declared list names the number, not the list, at ${seq}`, async () => {
+    const register = `rl_courses_${seq}`;
+    const teachers = `${register}_teachers`;
+    /* NO `one` IN THE DECLARATION, because a record does not have to send one and the survey's did not:
+       `declOf` folds `Courses` down to `course` itself, and the sentence has to come out right from
+       the name alone or it comes out right on nothing real.
+
+       AND ONE REF FIELD, because without it the last assertion below proved nothing. The declaration
+       held a single `text` field, so `targetsOf` named no register, and no list was paged whether the
+       missing-row return sat above the ref walk or below it: moving that return below the loop in
+       `row-live.ts` left all thirteen tests in this file green. With `teacher` declared, the same
+       mutation sends `/api/schema` for the target and then `/api/list`, and the assertion goes red. */
+    const { io, sent } = stocked({
+      [register]: { id: register, name: 'Courses', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'teacher', type: 'ref', to: teachers }] },
+      [teachers]: { id: teachers, name: 'Teachers', title: 'name', fields: [{ id: 'name', type: 'text' }] },
+    });
+    assert.deepEqual(await rowReader(BASE, io).read(register, seq), { from: 'live', entry: null, names: new Map() });
+    assert.equal(sentence(register, seq), `There is no course #${seq}.`);
+    /* AND THE BUTTON UNDERNEATH IS LABELLED FROM THE SAME DECLARATION, so *Back to Courses* now agrees
+       with the sentence above it instead of denying it. */
+    assert.equal(REGISTERS[register]?.name, 'Courses');
+    /* NO REF WALK FOR A ROW THAT IS NOT THERE: there are no fields to draw, so the 400-row list is
+       not paged through to name refs nobody will read. Only the row and the declaration are asked. */
+    assert.deepEqual(
+      sent.map((u) => u.pathname),
+      ['/api/get', '/api/schema'],
+    );
+  });
+
+test('a list the record will not declare still says the list is not there, because that is true', async () => {
+  const register = 'rl_nope';
+  const { io } = host((url) => (url.pathname === '/api/get' ? json(200, { ok: true, value: null }) : json(404, { ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${register}.` } })));
+  assert.deepEqual(await rowReader(BASE, io).read(register, 390), { from: 'live', entry: null, names: new Map() });
+  assert.equal(REGISTERS[register], undefined);
+  assert.equal(sentence(register, 390), 'There is no list called rl_nope.');
+});
+
 for (const [what, answer] of [
   ['nothing answers', null],
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
@@ -134,6 +208,14 @@ test('the row page draws the live row, its refusal, and no sample backlinks when
      live groups win where there are any, because on a record the sample's would be another record's
      rows pointing at this one. */
   assert.match(page, /const incoming = \$derived\(\s*linked\?\.from === 'live' \? linked\.groups : row && !live \? backlinks\(id, seq\) : \[\],?\s*\)/u);
+  /* THE READ THAT MAKES THE LEARNED DECLARATION VISIBLE, and it is one `void` away from silence. The
+     register table is a plain object, so `$derived(REGISTERS[id])` would depend on `id` alone and
+     never notice that `read` has just learned the list; `void got` is the whole reason the sentence
+     below the bars is right. Dropping it turns "There is no course #390." back into "There is no list
+     called courses." with nothing else changed, and no other test in this tree says a word about it.
+     Checked in memory against this file's own text: the pin holds as shipped and fails with the
+     `void got` removed. */
+  assert.match(page, /const decl = \$derived\.by\(\(\) => \(void got, REGISTERS\[id\]\)\)/u, 'the page must re-read the register table once the row has been read');
   assert.match(page, /\{:else if got\?\.from === 'refused'\}/u);
   assert.match(page, /title=\{got\.fix\}/u);
   assert.match(page, /got\?\.from === 'live' \? \(got\.entry \?\? undefined\)/u, 'a live row that is not there falls back to the sample again');

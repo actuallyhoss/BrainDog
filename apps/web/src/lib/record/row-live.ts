@@ -5,7 +5,8 @@
  *
  * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the page reads the sample as it
  * always did. Any other refusal is the record's own sentence. A row the record does not hold is
- * `entry: null`, never the sample's row of the same number.
+ * `entry: null`, never the sample's row of the same number, and the LIST's declaration is learned
+ * even then, because the screen that says the row is not there has to name the list it is not in.
  *
  * THE DECLARATION IS THE SEED'S COPY, as it is for the list (`remote.ts` says why and what pins it).
  * The answer is turned into the app's `Entry` by `entryOf`, so every helper the page already calls
@@ -73,10 +74,21 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       if (!Number.isInteger(seq) || seq < 1) return { from: 'sample' };
       const got = await client.get(register, seq);
       if (!got.ok) return missed(got);
-      if (got.value === null) return { from: 'live', entry: null, names: new Map() };
-      /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE: the row's list first, so its refs are known, and each
-         target before it is walked, so a ref is drawn as the row's name and not as `courses#1`. */
+      /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE, AND THE ROW'S LIST IS LEARNED WHETHER OR NOT THE ROW IS
+         THERE. This `learn` used to sit below the line under it, and a missing row therefore left `REGISTERS[register]`
+         empty, which is the one thing the row page reads to name the list. So `/r/courses/9999` on a student record
+         answered "There is no list called courses." under a button reading "Back to courses", with `courses` in the rail
+         holding rows: the sentence and the button contradicted each other, and the likely reading was that the list had
+         been destroyed. `/r/session/9999` was always right ("There is no run #9999.") only because `session` ships in the
+         bundle and never needed asking. One schema call, answered once per tab, buys every register that sentence.
+
+         It stays below `get` rather than above it, because a row that IS there needs the declaration just as much and
+         pays for it in the same place, and a pending row pays for neither. */
       await learn(client.schema, register, asked);
+      /* NO REF WALK FOR A ROW THAT IS NOT THERE: there are no fields to draw, so paging a 400-row target register would
+         name refs nobody is going to read. */
+      if (got.value === null) return { from: 'live', entry: null, names: new Map() };
+      /* Each target walked before the row is turned into an `Entry`, so a ref is drawn as the row's name, not `courses#1`. */
       const refs = new Map<string, RefMap>();
       for (const target of targetsOf(register)) {
         const map = await mapOf(target);
