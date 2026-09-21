@@ -42,16 +42,51 @@
    * nightly backups, and that is a strength, not a limit, and it is a counted figure of the kind he
    * named. Length came out of bands and pictures.
    *
-   * WHAT IT IS NOW: FIVE BANDS, VALUE FIRST, AND EVERY ONE OF THE FIRST THREE LED BY SOMETHING
-   * DRAWN RATHER THAN WRITTEN.
+   * WHAT IT IS NOW: FIVE BANDS, VALUE FIRST, AND WHAT EACH ONE IS LED BY, WRITTEN OUT RATHER THAN
+   * SLOGANISED.
    *
-   *   HERO        the promise, one action, and the product at the width of the screen, cropping off
-   *               the bottom of the fold the way Linear runs its 1,344px shot off the first screen.
-   *   0001        the switcher: the record becoming the reader's own, redrawn as they press.
-   *   0002        the dashboard, wider than the screen, with the sentence lying on its top strip.
+   *   HERO        the promise, one action, and the product PHOTOGRAPHED at the width of the screen,
+   *               cropping off the bottom of the fold the way Linear runs its 1,344px shot off the
+   *               first screen.
+   *   0001        the switcher, DRAWN IN CSS and running the full width of the screen: the record
+   *               becoming the reader's own, redrawn as they press.
+   *   0002        the dashboard PHOTOGRAPHED, wider than the screen, with the sentence lying on its
+   *               top strip.
    *   0003        the mechanism, all of it, in one band: registers, agents, the ledger arriving,
    *               and the three honest columns.
    *   close       the accent as a whole field.
+   *
+   * THIS PARAGRAPH USED TO READ *EVERY ONE OF THE FIRST THREE LED BY SOMETHING DRAWN RATHER THAN
+   * WRITTEN*, AND OF THE THREE, 0001 WAS NOT. Counted off `apps/site/build/index.html` on
+   * 2026-09-22: the hero holds one `<img>` and 0002 holds one, and 0001 holds no `<img>` and no
+   * `<svg>` at all. What 0001 draws it draws in CSS, which is a picture by any fair reading, but it
+   * was the FOURTH thing in the band. Above it stood a mark, a heading and a 23-word lead: 31 words
+   * of prose between the hairline that opens the band and the first drawn pixel in it. The lead
+   * moved UNDER the rail, where it answers what a reader has just watched happen rather than
+   * introducing a control nobody has seen yet, and the band now says eight words before the
+   * switcher. The claim above is written as what each band is led BY, because the slogan is what
+   * stopped anybody checking.
+   *
+   * AND THE ARITHMETIC THAT ARRIVED WITH THE COMPLAINT IS RIGHT ABOUT THE MARKUP AND WRONG ABOUT
+   * THE READER, WHICH IS WORTH RECORDING BECAUSE IT NEARLY BOUGHT THIS BAND A PHOTOGRAPH IT DOES
+   * NOT NEED. The report was that the two bands with no picture carry 303 of the page's 414 words
+   * and all 46 of its list items. Counting whitespace-separated tokens once tags and entities are
+   * stripped, the bytes say 122 words in 0001 and 181 in 0003 and 46 list items in the two of them,
+   * so the numerator is exact; the five bands hold 417 and not 414, which is the same 73 per cent
+   * OF THE MARKUP. Recount it off the same file and bound the closing band at its own `</section>`:
+   * running that last slice to the end of the document counts the 16-word footer as well, which is
+   * where 433 words and 70 per cent come from. What the number cannot see is that a reader is never
+   * shown it. Four of the switcher's five panels are `visibility: hidden`, so 30 of those words and
+   * 26 of those list items are off the screen, out of the tab order and out of the accessibility
+   * tree at any one moment. What a reader actually meets in 0001 is 92 words and ten rows.
+   *
+   * WHAT WOULD MAKE 0001'S DRAWING A DRAWING RATHER THAN A LIST OF NOUNS IS NOT IN THIS FILE. Every
+   * row of the rail carries a grey square where the application draws a glyph, and
+   * `lib/Arrange.svelte:390` says so itself at its `.mark` rule: *there is no glyph to draw for a
+   * row that is only a name*. The application draws 63 of them, counted off the keys of
+   * `apps/web/src/lib/ui/icons.ts`, and `lib/icons.ts:17` carries four, because four is all this
+   * site has asked for so far. Ten real glyphs down that rail is the difference between a picture
+   * of a navigation rail and a bulleted list, and it costs two files that this one does not own.
    *
    * WHAT SURVIVED FROM THE TWO PASSES BEFORE THIS ONE, because those measurements are still the
    * reason these shapes are the shapes:
@@ -194,9 +229,18 @@
 
      The switcher is the argument: pressing a case redraws the rail in front of the reader, so the
      claim is made by the page doing the thing rather than by a sentence about it. It is a strip.
-     The sentence runs the width of the column, the control runs the width of the SCREEN between two
-     hairlines, and the thing it redraws sits under it. Nothing is beside anything, so there is no
-     short column to leave a hole under. -->
+     The control runs the width of the SCREEN between two hairlines, the thing it redraws sits under
+     it, and the sentences run the width of the column below that. Nothing is beside anything, so
+     there is no short column to leave a hole under.
+
+     THE LEAD IS UNDER THE RAIL AND NOT OVER IT, WHICH IS THE WHOLE OF WHAT CHANGED HERE ON
+     2026-09-22. This band holds no photograph and no `<svg>`, so the switcher is its picture, and
+     the picture was the fourth thing in the band: counted off the built page, 31 words stood
+     between the hairline that opens the band and the first drawn pixel in it, of which 23 were a
+     lead introducing a control the reader had not seen. Eight stand there now, and they are the
+     band's number, its tag and its heading. The sentence lost nothing: it says *the pages, the
+     lists and the words follow*, which is a description of what the rail has just done, and under
+     the rail it is read by somebody who has watched it happen. -->
 <section class="band" data-ground="flip" aria-labelledby="arrange-title">
   <div class="in reveal">
     <p class="band-mark">
@@ -204,10 +248,7 @@
       <span class="band-rule"></span>
       <span class="band-tag">{site.arrange.tag}</span>
     </p>
-    <div class="arrange-head">
-      <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
-      <p class="lead lead-wide">{site.arrange.lead}</p>
-    </div>
+    <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
   </div>
 
   <div class="arrange-strip reveal">
@@ -215,7 +256,8 @@
   </div>
 
   <div class="in">
-    <p class="note arrange-note">{site.arrange.note}</p>
+    <p class="lead lead-wide">{site.arrange.lead}</p>
+    <p class="note">{site.arrange.note}</p>
   </div>
 </section>
 
@@ -583,23 +625,20 @@
 
   /* ── 0001 · The switcher ──────────────────────────────────────────────── */
 
-  /* The heading and the sentence stack, because the control under them is the width of the screen
-     and a heading set beside something would put a second column back on the one band that has
-     just lost one. `.lead-wide` rather than the 46ch measure for the same reason: with nothing on
-     its right, a 430px paragraph in a 1,136px row is the fault this page was rebuilt to remove. */
-  .arrange-head {
-    min-inline-size: 0;
-  }
+  /* THE SENTENCE UNDER THE RAIL NEEDS NO RULE OF ITS OWN, AND IT HAD ONE UNTIL IT WAS CHECKED.
+     `.arrange-lead { margin-block-start: var(--sp-5) }` stood here and changed nothing: `.lead`
+     above already declares `margin-block: var(--sp-5) 0`, the only override of it on this page is
+     `.report-card .lead`, and no media query touches either. So the gap the note used to sit at is
+     the gap the lead sits at by default, and band 0003 writes the same paragraph the same way with
+     `class="lead lead-wide"` and nothing else. `.lead-wide` rather than the 46ch measure: with
+     nothing on its right, a 430px paragraph in a 1,136px row is the empty-frame fault this page was
+     rebuilt to remove. The note keeps its base `--sp-4`, the gap between two paragraphs.
 
-  /* The component is a child of the band and not of `.in`, which is the whole of how its control
+     The component is a child of the band and not of `.in`, which is the whole of how its control
      strip reaches both edges of the screen. `Arrange.svelte` puts the buttons back inside `.in`
      itself, so only the rules are full-bleed. */
   .arrange-strip {
     margin-block-start: var(--sp-7);
-  }
-
-  .arrange-note {
-    margin-block-start: var(--sp-5);
   }
 
   /* ── 0002 · The dashboard ─────────────────────────────────────────────── */

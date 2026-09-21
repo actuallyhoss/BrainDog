@@ -9,8 +9,8 @@
  *   1. Somebody signed in. Their address must be the invitation's, and they go on the record.
  *   2. Nobody signed in, and the address already has a sign-in on this host. They sign in first and open the link
  *      again, because a link that signed somebody in as an existing person would be a way into their other records.
- *   3. Nobody signed in, and the address is new here. The person is made, put on the record and given a session,
- *      and the page asks them to add a passkey so they can come back.
+ *   3. Nobody signed in, and the address is new here. The person is made, with the name the page sent if it sent
+ *      one, put on the record and given a session, and the page asks them to add a passkey so they can come back.
  *
  * NOTHING HERE LOGS, and nothing is mailed. The token is in one request body and nowhere else.
  *
@@ -38,8 +38,17 @@ export type InviteDoor = {
   accept(token: string, person: { id: string; email: string }): Promise<Result<unknown>>;
   /** Whether this address can already sign in here, and so must, before a link is spent for it. */
   known(email: string): Promise<boolean>;
-  /** The Directory's person for a new address, made now. */
-  person(email: string): Promise<Result<{ id: string; email: string }>>;
+  /**
+   * The Directory's person for a new address, made now, under the name the page sent if it sent one.
+   *
+   * THE NAME REACHES THE ROW ONLY WHERE THE ROW IS BEING MADE. `person$` returns the row it finds before it
+   * looks at the name it was handed (`packages/record/src/directory.ts:650`), so every later invitation for the
+   * same address is a lookup and the name on it is dropped. Measured against a real Directory: somebody who has
+   * since named themselves keeps their name, and somebody still unnamed is left unnamed rather than named by
+   * whatever a second invitation typed. An invitation is somebody else's typing about a person, so a name that
+   * arrives after the row exists is not written here at all.
+   */
+  person(email: string, name?: string): Promise<Result<{ id: string; email: string }>>;
 };
 
 /** The part of a host's `AuthDoor` this route reads. */
@@ -121,7 +130,11 @@ export async function serveInvite(
       at: 'passkey',
     });
 
-  const made = await invite.person(email);
+  /* TRIMMED, AND AN EMPTY ONE IS NO NAME AT ALL. The column is NULL for everybody invited by address alone, and a
+     screen asks it "is there a name" before it draws one, so a name of spaces would answer yes and draw nothing.
+     Anything that is not a string is a page sending the wrong shape, which is not a name either. */
+  const asked = typeof body.name === 'string' ? body.name.trim() : '';
+  const made = await invite.person(email, asked || undefined);
   if (!made.ok) return reply(httpStatus(made), made);
   const out = await invite.accept(token, { id: made.value.id, email: made.value.email });
   if (!out.ok) return reply(httpStatus(out), out);
