@@ -498,9 +498,23 @@ export const site = {
            * refuse before they import: `workerSparkEngine` returns `undefined` when no endpoint is
            * configured, and `SPARK_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s
            * environments. So a visitor can still do nothing with it, which is this column's own
-           * definition, and the sentence now says which of the two reasons that is.
+           * definition.
+           *
+           * AND THE SENTENCE SAID "BOTH HOSTS REACH THE ENGINE", WHICH IS NOT TRUE AND WAS BACKED
+           * BY A GREP FOR THE PACKAGE NAME. Finding 3 of `loop/research-batch-five-audit.md`, and
+           * the finding under it is worse than the wording: `workerSparkEngine`
+           * (`apps/worker/src/spark.ts:83`) and `sparkEngineFor` (`apps/selfhost/src/spark.ts:73`)
+           * are called from their own test files and from nowhere else. Driven by the audit: with
+           * both builders throwing on every call, 172 of 172 tests pass in `apps/worker` and 199 of
+           * 199 in `apps/selfhost`. An import edge is not a path. Configuring a model would change
+           * nothing, because nothing asks either builder for an engine.
+           *
+           * So the line says what a stranger can check: the engine exists in this repository and no
+           * screen and no door reaches it. That is a smaller claim than the one it replaces and it
+           * is the one the code supports. It moves out of this comment and into the column the
+           * moment a caller exists.
            */
-          'Asking your record a question in words. Both hosts reach the engine; neither has a model configured.',
+          'Asking your record a question in words. The engine is built and nothing reaches it yet.',
           /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an
              arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
              itself` on its own now reads as the page disagreeing with its own history page. The
