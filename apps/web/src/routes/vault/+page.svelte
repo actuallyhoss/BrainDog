@@ -11,6 +11,13 @@
   THE APPROVAL IS SETTINGS', NOT A COPY OF IT. `record/vault.ts` holds the one `approve`, the one
   `answerLine` and the one `reprove`, and `/settings/agents` calls the same three.
 
+  THE INDEX AND THE MACHINES HAVE TWO DIFFERENT CEILINGS, AND THAT IS THE DECISION. What the registers
+  index is what a key OPENS and never the key, and a credential never goes in the record, so reading
+  the index is not reading a secret: a colleague at `read` may have it, and `/r/credentials` already
+  gives it to them. Who may open keys, and the acts on this screen, stay owner-only. Refusing one of
+  those two is not an answer about the other, and this screen used to draw the first refusal it got
+  as the whole page. `said.ts` holds what the record said and what is drawn from it.
+
   `/vault` carries NOTHING in its query string, ever. A credential id in the address is an entry in
   browser history and in URL-bar autocomplete (19 §5).
 -->
@@ -39,49 +46,90 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
 
-  /** Where the rows came from: the record, the sample on a host with no record, or a record that said no. */
-  let from = $state<'reading' | 'live' | 'sample' | 'refused'>('reading');
-  let refusal = $state('');
+  /** Where the rows came from: the record, or the sample on a host with no record. */
+  let from = $state<'reading' | 'live' | 'sample'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
   let names = $state(new Map<string, string>());
   let client: ReturnType<typeof createClient> | null = null;
 
+  /**
+   * WHAT THE RECORD SAID TO THREE OF THE FOUR READS, kept rather than dropped.
+   *
+   * A fresh self-host answers `REGISTER_UNKNOWN` to both lists and this screen drew "No keys yet."
+   * over them; a colleague at `read` is refused the machines and this screen drew that one sentence
+   * as the whole page, although the same person may read the Keys index on `/r/credentials`.
+   * `said.ts` has the measurements and the reasoning.
+   *
+   * THE FOURTH READ, `things`, IS THE ONE WITH NOTHING TO SAY, so it is not kept: a project the
+   * record would not name is drawn as the chip "A project" by `scopeName` and `keysOf`, which is
+   * already this screen declining to guess, and a second sentence about it would say no more.
+   */
+  let devices = $state<Said>({ kind: 'held' });
+  let index = $state<Said>({ kind: 'held' });
+  let counted = $state<Said>({ kind: 'held' });
+
   const waiting = $derived(asks(machines));
   const holding = $derived(holders(machines));
   const now = () => (from === 'sample' ? NOW : Date.now());
+  /**
+   * Adding, replacing, revealing, retiring and approving: the acts, which the machines read stands for.
+   *
+   * THE SAMPLE KEEPS ITS CONTROLS. It is the record a stranger presses things on, and every one of them
+   * answers with `copy.notOnDemo`, which is a sentence rather than a missing button.
+   */
+  const acts = $derived(from === 'sample' || (from === 'live' && mayAct(devices)));
+  /**
+   * The sentence for an act that is not this person's: the record's own where there is one, the demo's otherwise.
+   *
+   * THE INDEX'S REFUSAL IS ASKED SECOND, because an owner refused nothing is still refused a key form
+   * over a register the record does not hold, and `devices` has no sentence about that half.
+   */
+  const cannot = (): string => (devices.kind !== 'held' ? devices.fix : index.kind !== 'held' ? index.fix : copy.notOnDemo);
+  const indexTell = $derived(tellOf(index));
+  const machinesTell = $derived(machinesTellOf(devices));
+  /** Whether `listGrants` answered, so a row may say how often it was opened rather than guessing never. */
+  const counts = $derived(counted.kind === 'held');
 
   onMount(() => {
     void read(async () => {
       client = createClient({ base: location.origin });
       const listed = await client.listDevices();
-      if (!listed.ok) {
-        const said = 'refusal' in listed ? listed.refusal : { code: 'VERSION_STALE', fix: '' };
-        if (noRecord(said.code)) {
-          machines = sampleGrants(VAULT_GRANTS);
-          keys = sampleKeys(VAULT, VAULT_OPENED);
-          names = sampleNames(VAULT_GRANTS, VAULT_OPENED);
-          from = 'sample';
-          return true;
-        }
-        refusal = said.fix;
-        from = 'refused';
-        return false;
+      /* NO RECORD BEHIND THE SCREEN AT ALL is the one answer that replaces the page, because there is
+         nothing else to ask. Every other refusal is about one half of this screen and is said there. */
+      if (!listed.ok && 'refusal' in listed && noRecord(listed.refusal.code)) {
+        machines = sampleGrants(VAULT_GRANTS);
+        keys = sampleKeys(VAULT, VAULT_OPENED);
+        names = sampleNames(VAULT_GRANTS, VAULT_OPENED);
+        from = 'sample';
+        return true;
       }
-      /* A record without the agents pack has no Keys register, and its refusal is an empty index. */
+      /**
+       * THE INDEX IS READ WHATEVER THE MACHINES SAID. `listDevices` is about who may open keys and is
+       * owner-only; the Keys index is about what a key OPENS, which is ordinary metadata a reader may
+       * have, and `/r/credentials` already draws it to them. Refusing one is not an answer about the other.
+       */
+      devices = saidOf(listed);
+      if (listed.ok) machines = listed.value;
+      /* A record without the agents pack has no Keys register, and it says so rather than answering an empty index. */
       const [projects, credentials, grants] = await Promise.all([
         client.list({ register: 'things', limit: 200 }),
         client.list({ register: 'credentials', limit: 200 }),
         client.listGrants(),
       ]);
       type Row = { id: string; fields: Record<string, unknown>; state: string | null };
+      index = saidOf(credentials);
+      counted = saidOf(grants);
+      /* A RECORD WITH NO PROJECTS LIST NAMES NO PROJECT, and the chips say "A project" where a scope
+         points at one this screen cannot name, which is this screen saying where the record said nothing. */
       names = projects.ok ? namesOf(projects.value.rows as Row[]) : new Map();
       keys = credentials.ok ? keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names) : [];
-      machines = listed.value;
       from = 'live';
       reconnect();
-      return true;
+      /* The screen has an answer if either half answered; a screen refused both halves is a refused screen. */
+      return devices.kind === 'held' || index.kind === 'held';
     });
   });
   $effect(() => drew('ready'));
@@ -123,8 +171,8 @@
   }
 
   async function revokeRow(row: DeviceRow) {
-    if (from !== 'live' || !client) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client) {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     const at = opened();
@@ -140,8 +188,8 @@
    * THE INDEX IS READ AGAIN rather than patched here, so the line a person reads is the record and not a guess.
    */
   async function retireKey(k: KeyRow) {
-    if (from !== 'live' || !client || !k.grant) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client || !k.grant) {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     const at = opened();
@@ -209,9 +257,16 @@
     resumeAfter = null;
   };
 
+  /**
+   * AND THE BUTTON IS NOT THE ONLY DOOR INTO THIS SHEET. `reconnect()` below calls it straight from the
+   * address, and `reconnectOf` hands back `{ mode: 'add' }` for any label the index does not hold,
+   * which on an index that came back absent or refused is EVERY label: the Add button is drawn only
+   * where `index.kind === 'held'`, and this path walked round it into an eight-field sheet whose save
+   * the record would refuse. The guard is here as well as on the button, so both doors answer alike.
+   */
   function openAdd() {
-    if (from !== 'live' || !client) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client || index.kind !== 'held') {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     sheetSaid = '';
@@ -235,8 +290,8 @@
   }
 
   function openReplace(row: KeyRow) {
-    if (from !== 'live' || !client) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client) {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     sheetSaid = '';
@@ -253,8 +308,8 @@
   async function saveKey(e?: SubmitEvent) {
     e?.preventDefault();
     if (sheet === null || saving) return;
-    if (from !== 'live' || !client) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client) {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     const mode = sheet.mode;
@@ -290,8 +345,8 @@
    * nothing here is reachable by a URL, nothing is written into the query string, and nothing is kept.
    */
   async function revealKey(k: KeyRow) {
-    if (from !== 'live' || !client) {
-      toasts.push(copy.notOnDemo, { intent: 'warn' });
+    if (!acts || from !== 'live' || !client) {
+      toasts.push(cannot(), { intent: 'warn' });
       return;
     }
     if (revealing !== '') return;
@@ -336,132 +391,143 @@
 <div class="page">
   {#if from === 'sample'}<p class="demo" role="note">{copy.notOnDemo}</p>{/if}
 
-  {#if from === 'refused'}
-    <Empty kind="error" title={refusal}>
-      {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
-    </Empty>
-  {:else}
-    {#if waiting.length}
-      <Section title={words.waiting} count={waiting.length}>
-        <ul class="whos">
-          {#each waiting as d (d.handle)}
-            <li class="who" data-intent="warn">
-              <div class="who-head">
-                <Icon name="key" size="s" />
-                <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
-                <Chip label={scopeName(d.scope, names)} />
-                <span class="who-detail">{words.days(daysFor(d.scope))}</span>
-              </div>
-            </li>
-          {/each}
-        </ul>
-
-        <form class="code-form" onsubmit={tryCode} novalidate>
-          <label class="code-label" for="vault-code">{copy.codeLabel}</label>
-          <div class="code-row">
-            <div class="field field-lg">
-              <input
-                class="field-input code-input"
-                id="vault-code"
-                type="text"
-                inputmode="numeric"
-                autocomplete="one-time-code"
-                autocapitalize="off"
-                spellcheck="false"
-                placeholder={'0'.repeat(CODE_DIGITS)}
-                value={typed}
-                oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
-                aria-describedby="vault-code-said"
-                aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
-              />
-            </div>
-            <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
-          </div>
-          <p class="code-said" id="vault-code-said" role="status" data-intent={said?.tone}>{said?.line ?? ''}</p>
-          {#if answer?.kind === 'signin'}
-            <div class="row-actions">
-              <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-            </div>
-          {/if}
-        </form>
-      </Section>
-    {/if}
-
-    <Section title={words.keys} count={keys.length}>
-      {#if from !== 'reading' && keys.length === 0}
-        <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
-      {/if}
-      {#if from !== 'reading'}
-        <div class="row-actions">
-          <Button weight="primary" onclick={openAdd}>{words.addKey}</Button>
-        </div>
-      {/if}
+  {#if waiting.length}
+    <Section title={words.waiting} count={waiting.length}>
       <ul class="whos">
-        {#each keys as k (k.id)}
-          <li class="who">
+        {#each waiting as d (d.handle)}
+          <li class="who" data-intent="warn">
             <div class="who-head">
               <Icon name="key" size="s" />
-              <span class="who-name">{k.label}</span>
-              <Chip label={k.project ?? words.global} />
-              <span class="who-detail">
-                {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{words.opened(k.opened)}{#if k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, now()))}{/if}{/if}
-              </span>
-            </div>
-            {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
-            {#if shown && shown.id === k.id}
-              <!--
-                THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
-                the address, in the page title or in a toast.
-              -->
-              <div class="shown">
-                <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
-                <div class="who-do">
-                  <Button weight="quiet" onclick={() => void copyShown()}>{words.copyValue}</Button>
-                  <Button weight="bare" onclick={forget}>{words.hide}</Button>
-                  <span class="who-detail">{words.hidesIn(shown.left)}</span>
-                </div>
-              </div>
-            {/if}
-            <div class="who-do">
-              {#if k.grant && k.sealed}
-                <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
-                <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
-                  {revealing === k.id ? words.revealing : words.reveal}
-                </Button>
-              {/if}
-              <Button weight="quiet" onclick={() => openReplace(k)}>{words.replace}</Button>
-              {#if k.grant && k.sealed}
-                <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
-              {/if}
+              <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
+              <Chip label={scopeName(d.scope, names)} />
+              <span class="who-detail">{words.days(daysFor(d.scope))}</span>
             </div>
           </li>
         {/each}
       </ul>
-    </Section>
 
-    <Section title={words.mayOpen} count={holding.length}>
-      {#if from !== 'reading' && holding.length === 0}
-        <Empty kind="no-data-yet" title={words.noMachines} />
-      {/if}
-      <ul class="whos">
-        {#each holding as d (d.handle)}
-          <li class="who">
-            <div class="who-head">
-              <Icon name="session" size="s" />
-              <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
-              <Chip label={scopeName(d.scope, names)} />
-              <span class="who-detail">
-                {d.last_used ? copy.usedWhen(since(d.last_used, now())) : copy.neverUsed} · {copy.endsWhen(relative(d.expires.slice(0, 10), now()))}
-              </span>
+      <form class="code-form" onsubmit={tryCode} novalidate>
+        <label class="code-label" for="vault-code">{copy.codeLabel}</label>
+        <div class="code-row">
+          <div class="field field-lg">
+            <input
+              class="field-input code-input"
+              id="vault-code"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder={'0'.repeat(CODE_DIGITS)}
+              value={typed}
+              oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
+              aria-describedby="vault-code-said"
+              aria-invalid={said?.tone === 'bad' ? 'true' : undefined}
+            />
+          </div>
+          <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
+        </div>
+        <p class="code-said" id="vault-code-said" role="status" data-intent={said?.tone}>{said?.line ?? ''}</p>
+        {#if answer?.kind === 'signin'}
+          <div class="row-actions">
+            <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+          </div>
+        {/if}
+      </form>
+    </Section>
+  {/if}
+
+  <Section title={words.keys} count={keys.length}>
+    {#if indexTell}
+      <!--
+        WHAT THE RECORD SAID, RATHER THAN "No keys yet." OVER IT. A record with no Keys register and a
+        record that will not hand the index over are two different states, and both used to be drawn as
+        the third, an index that came back empty.
+      -->
+      <Empty kind={indexTell.kind} title={indexTell.title} body={indexTell.body}>
+        {#snippet actions()}
+          {#if index.kind === 'absent'}<Button weight="primary" href="/packs">{tells.browse}</Button>{/if}
+        {/snippet}
+      </Empty>
+    {:else if from !== 'reading' && keys.length === 0}
+      <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
+    {/if}
+    <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
+    {#if from !== 'reading' && acts && index.kind === 'held'}
+      <div class="row-actions">
+        <Button weight="primary" onclick={openAdd}>{words.addKey}</Button>
+      </div>
+    {/if}
+    <ul class="whos">
+      {#each keys as k (k.id)}
+        <li class="who">
+          <div class="who-head">
+            <Icon name="key" size="s" />
+            <span class="who-name">{k.label}</span>
+            <Chip label={k.project ?? words.global} />
+            <span class="who-detail">
+              {k.sealed ? words.sealed : words.indexOnly}{#if k.sealed}{' · '}{counts ? words.opened(k.opened) : countSaid(counted)}{#if counts && k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, now()))}{/if}{/if}
+            </span>
+          </div>
+          {#if k.opens}<p class="who-why">{k.opens}</p>{/if}
+          {#if shown && shown.id === k.id}
+            <!--
+              THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
+              the address, in the page title or in a toast.
+            -->
+            <div class="shown">
+              <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
+              <div class="who-do">
+                <Button weight="quiet" onclick={() => void copyShown()}>{words.copyValue}</Button>
+                <Button weight="bare" onclick={forget}>{words.hide}</Button>
+                <span class="who-detail">{words.hidesIn(shown.left)}</span>
+              </div>
+            </div>
+          {/if}
+          <div class="who-do">
+            {#if acts && k.grant && k.sealed}
+              <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
+              <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                {revealing === k.id ? words.revealing : words.reveal}
+              </Button>
+            {/if}
+            {#if acts}<Button weight="quiet" onclick={() => openReplace(k)}>{words.replace}</Button>{/if}
+            {#if acts && k.grant && k.sealed}
+              <Button weight="bare" tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</Button>
+            {/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  </Section>
+
+  <Section title={words.mayOpen} count={holding.length}>
+    {#if machinesTell}
+      <!-- THE HALF THAT IS OWNER-ONLY SAYS SO IN THE RECORD'S WORDS, and it no longer takes the page with it. -->
+      <Empty kind={machinesTell.kind} title={machinesTell.title} body={machinesTell.body} />
+    {:else if from !== 'reading' && holding.length === 0}
+      <Empty kind="no-data-yet" title={words.noMachines} />
+    {/if}
+    <ul class="whos">
+      {#each holding as d (d.handle)}
+        <li class="who">
+          <div class="who-head">
+            <Icon name="session" size="s" />
+            <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
+            <Chip label={scopeName(d.scope, names)} />
+            <span class="who-detail">
+              {d.last_used ? copy.usedWhen(since(d.last_used, now())) : copy.neverUsed} · {copy.endsWhen(relative(d.expires.slice(0, 10), now()))}
+            </span>
+            {#if acts}
               <span class="who-do">
                 <Button weight="bare" tone="bad" onclick={() => void revokeRow(d)}>{copy.revokeKey}</Button>
               </span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    </Section>
-  {/if}
+            {/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  </Section>
 
   <Sheet open={sheet !== null} title={sheetTitle} subtitle={sheetHint} onclose={shut}>
     <form class="key-form" id="key-form" onsubmit={saveKey} novalidate>
@@ -481,13 +547,20 @@
           </select>
         </div>
 
-        <label class="field-label" for="key-project">{words.projectField}</label>
-        <div class="field">
-          <select class="field-input" id="key-project" bind:value={form.project}>
-            <option value="">{words.projectNone}</option>
-            {#each [...names] as [id, name] (id)}<option value={id}>{name}</option>{/each}
-          </select>
-        </div>
+        <!--
+          ONLY WHERE THERE IS A PROJECT TO PICK. On a record with no projects list the record refuses
+          that read, and this select then offered one option, "No project", which is a control that
+          cannot change anything.
+        -->
+        {#if names.size > 0}
+          <label class="field-label" for="key-project">{words.projectField}</label>
+          <div class="field">
+            <select class="field-input" id="key-project" bind:value={form.project}>
+              <option value="">{words.projectNone}</option>
+              {#each [...names] as [id, name] (id)}<option value={id}>{name}</option>{/each}
+            </select>
+          </div>
+        {/if}
       {/if}
 
       <label class="field-label" for="key-value">{words.valueField}</label>
