@@ -261,6 +261,22 @@ const fieldOf = (agg: Aggregation): string => {
 };
 
 /**
+ * IS THIS A FIGURE OF MONEY? THE DECLARED TYPE OF A FIELD IT AGGREGATES ANSWERS, as the record's
+ * `isMoneyFigure` asks it, and a unit that happens to be three upper-case letters does not: `KGS` is a
+ * weight and `GBP` is not, and only the declaration can tell them apart.
+ *
+ * `some` AND NOT `every`, for the reason the record gives: a rate takes its currency from one half, so
+ * `sum(balance) / count(id)` is an average balance in the currency of the balances, and `id` names no
+ * declared field at all.
+ */
+const isMoneyFigure = (register: string | null, value: Value): boolean => {
+  const fields = register ? REGISTERS[register]?.fields : undefined;
+  if (!fields) return false;
+  const aggs: Aggregation[] = 'ratio' in value ? [value.ratio.of, value.ratio.per] : 'diff' in value ? [value.diff.of, value.diff.per] : [value];
+  return aggs.some((agg) => fields.find((f) => f.id === fieldOf(agg))?.type === 'money');
+};
+
+/**
  * A ratio or a diff over rows, as the record's `read` reads one: each half in the currency the figure is added up in,
  * or, when a half is in parts or the halves are in two currencies, once per currency over the rows in it (`pairParts`).
  */
@@ -933,8 +949,20 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
   const seen = currenciesRead(rows, decl.value);
   const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
   const heldFx = fxSource();
+  /**
+   * THE CURRENCY A MONEY FIGURE IS ADDED UP IN IS THE ONE SOMEBODY CHOSE, OR IT IS NONE.
+   *
+   * This read `heldFx.home ?? declared`, as the record's did, and the fallback is the defect in both.
+   * A pack declares `money.GBP` because a money figure must name a currency for its target to mean
+   * anything, which is a fact about the SEED and never about the record it lands on; taking it as the
+   * currency to add up in hands a record a currency nobody on it chose. Measured on a record holding
+   * one currency and no sterling, the figure came back `{"value":null,"parts":[{"currency":"EGP",…}]}`
+   * with `fx: {"into":"GBP","home":null}`, so one currency was said as a part, which is the shape for
+   * two, and the number went with it. `packages/kernel/src/metrics.ts` carries the whole argument and
+   * the numbers; this line is the same decision, and `engines.test.ts` holds the two to it.
+   */
   const fx: Fx = {
-    into: heldFx.home ?? declared,
+    into: heldFx.home,
     home: heldFx.home,
     rates: heldFx.rates,
     today: new Date(now).toISOString().slice(0, 10),
@@ -948,12 +976,27 @@ export function read(decl: MetricDecl, now: number = NOW): Reading {
     return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
-  /* AND THE FORMAT IS CHECKED AGAINST THEM. `format: money.GBP` is a declaration about how to write
-     the figure; the rows are what it is a figure OF. When they disagree the declaration is wrong,
-     and printing the rows' number under the declaration's code is the quiet version of that. */
-  const held = [...seen][0];
-  if (!acrossed && fx.into && declared && held && fx.into !== held) {
-    const why = `${decl.metric}: the rows are in ${held} and the format says ${fx.into}`;
+  /**
+   * AND THE FORMAT IS CHECKED AGAINST THEM, THOUGH NOT FOR THE CURRENCY ANY MORE.
+   *
+   * `format: money.GBP` is a declaration about how to write the figure and the rows are what it is a
+   * figure OF. This refused when they named different currencies, which only ever fired because the
+   * declared code stood in for the currency to add up in: a record with no home currency now reads its
+   * money in the currency its rows carry, `shown` writes it from `figure.unit` when the two differ
+   * (the line at the foot of this function), and the target is converted or withheld. Refusing there
+   * would blank every money tile on a record whose currency is not the pack author's.
+   *
+   * WHAT IS LEFT IS A MONEY FORMAT OVER ROWS THAT ARE NOT MONEY, and the declared field type is what
+   * answers that, never the three-letter shape of the unit: `KGS` is a weight. The record refuses the
+   * identical declaration with `MIXED_CURRENCY` and the argument is written out there.
+   *
+   * NO REGISTER THIS APP DRAWS DECLARES A `quantity` (`schema.ts`'s `FIELD_TYPES`), so nothing in this
+   * build can reach the refusal below today. It is here because the day one does, the engine that
+   * refuses and the engine that does not would be a live disagreement about a shipped figure, which is
+   * the whole reason `engines.test.ts` exists.
+   */
+  if (!acrossed && declared && figure.unit && !isMoneyFigure(register, decl.value)) {
+    const why = `${decl.metric}: the rows are in ${figure.unit} and the format says ${declared}`;
     return { value: null, shown: '—', rows: rows.length, held: heldRows.length, delta: null, why, unmeasured: null, refusals: [why], href: hrefFor(decl) };
   }
 
@@ -1110,14 +1153,27 @@ function groupsOf(rows: Entry[], decl: MetricDecl, now: number, fx: Fx): Pick<Re
     units.set(key, got.unit);
     return { key, value: got.value, rows: of.length, ...(got.parts ? { parts: got.parts } : {}), state: 'full' };
   };
-  /* ONE PART IN PARTS PUTS EVERY PART IN PARTS, as the record's `groupsOf` does. */
-  const inParts = (groups: Group[]): Group[] =>
-    !groups.some((g) => g.parts)
-      ? groups
-      : groups.map((g) => {
-          const unit = units.get(g.key);
-          return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
-        });
+  /**
+   * ONE PART IN PARTS PUTS EVERY PART IN PARTS, as the record's `groupsOf` does, AND SO DOES ONE
+   * CURRENCY BESIDE ANOTHER.
+   *
+   * Both engines asked only whether some group already HELD parts, and a group holds parts only when
+   * its own rows are in two currencies. Once `into` stopped falling back to the declared format, no
+   * group on a record with no home currency came back in parts at all, so three obligations in EGP and
+   * USD grouped by party drew `[{Landlord, 5200000}, {Utility, 618554}, {Bank, 340000}]`: the tile
+   * above refuses to add two currencies and the bars under it ranked E£52,000.00 over $3,400.00 on the
+   * raw minor units, with no currency drawn on the chart. The `units` map is what can answer it, and
+   * only for a figure of money, because a part carries a `currency`.
+   */
+  const money = isMoneyFigure(registerOf(decl.source), decl.value);
+  const inParts = (groups: Group[]): Group[] => {
+    const held = new Set([...units.values()].filter((u): u is string => u !== null));
+    if (!money || (held.size < 2 && !groups.some((g) => g.parts))) return groups;
+    return groups.map((g) => {
+      const unit = units.get(g.key);
+      return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
+    });
+  };
 
   if (decl.bucket !== undefined) {
     const bucket = decl.bucket;

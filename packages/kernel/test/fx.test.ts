@@ -177,7 +177,11 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
     { currency: 'EGP', amount: 5_200_000 },
     { currency: 'USD', amount: 350_050 },
   ]);
-  assert.deepEqual(bare.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
+  /* `into: null` BECAUSE NOBODY HAS CHOSEN A CURRENCY TO ADD UP IN, and `CASH` declares `money.GBP`
+     only because a money figure names a currency for its target to mean anything. This line read
+     `into: 'GBP'` while the declared format stood in for that choice, over a founder holding pounds
+     Egyptian and dollars and no sterling at all. */
+  assert.deepEqual(bare.fx, { into: null, home: null, asOf: null, forward: false, stale: false, missing: [] });
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
   const home = read(k, CASH);
@@ -303,7 +307,9 @@ test('AN AVERAGE, A LEAST AND A MOST ACROSS CURRENCIES are each currency’s own
     { currency: 'EGP', amount: 5_200_000 },
     { currency: 'USD', amount: 340_000 },
   ]);
-  assert.deepEqual(most.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
+  /* AND THE SAME HERE: the most is one amount per currency and the reading names no currency it was
+     added up in, because none was chosen. It said `GBP` off the back of the declaration. */
+  assert.deepEqual(most.fx, { into: null, home: null, asOf: null, forward: false, stale: false, missing: [] });
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
   assert.deepEqual(of({ avg: 'balance' }).fx?.missing, ['USD to EGP']);

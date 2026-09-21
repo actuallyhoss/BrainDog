@@ -388,6 +388,12 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
   const decls: WebMetric[] = [
     { metric: 'cash-now', name: 'Cash now', source: 'register.accounts', where: 'liquid is true', value: { sum: 'balance' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
     { metric: 'cash-by-kind', name: 'Cash by kind', source: 'register.accounts', value: { sum: 'balance' }, group_by: 'kind', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
+    /* GROUPED SO THAT EVERY GROUP IS IN ONE CURRENCY AND THE GROUPS DISAGREE, which `cash-by-kind`
+       cannot be: the two accounts added above are both banks, so its `bank` group holds three
+       currencies and comes back in parts of its own. One account a group is the shape that broke.
+       With no home currency chosen, no group is in parts and each is a bare number, and `largestFirst`
+       then ranks E£52,000.55 over $3,400.01 on the raw minor units. */
+    { metric: 'cash-by-name', name: 'Cash by account', source: 'register.accounts', value: { sum: 'balance' }, group_by: 'name', format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
     /* AN AVERAGE, A LEAST, A MOST, A DIFF AND A RATIO: each currency's own with no rate, of converted amounts with one. */
     { metric: 'cash-avg', name: 'Average balance', source: 'register.accounts', where: 'liquid is true', value: { avg: 'balance' }, format: 'money.GBP', target: { gte: 5_000_000 }, window: '30d', compare: 'none' },
     { metric: 'cash-min', name: 'Smallest balance', source: 'register.accounts', where: 'liquid is true', value: { min: 'balance' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' },
@@ -414,6 +420,21 @@ test('MONEY IN EGP AND USD READS THE SAME IN BOTH ENGINES: parts with no home cu
   try {
     const bare = same('no home currency');
     assert.ok(bare.ok && bare.value.parts && bare.value.parts.length === 3, 'sterling, dollars and pounds');
+    /* AND NO BAR IS A BARE NUMBER WHILE THE BARS BESIDE IT ARE IN ANOTHER CURRENCY. The tile above a
+       chart refuses to add three currencies; the chart under it drew them as plain minor units, in one
+       ranking, with nothing saying which currency any bar was in. Held on the reading both engines
+       answer, because `same` above has already compared the two. */
+    const byName = k.metric(decls.find((d) => d.metric === 'cash-by-name')! as never);
+    assert.ok(byName.ok && byName.value.groups?.length, 'no groups to hold');
+    for (const g of byName.value.groups!) {
+      assert.equal(g.value, null, `${g.key} is a bare number beside another currency's`);
+      assert.equal(g.parts?.length, 1, `${g.key} does not say which currency it is in`);
+    }
+    assert.deepEqual(
+      new Set(byName.value.groups!.flatMap((g) => g.parts!.map((p) => p.currency))),
+      new Set(['GBP', 'EGP', 'USD']),
+      'each account is drawn in its own currency',
+    );
     for (const id of ['cash-avg', 'cash-min', 'cash-max', 'cash-spread', 'cash-each']) {
       const r = webRead(decls.find((d) => d.metric === id)!);
       assert.equal(r.parts?.length, 3, `${id} with no home currency is one amount per currency`);

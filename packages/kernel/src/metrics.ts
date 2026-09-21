@@ -161,9 +161,12 @@ export type Group = {
 /**
  * How a money figure across currencies was read (`fx.ts`).
  *
- * `into` is the currency it was added up in, the home currency when the record has one (`home`), else the one the
- * figure declares. `asOf` is the OLDEST rate a converted figure used, because a figure is only as current as the
- * stalest rate behind it, and `missing` each pair with no rate, which is why a figure came back in `parts`.
+ * `into` IS THE CURRENCY SOMEBODY CHOSE TO ADD UP IN, OR IT IS `null`. That is the record's home currency (`home`),
+ * and a record with no home currency has no such currency at all. This sentence read *"else the one the figure
+ * declares"* for as long as `evaluateMetric` fell back to the declared format, which published `into: "GBP"` on a
+ * record holding pounds Egyptian and no sterling; the fallback is gone and so is the clause. `asOf` is the OLDEST
+ * rate a converted figure used, because a figure is only as current as the stalest rate behind it, and `missing`
+ * each pair with no rate, which is why a figure came back in `parts`.
  *
  * `stale` WHEN THAT OLDEST RATE IS OLDER THAN `RATE_STALE_DAYS`. A rate with no maximum age was the expensive kind
  * of silence: a poll that quietly stopped went on converting at the old rate and the figure never changed tone.
@@ -590,11 +593,39 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   if (refusals.length || !schema) return { ok: false, refusal: refusals[0]! };
 
-  /* THE CURRENCY A MONEY FIGURE IS ADDED UP IN: the record's home currency when it has one, else the figure's own. */
+  /**
+   * THE CURRENCY A MONEY FIGURE IS ADDED UP IN, AND IT IS THE ONE SOMEBODY CHOSE OR IT IS NONE.
+   *
+   * This was `held.home ?? declared`, and the fallback is the defect. A pack declares `money.GBP`
+   * because a money figure must name a currency for its target to mean anything, and that is a fact
+   * about the SEED and never about the record it lands on. Taking it as the currency to add up in
+   * hands a record a currency nobody on it chose: `into: "GBP"` went out in every reading on a record
+   * holding pounds Egyptian and dollars and no sterling at all.
+   *
+   * WHAT IT COST, MEASURED ON A RECORD WITH ONE CURRENCY AND NO HOME CURRENCY (`test/metrics.test.ts`,
+   * two obligations of EGP 58,185.54):
+   *
+   *     into: home ?? declared   {"value":null,"unit":null,"parts":[{"currency":"EGP","amount":5818554}],"fx":{"into":"GBP","home":null}}
+   *     into: home               {"value":5818554,"unit":"EGP","rows":2}
+   *
+   * A sum in a currency the figure is not added up in is read one currency at a time, so ONE currency
+   * that was not the declared one came back as one part with no number. A part is how two currencies
+   * are held apart, one of them is not two, and `value: null` costs the delta, the verdict, and the
+   * row in `snapshots`, because the night skips a figure whose value is null (`index.ts:3538`). The
+   * Ledger's night-by-night history therefore never started on a record whose one currency was not
+   * the pack's.
+   *
+   * WHAT REPLACES IT IS NOT A LOUDER FALLBACK. A figure over rows in one currency is IN that currency
+   * and says so in `unit`; the tile writes it from `unit` rather than from the format when the two
+   * differ (`apps/web/src/lib/record/metrics.ts:1106`), and a target in the declared currency is
+   * converted at the latest rate or has no verdict (`targetFor` below). Two currencies with no home
+   * currency are parts, exactly as before, and now `into` is `null` there, which is the true answer to
+   * "in which currency is this being added up": in none, because nobody has chosen one.
+   */
   const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
   const held = ctx.fx?.() ?? { home: null, rates: [] };
   const fx: Across = {
-    into: held.home ?? declared,
+    into: held.home,
     home: held.home,
     rates: held.rates,
     today: new Date(ctx.asOfMs ?? ctx.nowMs).toISOString().slice(0, 10),
@@ -607,24 +638,40 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * AND THE FORMAT IS CHECKED AGAINST THE ROWS, WHICH IT WAS NOT.
    *
    * `format: money.USD` is a declaration about how to WRITE the figure and the rows are what it is a
-   * figure OF, so when they disagree the declaration is wrong. This side checked neither: a `sum` of
-   * sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
-   * refusal, and every renderer in this product formats from `decl.format`, so it reached a screen
-   * as USD 168,794.00 over rows that are in pounds. That is the worst class of defect this file
-   * knows: a figure of the right size in the wrong currency, with nothing on the screen disagreeing
-   * with anything else on it.
+   * figure OF. A `sum` of sterling invoices declared `money.USD` once came back as a plain number
+   * with `unit: 'GBP'` and no refusal, and the renderers of the day formatted from `decl.format`, so
+   * it reached a screen as USD 168,794.00 over rows that are in pounds. That is the worst class of
+   * defect this file knows: a figure of the right size in the wrong currency, with nothing on the
+   * screen disagreeing with anything else on it.
    *
-   * THE BROWSER'S COPY OF THIS EVALUATOR HAS HAD THE CHECK ALL ALONG, one sentence and eight lines,
-   * and a differential pass over the shipped seed is what found the two disagreeing. `50 §1` says
-   * there should not be two engines; while there are, a check that lands on one of them is half a
-   * check, and this is the half that was missing.
+   * ANOTHER CURRENCY IS NO LONGER WHAT THIS REFUSES, AND THE REASON IS THE LINE ABOVE. A record
+   * without a home currency reads its money in the currency its rows are in, so `unit` is that
+   * currency, the tile writes the figure from `unit` when it differs from the format
+   * (`apps/web/src/lib/record/metrics.ts:1106`), and the target is converted or withheld
+   * (`targetFor` below). Refusing there would blank every money tile on a record whose currency is
+   * not the pack author's, which is a whole product going dark over a label. The declared code
+   * loses; the figure does not.
+   *
+   * WHAT IS LEFT IS THE DISAGREEMENT NO RENDERER CAN RESCUE: a money format over rows that are not
+   * money. A `quantity` of hours under `money.GBP` has `unit: 'h'`, and there is no amount of
+   * sterling that is three hours. It went through this branch before by accident, because the
+   * declared currency stood in for the currency to add up in and `'GBP' !== 'h'` was true.
+   *
+   * SO THE DECLARATION IS ASKED AND NOT THE SPELLING (`isMoneyFigure`). The first repair written
+   * here tested `!isCurrencyUnit(unit)`, which is three upper-case letters, and this file says one
+   * function away why that regex cannot do this job: `mixedUnits` takes `money = false` from the
+   * quantity arm precisely so that `KGS` against `LBS` stay units. Driven with the regex in this
+   * condition, a `sum` of a `quantity` field over two rows in `KGS` declared `money.GBP` answered
+   *
+   *     {"value":7,"unit":"KGS","rows":2}
+   *
+   * a weight read as money with no refusal, where the same rows in `h` still refused. The declared
+   * type of the field the figure aggregates is in scope here, and it is the only thing that knows.
    */
-  /* A MONEY SUM IS CONVERTED OR SPLIT BY CURRENCY BEFORE IT GETS HERE (`aggregate`), so what is left to disagree is an
-     average, a least or a most over rows in one currency the figure is not added up in. */
-  if (fx.into && declared && now.value.unit && fx.into !== now.value.unit)
+  if (declared && now.value.unit && !isMoneyFigure(schema, decl.value))
     return no<Reading>(
       'MIXED_CURRENCY',
-      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${fx.into}.`,
+      `${decl.metric}: the rows are in ${now.value.unit} and the format says ${declared}.`,
       { at: 'format', allowed: [now.value.unit] },
     );
 
@@ -724,15 +771,51 @@ function groupsOf(
     units.set(key, got.value.unit);
     return ok({ value: got.value.rows === 0 ? null : got.value.value, rows: got.value.rows, ...(got.value.parts ? { parts: got.value.parts } : {}) });
   };
-  /* ONE PART IN PARTS PUTS EVERY PART IN PARTS. A month in one currency beside a month in two is still a figure with no
-     single unit, so its amount is said as the one currency it is in, never as a bare number beside the others. */
-  const inParts = (groups: Group[]): Group[] =>
-    !groups.some((g) => g.parts)
-      ? groups
-      : groups.map((g) => {
-          const unit = units.get(g.key);
-          return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
-        });
+  /**
+   * ONE PART IN PARTS PUTS EVERY PART IN PARTS. A month in one currency beside a month in two is still a
+   * figure with no single unit, so its amount is said as the one currency it is in, never as a bare
+   * number beside the others.
+   *
+   * AND SO DOES ONE CURRENCY BESIDE ANOTHER, WHICH IS THE INVARIANT THE SENTENCE ABOVE ALREADY CLAIMED
+   * AND THE CODE STOPPED KEEPING. It asked whether some group already HELD parts, and a group holds
+   * parts only when its OWN rows are in two currencies. The day `into` stopped falling back to the
+   * declared format (`evaluateMetric`), no group on a record with no home currency came back in parts
+   * again: each group is in one currency, so `across` answers `one`. Measured on three obligations in
+   * EGP and USD, no home currency, grouped by party:
+   *
+   *     before   [{Landlord, parts:[EGP 5,200,000]}, {Utility, parts:[EGP 618,554]}, {Bank, parts:[USD 340,000]}]
+   *     after    [{"key":"Landlord","value":5200000},{"key":"Utility","value":618554},{"key":"Bank","value":340000}]
+   *
+   * The tile above refuses to add two currencies and the bars under it added them anyway: `largestFirst`
+   * ranked E£52,000.00 over $3,400.00 on the raw minor units, on a chart with no currency drawn anywhere
+   * on it. So the question is the one the `units` map can answer, how many currencies the groups hold
+   * BETWEEN them. A group that is ALREADY in parts is not one of them: `one` hands such a group back
+   * with `unit: null`, so it is filtered out of the tally, and the old test for it is kept as the
+   * second half of the condition rather than folded into the count.
+   *
+   * AND ONLY FOR A FIGURE OF MONEY (`isMoneyFigure`), because a part carries a `currency`: a `quantity`
+   * grouped by its unit would otherwise write `h` and `kg` into a currency field, and the refusals for
+   * two units in one figure are `aggregate`'s, not this one's.
+   *
+   * THAT GUARD IS A BELT AND NOT A REPAIR, AND IT IS SAID HERE BECAUSE NO TEST CAN DRIVE IT. Deleting
+   * it leaves all 1,007 tests in this package green, which is the state the `mixedUnits` note two
+   * hundred lines down calls out as the reason to distrust a claim. Driven rather than read: the
+   * ungrouped figure is read over the SAME predicate as the groups, so two units between the groups
+   * are two units in that figure, and `{ ...MEASURED, group_by: 'what' }` over rows in `h` and `d`
+   * answered `QUANTITY_MIXED_UNIT` from `evaluateMetric` and never reached this function at all. One
+   * unit between them makes `held.size` one and the condition moot. So the guard cannot fire today,
+   * and it is kept because the day a grouping is read under a predicate the figure above it is not,
+   * the alternative is a unit written into a currency field.
+   */
+  const money = isMoneyFigure(schema, decl.value);
+  const inParts = (groups: Group[]): Group[] => {
+    const held = new Set([...units.values()].filter((u): u is string => u !== null));
+    if (!money || (held.size < 2 && !groups.some((g) => g.parts))) return groups;
+    return groups.map((g) => {
+      const unit = units.get(g.key);
+      return g.parts || g.value === null || !unit ? { ...g, value: null } : { ...g, value: null, parts: [{ currency: unit, amount: g.value }] };
+    });
+  };
 
   if (decl.bucket !== undefined) {
     const bucket = decl.bucket;
@@ -842,6 +925,23 @@ const BARE_UNIT = 'no unit';
  */
 const isCurrencyUnit = (unit: string | null | undefined): unit is string =>
   typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit);
+
+/**
+ * IS THIS A FIGURE OF MONEY? THE DECLARATION ANSWERS, BECAUSE THE UNIT THAT CAME BACK CANNOT.
+ *
+ * `isCurrencyUnit` above is the spelling and this is the question. `KGS` and `LBS` are three
+ * upper-case letters and are not ISO 4217, which is why `mixedUnits` is handed `money = false` by the
+ * quantity arm; asking the regex instead let a `sum` of a `quantity` field over two rows in `KGS`
+ * pass under `format: 'money.GBP'` as `{"value":7,"unit":"KGS"}` with no refusal.
+ *
+ * `some` AND NOT `every`, and that is the one line of it worth arguing about. A rate takes its
+ * currency from one half: `sum(balance) / count(id)` is an average balance in the currency of the
+ * balances, and `id` is not a declared field at all, so `every` would refuse the average invoice size
+ * the `ratio` arm was widened to allow (`engines.test.ts`'s `cash-each`). A half that is money is
+ * what makes a currency a possible answer; `rateUnit` and the mixed-unit checks decide the rest.
+ */
+const isMoneyFigure = (schema: Schema, value: Value): boolean =>
+  aggregationsOf(value).some((f) => schema.fields[f.field]?.type === 'money');
 
 /**
  * THE LIST OF UNITS A MIXED-UNIT REFUSAL NAMES, AND THE WORD FOR HOW MANY OF THEM THERE ARE, decided

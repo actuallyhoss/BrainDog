@@ -521,7 +521,10 @@ test('A SUM ACROSS TWO CURRENCIES IS NOT ADDED: it is one amount per currency, w
     { currency: 'EUR', amount: 100_000 },
     { currency: 'GBP', amount: 720_000 },
   ]);
-  assert.deepEqual(out.fx, { into: 'GBP', home: null, asOf: null, forward: false, stale: false, missing: [] });
+  /* `into: null` BECAUSE NOBODY HAS CHOSEN A CURRENCY TO ADD UP IN. This line read `into: 'GBP'` for
+     as long as the declared format stood in for that choice, which is a currency out of a pack
+     written into the answer about somebody's own record. */
+  assert.deepEqual(out.fx, { into: null, home: null, asOf: null, forward: false, stale: false, missing: [] });
   assert.equal(out.met, null, 'a verdict on no one number');
   sql.close();
 });
@@ -547,20 +550,28 @@ test('A RATIO OF TWO DIFFERENT UNITS IS A RATE, and it was refused as a mixed cu
 
 test('A FORMAT THAT CONTRADICTS THE ROWS IS NEVER PRINTED UNDER IT: the rows are said in their own currency', async () => {
   /* `format: money.USD` is a declaration about how to WRITE the figure and the rows are what it is a
-     figure OF, so when they disagree the declaration is wrong. This side checked neither: a sum of
-     sterling invoices declared `money.USD` came back as a plain number with `unit: 'GBP'` and no
-     refusal, and every renderer formats from `decl.format`, so it reached a screen as USD 168,794.00
-     over rows that are in pounds. A sum is now the pounds, as a part, with the rate it would need,
-     and so is an average. */
+     figure OF. This side once checked neither: a sum of sterling invoices declared `money.USD` came
+     back as a plain number with `unit: 'GBP'` and no refusal, and the renderers of the day formatted
+     from `decl.format`, so it reached a screen as USD 168,794.00 over rows that are in pounds.
+
+     THE FIGURE IS THE POUNDS AND THE READING SAYS SO, which is the repair that survived. It was a
+     part for a while, `{"value":null,"parts":[{"currency":"GBP","amount":2945000}]}`, and a part is
+     how two currencies are said apart: one of them is not two, and a `null` there costs the delta,
+     the verdict and the night's snapshot, which skips a figure whose `value` is `null`. So the sum is
+     a number in the currency the rows are in, `unit` carries that currency, and the tile writes the
+     figure from `unit` rather than from the format when they differ
+     (`apps/web/src/lib/record/metrics.ts:1106`). The contradiction is still never printed; it is the
+     format that loses, not the figure. */
   const { k, sql } = await record();
   const out = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never));
-  assert.equal(out.value, null, 'a sterling sum was read under a dollar format');
-  assert.deepEqual(out.parts, [{ currency: 'GBP', amount: 2_945_000 }]);
-  assert.deepEqual(out.fx?.missing, [], 'no home currency was chosen, so no rate is what is missing');
+  assert.equal(out.value, 2_945_000, 'a sterling sum read under a dollar format lost its number');
+  assert.equal(out.unit, 'GBP', 'the reading does not say which currency the figure is in');
+  assert.equal(out.parts, undefined, 'one currency was said as parts, which is the shape for two');
+  assert.equal(out.met, null, 'a dollar ceiling over a sterling figure, with no rate, is no verdict');
 
   const avg = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { avg: 'amount' }, format: 'money.USD', target: { lte: 99_999_999 } } as never));
-  assert.equal(avg.value, null, 'a sterling average was read under a dollar format');
-  assert.deepEqual(avg.parts, [{ currency: 'GBP', amount: 2_945_000 / 5 }]);
+  assert.equal(avg.value, 2_945_000 / 5, 'a sterling average was read under a dollar format');
+  assert.equal(avg.unit, 'GBP');
   void fixOf;
 
   /* AND THE FORMAT THAT AGREES IS UNTOUCHED, so the check is about a contradiction rather than
@@ -568,6 +579,170 @@ test('A FORMAT THAT CONTRADICTS THE ROWS IS NEVER PRINTED UNDER IT: the rows are
   const fine = value<Reading>(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 99_999_999 } } as never));
   assert.equal(fine.value, 2_945_000);
   assert.equal(fine.fx, undefined);
+  sql.close();
+});
+
+/* ── a currency nobody chose ─────────────────────────────────────────────── */
+
+/**
+ * THE DIRECTIONS A MONEY FIGURE CAN GO WHEN THE RECORD IS NOT IN THE CURRENCY THE FIGURE DECLARES,
+ * and the reason they are one block of tests: the currency a figure is added up in is decided in this
+ * file, once, and each direction is that decision seen from a different record.
+ *
+ * WHAT WAS THERE BEFORE: `into: held.home ?? declared`. With no home currency chosen, the currency a
+ * pack happened to declare became the currency the figure was added up in, so a record holding one
+ * currency and no sterling read its own money as a foreign part: measured on the record below,
+ *
+ *     one currency, declared GBP   {"value":null,"unit":null,"parts":[{"currency":"EGP","amount":5818554}],"fx":{"into":"GBP","home":null}}
+ *     two currencies, declared GBP {"value":null,"unit":null,"parts":[…],"fx":{"into":"GBP","home":null}}
+ *
+ * `into: "GBP"` on a record with no sterling in it and no sterling asked for is the label nobody
+ * chose, and it is published to every reader of the reading, the agent tools included.
+ */
+const ABROAD: readonly Record<string, unknown>[] = [
+  { what: 'Cairo rent', party: 'Landlord', direction: 'owed_by_me', amount: { amount: 5_200_000, currency: 'EGP' }, due: day(4), state: 'open' },
+  { what: 'Cairo power', party: 'Utility', direction: 'owed_by_me', amount: { amount: 618_554, currency: 'EGP' }, due: day(9), state: 'open' },
+];
+
+/** The register of dated rates a pack declares (`08 §2.5`), so a home currency has something to convert with. */
+const FX: Declaration = {
+  id: 'register.fx',
+  kind: 'register',
+  body: {
+    id: 'fx',
+    name: 'Rates',
+    title: 'currency',
+    fields: [
+      { id: 'currency', type: 'text', required: true },
+      { id: 'base', type: 'text', required: true },
+      { id: 'rate', type: 'decimal', required: true },
+      { id: 'as_of', type: 'day', index: true, required: true },
+    ],
+  } as never,
+};
+
+/** A record in pounds Egyptian, with the rates register installed and a pack that can hold a home currency. */
+async function abroad(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([OBLIGATIONS, FX])).ok);
+  for (const row of ABROAD) assert.ok(k.create('obligations', row, { actor: 'p_1' }).ok);
+  k.rememberPack({
+    id: 'money-core',
+    version: '1.0.0',
+    source: 'local',
+    ref: null,
+    manifest: JSON.stringify({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }),
+    checksum: 'not-a-real-checksum',
+  });
+  return { k, sql };
+}
+
+/** The dollar bill that makes this record hold two currencies, and the party a grouping cuts it by. */
+const MERCURY = { what: 'Mercury', party: 'Bank', direction: 'owed_by_me', amount: { amount: 340_000, currency: 'USD' }, due: day(2), state: 'open' };
+
+/** The same declaration every direction below reads, in the currency this record does not hold. */
+const OWED = { ...OVERDUE, metric: 'owed-abroad', where: undefined, value: { sum: 'amount' }, format: 'money.GBP', target: { lte: 400_000 } };
+
+test('ONE CURRENCY AND NO HOME CURRENCY IS A FIGURE IN THAT CURRENCY, not a part of a sum nobody asked for', async () => {
+  /* A record with a single currency has nothing to add across. It read `value: null` because the
+     figure was being added up in the currency its format declares, and 5,818,554 piastres are not
+     sterling, so the one currency came back as one part. Nothing on the screen was wrong and
+     everything behind it was: no delta, no verdict, and no row in `snapshots`, because the night
+     skips a figure whose `value` is `null` (`packages/kernel/src/index.ts:3538`), so the Ledger's
+     night-by-night history never starts on a record whose one currency is not the pack's. */
+  const { k, sql } = await abroad();
+  const out = value<Reading>(k.metric(OWED as never));
+  assert.equal(out.value, 5_818_554, 'a record in one currency has no number for its own money');
+  assert.equal(out.unit, 'EGP', 'the figure is not said in the currency its rows are in');
+  assert.equal(out.rows, 2);
+  assert.equal(out.parts, undefined, 'one currency was split into parts, and parts are for two');
+  assert.equal(out.fx, undefined, 'nothing was converted and nothing was left unconverted, so there is nothing to say');
+  /* AND THE TARGET, WHICH IS IN THE DECLARED CURRENCY, HAS NO VERDICT RATHER THAN A WRONG ONE: there
+     is no rate from sterling here, so there is nothing to carry a sterling ceiling into pounds. */
+  assert.equal(out.met, null, 'a sterling ceiling was applied to a figure in pounds Egyptian');
+  assert.equal(out.targetIn, undefined);
+  sql.close();
+});
+
+test('TWO CURRENCIES AND NO HOME CURRENCY ARE STILL PARTS, and the reading no longer names a currency nobody chose', async () => {
+  /* The parts were always right. What was wrong was `into`, which said GBP over a record holding
+     pounds Egyptian and dollars: a reader of the reading was told the figure was being added up in
+     sterling, and the only thing sterling about it was a line in a pack. `into` now says what it
+     means, the currency somebody chose to add up in, and nobody chose one here. */
+  const { k, sql } = await abroad();
+  assert.ok(k.create('obligations', MERCURY, { actor: 'p_1' }).ok);
+
+  const out = value<Reading>(k.metric(OWED as never));
+  assert.equal(out.value, null, 'two currencies were added together');
+  assert.deepEqual(out.parts, [
+    { currency: 'EGP', amount: 5_818_554 },
+    { currency: 'USD', amount: 340_000 },
+  ]);
+  assert.deepEqual(out.fx, { into: null, home: null, asOf: null, forward: false, stale: false, missing: [] });
+  assert.deepEqual(out.fx?.missing, [], 'no home currency was chosen, so no rate is what is missing');
+  sql.close();
+});
+
+test('AND EVERY GROUP OF THAT FIGURE IS SAID IN ITS OWN CURRENCY, never as a bare number beside another currency’s', async () => {
+  /**
+   * THE HOLE THE LINE ABOVE OPENED, AND IT IS A CHART RATHER THAN A LABEL. `inParts` wraps a group's
+   * number into a one-currency part so that no bar is drawn as a bare number beside a bar in another
+   * currency, and it fired only when some group ALREADY held parts. A group holds parts when its own
+   * rows are in two currencies, and with `into` no longer falling back to the declared format, no
+   * group on a record with no home currency comes back in parts at all: each party here is in one
+   * currency, so `across` answers `one`. Measured on these three obligations, grouped by party:
+   *
+   *     [{"key":"Landlord","value":5200000},{"key":"Utility","value":618554},{"key":"Bank","value":340000}]
+   *
+   * The tile above it refuses to add two currencies and the bars under it added them anyway:
+   * `largestFirst` ranked E£52,000.00 above $3,400.00 on the raw minor units, with no currency drawn
+   * anywhere on the chart. So the question `inParts` asks is now the one the `units` map can answer,
+   * how many currencies the groups hold BETWEEN them.
+   */
+  const { k, sql } = await abroad();
+  assert.ok(k.create('obligations', MERCURY, { actor: 'p_1' }).ok);
+
+  const out = value<Reading>(k.metric({ ...OWED, group_by: 'party' } as never));
+  assert.deepEqual(out.groups, [
+    { key: 'Bank', value: null, rows: 1, state: 'full', parts: [{ currency: 'USD', amount: 340_000 }] },
+    { key: 'Landlord', value: null, rows: 1, state: 'full', parts: [{ currency: 'EGP', amount: 5_200_000 }] },
+    { key: 'Utility', value: null, rows: 1, state: 'full', parts: [{ currency: 'EGP', amount: 618_554 }] },
+  ]);
+  /* AND ONE CURRENCY IS LEFT ALONE, because a chart of one currency is a chart of numbers with a
+     code above it and wrapping those would cost every grouped money figure its bars. */
+  const home = value<Reading>(k.metric({ ...OWED, where: 'party is not Bank', group_by: 'party' } as never));
+  assert.deepEqual(home.groups, [
+    { key: 'Landlord', value: 5_200_000, rows: 1, state: 'full' },
+    { key: 'Utility', value: 618_554, rows: 1, state: 'full' },
+  ]);
+  sql.close();
+});
+
+test('A HOME CURRENCY THE ROWS DO NOT HOLD IS STILL THE ONE THEY ARE ADDED UP IN, and the declared one is not', async () => {
+  /* THIS IS THE DIRECTION THAT MAKES IT A KERNEL DECISION RATHER THAN A SEED ONE. A pack cannot know
+     what a record holds, and this record holds neither the currency the figure declares nor the one
+     it is read in: pounds Egyptian and dollars, added up in sterling because that is what was chosen
+     on Money's settings. The home currency decides, the declaration does not, and the declaration is
+     left to say what the target is in. */
+  const { k, sql } = await abroad();
+  assert.ok(k.create('obligations', MERCURY, { actor: 'p_1' }).ok);
+  for (const r of [
+    { currency: 'EGP', base: 'GBP', rate: 0.0155, as_of: day(0) },
+    { currency: 'USD', base: 'GBP', rate: 0.74, as_of: day(0) },
+  ])
+    assert.ok(k.create('fx', r, { actor: 'p_1' }).ok);
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'GBP' }, { actor: 'p_1' }).ok);
+
+  /* Declared in pounds Egyptian, so the format and the home currency disagree and the home currency wins. */
+  const out = value<Reading>(k.metric({ ...OWED, format: 'money.EGP', target: { lte: 6_000_000 } } as never));
+  assert.equal(out.unit, 'GBP', 'the currency chosen on the settings is not the one the figure came back in');
+  /* 5,818,554 piastres at 0.0155 is 90,188 pence, and 340,000 cents at 0.74 is 251,600. */
+  assert.equal(out.value, 90_188 + 251_600);
+  assert.deepEqual(out.fx, { into: 'GBP', home: 'GBP', asOf: day(0), forward: false, stale: false, missing: [] });
+  /* AND THE TARGET COMES WITH IT: it is in the declared currency, so it is converted at the latest rate. */
+  assert.equal(out.targetIn?.currency, 'GBP');
+  assert.equal(out.met, false, 'a ceiling of E£60,000.00 is £930.00, and the figure is £3,417.88');
   sql.close();
 });
 
@@ -762,6 +937,47 @@ test('A MONEY COLUMN WITH A ROW THAT CARRIES NO CURRENCY SAYS UNITS TOO, because
   const out = refusal(k.metric({ ...OVERDUE, where: undefined, value: { sum: 'amount' }, format: 'decimal' } as never));
   assert.equal(out.code, 'MIXED_CURRENCY', 'a money column is still refused under the money code, whatever the sentence calls the set');
   assert.equal(out.fix, 'these rows are in GBP and no unit, and two units are never added');
+  sql.close();
+});
+
+test('A MONEY FORMAT OVER ROWS THAT ARE NOT MONEY IS STILL REFUSED, and it is the only disagreement left', async () => {
+  /* THE ARM THAT SURVIVED THE FALLBACK, AND IT IS THE ONE WORTH KEEPING. A figure in a currency the
+     format does not name is written in its own currency and is a fact; a figure in HOURS under
+     `money.GBP` cannot be written at all, because there is no amount of sterling that is three
+     hours. The condition used to reach this by accident: the declared currency stood in for the
+     currency to add up in, and `'GBP' !== 'h'` happened to be true. So it now asks what it means, is
+     this a figure of money, and this test is why the narrowing did not take the branch with it. */
+  const { k, sql } = await measured();
+  const out = refusal(k.metric({ ...MEASURED, format: 'money.GBP' } as never));
+  assert.equal(out.code, 'MIXED_CURRENCY');
+  assert.equal(out.fix, 'measured: the rows are in h and the format says GBP.');
+  assert.deepEqual(out.allowed, ['h']);
+  assert.equal(out.at, 'format');
+  sql.close();
+});
+
+test('AND A UNIT SPELLED LIKE A CURRENCY CODE IS STILL NOT MONEY, which is why the declaration is asked and not the spelling', async () => {
+  /* `isCurrencyUnit` IS THREE UPPER-CASE LETTERS AND CANNOT DO THIS JOB, which this file says in its
+     own words one function away: `mixedUnits` takes `money = false` from the quantity arm precisely so
+     that `KGS` against `LBS` stay units, because the regex is wrong about them and the declaration is
+     not. The first repair of the check above tested `!isCurrencyUnit(unit)`, and driven over the two
+     rows below it answered
+
+         {"value":7,"unit":"KGS","rows":2}
+
+     a weight read as money, with no refusal, where the same rows in `h` refused. The type of the
+     field the figure aggregates is in scope in `evaluateMetric`, and it is the only thing that knows. */
+  const { k, sql } = await measured();
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.spent', json('{"value":3,"unit":"KGS"}')) WHERE json_extract(fields, '$.what') = 'Editing'`);
+  sql.exec(`UPDATE entry SET fields = json_set(fields, '$.spent', json('{"value":4,"unit":"KGS"}')) WHERE json_extract(fields, '$.what') = 'Binding'`);
+  const out = refusal(k.metric({ ...MEASURED, format: 'money.GBP' } as never));
+  assert.equal(out.code, 'MIXED_CURRENCY');
+  assert.equal(out.fix, 'measured: the rows are in KGS and the format says GBP.');
+  /* AND THE SAME ROWS UNDER THE FORMAT THAT FITS THEM ARE A FIGURE, so what is refused is the money
+     declaration and never the quantity. */
+  const fine = value<Reading>(k.metric(MEASURED));
+  assert.equal(fine.value, 7);
+  assert.equal(fine.unit, 'KGS');
   sql.close();
 });
 

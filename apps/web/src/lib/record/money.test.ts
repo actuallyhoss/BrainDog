@@ -417,14 +417,21 @@ test('and a sum whose format disagrees with its rows is said in the rows’ curr
   const decl: MetricDecl | undefined = METRICS.overdue;
   assert.ok(decl, 'the overdue metric is gone');
   assert.ok(decl.format?.startsWith('money.'), 'this test needs a money-formatted metric');
+  /* AND THE FIGURE NOW CARRIES ITS NUMBER RATHER THAN BEING PARTED. Until 21 September a sum whose
+     rows hold one currency the declaration does not name came back `value: null` with a single part,
+     because `into` fell back to the declared code and the sum then looked like a sum across two.
+     With that fallback gone the figure is a figure in the currency its rows are in, and `shown` is
+     unchanged: the screen said GBP before and says GBP now. */
   const out = read({ ...decl, format: 'money.JPY' });
-  assert.equal(out.value, null);
-  assert.equal(out.parts?.[0]?.currency, 'GBP');
+  assert.equal(out.value, 1_054_000);
+  assert.equal(out.unit, 'GBP');
+  assert.equal(out.parts, undefined);
   assert.match(out.shown, /^GBP /u);
-  /* AND SO IS AN AVERAGE: the rows' own currency, as a part, never relabelled. */
+  /* AND SO IS AN AVERAGE: the rows' own currency, never relabelled. */
   const avg = read({ ...decl, value: { avg: 'amount' }, format: 'money.JPY' });
-  assert.equal(avg.value, null);
-  assert.equal(avg.parts?.[0]?.currency, 'GBP');
+  assert.equal(avg.value, 527_000);
+  assert.equal(avg.unit, 'GBP');
+  assert.equal(avg.parts, undefined);
   assert.match(avg.shown, /^GBP /u);
 });
 
