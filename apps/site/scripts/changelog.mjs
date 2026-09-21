@@ -316,12 +316,13 @@ export const check = (entries, commits) => {
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  /* STDERR CAPTURED RATHER THAN INHERITED, WHICH IS `execFileSync`'S DEFAULT: measured against a
+     shallow clone whose remote URL does not exist, git's two fatals were printed once by git and then
+     again inside the reason below, so a reader of the real failure got the same four lines twice and
+     had to work out that it was one failure and not two. */
+  const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   /* ASKED BEFORE THE LOG IS READ, because a shallow clone ANSWERS the log rather than refusing it,
      so every finding that would follow is a claim about a commit the clone was never given. */
-  /* STDERR CAPTURED RATHER THAN INHERITED, WHICH IS `execFileSync`'S DEFAULT: git's two fatals were
-     printed once by git and then again inside the reason below, so a reader of the real failure got
-     the same four lines twice and had to work out that it was one failure. */
-  const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const history = fullHistory(git);
   if (!history.ok) {
     console.error(
