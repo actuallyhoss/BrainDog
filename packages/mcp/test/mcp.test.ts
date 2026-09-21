@@ -243,10 +243,14 @@ test('THE LIMITS `list` AND `search` ADVERTISE ARE THE ONES THE RECORD KEEPS, ce
   const most = value<{ rows: unknown[] }>(await mcp.call('list', { register: 'notes', limit: listed.ceiling + 100 }, owner));
   assert.equal(most.rows.length, listed.ceiling, `list answered ${String(most.rows.length)} rows for a ceiling it puts at ${String(listed.ceiling)}`);
 
-  const hits = value<unknown[]>(await mcp.call('search', { q: 'zebrafish' }, owner));
-  assert.equal(hits.length, found.fallback, `search with no limit answered ${String(hits.length)} hits and promises ${String(found.fallback)}`);
-  const every = value<unknown[]>(await mcp.call('search', { q: 'zebrafish', limit: found.ceiling + 50 }, owner));
-  assert.equal(every.length, found.ceiling, `search answered ${String(every.length)} hits for a ceiling it puts at ${String(found.ceiling)}`);
+  /* AND SEARCH ANSWERS THE SAME SHAPE AS `list` NOW, for the same reason: a hundred hits is
+     character-for-character the answer to a query with exactly a hundred matches, so an agent that asked a
+     broad question could not tell a whole answer from a corner of one. */
+  const hits = value<{ rows: unknown[]; matched: number; showing: number }>(await mcp.call('search', { q: 'zebrafish' }, owner));
+  assert.equal(hits.rows.length, found.fallback, `search with no limit answered ${String(hits.rows.length)} hits and promises ${String(found.fallback)}`);
+  assert.ok(hits.matched >= hits.rows.length, 'a search answered fewer matches than the rows it handed over');
+  const every = value<{ rows: unknown[] }>(await mcp.call('search', { q: 'zebrafish', limit: found.ceiling + 50 }, owner));
+  assert.equal(every.rows.length, found.ceiling, `search answered ${String(every.rows.length)} hits for a ceiling it puts at ${String(found.ceiling)}`);
   sql.close();
 });
 
@@ -579,16 +583,23 @@ test('search finds a row by any of its searchable fields, and the words are pref
   ]);
   value(await mcp.call('create', { register: 'people', fields: { name: 'Halden Studio' } }, owner));
 
-  const hits = value<{ spoken: string; title: string }[]>(await mcp.call('search', { q: 'hal' }, owner));
-  assert.equal(hits.length, 1);
-  assert.equal(hits[0]?.spoken, 'people#1');
-  assert.equal(hits[0]?.title, 'Halden Studio', 'a hit that does not say what it is makes the agent fetch it to find out');
+  const found = value<{ rows: { spoken: string; title: string }[]; matched: number; showing: number }>(await mcp.call('search', { q: 'hal' }, owner));
+  assert.equal(found.rows.length, 1);
+  assert.equal(found.rows[0]?.spoken, 'people#1');
+  assert.equal(found.rows[0]?.title, 'Halden Studio', 'a hit that does not say what it is makes the agent fetch it to find out');
+  assert.equal(found.matched, 1, 'a search that handed over every row it matched still has to say how many that was');
+  assert.equal(found.showing, 1);
   sql.close();
 });
 
 test('and a query of punctuation finds nothing rather than erroring', async () => {
   const { sql, mcp } = await agent();
-  for (const q of ['"', '-', '   ', 'NEAR(a b)']) assert.ok(Array.isArray(value(await mcp.call('search', { q }, owner))), `${q} threw`);
+  for (const q of ['"', '-', '   ', 'NEAR(a b)']) {
+    const answer = value<{ rows: unknown[]; matched: number }>(await mcp.call('search', { q }, owner));
+    assert.ok(Array.isArray(answer.rows), `${q} threw`);
+    assert.equal(answer.rows.length, 0, `${q} found something`);
+    assert.equal(answer.matched, 0, `${q} said rows matched that it did not hand over`);
+  }
   sql.close();
 });
 

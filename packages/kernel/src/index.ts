@@ -46,7 +46,7 @@ import {
   type PackConfig,
   type PackToggle,
 } from './declare.ts';
-import { project, projectedText, rebuild, search as ftsSearch, type Hit } from './fts.ts';
+import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { checkBrainl, exportBrainl, importBrainl, signBrainl, type Section, type Signer } from './brainl.ts';
 import {
   drainSchedule,
@@ -3828,6 +3828,25 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * a caller a short page whenever the matches were mostly in a register they cannot see, and they
    * cannot tell that from there having been no matches.
    */
+  /**
+   * THE SAME SEARCH, ANSWERING HOW MANY MATCHED, which is the half a screen cannot work out for itself.
+   *
+   * `fts.search` clamps any limit to a hundred, so a hundred hits is character-for-character the answer to a
+   * query with exactly a hundred matches. Measured on a record at the owner's size: `revenue` drew 100 where
+   * 140 matched, `the` 100 where 304 did, `bake` 100 where 577 did, and nothing downstream could tell. The
+   * count comes back beside the hits so a clamped read arrives looking like one, the way `list` has always
+   * been readable through its cursor and its `matched`.
+   *
+   * THE EMPTY-SEARCH OBSERVATION IS WRITTEN ONCE, HERE OR THERE AND NOT BOTH: a caller uses one of these two
+   * functions for one query, so the record's own count of the searches that found nothing stays a count of
+   * searches rather than of code paths.
+   */
+  function searchMatched(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Searched {
+    const found = ftsSearchMatched(sql, q, opts);
+    if (found.hits.length === 0 && q.trim()) observe(sql, clock.now(), [{ kind: 'search.empty', subject: q.trim().toLowerCase().slice(0, 60) }]);
+    return found;
+  }
+
   function search(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Hit[] {
     const hits = ftsSearch(sql, q, opts);
     /* A SEARCH THAT FOUND NOTHING IS THE ONE OBSERVATION WORTH MAKING ABOUT READING. It is the
@@ -3907,6 +3926,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     allocate,
     reload,
     search,
+    searchMatched,
     rebuildFts,
 
     /**

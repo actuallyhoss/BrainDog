@@ -1363,9 +1363,14 @@ test('AN `append` GRANT READS NOTHING, and every reader that named no register l
   const seen = value<{ registers: { id: string; count: number }[] }>(await api.boot(them));
   assert.deepEqual(seen.registers.map((r) => r.id), ['ledger'], 'boot named a register the caller may only file into');
 
-  const hits = value<{ register: string; title: string }[]>(await api.search({ q: 'payroll' }, them));
-  assert.deepEqual(hits.map((h) => h.register), ['ledger'], 'search answered out of a register `list` refuses');
-  assert.equal(hits.some((h) => h.title.includes('secret')), false, 'the title of an unreadable row travelled');
+  /* AND THE COUNT IS SCOPED THE WAY THE HITS ARE, which is the half worth asserting here: `matched` is
+     built inside the same query under the same register ceiling, so a caller who may read one register is
+     never told how many rows matched in the ones they may not. A count that leaked would be the same
+     disclosure as a title travelling, in a number rather than in words. */
+  const found = value<{ hits: { register: string; title: string }[]; matched: Record<string, number> }>(await api.search({ q: 'payroll' }, them));
+  assert.deepEqual(found.hits.map((h) => h.register), ['ledger'], 'search answered out of a register `list` refuses');
+  assert.equal(found.hits.some((h) => h.title.includes('secret')), false, 'the title of an unreadable row travelled');
+  assert.deepEqual(Object.keys(found.matched), ['ledger'], 'the count named a register this caller may not read');
 
   const listed = value<{ slug: string }[]>(await api.pages(them));
   assert.equal(listed.some((p) => p.slug === 'jotted'), false, 'a page title is a sentence about the register it draws from');
@@ -1382,7 +1387,7 @@ test('AN `append` GRANT READS NOTHING, and every reader that named no register l
 
   /* AND THE OWNER STILL SEES ALL OF IT, or this is a filter that hides the record from everybody. */
   assert.deepEqual(
-    value<{ register: string }[]>(await api.search({ q: 'payroll' }, owner)).map((h) => h.register).sort(),
+    value<{ hits: { register: string }[] }>(await api.search({ q: 'payroll' }, owner)).hits.map((h) => h.register).sort(),
     ['journal', 'ledger'],
   );
   sql.close();

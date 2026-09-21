@@ -793,15 +793,26 @@ export function tools<C>(surface: McpSurface<C>) {
     /* A HIT IS ITS SPOKEN ID AND ITS TITLE. `rank` is a float the order already says. */
     search: async (args, ctx) => {
       const found = await surface.search({ q: String(args.q ?? ''), ...(args.limit === undefined ? {} : { limit: Number(args.limit) }) }, ctx);
-      if (!found.ok || !Array.isArray(found.value)) return found;
-      return {
-        ok: true,
-        value: found.value.map((hit: unknown) =>
-          isObject(hit) && typeof hit.register === 'string' && typeof hit.seq === 'number'
-            ? { spoken: `${hit.register}#${String(hit.seq)}`, title: hit.title }
-            : hit,
-        ),
-      };
+      if (!found.ok) return found;
+      /**
+       * AND HOW MANY MATCHED IS PART OF THE ANSWER, because an agent is the caller least able to tell a
+       * hundred from a hundred-of-five-hundred-and-seventy-seven. The record clamps a search at a hundred
+       * hits, so an agent that asked a broad question and got a hundred rows has no way to know it is
+       * reading a corner of the answer unless the count is said.
+       *
+       * BOTH SHAPES ARE READ. A record built before the count existed answers a bare array, and this server
+       * is deployed separately from the record it talks to. The old shape keeps the old answer rather than
+       * reporting a total of zero, which would be a number that is not true.
+       */
+      const hits = Array.isArray(found.value) ? found.value : isObject(found.value) && Array.isArray(found.value.hits) ? found.value.hits : null;
+      if (hits === null) return found;
+      const matched = !Array.isArray(found.value) && isObject(found.value) && isObject(found.value.matched) ? (found.value.matched as Record<string, number>) : null;
+      const rows = hits.map((hit: unknown) =>
+        isObject(hit) && typeof hit.register === 'string' && typeof hit.seq === 'number' ? { spoken: `${hit.register}#${String(hit.seq)}`, title: hit.title } : hit,
+      );
+      if (matched === null) return { ok: true, value: rows };
+      const total = Object.values(matched).reduce((a, b) => a + b, 0);
+      return { ok: true, value: { rows, matched: total, showing: rows.length, ...(total > rows.length ? { more: `${String(total)} rows matched and the record answers at most ${String(rows.length)}. Narrow the question.` } : {}) } };
     },
 
     history: async (args, ctx) => {

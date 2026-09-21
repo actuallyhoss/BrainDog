@@ -4337,21 +4337,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          this", so handing one down would search EVERY register on behalf of somebody who may read
          none of them. Nothing matches, so nothing is asked, and no `search.empty` observation is
          written about a query that was never the record's to answer. */
-      if (registers.length === 0) return ok([]);
-      const hits = kernel.search(String(args.q ?? ''), {
+      if (registers.length === 0) return ok({ hits: [], matched: {} });
+      /**
+       * HOW MANY MATCHED COMES BACK WITH THEM, and the answer is an object for that reason alone.
+       *
+       * `fts` clamps any limit to a hundred, so a hundred hits is character-for-character the answer to a
+       * query with exactly a hundred matches, and every caller downstream printed the length it was handed.
+       * Measured on a record at the owner's size: `revenue` drew 100 where 140 matched, `the` 100 where 304
+       * did, `bake` 100 where 577 did. `list` has never had this problem because its page carries a cursor
+       * and a `matched`, which is the shape copied here.
+       *
+       * THE COUNT IS SCOPED THE WAY THE HITS ARE. `matched` is built inside the same query, under the same
+       * register ceiling, so a caller is never told about rows they may not read. A caller that hands the
+       * count on as a total is therefore saying something true about what they are allowed to see.
+       */
+      const found = kernel.searchMatched(String(args.q ?? ''), {
         /* AND A CALLER WHO MAY READ EVERY ONE OF THEM IS NOT SCOPED AT ALL, which is the query this
            always ran for an owner. */
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       });
-      return ok(
-        hits.flatMap((hit) => {
+      return ok({
+        hits: found.hits.flatMap((hit) => {
           const row = kernel.get(hit.id);
           if (!row) return [];
           const title = kernel.register(row.register)?.title;
           return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
         }),
-      );
+        matched: found.matched,
+      });
     },
 
     /** What this record is at, and what is reading it. `33 §4`, line 356. */

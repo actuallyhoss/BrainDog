@@ -455,7 +455,12 @@ export function sparkRecord(api: SparkRecordDeps): SparkRecordApi {
       if (args.where === undefined && args.q !== undefined && args.q !== null && args.q.trim() !== '') {
         const hits = await api.search({ q: args.q, limit: args.limit ?? ROWS }, ctx);
         if (!hits.ok) return hits;
-        for (const hit of hits.value) {
+        /* BOTH SHAPES, because the record answers `{hits, matched}` since the day a clamped search stopped
+           being printable as a total, and a host in one process is not always the version of the record it
+           is talking to. The count is not read here: this bridge walks the rows it was given and stops at
+           its own budget, so how many there were is the asker's question rather than the walk's. */
+        const found = Array.isArray(hits.value) ? hits.value : ((hits.value as { hits: typeof rows }).hits ?? []);
+        for (const hit of found as readonly { register: string; seq: number | null }[]) {
           if (!asked.includes(hit.register) || hit.seq === null) continue;
           const got = await api.get({ register: hit.register, seq: hit.seq }, ctx);
           if (!got.ok || got.value === null) continue;

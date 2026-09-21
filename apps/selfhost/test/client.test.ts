@@ -168,9 +168,13 @@ test('search comes back with enough to draw a result without fetching it', async
   const c = await connected();
   try {
     value(await c.client.create({ register: 'obligations', fields: { what: 'Invoice 41', party: 'Halden' } }));
-    const hits = value<{ register: string; seq: number; title: string }[]>(await c.client.search('hal'));
-    assert.equal(hits.length, 1);
-    assert.equal(hits[0]?.title, 'Invoice 41');
+    /* AND IT COMES BACK WITH HOW MANY MATCHED, which is what a caller cannot work out for itself: the
+       record clamps a search at a hundred hits, so a hundred rows is the same answer for a query with a
+       hundred matches and for one with five hundred and seventy-seven. */
+    const found = value<{ hits: { register: string; seq: number; title: string }[]; matched: Record<string, number> }>(await c.client.search('hal'));
+    assert.equal(found.hits.length, 1);
+    assert.equal(found.hits[0]?.title, 'Invoice 41');
+    assert.equal(found.matched['obligations'], 1);
   } finally {
     await c.close();
   }
