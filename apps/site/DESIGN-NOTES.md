@@ -206,3 +206,139 @@ and on the brand band is checked there rather than only argued for in `app.css`.
 
 The standing gates that read this app were run too: `colour-grep`, `css-rules`, `em-dash`,
 `dead-copy`, `layout`, the site's own `test/content.test.ts` and `svelte-check`.
+
+---
+
+# The second pass, 2026-09-21
+
+Everything above describes the first pass, which is commit `8d6bcc9c` and is what brain.dog serves
+today. That pass ended by naming four things about itself that were not good enough. This section
+is what was done about each, and the numbers are measured on the built page the same way the ones
+above are.
+
+## 1. Three bands shared one armature, and now none of them does
+
+The first pass counted seven layouts in seven bands. Counted honestly, it was five: bands 0001,
+0003 and 0005 were all the same shape, copy in a left column and a widget in a right one. The
+contents differed and the armature did not, which is the fault
+`loop/research-site-reference.md` §5 measures by asking how many distinct layouts a page runs
+before it repeats one. FirstLook runs ten in ten.
+
+Two of the three were rebuilt. The hero keeps the split, because one use of a shape is not a
+repeat of it.
+
+**0003 is a strip.** The heading and the sentence run the column, the segmented control runs the
+full width of the screen between two hairlines, and the rail it redraws sits under it at the
+column's own width. `Arrange.svelte` is now a child of the band rather than of `.in`, which is the
+whole mechanism: the strip's rules are full-bleed and the buttons inside it are not. Above 760px
+the five pills become five equal segments of the column, each carrying the case's name and how
+many parts it holds, the selected one marked by ground, weight and a 2px rule on its top edge.
+`holds.length` is read from `copy.ts` rather than typed, so the count cannot disagree with the
+list beneath it.
+
+**0005 is a layer.** The dashboard is the full width of the screen and 1,760px wide inside it, so
+it runs off the right edge at every viewport, and the specification lies **on** the picture in an
+opaque card rather than in a column beside it. It is the only place on the site where two surfaces
+overlap. The card is `--s1` inside a `--line` hairline, so nothing is read through it: this costs
+no new token, no new colour and no shadow, which is the rule the first pass set for itself.
+
+Counted the way the reference file counts the four reference sites, the page now runs:
+
+| band | layout |
+| --- | --- |
+| 0001 | split row, live ledger beside the sentence, spanning four-cell hairline strip under it |
+| 0002 | paired head, then a full-bleed photograph cover-cropped edge to edge |
+| 0003 | full-bleed control strip over a full-width result rail |
+| 0004 | title, wide lead, sixteen-cell inventory grid and a chip row, on the flipped ground |
+| 0005 | a card lying on a picture that is wider than the screen |
+| 0006 | three-column hairline table of lists |
+| close | display statement over a ruled baseline row |
+
+**Seven distinct layouts in seven bands, no repeat**, against FirstLook's ten in ten and the first
+pass's real five.
+
+## 2. The slack under 0003's left column is gone, because the column is gone
+
+Measured on the first pass's build, the copy column of band 0003 ended about 120px above the foot
+of the rail beside it, so the bottom left of the band was empty. That is the same emptiness defect
+the whole redesign was written to remove, at one band's scale. There is no left column now, so
+there is nothing for a hole to be under. The band also got shorter and wider: 630px tall where it
+was 779, with its ink reaching CSS x=1440 where it reached 1320.
+
+Re-measured on the built page at 1440, the seven bands' rightmost ink is now
+**1320, 1440, 1440, 1320, 1440, 1320, 1320**, so three bands reach the edge of the screen where two
+did. The document is 5,270px tall where the first pass left it at 5,008 and the page before it was
+4,368.
+
+## 3. The changelog is five days less stale
+
+The newest entry was 2026-09-16 and the tree was on the 21st, with 585 commits in between
+(`git rev-list --count --since=2026-09-17 HEAD`). The first pass would not write entries because
+that means making claims about commits it had not read.
+
+They were read. Nineteen entries were added across four days, each one traced to a named commit,
+with its body saying only what that commit's own message and diff support. Where the subject line
+sounded more finished than the state was, the body says the smaller thing: the hosted nightly copy
+entry says the copy refuses to write until an operator sets a real key, because
+`apps/worker/wrangler.jsonc` still carries `age1<production-recipient>` as a placeholder in both
+environments. Nineteen for 585 is deliberate: most of that week is tests, gates, specifications and
+documents, and this page is for what a reader can see.
+
+Reading the commits also falsified a line on the home page. `copy.ts` justified *the engine is
+written; no host reaches it yet* by citing
+`grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing. Run again it
+returns two files: `packages/spark` landed on the 20th and both hosts were wired to it the same
+day. The line now says what is still true, which is that both hosts reach the engine and neither
+has a model configured, and `SPARK_ENDPOINT` is `""` in both environments is the check for it.
+
+## 4. Legal and 404 were not left alone
+
+The first pass kept both on the old 960px document layout on purpose, and half of that decision was
+right: a licence is read rather than sold, so the prose keeps its 68ch measure and gets no picture,
+no ledger and no brand field. What did not survive a second look is that they also kept a
+**different skeleton** from every other route, so the one page a stranger meets by accident was the
+one page that did not look like the site. Both are bands now, with the site's own opener, the two
+grounds and the full-width hairline at every seam; only the frame changed and not a word of the
+copy. The 404's sequence number is `404` rather than `0001`, because it is not part of the
+record's sequence and the status really is a 404.
+
+`scripts/shot.mjs` photographs both routes from now on. They were the two routes nobody had ever
+photographed, which is not a coincidence: a page nobody looks at is a page nobody notices has
+stopped matching the rest of the site. Twenty shots rather than twelve.
+
+## 5. Light mode, looked at on its own
+
+The first pass was judged mostly in the dark. Every shot in `apps/site/shots` was opened in both
+schemes for this pass, and the only fault that was worse in light than in dark was on the pricing
+page: its closing band was a 16px heading and two lines of 16px prose in the left half of a 1,136px
+column, which is the emptiness fault on the one page that asks for money. It now opens with the
+same mark every other band on the site opens with, the question is a heading at heading size, and
+the answer sits beside it so the row reaches both edges.
+
+The two new bands were checked in both schemes and neither needed a scheme-specific rule, which is
+the point of a band naming a ground rather than painting a colour: the strip is `--s1` between two
+`--line` rules and the card is `--s1` inside one, and both come out right in light and in dark
+because those tokens are already solved per scheme.
+
+## What was measured on the finished page, again
+
+| | first pass | second pass |
+| --- | --- | --- |
+| Distinct layouts before a repeat | 5 in 7, counted honestly | **7 in 7** |
+| Rightmost ink per band, 1440 | 1320, 1440, 1320, 1320, 1440, 1320, 1320 | 1320, 1440, 1440, 1320, 1440, 1320, 1320 |
+| Bands reaching the screen edge | 2 | 3 |
+| Ground changes | 6 across 7 bands | 6 across 7 bands, unchanged |
+| Document height at 1440 | 5,008px | 5,270px |
+| Routes photographed | 3 of 5 | 5 of 5 |
+| Changelog newest entry | 2026-09-16 | 2026-09-21 |
+
+| check | how | result |
+| --- | --- | --- |
+| Accessibility | axe-core, `wcag2a wcag2aa wcag21a wcag21aa wcag22aa`, 5 routes x 2 schemes x 4 widths (1440, 900, 720, 390) | 0 violations |
+| Layout | `tools/gates/layout.mjs`, 855 page-runs over 19 widths | 0 findings |
+| Colour literals | `tools/gates/colour-grep.mjs` | 0 outside the theme |
+| Stylesheet rules | `tools/gates/css-rules.mjs`, 125 files, 143 tokens | 0 findings |
+| Em dashes | `tools/gates/em-dash.mjs`, 417 files | 0 |
+| Unrendered copy | `tools/gates/dead-copy.mjs` | 1,128 sentences, 18 unrendered, all 18 known |
+| Types and markup | `svelte-check`, 287 files | 0 errors, 0 warnings |
+| The site's own tests | `pnpm --filter @braindog/site test` | 14 pass |

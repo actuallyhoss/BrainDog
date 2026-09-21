@@ -4,6 +4,13 @@
   PRERENDERED AS `404.html`, which `wrangler.jsonc` names with `not_found_handling: "404-page"`, so
   a path the build has no file for answers a 404 status with this page in the site's own shell,
   rather than a blank white page. It is not in the sitemap and asks not to be indexed.
+
+  IT OPENS THE WAY EVERY OTHER BAND ON THIS SITE OPENS, and the number in the mark is the status
+  code. The redesign left this page on the old document layout on purpose, and the reason given
+  was that it is a signpost rather than a pitch. That is still true of the WORDS, and they have
+  not changed: one sentence and the four addresses the site has. What was wrong was that the one
+  page a stranger meets by accident was the one page that did not look like the site, at the
+  moment they most need telling which site they are on.
 -->
 <script lang="ts">
   import { site } from '$lib/copy.ts';
@@ -17,29 +24,41 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<section class="wrap head">
-  <h1 class="title">{n.title}</h1>
-  <p class="lede">{n.lede}</p>
-  <ul class="part-links">
-    {#each n.links as link}
-      <li><a href={link.href}>{link.label}</a></li>
-    {/each}
-  </ul>
+<section class="band head" data-ground="sunk">
+  <div class="in">
+    <!-- THE SEQUENCE NUMBER IS THE STATUS CODE. Every other band on the site counts 0001 upwards
+         because the record it sells is append-only; this page is not part of that sequence and
+         saying 0001 here would be the device used as decoration. The response really is a 404,
+         and the mono figure is the truest four characters this page could carry. -->
+    <p class="band-mark">
+      <span class="band-seq">404</span>
+      <span class="band-rule"></span>
+    </p>
+    <h1 class="title">{n.title}</h1>
+    <p class="lede">{n.lede}</p>
+    <ul class="part-links">
+      {#each n.links as link}
+        <li><a href={link.href}>{link.label}</a></li>
+      {/each}
+    </ul>
+  </div>
 </section>
 
 <style>
-  .wrap {
-    max-inline-size: 960px;
-    margin-inline: auto;
-    padding-inline: var(--sp-6);
+  /* The site's band, at the legal page's air: this is one screen with four links on it and the
+     footer under it, so it takes the same 128px each side rather than the home page's 192. */
+  .band {
+    padding-block: var(--sp-7) var(--sp-8);
   }
 
-  /* The legal page's heading and its row of links, with the page's own bottom under them. */
-  .head {
+  .head .in {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding-block: clamp(56px, 7vw, 104px) var(--sp-8);
+  }
+
+  .head .band-mark {
+    margin-block-end: 0;
   }
 
   .title {
@@ -85,8 +104,8 @@
   }
 
   @media (width < 640px) {
-    .wrap {
-      padding-inline: var(--sp-4);
+    .band {
+      padding-block: var(--sp-6) var(--sp-7);
     }
   }
 </style>

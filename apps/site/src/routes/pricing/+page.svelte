@@ -127,14 +127,25 @@
   </div>
 </section>
 
+<!-- THE LAST BAND WAS A 16px HEADING AND TWO LINES IN THE LEFT HALF OF A 1,136px COLUMN, which is
+     the emptiness fault the home page was rebuilt to remove, on the page that asks for money. It
+     opens with the same mark every other band on this site opens with, the question is a heading at
+     the size of a heading, and the answer sits beside it so the row reaches both edges. -->
 <section class="band" data-ground="sunk" aria-labelledby="honest-title">
-  <!-- THE CAP GOES ON THE PARAGRAPH AND NOT ON `.in`. `.in` is `margin-inline: auto`, so narrowing
-       the element that carries it centred the whole block in the page: the one section on the
-       pricing page that is an aside was the only one not sharing the left edge with everything
-       above it. -->
   <div class="in">
-    <h2 class="honest-title" id="honest-title">{p.honestTitle}</h2>
-    <p class="honest-body">{p.honest}</p>
+    <p class="band-mark">
+      <span class="band-seq">0003</span>
+      <span class="band-rule"></span>
+      <span class="band-tag">{p.honestTag}</span>
+    </p>
+    <!-- THE CAP GOES ON THE PARAGRAPH AND NOT ON `.in`. `.in` is `margin-inline: auto`, so
+         narrowing the element that carries it centred the whole block in the page: the one section
+         on the pricing page that is an aside was the only one not sharing the left edge with
+         everything above it. -->
+    <div class="honest-row">
+      <h2 class="honest-title" id="honest-title">{p.honestTitle}</h2>
+      <p class="honest-body">{p.honest}</p>
+    </div>
   </div>
 </section>
 
@@ -368,24 +379,36 @@
     white-space: nowrap;
   }
 
-  /* The page's own bottom: the shell puts no margin over the footer. */
+  /* The question on the left and the answer on the right, on one row, which is what the closing
+     band of the home page does with the same two parts. `align-items: start` rather than `end`,
+     because the heading is one line and the answer is three at this width. */
+  .honest-row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: var(--sp-8);
+    align-items: start;
+  }
+
   .honest-title {
-    font-size: var(--t-base);
+    margin: 0;
+    max-inline-size: 22ch;
+    font-size: var(--t-lg);
     font-weight: 600;
-    letter-spacing: 0;
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tr-tight);
   }
 
   .honest-body {
-    max-inline-size: 68ch;
-    margin-block-start: var(--sp-1);
+    margin: 0;
     color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.6;
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
     text-wrap: pretty;
   }
 
   @media (width < 900px) {
-    .head-row {
+    .head-row,
+    .honest-row {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-6);
     }

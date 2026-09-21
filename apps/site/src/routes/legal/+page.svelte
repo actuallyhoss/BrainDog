@@ -7,6 +7,18 @@
 
   NO INVENTED TERMS. The Terms of Service and the Privacy policy are not written yet, and the page
   says that in one sentence rather than drawing headings that read like a policy.
+
+  IT IS BANDS NOW, AND IT WAS THE LAST ROUTE THAT WAS NOT. The redesign left this page and the 404
+  on the old 960px document layout on purpose, and the purpose was sound as far as it went: a
+  licence is read, not sold, so it keeps a reading measure and gets no picture, no ledger and no
+  brand field. What did not survive a second look is that it also kept a DIFFERENT SKELETON. Every
+  other route opens each section with a sequence number against a hairline that runs the width of
+  the column, and changes ground where one idea stops; this one had neither, so a reader arriving
+  from the footer met a page that looked like somebody else's.
+
+  So the three sections are bands with the site's own opener and the site's own two grounds, and
+  the PROSE keeps its 68ch measure inside them. The document layout was right about the words and
+  wrong about the frame around them.
 -->
 <script lang="ts">
   import { site } from '$lib/copy.ts';
@@ -23,37 +35,63 @@
   <meta property="og:description" content={site.meta.legal.description} />
 </svelte:head>
 
-<section class="wrap head">
-  <h1 class="title">{l.title}</h1>
+<section class="band head" data-ground="sunk">
+  <div class="in">
+    <!-- NO WORD AFTER THE RULE ON THIS PAGE. Elsewhere the mark carries a short label because the
+         heading under it is a sentence; here the heading IS the label, and printing `LEGAL` twice
+         one line apart is the page counting one word as two. -->
+    <p class="band-mark">
+      <span class="band-seq">0001</span>
+      <span class="band-rule"></span>
+    </p>
+    <h1 class="title">{l.title}</h1>
+  </div>
 </section>
 
-<section class="wrap part" aria-labelledby="licence-title">
-  <h2 class="part-title" id="licence-title">{l.licence.title}</h2>
-  {#each l.licence.body as paragraph}
-    <p class="part-body">{paragraph}</p>
-  {/each}
-  <ul class="part-links">
-    {#each l.licence.links as link}
-      <li><a href={link.href}>{link.label}</a></li>
+<section class="band" data-ground="page" aria-labelledby="licence-title">
+  <div class="in part">
+    <p class="band-mark">
+      <span class="band-seq">0002</span>
+      <span class="band-rule"></span>
+    </p>
+    <h2 class="part-title" id="licence-title">{l.licence.title}</h2>
+    {#each l.licence.body as paragraph}
+      <p class="part-body">{paragraph}</p>
     {/each}
-  </ul>
-  <p class="part-note">{l.licence.note}</p>
+    <ul class="part-links">
+      {#each l.licence.links as link}
+        <li><a href={link.href}>{link.label}</a></li>
+      {/each}
+    </ul>
+    <p class="part-note">{l.licence.note}</p>
+  </div>
 </section>
 
-<section class="wrap part last" aria-labelledby="terms-title">
-  <h2 class="part-title" id="terms-title">{l.terms.title}</h2>
-  <p class="part-body">{l.terms.body}</p>
+<section class="band" data-ground="sunk" aria-labelledby="terms-title">
+  <div class="in part">
+    <p class="band-mark">
+      <span class="band-seq">0003</span>
+      <span class="band-rule"></span>
+    </p>
+    <h2 class="part-title" id="terms-title">{l.terms.title}</h2>
+    <p class="part-body">{l.terms.body}</p>
+  </div>
 </section>
 
 <style>
-  .wrap {
-    max-inline-size: 960px;
-    margin-inline: auto;
-    padding-inline: var(--sp-6);
+  /* The same air the other pages' bands carry, which `research-site-reference.md` measured at
+     192px between band bodies and found already right. The head takes less at the top because the
+     header above it already has its own. */
+  .band {
+    padding-block: var(--sp-8);
+  }
+
+  .band + .band {
+    border-block-start: 1px solid var(--line);
   }
 
   .head {
-    padding-block: clamp(56px, 7vw, 104px) var(--sp-7);
+    padding-block: var(--sp-7) var(--sp-8);
   }
 
   .title {
@@ -64,8 +102,9 @@
     text-wrap: balance;
   }
 
-  /* Each part is a hairline, a heading and its sentences, the same weight as the pricing page's
-     status and its note about the free tier. */
+  /* The measure stays where it was. A licence is read left to right and 68 characters is inside
+     the 45-to-75 band every typographic reference agrees on; the band around it is what changed,
+     not the line length inside it. */
   .part {
     display: flex;
     flex-direction: column;
@@ -76,13 +115,16 @@
     max-inline-size: 68ch;
   }
 
-  .part-title {
-    padding-block-start: var(--sp-5);
-    border-block-start: 1px solid var(--line);
+  .part .band-mark {
     max-inline-size: none;
-    font-size: var(--t-base);
+  }
+
+  .part-title {
+    max-inline-size: none;
+    font-size: var(--t-lg);
     font-weight: 600;
-    letter-spacing: 0;
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tr-tight);
   }
 
   .part-body {
@@ -124,14 +166,9 @@
     line-height: 1.5;
   }
 
-  /* The page's own bottom: the shell puts no margin over the footer. */
-  .last {
-    padding-block: var(--sp-7) var(--sp-8);
-  }
-
   @media (width < 640px) {
-    .wrap {
-      padding-inline: var(--sp-4);
+    .band {
+      padding-block: var(--sp-7);
     }
   }
 </style>

@@ -28,6 +28,13 @@
 
   NO LINK TO A RELEASES PAGE. This repository tags and does not publish GitHub Releases, so a link
   to one would be a 404 with a promise attached.
+
+  THE NUMBERS IN THE PARAGRAPH ABOVE WERE TAKEN BEFORE THE FIVE MISSING DAYS WERE WRITTEN. Counted
+  again on the built page on 2026-09-21, after nineteen entries were added: 3,135 words against
+  1,893, and 39 words to a body against 36, with no sentence over 25 words. The reading grade is
+  deliberately not restated. The 6.4 above came from a tool this pass does not have, and a second
+  figure from a different syllable counter would not be comparable to it, which is worse than
+  leaving the first one standing as the record of what was measured when.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
@@ -63,6 +70,188 @@
   };
 
   const ENTRIES: Entry[] = [
+    /* ── The five days this page was missing ─────────────────────────────────
+       The newest entry below was 2026-09-16 and the tree was on the 21st, with 585 commits in
+       between (`git rev-list --count --since=2026-09-17 HEAD`). The first pass of the redesign
+       would not write these, because writing them means making claims about commits nobody had
+       read, and a changelog that overstates what shipped is worse than one that is stale.
+
+       So they were read. Every entry below names one commit or two, its body says only what that
+       commit's own message and diff support, and where the state was less finished than the
+       subject line sounded, the body says the smaller thing. Nineteen entries for 585 commits is
+       deliberate: most of that week is tests, gates, specifications and documents, and this page
+       is for what a reader can see. */
+    {
+      date: '2026-09-21',
+      kind: 'shipped',
+      title: 'A forwarded message can reach a hosted record, on an address you mint',
+      body:
+        'The Cloud had a mail door and no way to get an address for it. Minting one stores only ' +
+        'the hash of the token and hands you the token once. Rotating it is minting again, and ' +
+        'revoking it is writing nothing in its place.',
+    },
+    {
+      date: '2026-09-21',
+      kind: 'changed',
+      title: 'This site was rebuilt around what fills a page rather than around its colour',
+      body:
+        'Four reference sites were measured in a browser and this one beside them. Almost half of ' +
+        'the home page held nothing but a one pixel rule. It has seven layouts now, six changes ' +
+        'of ground, and the record photographed at the width of the screen.',
+    },
+    {
+      date: '2026-09-21',
+      kind: 'fixed',
+      title: 'A project with no invoices stops being told that none of them are overdue',
+      body:
+        'A figure can tell an empty register from an empty match. One narrowed to a single ' +
+        'project could not, so the emptiest screen in the product drew the one sentence that ' +
+        'field exists to prevent. The count is taken where the narrowing happens now.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'shipped',
+      title: 'Money moves: a ledger, categories, rules, recurring items and instalments',
+      body:
+        'Money declared accounts and bills and nothing else. It carries transactions, categories, ' +
+        'recurring items, instalments and periodic snapshots now, with the rules and figures over ' +
+        'them. A check found one figure adding what you are owed to what you owe.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'shipped',
+      title: 'A message sent in from outside reaches the record, and both hosts open the door',
+      body:
+        'An arrival lands on a route of its own and is read for what it holds. One that nothing ' +
+        'understands is kept whole rather than dropped. A sender can no longer talk the check out ' +
+        'of its verdict by writing its own headers.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'shipped',
+      title: 'Spark asks a model, accounts for what it spent, and cites what it read',
+      body:
+        'The engine behind it is a package of its own: the triage shapes, the pattern draft and ' +
+        'the proposal door. Every ask is written down as a row, the refused ones included. A ' +
+        "stranger's message goes to the model inside its own fence.",
+    },
+    {
+      date: '2026-09-20',
+      kind: 'shipped',
+      title: 'A self-host can be reached from a phone, over https, on a name that stays',
+      body:
+        'It could not hold a session, so nobody could sign in away from the desk. It serves https ' +
+        'with a certificate you supply, and prints the origin a passkey is bound to. Changing ' +
+        'that name stops every passkey already registered, and the file says so.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'changed',
+      title: 'Every command takes --json, which the specification has promised since it was written',
+      body:
+        'Not one command accepted the flag, so four written that week had to refuse it. It is ' +
+        'decided in one place now: the answer goes to one stream and everything else to the ' +
+        'other. A refusal is as readable by a machine as a success is.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'shipped',
+      title: 'The hosted Worker writes the nightly copy the self-host already wrote',
+      body:
+        'A nightly job walks the directory, and each record signs its whole file into object ' +
+        'storage. Thirty are kept, which is what a self-host has done for a week. The copy ' +
+        'refuses to write until an operator sets a real key to seal it.',
+    },
+    {
+      date: '2026-09-20',
+      kind: 'fixed',
+      title: 'Two currencies were added together in the two places nothing was looking',
+      body:
+        'A connector took the amount off a money row and left its currency behind. A hundred ' +
+        'Egyptian pounds and two and a half dollars were written down as one number. A reading ' +
+        'like that is refused whole now, because a total that is quietly short is worse than none.',
+    },
+    {
+      date: '2026-09-19',
+      kind: 'shipped',
+      title: 'A connector fetches from a provider on a schedule and writes back what it gets',
+      body:
+        'A connector could be declared and nothing could run one. Eight kinds of credential open ' +
+        'from a sealed grant and are never logged. Paging stops on its own terms, and a resumed ' +
+        'run reads back what it left rather than starting again.',
+    },
+    {
+      date: '2026-09-19',
+      kind: 'shipped',
+      title: "Reading a stranger's message: the anchors, the extractors, money and dates",
+      body:
+        'The package for this had a long specification and no code. It has eighty-one tests now, ' +
+        'one for each row of that document. The currency is found before the number is read, ' +
+        'because 1.250 is one amount in Cairo and a different one in London.',
+    },
+    {
+      date: '2026-09-19',
+      kind: 'fixed',
+      title: 'A hosted run counts what it may spend before it spends it',
+      body:
+        'Cloudflare allows eight hundred outward requests to one invocation, and a connector at ' +
+        'forty pages can make eighty-six. Passing that ceiling ends the work of every other ' +
+        'record in the same run. Each job reserves its worst case now, and one run always goes.',
+    },
+    {
+      date: '2026-09-17',
+      kind: 'shipped',
+      title: 'A the old tool export moves into BrainDog with one command',
+      body:
+        'It reads the export and maps projects, tasks, people, numbers, questions, accounts and ' +
+        'bills onto Solo founder. Each row keeps its old key in its tags, so a second run updates ' +
+        'and never adds. No key value is read, and a row shaped like one is left out whole.',
+    },
+    {
+      date: '2026-09-17',
+      kind: 'shipped',
+      title: 'Money in more than one currency stops refusing to answer',
+      body:
+        'A figure over two currencies used to refuse outright. With no home currency it answers ' +
+        'one amount for each and names the pair it lacks. With one set, it converts at the rate ' +
+        "for each row's own day and says as of when.",
+    },
+    {
+      date: '2026-09-17',
+      kind: 'shipped',
+      title: 'A use case can be shared as a signed file, and a later version is offered',
+      body:
+        'A catalogue holds versions that never change, a bump it works out for itself, and a ' +
+        'checksum. The web lists add-ons beside use cases and says which key signed each one. A ' +
+        'newer version of what a record holds is filed as a proposal and installed only if it is ' +
+        'accepted.',
+    },
+    {
+      date: '2026-09-17',
+      kind: 'changed',
+      title: 'Work, Projects and Team lead with what is waiting on you',
+      body:
+        'A task gains an owner, an agent, a part it belongs to and a day it was done. Work draws ' +
+        'the queue waiting on you, what is due soon, and what agents hold. It was tested on a ' +
+        'real record, with an agent taking work and handing it back.',
+    },
+    {
+      date: '2026-09-17',
+      kind: 'fixed',
+      title: 'A report key is held to six hundred rows a minute on both hosts',
+      body:
+        'A key with no ceiling on it can fill a record with text. It is refused with how long to ' +
+        'wait now, and the answer carries that time in its own header.',
+    },
+    {
+      date: '2026-09-17',
+      kind: 'fixed',
+      title: 'Every control a thumb reaches is 44 pixels on a phone',
+      body:
+        "A question's link was 43 pixels tall and a folded field was 21. Decide drew its box in a " +
+        'way the layout gate cannot read, so it is drawn the way every other hit area is. A ' +
+        'checkbox inside its own label is measured through that label now.',
+    },
     {
       date: '2026-09-16',
       kind: 'shipped',

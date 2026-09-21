@@ -26,6 +26,21 @@
    *     a full-bleed photograph of the product, a switcher, a sixteen-cell grid on a flipped
    *     ground, a specification beside an image that runs off the edge of the screen, a
    *     three-column table, and a closing band in the brand colour.
+   *
+   * WHAT THE SECOND PASS CHANGED, and the sentence in the first pass's own notes that asked for
+   * it: "three bands still share one armature". Bands 0001, 0003 and 0005 were all copy on the
+   * left and a widget on the right, so the count above was really five shapes in seven bands, and
+   * 0003 carried the emptiness fault at one band's scale with its left column stopping about 120px
+   * short of the rail beside it.
+   *
+   *   - 0003 IS A STRIP. The sentence runs the column, the control runs the whole screen between
+   *     two hairlines, and the rail it redraws sits under it. Nothing is beside anything.
+   *   - 0005 IS A LAYER. The dashboard is the width of the screen and 1,760px wide inside it, and
+   *     the specification lies on the picture in an opaque card rather than in a column next to
+   *     it. It is the only place on the site where two surfaces overlap.
+   *   - The split survives in the hero alone, which is one use of a shape and not a repeat of one.
+   *     Counted the way `loop/research-site-reference.md` counts the references, that is seven
+   *     distinct layouts across seven bands, against FirstLook's ten in ten.
    *   - SIX GROUND CHANGES, two of them at the body-text ratio. `app.css` holds the mechanism and
    *     the argument for it; a band names a ground and every component inside it follows.
    *   - THE FRAME IS FILLED. Measured on the built page at 1440, the rightmost ink in each of the
@@ -169,7 +184,17 @@
 
 <!-- ── 0003 · Arranged for you ──────────────────────────────────────────────
      The switcher is the argument: pressing a case redraws the rail in front of the reader, so the
-     claim is made by the page doing the thing rather than by a sentence about it. -->
+     claim is made by the page doing the thing rather than by a sentence about it.
+
+     THIS BAND USED TO BE COPY ON THE LEFT AND THE WIDGET ON THE RIGHT, which was the hero's
+     armature and the report band's armature as well, so one shape ran three times on a page whose
+     whole brief was that FirstLook runs ten without repeating. It had the emptiness fault too, at
+     one band's scale: the copy column ran out about 120px above the rail beside it and the bottom
+     left of the band was blank.
+
+     It is a strip now. The sentence runs the width of the column, the control runs the width of
+     the SCREEN between two hairlines, and the thing it redraws sits under it. Nothing is beside
+     anything, so there is no short column to leave a hole under. -->
 <section class="band" data-ground="page" aria-labelledby="arrange-title">
   <div class="in reveal">
     <p class="band-mark">
@@ -177,14 +202,18 @@
       <span class="band-rule"></span>
       <span class="band-tag">Made of parts</span>
     </p>
-    <div class="arrange-grid">
-      <div class="arrange-copy">
-        <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
-        <p class="lead">{site.arrange.lead}</p>
-        <p class="note">{site.arrange.note}</p>
-      </div>
-      <Arrange cases={site.arrange.cases} head={site.arrange.head} label={site.arrange.label} />
+    <div class="arrange-head">
+      <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
+      <p class="lead lead-wide">{site.arrange.lead}</p>
     </div>
+  </div>
+
+  <div class="arrange-strip reveal">
+    <Arrange cases={site.arrange.cases} head={site.arrange.head} label={site.arrange.label} />
+  </div>
+
+  <div class="in">
+    <p class="note arrange-note">{site.arrange.note}</p>
   </div>
 </section>
 
@@ -218,9 +247,19 @@
 </section>
 
 <!-- ── 0005 · Numbers arrive ────────────────────────────────────────────────
-     Copy and a specification on the left, the dashboard those numbers drew on the right, painted
-     at its own size and running off the edge of the screen. The band clips rather than scrolls, so
-     the picture is a window onto something wider without costing the reader a scroll trap. -->
+     The dashboard runs the full width of the screen and past both edges of it, and the
+     specification sits ON it rather than beside it.
+
+     IT WAS THE THIRD COPY OF ONE ARMATURE. Copy on the left, picture on the right, which the hero
+     and the switcher band were both already doing. It had the second fault as well: a 450px copy
+     column against a 540px picture leaves the bottom of the left column empty whichever way the
+     two are aligned, which is the emptiness this redesign exists to remove.
+
+     A CARD LYING ON THE PICTURE IS THE ONE LAYERED THING ON THE PAGE. It is the only place where
+     two surfaces overlap, it needs no second column to be full of something, and it holds its own
+     height rather than borrowing the picture's. The card is opaque `--s1` inside a `--line`
+     hairline, so nothing behind it is read through it and the contrast is the page's own, which is
+     why this costs no new token and no new shadow. -->
 <section class="band" data-ground="page" aria-labelledby="report-title">
   <div class="in">
     <p class="band-mark">
@@ -229,8 +268,11 @@
       <span class="band-tag">Reported</span>
     </p>
   </div>
-  <div class="report-grid reveal">
-    <div class="report-copy">
+  <div class="report reveal">
+    <!-- THE HEADING COMES FIRST IN THE MARKUP AND LAST IN THE PAINT ORDER. A reader with a screen
+         reader meets the heading and then the picture, which is the order the section is written
+         in; `z-index` alone decides which of the two grid items is on top. -->
+    <div class="report-card">
       <h2 class="title" id="report-title">{site.report.title}</h2>
       <p class="lead">{site.report.lead}</p>
 
@@ -274,7 +316,7 @@
           decoding="async"
         />
       </picture>
-      <figcaption class="caption">{site.report.caption}</figcaption>
+      <figcaption class="caption in">{site.report.caption}</figcaption>
     </figure>
   </div>
 </section>
@@ -548,18 +590,23 @@
 
   /* ── 0003 · The switcher ──────────────────────────────────────────────── */
 
-  /* THE SENTENCE ON THE LEFT AND THE THING IT DESCRIBES ON THE RIGHT, so the band's ink reaches
-     both edges of the column. The rail's own 240px cap was the other half of that fix and it is
-     lifted in `Arrange.svelte`, with the measurement that condemned it written beside the rule. */
-  .arrange-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--sp-8);
-    align-items: start;
+  /* The heading and the sentence stack, because the control under them is the width of the screen
+     and a heading set beside something would put a second column back on the one band that has
+     just lost one. `.lead-wide` rather than the 46ch measure for the same reason: with nothing on
+     its right, a 430px paragraph in a 1,136px row is the fault this page was rebuilt to remove. */
+  .arrange-head {
+    min-inline-size: 0;
   }
 
-  .arrange-copy {
-    min-inline-size: 0;
+  /* The component is a child of the band and not of `.in`, which is the whole of how its control
+     strip reaches both edges of the screen. `Arrange.svelte` puts the buttons back inside `.in`
+     itself, so only the rules are full-bleed. */
+  .arrange-strip {
+    margin-block-start: var(--sp-7);
+  }
+
+  .arrange-note {
+    margin-block-start: var(--sp-5);
   }
 
   /* ── 0004 · The typed surface ─────────────────────────────────────────── */
@@ -604,26 +651,53 @@
 
   /* ── 0005 · The specification beside the dashboard ────────────────────── */
 
-  /* `start` AND NOT `center`. Centring a 450px copy column against a 900px picture left 225px of
-     nothing above the heading and 225px below the specification, which is the exact fault this
-     redesign is answering everywhere else on the page. Both columns begin at the same line now,
-     and the picture is cropped rather than the band stretched. */
-  /* 0.85 AGAINST 1.15 AND NOT AN EVEN SPLIT. The picture is painted at its own size, so the column
-     width decides how much of the application a reader sees: at an even split the visible 545px
-     was the record's 240px rail and about 300px of dashboard, which is a picture of a sidebar. The
-     wider column shows the rail and roughly 540px of the page beside it, which is the cash figure,
-     the balance bar and the first of the drawn numbers. The copy column loses about 70px and still
-     holds a 46ch measure. */
-  .report-grid {
+  /* ONE CELL WITH TWO THINGS IN IT. Both children are `grid-area: 1 / 1`, so the picture fills the
+     band edge to edge and the card lies on it. `align-items: center` puts the card's middle on the
+     picture's middle, which is the only alignment that does not care how tall either of them ends
+     up being: the fault this band had before was that two columns of different heights always
+     leave the shorter one's foot empty. */
+  .report {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    gap: var(--sp-8);
-    align-items: start;
-    padding-inline-start: max(var(--sp-6), calc((100% - var(--site-max)) / 2 + var(--sp-6)));
+    align-items: center;
   }
 
-  .report-copy {
-    min-inline-size: 0;
+  .report > * {
+    grid-area: 1 / 1;
+  }
+
+  /**
+   * THE CARD, AND ITS LEFT EDGE IS THE READING COLUMN'S LEFT EDGE.
+   *
+   * `max(var(--sp-6), calc((100% - var(--site-max)) / 2 + var(--sp-6)))` is the same expression
+   * `.in` resolves to, written out because this element is not inside `.in`: below 1200px it is
+   * the plain 32px gutter and above it the column's own margin, so the card starts exactly where
+   * every heading on the page starts.
+   *
+   * 480px AND NOT A `ch` MEASURE. The specification under the sentence is a two-column table with
+   * an 11ch term column, and a card sized to the prose put `One register, and a fixed set of
+   * fields.` onto three lines. 480px holds every definition on two lines at most and is still
+   * under half the 1,136px column, so two thirds of the dashboard behind it stays visible.
+   *
+   * `position: relative` AND `z-index` RATHER THAN DOM ORDER, because the heading has to come
+   * first in the markup for a reader who is listening to the page rather than looking at it.
+   */
+  /* THE CARD MOVED TO THE RIGHT, AND IT IS ABOUT WHICH NUMBER IT HIDES. On the left it covered the
+     app's rail AND `Cash now GBP 24,800.00`, which left `GBP 0.00` as the largest figure visible on
+     the band: a marketing page whose biggest number is zero. The picture is 1,760px inside a
+     1,440px screen with `object-position: 0 0`, so its right edge is cut anyway, and a card on that
+     side covers the part the frame was already losing. Cash now reads, and what the card hides is
+     the cut. The left edge of the card still lands inside the reading column's right margin, so
+     the composition keeps its seam. */
+  .report-card {
+    position: relative;
+    z-index: var(--z-raise);
+    justify-self: end;
+    inline-size: min(480px, 100% - 2 * var(--sp-6));
+    margin-inline-end: max(var(--sp-6), calc((100% - var(--site-max)) / 2 + var(--sp-6)));
+    padding: var(--sp-6);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
   }
 
   .spec {
@@ -655,10 +729,8 @@
   /**
    * THE CLIP LIVES ON THE FIGURE, AND WHICH KEYWORD IT IS MATTERS TWICE.
    *
-   * THE LEFT EDGE IS THE COLUMN'S AND THE RIGHT EDGE IS THE SCREEN'S. `.report-grid` pads only its
-   * inline start, so this column's right edge IS the viewport's right edge at every width; the
-   * picture is 1,440px inside a box about 700 wide, and what falls past the box falls past the
-   * screen. Clipping here and clipping at the band are therefore the same picture.
+   * THE FIGURE IS THE WIDTH OF THE SCREEN AND THE PICTURE IS WIDER. What falls past the figure
+   * falls past the viewport, so clipping here and clipping at the band are the same picture.
    *
    * IT WAS `overflow: clip` ON THE BAND AND THE LAYOUT GATE READ IT AS AN OVERFLOW.
    * `tools/gates/layout.mjs` excuses an element that sticks out only when an ancestor contains it,
@@ -668,10 +740,10 @@
    * gate: nothing about this design needs `clip` specifically.
    *
    * AND IT MUST NOT BE THE BAND. `overflow: hidden` makes an element a scroll container, and
-   * `.report-grid` carries the page's scroll-driven reveal: with the clip on the band, the band
-   * would become the nearest scrollport and the reveal's timeline would resolve against something
-   * that never scrolls. On the figure it cannot, because the figure is a child of the animated
-   * element rather than an ancestor of it.
+   * `.report` carries the page's scroll-driven reveal: with the clip on the band, the band would
+   * become the nearest scrollport and the reveal's timeline would resolve against something that
+   * never scrolls. On the figure it cannot, because the figure is a child of the animated element
+   * rather than an ancestor of it.
    */
   .report-shot {
     min-inline-size: 0;
@@ -679,25 +751,35 @@
     overflow: hidden;
   }
 
-  /* 1440 natural pixels in a column about 700 wide, so a reader sees the left half of the
-     dashboard at full size and the rest of it is past the edge of the screen. Not a scroll box:
-     `research-site-reference.md` found both of the old windows cost a reader roughly 480px of
-     trapped wheel on the way down the page, twice. */
+  /**
+   * 1,760 NATURAL PIXELS IN A SCREEN OF 1,440, so the dashboard always runs off the right edge
+   * rather than ending inside it.
+   *
+   * The capture is 1,440 CSS px wide, so painting it at 1,760 is a 1.22x enlargement of a 2,880px
+   * source: 2.36 device pixels per CSS pixel at a scale of 2, which is still above 1:1 and is why
+   * the picture stays sharp while being bigger than the window it is seen through. The old
+   * treatment painted it at 1:1 in a 700px column, which showed the rail and about 460px of the
+   * page; this shows the rail and roughly 1,200px of it, of which the card covers 480.
+   *
+   * A top rule and no side rules, because there is no side for one to be on.
+   */
   .report-shot img {
     display: block;
-    inline-size: 1440px;
+    inline-size: 1760px;
     max-inline-size: none;
-    block-size: clamp(340px, 33vw, 540px);
+    /* 44vw IS 633px AT 1440, AND THE NUMBER IS WHERE THE PICTURE HAS A SEAM RATHER THAN A ROW.
+       42vw cut the dashboard at 605px, which is nine pixels into the figures under `Active users`,
+       `Monthly recurring revenue` and `Signups`: three numbers sliced along their waists. A crop
+       that ends between two rows reads as a photograph continuing past the frame, and one that
+       ends inside a glyph reads as a mistake. */
+    block-size: clamp(420px, 44vw, 700px);
     object-fit: cover;
     object-position: 0 0;
-    border-start-start-radius: var(--r-lg);
-    border-end-start-radius: var(--r-lg);
-    border: 1px solid var(--line);
-    border-inline-end: 0;
+    border-block-start: 1px solid var(--line);
   }
 
   .report-shot .caption {
-    padding-inline-start: 2px;
+    margin-block-start: var(--sp-3);
   }
 
   /* ── 0006 · Plain about what it is ────────────────────────────────────── */
@@ -825,8 +907,7 @@
 
   @media (width < 1000px) {
     .hero-row,
-    .head-two,
-    .arrange-grid {
+    .head-two {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-7);
     }
@@ -841,28 +922,42 @@
     }
   }
 
-  /* THE DASHBOARD STOPS RUNNING OFF THE EDGE AND BECOMES ITS OWN PHOTOGRAPH. Below 900px the two
-     columns stack, so "the left half at full size" would be a 1440px image in a 900px column: a
-     crop of a crop. The narrow capture is the dashboard as a phone draws it, so it goes back to
-     the column's own width and every figure on it is readable. */
+  /* THE CARD COMES OFF THE PICTURE AND THE PICTURE STOPS RUNNING OFF THE EDGE. Below 900px a 480px
+     card laid on the screen would cover most of it, and a 1,760px image in a 900px window is a
+     crop of a crop. The two go back to being stacked, and the narrow capture is the dashboard as a
+     phone draws it, at the column's own width, with every figure on it readable. */
   @media (width < 900px) {
-    .report-grid {
-      grid-template-columns: minmax(0, 1fr);
-      padding-inline: var(--sp-6);
+    .report {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-7);
       max-inline-size: var(--site-max);
       margin-inline: auto;
+      padding-inline: var(--sp-6);
+    }
+
+    .report-card {
+      inline-size: 100%;
+      margin-inline-start: 0;
+      padding: 0;
+      background: none;
+      border: 0;
     }
 
     /* `block-size: auto` UNDOES THE CROP, which is the half that is easy to forget: the wide
-       treatment is a 1440px image cut to 540px tall, and applying that to a 2532px-tall phone
+       treatment is a 1,760px image cut to 660px tall, and applying that to a 2532px-tall phone
        capture would show the reader the dashboard's title and nothing under it. */
     .report-shot img {
       inline-size: 100%;
       max-inline-size: 420px;
       block-size: auto;
       object-fit: fill;
-      border-inline-end: 1px solid var(--line);
+      border: 1px solid var(--line);
       border-radius: var(--r-lg);
+    }
+
+    .report-shot .caption {
+      padding-inline: 0;
     }
   }
 
@@ -911,7 +1006,7 @@
       padding: var(--sp-4);
     }
 
-    .report-grid {
+    .report {
       padding-inline: var(--sp-4);
     }
   }

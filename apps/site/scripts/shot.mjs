@@ -58,10 +58,20 @@ const server = createServer(async (req, res) => {
 
 await new Promise((r) => server.listen(PORT, r));
 
+/**
+ * EVERY PRERENDERED ROUTE, AND IT WAS THREE OF FIVE.
+ *
+ * `/legal` and `/404` were the two routes the redesign left on the old document layout, and they
+ * were also the two routes this script had never photographed, which is not a coincidence: a page
+ * nobody looks at is a page nobody notices has stopped matching the rest of the site. They are
+ * here so the next person deciding what to do with them is deciding from a picture.
+ */
 const ROUTES = [
   ['home', '/'],
   ['pricing', '/pricing'],
   ['changelog', '/changelog'],
+  ['legal', '/legal'],
+  ['404', '/404'],
 ];
 
 /**

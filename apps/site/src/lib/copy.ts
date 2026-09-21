@@ -484,15 +484,31 @@ export const site = {
       {
         head: 'Not built yet',
         lines: [
-          /* THE LINE THAT STOOD HERE WAS FALSE. See the note on `arrange.note`, which is where the
-             true half of it now lives. What IS unbuilt, and what this replaces it with, is the
-             other Spark: `packages/spark` answers a typed question against a person's own rows and
-             cites what it read (`packages/spark/src/propose.ts:1-25`), and
-             `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returns nothing, so no
-             host reaches it. A visitor can do nothing with it today, which is the definition of
-             this column. */
-          'Asking your record a question in words. The engine is written; no host reaches it yet.',
-          'Mail does not arrive by itself.',
+          /**
+           * THIS LINE WAS TRUE ON 2026-09-21 IN THE MORNING AND FALSE BY THE EVENING, which is what
+           * a marketing page that cites a grep is for.
+           *
+           * It said *the engine is written; no host reaches it yet*, on the strength of
+           * `grep -rl "@braindog/spark" apps/worker/src apps/selfhost/src` returning nothing. Run
+           * again, it returns `apps/worker/src/spark.ts` and `apps/selfhost/src/spark.ts`: the
+           * engine landed as a package of its own on 2026-09-20 and both hosts were wired to it in
+           * the same day's work.
+           *
+           * WHAT IS STILL TRUE IS NARROWER AND IS WHY THE LINE STAYS IN THIS COLUMN. Both wirings
+           * refuse before they import: `workerSparkEngine` returns `undefined` when no endpoint is
+           * configured, and `SPARK_ENDPOINT` is `""` in both of `apps/worker/wrangler.jsonc`'s
+           * environments. So a visitor can still do nothing with it, which is this column's own
+           * definition, and the sentence now says which of the two reasons that is.
+           */
+          'Asking your record a question in words. Both hosts reach the engine; neither has a model configured.',
+          /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an
+             arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
+             itself` on its own now reads as the page disagreeing with its own history page. The
+             two are compatible and the distinction is the whole point: nothing here reaches into
+             an inbox, and what does land has to be forwarded there by a person. The sentence says
+             the limit and stops, because neither plan is open and a claim about what a stranger
+             can make land today would be a claim about a door nobody can reach. */
+          'Mail does not arrive by itself. Nothing reaches into your inbox, and a message has to be forwarded in.',
           /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
              to point its one filled button at it. `DEMO_RECORD` is empty in both environments. */
           'Neither plan is open, and there is no demo to open yet.',
@@ -592,6 +608,10 @@ export const site = {
         ['Price', 'Free', '$12 a month, per record'],
       ],
     },
+    /* THE BAND'S OWN LABEL, in the same register as `Pricing` and `Side by side` above it. Three
+       words off the sentence under it rather than a new claim: this band exists to say there is no
+       free hosted tier, so that is what its mark says. */
+    honestTag: 'No free tier',
     honestTitle: 'Why there is no free hosted tier',
     honest:
       'No free hosted tier, on purpose. A per-customer database with no revenue against it ends as ' +
