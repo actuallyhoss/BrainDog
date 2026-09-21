@@ -51,6 +51,8 @@
   import { answerFor, wouldRecord, type Answer } from '$lib/record/answer.ts';
   import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
+  import { mayAnswer, whyNotAnswering } from '../answering.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
@@ -106,6 +108,33 @@
 
   /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
   const now = $derived(from === 'live' ? Date.now() : NOW);
+
+  /**
+   * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED EITHER.
+   *
+   * `/decide` WAS REPAIRED AND THIS WAS NOT, AND IT IS THE DEEPER DEAD END OF THE TWO. A reader gets
+   * here from the card link on that same queue. The queue answers in one press, so its dead end cost
+   * a press, a paragraph and a second press. This screen is deliberately slower than the queue, and
+   * every part of that slowness is spent by somebody who is going to be refused: `Choose this` opens
+   * a REQUIRED reason box, the commit stays off while the box is empty, "required" is said twice
+   * above it, and the reason is the whole ceremony somebody came here for. Then the record answers.
+   *
+   * COUNTED FROM THIS FILE for the sample's three-option question, before: four controls inside the
+   * decision, being three `Choose this` buttons and `Defer`, NOT ONE of them disabled, and no word
+   * anywhere on the page about access. Two ways in and neither asked: the buttons, and the keyboard,
+   * where `Enter` on a highlighted option calls `choose` and `d` calls `defer`.
+   *
+   * SO THE SENTENCE IS THE RECORD'S OWN, MOVED IN FRONT OF THE OPTIONS, and the module it comes from
+   * is the one the queue already reads. `answering.ts` exists so that this screen is not a fourth
+   * spelling of one rule, and a colleague who reads the hint here, reads it on the queue, or presses
+   * through to the refusal meets the same words three times over.
+   *
+   * THE SAMPLE IS UNTOUCHED, and that is the shell's doing rather than a special case here: `api.ts`
+   * gives the sample reader `owner`, so a host with no record behind it draws what it drew.
+   */
+  const me = $derived((page.data as unknown as Shell).me);
+  const answerable = $derived(mayAnswer(me.level, me.owner));
+  const whyNot = $derived(whyNotAnswering(me.level));
 
   const question = $derived(
     from === 'live'
@@ -176,6 +205,15 @@
   const short = $derived(reason.trim().length > 0 && reason.trim().length < 25);
 
   function choose(key: string) {
+    /* A READER WHO MAY NOT ANSWER IS TOLD BEFORE THE REASON BOX OPENS, AND NOT AFTER THE PARAGRAPH.
+       The buttons below are off, but off is not closed: `Enter` on a highlighted option arrives here
+       with no button in the way, and a required reason box that opens for somebody whose access
+       cannot reach the commit is the dead end this screen is being repaired for, with one more
+       keystroke in it. The words are the standing hint's, so the toast and the sentence agree. */
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
     committing = key;
     deferring = false;
     reason = '';
@@ -184,6 +222,15 @@
   }
 
   function defer() {
+    /* AND THE THIRD VERB IS A DECISION TOO. A defer takes a reason and a wake date and is sent to
+       `decide` like every other answer, so a gate with its two answers off and its defer live is
+       still a dead end, just a quieter one. Guarded here rather than in `deferIt` because `d` on the
+       keyboard and `?defer` on the URL both land on this function, and both of them precede the
+       typing that the refusal would otherwise arrive after. */
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
     deferring = true;
     committing = null;
     reason = '';
@@ -591,6 +638,16 @@
         <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
       </section>
 
+      <!-- WHY THE ANSWERS ARE OFF, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is
+           the record's own refusal, said before anybody has chosen anything, and it ends by saying
+           that reading is what this colleague still holds. Every option's button and the defer
+           point at it. It sits BELOW the cost and the context on purpose: those are reading, this
+           reader was invited to read, and a screen that opens by naming what you cannot do reads as
+           a door rather than as the question it is. -->
+      {#if !answerable}
+        <p class="cannot" id="cannot-decide">{whyNot}</p>
+      {/if}
+
       <section class="options">
         <div class="options-head">
           <h2 class="options-title">{copy.theOptions}</h2>
@@ -606,7 +663,17 @@
                 {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
               </header>
               <p class="card-body">{option.body}</p>
-              <Button weight={highlighted === option.key ? 'primary' : 'quiet'} onclick={() => choose(option.key)}>
+              <!-- OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the options
+                   that says why. `aria-describedby` rather than a title, so the reason is read out
+                   with the control and not only seen beside it, which is the shape `/decide` and
+                   `/settings/people` both use. The card around it is untouched: the number, the
+                   title, the recommendation and the body are what this reader came for. -->
+              <Button
+                weight={highlighted === option.key ? 'primary' : 'quiet'}
+                disabled={!answerable}
+                aria-describedby={answerable ? undefined : 'cannot-decide'}
+                onclick={() => choose(option.key)}
+              >
                 {copy.chooseThis(option.title)}
               </Button>
             </article>
@@ -692,7 +759,7 @@
           <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
                It had no handler, so the one control that stops a gate being cleared by dismissing
                things did nothing — while `d` on the keyboard opened the same flow correctly. -->
-          <Button onclick={defer}>{copy.defer}</Button>
+          <Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>
           <span class="third-note">{copy.deferHint}</span>
         </div>
       {/if}
@@ -735,6 +802,18 @@
     margin-block-start: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-ui);
+  }
+
+  /* THE STANDING SENTENCE OVER THE OPTIONS, at the weight of a hint rather than an alarm, and the
+     same rule `/decide` draws it by: nothing has gone wrong, and this reader is doing exactly what
+     they were invited to do. `--measure` because it is three sentences and a line that runs the
+     width of the page is a line nobody reads. The page itself is a flex column with `--sp-5`
+     between its children, so this needs no margin of its own. */
+  .cannot {
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
   }
 
   .options-head {
