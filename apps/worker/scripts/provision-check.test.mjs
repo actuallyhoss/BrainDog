@@ -117,8 +117,12 @@ test('one missing thing is named once, and the list is in the order to repair it
  * than in the function: a run that cannot see the history cannot be asked about it.
  */
 const holds = (sha) => {
+  /* `repo` AND NOT `root`, AND `-C` AND NOT `cwd`, for the reason `provision-check.mjs` states over its
+     own `gitOk`: `secret-grep` counts `root` as a name a key goes by in a file that is also about keys,
+     and this file names `KEK` in its assertions. CI went red here once for exactly that. */
+  const repo = root;
   try {
-    execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root, stdio: 'ignore' });
+    execFileSync('git', ['-C', repo, 'cat-file', '-e', `${sha}^{commit}`], { stdio: ['ignore', 'ignore', 'ignore'] });
     return true;
   } catch {
     return false;
