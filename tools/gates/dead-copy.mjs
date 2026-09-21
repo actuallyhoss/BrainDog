@@ -215,9 +215,39 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
    * widened pattern finds the same 399, which is the point: it costs nothing now, and it is not
    * sitting there waiting to be wrong on the day somebody writes one.
    */
+  /**
+   * AND ONLY INSIDE THE OBJECT THE ENTRY NAMES, which is what the paragraph above always said and
+   * the scan did not do: it read every two-space key in the whole FILE.
+   *
+   * `first-run.ts` grew a function whose parameters are an object type written over four lines, and
+   * `press:`, `own:`, `held:` and `fallback:` are two-space keys by that pattern, so the gate
+   * reported four sentences this product types and nobody reads. They are not sentences, they are
+   * parameters, and no wording of an allow-list entry would have been true about them.
+   *
+   * The object's own text is from `export const <name>` to the first `};` at the start of a line,
+   * which is how every module here is written and is checked rather than assumed: a module whose
+   * object cannot be found that way is a finding of its own rather than a silent zero.
+   */
+  const bodies = new Map();
+  const unreadable = [];
+  for (const m of defined) {
+    const source = sources.get(m.at) ?? '';
+    const opened = source.search(new RegExp(String.raw`^export const ${m.object}\b`, 'mu'));
+    if (opened < 0) {
+      unreadable.push(m);
+      continue;
+    }
+    const rest = source.slice(opened);
+    /* BOTH SPELLINGS OF THE END, because `copy.ts` closes with `} as const;` and the first
+       version of this looked only for `};`, found neither, and read each file to its last line: a
+       function's parameters four hundred lines below the object were counted as sentences. */
+    const closed = rest.search(/^\}(?: as const)?;$/mu);
+    bodies.set(m.at, closed < 0 ? rest : rest.slice(0, closed));
+  }
+
   const entries = [];
   for (const m of defined)
-    for (const k of sources.get(m.at).matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu))
+    for (const k of (bodies.get(m.at) ?? '').matchAll(/^ {2}(?:['"]([^'"]+)['"]|([A-Za-z_$]\w*))\s*:/gmu))
       entries.push({ ...m, key: k[1] ?? k[2], name: `${m.object}.${k[1] ?? k[2]}` });
 
   /* THE NAME AS A USE OF IT IS WRITTEN, which is what the allow-list and both reports are keyed on.
@@ -260,6 +290,16 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
   console.log(
     `  dead-copy: ${names.length} sentences, ${dead.length} unrendered (${ALLOWED.size} known), over ${renderers} of ${files.length - defs.size} files a route reaches`,
   );
+
+  /* A MODULE WHOSE OBJECT COULD NOT BE FOUND IS A FINDING AND NOT A ZERO, and this gate proved its
+     own point while it was being written: a stray byte in the pattern made both modules unreadable,
+     every body came out empty, and the line it printed was `0 sentences, 0 unrendered`, which reads
+     exactly like a clean run. That is the shape this gate exists to catch, one level up. */
+  if (unreadable.length) {
+    console.error('\n  a copy module this gate could not read:');
+    for (const m of unreadable)
+      console.error(`      ${m.file}: no \`export const ${m.object}\` in it, so none of its sentences were checked`);
+  }
 
   if (unexpected.length) {
     console.error('\n  a sentence this product types and nobody reads:');
