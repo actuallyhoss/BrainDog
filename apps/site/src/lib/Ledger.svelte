@@ -281,6 +281,27 @@
     background: var(--hover-wash);
   }
 
+  /**
+   * AND THE TWO QUIET CELLS STEP UP ON THAT ONE ROW, because `--dim` runs out of contrast three
+   * surfaces down.
+   *
+   * `--flip-dim` is solved against the flipped band's GROUND, which `app.css` states and measures at
+   * 5.73:1 in the dark scheme. These rows are not on the ground: they are on `--s1`, which is 4.74:1,
+   * and this row adds a 6 per cent wash under them, which is 4.19:1 and under the 4.5 body floor.
+   * The `a11y` gate found it on `.newest > .seq` and `.newest > .age`, in dark at 1440 and at 390,
+   * and nowhere else, because light lands at 4.94:1 and clears.
+   *
+   * THE TOKEN IS NOT THE THING THAT IS WRONG. Raising `--flip-dim` until it clears on this surface
+   * needs 68 per cent, and `--flip-ink2` is 76: the quiet role and the secondary role would be eight
+   * points apart and read as one colour, which is a worse product than a legible number. So the call
+   * site that stacked two surfaces under a token solved for one pays for it, in `--ink2`, which
+   * measures 6.18:1 here. `.who` and `.what` are already `--ink2` and `--ink` and were never in it.
+   */
+  .newest .seq,
+  .newest .age {
+    color: var(--ink2);
+  }
+
   .seq {
     grid-area: seq;
     color: var(--dim);
