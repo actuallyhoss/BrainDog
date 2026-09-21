@@ -473,12 +473,24 @@ export const site = {
            * 199 in `apps/selfhost`. An import edge is not a path. Configuring a model would change
            * nothing, because nothing asks either builder for an engine.
            *
-           * So the line says what a stranger can check: the engine exists in this repository and no
-           * screen and no door reaches it. That is a smaller claim than the one it replaces and it
-           * is the one the code supports. It moves out of this comment and into the column the
-           * moment a caller exists.
+           * So the line said what a stranger could check: the engine exists in this repository and no
+           * screen and no door reaches it.
+           *
+           * AND A DOOR REACHES IT NOW, SO THE SENTENCE MOVED RATHER THAN THE COLUMN. Both hosts
+           * mounted `POST /api/spark/read` on 2026-09-21, and a real self-host over a real socket
+           * answers it 200 on exactly one model call. Two things are still true and they are what
+           * the new sentence says: nothing in `apps/web` calls that address, which
+           * `grep -rn "spark/read" apps/web/src` returns nothing for, and `SPARK_ENDPOINT` is `""`
+           * in both of `apps/worker/wrangler.jsonc`'s environments, so no host this project deploys
+           * has a model behind it. A visitor can still do nothing with it, which is this column's
+           * own definition.
+           *
+           * THE THIRD THING IS NOT ON THE PAGE BECAUSE IT IS NOT A PROMISE ANYBODY MADE: what the
+           * door answers today is empty, on a record holding rows. That is a defect rather than a
+           * limit, it is written up in `loop/BACKLOG.md`, and a marketing page is not where a
+           * project reports its open bugs.
            */
-          'Asking your record a question in words. The engine is built and nothing reaches it yet.',
+          'Asking your record a question in words. Nothing on a screen asks it, and no host here has a model behind it.',
           /* THE SECOND HALF IS NEW AND IT IS THERE TO STOP A CONTRADICTION. Both hosts opened an
              arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
              itself` on its own now reads as the page disagreeing with its own history page. The
