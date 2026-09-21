@@ -937,7 +937,24 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         const link = b.refusals?.length || (b.kind !== 'bar' && b.kind !== 'split') ? null : linkOf(registerOf(b), b.columns?.[1]?.field);
         if (!link) continue;
         const rows = await rowsOf(link.to);
-        if (rows) linked.set(i, Object.fromEntries(rows.map((r) => [r.id, r.fields[link.money]])));
+        /* BY THE ULID AND BY THE NUMBER, because the element the bar looks up is no longer the one that
+           arrived. `entryOf` resolves a `list<ref>` element to the target row's SEQUENCE as of
+           `a4d0111d`, which is what a person says and what every other screen wants; this map was
+           written before that and keyed only by the ULID the record sends. The lookup then missed on
+           every row, every row was skipped as linking to nothing, and the founder use case's "Balance
+           by organisation" drew its empty line, "No organisation lists an account yet", on a record
+           whose three organisations each hold an account. It was caught in a marketing capture rather
+           than by a test, which is why the test beside this one drives both forms. */
+        if (rows)
+          linked.set(
+            i,
+            Object.fromEntries(
+              rows.flatMap((r) => {
+                const held = r.fields[link.money];
+                return r.seq === null ? [[r.id, held] as const] : [[r.id, held] as const, [String(r.seq), held] as const];
+              }),
+            ),
+          );
       }
       return {
         from: 'live',

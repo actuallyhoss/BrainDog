@@ -783,3 +783,65 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
   assert.equal(said?.tone, 'good', 'rows that said keep their verdict');
   assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
 });
+
+test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element arrives as an id or as a number', async () => {
+  /**
+   * THE MONEY BESIDE EACH ORGANISATION VANISHED FROM A LIVE PAGE AND A MARKETING CAPTURE CAUGHT IT.
+   *
+   * `entryOf` resolves a `list<ref>` element to the target row's SEQUENCE as of `a4d0111d`, which is
+   * what a person says and what every other screen wants. This reader's `linked` map was written
+   * before that and keyed only by the ULID the record sends, so the lookup missed on every row, every
+   * row was skipped as linking to nothing, and the founder use case's "Balance by organisation" drew
+   * "No organisation lists an account yet" on a record whose three organisations each hold an
+   * account. `measures.test.ts` holds the same block green because it hands `linked` and the rows in
+   * one shape, which is the half a test cannot catch by construction: the two shapes are made by two
+   * files and only the reader puts them together.
+   */
+  const declared: Record<string, unknown> = {
+    pl_orgs: { id: 'pl_orgs', name: 'Organisations', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'accounts', type: 'list', of: 'ref', to: 'pl_accounts' }] },
+    pl_accounts: { id: 'pl_accounts', name: 'Accounts', title: 'label', fields: [{ id: 'label', type: 'text' }, { id: 'balance', type: 'money' }] },
+  };
+  const ACC = ['01JACC000000000000000001', '01JACC000000000000000002'];
+  const answer = {
+    page: 'dashboard',
+    title: 'Dashboard',
+    blocks: [
+      {
+        kind: 'bar',
+        heading: 'Balance by organisation',
+        source: 'register.pl_orgs',
+        columns: [{ field: 'name' }, { field: 'accounts' }],
+        empty: 'No organisation lists an account yet.',
+        rows: [{ ...row(1, { name: 'Northwind Labs', accounts: [ACC[0]] }), register: 'pl_orgs' }, { ...row(2, { name: 'Harbour Studio', accounts: [ACC[1]] }), register: 'pl_orgs' }],
+        matched: 2,
+        refusals: [],
+      },
+    ],
+  };
+  const { io } = host((method, url) => {
+    if (method === 'page') return json(200, { ok: true, value: answer });
+    if (method === 'schema') return json(200, { ok: true, value: declared[url.searchParams.get('register') ?? ''] });
+    if (method === 'list' && url.searchParams.get('register') === 'pl_accounts')
+      return json(200, {
+        ok: true,
+        value: {
+          rows: [
+            { id: ACC[0], seq: 1, fields: { label: 'Current', balance: { amount: 2_480_000, currency: 'GBP' } } },
+            { id: ACC[1], seq: 2, fields: { label: 'Reserve', balance: { amount: 910_000, currency: 'GBP' } } },
+          ],
+          cursor: null,
+        },
+      });
+    return json(200, { ok: true, value: { rows: [], cursor: null } });
+  });
+  const out = await pageReader(BASE, io, () => AT).read('dashboard');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [bar] = out.page.blocks;
+  const drawn = toSegments(bar!).filter((s) => 'rows' in s) as { rows: { cells: string[] }[] }[];
+  assert.deepEqual(
+    drawn[0]?.rows.map((r) => r.cells.slice(0, 2).join(' | ')),
+    ['Northwind Labs | GBP 24,800.00', 'Harbour Studio | GBP 9,100.00'],
+    'the money each organisation names, and not the empty line',
+  );
+});
