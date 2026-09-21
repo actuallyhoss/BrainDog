@@ -71,6 +71,58 @@ test('ONLY THE FIELDS A REGISTER SAYS ARE WORTH SEARCHING', () => {
   assert.ok(!text.includes('private'), 'a field nobody asked to search was indexed');
 });
 
+test('A ROW IS ALWAYS FINDABLE BY THE WORDS IT IS SHOWN UNDER, whatever type its title is', () => {
+  /**
+   * A HIT CARRIES THE TITLE AND NOTHING ELSE OF THE ROW, so a title outside the index is a result a
+   * person can read and never reach. Measured over every register this product declares, 30 titles
+   * are `text` and already searchable, one is a `document`, and one is an `enum`: `personal /
+   * budgets`, whose other two fields are a note and tags that nothing here marks searchable. That
+   * register had nothing in the index at all.
+   */
+  const fields = [
+    { id: 'category', type: 'enum' },
+    { id: 'limit', type: 'money' },
+    { id: 'note', type: 'text' },
+  ];
+  assert.equal(projectedText(fields, { category: 'Groceries', limit: 40_000, note: 'a private aside' }, 'category'), 'Groceries');
+  /* AND NOTHING ELSE COMES WITH IT: naming the title does not turn the row on. */
+  assert.equal(projectedText(fields, { category: 'Groceries', limit: 40_000, note: 'a private aside' }), '');
+  /* A TITLE THAT SAYS `search: true` IS NOT SAID TWICE. */
+  const named = [{ id: 'what', type: 'text', search: true }, { id: 'party', type: 'text', search: true }];
+  assert.equal(projectedText(named, { what: 'Invoice 41', party: 'Halden' }, 'what'), 'Invoice 41\nHalden');
+});
+
+test('AND A REGISTER WHOSE ONLY WORDS ARE ITS TITLE IS FINDABLE, over a real record', async () => {
+  /* `personal / budgets` IS THIS REGISTER: titled by an enum, with a note and tags beside it that
+     nothing in this product marks searchable. It had nothing in the index, so every query a personal
+     record was asked answered nothing about its budgets. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok(
+    (
+      await k.install([
+        {
+          id: 'register.budgets',
+          kind: 'register',
+          body: {
+            id: 'budgets',
+            name: 'Budget',
+            title: 'category',
+            fields: [
+              { id: 'category', type: 'enum', values: ['Groceries', 'Transport'], required: true },
+              { id: 'note', type: 'text' },
+            ],
+          } as never,
+        },
+      ])
+    ).ok,
+  );
+  value(k.create('budgets', { category: 'Groceries', note: 'a private aside' }, { actor: 'p_1' }));
+  assert.equal(k.search('groceries', { limit: 5 }).length, 1, 'a budget line is shown by its category and found by nothing');
+  assert.equal(k.search('private', { limit: 5 }).length, 0, 'the note came with it');
+  sql.close();
+});
+
 test('whitespace is collapsed and an empty value leaves no blank line', () => {
   // A blank line in the projection is a token boundary that means nothing.
   const fields = [{ id: 'a', type: 'text', search: true }, { id: 'b', type: 'text', search: true }];

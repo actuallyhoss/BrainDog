@@ -26,11 +26,25 @@ type Searchable = { id: string; type: string; search?: boolean; retired?: boolea
  * A list is joined with spaces and whitespace is collapsed, so a value typed across two lines is one
  * run of words to the tokeniser. Empty values are dropped rather than leaving blank lines, because a
  * blank line in the projection is a token boundary that means nothing.
+ *
+ * AND THE TITLE IS ALWAYS ONE OF THEM, whatever its type and whether or not it says `search: true`.
+ * A hit carries the row's title and nothing else of the row (`search` answers `{register, seq,
+ * title, rank}`), so a row whose title is not in the index is a result a person can READ and never
+ * REACH. Measured over every register this product declares, 14 in the first-party packs and 18
+ * across the six use cases: 30 titles are `text` and already searchable, one is a `document`, and
+ * one is an `enum`, `personal / budgets`, whose other two fields are a note and tags that nothing in
+ * this product marks searchable. That register had nothing in the index at all, so every query a
+ * personal record was asked answered nothing about its budgets.
+ *
+ * NO MONEY OR DATE TITLE EXISTS TODAY, which is what makes this rule cheap: the worry about putting
+ * digits into a text index is real and it is nobody's case yet. A pack that later titles its rows by
+ * an amount gets that amount indexed for that register, which is still the row's own words as the
+ * screen says them, and this comment is where to argue it if it ever bites.
  */
-export function projectedText(fields: readonly Searchable[], values: Record<string, Json>): string {
+export function projectedText(fields: readonly Searchable[], values: Record<string, Json>, title?: string): string {
   const lines: string[] = [];
   for (const f of fields) {
-    if (!f.search || f.retired) continue;
+    if ((!f.search && f.id !== title) || f.retired) continue;
     const raw = values[f.id];
     if (raw === undefined || raw === null || raw === '') continue;
     /* NFC HERE TOO, OR THE QUERY COMPOSES AND THE INDEX DOES NOT. `ftsQuery` normalises what was
@@ -224,7 +238,7 @@ export function searchMatched(sql: Sql, q: string, opts: Ask = {}): Searched {
 /** Every live row's line, rebuilt from nothing. What an import runs once at the end. */
 export function rebuild(
   sql: Sql,
-  fieldsOf: (register: string) => readonly Searchable[] | undefined,
+  fieldsOf: (register: string) => { fields: readonly Searchable[]; title?: string } | undefined,
   isSeries: (register: string) => boolean,
 ): number {
   sql.exec('DELETE FROM entry_fts');
@@ -234,9 +248,9 @@ export function rebuild(
   );
   for (const row of rows) {
     if (isSeries(row.register)) continue;
-    const fields = fieldsOf(row.register);
-    if (!fields) continue;
-    const text = projectedText(fields, JSON.parse(row.fields) as Record<string, Json>);
+    const held = fieldsOf(row.register);
+    if (!held) continue;
+    const text = projectedText(held.fields, JSON.parse(row.fields) as Record<string, Json>, held.title);
     if (!text) continue;
     sql.exec('INSERT INTO entry_fts (rowid, id, register, text) VALUES (?, ?, ?, ?)', row.rowid, row.id, row.register, text);
     n++;

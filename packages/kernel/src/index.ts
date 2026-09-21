@@ -2735,7 +2735,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     project(
       sql,
       { rowid: row.rowid, id: entry.id, register: entry.register, deleted: entry.deleted_at !== null },
-      projectedText(decl.fields, entry.fields),
+      projectedText(decl.fields, entry.fields, decl.title),
     );
   }
 
@@ -3862,7 +3862,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     transaction(() =>
       rebuild(
         sql,
-        (register) => registers.get(register)?.fields,
+        (register) => {
+          const decl = registers.get(register);
+          return decl ? { fields: decl.fields, ...(typeof decl.title === 'string' ? { title: decl.title } : {}) } : undefined;
+        },
         (register) => Boolean(registers.get(register)?.series),
       ),
     );
