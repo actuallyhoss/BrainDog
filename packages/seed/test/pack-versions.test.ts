@@ -34,6 +34,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../src/index.ts';
 
@@ -312,4 +314,41 @@ test('THE GUARD REFUSES AN ENTRY WITH NO REASON BESIDE ITS FINGERPRINT, and name
     one({ ...ok, history: [...ok.history, 'A second line saying the same thing about `things` all over again -> aaaaaaaaaaaaaaaa'] }),
     /lists aaaaaaaaaaaaaaaa twice/u,
   );
+});
+
+/**
+ * AND THE TOOL THAT PRINTS THE ENTRY THIS GUARD IS ABOUT TO DEMAND.
+ *
+ * WRITTEN BECAUSE THE ENTRY WAS HAND-FED THREE TIMES IN TWO DAYS, most recently `portfolio@1.4.0` in `a89bc072`,
+ * every time by somebody reading a fingerprint out of another agent's report. `packages/seed/scripts/fingerprint.mjs`
+ * computes it instead, and this test is what keeps the tool and the guard from drifting apart: the ids and the
+ * fingerprint it prints have to be the ones the guard computes live, and the entry it prints has to be REFUSED, exactly
+ * once, for the one thing a tool cannot supply. The reason is the only field a person still writes, which is the point
+ * of the guard.
+ *
+ * RE-AUTHORED BY THE CALLER after the run that wrote it lost this file to a concurrent restore; the tool itself
+ * survived. Both halves were driven by hand here: with the tool's inventory narrowed the ids assertion goes red, and
+ * with a citation written into the tool's own placeholder reason the "refused exactly once" assertion goes red.
+ */
+test('THE FINGERPRINT TOOL PRINTS WHAT THE GUARD DEMANDS, and the guard still refuses it for the reason nobody can compute', () => {
+  const printed = execFileSync(process.execPath, [fileURLToPath(new URL('../scripts/fingerprint.mjs', import.meta.url))], { encoding: 'utf8' });
+  let held = 0;
+  for (const id of FIRST_PARTY) {
+    const version = FIRST_PARTY_VERSIONS[id];
+    if (version === '1.0.0') continue;
+    const key = `${id}@${version}`;
+    const block = printed.slice(printed.indexOf(`'${key}': {`));
+    assert.ok(block !== '' && printed.includes(`'${key}': {`), `${key}: the tool printed no entry for the version the pack is on`);
+    const holds = /holds: `([^`]*)`/u.exec(block)?.[1] ?? '';
+    const declares = /declares: '([0-9a-f]{16})'/u.exec(block)?.[1] ?? '';
+    const history = /history: \[\n\s*'([^']*)',/u.exec(block)?.[1] ?? '';
+    const doc = firstPartyDocument(id, { seeds: [] }) as Doc;
+    assert.deepEqual(ids(holds), inventory(id, doc), `${key}: the ids the tool printed are not the ids the pack provides`);
+    assert.equal(declares, fingerprint(doc), `${key}: the fingerprint the tool printed is not the one the guard computes`);
+    const refusals = wrong(key, { holds, declares, history: [history] }, { holds: inventory(id, doc), declares: fingerprint(doc), current: true });
+    assert.equal(refusals.length, 1, `${key}: the printed entry should be refused exactly once, for its reason, and it said ${refusals.join(' | ')}`);
+    assert.match(refusals[0]!, /names nothing the pack declares|characters of reason/u, `${key}: refused for something other than its unwritten reason`);
+    held += 1;
+  }
+  assert.ok(held >= 3, 'the tool was asked about fewer packs than are off 1.0.0');
 });
