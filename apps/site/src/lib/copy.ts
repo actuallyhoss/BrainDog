@@ -532,7 +532,22 @@ export const site = {
   closing: {
     /* NOT THE SLOGAN AGAIN: the hero already made the promise in this face, and the same seven
        words at the foot of the page read as a mistake. This one says what to do next. */
-    title: 'Start your record',
+    /**
+     * AND IT SAID `Start your record`, WHICH IS THE VERB THE PRODUCT CANNOT PERFORM, in 88px, on the
+     * only coloured field on the page.
+     *
+     * The rule is thirty lines up this file, written about `hero.primary`: a control naming a verb the
+     * product cannot perform is the exact defect this app keeps shipping. `POST /auth/provision`
+     * answers 404 on both hosts because `PROVISION_KEY` is unset, so starting a record is the one
+     * thing a reader who has got this far cannot do. The heading was doing what the button beneath it
+     * was stopped from doing, and it was louder.
+     *
+     * A QUESTION RATHER THAN A SMALLER PROMISE. The body under it already says what making a record
+     * takes, and the two actions are honest: the app opens, and the pricing is there to read. What the
+     * heading has to stop doing is instruct. The day `/auth/provision` answers, `Start your record` is
+     * the right heading again and this comment is how somebody knows it.
+     */
+    title: 'What would you keep in it?',
     /* IT SAID `The demo is a made-up business`, and there is no demo. What is true and is the
        better sentence anyway: making a record is two answers long. `/start` asks who you are and
        what the record is for, and arranges the rest from those (`packages/seed/src/usecases`). */
@@ -718,7 +733,8 @@ export const site = {
       limits: [
         { what: 'Writes only', said: 'It reads no list, no figure and no person. Every other call is refused.' },
         { what: 'One register', said: 'The register is fixed when the key is minted, and a label is fixed for a token’s life.' },
-        { what: 'Up to 8 fixed fields', said: 'Values the project cannot change, set by whoever minted the key.' },
+        /* `At most` AND NOT `Up to`, which is this file's own third voice rule: a number is a real number or it is absent, no 10x and no up to. Eight is a real cap, so only the phrasing was selling it. */
+        { what: 'At most 8 fixed fields', said: 'Values the project cannot change, set by whoever minted the key.' },
         { what: '100 rows a call', said: 'A batch past it is refused whole, rather than half written.' },
         { what: '256 KB a call', said: 'Measured as the JSON of its rows.' },
         { what: '600 rows a minute', said: 'Counted in a window the first report opens. A leaked key was every row the record could hold.' },

@@ -99,10 +99,24 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-21',
     kind: 'changed',
+    /* THE ENTRY THAT WAS MISSING, and the absence had a measurable effect: with no line after it, the
+       newest thing this changelog said about colour was the 10 September entry below, "Indigo controls",
+       which has not been true since the 16th. The entry for the 10th is left exactly as it stands. It
+       was true on the day, and a changelog edited to agree with today is not a changelog. */
+    title: 'The accent is the mark\u2019s own red again, and the indigo is gone',
+    body:
+      'The product wore an indigo accent from the 10th of September. It is the red the mark has ' +
+      'always been, solved against every surface in both schemes so that a figure drawn in it clears ' +
+      'the contrast floor rather than only looking right on one ground.',
+    commits: ['411272a7', '938175fb'],
+  },
+  {
+    date: '2026-09-21',
+    kind: 'changed',
     title: 'This site was rebuilt around what fills a page rather than around its colour',
     body:
       'Four reference sites were measured in a browser and this one beside them. Almost half of ' +
-      'the home page held nothing but a one pixel rule. It has seven layouts now, six changes ' +
+      'the home page held nothing but a one pixel rule. It has five bands now, four changes ' +
       'of ground, and the record photographed at the width of the screen.',
     commits: ['8d6bcc9c', '164ad664'],
   },
