@@ -22,7 +22,7 @@
     "deploy:alpha": "wrangler deploy --env alpha",
     "deploy:production": "wrangler deploy --env production",
     "tail": "wrangler tail",
-    "test": "node --test test/*.test.ts",
+    "test": "node --test test/*.test.ts && node --test scripts/*.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
   }
 }
