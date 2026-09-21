@@ -14,10 +14,14 @@
  *
  * `UNREACHABLE` and `UNAUTHORIZED` mean there is no record here, and the route reads the sample as
  * it always did. `VIEW_UNKNOWN` is a view this record does not hold, carrying the addresses it does
- * hold, so the answer ends the search instead of starting one. Any other refusal is the record's own
- * sentence, and that INCLUDES the read of the rows: a view whose filter names a field the register
- * has since dropped is refused by `list`, and the record's sentence about that field is the only
- * thing on the screen that can explain a view that used to work.
+ * hold, so the answer ends the search instead of starting one. THAT SENTENCE WAS HALF TRUE UNTIL
+ * `everyAddress` BELOW: the record builds `allowed` from `kernel.views(register)`, which is
+ * `WHERE register = ?` (`packages/kernel/src/index.ts`), so a key naming a register with no views at
+ * all carried nothing, and `/v/[view]` printed "This record has no saved views yet." over a record
+ * holding several. Any other refusal is the record's own sentence, and that INCLUDES the read of the
+ * rows: a view whose filter names a field the register has since dropped is refused by `list`, and
+ * the record's sentence about that field is the only thing on the screen that can explain a view
+ * that used to work.
  *
  * `<register>.<id>` IS THE ADDRESS, split at the last dot, because that is the shape the sample's own
  * keys already have (`obligations.overdue`) and the shape the record's key is in: a view belongs to
@@ -302,6 +306,20 @@ export function viewReader(base: string, io?: Fetch): ViewReader {
     return { ok: true, value: { rows, matched } };
   }
 
+  /**
+   * Every saved view this record holds, as addresses, or none where it would not say.
+   *
+   * THE SECOND READ THAT MAKES A MISS USEFUL. `VIEW_UNKNOWN` carries one register's views, so a key
+   * naming a register that holds none carries an empty set, and `/v/[view]` turns an empty set into
+   * "This record has no saved views yet." on a record with two of them. A refused second read leaves
+   * the addresses empty rather than replacing the record's sentence: the reader came for the first
+   * sentence and it is still the true one.
+   */
+  async function everyAddress(): Promise<string[]> {
+    const all = await client.views();
+    return all.ok ? all.value.map((v) => `${v.register}.${v.id}`) : [];
+  }
+
   return {
     async read(key, extra = [], q = '') {
       const at = addressOf(key);
@@ -313,7 +331,13 @@ export function viewReader(base: string, io?: Fetch): ViewReader {
         return { from: 'missing', said: liveWords.noAddress(key), addresses: all.value.map((v) => `${v.register}.${v.id}`) };
       }
       const got = await client.view(at);
-      if (!got.ok) return missed(got, at.register);
+      if (!got.ok) {
+        const said = missed(got, at.register);
+        /* AND A MISS THAT NAMED NOBODY IS ASKED AGAIN, ONCE. The record's own sentence stays; only
+           the half that lists addresses is filled in, and only where that register answered with
+           none. A register that does hold views has already answered the question. */
+        return said.from === 'missing' && said.addresses.length === 0 ? { ...said, addresses: await everyAddress() } : said;
+      }
       const saved = got.value;
 
       /* A USE CASE'S OWN LISTS ARE DECLARED BY THE RECORD ALONE: the view's list first, so its

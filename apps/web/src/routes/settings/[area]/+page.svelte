@@ -41,6 +41,9 @@
   import { callsOutOf, words as actionWords, type CallOut } from '$lib/record/actions.ts';
   /* THE FORWARDING ADDRESS, which the Worker minted and nothing in this app asked for. See the Ingest area. */
   import { mailUrl, mintInbound, revokeInbound, words as mailWords, type Said as MailSaid } from '$lib/record/inbound-write.ts';
+  /* AND WHETHER THE HOST ANSWERING HAS THAT DOOR AT ALL, which is the question the two buttons were
+     drawn without asking. `inbound-door.ts` says why it is a request and not `DEPLOYMENT.kind`. */
+  import { mintsMail } from '$lib/record/inbound-door.ts';
   /* THE WRITES THIS SCREEN MAKES, and the one reading of what the record answered to each. */
   import {
     addException, dropException, exportFile, moveLevel, readPeople, removeAccess, wrote,
@@ -322,8 +325,28 @@
    * built from it for the screen and is never kept separately, because two spellings of one secret
    * are two things to keep out of a log.
    */
-  let mailSaid = $state<MailSaid | null>(null);
+  let mailSaid = $state<Exclude<MailSaid, { kind: 'unrouted' }> | null>(null);
   let mailBusy = $state(false);
+  /**
+   * WHETHER THIS HOST MAKES FORWARDING ADDRESSES, asked once on arriving at the area.
+   *
+   * `null` UNTIL IT ANSWERS, AND NEITHER BUTTON IS DRAWN MEANWHILE. `research-usability-2026-09-21.md`
+   * finding 16 counted `Make an address` and `Stop taking forwarded mail` among the eight controls a
+   * fresh record cannot honour: on a self-host both presses answered 404 `ROUTE_UNKNOWN`, the good
+   * sentence about `inbound.token` arrived only after the press, and a reload put both buttons back.
+   *
+   * IT IS NOT `DEPLOYMENT.kind`, WHICH WOULD HAVE TAKEN THE FEATURE OFF THE CLOUD. That constant
+   * follows `__BRAINDOG_VARIANT__`, substituted at build time and empty in every shipped bundle, so
+   * it reads `self-host` on the Cloud build too: it says which RECORD this build shows and knows
+   * nothing about which host answered. `mintsMail` asks the door instead.
+   *
+   * AND THE ANSWER IS KEPT FOR AS LONG AS THIS SCREEN IS, because it is a fact about the host rather
+   * than about the record: the `area !== 'ingest'` arm above empties `mailSaid` and leaves this
+   * alone, so moving between settings areas and coming back does not ask again. Leaving Settings
+   * does, because this is component state and the component goes with the route: a module-level
+   * cache for one GET would outlive a sign-out, and the answer is cheap.
+   */
+  let mintsHere = $state<boolean | null>(null);
   /**
    * WHICH PRESS THE SIGN-IN IS FOR, so proving it again sends the same one.
    *
@@ -344,16 +367,37 @@
     /* THE ADDRESS NAMES THIS ORIGIN, and `readAgents` is the only other place that reads it: a person
        who lands straight on `/settings/ingest` has never been through that function. */
     origin = location.origin;
+    /* AND THE HOST IS ASKED WHAT IT SERVES BEFORE ANYTHING IS OFFERED, once. Read through `untrack`
+       so the answer landing does not re-run this effect and ask again. */
+    if (untrack(() => mintsHere) === null) void askMailDoor();
   });
+
+  /**
+   * One GET at the mint door, which mints nothing.
+   *
+   * `serveInbound` refuses a non-POST at its second line, above the bearer, the origin, the level and
+   * the fifteen-minute proof, so this costs one request and has no effect on any host. A host without
+   * the door answers 404 `ROUTE_UNKNOWN` from `serveApi` and the two buttons are never drawn.
+   */
+  async function askMailDoor() {
+    const at = opened();
+    mintsHere = await mintsMail(location.origin);
+    closed(true, at);
+  }
 
   const mailAddress = $derived(mailSaid?.kind === 'minted' ? mailUrl(origin, mailSaid.token) : '');
 
   /**
    * The line under the two buttons, and the tone it carries.
    *
-   * EVERY ARM IS A SENTENCE. `sample` is the demo, which has no account to mint on; `unrouted` is a
-   * host whose forwarding address is a file rather than a door, which today is every self-host; the
-   * rest is the door's own `fix` rendered verbatim (`13 §6`).
+   * EVERY ARM IS A SENTENCE. `sample` is the demo, which has no account to mint on, and the rest is
+   * the door's own `fix` rendered verbatim (`13 §6`).
+   *
+   * `unrouted` IS NOT AN ARM HERE ANY MORE, AND THAT IS THE POINT OF FINDING 16. A host whose
+   * forwarding address is a file rather than a door has not refused a press; it has answered the
+   * question this screen now asks on arrival. So `askMail` turns that answer into `mintsHere` and
+   * the section states it above, where a person reads it instead of earning it, and `mailSaid` is
+   * typed without the kind so this expression cannot quietly grow the arm back.
    */
   const mailLine = $derived(
     mailSaid === null
@@ -364,9 +408,7 @@
           ? mailWords.revoked
           : mailSaid.kind === 'sample'
             ? copy.notOnDemo
-            : mailSaid.kind === 'unrouted'
-              ? mailWords.unrouted
-              : mailSaid.fix,
+            : mailSaid.fix,
   );
   const mailTone = $derived(mailSaid === null || mailSaid.kind === 'minted' || mailSaid.kind === 'revoked' ? undefined : 'bad');
 
@@ -386,6 +428,16 @@
     const said = which === 'mint' ? await mintInbound(location.origin) : await revokeInbound(location.origin);
     closed(true, at);
     mailBusy = false;
+    if (said.kind === 'unrouted') {
+      /* THE HOST HAS ANSWERED THE QUESTION THE SCREEN ASKS ON ARRIVAL, so it is kept as what the
+         host is and not as what this press did. Before this the sentence was shown once and a
+         reload put both buttons back, which is the half of finding 16 that let somebody press the
+         same unservable button all afternoon. */
+      mintsHere = false;
+      mailSaid = null;
+      mailPending = null;
+      return;
+    }
     mailSaid = said;
     /* The pending press is kept only while a sign-in would send it again. */
     if (said.kind !== 'signin') mailPending = null;
@@ -2365,46 +2417,60 @@
         AND IT IS AN OWNER'S SCREEN WHEREVER IT IS DRAWN. Whoever can change where a record takes its mail can
         redirect its statements, so the door wants an owner and a sign-in from the last fifteen minutes; the
         screen states that before either button rather than after a refusal.
+
+        AND SO IS WHETHER THIS HOST HAS THE DOOR, WHICH IS FINDING 16 OF `research-usability-2026-09-21.md`.
+        Both buttons were drawn on every host, both presses answered 404 `ROUTE_UNKNOWN` on a self-host, and
+        the sentence about `inbound.token`, a good sentence, was earned by pressing rather than read. A
+        reload put the pair back. `mintsHere` is the host's own answer to one GET, and neither control exists
+        until it lands.
       -->
       <Section title={mailWords.title}>
         <p class="hint">{mailWords.how}</p>
-        <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
-             rather than leaving a blank where a value would go and letting it read as "you have none". -->
-        <p class="hint">{mailWords.unknown}</p>
-        {#if mailSaid?.kind === 'minted'}
-          <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
-          <div class="code-form" role="status">
-            <p class="code-label">{mailWords.once}</p>
-            <p class="mono wrap">{mailAddress}</p>
-            <div class="row-actions">
-              <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
-                   the text here is a live credential. -->
-              <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+        {#if mintsHere === true}
+          <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
+               rather than leaving a blank where a value would go and letting it read as "you have none". -->
+          <p class="hint">{mailWords.unknown}</p>
+          {#if mailSaid?.kind === 'minted'}
+            <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
+            <div class="code-form" role="status">
+              <p class="code-label">{mailWords.once}</p>
+              <p class="mono wrap">{mailAddress}</p>
+              <div class="row-actions">
+                <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
+                     the text here is a live credential. -->
+                <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+              </div>
+              <p class="hint">{mailWords.forwardHow}</p>
             </div>
-            <p class="hint">{mailWords.forwardHow}</p>
-          </div>
-        {/if}
-        <div class="row-actions">
-          <Button weight="primary" disabled={mailBusy} onclick={() => void askMail('mint')}>
-            {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
-          </Button>
-          <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
-               posting to the old address is refused from that moment, with nothing to show for it. -->
-          <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
-            {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
-          </Button>
-        </div>
-        <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
-             first sentence is not reliably announced. -->
-        <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
-        {#if mailSaid?.kind === 'signin'}
-          <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
-               agents area offers, and then the same press again rather than a press the person has to find. -->
+          {/if}
           <div class="row-actions">
-            <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
+            <Button weight="primary" disabled={mailBusy} onclick={() => void askMail('mint')}>
+              {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
+            </Button>
+            <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
+                 posting to the old address is refused from that moment, with nothing to show for it. -->
+            <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
+              {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
+            </Button>
           </div>
+          <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
+               first sentence is not reliably announced. -->
+          <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
+          {#if mailSaid?.kind === 'signin'}
+            <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
+                 agents area offers, and then the same press again rather than a press the person has to find. -->
+            <div class="row-actions">
+              <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
+            </div>
+          {/if}
+          <p class="hint">{mailWords.freshWhy}</p>
+        {:else if mintsHere === false}
+          <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the address
+               and what writing and deleting that file do, so the person leaves with the thing they came for
+               instead of a control that cannot work. Nothing is said about a fresh sign-in, because there is
+               no door here for a sign-in to open. -->
+          <p class="hint">{mailWords.unrouted}</p>
         {/if}
-        <p class="hint">{mailWords.freshWhy}</p>
       </Section>
     {:else if area === 'notifications'}
       <!--
