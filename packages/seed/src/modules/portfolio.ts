@@ -254,13 +254,50 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      the engine offers is the same predicate against a moved clock, and these predicates name no
      date, so a moved clock reads the same four rows: the delta would be structurally zero and the
      tile would say steady about a business nobody measured. The year before is a field, and the
-     comparison is the diff below. */
+     comparison is the diff below.
+
+     AND OVER THE PROJECTS THAT HAVE SAID, WHICH IS WHY ALL FOUR CARRY `revenue is set`: THE OVERVIEW
+     TOLD AN IMPORTED RECORD IT EARNED NOTHING. Driven on a self-host at Sam's size,
+     21 registers and his 26 projects imported through the owner's own door plus the founder pack's
+     one example project: 27 projects, 14 of them in play, and not one annual figure on any of them,
+     because `apps/cli/src/legacy.ts` files a project's monthly revenue as a READING and has no
+     year to write. `projects-earning` answered `value: 0, rows: 14, held: 27, met: true`, so the
+     Earning tile drew "Earned in a year GBP 0.00" with "GBP 0.00 the year before", in the GOOD tone
+     and linked into the list, in the same block row as a bar correctly drawing "No project in play
+     says what it earns". His record held a monthly figure for three of those projects at the time.
+
+     THE IMPORTER IS NOT THE THING TO CHANGE, AND THE ARGUMENT IS ALREADY IN THIS TREE. `estate-year`
+     multiplies a service's `cost` by its cycle and is called "Cost per YEAR": a subscription is a
+     standing commitment, so twelve of a monthly one is a rate that will be paid. This field is
+     "Earned IN a year": a total that happened. Twelve times a monthly figure is a run rate and not a
+     total, so an importer writing it here would be putting a forecast in a field the page reads as
+     history, and one of the three monthly figures on his record is a salary, where twelve of it
+     asserts a year of employment nothing in the export states. Nor can these figures read the
+     reading: `datapoints` is declared by the `usecase-founder` use case, so a figure over it would
+     make Portfolio install a use case and would shut the Overview on a record that keeps only
+     projects. Both halves are right about their own kind of fact. What was wrong was this
+     predicate.
+
+     A ROW WITH THE FIELD UNSET IS NOT A PROJECT THAT EARNED NOTHING, and a money sum cannot say the
+     difference: a sum over no values is zero and the kernel means it to be (`metrics.ts`, "a sum of
+     nothing is"). `held` does not rescue it either, because `held` is the whole register by design,
+     so "zero matched over rows that exist is good news" reads a field nobody filled in as a year
+     measured at nil. The one number left is `rows`, and `revenue is set` is what makes it honest:
+     over the drive above the reading becomes `rows: 0` where the register holds 27, and the figure
+     is now over exactly the rows the bar beside it draws, which is what a total and its breakdown
+     have to be for the two to be one statement.
+
+     AND IT CLOSES A SECOND LIE NOBODY HAD SEEN: a project in play stating `earned_before` and no
+     `revenue` is a project that has said nothing about this year, and under `where: LIVE` the diff
+     read its absence as a fall. Measured on the sample with one such project added at GBP 21,000:
+     the comparison went from GBP 3,380.00 up to GBP 17,620.00 down, a collapse the record never
+     stated. */
 
   'projects-earning': {
     metric: 'projects-earning',
     name: 'Earned in a year',
     source: 'register.things',
-    where: LIVE,
+    where: `${LIVE}, revenue is set`,
     value: { sum: 'revenue' },
     format: 'money.GBP',
     target: { gte: 0 },
@@ -272,7 +309,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     metric: 'projects-earning-before',
     name: 'Earned the year before',
     source: 'register.things',
-    where: LIVE,
+    where: `${LIVE}, revenue is set`,
     value: { sum: 'earned_before' },
     format: 'money.GBP',
     target: { gte: 0 },
@@ -280,17 +317,29 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HOW MANY OF THEM SAID, WHICH IS THE ONLY THING THAT STOPS GBP 0.00 BEING A CLAIM. The headline
+     is a money sum and a money sum of nothing is zero, so the figure itself cannot hold the
+     difference between a portfolio that earned nothing and a portfolio nobody has told. The tile
+     says both numbers instead: the total, and how many of the projects in play it is a total of.
+     `{{projects-earning-said}} of {{projects-live}}` reads "0 of 14" on the drive above and "3 of 3"
+     on this sample, and 0 of 14 is a sentence a person can act on where a green GBP 0.00 was not. */
+  'projects-earning-said': counted('projects-earning-said', 'Saying what they earn', `${LIVE}, revenue is set`),
+
   /* ONE FIGURE AND NOT A SUBTRACTION ON THE PAGE. A page that draws two tiles and subtracts them
      has nowhere to refuse when the two are in different currencies: it would print the difference
      between pence and cents. A `diff:` is read by the kernel's pair arithmetic, which converts both
      halves into one currency at the record's rates or answers in parts and names the pair it has no
      rate for. Its target is zero because the question the tile asks is whether the year is up on
-     the one before, and that is the only bound that is not somebody's guess. */
+     the one before, and that is the only bound that is not somebody's guess.
+
+     ITS PREDICATE IS THE OTHER TWO'S, and it has to be: the comparison is the two halves over ONE
+     set of rows, so a clause on the halves and not on the diff would be a difference between two
+     different portfolios. */
   'projects-earning-change': {
     metric: 'projects-earning-change',
     name: 'Against the year before',
     source: 'register.things',
-    where: LIVE,
+    where: `${LIVE}, revenue is set`,
     value: { diff: { of: { sum: 'revenue' }, per: { sum: 'earned_before' } } },
     format: 'money.GBP',
     target: { gte: 0 },
@@ -470,12 +519,21 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* THE TWELVE-MONTH TOTAL AND WHAT IT IS UP ON, which is the pair. A year on its own is a
            number nobody can act on: GBP 22,600 is good news or bad news only beside the year before
            it. Both tiles are money and both name their currency, so neither can quietly become a
-           count. */
+           count.
+
+           AND HOW MANY PROJECTS IT IS A TOTAL OF, because the pair on its own reads GBP 0.00 against
+           GBP 0.00 on every record that has not filled the field in, which is every imported one.
+           Driven at his size the tile said "Earned in a year GBP 0.00, GBP 0.00 the year before" in
+           the good tone over 14 projects in play, none of which had stated a year; it now says "0 of
+           14 in play" on the same line, which is the only part of that tile a person could act on.
+           The count is in the note rather than a third tile: a portfolio's headline is what it earns,
+           and a tile counting the projects that have answered a question would take a quarter of
+           this block to say something about the record's paperwork. */
         kind: 'stat',
         heading: 'Earning',
         span: 4,
         cells: [
-          { metric: 'projects-earning', label: 'Earned in a year', note: '{{projects-earning-before}} the year before' },
+          { metric: 'projects-earning', label: 'Earned in a year', note: '{{projects-earning-before}} the year before, from {{projects-earning-said}} of {{projects-live}} in play' },
           { metric: 'projects-earning-change', label: 'Against that year' },
         ],
       },

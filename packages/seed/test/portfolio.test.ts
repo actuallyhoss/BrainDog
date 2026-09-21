@@ -38,7 +38,7 @@ const live = () => THINGS.filter((t) => t.lane === 'building' || t.lane === 'ear
 const walked = (field: string): number =>
   live().reduce((total, t) => total + ((t[field] as { amount: number } | undefined)?.amount ?? 0), 0);
 
-type Block = { kind: string; heading?: string; source?: string; columns?: { field?: string }[]; cells?: { metric?: string }[] };
+type Block = { kind: string; heading?: string; source?: string; columns?: { field?: string }[]; cells?: { metric?: string; note?: string }[] };
 const blocksOf = (slug: string): Block[] => (PAGES[slug]!.blocks as unknown as Block[]) ?? [];
 
 /* ── the page draws it ───────────────────────────────────────────────────── */
@@ -133,6 +133,104 @@ test('A PROJECT EARNING IN ANOTHER CURRENCY IS NEVER ADDED TO THE REST, which is
     assert.equal((mixed as { refusal: { code: string } }).refusal.code, 'MIXED_CURRENCY');
   }
   assert.notEqual(total, null, 'the one-currency reading above was already no number, so this proves nothing');
+
+  sql.close();
+});
+
+/* ── a project that has not said is not a project that earned nothing ────── */
+
+/**
+ * WHAT AN IMPORTED RECORD ACTUALLY LOOKS LIKE, AND IT IS THE CASE THIS FILE HAD NO ROW FOR.
+ *
+ * `apps/cli/src/legacy.ts` files a project's monthly revenue as a READING and writes no annual
+ * field, which is right: a month is not a year and the importer has no year to write. So on an
+ * imported record every project in play arrives with `revenue` unset, and the three figures above
+ * were declared over `lane is building or earning` with nothing said about whether a row states a
+ * figure at all. Measured on a self-host at his size, 27 projects and 14 of them in play with no
+ * annual figure on any of them: `projects-earning` answered `value: 0, rows: 14, held: 27, met:
+ * true`, so the Overview's Earning tile drew "Earned in a year GBP 0.00" in the good tone with a
+ * link into the list, beside a bar that correctly drew "No project in play says what it earns".
+ *
+ * Every test below adds one project of that shape to the sample and asks what the figures do with
+ * it. The sample's own four rows all state a figure, which is why none of this was visible here.
+ */
+const added = (k: Kernel, fields: Record<string, unknown>) => {
+  const made = k.create('things', { lane: 'earning', ...fields }, { actor: 'p_seed' });
+  assert.ok((made as { ok: boolean }).ok, sayOf(made));
+};
+
+/** One declared figure, read over the record, refusals reported as the failure they are. */
+const readingOf = (k: Kernel, id: string) => {
+  const out = k.metric(METRICS[id] as MetricDecl);
+  assert.ok(out.ok, `${id}: ${sayOf(out)}`);
+  return out.value;
+};
+
+test('A PROJECT THAT HAS NOT SAID WHAT IT EARNS IS NOT ONE OF THE PROJECTS THE TOTAL IS OVER', async () => {
+  const { k, sql } = await seeded();
+
+  const before = readingOf(k, 'projects-earning');
+  added(k, { name: 'Imported project' });
+  const after = readingOf(k, 'projects-earning');
+
+  assert.equal(after.value, before.value, 'a project with no figure on it moved the total');
+  /* `rows` IS WHAT THE READING CLAIMS IT READ, and `held` cannot stand in for it: `held` is the whole
+     register by design ("zero matched over rows that exist is good news, zero held is not news at
+     all", `kernel/src/metrics.ts`). That rule tells an empty register from an empty match for a
+     COUNT. For a sum of a field nobody filled in it says the opposite of the truth, so the one
+     number left that can carry it is how many rows the predicate admitted. */
+  assert.equal(
+    after.rows,
+    before.rows,
+    `the total says it read ${String(after.rows)} projects where ${String(before.rows)} state a figure, so a record where nobody has said anything reads as a portfolio that earned nothing`,
+  );
+
+  sql.close();
+});
+
+test('AND A PROJECT THAT STATED LAST YEAR AND NOTHING THIS YEAR DOES NOT PRINT A COLLAPSE', async () => {
+  const { k, sql } = await seeded();
+
+  const before = readingOf(k, 'projects-earning-change');
+  added(k, { name: 'Back in play', earned_before: { amount: 2_100_000, currency: 'GBP' } });
+  const after = readingOf(k, 'projects-earning-change');
+
+  assert.equal(
+    after.value,
+    before.value,
+    `the comparison fell by ${String((before.value ?? 0) - (after.value ?? 0))} for a project that has not said what it earns this year, which is a decline the record never stated`,
+  );
+
+  sql.close();
+});
+
+test('THE EARNING TILE SAYS HOW MANY PROJECTS THE TOTAL IS OVER, so a total of nothing cannot be read as a year', () => {
+  const earning = blocksOf('portfolio').find((b) => (b.cells ?? []).some((c) => c.metric === 'projects-earning'));
+  assert.ok(earning, 'no block on the Overview draws projects-earning');
+
+  const cell = (earning.cells ?? []).find((c) => c.metric === 'projects-earning');
+  const note = String(cell?.note ?? '');
+  assert.ok(
+    note.includes('{{projects-earning-said}}'),
+    `the tile's note is ${JSON.stringify(note)}, which says nothing about how many projects stated a figure, so GBP 0.00 stands on the page as a year somebody measured`,
+  );
+  assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so the note names a figure the record cannot answer');
+});
+
+test('and that count is of the projects that stated a figure, never of the projects in play', async () => {
+  const { k, sql } = await seeded();
+
+  const stated = live().filter((t) => t.revenue !== undefined).length;
+  assert.equal(readingOf(k, 'projects-earning-said').value, stated, `the sample states a figure on ${String(stated)} projects in play`);
+
+  added(k, { name: 'Imported project' });
+  assert.equal(readingOf(k, 'projects-earning-said').value, stated, 'a project with no figure on it was counted as one that stated a figure');
+  /* IN PLAY IS COUNTED FROM THE ROWS IN PLAY, NOT FROM `stated` PLUS ONE. The two are the same number
+     on this sample only because all three of its live rows state a figure, and that coincidence is
+     the very thing the tests above exist to stop being load-bearing: a fifth sample project in play
+     with no figure on it would leave `stated` at 3 while `projects-live` read 5, and this line would
+     fail over a sample row rather than over the predicate it is here to hold. */
+  assert.equal(readingOf(k, 'projects-live').value, live().length + 1, 'the added project is not in play, so nothing here is being told apart');
 
   sql.close();
 });

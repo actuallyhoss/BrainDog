@@ -94,6 +94,18 @@ const DECLARED: Record<string, Version> = {
     declares: 'b43e0664aa176905',
     history: ['A project says what it earned in a year and what it earned the year before, and the Overview draws both, so `projects-earning-before` and `projects-earning-change` are new -> b43e0664aa176905'],
   },
+  'portfolio@1.4.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-by-health metric.projects-earning metric.projects-earning-before
+      metric.projects-earning-change metric.projects-earning-said metric.projects-live metric.projects-need-you
+      metric.projects-parked metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio register.things rule.project-past-aim
+    `,
+    declares: '7e7c2e05e820f763',
+    history: [
+      'The Earning figures stop summing every project in play and sum the projects that said what they earn, which is the row set the bar beside them draws, and `projects-earning` says how many of them there were through the new `projects-earning-said`. A record where nobody had said anything read GBP 0.00 as a fact about the portfolio -> 7e7c2e05e820f763',
+    ],
+  },
   'money-core@1.1.0': { declares: '5cb37a57b9de3499' },
   'money-core@1.2.0': { declares: '4f42a8e447293eaf' },
   /**

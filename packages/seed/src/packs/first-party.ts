@@ -51,6 +51,10 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  * - portfolio 1.3.0: a project says what it earned in a year and what it earned the year before, and the Overview draws
  *   both: the twelve-month total beside the year before it, the difference, and a bar a project. One field added, so the
  *   step is a minor one and nothing is taken away.
+ * - portfolio 1.4.0: the Earning figures stop being a sum over every project in play and become a sum over the
+ *   projects that said what they earn, which is the same row set the bar beside them draws, and the tile says how
+ *   many of them there were. A record where nobody has said anything read `Earned in a year GBP 0.00` in the tone
+ *   the product uses for good news. One figure added, `projects-earning-said`, so the step is a minor one.
  * - money-core 1.1.0: the home currency is chosen from a list.
  * - money-core 1.2.0: the ledger arrives: transactions, categories, recurring items, instalments and snapshots, with
  *   the rules over them and the figures they carry. Five lists, so the step is a minor one and nothing is taken away.
@@ -80,7 +84,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  * - work 1.4.0: the Board says which cards an agent is on right now.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.3.0',
+  portfolio: '1.4.0',
   people: '1.0.0',
   'money-core': '1.4.0',
   estate: '1.1.0',
