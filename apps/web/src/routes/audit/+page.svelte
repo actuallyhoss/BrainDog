@@ -16,7 +16,7 @@
   import Button from '$lib/ui/Button.svelte';
   import { day as fmtDay, since, stamp } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
-  import { AUDIT, DECIDED, DOM_CAP, NOW, PAGES, QUESTIONS, REGISTERS, actorOf, entry } from '$lib/record/api.ts';
+  import { AUDIT, DECIDED, DOM_CAP, NOW, PAGES, QUESTIONS, REGISTERS, entry } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -33,6 +33,10 @@
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  /* WHO, IN WORDS. This screen's three person-shaped slots (the actor column, the `by` filter, and
+     the target of an access row) all printed raw `p_` ids on a record with more than one person on
+     it. `who.ts` holds the reason and the measurement. */
+  import { actorSaid, offeredActors, targetSaid } from './who.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -124,9 +128,24 @@
   const LOG = $derived(route.data.live ? (live?.events ?? []) : AUDIT);
   const clock = $derived(route.data.live ? Date.now() : NOW);
 
+  /**
+   * WHO THE READER IS, AND WHAT THE RECORD TOLD THEM THE OTHERS ARE CALLED.
+   *
+   * Both are already in the shell (`boot.names`, kept by `layoutOf`), so this screen adds no call to
+   * say a colleague's name. `readLog`'s own `names` map is a different fact and stays where it is:
+   * it holds what each TARGET is titled, a row's title or a question, keyed by `services#6`, and it
+   * never has a person in it.
+   *
+   * Measured on a record driven with eight people on it: `boot.names` came back `{}` for every one
+   * of them, because nothing in the product writes `member.name` (`packages/kernel/src/members.ts`
+   * takes a `name` on `invite` and no caller sends one). So today every line below goes down the
+   * "Someone on this record" branch, which is the honest reading of a record that does not know.
+   */
+  const me = $derived(route.data.me.person);
+  const names = $derived<ReadonlyMap<string, string>>(new Map(Object.entries(route.data.names ?? {})));
+
   $effect(() => {
     if (!route.data.live) return;
-    const me = route.data.me.person;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
@@ -155,7 +174,7 @@
     olderFix = null;
     try {
       const m = await import('$lib/record/news-live.ts');
-      const out = await m.readLog(location.origin, route.data.me.person, undefined, had.cursor);
+      const out = await m.readLog(location.origin, me, undefined, had.cursor);
       if (out.from === 'live') live = { events: [...had.events, ...out.events], names: new Map([...had.names, ...out.names]), cursor: out.cursor };
       else if (out.from === 'refused') olderFix = out.fix;
     } finally {
@@ -198,10 +217,6 @@
    * `null` when nothing is known by that id any more, and the line prints the id alone, which is
    * what it did before rather than an empty name.
    */
-  /* `actorOf` words an actor for the middle of a sentence ("by the assistant"); a pill or a row's
-     lead stands alone, so it starts with a capital: Claude, The assistant, Reply rule. */
-  const named = (actor: string): string => actor.charAt(0).toUpperCase() + actor.slice(1);
-
   const nameOf = (target: string): string | null => {
     if (route.data.live) return live?.names.get(target) ?? null;
     const row = /^([a-z0-9_-]+)#(\d+)$/.exec(target);
@@ -225,6 +240,11 @@
    * `encodeURIComponent`, and not because of spaces. `#` in a URL starts the FRAGMENT, so
    * `/services#6` navigates to `/services` and scrolls to an anchor that does not exist. The
    * resolver decodes it on the other side.
+   *
+   * A PERSON NEVER GETS HERE, and that is the caller's job rather than a branch in this function.
+   * An `access.grant` row's target IS a person, so this built `/p_01M1KJ7RG0TYYA0AX15QPGJJ4` and
+   * the resolver answered nothing: there is no person route in this build. The line draws an anchor
+   * only where `targetSaid` says the target is not somebody.
    */
   const href = (target: string): string => {
     const page = /^page\.([a-z0-9_]+)$/.exec(target);
@@ -251,7 +271,11 @@
    * AND THEY APPEAR WHEN THERE IS SOMETHING TO CHOOSE BETWEEN. One actor is not a filter; it is a
    * fact, and a control offering it is a control that cannot change anything.
    */
-  const actors = $derived([...new Set(LOG.map((e) => e.by))]);
+  /* AND A CHIP HAS TO SAY WHICH ONE IT MEANS. Once an actor is said by name rather than by id, two
+     people the record has no name for carry the same four words, and seven identical chips each
+     filtering to one of seven is a control that lies about what it does. `offeredActors` withholds
+     the offer, never the filter: a `?by=` somebody pasted still narrows the log (`19 §5`). */
+  const actors = $derived(offeredActors([...new Set(LOG.map((e) => e.by))], me, names));
   const kinds = $derived([...new Set(LOG.map((e) => e.kind))]);
 
   const who = $derived(route.url.searchParams.get('by') ?? '');
@@ -328,7 +352,7 @@
               aria-pressed={who === a ? 'true' : 'false'}
               onclick={() => setParam('by', who === a ? '' : a)}
             >
-              {#if who === a}<Icon name="check" size="s" />{/if}{named(actorOf(a))}
+              {#if who === a}<Icon name="check" size="s" />{/if}{actorSaid(a, me, names).name}
             </button>
           {/each}
           </span>
@@ -399,7 +423,7 @@
       title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(LOG.length, 'entries')}
       query={LOG.length === 0
         ? undefined
-        : [who ? actorOf(who) : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
+        : [who ? actorSaid(who, me, names).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
       body={LOG.length === 0 ? copy.auditHolds : undefined}
     >
       {#snippet actions()}
@@ -410,7 +434,7 @@
 
   <ul class="ledger">
     {#each shown as e}
-      {@const who = actorOf(e.by)}
+      {@const by = actorSaid(e.by, me, names)}
       <li>
         <div class="line line-short">
           <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
@@ -418,9 +442,15 @@
                "renewal rule" arrived as `the renewal r…`. An actor is a name. -->
           <!-- A face beside the name, so the log reads as who passed through rather than as a
                column of names. -->
+          <!-- AND THE FACE TOOK ITS INITIALS FROM AN ID. It was handed `actorOf(e.by)`, which gives
+               a `p_` id straight back, so on a record with seven colleagues every face in the
+               column was two characters of a ULID. It is handed the same words the column prints
+               now, and `by.you` rather than a string compare against `'you'`, because that answer
+               is `whoDid`'s: a live record signs the reader's own writes with their id, and it is
+               `news-live.ts` and `whoDid` between them that know the id is theirs. -->
           <span class="who">
-            <Face name={who} you={who === 'you'} size="s" />
-            <span class="who-name">{named(who)}</span>
+            <Face name={by.name} you={by.you} size="s" />
+            <span class="who-name">{by.name}</span>
           </span>
           <span class="line-main">
             <!-- The target is a LINK, and that is not decoration. This page was a list of spans:
@@ -433,11 +463,20 @@
                  ledger now has kinds that use the nullability, so the link is drawn when there is
                  something to link to and the verb stands alone when there is not — rather than an
                  empty anchor, which is a keyboard stop that goes nowhere and reads as nothing. -->
+            <!-- AND A PERSON IS NOT A ROW. An access row's target IS somebody, so this printed
+                 `Gave access p_01M1KJ7RG0TYYA0AX15QPGJJ4` and linked it to a route that resolves to
+                 nothing. Measured on a record driven with eight people on it: all 8 of its
+                 `access.grant` lines. A person is said in the words the rest of the product uses
+                 for one, carries no spoken id (a `p_` id is not a number anybody says out loud),
+                 and is not a link, because there is nowhere in this build to send a reader who
+                 clicks a colleague. -->
             <span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              {#if e.target}{@const name = nameOf(e.target)}<a class="target tap" href={href(e.target)}
+              {#if e.target}{@const person = targetSaid(e.target, me, names)}{@const name = nameOf(e.target)}{#if person}<bdi
+                  class="target-name">{person.name}</bdi
+                >{:else}<a class="target tap" href={href(e.target)}
                   >{#if name}<bdi class="target-name">{name}</bdi> <span class="target-id">{targetOf(e.target)}</span
                     >{:else}{targetOf(e.target)}{/if}</a
-                >{/if}</span>
+                >{/if}{/if}</span>
           </span>
           <span class="line-amount note">{e.note}</span>
           <!--

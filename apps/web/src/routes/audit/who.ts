@@ -1,0 +1,128 @@
+/**
+ * WHO A LOG LINE IS BY, AND WHO IT IS ABOUT, on a record with more than one person on it.
+ *
+ * `/audit` printed raw person ids in three places, and nobody caught it because every pass before
+ * `loop/research-second-person.md` drove a record with one person on it, whose lines are all signed
+ * `you`. Driven in process against a real record with eight people put on it by the record's own
+ * `invite` (a scratch script, not a fixture: `createRecord` then seven `invite` calls then one
+ * `acceptInvite`), `recentHistory` came back with 8 lines, and every one of the 8 `access.grant`
+ * rows had a person id where the screen prints a name:
+ *
+ *   - the ACTOR column ran `named(actorOf(e.by))`, and `actorOf` returns a `p_` id unchanged, so
+ *     `named` capitalised its first letter and the column read `P_01M1KJ7RG0TYYA0AX15QPGJJ4`. The
+ *     `Face` beside it took its initials from the same string.
+ *   - the WHO filter chips are built from the same call, so a record with seven colleagues on it
+ *     offered seven chips each labelled with a mangled id, and the `no-results` state quoted one.
+ *   - the TARGET of an access row IS the person, and `targetOf` let anything it did not recognise
+ *     through unchanged, so the line read `Gave access p_01M1KJ7RG0TYYA0AX15QPGJJ4` and linked it
+ *     to `/p_01M1KJ7RG0TYYA0AX15QPGJJ4`, which the spoken-id resolver resolves to nothing.
+ *
+ * THE RULE ALREADY EXISTED AND THIS SCREEN WAS THE ONE PLACE NOT KEEPING IT. `whoDid` in
+ * `lib/record/api.ts` is the product's own answer: the reader is You, a person the record has a
+ * name for is that name, and any other person is Someone on this record, never their id. Home's
+ * feed has gone through it since `boot-live.ts` was written. This module is the same call, wearing
+ * the two extra facts this screen needs: that an actor which is NOT a person still wants
+ * `actorOf`'s lowercase words capitalised ("The record itself"), and that a person is not a
+ * destination, so their line carries no link.
+ *
+ * WHAT IT CANNOT DO IS INVENT A NAME. Measured on that same record: `members()` returned
+ * `name: null` for all eight people and `boot.names` came back `{}`, because nothing in the product
+ * ever writes `member.name`. So today every line goes down the Someone branch, which is the
+ * honest reading of a record that does not know. Where a name arrives, this says it, with no
+ * further change here.
+ */
+
+import { whoDid } from '../../lib/record/api.ts';
+
+/**
+ * A PERSON REACHES THIS SCREEN AS A TARGET IN TWO SPELLINGS, and the second one is not a typo.
+ *
+ * `invite` and `removeMember` write `target = <person id>` with `target_kind = 'member'`
+ * (`packages/kernel/src/members.ts`, the `event` helper). The founding owner's own grant, the one
+ * `createRecord` writes so that every record's log says how its owner got there, writes
+ * `target = person:<person id>` with `target_kind = 'person'`
+ * (`packages/kernel/src/provision.ts:132`). Both were measured on the driven record: seven of the
+ * first shape and one of the second.
+ *
+ * `AuditEvent` carries neither `target_kind` nor `field`, so the shape of the string is all this
+ * screen has to go on. That is enough, because a `p_` id is unambiguous: `30 §3` closes the actor
+ * grammar and no row, page or governance id can be spelt like one.
+ */
+const PERSON_TARGET = /^(?:person:)?(p_[0-9A-Z]{20,})$/u;
+
+/** The person a target names, or `null` when the target is a row, a page, a key or a governance id. */
+export const personIn = (target: string): string | null => PERSON_TARGET.exec(target)?.[1] ?? null;
+
+/** What this screen says about one person: the words, and whether the record actually knew them. */
+export type Said = {
+  /** The words the column prints. Never an id. */
+  name: string;
+  /** True when this is the reader, which is what draws their own face differently. */
+  you: boolean;
+  /** True when the subject is a person at all, as opposed to a rule, an agent, the assistant or the record itself. */
+  person: boolean;
+};
+
+/**
+ * A ROW'S LEAD AND A FILTER CHIP STAND ALONE, SO THEY START WITH A CAPITAL, which is what the
+ * `named` helper in the page was for: `actorOf` words an actor for the middle of a sentence ("by the
+ * assistant"). It was applied to the result of `actorOf` and therefore to person ids as well, which
+ * is how `P_01M…` got onto the screen. Here it is applied only to the branch it was written for.
+ */
+const lead = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Who wrote the line, for the actor column and the `by` filter.
+ *
+ * `by` IS ALREADY `actorFor`'s ANSWER: `news-live.ts` turns the reader's own id into `you` before
+ * the screen sees it, and `whoDid` takes `you` as itself, so the sample and a live record go through
+ * one call.
+ */
+export function actorSaid(by: string, me: string | null, names: ReadonlyMap<string, string>): Said {
+  const said = whoDid(by, me, names);
+  return said.person ? said : { ...said, name: lead(said.name) };
+}
+
+/**
+ * Who the line is ABOUT, when that is a person rather than a row.
+ *
+ * `null` for every other target, and the caller then words it as it always did: a row keeps its
+ * spoken id, because `19 §2` is explicit that a row has a number you can say out loud, and a page
+ * keeps its title.
+ */
+export function targetSaid(target: string, me: string | null, names: ReadonlyMap<string, string>): Said | null {
+  const person = personIn(target);
+  return person === null ? null : whoDid(person, me, names);
+}
+
+/**
+ * WHICH ACTORS THE `by` FILTER CAN HONESTLY OFFER, which is not all of them.
+ *
+ * The screen's own rule for this bar is that *"a choice appears when there is one to make"*: one
+ * actor is a fact about the record and a control over it changes nothing. Saying who by name rather
+ * than by id extends that rule rather than breaking it, because two people the record has no name
+ * for are said with the same four words. A chip reading "Someone on this record" that filters to
+ * one of seven is worse than the mangled id it replaced: the id was useless and looked it, whereas
+ * this looks like it means all of them and quietly hides six.
+ *
+ * SO A CHIP IS DRAWN WHERE THE WORDS PICK OUT ONE ACTOR, and nowhere else. On a record whose people
+ * have no names that leaves the record itself, the assistant, the rules and the agents, which are
+ * exactly the actors this screen can still tell apart. The chips come back on their own the day
+ * anybody sets a name, with no further change here.
+ *
+ * THE FILTER ITSELF IS UNTOUCHED, and that is deliberate: `19 §5` says what defines which rows you
+ * are looking at must be shareable, so a `?by=p_…` somebody already pasted still narrows the log.
+ * What is withheld is the offer, not the ability.
+ */
+export function offeredActors(
+  all: readonly string[],
+  me: string | null,
+  names: ReadonlyMap<string, string>,
+): string[] {
+  const seen = new Map<string, number>();
+  for (const by of all) {
+    const said = actorSaid(by, me, names).name;
+    seen.set(said, (seen.get(said) ?? 0) + 1);
+  }
+  return all.filter((by) => seen.get(actorSaid(by, me, names).name) === 1);
+}
