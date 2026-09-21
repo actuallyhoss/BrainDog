@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, withSession, type SessionHints, type VaultGrantSeen } from '@braindog/host';
+import { handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSpark, servesSpark, withSession, type SessionHints, type SparkAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 import { INVITE_GONE, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
@@ -35,7 +35,7 @@ import { ALARM_RUNS, actionExecutor, holding, holdingPaged, invocation, keyOpene
 import { pagedRunner } from '@braindog/host/connector';
 
 import { alarmScheduler } from './alarm.ts';
-import { sparkLook, workerSparkModel } from './spark.ts';
+import { sparkLook, workerSparkDoor, workerSparkModel } from './spark.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
 import { DELETED, destroyRecord } from './destroy.ts';
 import { DELIVERS, makeDeliver } from './deliver.ts';
@@ -198,6 +198,9 @@ export class Record$ extends DurableObject<Env> {
    * is answered until this finishes". A record that answers a read while its schema is half applied
    * is a record that returns rows nobody can interpret.
    */
+  /** Spark's door, built on the first ask and kept, because the engine it holds writes its own tables. */
+  #spark: SparkAskDoor<CallContext> | undefined;
+
   #record(): Promise<RecordApi> {
     if (this.#gone) return Promise.reject(new Error(DELETED.fix));
     /* AND A REJECTED PROMISE IS NOT A CACHED ANSWER. `??=` stored whatever the opener returned,
@@ -610,6 +613,27 @@ export class Record$ extends DurableObject<Env> {
     if (copy !== null) {
       const out = await copyRefusal(copy, () => api.snapshots(ctx));
       return json(out, httpStatus(out));
+    }
+
+    /**
+     * SPARK'S ASK, AND THIS BRANCH IS THE WHOLE OF WHAT WAS MISSING. Three passes added the dependency, then
+     * the builder, then the door, and each reported that the thirteenth package was reached; an audit drove it
+     * each time and found the only callers were the tests naming them. `spark.ts` says where the mount belongs
+     * in its own words, and this is that place: beside `servesMcp`'s branch and before `serveApi`, because
+     * `servesApi` is a prefix test and `/api/spark/read` reaches this object already, where `serveApi` would
+     * answer it `ROUTE_UNKNOWN: There is no method called spark/read.`
+     *
+     * A FIELD AND NOT A LOCAL, for the reason `sparkAskDoor` caches on the door it returns: a door built per
+     * request runs `createSpark`'s two `CREATE TABLE IF NOT EXISTS` and its settings insert on every question.
+     */
+    if (servesSpark(new URL(request.url).pathname)) {
+      this.#spark ??= workerSparkDoor(
+        this.env,
+        () => api,
+        { sql: storageSql(this.ctx.storage), clock: { now: () => Date.now() } },
+        new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
+      );
+      return serveSpark(request, this.#spark, ctx);
     }
 
     /* SPARK'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day. */

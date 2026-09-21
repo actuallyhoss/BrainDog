@@ -18,8 +18,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { argv, env, exit } from 'node:process';
 
 import {
-  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveVault, servesKeys, servesVault, sessionOf, withSession,
-  type Handler, type IngestDoor, type KeysDoor, type VaultDoor,
+  handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSpark, serveVault, servesKeys, servesSpark, servesVault, sessionOf, withSession,
+  type Handler, type IngestDoor, type KeysDoor, type SparkAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
   clearCookie,
@@ -51,7 +51,7 @@ import type { Auth, Param, Refusal, Row, Scheduler, Sql } from '@braindog/ports'
 import { actionExecutor, holding, holdingPaged, keyOpener, meterPass, pass, sharedReader, type OpenKey, type RehearseOnThisMachine, type Resolve, type Send } from './actions.ts';
 import { pagedRunner } from '@braindog/host/connector';
 import { httpFor } from './http.ts';
-import { sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
+import { sparkDoor, sparkFromEnv, sparkModelFor, type SparkConfig } from './spark.ts';
 import type { KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -175,6 +175,8 @@ type Site = {
   vault: VaultDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
+  /** Spark's ask, `POST /api/spark/read`, built on the first question and kept (`46 §5.2`). */
+  spark: SparkAskDoor<CallContext>;
   /** `/in/*`: the arrival door (`49 §5.16`), one record and one process. Its mail half is the half that can be absent. */
   arrivals: IngestDoor;
   /** `/account/*`: the Directory's usage ledger, and the switcher's rows, for a signed-in person. */
@@ -793,7 +795,18 @@ export async function start(options: {
      it drains, which is why this one binding is written before the thing it names exists. */
   let api!: Awaited<ReturnType<typeof createRecordApi>>;
   /* SPARK'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
-  const sparkModel = sparkModelFor(options.spark ?? sparkFromEnv(env), () => api, options.keys);
+  /* LIFTED OUT OF THE CALL BELOW BECAUSE BOTH PORTS MUST READ ONE CONFIG: the model that drafts an
+     arrangement and the engine that answers a question are two features sharing a name (`1f85a49a`), and two
+     reads of the environment are two hosts that come to disagree about which one is configured. */
+  const sparkConfig = options.spark ?? sparkFromEnv(env);
+  const sparkModel = sparkModelFor(sparkConfig, () => api, options.keys);
+  /* SPARK'S OWN SQLITE AND NOT THE RECORD'S (`46 §2`): the engine writes its `settings` and `call` tables into
+     its own database, beside the record's rather than inside it. */
+  /* IN MEMORY AND NOT BESIDE THE RECORD FILE, until somebody decides where it belongs: the engine's tables are
+     a cache of what it has been asked and what it drafted, `46 §4.1`, and a process that forgets them asks the
+     model again rather than answering wrongly. A file for it is a decision about backups and about what a copy
+     of a record carries, which is not this mount's to take. */
+  const sparkSql = openSqlite(':memory:');
 
   /**
    * Drain everything due, then re-arm.
@@ -1151,6 +1164,7 @@ export async function start(options: {
     origins,
     vault: vaultDoor(api, options.keys),
     keys: keysDoor(api, options.keys, origins),
+    spark: sparkDoor(sparkConfig, () => api, options.keys, { sql: sparkSql, clock }, origins),
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
     arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail),
     snapshots: kept,
@@ -1349,7 +1363,13 @@ async function answer(
      stays the record's question. */
   if ('ctx' in seen) {
     const ctx = withSession(seen.ctx, sessionOf(request.headers));
-    const out = servesKeys(path) ? await serveKeys(request, site.keys, ctx) : await serveApi(request, handlers, ctx);
+    /* SPARK AHEAD OF THE KEY DOORS AND BOTH AHEAD OF `serveApi`, because `serveApi` answers anything it does
+       not know as `ROUTE_UNKNOWN`, which is what `POST /api/spark/read` got until this line existed. */
+    const out = servesSpark(path)
+      ? await serveSpark(request, site.spark, ctx)
+      : servesKeys(path)
+        ? await serveKeys(request, site.keys, ctx)
+        : await serveApi(request, handlers, ctx);
     return write(res, out, seen.cookie);
   }
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —
