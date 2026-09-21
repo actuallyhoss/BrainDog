@@ -1,12 +1,29 @@
 {
+  // THE `src/` MODULES ARE NOT LISTED, BECAUSE TYPESCRIPT ALREADY FOLLOWS THE IMPORTS.
+  // `include` names the program's ROOTS, and every file a root imports joins the program whether it
+  // is listed or not. Six modules were named here and `src/inbound.ts` was not, and `src/inbound.ts`
+  // was typechecked all the same, because `test/route.test.ts` imports it. Measured on 2026-09-21
+  // with `tsc --noEmit -p tsconfig.test.json --listFiles`: 18 of the 19 modules in `src/` were in
+  // the program, and the list named six of them. A list that describes a third of what it claims to
+  // is a list somebody has to remember, and the name it was missing is the evidence that nobody
+  // does.
+  //
+  // AND IT DOES NOT FOLLOW THE DIRECTORY EITHER, which is the other tidy answer and is the wrong one
+  // here. A `src` glob would make `src/index.ts` a root, and `index.ts` imports `cloudflare:workers`
+  // and needs `@cloudflare/workers-types`, which this config deliberately does not have: these are
+  // Node's tests, typechecked with Node's types, and that is the whole reason `tsconfig.json` and
+  // this file are two files. `index.ts` is the one module of the 19 that stays out, and it stays out
+  // by being the one module no test imports, which is the same rule that lets the other 18 in.
+  // Whether a module can be checked under Node's types and whether a test can import it are the same
+  // question, so the import graph is the only list here that cannot go stale.
+  //
+  // AND THE COMMENT IS LINE COMMENTS, NOT A BLOCK. This paragraph was first written as one, and a
+  // glob with a star and a slash in it closed the block early: `tsc --showConfig` then reported 21
+  // parse errors, `extends` was never read, `types: ["node"]` never arrived, and the Node tests
+  // failed with `Cannot find name 'node:crypto'` from a file in another package. A comment that can
+  // be ended by its own example is a comment that changes what it documents.
   "extends": "../../tsconfig.base.json",
   "include": [
-    "test/**/*.ts",
-    "src/actions.ts",
-    "src/alarm.ts",
-    "src/keys.ts",
-    "src/route.ts",
-    "src/session.ts",
-    "src/vault.ts"
+    "test/**/*.ts"
   ]
 }

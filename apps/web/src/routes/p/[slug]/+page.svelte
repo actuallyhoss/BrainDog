@@ -1169,6 +1169,50 @@
     }
   }
 
+  /**
+   * A STAT IN A NARROW SLOT STACKS ITS FIGURES, because a slot on this page is narrower than a
+   * phone long before the window is, and every rule below this one is keyed to the VIEWPORT.
+   *
+   * `/p/portfolio` puts a two-figure stat in a four-column slot. Measured in Chromium on the
+   * shipped record, that block is 267px wide in a 1180px window, 215px at 1024 and 174px at 900,
+   * which leaves each cell 117.7px, 91.7px and 71px. `£22,600.00` draws 123px at `--t-xl`, so
+   * 5px, 31px and 52px of it were cut off: a money figure drawn short a digit, on a laptop, on a
+   * screen whose whole job is to say how much.
+   *
+   * THE LAYOUT GATE CANNOT SEE THIS and never could. It reports an element only when it reaches
+   * past the window with nothing scrolling above it, and a figure overflowing a 117px cell in the
+   * middle of the page does neither: `main.body` scrolls, which is the excuse that gate grants on
+   * purpose so that a wide table is not a finding. Truncation inside a cell is a different defect
+   * from the page sliding sideways, and nothing was measuring it.
+   *
+   * STACKED RATHER THAN SHRUNK, AND NOTHING DROPPED. A figure longer than its tile already steps
+   * down inside it (`blocks.css` reads `--chars`), and that mark is put on a figure only above ten
+   * characters, which `£22,600.00` is exactly not. What this page has instead is room down the
+   * column: one figure a row draws the whole amount at the size every other figure on the page
+   * reads at, where two columns at that width cannot draw either of them whole. Dropping a figure
+   * behind a link was the third option and it is the worst of the three here, because both figures
+   * are already the answer to the heading above them.
+   *
+   * 280px IS THE ROW'S OWN ARITHMETIC RATHER THAN A DEVICE: two cells of 123px with the 32px gap
+   * between them need 278px. Measured either side of it, the slot is 281px in a 1220px window and
+   * keeps its two columns at 124.3px each, and 274px at 1200 and stacks. The phone is untouched at
+   * both ends of its range, because the slot there is the page itself: 358px at 390 and 288px at
+   * 320, both above the threshold, so the two-up strip below is still what a phone draws.
+   *
+   * AND THE THRESHOLD IS px WHERE EVERY OTHER QUERY IN THIS SYSTEM IS rem, because the width it
+   * guards is a px width: `--t-xl` is 24px whatever the root font size is, so the figure stays
+   * 123px and a rem threshold would be the only thing that moved. Written as `17.5rem` it was
+   * measured firing on a phone. With the browser's own font size set to Large, which is a 20px root
+   * and so a 350px threshold, the slot at a 360px window is 328px and a two-figure stat stacked:
+   * that undoes the two-up strip below, for figures measured at 102.7px in a 152px cell, which were
+   * never in any danger.
+   */
+  @container (inline-size < 280px) {
+    .block-slot :global(.grid:has(> .cell:nth-child(2))) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   /* A stat's cells are declared, so the block cannot infer how many to draw (05 §4) — but the HOST
      may restack what it was given, and three figures across a 358px phone breaks `GBP 4,050.00`
      into two lines. A board on a phone stacks its lanes, which is what this still does for one. */
