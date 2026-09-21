@@ -35,6 +35,8 @@
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, wouldRecord, type Answer } from '$lib/record/answer.ts';
+  import { mayAnswer, whyNotAnswering } from './answering.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
@@ -100,6 +102,23 @@
 
   /** The clock a band is read against: the reader's on a live record, the sample's own otherwise. */
   const now = $derived(from === 'live' ? Date.now() : NOW);
+
+  /**
+   * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED.
+   *
+   * Measured on 21 September, driving a real self-host as a colleague invited to READ: this screen
+   * came back at 279 words and 168 controls, 17 of them buttons that answer a question, and NOT ONE
+   * of them disabled — control for control the screen the colleague at `decide` got. The refusal
+   * arrived from the record after a press, a typed reason and a second press. `shell.me` has carried
+   * the answer since `boot`, and one grep across the app found exactly one line of markup reading
+   * `me.level` anywhere, on `/settings/identity`. This is the second.
+   *
+   * THE SAMPLE IS UNTOUCHED BY THIS, and that is the shell's doing rather than a special case here:
+   * `api.ts` gives the sample reader `owner`, so a host with no record behind it draws what it drew.
+   */
+  const me = $derived((route.data as unknown as Shell).me);
+  const answerable = $derived(mayAnswer(me.level, me.owner));
+  const whyNot = $derived(whyNotAnswering(me.level));
 
   const open = $derived(
     from === 'live' ? (live?.open ?? []) : from === 'sample' ? QUEUE : [],
@@ -294,6 +313,13 @@
    * focused, so it is found rather than chosen (`19 §4`, `20 §3`).
    */
   async function take(q: Question, key: string) {
+    /* A READER WHO MAY NOT ANSWER IS TOLD SO HERE TOO, because the option buttons are not the only
+       way in: `1` to `9` and `a` answer from the keyboard, and a key that silently did nothing would
+       be the absence this screen is being repaired for. The words are the standing hint's. */
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
     const a = answerFor(q, key, new Date(now).toISOString());
     /* A key this question does not offer answers nothing. */
     if (!a) return;
@@ -458,6 +484,12 @@
    * sentence on its card and the rest carry on.
    */
   async function answerPicked() {
+    /* THE SAME GATE ON THE BATCH, and not only on its button: one answer to eight questions is eight
+       decisions, and a control that is off is not a path that is closed. */
+    if (!answerable) {
+      toasts.push(whyNot, { intent: 'warn' });
+      return;
+    }
     if (batching || approvable.length === 0) return;
     const at = new Date(now).toISOString();
     const reason = batchReason.trim();
@@ -628,10 +660,20 @@
             {/if}
           </div>
         {:else}
-          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject. -->
+          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject.
+
+               AND OFF FOR A READER WHO MAY NOT ANSWER, each one pointing at the standing sentence
+               over the queue that says why. `aria-describedby` rather than a title, so the reason is
+               read out with the control and not only seen beside it, which is the shape
+               `/settings/people` uses for its last-owner rule. -->
           <div class="q-options" role="group" aria-labelledby="q-{q.id}-title">
             {#each optionsOf(q) as o (o.key)}
-              <Button id="opt-{q.id}-{o.key}" onclick={() => take(q, o.key)}>
+              <Button
+                id="opt-{q.id}-{o.key}"
+                disabled={!answerable}
+                aria-describedby={answerable ? undefined : 'cannot-decide'}
+                onclick={() => take(q, o.key)}
+              >
                 {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
               </Button>
             {/each}
@@ -699,6 +741,13 @@
         </div>
       {/snippet}
 
+      <!-- WHY THE ANSWERS ARE OFF, ABOVE THE QUESTIONS AND NOT AFTER A PRESS. It is the record's own
+           refusal, said before anybody has typed a word, and it ends by saying that reading is what
+           this colleague still holds. Every option button and the batch commit point at it. -->
+      {#if !answerable}
+        <p class="cannot" id="cannot-decide">{whyNot}</p>
+      {/if}
+
       {#each groups as g (g.key)}
         <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
           {#if grouping !== 'none'}<h3 class="group-head">{g.name}<span class="group-n">{g.items.length}</span></h3>{/if}
@@ -741,7 +790,12 @@
                 }
               }}
             />
-            <Button weight="primary" disabled={batching || (from === 'live' && !batchReason.trim())} onclick={answerPicked}>
+            <Button
+              weight="primary"
+              disabled={batching || !answerable || (from === 'live' && !batchReason.trim())}
+              aria-describedby={answerable ? undefined : 'cannot-decide'}
+              onclick={answerPicked}
+            >
               {copy.decideAnswerSuggested(approvable.length)}
             </Button>
           {:else if !heldBack}
@@ -805,6 +859,17 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--sp-2) var(--sp-3);
+  }
+
+  /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has
+     gone wrong, and this reader is doing exactly what they were invited to do. `--measure` because
+     it is three sentences and a line that runs the width of the page is a line nobody reads. */
+  .cannot {
+    margin: 0 0 var(--sp-4);
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
   }
 
   .group + .group {

@@ -2416,7 +2416,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * about to install should be able to ask for that. A private or local address is refused as a scheduled action's is.
      */
     async fetchUseCase(args: { url: string } | undefined, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'read a use case from the web');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = stray(said, ['url']);
@@ -2438,7 +2438,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * before anything is planned. Installing is `installPack`, one document at a time, with no door of its own.
      */
     async planUseCase(args: { doc?: unknown; text?: string; source?: PackSource; modules?: Record<string, unknown> } | undefined, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'read a plan for a use case');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = stray(said, ['doc', 'text', 'source', 'modules']);
@@ -3066,7 +3066,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * would send somebody looking for a bigger token, and there is not one.
      */
     async planPack(args: { doc: unknown; source?: PackSource }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'read a plan for a pack');
       if (stop) return { ok: false as const, refusal: stop };
 
       const pack = await normalise(args?.doc, args?.source ?? { kind: 'local' });
@@ -3452,7 +3452,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `guards` gate does now, which is the repair that survives the next method somebody adds.
      */
     async members(ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = admin(ctx, 'see who is on this record');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.members());
     },
