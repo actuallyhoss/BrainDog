@@ -47,12 +47,17 @@ export const currencyOf = (value: unknown): string | null => (isMoney(value) ? v
  * a list of two units, one of which is money; `GBP and no currency` is a list with a hole in it.
  *
  * SPELLED HERE AND NOT IMPORTED, because `metrics.ts` imports this module and a constant cannot
- * travel back up that edge without an import cycle. `metrics.ts` declares the same string for its
- * own set and `forecast.ts` reads it from there.
+ * travel back up that edge without an import cycle. `forecast.ts` reads it from `metrics.ts`.
  *
- * THE SECOND COPY IS NOT PERMANENT. The edge runs metrics to money, so the way out is for
- * `metrics.ts` to delete its own line and re-export this one, and then the equality assertion has
- * nothing left to guard. That file belonged to another change when this one was written.
+ * AND THE WEB'S SECOND COPY IS ALREADY GONE, which this paragraph went on describing as future work
+ * for two commits after it happened. `metrics.ts` deleted its own literal and re-exports this one, so
+ * the `BARE === METRICS_BARE` assertion in `money.test.ts` now holds a re-export against its source
+ * and is worth keeping only as a tripwire on that arrangement. What is left is the kernel's
+ * `BARE_UNIT`, which is module-private at `packages/kernel/src/metrics.ts` and reachable from no
+ * importer. `bare-unit.test.ts` holds that last gap by matching the kernel's declaration line in its
+ * source, which is a whole line with nothing around it to miss, and `money.test.ts` drives the
+ * clause the mark sits inside out of a running record, because a regex over the kernel saw the mark
+ * and not the clause and the two diverged on the clause with the assertions still green.
  */
 export const BARE = 'no unit';
 
@@ -127,6 +132,42 @@ export function total(values: Iterable<unknown>): Total {
  * at `:1089` and `:1094` on the day it was written: it was wrong before it was committed, and it was
  * the only mechanism the comment offered against the copies drifting.
  *
+ * SO THE BROWSER HOLDS A MIRROR AND THE DIFFERENTIAL IS WHAT KEEPS THE TWO EQUAL, said plainly here
+ * because the commit that wrote the paragraph above closed its message with *"the browser reads the
+ * kernel's sentence rather than a second copy of the rule"* and what it shipped was this copy plus
+ * that differential. The differential is real and was driven in both directions by an audit; the
+ * sentence about single-sourcing was not true on the day it was written. A file that says one thing
+ * and does another is worse than either, so this says what the file does.
+ *
+ * AND IT IS NOT WEIGHT THAT KEEPS THE MIRROR HERE, WHICH WAS MEASURED RATHER THAN ASSUMED. The
+ * standing defence for a copy in a browser module is that importing a record engine would drag it into
+ * a chunk every screen waits for. It would not, because it is already in that chunk: `./schema.ts`
+ * re-exports `REDUCES` from `@braindog/kernel`, so the barrel is in this module's graph whatever this
+ * file does. Bundled through the app's own rollup, an entry taking `amountOf`, `currencyOf`, `drawn`,
+ * `symbolText` and `mixedFix` from here comes to 44,797 bytes minified and 14,293 gzipped, of which
+ * about 45 KB is the kernel's migration SQL, carried in by that re-export. Adding a named
+ * import from `@braindog/kernel` on top of that costs 81 bytes minified and 29 gzipped. The
+ * measurement is worth having either way: the 45 KB is a real finding about this chunk and it belongs
+ * to whoever owns `schema.ts`, not to this function.
+ *
+ * WHAT KEEPS IT HERE IS ONE MISSING KEYWORD IN A FILE THIS CHANGE DID NOT OWN. `mixedUnits` is
+ * declared `function mixedUnits` with no `export`, so `packages/kernel/src/index.ts` cannot name it in
+ * the list it already re-exports from `./metrics.ts` and no importer can reach it. Making the browser
+ * read the kernel's sentence is that keyword plus one name in that list plus an import here. Nothing
+ * has to be said about the kernel's `money` argument, which already defaults to `true`, and this
+ * mirror declares no `quantity` type that would ever want `false`.
+ *
+ * AND THE MARK HAS TO GO BACK TO `null` ON THE WAY IN, which is the one part of that import a reader
+ * would get wrong, and it was run through the kernel's own code rather than reasoned about. The kernel
+ * takes the units as the RECORD holds them, so a unitless row arrives as `null` and `mixedUnits` writes
+ * `BARE_UNIT` in itself; the set this mirror hands around already carries the word. Handed
+ * `['EUR', 'no unit', 'pounds']`, the kernel's filter drops nothing, counts three named units and
+ * answers *"EUR and no unit and pounds"*, which is the exact ORDER divergence the paragraph below is
+ * about, reintroduced through the function that was supposed to end it. The call is
+ * `mixedUnits(mixed.map((u) => (u === BARE ? null : u)))`, and `money.test.ts` goes red on the naive
+ * one rather than letting it through. Until the keyword lands, the copy below is the arrangement and
+ * the test is the guard.
+ *
  * THE RULE, SPELLED OUT BECAUSE IT HAS TO BE THE SAME RULE AND NOT THE SAME OUTPUT BY LUCK: named
  * units first and the unitless mark last, and *currencies* only when every entry in the set reads as
  * an ISO 4217 code. This tested `mixed.includes(BARE)` instead, which agrees with the record on
@@ -143,6 +184,20 @@ export function total(values: Iterable<unknown>): Total {
  *
  * `money.test.ts` opens a real record, puts these rows in a money column, and holds this function's
  * output against the refusal that comes back, so a rewording there fails here rather than drifting.
+ *
+ * AND HALF THE BRANCHES CANNOT BE ASKED OF A LIVE RECORD, which was driven rather than reasoned out
+ * and changes what the differential can be. The kernel's money aggregation reaches this sentence only
+ * when at least one row carries no unit at all: `count` and `distinct` return before the group-by, the
+ * remaining four aggregations are all in `REDUCIBLE`, and `evaluateMetric` always builds an `Across`, so
+ * every set whose units are all non-null goes to `fx.ts` and comes back in parts instead. Driven over
+ * a two-row money column with no home currency and no rate table at all, `GBP` beside `EUR` answered
+ * `parts: [EUR, GBP]` with `missing: []` and no refusal, and so did `pounds` beside `euros`, `GBP`
+ * beside `gbp`, `GBP` beside `GBPX`, and `GBP` beside a row whose currency was the empty string. Add
+ * one unitless row to any of those and it refuses. So a null in the set is a precondition of the
+ * sentence, `units.every(isCurrencyUnit)` is therefore always false where the record says it, and the
+ * *currencies* half of this mirror has no counterpart in the record's money arm to be held against.
+ * It is live here regardless: `api.ts` prints it over `runway`'s `mixed`, which is two codes and no
+ * bare row. The test pins that half against the wording alone and says which cases those are.
  */
 export const mixedFix = (mixed: readonly string[]): string => {
   const named = mixed.filter((u) => u !== BARE && u !== '');

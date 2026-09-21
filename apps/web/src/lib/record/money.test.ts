@@ -75,6 +75,17 @@ const TAKINGS: Declaration = {
  * sentence about a set a fresh record could not hold.
  */
 async function refusedOver(amounts: readonly string[]): Promise<{ code: string; fix: string }> {
+  const out = await metricOver(amounts);
+  assert.equal(out.ok, false, 'the record answered a sum over a mixed money column instead of refusing');
+  return out.refusal!;
+}
+
+/**
+ * The same sum, WITHOUT the assertion that it refused, because half the branches of the sentence turn
+ * out to be ones a live record answers rather than refuses, and a test that can only ask for a refusal
+ * cannot show that.
+ */
+async function metricOver(amounts: readonly string[]): Promise<{ ok: boolean; refusal?: { code: string; fix: string } }> {
   const db = new DatabaseSync(':memory:');
   let depth = 0;
   const sql = {
@@ -117,9 +128,8 @@ async function refusedOver(amounts: readonly string[]): Promise<{ code: string; 
     window: '30d',
     format: 'decimal',
   } as never) as { ok: boolean; refusal?: { code: string; fix: string } };
-  assert.equal(out.ok, false, 'the record answered a sum over a mixed money column instead of refusing');
   db.close();
-  return out.refusal!;
+  return out;
 }
 
 test('a total of one currency is a total; a total of two is a REFUSAL', () => {
@@ -202,6 +212,73 @@ test('AND THE SENTENCE SAYS SO, in the words the RECORD uses', async () => {
      live record answers that case in parts rather than refusing, because it has a rate table to try
      first, so this one is the mirror on its own. */
   assert.equal(mixedFix(['EUR', 'GBP']), 'these rows are in EUR and GBP, and two currencies are never added');
+});
+
+/**
+ * EVERY BRANCH OF THE SENTENCE, because the differential covered two of them and an audit could line
+ * the two copies up in a table anyway.
+ *
+ * The test above drives one named unit beside a unitless row, twice, once with a code and once with a
+ * word. Both times `said` has exactly one named entry and the mark, so nothing in it can tell the rule
+ * *"the named units in order, then the mark"* apart from a two-slot template, and `${named[0]} and
+ * ${named[1] ?? BARE}` passes all of it. This drives three entries, where the mark is not the second
+ * thing in the sentence, and it drives a set the sort leaves with the mark in the MIDDLE.
+ *
+ * AND THE HALVES A LIVE RECORD CANNOT BE ASKED ARE ASKED ANYWAY, AND THE ANSWER RECORDED HERE. Driven:
+ * the kernel's money aggregation reaches this sentence only when at least one row carries no unit at
+ * all, because every set whose units are all non-null goes to `fx.ts` and comes back in parts. So the
+ * *currencies* half of `mixedFix` has no counterpart in the record's money arm, and the two assertions
+ * below that pin it are pinning the wording alone. They say so rather than looking like more of the
+ * differential than they are. That half is not dead in the browser: `api.ts` writes it over `runway`'s
+ * `mixed`, which is two codes and no unitless row.
+ */
+test('AND EVERY BRANCH OF THE SENTENCE, not the two that could be lined up in a table', async () => {
+  /* THREE ENTRIES, SO THE MARK IS NOT THE SECOND THING IN THE SENTENCE. Both copies build the list as
+     the named units followed by the mark, and with one named unit that is indistinguishable from a
+     template with two slots in it. */
+  const three = total([gbp(100), eur(250), 5]);
+  assert.deepEqual(three.mixed, ['EUR', 'GBP', BARE], 'the set is no longer two codes and a unitless row, so this pins nothing');
+  const drivenThree = await refusedOver(['{"amount":10000,"currency":"GBP"}', '{"amount":25000,"currency":"EUR"}', '{"amount":500}']);
+  assert.equal(drivenThree.code, 'MIXED_CURRENCY');
+  assert.equal(mixedFix(three.mixed), drivenThree.fix, 'the sample and the record say different things about the same three rows');
+  assert.equal(drivenThree.fix, 'these rows are in EUR and GBP and no unit, and two units are never added');
+
+  /* AND A SET THE SORT LEAVES WITH THE MARK IN THE MIDDLE, which is the shape that made the ORDER
+     divergence possible in the first place and which neither existing case has. `total()` sorts the
+     whole set, so `no unit` lands between `EUR` and `pounds`, and both copies have to lift the named
+     units out rather than print the set as they were handed it. The record orders by unit in SQL and
+     gets `NULL` first, so the two arrive at the same sentence from two different orders. */
+  const middle = total([eur(100), { amount: 250, currency: 'pounds' }, 5]);
+  assert.deepEqual(middle.mixed, ['EUR', BARE, 'pounds'], 'the mark no longer sorts into the middle, so the order this pins is a different one');
+  const drivenMiddle = await refusedOver(['{"amount":10000,"currency":"EUR"}', '{"amount":25000,"currency":"pounds"}', '{"amount":500}']);
+  assert.equal(mixedFix(middle.mixed), drivenMiddle.fix);
+  assert.equal(drivenMiddle.fix, 'these rows are in EUR and pounds and no unit, and two units are never added');
+
+  /* A ROW WHOSE CURRENCY IS THE EMPTY STRING IS A ROW WITH NO UNIT, never a hole in the list. Both
+     copies filter it out of the named units and count it toward the mark, and dropping that one clause
+     prints *"these rows are in  and GBP"* with two spaces where a unit should be. `isMoney` checks only
+     that the code is a string, so `{ amount, currency: '' }` is money to this app and a money column
+     that already held it can hand it over. */
+  const hole = total([gbp(100), { amount: 250, currency: '' }]);
+  assert.deepEqual(hole.mixed, ['', 'GBP'], 'the empty code no longer reaches the set, so this pins nothing');
+  assert.equal(mixedFix(hole.mixed), 'these rows are in GBP and no unit, and two units are never added');
+
+  /* AND THE *currencies* HALF, PINNED AGAINST THE WORDING AND NOT AGAINST THE RECORD, with the reason
+     driven here rather than asserted in a comment. Three codes and no unitless row: the record answers
+     in parts instead of refusing, so there is no sentence of its own to compare, and the same is true
+     of two codes, of two words that are not codes, and of a code beside the empty string. */
+  const codes = await metricOver(['{"amount":1,"currency":"GBP"}', '{"amount":2,"currency":"EUR"}', '{"amount":3,"currency":"USD"}']);
+  assert.equal(codes.ok, true, 'the record refuses a money column of codes now, so the currencies half can be driven rather than pinned');
+  assert.equal(
+    mixedFix(total([gbp(1), eur(2), { amount: 3, currency: 'USD' }]).mixed),
+    'these rows are in EUR and GBP and USD, and two currencies are never added',
+  );
+  /* AND ONE UNITLESS ROW ADDED TO THOSE SAME THREE CODES IS WHAT MAKES IT A REFUSAL, which is the
+     measurement the paragraph above rests on: a null in the set is the precondition of the sentence,
+     and a null in the set is also what makes the noun *units*. */
+  const andBare = await refusedOver(['{"amount":1,"currency":"GBP"}', '{"amount":2,"currency":"EUR"}', '{"amount":3,"currency":"USD"}', '{"amount":4}']);
+  assert.equal(andBare.fix, 'these rows are in EUR and GBP and USD and no unit, and two units are never added');
+  assert.equal(mixedFix(total([gbp(1), eur(2), { amount: 3, currency: 'USD' }, 4]).mixed), andBare.fix);
 });
 
 test('and the remainder bucket carries the marker, and carries it only when a bare row is really in it', () => {
