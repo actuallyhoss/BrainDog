@@ -23,6 +23,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import * as accent from './accent.ts';
 import * as pref from './pref.ts';
@@ -117,20 +119,35 @@ test('and it says so once, naming the colour, rather than failing in silence', (
 
 test('and the load after that is quiet, because there is nothing left to refuse', () => {
   /* ONCE MEANS ONCE, and the clearing is what makes it once. A message written on every load is a
-     message a person learns to scroll past, which is the same silence with more noise in it. */
+     message a person learns to scroll past, which is the same silence with more noise in it.
+
+     THE FIRST ASSERTION IS THE ONE THIS TEST WAS MISSING, AND WITHOUT IT THE TEST COULD NOT FAIL FOR
+     THE REASON IT IS ABOUT. Measured: with `restore` reverted whole to `const held =
+     pref.read().theme; if (held) apply(held);`, the other cases here go red and this one stayed
+     green, because a function that says nothing on either load satisfies a second empty array just
+     as well as one that says it exactly once. So the assertion it made was "the second load is
+     quiet", which silence passes, and the assertion it meant was "the message stopped", which needs
+     a message to have started. Both loads are counted now. */
   browser();
   pref.write({ theme: REFUSED });
 
-  warnings(() => accent.restore());
+  const first = warnings(() => accent.restore());
+  assert.equal(first.length, 1, 'nothing was said on the load that dropped the colour, so there is no "once" to stop');
   const second = warnings(() => accent.restore());
   assert.deepEqual(second, [], 'the refusal was reported again on a load with no stored accent');
 });
 
-test('and the caller is told, in the same shape `apply` answers in', () => {
-  /* THE SHELL CALLS THIS AND COULD SAY IT IN WORDS. `restore` returned `void`, so the refusal had
+test('and the caller is told, with the codes to build a sentence from and the colour to name in it', () => {
+  /* THE SHELL CALLS THIS AND SAYS IT IN WORDS. `restore` returned `void`, so the refusal had
      nowhere to go even if a caller wanted it; the settings screen already turns `codes` into a
      sentence a person can act on through `copy.accentRefused`, and that is the sentence this
-     result makes reachable from the shell. */
+     result makes reachable from the shell.
+
+     `dropped` IS THE FIELD THAT MAKES THE SENTENCE SAYABLE AND THE ONE A CALLER CANNOT RECOVER FOR
+     ITSELF. `copy.accentRefused` takes a name first, and by the time this returns, `apply(null)` has
+     taken `theme` out of the cookie: a shell reading `pref.read().theme` after the call gets
+     `undefined` and names the dropped colour the empty string. Asserted against the hex the cookie
+     actually held, so a result that carried the CURRENT Moss, or the empty string, is a failure. */
   browser();
   pref.write({ theme: REFUSED });
 
@@ -140,6 +157,8 @@ test('and the caller is told, in the same shape `apply` answers in', () => {
   if (out.ok) return;
   assert.deepEqual(out.codes, ['CONTRAST_FLOOR']);
   assert.ok(out.refusals.length > 0, 'a refusal with no sentence in it');
+  assert.equal(out.dropped, REFUSED, 'the refusal does not name the colour it dropped, so the shell cannot either');
+  assert.equal(pref.read().theme, undefined, 'the cookie still holds it, which is the only other way a caller could read it');
 });
 
 test('a stored colour that still clears the floors is put back, and kept', () => {
@@ -154,6 +173,56 @@ test('a stored colour that still clears the floors is put back, and kept', () =>
   assert.equal(pref.read().theme, ACCEPTED, 'a colour that passed every check was forgotten');
   assert.equal(sheets().length, 1);
   assert.match(sheets()[0]?.text ?? '', /@layer theme/u, 'the adopted sheet is not the record palette');
+});
+
+/**
+ * AND THE SHELL SAYS IT, WHICH IS THE HALF NO ASSERTION ABOVE CAN REACH.
+ *
+ * Every case above proves `restore` hands the refusal back. None of them proves anybody catches it,
+ * and for a while nobody did: `+layout.svelte` called `restoreAccent();` as a statement and dropped
+ * the value, so the whole account of a lost colour was a `console.warn` written in ratios, and
+ * `copy.accentRefused` had exactly one caller — the swatch row, reached only by pressing a swatch.
+ *
+ * READ AS TEXT, BECAUSE THE SHELL IS A `.svelte` FILE AND THIS RUNNER IS `node --test`. It is the
+ * same move `pref.test.ts` makes on this module and on the appearance screen, for the same reason,
+ * and it is worth making: the defect it catches is a call whose value goes nowhere, which compiles,
+ * typechecks, renders and is invisible to every other test in this package. Comments are stripped
+ * first so that a paragraph ABOUT the old shape cannot pass for the old shape.
+ */
+test('and the shell catches it, in the toast dialect the rest of the shell already speaks', () => {
+  const shell = readFileSync(fileURLToPath(new URL('../routes/+layout.svelte', import.meta.url)), 'utf8');
+  const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
+
+  /* THE CALL AND THE LINE UNDER IT, EXTRACTED, AND THE EXTRACTION IS NOT TIDINESS. A `doesNotMatch`
+     against the whole file prints the whole file: measured at roughly twenty kilobytes of escaped
+     Svelte in the failure report, which is a diff nobody reads, on a test whose entire value is
+     telling somebody in one line what they broke. */
+  const at = code.indexOf('restoreAccent()');
+  assert.notEqual(at, -1, 'the shell no longer puts the record colour back at all');
+  /* FROM THE START OF THE LINE AND NOT FROM THE CALL, which is the difference between a test and a
+     tautology: slicing at the identifier throws away the `const out =` in front of it, so the
+     repaired shell's own line begins `restoreAccent();` too and the first assertion below fails
+     against the fix it was written to protect. Seen, on the first run of this test. */
+  const said = code.slice(code.lastIndexOf('\n', at) + 1).split('\n').slice(0, 2).join(' ').trim();
+
+  assert.doesNotMatch(said, /^restoreAccent\(\);/u, 'the shell calls restoreAccent for its side effect again, so the refusal goes nowhere');
+  assert.match(
+    said,
+    /toasts\.push\(copy\.accentRefused\([^)]*\), \{ intent: 'warn' \}\)/u,
+    'a refused stored colour is not said on the toast stack, so the only account of it is a console line in ratios',
+  );
+  /* AND THE PUSH IS `untrack`ED, WHICH IS NOT A STYLE NOTE. `toasts.push` reads `items` before it
+     writes them and `#arm` reads `held` (`toast.svelte.ts:43` and `:109`), so a toast pushed from
+     inside an effect makes that effect depend on the stack it pushed to and Svelte runs it again.
+     `Empty.svelte:98` is the same shape measured: it reran to `effect_update_depth_exceeded` on four
+     of the five states that component draws. Here the second run is saved by the cleared cookie, so
+     nothing looks broken and the dependency is invisible, which is exactly why it needs an
+     assertion rather than a reader noticing. */
+  assert.match(
+    said,
+    /untrack\(\(\) => toasts\.push\(/u,
+    'the shell pushes the toast inside the effect it tracks, so the effect depends on the stack it just wrote to',
+  );
 });
 
 test('and a browser holding no colour at all adopts nothing and says nothing', () => {

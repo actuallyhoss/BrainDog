@@ -63,6 +63,7 @@
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { untrack } from 'svelte';
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
 
@@ -111,10 +112,57 @@
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
-  /* THE RECORD'S COLOUR, PUT BACK. `app.html` stamps `data-theme` before first paint so there is
-     no flash of the wrong palette; this is what puts the custom properties behind that attribute. */
+  /**
+   * THE RECORD'S COLOUR, PUT BACK — AND SAID OUT LOUD WHEN IT CANNOT BE.
+   *
+   * `app.html` stamps `data-theme` before first paint so there is no flash of the wrong palette;
+   * `restoreAccent` is what puts the custom properties behind that attribute.
+   *
+   * IT ALSO DROPS A STORED COLOUR THE CONTRAST FLOOR NOW REFUSES, and this shell used to throw that
+   * refusal away. The four colours the swatch row suggested until 21 September are all refused by
+   * check R — Moss is 2.92:1 as a fill against `s1` in dark against a 3:1 floor, and the other three
+   * are 2.55, 2.84 and 2.94 — so every browser that pressed one of them loses its colour on the next
+   * load. `accent.ts` writes a `console.warn` naming the ratio, which is the right account for
+   * whoever can move a lightness axis and no account at all for the person who chose the green.
+   *
+   * A TOAST, AND IT IS THE STACK'S OWN DIALECT RATHER THAN A NEW ONE. `Sidebar.svelte:134` says the
+   * same kind of thing in the same shape — "a change the record refused is already put back on
+   * screen; this says why", `intent: 'warn'` — and that is exactly this case: the colour is already
+   * back to House by the time the toast is pushed. The stack is one polite live region for the whole
+   * product, so this reaches a screen reader without a second one being invented, and `warn` draws
+   * the `alert` glyph so the meaning is not carried by colour alone.
+   *
+   * ONCE, AND THE CLEARING IS WHAT MAKES IT ONCE. `restoreAccent` empties the preference before it
+   * answers, so the next load holds nothing to refuse and says nothing; a sentence on every load
+   * for ever would be worse than the silence being repaired here. This shell mounts once for the
+   * life of the tab, so a load says it at most one time.
+   *
+   * AND THE SAYING IS `untrack`ED, WHICH IS THE RULE `Empty.svelte:98` ALREADY PAID FOR. `push` reads
+   * `this.items` before it writes them and `#arm` reads `this.held` (`toast.svelte.ts:43` and `:109`),
+   * so a toast pushed from inside an effect makes that effect depend on the stack it just pushed to
+   * and Svelte schedules it again. Empty's version of the same shape ran until
+   * `effect_update_depth_exceeded` on four of the five states it draws. This one would have stopped
+   * on its second run, because the cookie is empty by then and `restoreAccent` answers `{ ok: true }`,
+   * but that is the clearing rescuing a dependency nobody wanted: a browser whose cookie can be read
+   * and not written would refuse, push, and loop into the blank screen `pref.ts` says a preference
+   * must never be able to cause. Saying something is not a dependency.
+   *
+   * THE NAME IN THE SENTENCE IS A HEX AND NOT "MOSS", WHICH IS MEASURED AND NOT AN OVERSIGHT. The
+   * swatch row can say "Moss" because it is naming a swatch somebody just pressed; here the colour
+   * is a hex from a cookie written by an older build, and `theme.test.ts:684` asserts every current
+   * `ACCENTS` entry passes `recordTheme`, so a lookup against that row can never hit for a colour
+   * that got this far. Dead flexibility, left out.
+   *
+   * AND THE SENTENCE IS BORROWED FROM THE SWATCH ROW, which is the one part of this that is not
+   * finished. `copy.accentRefused` closes with "The other colours are unaffected", which is written
+   * for somebody looking at a row of swatches and says nothing about the house colour being back or
+   * where to choose another; a key of its own belongs in `copy.ts`. What it does carry is the colour
+   * and the reason, which is the half a reader cannot get from anywhere else, so it is the right
+   * thing to say until that key exists.
+   */
   $effect(() => {
-    restoreAccent();
+    const out = restoreAccent();
+    if (!out.ok) untrack(() => toasts.push(copy.accentRefused(out.dropped, out.codes), { intent: 'warn' }));
   });
 
   /**

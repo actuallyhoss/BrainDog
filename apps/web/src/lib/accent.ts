@@ -96,11 +96,23 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
  * SO IT IS CLEARED, AND THAT IS WHAT MAKES THE ACCOUNT WORTH ONE LINE. Holding a value that can
  * never be built again is not remembering a preference, it is remembering a failure; once the
  * cookie is back to House the message is said once rather than on every load, which is the
- * difference between an account and noise. The refusal also comes back to the caller in the shape
- * `apply` answers in, because the shell could say it in words through `copy.accentRefused` and had
- * no way to hear it while this returned `void`.
+ * difference between an account and noise.
+ *
+ * AND THE REFUSAL COMES BACK CARRYING THE COLOUR IT DROPPED, which is one field more than `apply`
+ * answers with, and that field is the reason this is its own shape rather than `apply`'s. This used
+ * to return `void`, so the shell heard nothing and the only account was the `console.warn` below;
+ * it then returned `apply`'s shape, which the shell could hear but could not say, because
+ * `copy.accentRefused` wants a name first and the refusal carried none. The shell's other way to
+ * get one is `pref.read().theme` BEFORE the call, and that is a trap: the line above has already
+ * emptied the cookie by the time this returns, so a reader a line late reads `undefined` and names
+ * the dropped colour the empty string.
+ *
+ * THE SAYING ITSELF IS THE SHELL'S AND NOT THIS MODULE'S. `+layout.svelte` pushes it onto the toast
+ * stack, which is the one polite live region in the product. It cannot be done from here: this file
+ * is loaded by a node test against a `document` with four members in it, and the toast store is
+ * Svelte runes.
  */
-export function restore(): { ok: true } | { ok: false; refusals: string[]; codes: string[] } {
+export function restore(): { ok: true } | { ok: false; refusals: string[]; codes: string[]; dropped: string } {
   const held = pref.read().theme;
   if (!held) return { ok: true };
 
@@ -114,9 +126,11 @@ export function restore(): { ok: true } | { ok: false; refusals: string[]; codes
   apply(null);
   /* THE AUTHOR'S SENTENCE AND NOT THE READER'S, deliberately: this goes to a console, and the one
      thing a console is read by is somebody who can act on "2.92:1 against s1 in dark". The reader's
-     version of the same refusal is `copy.accentRefused`, built from `codes` by the screen that has a
-     swatch on it, and that is what the returned result is for. */
+     version of the same refusal is `copy.accentRefused`, built from `codes` and `dropped` by
+     whichever surface is looking at it: the swatch row when a swatch was pressed, and the shell when
+     nobody pressed anything and a load lost a colour. Both are what the returned result is for, and
+     the console line stays because it is the only one of the three that carries the ratio. */
   const why = out.refusals[0] ?? `${out.codes.join(', ')}.`;
   console.warn(`${held} can no longer be this record's colour. ${why} It is back to the house colour.`);
-  return out;
+  return { ...out, dropped: held };
 }
