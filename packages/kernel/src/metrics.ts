@@ -121,7 +121,7 @@ export type MetricDecl = {
    * held is a reading that contradicts itself, and it is the one shape `scopeOf` in `pages.ts`
    * refuses to produce on purpose, so the body a pack could write by hand was worse than the copy a
    * reader builds. That route is shut. The measurement stays because it is the argument for the
-   * guard, not a description of what happens now. Closing it belongs in `declare.ts`.
+   * guard, not a description of what happens now.
    *
    * SO THE GUARANTEE IS OVER A STORED BODY AND NOT OVER THIS FIELD. `evaluateMetric` still honours a
    * `within` from whoever calls it, so the same object assembled in TypeScript rather than parsed out
@@ -826,9 +826,11 @@ const heldBy = (sql: Sql, schema: Schema, within: Predicate | undefined): number
  * Spelled once here because it was spelled four times, and the day the sample said `no currency` a
  * live record said `no unit` about the same two rows. The web held two of those copies and holds one:
  * `apps/web/src/lib/record/money.ts` declares `BARE` and its `metrics.ts` re-exports it rather than
- * declaring its own, which `bare-unit.test.ts` asserts by reading both files. So the string is
- * written twice in the tree, here and there, because this one is module-private and `index.ts`
- * re-exports no such name, which is the gap that test exists to hold. It is a UNIT and not a
+ * declaring its own, which `bare-unit.test.ts` asserts by importing the two names and then reading
+ * the web's `metrics.ts`, because an equality holds right up until somebody edits one of two
+ * declarations. So the string is written twice in the tree, here and there, because this one is
+ * module-private and `index.ts` re-exports no such name; that same test reads the line below out of
+ * this file and pins it to the web's value, which is the gap it exists to hold. It is a UNIT and not a
  * CURRENCY because the set it joins is units, one of which happens to be money: `GBP and no unit`
  * is a list of two units, `GBP and no currency` is a list with a hole in it.
  */

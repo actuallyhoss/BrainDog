@@ -446,7 +446,7 @@ test('A `within` WRITTEN INTO A BODY IS REFUSED AT INSTALL, and the field itself
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const source = (...parts: string[]): string => readFileSync(join(REPO, ...parts), 'utf8');
 
-test('EVERY COMMENT IN `metrics.ts` THAT NAMES ANOTHER FILE SAYS WHAT THAT FILE DOES', () => {
+test('THE THREE COMMENTS IN `metrics.ts` THAT NAMED WORK IN ANOTHER FILE SAY WHAT THAT FILE DOES NOW', () => {
   /* THREE OF THEM SAID THE OPPOSITE, and each one went stale the same way: the comment argued for a
      repair, somebody made the repair in the file the comment named, and the sentence describing the
      hole stayed behind as a claim about the present. Two audits found this shape here before this
