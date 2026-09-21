@@ -194,7 +194,22 @@ test('the accent is in the brand red family, and is not the alarm', () => {
     const accent = rgbToLch(parseColour(HOUSE.schemes[scheme].accent));
     const danger = rgbToLch(parseColour(HOUSE.schemes[scheme].danger));
     assert.ok(hueGap(accent.H, mark.H) <= 45, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees from the mark`);
-    assert.ok(hueGap(accent.H, danger.H) >= 15, `the ${scheme} accent is ${hueGap(accent.H, danger.H).toFixed(0)} degrees from danger`);
+    /**
+     * THE FIFTEEN DEGREES ARE GONE, AT THE OWNER'S WORD ON 2026-09-21: *bring back our red accent, no
+     * more of that purple color*. They were the reason the accent could not be red.
+     *
+     * `danger` is anchored on the mark's own hue, 27, so a floor of fifteen degrees put the accent at
+     * hue 6 and hue 6 at this chroma is `#D72065`, a crimson that reads pink beside the logo. The rule
+     * was solving the right problem in the wrong dimension, which this file's own §SIX already argues:
+     * what keeps a red accent from reading as an alarm is that primary actions are drawn in ink, that an
+     * error is a FILLED CHIP WITH A GLYPH rather than a hue, and that the accent is spent rarely. The
+     * two references he named both run a red at 0.20 to 0.21 and neither reads as an error.
+     *
+     * WHAT IS ASSERTED INSTEAD IS THE THING THAT STILL HAS TO BE TRUE: the alarm stays a step more
+     * insistent than the brand it shares a family with, which is the chroma line below, and neither is
+     * ever colour alone, which `blocks.css` holds with a glyph. The accent is now the mark's own hue.
+     */
+    assert.ok(hueGap(accent.H, mark.H) <= 2, `the ${scheme} accent is ${hueGap(accent.H, mark.H).toFixed(0)} degrees off the mark, and it is meant to BE the mark`);
     const fill = rgbToLch(parseColour(HOUSE.schemes[scheme]['danger-fill']));
     assert.ok(accent.C < fill.C, `the ${scheme} accent is as saturated as the danger chip`);
   }

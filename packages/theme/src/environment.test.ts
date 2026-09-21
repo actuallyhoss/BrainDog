@@ -43,7 +43,11 @@ test('the environment hue is the farthest legal point from the accent and the br
      is the answer it gives today. If somebody improves the scorer, this line goes red naming the
      degree it moved to - which is a review, not a silent repaint of a deployed environment. */
   assert.equal(environmentHue(HOUSE_SEED), 286);
-  assert.equal(ALPHA_SEED.accent, 'oklch(0.576 0.215 286)');
+  /* 0.575 AND NOT 0.576 SINCE 2026-09-21: alpha takes the house accent's lightness and chroma and only
+     its hue is derived, so moving the house accent onto the mark's own hue (27, the owner's red) moved
+     this by a thousandth. The hue it steers to is unmoved at 286, which is the point of the pin: the
+     derivation did not change, the colour it derives from did. */
+  assert.equal(ALPHA_SEED.accent, 'oklch(0.575 0.215 286)');
 });
 
 test('the environment seed changes the hue and nothing else', () => {

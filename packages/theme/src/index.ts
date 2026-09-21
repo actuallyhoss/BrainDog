@@ -96,7 +96,7 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_PROFILE, type Seed } from './build.
  * the second pass over the same sources.
  */
 export const HOUSE_SEED: Seed = {
-  accent: 'oklch(0.575 0.215 6)',
+  accent: 'oklch(0.575 0.215 27)',
   neutralHue: 75,
   space: 4,
   radius: { sm: 6, md: 8, lg: 12 },
