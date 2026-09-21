@@ -281,6 +281,15 @@ const LIVE = 'state is not done or dropped';
 const OPEN = 'state is not backlog or done or dropped';
 
 /**
+ * What waits on a person: handed back to be checked, or stuck.
+ *
+ * ONE PREDICATE FOR THE FIGURE AND THE QUEUE UNDER IT, because they are the same question asked twice on one screen and
+ * they were two copies of one sentence. The Overview's Due soon now says it is what is due and NOT this, so a third copy
+ * drifting would put a ticket back under two headings without either of them changing.
+ */
+const WAITING = 'state is review or blocked';
+
+/**
  * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
  * its date, what waits on a person, and what was finished, by the day it was finished.
  *
@@ -339,7 +348,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     metric: 'tasks-waiting',
     name: 'Waiting on you',
     source: 'register.tasks',
-    where: 'state is review or blocked',
+    where: WAITING,
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },
@@ -443,16 +452,19 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         /* THE QUEUE A PERSON WORKS FROM: what an agent handed back to be checked, and what cannot move, with who touched
            it last, so a person sees whose work they are checking. */
+        /* AND WHEN EACH ONE IS DUE, because Due soon below no longer draws these rows a second time and this was the only
+           other place their date appeared. Without this column a ticket blocked and due tomorrow said neither. */
         kind: 'table',
         heading: 'Waiting on you',
         span: 12,
         source: 'register.tasks',
-        where: 'state is review or blocked',
+        where: WAITING,
         columns: [
           DESCRIPTION,
           { field: 'state', label: 'Status', width: '12ch' },
           { field: 'agent', label: 'Agent', width: '10ch' },
           { field: 'note', label: 'Why', width: 'minmax(16ch,1fr)' },
+          { field: 'by', label: 'Due', width: '13ch' },
           { field: 'changed', label: 'Changed by', width: '16ch' },
         ],
         order: [{ field: 'by', dir: 'asc' }],
@@ -460,11 +472,17 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing is waiting on you.',
       },
       {
+        /* WHAT IS DUE THAT IS NOT ALREADY IN THE QUEUE ABOVE IT. `state is not review or blocked` is the whole of the
+           difference, and it is here because a person reading down this page was counting the same ticket twice: driven
+           against the sample at 390 and at 1440, this page drew 21 rows and `Chase Halden on 2026-041`, `Reconcile the
+           Fenwick invoice against services` and `Decide the licensing tier split` were all three of them under Waiting on
+           you and then again here. `loop/research-usability-2026-09-21.md` finding 15 measured the same overlap on the
+           team pack's Home and says what it costs: the first reading is that the board is double-counting. */
         kind: 'table',
         heading: 'Due soon',
         span: 7,
         source: 'register.tasks',
-        where: `${LIVE}, by before +15d`,
+        where: `${LIVE}, state is not review or blocked, by before +15d`,
         columns: [
           DESCRIPTION,
           { field: 'thing', label: 'Project', width: 'minmax(8ch,14ch)' },
@@ -472,7 +490,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        empty: 'Nothing is due in the next two weeks.',
+        /* "ELSE", BECAUSE THE BLOCK CAN NOW BE EMPTY WHILE WORK IS DUE and the old line said the opposite. Driven against
+           the sample with its eight open tickets due inside the fortnight moved to blocked, this block drew no rows and
+           read "Nothing is due in the next two weeks." directly under a queue holding eleven tickets due inside it. */
+        empty: 'Nothing else is due in the next two weeks.',
       },
       {
         /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. A task with no size adds

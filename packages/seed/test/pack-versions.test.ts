@@ -165,6 +165,25 @@ const DECLARED: Record<string, Version> = {
     declares: '0173aa61c9b3bc21',
     history: ['The Board says which cards an agent is on right now, which is `tasks-with-agents` and `tasks-done-7d-agents` -> 0173aa61c9b3bc21'],
   },
+  /**
+   * THE FIRST ENTRY NOBODY TYPED. `holds` and `declares` below are what `scripts/fingerprint.mjs` printed, pasted
+   * unedited; the reason is the one field the tool leaves blank, and writing it is where the decision about what moved
+   * actually happened.
+   */
+  'work@1.5.0': {
+    holds: `
+      metric.open-tasks metric.project-done-7d metric.project-due-soon metric.project-in-review metric.project-open
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week
+      metric.tasks-later metric.tasks-overdue metric.tasks-waiting metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+    `,
+    declares: '39887628aa89f296',
+    history: [
+      'Due soon on `page.work` stops drawing the tickets that are already in the queue above it, and that queue gained the due day it was the only other place to see: the sample drew three of its fourteen tickets twice on one screen -> 43b75b3712bfb336',
+      'Words only, and the same version because it was never released: `page.work`\'s Due soon now reads "Nothing else is due in the next two weeks." A block that holds work back can be empty while work is due, and driven against the sample with its eight open tickets inside the fortnight moved to blocked it said nothing was due over a queue of eleven that were -> 39887628aa89f296',
+    ],
+  },
   'estate@1.1.0': {
     holds: `
       metric.estate-year metric.lapsing metric.points-nowhere metric.project-cost metric.renews-30d

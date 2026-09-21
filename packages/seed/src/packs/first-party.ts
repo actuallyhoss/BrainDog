@@ -82,13 +82,18 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  *   Board pages, and the figures under them.
  * - work 1.2.0: Open, on Work and on a project, leaves out work kept for later, and Kept for later is its own figure.
  * - work 1.4.0: the Board says which cards an agent is on right now.
+ * - work 1.5.0: Due soon on the Overview stops drawing what is already in the queue above it, and the queue says when
+ *   each of its tickets is due. Driven against the sample at 390 and at 1440, the Overview drew three of its fourteen
+ *   tickets twice on one screen. Nothing is taken away and no list or field moves, so the step is a minor one: what
+ *   changed is `page.work`'s Due soon predicate, its empty line, which would otherwise say nothing is due while blocked
+ *   work is, and the Waiting on you columns.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.4.0',
   people: '1.0.0',
   'money-core': '1.4.0',
   estate: '1.1.0',
-  work: '1.4.0',
+  work: '1.5.0',
 };
 
 type Body = Record<string, unknown>;
