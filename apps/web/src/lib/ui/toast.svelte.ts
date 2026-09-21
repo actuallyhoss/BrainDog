@@ -14,7 +14,32 @@
  *
  * Announced through ONE polite live region, never one per toast: `role="alert"` for "row archived"
  * interrupts whatever a screen-reader user was reading, to tell them about a thing they did.
+ *
+ * SAYING SOMETHING IS NOT A DEPENDENCY, WHICH IS WHY EVERY METHOD HERE THAT READS THE STACK IS
+ * `untrack`ED INSIDE.
+ * `push` reads `items` to apply the cap before it writes them and `#arm` reads `held`, so an effect
+ * that pushed a toast took a dependency on the stack it had just written to and Svelte scheduled that
+ * effect again for its own toast. Measured against Svelte 5.57 in `toast.test.ts`: an effect whose
+ * body was one `toasts.push` ran 13 times with that file's bound holding it there, and without the
+ * bound it ran until `effect_update_depth_exceeded`. `Empty.svelte:98` is the same shape one file
+ * over, and it reached that error on four of the five states that component draws.
+ *
+ * IT MOVED IN HERE BECAUSE THE CALLERS WERE CARRYING IT AND ONE OF ELEVEN ACTUALLY DID.
+ * `+layout.svelte:165` writes `untrack(() => toasts.push(...))` and `accent.test.ts:214` asserts that
+ * it does. The other ten sites that push, in `clipboard.ts`, `Palette.svelte`, `ClearExamples.svelte`,
+ * `Sidebar.svelte` and `SparkDaily.svelte`, wrap nothing, and today none of them is inside a tracked
+ * effect. The shell is not the last caller this stack will have: a rule a caller has to remember at
+ * eleven sites is a rule the twelfth site breaks, and the twelfth site is the one inside an effect. A
+ * wrapper still at a call site is now belt over braces and costs nothing.
+ *
+ * WHAT IS UNTRACKED IS THE READING AND NOT THE WRITING, and that distinction is the whole repair.
+ * `untrack` suppresses the dependency a read would register; the write still notifies everything that
+ * reads `items` elsewhere, which is how `Toasts.svelte` re-renders at all. `toast.test.ts` measures
+ * both halves, because a repair that quietly stopped the notification would ship a stack that never
+ * appears on screen and would satisfy every other test in that file.
  */
+
+import { untrack } from 'svelte';
 
 export type Toast = {
   id: number;
@@ -39,26 +64,30 @@ class Toasts {
   #timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   push(text: string, opts: { undo?: () => void; intent?: Toast['intent'] } = {}): number {
-    const id = this.#next++;
-    const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent }];
+    return untrack(() => {
+      const id = this.#next++;
+      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent }];
 
-    /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
-       countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds
-       later and writes to `items` anyway, which is every toast then on screen re-rendering on behalf
-       of one that has not existed since. */
-    const over = next.length - CAP;
-    if (over > 0) for (const gone of next.slice(0, over)) this.dismiss(gone.id);
+      /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
+         countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds
+         later and writes to `items` anyway, which is every toast then on screen re-rendering on behalf
+         of one that has not existed since. */
+      const over = next.length - CAP;
+      if (over > 0) for (const gone of next.slice(0, over)) this.dismiss(gone.id);
 
-    this.items = next.slice(-CAP);
-    this.#arm(id);
-    return id;
+      this.items = next.slice(-CAP);
+      this.#arm(id);
+      return id;
+    });
   }
 
   dismiss(id: number) {
-    this.items = this.items.filter((t) => t.id !== id);
-    const t = this.#timers.get(id);
-    if (t) clearTimeout(t);
-    this.#timers.delete(id);
+    untrack(() => {
+      this.items = this.items.filter((t) => t.id !== id);
+      const t = this.#timers.get(id);
+      if (t) clearTimeout(t);
+      this.#timers.delete(id);
+    });
   }
 
   /**
@@ -69,10 +98,12 @@ class Toasts {
    * the archive you are actually thinking of, not do nothing and leave you pressing it again.
    */
   undoLast(): boolean {
-    const held = [...this.items].reverse().find((t) => t.undo);
-    if (!held) return false;
-    this.run(held.id);
-    return true;
+    return untrack(() => {
+      const held = [...this.items].reverse().find((t) => t.undo);
+      if (!held) return false;
+      this.run(held.id);
+      return true;
+    });
   }
 
   /**
@@ -86,15 +117,25 @@ class Toasts {
    * look exactly like one that did: the toast goes, the row does not come back, and nothing is
    * reported anywhere. Propagating leaves it to the browser's own error reporting, which is a worse
    * account than a designed one and a far better account than silence.
+   *
+   * AND THE CALLBACK RUNS INSIDE THE `untrack` TOO, DELIBERATELY. An undo is a command in exactly the
+   * same sense as the push that offered it, so whatever it reads on its way to putting the row back is
+   * not something the caller asked to depend on. The throw is unaffected: `untrack` returns the value
+   * or lets the error out, and the `finally` below still spends the offer either way.
    */
   run(id: number) {
-    try {
-      this.items.find((t) => t.id === id)?.undo?.();
-    } finally {
-      this.dismiss(id);
-    }
+    untrack(() => {
+      try {
+        this.items.find((t) => t.id === id)?.undo?.();
+      } finally {
+        this.dismiss(id);
+      }
+    });
   }
 
+  /** The only method here that is not wrapped: it reads no reactive state at all, and a write on its
+      own does not schedule the effect that made it. Measured in `toast.test.ts`: an effect whose body
+      is one `hold()` runs once, wrapper or no wrapper. What `held` wakes is `Toasts.svelte`. */
   hold() {
     this.held = true;
     for (const t of this.#timers.values()) clearTimeout(t);
@@ -102,8 +143,10 @@ class Toasts {
   }
 
   release() {
-    this.held = false;
-    for (const t of this.items) this.#arm(t.id);
+    untrack(() => {
+      this.held = false;
+      for (const t of this.items) this.#arm(t.id);
+    });
   }
 
   #arm(id: number) {
