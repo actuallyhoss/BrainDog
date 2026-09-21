@@ -12,6 +12,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { fixOf } from '@braindog/ports';
 
@@ -393,6 +396,86 @@ test('AND A PREDICATE WRITTEN AS JSON NARROWS UNDER AN `all` AND NOWHERE ELSE', 
   assert.equal(inverted.held, 5, 'a parameter under a `none` is not a scope either');
   for (const r of [conjoined, widened, inverted]) assert.ok(r.held >= r.rows, 'a reading that holds fewer rows than it matched contradicts itself');
   sql.close();
+});
+
+test('A `within` WRITTEN INTO A BODY IS REFUSED AT INSTALL, and the field itself is still unguarded', async () => {
+  /* `MetricDecl.within` says both halves of this, and it used to say the first half was still to do.
+     The guard is `metricBody` in `declare.ts` and it refuses the key by name, so the route the old
+     comment measured is shut: the body it described as accepted does not install.
+
+     THE SECOND HALF IS THE PART THAT DID NOT CHANGE, and it is why the comment cannot simply say the
+     hole is closed. `evaluateMetric` honours a `within` from whoever hands it one, so the same object
+     built here rather than parsed out of a declaration row still answers `rows: 4, held: 1` over this
+     seed. Four matched out of one held is a reading that contradicts itself, and `held === 0` is how
+     the tiles spell a list nobody has written to, which is the whole reason the install-time refusal
+     is worth having. The invariant is at the boundary, not in the type. */
+  const { k, sql } = await record();
+  const body = {
+    metric: 'scoped',
+    name: 'Scoped by hand',
+    source: 'register.obligations',
+    where: 'state is open',
+    within: 'party is HMRC',
+    value: { count: 'id' },
+    target: { lte: 9 },
+    window: '30d',
+    compare: 'none',
+    format: 'int',
+  };
+
+  const said = refusal(await k.install([{ id: 'metric.scoped', kind: 'metric', body } as never]));
+  assert.equal(said.code, 'DECLARATION_INVALID', 'a body carrying the reader’s own key installed again');
+  assert.equal(said.at, 'within');
+
+  const read = value<Reading>(k.metric(body as unknown as MetricDecl));
+  assert.equal(read.rows, 4, 'four of the five obligations are open');
+  assert.equal(read.held, 1, 'the hand-written scope admits HMRC alone, so the evaluator honoured it');
+  assert.ok(read.held < read.rows, 'the evaluator now guards the field, so the comment beside it is stale');
+
+  /* AND THE REFUSAL IS BY NAME RATHER THAN AN UNKNOWN-KEY CHECK, which is the other half the comment
+     has to keep saying: a metric body has no such check, so the next key a pack invents is admitted
+     exactly as `within` was. Asserted rather than assumed, because "closed by name" and "closed" are
+     different sentences and only one of them is true. */
+  const { within: _unscoped, ...plain } = body;
+  const invented = await k.install([{ id: 'metric.wibbly', kind: 'metric', body: { ...plain, metric: 'wibbly', wibble: 1 } } as never]);
+  assert.ok(invented.ok, 'a metric body now refuses a key it does not read, so the comment overstates the hole');
+  sql.close();
+});
+
+/** The repository root, for the three comments below that make a claim about another file. */
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const source = (...parts: string[]): string => readFileSync(join(REPO, ...parts), 'utf8');
+
+test('EVERY COMMENT IN `metrics.ts` THAT NAMES ANOTHER FILE SAYS WHAT THAT FILE DOES', () => {
+  /* THREE OF THEM SAID THE OPPOSITE, and each one went stale the same way: the comment argued for a
+     repair, somebody made the repair in the file the comment named, and the sentence describing the
+     hole stayed behind as a claim about the present. Two audits found this shape here before this
+     one, which makes it a habit rather than an accident, so the pairing is held by a test instead of
+     by whoever reads the file next.
+
+     IT IS THE PREMISE THAT IS ASSERTED FIRST, and that is what keeps this from being a spell check. A
+     deferral sentence is only false while the other file holds the check; if the check is ever taken
+     out, the first assertion of each pair fails and whoever took it out is sent to the comment that
+     goes with it. The two move together or the test says so. */
+  const mine = source('packages', 'kernel', 'src', 'metrics.ts');
+
+  /* `MetricDecl.within`: `declare.ts` refuses the key, so nothing here may say the closing is still owed. */
+  assert.match(source('packages', 'kernel', 'src', 'declare.ts'), /if \(body\.within !== undefined\)/u, 'declare.ts no longer refuses a hand-written within');
+  assert.equal(mine.includes('Closing it belongs in `declare.ts`'), false, 'the field still defers a check declare.ts has made');
+  assert.equal(mine.includes('a convention rather than an invariant'), false, 'the field still calls the refusal a convention');
+
+  /* `Reading.held`: the browser narrows its own scope now, so nothing here may say the two disagree. */
+  const web = source('apps', 'web', 'src', 'lib', 'record', 'metrics.ts');
+  assert.match(web, /const heldRows = scope === null \? all : all\.filter/u, 'the browser counts held over the whole register again');
+  assert.match(web, /within: scope\.join/u, 'withParam no longer writes the scope it cut');
+  assert.equal(mine.includes('without setting any scope'), false, 'held still says the browser sets no scope');
+  assert.equal(mine.includes('nothing measures the half they differ on'), false, 'held still says the parameterised case is unmeasured');
+  assert.match(source('apps', 'web', 'src', 'lib', 'record', 'engines.test.ts'), /withParam\(/u, 'engines.test.ts no longer fills a parameter by the browser’s own rule');
+
+  /* `BARE_UNIT`: the web holds one literal and a re-export, not two literals, and its own test says so. */
+  assert.equal(web.includes("BARE = 'no unit'"), false, 'the browser declares the mark again, so three modules hold it');
+  assert.match(web, /^export \{ BARE \};$/mu, 'the browser no longer passes on money.ts’s one literal');
+  assert.equal(mine.includes('three modules, one string'), false, 'the mark still claims three modules hold it');
 });
 
 test('a ratio with a zero denominator is not a number', async () => {

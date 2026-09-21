@@ -107,15 +107,32 @@ export type MetricDecl = {
    * the reader that fills the parameter writes this key on the copy it hands the evaluator (`fill`,
    * in `pages.ts`). Nothing in the shipped seed carries it and nothing needs to.
    *
-   * BUT A BODY THAT CARRIES IT IS INSTALLED AND IS HONOURED, WHICH IS NOT A GUARANTEE THIS FIELD HAS
-   * EARNED. Measured: a metric installed as `{where: 'state is open', within: 'party is HMRC'}` was
-   * accepted by `install` with no refusal, because a metric body has no unknown-key check at all
-   * (`wibble: 1` installs too), and `PageDeps.metric` in `index.ts` hands the whole parsed body to
-   * `evaluateMetric`. The tile read `rows: 4, held: 1` on a five-row register. A `held` under `rows`
-   * is a reading that contradicts itself, which is the one shape `scopeOf` in `pages.ts` refuses to
-   * produce on purpose, so the shape a pack can write by hand is worse than the one a reader builds.
-   * Closing it belongs in `declare.ts`, which is the only place that can refuse a body, and until it
-   * does the sentence above is a convention rather than an invariant.
+   * AND A BODY THAT CARRIES IT IS REFUSED AT INSTALL, which is where the sentence that used to stand
+   * here said the closing belonged. `metricBody` in `declare.ts` refuses the key by name, and the
+   * case that sentence described as accepted was driven through `install` again to write this one:
+   *
+   *     install {where: 'state is open', within: 'party is HMRC'}
+   *       DECLARATION_INVALID at within
+   *       "within is the scope a parameter cut rather than a key a document carries: the reader
+   *        derives it from where when it fills {{it}}."
+   *
+   * WHY THE GUARD IS THERE, KEPT AS HISTORY: installed, that same body read `rows: 4, held: 1` over
+   * the five-row register of `metrics.test.ts`, with no refusal anywhere. Four matched out of one
+   * held is a reading that contradicts itself, and it is the one shape `scopeOf` in `pages.ts`
+   * refuses to produce on purpose, so the body a pack could write by hand was worse than the copy a
+   * reader builds. That route is shut. The measurement stays because it is the argument for the
+   * guard, not a description of what happens now. Closing it belongs in `declare.ts`.
+   *
+   * SO THE GUARANTEE IS OVER A STORED BODY AND NOT OVER THIS FIELD. `evaluateMetric` still honours a
+   * `within` from whoever calls it, so the same object assembled in TypeScript rather than parsed out
+   * of a declaration row still reads `rows: 4, held: 1` on that seed, measured today. The invariant
+   * lives at the install boundary: `fill` is the only writer meant to set the key, and nothing in
+   * this type or in the evaluator says so.
+   *
+   * AND IT IS A REFUSAL BY NAME RATHER THAN AN UNKNOWN-KEY CHECK, because a metric body still has
+   * none of those: `wibble: 1` beside the same keys installs cleanly, measured on the same record. So
+   * this one word is closed and the next key a pack invents is not, which is why the `within` beside
+   * `where` in `evaluateMetric` is resolved and compiled rather than trusted.
    *
    * `project-owed:Kiln` IS NOT A FILTER OVER THE OBLIGATIONS REGISTER, IT IS A QUESTION ABOUT KILN.
    * `held` exists to tell an empty register from an empty match, and on a project page the register
@@ -208,13 +225,16 @@ export type Reading = {
    * the ambiguous pair while the browser did not. `50 §1` says there should not be two engines;
    * while there are, a field on one of them is half a field.
    *
-   * AND THE TWO NOW DISAGREE ON EXACTLY THE PARAMETERISED CASE, which the paragraph above only fixed
-   * on this side. The browser's `held` is `all.length`, the register's rows before its filter runs,
-   * and `withParam` fills `{{it}}` without setting any scope, so `project-owed:Kiln` in the demo
-   * still answers the whole register. `engines.test.ts` holds the two to one `held`, and every case
-   * in that loop is unparameterised, so nothing measures the half they differ on. Closing it means
-   * narrowing `all` in `apps/web/src/lib/record/metrics.ts` the way `scopeOf` narrows here, which is
-   * a second copy of this rule in the copy `50 §1` wants deleted.
+   * AND THE PARAMETERISED CASE, WHICH THE TWO DID DISAGREE ON, IS CLOSED ON BOTH SIDES NOW. The
+   * browser's `held` was `all.length` with nothing able to narrow it, so `project-owed:Kiln` answered
+   * `held: 40` there against this side's `held: 10` on the demo's rows; its `withParam` now writes
+   * `within` the way `fill` does and its `heldRows` is `all` filtered by that scope. What holds them
+   * together is a test rather than a shared function: `engines.test.ts` drove only unparameterised
+   * figures through its `held` loop, and now also fills one parameter by each engine's own rule and
+   * asserts the two counts and the narrowing. The rule is still written twice, in `scopeOf` on this
+   * side and in `withParam` on that one, which is the duplication `50 §1` wants deleted rather than
+   * guarded: the two agree because a test says so, not because either derives its scope from a
+   * function they share.
    */
   held: number;
   /** `(value − prior) / prior`, or `null` with `why` naming the clause that stopped it. */
@@ -803,9 +823,12 @@ const heldBy = (sql: Sql, schema: Schema, within: Predicate | undefined): number
 /**
  * The mark a mixed-unit refusal gives a row that carries no unit at all.
  *
- * Spelled once here because it was spelled four times, and `apps/web/src/lib/record/money.ts` and
- * `metrics.ts` each hold a copy for the sample: three modules, one string, and the day the sample
- * said `no currency` a live record said `no unit` about the same two rows. It is a UNIT and not a
+ * Spelled once here because it was spelled four times, and the day the sample said `no currency` a
+ * live record said `no unit` about the same two rows. The web held two of those copies and holds one:
+ * `apps/web/src/lib/record/money.ts` declares `BARE` and its `metrics.ts` re-exports it rather than
+ * declaring its own, which `bare-unit.test.ts` asserts by reading both files. So the string is
+ * written twice in the tree, here and there, because this one is module-private and `index.ts`
+ * re-exports no such name, which is the gap that test exists to hold. It is a UNIT and not a
  * CURRENCY because the set it joins is units, one of which happens to be money: `GBP and no unit`
  * is a list of two units, `GBP and no currency` is a list with a hole in it.
  */

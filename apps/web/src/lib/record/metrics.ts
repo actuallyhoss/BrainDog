@@ -710,10 +710,17 @@ const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct'];
 /**
  * Every key a metric document may carry here, so one it may not is named rather than ignored.
  *
- * `within` IS IN HERE THOUGH NO DOCUMENT WRITES IT, because `withParam` puts it on the copy it hands
- * `read` and this check runs on that copy: left out, every parameterised figure came back refused
- * with *"within: is published in 08 and not read by this build"*, which is every tile on every
+ * `within` IS IN HERE FOR THE COPY AND NOT FOR THE DOCUMENT, because `withParam` puts it on the copy
+ * it hands `read` and this check runs on that copy: left out, every parameterised figure came back
+ * refused with *"within: is published in 08 and not read by this build"*, which is every tile on every
  * project page.
+ *
+ * THE REASON THAT USED TO STAND HERE SAID NO DOCUMENT WRITES IT, AND A DOCUMENT COULD. Measured before
+ * the kernel closed it, `{where: 'state is open', within: 'party is HMRC'}` installed through
+ * `validate` with no refusal at all, and the demo's `project-owed` body with `within: 'thing is Kiln,
+ * thing is Tallow'` read here as `rows: 3, held: 0, value: 498000`. `declare.ts`'s `metricBody` now
+ * refuses a body carrying the key, so what this line admits is the reader's own copy, and the check
+ * below holds it to the shape a reader builds rather than trusting the name.
  */
 const READS_KEY = new Set(['metric', 'name', 'source', 'where', 'value', 'format', 'target', 'window', 'compare', 'lookups', 'snapshot', 'group_by', 'bucket', 'within']);
 
@@ -733,6 +740,35 @@ export function unreadable(decl: MetricDecl): string[] {
   for (const key of Object.keys(decl))
     if (!READS_KEY.has(key))
       out.push(`${key}: is published in 08 and not read by this build. The figure would be the ungrouped one`);
+
+  /**
+   * AND A `within` IS CLAUSES OF THIS FIGURE'S OWN `where`, WHICH IS WHAT KEEPS `held` AT OR ABOVE `rows`.
+   *
+   * `withParam` keeps the clauses of `where` that carried the parameter and substitutes the same name
+   * into both, so every clause of a `within` it built is a clause of the `where` beside it, character
+   * for character once the space after the comma is trimmed (measured: `within: ' thing is Kiln'`, and
+   * the kernel's `fill` writes the same leading space). Holding the key to that is not tidiness. `rows`
+   * counts what `where` matched and `held` counts what `within` matched, both conjunctions over one
+   * register, so clauses that are a subset cannot be matched by FEWER rows, and a subset is therefore
+   * the whole of the `held >= rows` guarantee the tiles are read against.
+   *
+   * MEASURED ON ONE THAT IS NOT A SUBSET: `where: 'state is open, direction is owed to me, thing is
+   * Kiln'` beside `within: 'thing is Kiln, thing is Tallow'` answered `rows: 3, held: 0, value: 498000`
+   * with no refusal, and the tile drew GBP 4,980.00 with no `tone` and no `href` over those three rows,
+   * because `held === 0` is how `news-live.ts` and `page-live.ts` both spell a list nobody has written
+   * to. The kernel refuses that body at install; this is the same fact on the side that builds the copy,
+   * so a reader that ever derives one wrongly is a sentence here rather than a money figure with its
+   * verdict and its door withheld.
+   */
+  if (decl.within !== undefined) {
+    const clauses = new Set((decl.where ?? '').split(',').map((clause) => clause.trim()));
+    const loose = String(decl.within)
+      .split(',')
+      .map((clause) => clause.trim())
+      .filter((clause) => !clauses.has(clause));
+    if (loose.length)
+      out.push(`within: ${loose.join(', ')} is not a clause of this figure's where, so held would count a different list from rows`);
+  }
 
   const value = decl.value as Record<string, unknown> | undefined;
   if (!value || typeof value !== 'object') out.push('value: is missing');

@@ -789,6 +789,42 @@ test('and a comparison is one of the three the evaluator has an arm for', () => 
   assert.deepEqual(said?.allowed, ['previous', 'year_ago', 'none']);
 });
 
+test('AND A `within` WRITTEN BY HAND IS REFUSED, because a held under rows is a reading that contradicts itself', () => {
+  /**
+   * `metrics.ts`'s `MetricDecl.within` named this file and said why: *"Closing it belongs in
+   * `declare.ts`, which is the only place that can refuse a body, and until it does the sentence above
+   * is a convention rather than an invariant."* Driven against `validate` before the check existed:
+   *
+   *     {where: 'state is open', within: 'party is HMRC'}                      -> null, installed
+   *     project-owed's body by hand, within: 'thing is Kiln, thing is Tallow'  -> null, installed
+   *
+   * The second read `rows: 3, held: 0, value: 498000` through the browser's `read` with no refusal,
+   * and the tile it produced drew `GBP 4,980.00` with no `tone` and no `href` over three real rows,
+   * because `news-live.ts` and `page-live.ts` both take `(held ?? rows) === 0` for a list nobody has
+   * written to. A body with no unknown-key check at all is how it got in: `wibble: 1` installs too.
+   *
+   * WHAT THE VALUE SAYS IS NOT CHECKED, ON PURPOSE. The key being present is the defect, and a
+   * well-formed one is the dangerous one, because that is the one that compiles and narrows.
+   */
+  for (const within of ['party is HMRC', 'thing is Kiln, thing is Tallow', { all: [{ field: 'party', is: 'HMRC' }] }, '', null]) {
+    const said = validateDeclaration(metric({ where: 'state is open', within }));
+    assert.equal(said?.code, 'DECLARATION_INVALID', `${JSON.stringify(within)} reached the evaluator as this figure's scope`);
+    assert.equal(said?.at, 'within');
+    assert.match(said?.fix ?? '', /the scope a parameter cut/);
+  }
+
+  /* AND THE TEMPLATE IT COULD HAVE BEEN ADMITTED ON IS REFUSED WITH THE REST, which is the decision
+     argued beside the check: `fill` overwrites a conjunctive template's own key on the copy it reads
+     (measured: `within: 'party is HMRC'` came back as `within: ' thing is Kiln'`) and leaves it
+     standing when the parameter is inside an `any`, so there is no shape in which a stored one is the
+     one counted. */
+  assert.equal(refusedWith(metric({ where: 'state is open, thing is {{it}}', within: 'party is HMRC' })), 'DECLARATION_INVALID');
+
+  /* AND A TEMPLATE WITHOUT ONE STILL INSTALLS, so this refuses the key and not the parameter. */
+  assert.equal(refusedWith(metric({ where: 'state is open, thing is {{it}}' })), null);
+  assert.equal(refusedWith(metric({ where: 'state is open' })), null);
+});
+
 test('AND EVERY METRIC THE RECORD SHIPS SATISFIES ALL OF IT', async () => {
   /* BY PATH, because the kernel does not depend on the seed and must not — `31 §2`'s order puts
      the seed above it. This is a test reading a population, which is the same shape as the currency

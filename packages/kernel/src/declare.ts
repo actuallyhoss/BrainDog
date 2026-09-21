@@ -326,6 +326,7 @@ function metricBody(decl: Declaration): Refusal | null {
     group_by?: unknown;
     bucket?: unknown;
     lookups?: unknown;
+    within?: unknown;
   };
   const id = decl.id;
 
@@ -340,6 +341,39 @@ function metricBody(decl: Declaration): Refusal | null {
 
   if (body.value === null || typeof body.value !== 'object')
     return bad('DECLARATION_INVALID', `${id} has no value, so there is nothing to compute.`, 'value');
+
+  /**
+   * A `within` IS THE READER'S KEY, AND A DOCUMENT THAT WRITES ONE BY HAND IS REFUSED HERE.
+   *
+   * `MetricDecl.within` in `metrics.ts` names this function as the place this belongs and calls its own
+   * sentence *"a convention rather than an invariant"* until it does. Driven against this file before
+   * the check existed: `{where: 'state is open', within: 'party is HMRC'}` installed with `validate`
+   * answering `null`, because a metric body has no unknown-key check at all. Then the demo's own
+   * `project-owed` body with its parameter written in by hand, `where: 'state is open, direction is
+   * owed to me, thing is Kiln'` beside `within: 'thing is Kiln, thing is Tallow'`, read `rows: 3,
+   * held: 0, value: 498000` with no refusal on either engine, and the browser's `tileOf` answered
+   * `{"value":"GBP 4,980.00","note":"no more than GBP 10,000.00"}` with no `tone` and no `href`:
+   * `news-live.ts` and `page-live.ts` both take `(held ?? rows) === 0` for a list nobody has written
+   * to, so that is GBP 4,980.00 over three real rows with the verdict and the drill-in withheld and
+   * nothing else on the screen disagreeing.
+   *
+   * REFUSED OUTRIGHT RATHER THAN ADMITTED ON A TEMPLATE, which was the other candidate. `fill` in
+   * `pages.ts` is the only writer, and it writes the key on the COPY it hands the evaluator, so a
+   * template carrying one in its stored body has it overwritten the moment it is read: measured,
+   * `where: 'state is open, thing is {{it}}'` with `within: 'party is HMRC'` came back from `fill` as
+   * `within: ' thing is Kiln'`. A key discarded on every read can only drift from what is counted.
+   * Where it is NOT overwritten it is the hole itself: with the parameter inside an `any`, `scopeOf`
+   * answers nothing, and the hand-written `within: 'party is HMRC'` survived `fill` intact, naming a
+   * clause the filter never had. The third candidate, refusing a `within` that leaves `held` under
+   * `rows`, cannot be decided here at all, because it needs the rows: `42 §5.3` files a check that
+   * reads no installed state as class B, and class B is what this function is.
+   */
+  if (body.within !== undefined)
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} writes within, and within is the scope a parameter cut rather than a key a document carries: the reader derives it from where when it fills {{it}}. Write the clause in where.`,
+      'within',
+    );
 
   /* THE FACTOR TABLES TRAVEL IN THE BODY (`metrics.ts`, `MetricDecl.lookups`), so a figure that
      multiplies by one is refused here when it does not carry it. Installed without, it read
