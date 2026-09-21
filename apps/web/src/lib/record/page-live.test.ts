@@ -782,6 +782,25 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
   const said = earning({ rows: 3, held: 27 }).metrics?.[0];
   assert.equal(said?.tone, 'good', 'rows that said keep their verdict');
   assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
+
+  /* AND A FIGURE MADE OF TWO HALVES IS ONE TOO, which the first writing of this test did not hold:
+     the audit of batch ten measured that `reducedFields`' pair branch could be deleted whole and
+     this file stayed 26 of 26, while `projects-earning-change` (`diff` of two sums, both over
+     `revenue is set`) is a tile the Overview draws. */
+  const change = blockOf(
+    {
+      kind: 'stat',
+      cells: [{ metric: 'projects-earning-change' }],
+      readings: [{ metric: 'projects-earning-change', reading: { value: 0, unit: 'GBP', met: true, refusals: [], rows: 0, held: 27 } }],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    AT,
+  ).metrics?.[0];
+  assert.equal(change?.tone, undefined, 'a diff of two sums over a field nobody filled in is not good news either');
+  assert.equal(change?.note, liveWords.unsaid);
 });
 
 test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element arrives as an id or as a number', async () => {

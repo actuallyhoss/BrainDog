@@ -636,6 +636,20 @@ export const copy = {
      and not silence either, because a bare `GBP 0.00` with no note beside it is the same tile a
      working figure draws. It names the list, so it points at what to do next. */
   nothingIn: (list: string) => `Nothing in ${list} yet.`,
+  /**
+   * WHAT A REDUCING FIGURE SAYS WHEN ITS PREDICATE MATCHED NO ROW.
+   *
+   * A sum of no values is zero and the kernel means it to be, so `GBP 0.00` is the same number
+   * whether a portfolio earned nothing or nobody has written down what it earns. The tile draws this
+   * instead of a target line every value satisfies, and draws no verdict and no door beside it.
+   *
+   * IT SAYS WHAT HAPPENED AND NOT WHY, because the reader cannot know which clause did the
+   * excluding. The first wording was "No row has filled this in yet", which is a claim about ONE
+   * clause: `days-late-in` matches nothing on a record whose recent invoices are all unpaid, and
+   * that sentence would then be false about `settled`, a field many rows have filled in. Three
+   * surfaces drew it, so it was three false sentences.
+   */
+  nothingMatched: 'No row matched, so there is nothing to add up.',
   nothingDated: 'Nothing dated to walk yet.',
   /* A BRIDGE OVER THE CASH WALK: where the money starts, what comes and goes, and where it lands. */
   bridgeStart: 'Cash now',

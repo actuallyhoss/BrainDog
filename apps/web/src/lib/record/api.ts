@@ -57,7 +57,7 @@ import { resolvePages } from './pages.ts';
 import { compile, declaredValue, explain, matches } from './where.ts';
 import { METRICS } from './declared.ts';
 import { STALE_MS, barsOf, costOf, costRank, findingsFrom, isStale, stepsPercent, tallySteps, type Bars, type Cost, type MeasureSeries, type Part, type QueueQuestion, type Rate, type SeriesLine } from '@braindog/kernel';
-import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam } from './metrics.ts';
+import { BARE, fxNote, fxNow, meetsTarget, offTarget, noteOf, read, targetLine, targetSaid, walksNote, windowMs, withParam, type MetricDecl, type Reading } from './metrics.ts';
 import { REDUCES } from './schema.ts';
 import type { Entry, Fields, Filter, FieldDecl, Job, PackInfo, PageBlock, PageDecl, Question, RegisterDecl } from './schema.ts';
 import type { CallOut } from './actions.ts';
@@ -1149,6 +1149,107 @@ const perYear = (e: Entry): number =>
 const days = (iso: unknown) =>
   typeof iso === 'string' ? (Date.parse(`${iso}T12:00:00Z`) - NOW) / 86_400_000 : Infinity;
 
+/* ── the third state of a figure ──────────────────────────────────────────
+   There are three engines that turn one reading of one declaration into one tile: this file for the
+   sample, `news-live.ts` for Home, `page-live.ts` for a declared page. The rule below is theirs, and
+   it lives here because this file is the only one of the three the other two already import, so
+   reading it costs no new edge and creates no cycle.
+
+   IT BELONGS IN `metrics.ts`, which is where every other question asked ABOUT a declaration lives:
+   `hrefFor`, `offTarget`, `targetSaid` and `withParam` all take a `MetricDecl` and answer something
+   about it, and all three engines already import from there. It is here because that file belonged to
+   another agent on the run that moved it, and this is the nearest home reachable from all three.
+   `50 §1` is this tree's standing bill for the same rule written twice, so it is worth saying plainly
+   that `page-live.ts` still holds a copy of `overUnsaidField` and `reducedFields`: the parity test in
+   `news-live.test.ts` drives one reading through all three and is what will fail the day they
+   differ. */
+
+/** The four aggregations that reduce a FIELD to one number. A count reads rows and is not one of them. */
+const REDUCING = ['sum', 'avg', 'min', 'max'] as const;
+
+const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** The fields a figure adds up, averages or takes a bound of, both halves of a pair included. */
+function reducedFields(value: MetricDecl['value']): string[] {
+  const halves: unknown[] = 'diff' in value ? [value.diff.of, value.diff.per] : 'ratio' in value ? [value.ratio.of, value.ratio.per] : [value];
+  return halves.flatMap((half) => {
+    const said = isObject(half) ? half : {};
+    return REDUCING.flatMap((word) => {
+      const operand = said[word];
+      if (typeof operand === 'string') return [operand];
+      /* A ROW-LEVEL PRODUCT reduces over the field it multiplies, which is the first half of `product`. */
+      const product = isObject(operand) && Array.isArray(operand.product) ? operand.product[0] : null;
+      return typeof product === 'string' ? [product] : [];
+    });
+  });
+}
+
+/**
+ * WHETHER A FIGURE'S OWN PREDICATE REQUIRES THE FIELD IT REDUCES OVER TO BE FILLED IN.
+ *
+ * THIS IS THE LINE BETWEEN THE TWO ZEROES, and it is narrow on purpose. `out-30d` sums `amount` where
+ * the obligation is open and due inside a month: nothing matched over forty obligations is GBP 0.00
+ * owed, which is the answer that figure exists to give, and it keeps its verdict and its door.
+ * `projects-earning` sums `revenue` where `revenue is set`: nothing matched means no row carries the
+ * number being added up, so its zero is the absence of an answer rather than one.
+ *
+ * `compile` IS ASKED RATHER THAN THE SENTENCE BEING READ A SECOND TIME. The grammar spells this clause
+ * three ways, `is set`, `is present` and `is not empty`, all of which compile to one `present` clause,
+ * and a second reader of the sentence would be a fourth place to get it wrong. A register this build
+ * has no declaration for compiles to no clauses, so the tile answers as it did before rather than
+ * guessing.
+ */
+function overUnsaidField(decl: MetricDecl): boolean {
+  const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
+  if (register === null) return false;
+  const reduced = reducedFields(decl.value);
+  if (reduced.length === 0) return false;
+  return compile(register, decl.where).clauses.some((c) => c.op === 'present' && reduced.includes(c.field));
+}
+
+/**
+ * WHAT A REDUCING FIGURE SAYS WHEN THE FIELD IT ADDS UP IS ONE NOBODY HAS FILLED IN.
+ *
+ * It is the tile's half of the sentence the bar beside it already draws, *"No project in play says
+ * what it earns. Put a year on one and it draws here."* That bar can name the field because a
+ * declaration wrote its `empty:` for one block; this line is said under any figure, so it names what
+ * happened rather than what to type.
+ *
+ * IT LIVES IN `copy.ts` WITH THE REST OF THE PRODUCT'S SENTENCES, which is where it went the moment
+ * one pass owned both files. `page-live.ts` reads the same key through `liveWords.unsaid`, and the
+ * parity test holds the two to each other.
+ */
+export const NO_ROW_SAID = copy.nothingMatched;
+
+/**
+ * THE STATE BETWEEN AN EMPTY LIST AND AN ANSWER: THE LIST HOLDS ROWS, AND NOT ONE OF THEM HAS SAID.
+ *
+ * The kernel's zero rule is written for a COUNT, and its own words are that zero matched over rows
+ * that exist is good news (`packages/kernel/src/metrics.ts`). A REDUCING figure turns that sentence
+ * over. A sum of no values is zero and the kernel means it to be, so `GBP 0.00` is the same number
+ * whether a portfolio earned nothing or nobody has written down what it earns, and `target: { gte: 0 }`
+ * on a money sum is met by every value such a sum can take, which is the decoration a target is
+ * refused at install for being. So `met: true` carried no measurement and the tile drew a tick anyway.
+ *
+ * MEASURED AT HIS SIZE, on the record `loop/research-at-scale.md` §1 built: 27 projects, 14 in play, a
+ * monthly figure held for three of them and `revenue` unset on every row, because the importer files a
+ * monthly figure as a reading and has no year to write. After `a89bc072` put `revenue is set` on the
+ * Earning figures the reading is `rows: 0, held: 27`. Driven through the three engines before this
+ * function existed, over exactly that reading: Home and the sample both answered `tone: "good"` with
+ * `href: /r/things?f=lane:in:building,earning&f=revenue:is:set` and the target line "never below
+ * zero", while the declared page answered no tone, no door and the sentence. One figure, three
+ * screens, two answers.
+ *
+ * AN EMPTY LIST IS ASKED FIRST AND WINS, because a list nobody has written to has no field to have
+ * filled in: that zero is `held`, it has its own sentence on each surface, and asking this second
+ * would have replaced it. `held` is absent on a reading a caller built by hand, and the fallback to
+ * `rows` there is the old ambiguous zero, which withholds the verdict rather than inventing one.
+ */
+export function unsaidFigure(decl: MetricDecl | undefined, r: { rows: number; held?: number }): boolean {
+  if (decl === undefined || (r.held ?? r.rows) === 0) return false;
+  return r.rows === 0 && overUnsaidField(decl);
+}
+
 /**
  * A figure, read from its DECLARATION.
  *
@@ -1242,8 +1343,22 @@ export function metric(id: string): Metric {
   if (!template)
     return { id, label: id, value: MISSING, note: 'no metric is declared under that name', tone: 'warn', href: '/p/money' };
   const decl = at === -1 ? template : withParam(template, id.slice(at + 1));
+  return figureTile(id, decl, read(decl));
+}
 
-  const reading = read(decl);
+/**
+ * ONE READING OF ONE DECLARATION, AS A TILE: the sample engine's half of a rule the other two engines also hold.
+ *
+ * IT WAS THE TAIL OF `metric` AND IS ITS OWN FUNCTION SO THAT A READING CAN BE HANDED TO IT. The
+ * other two renderers of this same tile, `news-live.ts`'s `tileOf` and `page-live.ts`'s, each take a
+ * reading and return a tile, so each can be driven over a reading a test wrote; this one built its
+ * own out of the seed's fixed rows, so the only readings it could ever be asked about were the four
+ * `things` the sample ships. The parity drive in `news-live.test.ts` needs `rows: 0` over `held: 27`,
+ * which is a shape the sample's rows cannot produce, so with no seam here the third engine could only
+ * be argued about rather than measured. Nothing else changed in the move: `metric` still reads the
+ * declaration and calls this with `read(decl)`.
+ */
+export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metric {
   /**
    * A FIGURE THAT CANNOT BE WORKED OUT SAYS SO, IN THE TERMS OF THIS SCREEN.
    *
@@ -1290,9 +1405,15 @@ export function metric(id: string): Metric {
    */
   const empty = reading.held === 0;
 
+  /* AND THE STATE BETWEEN THAT ZERO AND AN ANSWER, which `unsaidFigure` above is and says why: a
+     reducing figure whose predicate requires the field it reduces over, matching no row of the rows
+     the list holds. The figure itself stays, because a total of nothing is zero; it is the verdict on
+     it and the door beside it that were invented. */
+  const unsaid = unsaidFigure(decl, reading);
+
   /* A FIGURE CONVERTED OUT OF ITS DECLARED CURRENCY IS JUDGED AGAINST ITS TARGET CONVERTED, and has no verdict without a rate. */
   const off = offTarget(decl, reading.unit);
-  const met = empty ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value) : null) : meetsTarget(decl, reading.value);
+  const met = empty || unsaid ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value) : null) : meetsTarget(decl, reading.value);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
   /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be
@@ -1320,9 +1441,13 @@ export function metric(id: string): Metric {
     value: reading.shown,
     note: empty
       ? copy.nothingIn(REGISTERS[decl.source.replace(/^register\./, '')]?.name ?? decl.name)
-      : reading.parts
-        ? (across ?? '')
-        : `${targetSaid(decl, reading)}${move}${across ? ` · ${across}` : ''}`.replace(/^ · /u, ''),
+      : /* AND THE TARGET LINE GOES WITH THE TICK. "never below zero" under a figure no row contributed
+           to is a bound every such figure satisfies, printed as though it had been checked. */
+        unsaid
+        ? [NO_ROW_SAID, across].filter(Boolean).join(' · ')
+        : reading.parts
+          ? (across ?? '')
+          : `${targetSaid(decl, reading)}${move}${across ? ` · ${across}` : ''}`.replace(/^ · /u, ''),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     /**
      * AND A FIGURE OVER AN EMPTY REGISTER IS NOT A DOOR EITHER.
@@ -1335,8 +1460,12 @@ export function metric(id: string): Metric {
      * `held === 0` AND NOT `value === 0`, and the difference is the whole of it. `Overdue · GBP
      * 0.00` over thirty-eight invoices is an answer, and its door opens the filter that produced it,
      * which is worth having. A register with nothing in it has no such filter to show.
+     *
+     * AND NEITHER IS A FIGURE NO ROW HAS SAID ANYTHING TO. That door is the predicate as a filter, and
+     * the predicate matched nothing, so it opened a list of no rows from under a sentence saying there
+     * was nothing to see.
      */
-    ...(empty ? {} : { href: reading.href }),
+    ...(empty || unsaid ? {} : { href: reading.href }),
   };
 }
 

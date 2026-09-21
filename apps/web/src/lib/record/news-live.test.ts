@@ -4,12 +4,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MISSING } from 'braindog-render';
+import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { figureTile } from './api.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
+import { hrefFor } from './metrics.ts';
 import { HOME_FIGURES, LOG_PAGE, homeFigures, markAll, readHome, readLog, tileOf } from './news-live.ts';
+import { liveWords, tileOf as pageTile } from './page-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -62,6 +65,74 @@ test("a figure is the record's reading in the declaration's words, and one that 
   const broken = tileOf(id, { value: null, unit: null, rows: 0, met: null, refusals: ['x'] });
   assert.equal(broken.value, MISSING);
   assert.equal(broken.note, copy.figureUnavailable);
+});
+
+/**
+ * THE THIRD STATE OF A FIGURE, ON ALL THREE ENGINES AT ONCE.
+ *
+ * `a7d9e5c8` gave `page-live.ts` a state between "the list is empty" and "the list answered": a
+ * REDUCING figure whose own predicate requires the field it reduces over to be set, matching no rows,
+ * has no verdict to give, because a sum of no values is zero and `target: { gte: 0 }` is met by every
+ * value such a sum can take. It wrote that on one of the three renderers of the same tile. The other
+ * two, the sample engine (`api.ts`) and Home (`news-live.ts`), kept the old two-state reading, so the
+ * same reading of the same declaration came out `tone: "good"` with a door on two screens and no tone
+ * and no door on the third. Measured before the repair, over `projects-earning` at `rows: 0` held
+ * over 27:
+ *
+ *     home   tone good  href /r/things?f=lane:in:building,earning&f=revenue:is:set  note never below zero
+ *     sample tone good  href /r/things?f=lane:in:building,earning&f=revenue:is:set  note never below zero
+ *     page   tone —     href —                                                     note No row has filled this in yet.
+ *
+ * `50 §1` IS THE BILL FOR THE SAME RULE WRITTEN TWICE, and this test is what stops a third copy
+ * drifting: one reading goes through all three, and the three answers are held to each other rather
+ * than each to a literal of its own. The rule itself is one function now, `unsaidFigure` in `api.ts`,
+ * which Home reads; `page-live.ts` still holds its own copy of it, because that file belonged to
+ * another agent on the run that wrote this, and this test is what will catch the day the two differ.
+ *
+ * THE READING IS THE ONE HIS RECORD PRODUCES, not one invented for a test: 27 projects imported,
+ * 14 in play, `revenue` unset on every row because the importer files a monthly figure as a reading
+ * and has no year to write, so `projects-earning` with `revenue is set` on it matches nothing.
+ */
+test('ONE READING OF ONE FIGURE, THREE ENGINES, ONE ANSWER: no row has filled the summed field in', () => {
+  const id = 'projects-earning';
+  const decl = METRICS[id]!;
+  const shape = { value: 0, unit: 'GBP', rows: 0, held: 27, met: true, refusals: [] as string[] };
+
+  const home = tileOf(id, shape);
+  const page = pageTile({ metric: id, reading: shape } as never);
+  /* THE SAMPLE ENGINE BUILDS THE REST OF ITS READING ITSELF, so only the keys it cannot derive from
+     the declaration are written here: the figure, its unit, and the two counts the state turns on. */
+  const sample = figureTile(id, decl, { ...shape, shown: money(0, 'GBP'), delta: null, why: '', unmeasured: null, href: hrefFor(decl) });
+
+  const answers = [home, page, sample].map((t) => [t.value, t.tone ?? null, t.href ?? null, t.note]);
+  assert.deepEqual(answers[1], answers[0], 'Home and the page answered one reading differently');
+  assert.deepEqual(answers[2], answers[0], 'the sample engine and Home answered one reading differently');
+  assert.deepEqual(answers[0], ['GBP 0.00', null, null, liveWords.unsaid], 'a total of nothing is still zero, and carries no verdict and no door');
+});
+
+/**
+ * AND THE RULE STAYS NARROW, on the two engines this run owns.
+ *
+ * `out-30d` sums `amount` where the obligation is open and due inside a month, a predicate that says
+ * nothing about `amount`: nothing matched over forty obligations is GBP 0.00 owed, which is the
+ * answer that figure exists to give, so it keeps its verdict and its door. A figure over rows that
+ * DID say keeps both as well. Without these two the repair above would be a way of hiding every
+ * zero on the product.
+ */
+test('a zero the predicate does say something about keeps its verdict and its door', () => {
+  const matched = { value: 0, unit: 'GBP', rows: 0, held: 40, met: true, refusals: [] as string[] };
+  const bill = tileOf('out-30d', matched);
+  assert.equal(bill.tone, 'good', 'nothing owed inside a month is the answer, not the absence of one');
+  assert.ok(bill.href, 'and its door opens the filter that produced it');
+
+  const said = tileOf('projects-earning', { ...matched, rows: 3, held: 27 });
+  assert.equal(said.tone, 'good', 'rows that said keep their verdict');
+  assert.ok(said.href, 'and keep their door');
+
+  const nothing = tileOf('projects-earning', { ...matched, rows: 0, held: 0 });
+  assert.equal(nothing.tone, undefined, 'and an empty list is still the other zero');
+  assert.equal(nothing.href, undefined);
+  assert.notEqual(nothing.note, liveWords.unsaid, 'a list holding nothing is not a field nobody filled in');
 });
 
 test('Home asks for what is new and its three figures together, and leaves out a figure it may not read', async () => {

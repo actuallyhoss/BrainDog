@@ -65,7 +65,7 @@ export const liveWords = {
    * is already the two sentences this path says for itself, so a third sits beside them rather than
    * being written twice; moving it is a rename and nothing else.
    */
-  unsaid: 'No row has filled this in yet.',
+  unsaid: copy.nothingMatched,
 } as const;
 
 /** A refusal as the record sends one, and only the keys read here. */

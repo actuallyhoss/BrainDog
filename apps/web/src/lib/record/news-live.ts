@@ -13,7 +13,7 @@ import { isEventKind, type FxRead, type Part } from '@braindog/kernel';
 import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import type { Metric } from './api.ts';
+import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, forget, newsOf, readBoot, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noRecord } from './device.ts';
@@ -69,6 +69,17 @@ const refusalOf = (out: { ok: false; refusal: Said } | { ok: false; conflict: un
  * tile that this one had stopped drawing. `engines.test.ts` hands one kernel reading, `rows: 0, held: 40` over the
  * seed's forty obligations, to both renderers and holds them to one verdict and one door, so the next divergence is a
  * failing test rather than two screens answering differently about one figure.
+ *
+ * AND THERE IS A THIRD STATE BETWEEN THOSE TWO, which `unsaidFigure` in `api.ts` answers for every engine that draws
+ * this tile: a list that HOLDS rows where not one of them carries the field the figure reduces over. `page-live.ts` had
+ * it and this file did not, so driven over `projects-earning` at `rows: 0, held: 27` — his own record, 27 projects
+ * imported and `revenue` unset on all of them — Home answered `tone: "good"` with a door into a list of no rows and the
+ * target line "never below zero", where the declared page answered no verdict, no door and the sentence. Home is the
+ * first screen he opens, so it is the worst of the three places to have got this wrong.
+ *
+ * THE RULE IS ASKED, NOT READ A SECOND TIME. `50 §1` is this tree's bill for the same rule written twice; the reason
+ * three engines diverged here at all is that the state was written on one of them. `news-live.test.ts` drives one
+ * reading through all three and holds their tone, their door and their note to each other.
  */
 export function tileOf(id: string, r: Reading | null): Metric {
   const decl = METRICS[id];
@@ -78,14 +89,17 @@ export function tileOf(id: string, r: Reading | null): Metric {
   if (r?.parts && r.refusals.length === 0) return { id, label, value: partsText(r.parts), note: across ?? '' };
   if (!r || r.value === null || r.refusals.length) return { id, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
-  const met = empty ? null : r.met;
+  const unsaid = unsaidFigure(decl, r);
+  const met = empty || unsaid ? null : r.met;
   return {
     id,
     label,
     value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
-    note: [decl && !offTarget(decl, r.unit) ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
+    /* THE TARGET LINE GOES WITH THE TICK, because "never below zero" under a figure no row contributed to is a bound
+       every such figure satisfies, printed as though something had been checked against it. */
+    note: [unsaid ? NO_ROW_SAID : decl && !offTarget(decl, r.unit) ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
-    ...(decl && !empty ? { href: hrefFor(decl) } : {}),
+    ...(decl && !empty && !unsaid ? { href: hrefFor(decl) } : {}),
   };
 }
 
