@@ -7,10 +7,25 @@
  * 0.8 MB phone shot failed, and a 56 KB one went through on the first try. So the limit is size
  * and not the image, and this script exists so that nobody works that out a third time.
  *
- * JPEG AND NOT PNG, at 1,200px and quality 60. A screenshot of a page is mostly flat colour with
- * text on it, which is the case PNG is good at, and at full page height PNG is still four times
- * over the limit. What comes out here is about 95 KB, which is a tenth of the allowance, and it is
- * a picture to look at on a phone rather than a record of pixels: `shots/` keeps the PNGs.
+ * JPEG AND NOT PNG, at 1,200px and quality 62. A screenshot of a page is mostly flat colour with
+ * text on it, which is the case PNG is good at, and at full page height PNG is still over the line:
+ * re-encoding the same capture as PNG instead gives 668,703 and 657,881 bytes for the two schemes,
+ * about 663 KB, where the JPEG gives 256,805 and 256,955, about 257 KB. What is sent is a picture to
+ * look at on a phone rather than a record of pixels: `shots/` keeps the PNGs.
+ *
+ * THIS HEADER USED TO SAY "ABOUT 95 KB, WHICH IS A TENTH OF THE ALLOWANCE", AND BOTH HALVES OF THAT
+ * WERE WRONG. 95 KB was the size of the blank capture this script was rewritten to stop sending:
+ * the first version visited the site and caught five of the seven bands as bare ground and both
+ * product shots as empty frames, and a page with most of its pictures missing compresses to a tenth
+ * of what the real one does. The capture was fixed in the next commit and the number was never
+ * taken again. Driven on 21 September, it is 2.7 times what it claimed.
+ *
+ * AND THE ALLOWANCE ITSELF IS NOT WRITTEN DOWN ANYWHERE. Not in this repository, and not in the
+ * description of the channel that carries the file, which states no size at all. What stands in its
+ * place is the bracket the failures above draw: 256,955 bytes goes through, 0.8 MB comes back
+ * `400`, 1.4 MB comes back `400`. So there is room, and it is under 550 KB of room rather than the nine
+ * tenths the old number promised. A taller home page is one change away from the refusal this whole
+ * file exists to avoid, so re-measure after anything that adds a band.
  *
  *   node apps/site/scripts/send-shot.mjs            the home page, both schemes
  *   node apps/site/scripts/send-shot.mjs pricing    any shot `shot.mjs` has taken
