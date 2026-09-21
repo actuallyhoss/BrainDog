@@ -101,10 +101,19 @@ test('THE SCREEN SAYS WHAT THE HOST CAN DO BEFORE IT OFFERS TO DO IT', () => {
     /mintsHere === false[\s\S]*?mailWords\.unrouted/u,
     'a host without the door does not say so before the press',
   );
-  /* AND NOT AS A HALF-DRAWN OFFER WHILE THE HOST IS BEING ASKED. `null` is the third state and it
-     draws neither button, the way `liveKeys` draws no passkey list until the host has answered. */
-  const gone = INGEST.indexOf("mintsHere === false");
-  assert.ok(gone > 0 && INGEST.indexOf("askMail('revoke')") < gone, 'the revoke button is drawn outside the answered branch');
+  /**
+   * AND NOT AS A HALF-DRAWN OFFER WHILE THE HOST IS BEING ASKED. `null` is the third state and it
+   * draws neither button, the way `liveKeys` draws no passkey list until the host has answered.
+   *
+   * THIS ASKED FOR AN ORDER AND THE ORDER WAS AN ACCIDENT OF THE DAY IT WAS WRITTEN. It held that
+   * the revoke button came BEFORE `mintsHere === false`, which was true while the area opened with
+   * the host-has-the-door arm. The level gates landed the same afternoon and put the refusals
+   * first, so a correct screen went red on a claim about which arm was typed first. What it means
+   * is that the button is inside an arm that knows the host answered, so that is what it asks.
+   */
+  const answered = INGEST.indexOf('mintsHere === true');
+  assert.ok(answered > 0, 'the ingest area never asks whether the host has the door');
+  assert.ok(INGEST.indexOf("askMail('revoke')") > answered, 'the revoke button is drawn outside the answered branch');
 });
 
 test('AND THE ANSWER STICKS, which is the half a reload undid', () => {
