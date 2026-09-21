@@ -45,6 +45,31 @@ const article = (noun: string): string => {
   return /^[aeio]/.test(w) ? 'an' : 'a';
 };
 
+/**
+ * THE SENTENCES TYPED ONCE AND NAMED TWICE, because two keys over one string is how a sentence
+ * drifts into two.
+ *
+ * The rule at the top of this file is that a sentence is typed in one place, and the check for it is
+ * a reader's eye. A scan of the file's own literals found two full sentences typed out twice, and
+ * both pairs are pairs for a reason that is not going away: each key has its own call sites and its
+ * own lane, so neither can be deleted from here without editing the screens that name it.
+ *
+ * `notReached` IS A REFUSAL, WHICH MAKES IT THE MOST-READ PROSE THIS PRODUCT HAS. `recordNotReached`
+ * is lanes C and D (inbox writes, page-row writes, settings, the catalogue) and `writeNotReached` is
+ * lane A (row writes, the grid, `/start`): twelve call sites and five, outside the tests. They were
+ * two identical literals eight lines apart. Editing one and not the other gives a product describing
+ * the same dead network two ways depending on which control you pressed, and nothing would have
+ * caught it: both keys are rendered, so `dead-copy` is content and the tests assert against the key
+ * rather than the words.
+ *
+ * `updatesTo` IS ONE LINE IN TWO POSITIONS, and `decide/[id]/arranged.ts` already knows it: the lead
+ * of a single-pack proposal at `:316` and a line in the Packs section at `:284`, with `saidByLead`
+ * there to stop the same sentence appearing twice on the one screen. A guard that exists because two
+ * strings are equal should not depend on somebody keeping them equal.
+ */
+const notReached = 'The record could not be reached, so nothing was saved. Try again in a moment.';
+const updatesTo = (name: string, from: string, to: string): string => `Updates ${name} from ${from} to ${to}`;
+
 export const copy = {
   /* the product */
   product: 'BrainDog',
@@ -1485,8 +1510,33 @@ export const copy = {
      saved does. */
   neverSaved: (one: string) =>
     `That ${one.toLowerCase()} was never saved, so it is gone. Nothing typed into this product is kept until the record is given it.`,
-  theseExist: (kind: string, names: readonly string[]) =>
-    `${kind} on this record: ${names.join(' · ')}.`,
+  /**
+   * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.
+   *
+   * `/v/nothing` on any live record with no saved views printed *"Saved views on this record: ."*
+   * The arm at `v/[view]/+page.svelte:264` asks the record for its own addresses rather than the
+   * sample's names, which is right; on a keyless address `addressOf` answers `null`, `client.views()`
+   * answers `[]`, and `join` over nothing left the sentence trailing off. A refusal that trails off
+   * reads as a broken product rather than as an answer, on the one screen whose whole job is to
+   * teach. So none is a branch, and it says the fact instead of listing it.
+   *
+   * AND THE NAMES ARE DE-DUPLICATED, because nothing upstream promises they are unique and one
+   * caller's are not. After `Clear the examples` the rail keeps entries for pages that no longer
+   * exist, and following one gave *"Pages on this record: Overview · People · Home · Overview ·
+   * Ledger · Overview · Board · Overview · Dashboard."* Nine names of which five are the one word
+   * repeated, because a page title is per-pack and this list is every pack's. The repetition carries
+   * nothing a reader can use: two pages called Overview are told apart by which pack they sit in,
+   * and a dot-separated sentence has no room for that.
+   *
+   * ORDER IS THE CALLER'S ORDER. Each caller passes the order its own screen shows, so sorting here
+   * would make the refusal disagree with the rail the reader arrived from.
+   */
+  theseExist: (kind: string, names: readonly string[]) => {
+    const unique = [...new Set(names)];
+    return unique.length === 0
+      ? `This record has no ${kind.toLowerCase()} yet.`
+      : `${kind} on this record: ${unique.join(' · ')}.`;
+  },
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
   yourData: 'The whole record',
@@ -1994,7 +2044,8 @@ export const copy = {
   inboxFiled: (row: string) => `Filed as ${row}. It has left the inbox.`,
   inboxArchived: 'Archived. The email is kept, and it has left the inbox.',
   inboxNoLists: 'This record has no lists to file it in yet.',
-  recordNotReached: 'The record could not be reached, so nothing was saved. Try again in a moment.',
+  /* Lanes C and D. Typed at `notReached` above, with `writeNotReached`, and the header there says why. */
+  recordNotReached: notReached,
   pageRowConflict: (title: string) => `${title} was changed somewhere else first. The page has been read again, so try once more.`,
   pageRowUnknown: 'This could not be saved from here, because the page did not say which row it is.',
   pageRowNoState: 'This could not be saved from here, because its list has no state to mark it done with.',
@@ -2002,7 +2053,9 @@ export const copy = {
   decideConflict: 'A row this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
   /* Row writes (lane A) */
   writeConflict: (row: string) => `${row} was changed somewhere else first. It now shows the latest version, so check it and try again.`,
-  writeNotReached: 'The record could not be reached, so nothing was saved. Try again in a moment.',
+  /* Lane A, and the same sentence as `recordNotReached`: a dead network is a dead network whichever
+     control was pressed. */
+  writeNotReached: notReached,
   writeMarkAdded: 'Added',
   writeMarkSaved: 'Saved',
   writeMarkSaving: 'Saving',
@@ -2191,8 +2244,8 @@ export const copy = {
   arrangeLeadUseCase: (name: string) => `Sets this BrainDog up for ${name}`,
   arrangeLeadArrange: 'Rearranges this BrainDog',
   arrangeLeadInstall: (name: string) => `Adds ${name}`,
-  /** A pack on at an older version, updated to the one on offer. */
-  arrangeLeadUpdate: (name: string, from: string, to: string) => `Updates ${name} from ${from} to ${to}`,
+  /** A pack on at an older version, updated to the one on offer. The lead's position; see `updatesTo`. */
+  arrangeLeadUpdate: updatesTo,
   arrangeLeadEnable: (name: string) => `Turns ${name} back on`,
   arrangeLeadDisable: (name: string) => `Turns ${name} off`,
   arrangeLeadSettings: (name: string) => `Changes the words and settings of ${name}`,
@@ -2205,7 +2258,8 @@ export const copy = {
   arrangeCallSends: (fields: string) => `sends ${fields}`,
   arrangePacks: 'Packs',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
-  arrangeUpdates: (name: string, from: string, to: string) => `Updates ${name} from ${from} to ${to}`,
+  /** The same line inside the Packs section, which is why `arranged.ts` guards against printing both. */
+  arrangeUpdates: updatesTo,
   /** Use cases an arrangement installs beside the one the record speaks in, which keeps its voice. */
   arrangeBeside: (names: string[]) => `Adds ${list(names)} beside it, in the same voice`,
   /** A use case a pack proposal adds while another speaks: that one keeps speaking. */
