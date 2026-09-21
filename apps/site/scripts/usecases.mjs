@@ -64,6 +64,66 @@ const CASES = [
 ];
 
 /**
+ * THE OTHER TWO COMPANIES, BECAUSE HE SAID "A FEW" AND THE PAGE DREW ONE.
+ *
+ * The founder types "I run a few companies" into /start, and what the dashboard photographed after it
+ * was a screen contradicting him: "Across your organisations" over one organisation, "Balance by
+ * organisation" as a single bar running the full width (which is what a bar chart of one row is), and
+ * "Owed to you, 30 days" reading GBP 0.00 because the use case's example rows carry one invoice and it
+ * goes the other way. Three of the four things in the top 900 pixels of the capture were wrong about
+ * the person in the same frame as their own sentence.
+ *
+ * So the priming writes what that sentence implies: two more companies, an account each with a balance
+ * somebody would recognise, and five invoices in both directions, due on days 6, 12, 14, 21 and 25 from
+ * the day the record is made. With the founder example's own hosting bill at day 9 that is six dated
+ * rows inside the thirty days both tiles read. Nothing here is generated: each row is typed out,
+ * because a marketing capture is read by a person who will notice five invoices for the same amount on
+ * the same day.
+ *
+ * SYNTHETIC BY THE SAME RULE AS THE SEED (22 §10): invented companies, no real counterparty, and the
+ * record it is written into is a temporary directory this script deletes when it is done.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO is have the new projects report numbers as well. The dashboard's
+ * `lines` block draws one chart a MEASURE across every project, so a second project sending "Monthly
+ * recurring revenue" would land in the same series as the first and the chart would read as one
+ * company's revenue doubling overnight. The numbers stay with Northwind, where the story is true.
+ */
+async function aFewCompanies(call) {
+  /* `day` type, so an actual date and not the `+9d` the use case's own seeds may use: those are
+     resolved by `install.ts` at install time, and this is the raw API. */
+  const on = (days) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  const gbp = (minor) => ({ amount: minor, currency: 'GBP' });
+  const companies = [
+    {
+      org: { name: 'Marchetti Tools Ltd', kind: 'company', country: 'United Kingdom', currency: 'GBP' },
+      account: { name: 'Marchetti current account', kind: 'bank', balance: gbp(1_142_000), as_of: on(-1), liquid: true },
+      project: { name: 'Marchetti CLI', lane: 'earning', since: on(-620) },
+    },
+    {
+      org: { name: 'Hale Consulting', kind: 'sole_trader', country: 'United Kingdom', currency: 'GBP' },
+      account: { name: 'Consulting account', kind: 'bank', balance: gbp(638_000), as_of: on(-3), liquid: true },
+      project: { name: 'Retainer work', lane: 'earning', since: on(-280) },
+    },
+  ];
+  for (const c of companies) {
+    const account = await call('create', { register: 'accounts', fields: c.account });
+    const project = await call('create', { register: 'things', fields: c.project });
+    await call('create', {
+      register: 'organisations',
+      fields: { ...c.org, accounts: [`accounts#${account.seq}`], projects: [`things#${project.seq}`] },
+    });
+  }
+  const invoices = [
+    { what: 'Annual plan, Fernwood Group', direction: 'owed_to_me', amount: gbp(480_000), due: on(6), state: 'open' },
+    { what: 'Consulting, September', direction: 'owed_to_me', amount: gbp(360_000), due: on(12), state: 'open' },
+    { what: 'Annual plan, Bewley & Co', direction: 'owed_to_me', amount: gbp(240_000), due: on(21), state: 'open' },
+    { what: 'Contractor, September', direction: 'owed_by_me', amount: gbp(275_000), due: on(14), state: 'open' },
+    { what: 'Accountant, quarter to September', direction: 'owed_by_me', amount: gbp(89_000), due: on(25), state: 'open' },
+  ];
+  for (const fields of invoices) await call('create', { register: 'obligations', fields });
+}
+
+/**
  * SIXTY DAYS OF NUMBERS, AS A PROJECT WOULD HAVE SENT THEM. A fresh founder record holds one example
  * number, which the dashboards leave out on purpose, so a dashboard photographed straight after /start is
  * a page of empty states. These rows are what a project reporting once a day for two months leaves behind:
@@ -78,6 +138,7 @@ async function reportNumbers(base) {
     return body.value;
   };
   await call('update', { register: 'organisations', seq: 1, patch: { accounts: ['accounts#1'], projects: ['things#1'] } });
+  await aFewCompanies(call);
   const day = 86_400_000;
   const now = Date.now();
   for (let d = 59; d >= 0; d--) {

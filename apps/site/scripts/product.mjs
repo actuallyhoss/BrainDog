@@ -1,7 +1,7 @@
 /**
- * The five product screenshots on brain.dog, regenerated from the record app's own build.
+ * The product screenshots on brain.dog, regenerated from the record app's own build.
  *
- *   node scripts/product.mjs        # writes static/shots/<name>-<scheme>.png
+ *   node scripts/product.mjs        # writes static/shots/<name>[-phone]-<scheme>.webp
  *
  * THESE ARE SHIPPED ASSETS, not review artefacts — `scripts/shot.mjs` beside this one photographs
  * the SITE for a person to look at, and those go to `shots/`. These go to `static/shots/` and get
@@ -44,24 +44,51 @@ const ROOT = join(import.meta.dirname, '..', '..', 'web', 'build');
 const OUT = join(import.meta.dirname, '..', 'static', 'shots');
 const PORT = 5188;
 
-/** Each shot, and what it has to be showing. `do` runs after load, before the shutter. */
 /**
- * ONE SHOT, BECAUSE THE SITE SERVES ONE.
+ * SIX SHOTS, BECAUSE THE PAGE'S ARGUMENT IS NOW THE PICTURES (`loop/DIRECTION.md` §19).
  *
- * This list held five: `home`, `grid`, `money`, `project` and `arrange`. Four of them existed for
- * the bento and the use-case rows on the old home page, which drew ten pictures of the product,
- * most of them painted below full size. The redesign kept two pictures, and photographing four
- * screens nobody is shown cost 2.2 MB in `static/`, every byte of it deployed and none of it
- * requested. The four went with the sections that asked for them.
+ * This list was one, and before that five. The five went because they were painted below full size
+ * in a bento, so nobody could read them; the one that stayed was `home`, and a page arguing its case
+ * with a single screenshot and six paragraphs is the page he has just called long, boring and all
+ * text. So the list grows again, and this time on a rule rather than on a layout: EVERY ENTRY IS A
+ * SCREEN THAT SHOWS WHAT A PERSON GETS, never one that shows how the thing is built. No register
+ * grid, no pack page, no audit trail. Those are reasons to stay, not reasons to look.
  *
- * Adding one back is one line here and one `node scripts/product.mjs` run. That is the whole
- * reason this comment names the four rather than just deleting them quietly.
+ * WHY THESE SIX AND NOT OTHERS, measured by opening sixteen of the seeded record's routes at 1440 by
+ * 900 and looking at every one:
+ *   - `/inbox` photographs as an empty state ("Nothing waits in the inbox"), because the seed files
+ *     everything it receives. One picture, no content.
+ *   - `/spark` photographs as "Nothing to suggest yet": Spark waits two weeks before it proposes,
+ *     and the screen's own words are "This BrainDog started today".
+ *   - `/p/ledger` leads with a warning panel about nine uncategorised rows. True, and not the first
+ *     thing a stranger should meet.
+ *   - `/r/*` are the register grids. That is the mechanism, and §19 puts mechanism after value.
+ *
+ * `png` IS THE EXCEPTION AND NOT THE RULE. `app.html` names `home-light.png` as the `og:image`, and
+ * a link preview fetcher is somebody else's server: not every one of them decodes WebP. That is one
+ * file. Every other capture ships as WebP alone — see the shutter below for what the old `path:`
+ * argument cost.
+ *
+ * `act` runs after load and before the shutter, and is skipped at phone width (the layout differs).
  */
 const SHOTS = [
-  /* `webp`: the typed band serves this one at full size, so it gets a WebP beside its PNG. The
-     PNG is not spare — `app.html` names `home-light.png` as the `og:image`, and a link preview
-     fetcher is the one reader that will not take a WebP from every service that renders it. */
-  { name: 'home', route: '/', webp: true },
+  /* The day: what you are owed, what is due, what needs your call, and what the agents did while you
+     were away. It is the only screen that holds all four at once, which is why it is still first. */
+  { name: 'home', route: '/', png: true },
+  /* Cash now and cash ahead, with the date the line crosses zero called out and two scrubbers under
+     it. The most graphical screen the product has and the one that answers "what is this worth". */
+  { name: 'money', route: '/p/money' },
+  /* Six columns of real cards across the full width. The picture that answers "is this an exciting
+     tool", because it is the one that looks like something being used rather than read. */
+  { name: 'board', route: '/p/work-board' },
+  /* Three progress rings, a health band and what each project earns: the portfolio at a glance. */
+  { name: 'projects', route: '/p/portfolio' },
+  /* One project, which §5 calls the flagship: its ring, its open work, and the agents at work on it
+     with what each is doing right now. */
+  { name: 'project', route: '/p/kiln' },
+  /* Eight questions with their answers as buttons, which is the whole agent argument in one frame:
+     the agent drafted the change, and pressing a word is how it happens. */
+  { name: 'decide', route: '/decide' },
 ];
 
 const TYPES = {
@@ -137,12 +164,14 @@ const encoder = await browser.newPage();
  * as.
  */
 const SIZES = [
-  { suffix: '', width: 1440, height: 900, scale: 2 },
+  /* `png`: the one pass that also writes a PNG, for the one address `app.html` names as `og:image`. */
+  { suffix: '', width: 1440, height: 900, scale: 2, png: true },
   { suffix: '-phone', width: 390, height: 844, scale: 3 },
 ];
 
 for (const size of SIZES)
   for (const scheme of ['light', 'dark']) {
+    const wants = { png: size.png === true && scheme === 'light' };
     const context = await browser.newContext({
       viewport: { width: size.width, height: size.height },
       deviceScaleFactor: size.scale,
@@ -187,17 +216,47 @@ for (const size of SIZES)
          phone falls back to the wide capture for that one. */
           if (shot.act && size.suffix === '') await shot.act(page);
           await page.waitForTimeout(300);
-          png = await page.screenshot({ path: join(OUT, `${name}.png`) });
+          /**
+           * NO `path:` ON THE SHUTTER, AND THAT WAS COSTING A PNG A CAPTURE.
+           *
+           * `page.screenshot({ path })` both returns the buffer and writes it, so every shot at
+           * every size in every scheme landed in `static/shots/` as a PNG whether or not anything
+           * served it. Measured on this directory with the old one-shot list: `git ls-files` tracks
+           * `home-light.png` and nothing else, and a run left `home-dark.png`,
+           * `home-phone-light.png` and `home-phone-dark.png` untracked beside it, 932,761 bytes of
+           * files somebody deleted by hand afterwards. At six shots that is twenty-one of them, and
+           * `static/` is a directory where an untracked file is one `git add -A` from being
+           * deployed. The buffer is all this loop ever needed; `png: true` writes the one file that
+           * has a reader.
+           */
+          png = await page.screenshot();
         } catch (error) {
           if (attempt >= 3) throw error;
           await page.waitForTimeout(2000);
         }
       }
-      if (shot.webp) {
-        /* AND A WEBP BESIDE IT, which is what the page serves: the PNG of one screen is over a
-           megabyte and the hero is the largest paint on the page. The PNG stays for `og:image`,
-           because a preview fetcher is somebody else's server and not every one decodes WebP. The
-           browser encodes it, so the script needs no image library. */
+      /**
+       * AND THE PNG IS ONE FILE, NOT FOUR, AND IT IS WRITTEN OUTSIDE THE RETRY.
+       *
+       * `png: true` on the shot is a fact about the shot, so the first pass at this wrote
+       * `home-dark.png`, `home-phone-light.png` and `home-phone-dark.png` as well and left exactly
+       * the three strays the change was made to stop. `app.html` names one address,
+       * `/shots/home-light.png`, so the condition is the wide light capture of a shot that asked for
+       * a PNG and nothing else.
+       *
+       * IT SITS AFTER THE LOOP BECAUSE THE LOOP'S CONDITION IS `png`. Inside the `try`, a `writeFile`
+       * that threw was caught by the shutter's own handler, and by then `png` held the buffer, so
+       * `!png` ended the loop on the spot: the same shape run on its own answered `attempts: 1,
+       * png assigned: true, png file written: false, error surfaced: no`. A retry cannot help a
+       * refused write anyway, and the og:image quietly not being there is the one failure this
+       * directory cannot afford, so the write throws where the run can see it.
+       */
+      if (shot.png && wants.png) await writeFile(join(OUT, `${name}.png`), png);
+      {
+        /* THE WEBP IS WHAT THE PAGE SERVES, every time and not just for the hero: the PNG of one
+           screen is around half a megabyte and the WebP of the same pixels is around 270 KB, so
+           WebP-for-everything is the whole of `static/shots/` at a little over half its old weight.
+           The browser encodes it, so the script needs no image library. */
         const webp = await encoder.evaluate(async (b64) => {
           const img = new Image();
           img.src = `data:image/png;base64,${b64}`;
@@ -213,9 +272,13 @@ for (const size of SIZES)
           for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
           return btoa(out);
         }, png.toString('base64'));
-        await writeFile(join(OUT, `${name}.webp`), Buffer.from(webp, 'base64'));
+        const bytes = Buffer.from(webp, 'base64');
+        await writeFile(join(OUT, `${name}.webp`), bytes);
+        /* THE WEIGHT IS PRINTED BECAUSE THE PAGE IS A BUDGET. A full-bleed capture at 2x is the
+           largest thing brain.dog ships, and "keep it defensible" is not a thing anybody can do
+           from a run that says only which files it wrote. */
+        console.log(`  static/shots/${name}.webp  ${(bytes.length / 1024).toFixed(0)} KB${shot.png && wants.png ? ' (and .png for og:image)' : ''}`);
       }
-      console.log(`  static/shots/${name}.png${shot.webp ? ' and .webp' : ''}`);
     }
     await context.close();
   }
