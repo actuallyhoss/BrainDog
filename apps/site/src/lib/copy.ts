@@ -15,12 +15,29 @@
  *   - NO EM DASHES, anywhere a person reads. A sentence that only worked because of the dash was
  *     two sentences. Write them as two, or use a colon.
  *
+ * AND A SIXTH RULE, ADDED 2026-09-21 BY THE OWNER, WHO COUNTED THE NUMBERS ON THE PAGE AND CALLED
+ * THEM "silly ai-looking stats" (`loop/DIRECTION.md` §19). A figure earns its place by answering a
+ * question the reader was already asking. `16 tools an agent can call`, `5 resource templates`,
+ * `1 file holds your record` and `30 nightly backups` answered none: nobody arrives at a marketing
+ * page wondering how many tools a protocol surface declares, and a row of four such figures under a
+ * headline is the shape of a page filling space rather than making an argument. The `facts` section
+ * that held them is deleted, along with the sixteen tool names and the five resource-template
+ * grammars that were drawn as a grid two bands further down. `test/content.test.ts` now fails if any
+ * of them comes back.
+ *
  * THE DRAWINGS ARE COPY TOO. The home page draws two working things rather than pictures of them: a
  * ledger whose events are only ever added to, and a switcher that rearranges the page as you pick
  * who the record is for. Every name, figure and time in both is below, read off the demo record
  * (`apps/web/src/lib/record/data.ts` and `packages/seed/src/index.ts`). Nothing in a drawing is
  * invented: when the seed's sample business changes, these change with it, not before it. A key
  * that nothing renders is deleted rather than kept for later.
+ *
+ * WHY THERE ARE FEWER SECTIONS THAN THERE WERE. `typed` and `agents` were two bands of their own and
+ * are now three sentences inside one. The page used to open on typed rows, registers and the MCP
+ * tool table, which is how the thing is built rather than what it is worth, and §19 is explicit that
+ * the first blocks answer the second question. Their surviving sentences moved into `plain`, at the
+ * foot of the page where a reader who wants the mechanism will still find it, and the comments that
+ * argued each sentence into its current wording moved with them rather than being thrown away.
  */
 
 export const site = {
@@ -135,35 +152,33 @@ export const site = {
      */
     secondary: 'See what it costs',
     note: 'Neither plan is open yet.',
+    /**
+     * THE CAPTION AND THE ALT BELONG TO THE HERO NOW, because the picture does.
+     *
+     * They were `typed.caption` and `typed.alt`, under a band whose heading was `Typed rows, not a
+     * pile of notes`: the product's own screen, used as the illustration for a sentence about data
+     * modelling. §19 says the picture is the argument, so it moved up into the first screen and the
+     * sentence it used to illustrate moved down into `plain`. The words themselves are unchanged.
+     *
+     * The caption is literal about the pixels and it has to stay that way. The capture is 1440 CSS
+     * px wide, so at a 1440 viewport it paints one device pixel per captured pixel.
+     */
+    caption: 'One record, photographed on the day this build was made',
+    alt:
+      'The home screen of a record: what it is owed and what is due, the money falling due this ' +
+      'week, the questions waiting on a decision, and what its agents and rules did while you ' +
+      'were away.',
   },
 
   /**
-   * THE FOUR FIGURES UNDER THE HERO, and every one of them was counted on 2026-09-21 rather than
-   * remembered. `apps/site/DESIGN-NOTES.md` §4 carries the command beside each.
+   * THE LEDGER, which the home page draws as rows rather than as a picture of rows. `head` and
+   * `only` are its heading, drawn as one line.
    *
-   *   16   the `name:` keys of `packages/mcp/src/index.ts:163-329`
-   *    5   the `TEMPLATES` array of the same file
-   *    1   `apps/selfhost/src/main.ts:105`: the record is one file (of three an install writes,
-   *        which is why the label says the record and not the installation)
-   *   30   `apps/selfhost/src/snapshots.ts:30` and `apps/worker/src/snapshots.ts`, both hosts
-   *
-   * TWO FIGURES FROM THE BRIEF ARE NOT HERE and the reason is the rule above: a commit count moves
-   * every hour on a site that redeploys on a schedule, and the brief's gate count was 31 where the
-   * registered list in `tools/gates/run.mjs` holds 30. A number that has to be re-earned on every
-   * deploy is a number this file will eventually ship stale, which is the defect it exists to stop.
-   */
-  facts: {
-    items: [
-      { figure: '16', label: 'tools an agent can call' },
-      { figure: '5', label: 'resource templates beside them' },
-      { figure: '1', label: 'file holds your record' },
-      { figure: '30', label: 'nightly backups, either host' },
-    ],
-  },
-
-  /**
-   * THE LEDGER UNDER THE HERO, which the home page draws as rows rather than as a picture of rows.
-   * `head` and `only` are its heading, drawn as one line.
+   * IT MOVED OUT OF THE HERO AND DOWN TO THE LAST BAND BEFORE THE CLOSE, and the move is the whole
+   * of §19 in one component. A list of five text rows is a record, and a record on the first screen
+   * is exactly what the owner meant by *it is all records and text*. Where it now sits it is the
+   * evidence for the sentence above it, which is that every change carries a name: the `who` column
+   * is You, Codex, a rule and Claude, and the reader watches the last three of them arrive.
    *
    * WHAT IS CHECKABLE ABOUT THESE FIVE, said exactly, because the looser version of this sentence
    * was wrong three ways at once and an audit found all three.
@@ -239,14 +254,23 @@ export const site = {
   },
 
   /**
-   * THE ARRANGEMENT SWITCHER on the home page: pressing a case redraws the section, so the claim
-   * above it is made by the page doing the thing rather than by a sentence about it.
+   * THE ARRANGEMENT SWITCHER, and it is the page's first band after the hero because it is the one
+   * that answers *what is this worth to me*. Pressing a case redraws the rail in front of the
+   * reader, so the claim above it is made by the page doing the thing rather than by a sentence
+   * about it, and what it shows is the product becoming the reader's own: their money, their
+   * studies, their companies, their team, their new project.
    *
    * `id` is what the switcher tracks and what /start calls the setup. `holds` is the pages and the
    * lists that setup ships, each under the name the record itself gives it, so a reader can check
    * this list against the screen they get after Make my record.
+   *
+   * `tag` IS THE WORD IN THE BAND'S OPENER, and it lives here rather than in the page for the
+   * reason at the top of this file: it is a word a stranger reads. All four were literals inside
+   * `+page.svelte` until 2026-09-21, which meant the em-dash scan over this file could not see
+   * them and nobody editing copy would have found them.
    */
   arrange: {
+    tag: 'Yours',
     title: 'Arranged for you. Made of parts.',
     /* THE TWO STRINGS THE SWITCHER ITSELF SAYS, here rather than defaulted inside the component,
        because every word a stranger reads on this site is in this file and a default in a
@@ -268,10 +292,10 @@ export const site = {
      * draft. So the claim moves out of the not-built column, where it was a lie about our own
      * software, and becomes the limit it always was, stated beside the thing it limits.
      *
-     * `Turn a module off, People included` IS FROM THE CHANGELOG OF 2026-09-14 and is the detail
-     * `research-site-copy.md` ranks fifth of the eight things this page should say and does not:
-     * the granularity goes all the way down to the one register most products treat as
-     * infrastructure.
+     * IT SURVIVED THE CUT OF 2026-09-21 WHOLE, and that is deliberate. §19 asks for a shorter
+     * page, and `loop/DIRECTION.md` is equally clear that a shorter page must not become a
+     * truer-sounding one. Deleting a stated limit is the cheapest way to lose length and the one
+     * way that is not allowed, so the length came out of bands and pictures instead.
      */
     note:
       'Rules draft the arrangement. A model drafts it instead once you configure one, and none is ' +
@@ -325,135 +349,80 @@ export const site = {
   },
 
   /**
-   * THE ONE SENTENCE ON THE SITE THAT TEACHES THE WORD REGISTER by example.
-   *
-   * `test/content.test.ts` reads the register names back out of the served page and checks each
-   * against the seed's declarations, so `money, services, people` cannot be edited here alone. The
-   * picture beside it is the demo's home screen, photographed by `scripts/product.mjs`, and `alt`
-   * says what that screen holds for somebody who is not shown it.
-   */
-  typed: {
-    title: 'Typed rows, not a pile of notes',
-    lead:
-      'A register is a typed collection: money, services, people. So "what is due in October" has ' +
-      'an answer, not a search.',
-    /**
-     * THE CAPTION FOR A PICTURE THAT IS NOW THE WIDTH OF THE SCREEN.
-     *
-     * It read `the demo record, at full size`, which was a promise about the pixels made inside a
-     * 420px window that showed about a third of them. The picture is full-bleed now and the
-     * capture is 1440 CSS px wide, so at a 1440 viewport it paints one device pixel per captured
-     * pixel and the sentence is finally literal. `loop/research-site-reference.md` §5 measured
-     * that none of the four references boxes its primary product image.
-     */
-    caption: 'One record, photographed on the day this build was made',
-    alt:
-      'The home screen of a record: what it is owed and what is due, the money falling due this ' +
-      'week, the questions waiting on a decision, and what its agents and rules did while you ' +
-      'were away.',
-  },
-
-  /**
-   * AGENTS, with the limit in `note` and not in a footnote.
-   *
-   * THE RATIONALE HERE USED TO SAY *the transport is written and the hosted door is not*, and the
-   * hosted door IS written: `apps/worker/src/index.ts:1020-1032`, routed at
-   * `apps/worker/src/route.ts:70`, with `apps/worker/test/mcp.test.ts` over it. The public
-   * sentence in `note` was right for a different reason, which is worth having straight before
-   * somebody edits it: a hosted record is what nobody can open yet, not the door into one. A
-   * buyer who reads specifications works that out in about four minutes, so better it comes from
-   * us.
-   *
-   * THE TWENTY-ONE NAMES BELOW ARE THE SURFACE ITSELF, and they are here because
-   * `loop/research-site-copy.md` ranks this first of the eight things the page should say and does
-   * not: *"Agents get a typed surface, not a chat window."* The old section said agents "read and
-   * write the same rows", which undersells a surface built so a session can ask for a schema, a
-   * filtered list, a search, an activity feed, a money view, a governance queue, and hand context
-   * to the next session, all typed and none of it scraped HTML.
-   *
-   * THEY ARE COPIED FROM THE DECLARATION AND NOT INVENTED. `tools` is every `name:` key of
-   * `packages/mcp/src/index.ts:163-329`, in declaration order; `templates` is the `name` of each
-   * entry in that file's `TEMPLATES` array. `schema` appears in both lists and that is not a
-   * mistake: it is a tool a caller runs and a resource a client can subscribe to, which is why the
-   * two lists are drawn under two headings rather than merged into one of twenty.
-   */
-  agents: {
-    title: 'Agents propose. You decide.',
-    lead:
-      'Claude, Codex and Cursor read and write the same rows you do, over MCP, with a key you ' +
-      'issue. Every change carries a name.',
-    toolsHead: 'Tools',
-    tools: [
-      'record_index',
-      'context',
-      'schema',
-      'get',
-      'list',
-      'search',
-      'history',
-      'activity',
-      'money',
-      'governance',
-      'propose',
-      'create',
-      'update',
-      'log',
-      'handoff',
-      'meet',
-    ],
-    templatesHead: 'Resource templates',
-    templates: ['schema/{register}', 'page/{slug}', 'metric/{id}', 'skill/{name}', 'declaration/{slug}'],
-    note: 'Agents reach a self-hosted record today.',
-  },
-
-  /**
    * THE OWNER'S OWN CASE: numbers arriving from the projects themselves, drawn as dashboards.
    * `caption` says where the numbers in the picture came from, because a dashboard with no
    * provenance is a mock-up.
+   *
+   * THE SPECIFICATION THAT USED TO LIE ON THIS PICTURE IS GONE FROM THE PAGE. It was four rows of
+   * what a report key can and cannot do (write only, one register, 100 rows and 256 KB a call, 600
+   * rows a minute), every figure read off `packages/record/src/report.ts:1-30`, and every one of
+   * them true. It is also a table of limits on a credential, which is a thing a reader wants at the
+   * moment they are about to paste one into a deploy script and at no moment before that. §19 puts
+   * it plainly: what is worth keeping belongs on a page a curious reader reaches on purpose. There
+   * is no such page on this site yet, so the rows are recorded here and drawn nowhere, and the
+   * band is about two hundred and thirty pixels shorter for it.
    */
   report: {
+    tag: 'Reported',
     title: 'Your projects report. Your dashboards draw.',
     lead: 'Give a project a report key, or an address to poll. The numbers arrive and the tiles draw.',
-    /**
-     * WHAT A LEAKED REPORT KEY CAN ACTUALLY DO, which is the fourth thing
-     * `loop/research-site-copy.md` says this page should say and does not.
-     *
-     * Every figure is read off `packages/record/src/report.ts:1-30`. A developer deciding whether
-     * to paste a credential into a deploy script checks exactly this before anything else, and
-     * "give a project a report key" on its own invites them to assume the worst, which is an API
-     * token with read access to their whole record. It is the opposite: it cannot read one row of
-     * the record it writes into.
-     */
-    specHead: 'What a report key can do',
-    spec: [
-      { term: 'Direction', def: 'Write only. It cannot read a row.' },
-      { term: 'Reach', def: 'One register, and a fixed set of fields.' },
-      { term: 'Per call', def: '100 rows, 256 KB.' },
-      { term: 'Per minute', def: '600 rows.' },
-    ],
     caption: 'sixty days of rows, written the way a project reports them',
     /* `region` WENT WITH THE SCROLLING BOX IT NAMED. It was the accessible name of a 420px window
        a reader had to scroll, and there is no window now: the picture is painted at its own size
        and the band clips what will not fit. This file's own rule is that a key nothing renders is
-       deleted rather than kept for later, and `typed.region` went the same way in the same pass. */
+       deleted rather than kept for later. */
     alt:
       "A founder's Dashboard: cash across organisations, the balance of each, and active users, " +
       'recurring revenue and signups drawn against the thirty days before.',
   },
 
   /**
+   * THE LAST BAND BEFORE THE CLOSE, and it is where every sentence about mechanism ended up.
+   *
    * WHAT A READER CAN HOLD THE PRODUCT TO, what is not built, and what it will never do, in three
-   * columns side by side. The middle column is the reason the other two get believed.
+   * columns side by side. The middle column is the reason the other two get believed, which is why
+   * it is the longest of the three and why it lost nothing in the cut.
+   *
+   * `lead` IS TWO BANDS' WORTH OF PAGE IN THREE SENTENCES, and each one is load-bearing:
+   *
+   *   - `A register is a typed collection: money, services, people.` is the one sentence on the
+   *     site that teaches the word by example, and `test/content.test.ts` reads the three names
+   *     back out of the served bytes and checks each against the seed's declarations. It was the
+   *     lead of a band called `Typed rows, not a pile of notes`, at the top of the page, which is
+   *     the mechanism-before-value order §19 asks us to stop using.
+   *   - The agents sentence is what `loop/research-site-copy.md` ranks FIRST of the eight things
+   *     this page should say: an agent gets a typed surface, not a chat window. The sixteen tool
+   *     names that used to be drawn under it as a grid are gone, because a reader who does not
+   *     already know what `governance` or `handoff` means learns nothing from reading the word,
+   *     and a reader who does will go to the protocol.
+   *   - `every change carries a name` is the claim the ledger under this paragraph demonstrates.
+   *     It is placed last for that reason: the names in the `who` column are You, Codex, a rule
+   *     and Claude, and three of the four arrive while the reader is looking at them.
    */
   plain: {
+    tag: 'In writing',
     title: 'Plain about what it is',
+    lead:
+      'A register is a typed collection: money, services, people. Claude, Codex and Cursor read ' +
+      'and write the same rows you do, over MCP, with a key you issue, and every change carries a ' +
+      'name.',
+    /**
+     * THE LIMIT ON THE SENTENCE ABOVE, and it is a limit about records rather than about the door.
+     *
+     * The hosted MCP door IS written (`apps/worker/src/index.ts:1020-1032`, routed at
+     * `apps/worker/src/route.ts:70`, with `apps/worker/test/mcp.test.ts` over it). What nobody can
+     * open yet is a hosted RECORD, so self-hosting is the only place an agent can reach one today.
+     * A buyer who reads specifications works that out in about four minutes, so better it comes
+     * from us.
+     */
+    note: 'Agents reach a self-hosted record today.',
     columns: [
       {
         head: 'Yours to keep',
         /**
-         * ALL THREE OF THESE WERE FALSE OR OVERSTATED, and an audit falsified each with one grep.
-         * They are the three sentences on the page a reader is most likely to check, which is the
-         * whole point of the column, so they are the three worst ones to have got wrong.
+         * ALL THREE OF THESE WERE FALSE OR OVERSTATED ONCE, and an audit falsified each with one
+         * grep. They are the sentences on the page a reader is most likely to check, which is the
+         * whole point of the column, so they were the worst ones to have got wrong.
          *
          *   - `The code is on GitHub` is true of the address and not of a reader: the repository
          *     is private and the link 404s. `/legal` admitted it and this page did not, which is
@@ -462,23 +431,18 @@ export const site = {
          *     (`apps/selfhost/src/main.ts:105`, `:171`, `:257`): the record, a second database
          *     holding sign-in and people, and a `blobs` directory where attachments live OUTSIDE
          *     the record. The pricing page kept the qualifier and this page dropped it.
-         *   - `Nothing is overwritten` is the hero's claim and falls for the hero's reason.
+         *
+         * THE BACKUPS LINE WENT IN THE CUT OF 2026-09-21 AND IT IS THE ONE DELETION HERE.
+         * It read `Thirty nightly backups, in the same portable format on either host`, and it is
+         * true (`apps/worker/src/snapshots.ts:1-30`, `apps/selfhost/src/snapshots.ts:30`). It is
+         * also a counted figure of the product's own parts, which is the category the owner named
+         * as silly, and the same thirty was one of the four numbers deleted from under the hero. A
+         * strength coming off the page costs the page nothing it is owed; a LIMIT coming off would
+         * have, which is why the middle column below still has three lines.
          */
-        /* THE THIRD LINE WAS THE HERO'S SENTENCE AGAIN, WORD FOR WORD. `hero.sub` already ends
-           `Every change is an event, and the log only grows`, and the same ten words a second
-           time three bands down is not a second reason to believe it: it is the page counting
-           one claim twice. The column is two lines now, and the claim is made once, at the top,
-           where the ledger beside it is busy demonstrating it. */
         lines: [
           'Open source. The code opens on GitHub when the product launches.',
           'Your record is one file. Leaving is a copy, not a migration.',
-          /* THE STRONGEST ANSWER TO "WHAT HAPPENS IF I LEAVE" AND IT WAS ON NEITHER MARKETING
-             PAGE. `loop/research-site-copy.md` ranks it third: the self-host writes a signed,
-             versioned export, the hosted Cloud takes the same format as its nightly backup, and
-             thirty are kept on both sides (`apps/worker/src/snapshots.ts:1-30`,
-             `apps/selfhost/src/snapshots.ts:30`). The pricing page offered "your own backups" to
-             self-hosters only, which reads as a reason NOT to take the hosted plan. */
-          'Thirty nightly backups, in the same portable format on either host.',
         ],
       },
       {
@@ -519,9 +483,7 @@ export const site = {
              arrival door on 2026-09-20 and the changelog says so, so `Mail does not arrive by
              itself` on its own now reads as the page disagreeing with its own history page. The
              two are compatible and the distinction is the whole point: nothing here reaches into
-             an inbox, and what does land has to be forwarded there by a person. The sentence says
-             the limit and stops, because neither plan is open and a claim about what a stranger
-             can make land today would be a claim about a door nobody can reach. */
+             an inbox, and what does land has to be forwarded there by a person. */
           'Mail does not arrive by itself. Nothing reaches into your inbox, and a message has to be forwarded in.',
           /* THE DEMO BELONGS IN THIS COLUMN and was in none of them, which is how the page came
              to point its one filled button at it. `DEMO_RECORD` is empty in both environments. */
@@ -534,7 +496,10 @@ export const site = {
            `loop/DIRECTION.md:224` schedules exactly that: *agents do the legwork in view: filing
            invoices from email, chasing, flagging, proposing*. This column is a list of permanent
            never-promises, so a capability the owner has written down as planned cannot be in it.
-           Double entry stays, because DIRECTION §2 is explicit that Money is not a ledger. */
+           Double entry stays, because DIRECTION §2 is explicit that Money is not a ledger.
+
+           ALL THREE SURVIVED THE CUT. A refusal is the cheapest credibility a marketing page can
+           buy and the most expensive to win back once it is dropped. */
         lines: [
           'Double entry, or a general ledger.',
           'A pipeline, a sequence or a lead score.',

@@ -2,64 +2,82 @@
   /**
    * brain.dog's home page.
    *
-   * WHAT THIS REPLACED, AND THE MEASUREMENTS THAT CONDEMNED IT. The page before it was audited
-   * pixel by pixel in `loop/research-site-reference.md` against PostHog, FirstLook, Linear and
-   * Supabase, and the findings are not opinions:
+   * WHAT THE OWNER SAID ON 2026-09-21, WHICH IS THE THIRD DIRECTION ABOUT THIS PAGE IN ONE DAY, and
+   * `loop/DIRECTION.md` §19 carries it verbatim: *i dont like how it's so long, and it's all records
+   * and text. i want it to be more graphical, and shows the value, not what it does technically (at
+   * least not for the first blocks). it should be an exciting tool to use, not a boring text-based
+   * tool. less of those silly ai-looking stats of tools, templates, etc. i want a high value elevated
+   * design please*
    *
-   *   - Every band used the same grid and opened with the same move, so ONE layout ran six times.
-   *     FirstLook runs ten in ten sections and repeats none.
-   *   - The ground did not change for 4,368px. The only second surface on the whole page was a
-   *     320px closing band at 1.04:1 against what it sat on. FirstLook flips its ground six times
-   *     and each flip is a 15.88:1 jump.
-   *   - Sampling every sixth row, 519 of 1,092 rows held nothing but the 1px rule. At three
-   *     separate heights a scan of the full 2160px row returned exactly two non-background pixels.
-   *     The median row's ink stopped at CSS x=389 of 1440.
-   *   - The hero was 86.4px of type, the largest of the five sites measured, squeezed into 441px
-   *     by `max-inline-size: 14ch`. Linear's 64px spans 1282px.
-   *   - Both product screenshots were boxed in a 420px scrolling window. Not one of the four
-   *     references boxes its primary product image.
+   * THE PAGE HE WAS LOOKING AT, MEASURED BEFORE ANY OF THIS WAS TOUCHED. Driven over
+   * `apps/site/build` at 1440 by 900, device scale 1, motion reduced, dark scheme: the document was
+   * 5,658px over seven bands of 904, 966, 630, 726, 1,153, 573 and 397, and 7,042px at 390. Four of
+   * those seven bands opened with a sentence and then argued in a table, a list or a grid.
    *
-   * WHAT IT IS NOW, and the rule each answer came from. `apps/site/DESIGN-NOTES.md` carries the
-   * source read, with the URL beside every value.
+   * WHAT CAME OUT, AND WHY EACH ONE RATHER THAN A TRIM EVERYWHERE:
    *
-   *   - SEVEN BANDS, AND SEVEN LAYOUTS AT 1024 AND ABOVE, six below 1000: a hero whose headline
-   *     runs the width of the column, a full-bleed photograph of the product, a switcher, a
-   *     sixteen-cell grid on a flipped ground, a specification beside an image that runs off the
-   *     edge of the screen, a three-column table, and a closing band in the brand colour.
+   *   - THE FOUR COUNTED FIGURES UNDER THE HERO. `16 tools an agent can call`, `5 resource
+   *     templates beside them`, `1 file holds your record`, `30 nightly backups, either host`.
+   *     Every one was counted off a real declaration and not one of them answered a question a
+   *     reader had arrived with. They were 130px of the first screen, which is the most expensive
+   *     130px on the site.
+   *   - THE WHOLE `Over MCP` BAND, which was the sixteen tool names in a four-column grid, five
+   *     resource-template grammars as chips, and two uppercase list headings over them: 726px to
+   *     print a protocol's declaration order at a stranger. Its two sentences survive, in the last
+   *     band before the close, where a reader who wants the mechanism will find them.
+   *   - THE `Typed rows` BAND'S HEADING BLOCK, 235px of mark, heading and lead sitting between the
+   *     hero and the product photograph it introduced. The photograph moved INTO the hero and the
+   *     heading block did not come with it, because the picture was never the illustration for that
+   *     sentence: it is the best thing this product has and it was being used as a footnote to a
+   *     paragraph about data modelling.
+   *   - THE FOUR-ROW SPECIFICATION OF WHAT A REPORT KEY CAN DO, off the dashboard band. Every
+   *     figure in it is true and the whole table is a thing a reader wants at the moment they are
+   *     about to paste a credential into a deploy script, which is not this moment.
    *
-   * WHAT THE SECOND PASS CHANGED, and the sentence in the first pass's own notes that asked for
-   * it: "three bands still share one armature". Bands 0001, 0003 and 0005 were all copy on the
-   * left and a widget on the right, so the count above was really five shapes in seven bands, and
-   * 0003 carried the emptiness fault at one band's scale with its left column stopping about 120px
-   * short of the rail beside it.
+   * WHAT DID NOT COME OUT, AND THIS IS THE RULE WITH TEETH. `loop/DIRECTION.md` is explicit that a
+   * shorter page must not become a truer-sounding one. Every stated limit is still on the page: the
+   * three lines of `Not built yet`, the three refusals of `It will not do`, the note that agents
+   * reach a self-hosted record today, and the note that rules draft the arrangement unless a model
+   * is configured. The only sentence deleted for length rather than for mechanism is the thirty
+   * nightly backups, and that is a strength, not a limit, and it is a counted figure of the kind he
+   * named. Length came out of bands and pictures.
    *
-   *   - 0003 IS A STRIP. The sentence runs the column, the control runs the whole screen between
-   *     two hairlines, and the rail it redraws sits under it. Nothing is beside anything.
-   *   - 0005 IS A LAYER. The dashboard is the width of the screen and wider than it inside, by
-   *     12.7 per cent at every width, and the specification lies on the picture in an opaque card
-   *     rather than in a column next to it. It is the only place on the site where two surfaces
-   *     overlap.
-   *   - The split survives in the hero alone, which is one use of a shape and not a repeat of one.
-   *     Counted the way `loop/research-site-reference.md` counts the references, that is seven
-   *     distinct layouts across seven bands AT 1024 AND ABOVE, against FirstLook's ten in ten.
-   *     The width belongs on that claim: `.head-two` collapses to one column under 1000px, and
-   *     bands 0002 and 0003 then open with a mark, a title and a lead at the same coordinates, so
-   *     it is six in seven at 900 and at 390. Measured, both titles land at x=32, y=139 inside
-   *     their band at 900 and the leads differ by 24px of offset and by their measure alone.
-   *   - SIX GROUND CHANGES, two of them at the body-text ratio. `app.css` holds the mechanism and
-   *     the argument for it; a band names a ground and every component inside it follows.
-   *   - THE FRAME IS FILLED. Measured on the built page at 1440, the rightmost ink in each of the
-   *     seven bands is 1320, 1440, 1320, 1320, 1440, 1320 and 1320 pixels: every band reaches the
-   *     right edge of the 1,200px column, and the two picture bands reach the edge of the screen.
-   *     The page this replaces had a MEDIAN rightmost ink of x=389.
-   *   - AIR IS UNCHANGED, on purpose. 192px between bands is identical to FirstLook's and three
-   *     times PostHog's 64px, so spacing was measured, found already right, and left alone.
-   *   - TYPE CAME DOWN, from 86.4px to 67.68px at 1440, and the `14ch` cap went, so the headline
-   *     is 970px wide on ONE line where it was 441px on three. Linear's is 64px over 1282px.
-   *   - ONE FILLED BUTTON ABOVE THE CLOSE, which is `app.css`'s rule and was already kept.
-   *   - COLOUR IS SPENT FOUR WAYS, not one: the last two words of the headline, the sequence
-   *     number opening each band, the three state marks in the promise table, and the closing
-   *     band's whole field.
+   * WHAT IT IS NOW: FIVE BANDS, VALUE FIRST, AND EVERY ONE OF THE FIRST THREE LED BY SOMETHING
+   * DRAWN RATHER THAN WRITTEN.
+   *
+   *   HERO        the promise, one action, and the product at the width of the screen, cropping off
+   *               the bottom of the fold the way Linear runs its 1,344px shot off the first screen.
+   *   0001        the switcher: the record becoming the reader's own, redrawn as they press.
+   *   0002        the dashboard, wider than the screen, with the sentence lying on its top strip.
+   *   0003        the mechanism, all of it, in one band: registers, agents, the ledger arriving,
+   *               and the three honest columns.
+   *   close       the accent as a whole field.
+   *
+   * WHAT SURVIVED FROM THE TWO PASSES BEFORE THIS ONE, because those measurements are still the
+   * reason these shapes are the shapes:
+   *
+   *   - FIVE DISTINCT LAYOUTS IN FIVE BANDS at 1024 and above. `research-site-reference.md` counts
+   *     FirstLook at ten in ten and the page before last at one in six.
+   *   - THE FRAME IS FILLED. The fault that redesign existed to fix was a MEDIAN rightmost ink of
+   *     x=389 of 1440, with 519 of 1,092 sampled rows holding nothing but a hairline. Two of the
+   *     five bands here reach the edge of the screen and the rest reach the edge of the column.
+   *   - FOUR GROUND CHANGES over five bands, three of them inversions at 15.41:1 in light and
+   *     17.61:1 in dark. `app.css` holds the mechanism and the arithmetic.
+   *   - ONE FILLED BUTTON ABOVE THE CLOSE, which is `app.css`'s rule.
+   *   - THE ACCENT IS SPENT FOUR WAYS and it is a true red now, `#DB2527` at the mark's own hue
+   *     (DIRECTION §19): the last two words of the headline, the glow the product picture rises
+   *     out of, the sequence number on the bands that sit on the page's own ground, and the
+   *     closing band's whole field.
+   *
+   *     THE SEQUENCE NUMBER IS RED ON ONE BAND OF THE THREE AND NOT ON ALL THREE, which the line
+   *     above used to claim. `.band-seq` is `--accent-text`, and `app.css` redefines
+   *     `--accent-text` on a flipped band to the flipped ink, for a reason that is not negotiable:
+   *     a flipped band is the OTHER scheme's ground, `--accent-text` is solved against the five
+   *     DECLARED surfaces of the current one, and on a flipped band it measures about 1.9:1 in
+   *     dark and 2.5:1 in light, under the 3:1 a focus indicator needs. So 0002 opens in red and
+   *     0001 and 0003 open in ink, and that is the accessibility rule winning an argument with the
+   *     decoration, which is the right result. What would fix it properly is a token for the other
+   *     scheme's accent text, and that belongs in `packages/theme` rather than here.
    */
   import Arrange from '$lib/Arrange.svelte';
   import Icon from '$lib/Icon.svelte';
@@ -75,7 +93,7 @@
    * reading: what holds is `earn`, what is not here yet is `warn`, and what will never be here is
    * `info`, because it is a decision rather than a fault. `danger` is deliberately not among them,
    * for the reason `icons.ts` already gives: on a page with nothing wrong on it, a red mark says
-   * something is.
+   * something is. That reason got stronger on 2026-09-21, when the accent itself became a red.
    */
   const COLUMN_HUE: readonly Hue[] = ['earn', 'warn', 'info'];
 </script>
@@ -92,24 +110,30 @@
   <meta property="og:description" content={site.meta.home.description} />
 </svelte:head>
 
-<!-- ── 0001 · The hero ──────────────────────────────────────────────────────
-     The headline runs the full column on one line at 1440, and the row under it carries the
-     sentence on the left and the action on the right. THE LEDGER IS NOT ON THE RIGHT, which is
-     what this comment said while the second pass's hero was still here: it runs under both at
-     1,200px, measured at x=120, against the headline's 1,136 at x=152. The four figures close the
-     band at the column's own width, so the first screen has ink from margin to margin at three
-     separate heights rather than at none. -->
-<section class="band hero" data-ground="page" aria-labelledby="hero-title">
-  <div class="in reveal">
-    <p class="band-mark">
-      <span class="band-seq">0001</span>
-      <span class="band-rule"></span>
-      <span class="band-tag">One record</span>
-    </p>
+<!-- ── The hero ─────────────────────────────────────────────────────────────
+     THE FIRST SCREEN IS A PROMISE AND A PRODUCT, AND NOTHING ELSE IS ALLOWED ON IT.
 
+     It used to carry the promise, a five-row ledger at 1,200px, and four counted figures across the
+     column, which is three things competing to be looked at first and two of them made of text. The
+     ledger is a list of records, which is literally what he said the page was all of, and the four
+     figures are the stats he called silly. Both are gone from here: the ledger is the evidence in
+     band 0003, and the figures are gone from the site.
+
+     THERE IS NO SEQUENCE MARK ABOVE THE HEADLINE. Every other band opens with one, and on the hero
+     it would be an uppercase eyebrow over an `h1`, which `loop/DIRECTION.md` §1 lists by name as a
+     regression. The numbering therefore runs 0001 to 0003 across the three bands after this one,
+     which reads as three chapters rather than as a form with a missing first field. -->
+<section class="band hero" data-ground="page" aria-labelledby="hero-title">
+  <!-- `.in` AND NOTHING ELSE. This carried `hero-say` until the checker read it: the rule of that
+       name became `.hero-row` on the inner grid in the same pass, so the class on this element
+       styled nothing, in a file whose own rule is that a name nothing renders is deleted. It also
+       no longer carries `reveal`, which is right and is worth saying: the hero is on screen when
+       the page opens, and a `view()` timeline on something already in view resolves at the end of
+       its own range and does nothing. The picture below has an on-load animation instead. -->
+  <div class="in">
     <h1 class="display" id="hero-title">{site.hero.title} <span class="hl">{site.hero.titleAccent}</span></h1>
 
-    <div class="hero-say">
+    <div class="hero-row">
       <p class="sub">{site.hero.sub}</p>
       <div class="hero-do">
         <div class="actions">
@@ -122,77 +146,32 @@
     </div>
   </div>
 
-  <!-- THE CLAIM, BEING DEMONSTRATED UNDER IT, ACROSS THE WHOLE READING COLUMN AND ITS GUTTERS.
+  <!--
+    THE PRODUCT, AT THE WIDTH OF THE SCREEN, RISING OUT OF THE ACCENT.
 
-       IT WAS A 540px PANEL BESIDE 46ch OF COPY, which is the armature bands 0002 and 0005 were
-       both using: three copies of one shape, and the first one is the shape a stranger meets. The
-       hero is the only band on the page that cannot afford to look like the others.
+    This picture was band 0002 and it had 235px of heading above it. Measured at 1440 on the page
+    before this one, the 0001/0002 hairline was at y=953.06 and the picture's top edge at y=1188.06,
+    so a reader met a rule, a mark, a two-column heading and a paragraph before they saw the product
+    at all. It is the first thing under the headline now.
 
-       The reference read measures what the pages he pointed at put on the first screen instead:
-       Linear runs a 1,344px product element from y=527 off the bottom of the fold, and 25 distinct
-       colours cover the first screen with no single one over 49.8 per cent of it
-       (`loop/research-site-reference.md`, section 3). We have no third capture to run off the fold
-       and we have something no reference has: an element that is actually running. So the demo
-       goes under the headline at 1,200px, measured at x=120 in a 1,440px window, which is 2.2
-       times the 540px box it replaces and 144px under Linear's 1,344. This comment said "at the
-       width of the screen" for two passes and the pixels never said it.
+    IT IS PAINTED AT ITS OWN SIZE AND CROPPED AT THE BOTTOM, which is Linear's move: a 1,344px
+    product shot that starts inside the first screen and runs off it. The capture is 1440 CSS px
+    wide (2880 at a device scale of 2), so at a 1440 viewport this paints exactly one device pixel
+    per captured pixel and the caption's claim is literal.
 
-       "The log only grows" is a claim about behaviour over time, and no still picture can carry
-       one. A list that only ever grows, watched for four seconds, can. -->
-  <div class="hero-stage reveal">
-    <Ledger
-      events={site.ledger.events}
-      head={site.ledger.head}
-      only={site.ledger.only}
-      all={site.ledger.all}
-    />
-  </div>
+    FOUR SOURCES, AND THE NARROW PAIR IS A DIFFERENT PHOTOGRAPH RATHER THAN THE SAME ONE SMALLER. A
+    1440-wide capture painted into 358px is a twelve per cent scale, which puts the app's 14px text
+    on the page at under two pixels: a grey texture in the one picture whose whole argument is look
+    at this. `scripts/product.mjs` takes the narrow pair at 390 by 844 at a device scale of 3, which
+    is what that class of device actually has, so on a phone the type is the size the type is. It is
+    also the truthful picture: somebody reading this on a phone is deciding whether to open the app
+    on a phone.
 
-  <div class="in">
-
-    <!-- FOUR NUMBERS, EACH ONE COUNTED. `copy.ts` records the command behind every figure and why
-         two of the ones asked for are absent: a commit count moves every hour, and this page
-         redeploys on a schedule. -->
-    <ul class="facts hair">
-      {#each site.facts.items as fact (fact.label)}
-        <li class="fact">
-          <span class="fact-fig num">{fact.figure}</span>
-          <span class="fact-lab">{fact.label}</span>
-        </li>
-      {/each}
-    </ul>
-  </div>
-</section>
-
-<!-- ── 0002 · The product, at the width of the screen ───────────────────────
-     The one move every reference makes and this page did not. Linear runs a 1344px product shot
-     off the bottom of its first screen; PostHog's wallpaper is full-bleed behind everything;
-     FirstLook's section grounds go edge to edge. Ours was 1440 natural pixels inside a 420px
-     window, which showed about a third of the picture and asked the reader to scroll a box. -->
-<section class="band" data-ground="page" aria-labelledby="typed-title">
-  <div class="in reveal">
-    <p class="band-mark">
-      <span class="band-seq">0002</span>
-      <span class="band-rule"></span>
-      <span class="band-tag">Typed rows</span>
-    </p>
-    <div class="head-two">
-      <h2 class="title" id="typed-title">{site.typed.title}</h2>
-      <p class="lead">{site.typed.lead}</p>
-    </div>
-  </div>
-
-  <figure class="bleed reveal">
-    <!-- FOUR SOURCES, AND THE NARROW PAIR IS A DIFFERENT PHOTOGRAPH RATHER THAN THE SAME ONE
-         SMALLER. A 1440-wide capture painted into 358px is a twelve per cent scale, which puts the
-         app's 14px text on the page at under two pixels: a grey texture in the one band whose
-         whole argument is look at this. `scripts/product.mjs` takes the narrow pair at 390 by 844
-         at a device scale of 3, which is what that class of device actually has, so on a phone the
-         type is the size the type is. It is also the truthful picture: somebody reading this on a
-         phone is deciding whether to open the app on a phone.
-
-         `width` and `height` on every source so the box is reserved before the bytes arrive and
-         nothing below it moves while somebody is reading. -->
+    `width` and `height` on every source so the box is reserved before the bytes arrive and nothing
+    below it moves while somebody is reading. No `loading="lazy"`: this is above the fold now, and a
+    lazy first screen is a first screen that arrives late.
+  -->
+  <figure class="stage">
     <picture>
       <source
         media="(prefers-color-scheme: dark) and (width < 700px)"
@@ -202,31 +181,28 @@
       />
       <source media="(width < 700px)" srcset="/shots/home-phone-light.webp" width="1170" height="2532" />
       <source media="(prefers-color-scheme: dark)" srcset="/shots/home-dark.webp" width="2880" height="1800" />
-      <img src="/shots/home-light.webp" width="2880" height="1800" alt={site.typed.alt} decoding="async" />
+      <img src="/shots/home-light.webp" width="2880" height="1800" alt={site.hero.alt} decoding="async" />
     </picture>
-    <figcaption class="caption in">{site.typed.caption}</figcaption>
+    <figcaption class="caption in">{site.hero.caption}</figcaption>
   </figure>
 </section>
 
-<!-- ── 0003 · Arranged for you ──────────────────────────────────────────────
+<!-- ── 0001 · Arranged for you ──────────────────────────────────────────────
+     THE FIRST BAND AFTER THE HERO ANSWERS "WHAT IS THIS WORTH TO ME", which is the order §19 asks
+     for and the reverse of the order this page had. It used to be the third band, behind typed rows
+     and behind the full-bleed photograph; ahead of it a reader met a sentence about registers.
+
      The switcher is the argument: pressing a case redraws the rail in front of the reader, so the
-     claim is made by the page doing the thing rather than by a sentence about it.
-
-     THIS BAND USED TO BE COPY ON THE LEFT AND THE WIDGET ON THE RIGHT, which was the hero's
-     armature and the report band's armature as well, so one shape ran three times on a page whose
-     whole brief was that FirstLook runs ten without repeating. It had the emptiness fault too, at
-     one band's scale: the copy column ran out about 120px above the rail beside it and the bottom
-     left of the band was blank.
-
-     It is a strip now. The sentence runs the width of the column, the control runs the width of
-     the SCREEN between two hairlines, and the thing it redraws sits under it. Nothing is beside
-     anything, so there is no short column to leave a hole under. -->
+     claim is made by the page doing the thing rather than by a sentence about it. It is a strip.
+     The sentence runs the width of the column, the control runs the width of the SCREEN between two
+     hairlines, and the thing it redraws sits under it. Nothing is beside anything, so there is no
+     short column to leave a hole under. -->
 <section class="band" data-ground="flip" aria-labelledby="arrange-title">
   <div class="in reveal">
     <p class="band-mark">
-      <span class="band-seq">0003</span>
+      <span class="band-seq">0001</span>
       <span class="band-rule"></span>
-      <span class="band-tag">Made of parts</span>
+      <span class="band-tag">{site.arrange.tag}</span>
     </p>
     <div class="arrange-head">
       <h2 class="title" id="arrange-title">{site.arrange.title}</h2>
@@ -243,61 +219,28 @@
   </div>
 </section>
 
-<!-- ── 0004 · Agents ───────────────────────────────────────────────────────
-     The strongest thing this product has to say and the page used to spend three chips on it.
-     `loop/research-site-copy.md` ranks it first of eight: an agent gets a typed surface, not a
-     chat window. So the surface itself is the picture, all twenty-one names of it.
-
-     AND IT IS THE ONE BAND WHOSE HEADING SHARES A LINE WITH ITS MARK. 0003 and 0004 were the only
-     two bands left opening the same way, mark, then heading, then lead, which is the shape a
-     reader stops seeing the second time. Here the heading sits on the mark's own line and the rule
-     runs from the end of the words to the tag, so the opener is one line instead of three and the
-     tools table starts higher up the band. -->
-<section class="band" data-ground="page" aria-labelledby="agents-title">
-  <div class="in reveal">
-    <div class="band-mark band-mark-line">
-      <span class="band-seq">0004</span>
-      <h2 class="title title-inline" id="agents-title">{site.agents.title}</h2>
-      <span class="band-rule"></span>
-      <span class="band-tag">Over MCP</span>
-    </div>
-    <p class="lead lead-wide">{site.agents.lead}</p>
-
-    <h3 class="sub-head">{site.agents.toolsHead}</h3>
-    <ul class="tools hair">
-      {#each site.agents.tools as tool (tool)}<li class="tool">{tool}</li>{/each}
-    </ul>
-
-    <h3 class="sub-head">{site.agents.templatesHead}</h3>
-    <ul class="templates">
-      {#each site.agents.templates as template (template)}<li class="template">{template}</li>{/each}
-    </ul>
-
-    <p class="note">{site.agents.note}</p>
-  </div>
-</section>
-
-<!-- ── 0005 · Numbers arrive ────────────────────────────────────────────────
-     The dashboard runs the full width of the screen and past both edges of it, and the
-     specification sits ON it rather than beside it.
-
-     IT WAS THE THIRD COPY OF ONE ARMATURE. Copy on the left, picture on the right, which the hero
-     and the switcher band were both already doing. It had the second fault as well: a 450px copy
-     column against a 540px picture leaves the bottom of the left column empty whichever way the
-     two are aligned, which is the emptiness this redesign exists to remove.
+<!-- ── 0002 · Numbers arrive ────────────────────────────────────────────────
+     The dashboard runs the full width of the screen and past both edges of it, and the sentence
+     sits ON it rather than beside it.
 
      A CARD LYING ON THE PICTURE IS THE ONE LAYERED THING ON THE PAGE. It is the only place where
      two surfaces overlap. The card is opaque `--s1` inside a `--line` hairline, so nothing behind
      it is read through it and the contrast is the page's own, which is why this costs no new token
      and no new shadow. WHAT IT MAY LIE ON IS THE PICTURE'S TOP STRIP AND NOTHING ELSE: every third
      of this dashboard holds a money figure, so a card parked against either margin hides one, and
-     it hid one for two passes. The measurement is in the stylesheet beside the overlap. -->
+     it hid one for two passes. The measurement is in the stylesheet beside the overlap.
+
+     THE CARD LOST ITS SPECIFICATION AND KEPT ITS SHAPE. It held a four-row table of what a report
+     key can do beside the heading; that table is now a comment in `copy.ts` and nothing on the
+     page. The two columns stay, because a heading alone in a 1,136px strip is the empty-frame
+     fault this page was rebuilt to remove: the title takes the left five twelfths and the sentence
+     the right six, and the strip reaches both edges of the reading column. -->
 <section class="band" data-ground="page" aria-labelledby="report-title">
   <div class="in">
     <p class="band-mark">
-      <span class="band-seq">0005</span>
+      <span class="band-seq">0002</span>
       <span class="band-rule"></span>
-      <span class="band-tag">Reported</span>
+      <span class="band-tag">{site.report.tag}</span>
     </p>
   </div>
   <div class="report reveal">
@@ -305,22 +248,8 @@
          reader meets the heading and then the picture, which is the order the section is written
          in; `z-index` alone decides which of the two grid items is on top. -->
     <div class="report-card">
-      <div class="report-say">
-        <h2 class="title" id="report-title">{site.report.title}</h2>
-        <p class="lead">{site.report.lead}</p>
-      </div>
-
-      <div class="report-spec">
-        <h3 class="sub-head">{site.report.specHead}</h3>
-        <dl class="spec hair">
-          {#each site.report.spec as row (row.term)}
-            <div class="spec-row">
-              <dt class="spec-term">{row.term}</dt>
-              <dd class="spec-def">{row.def}</dd>
-            </div>
-          {/each}
-        </dl>
-      </div>
+      <h2 class="title" id="report-title">{site.report.title}</h2>
+      <p class="lead">{site.report.lead}</p>
     </div>
 
     <figure class="report-shot">
@@ -357,17 +286,47 @@
   </div>
 </section>
 
-<!-- ── 0006 · Plain about what it is ────────────────────────────────────────
-     Three columns at one weight, in a grid whose dividers are the gap. The limits are not a
-     footnote; they are the reason the rest is believable. -->
+<!-- ── 0003 · Plain about what it is ────────────────────────────────────────
+     EVERY SENTENCE ABOUT MECHANISM ON THIS SITE IS IN THIS ONE BAND, and that is the whole of what
+     §19 asked for structurally. Registers, MCP, the ledger and the limits were four bands over
+     3,000px, spread from the second screen to the sixth. They are one band at the foot of the page
+     now, for the reader who has been convinced and wants to know what they would be buying.
+
+     THE LEDGER IS THE EVIDENCE FOR THE SENTENCE ABOVE IT AND NOT AN ORNAMENT. The lead ends `every
+     change carries a name`; the `who` column is You, Codex, a rule and Claude, and three of the
+     four arrive while the reader is looking at it. In the hero, where it used to live, it was
+     proving a sentence two lines above it that nobody had a reason to doubt yet.
+
+     THE OPENER IS ONE LINE. The heading sits on the mark's own line and the rule runs from the end
+     of the words to the tag, so the band starts with three lines of chrome fewer than the two above
+     it and no two bands on the page open the same way. -->
 <section class="band" data-ground="flip" aria-labelledby="plain-title">
   <div class="in reveal">
-    <p class="band-mark">
-      <span class="band-seq">0006</span>
+    <div class="band-mark band-mark-line">
+      <span class="band-seq">0003</span>
+      <h2 class="title title-inline" id="plain-title">{site.plain.title}</h2>
       <span class="band-rule"></span>
-      <span class="band-tag">In writing</span>
-    </p>
-    <h2 class="title" id="plain-title">{site.plain.title}</h2>
+      <span class="band-tag">{site.plain.tag}</span>
+    </div>
+    <p class="lead lead-wide">{site.plain.lead}</p>
+  </div>
+
+  <!-- THE LEDGER AT THE READING COLUMN AND ITS GUTTERS, which is 1,200px at 1440 and 83 per cent
+       of the screen. The rows are five columns of tabular text and the room goes to `what`, which
+       is the column that ellipsises first: the one element whose job is to prove nothing is
+       overwritten must not be truncating its own sentences. `overflow: hidden` because the rows
+       animate in from the right. -->
+  <div class="proof reveal">
+    <Ledger
+      events={site.ledger.events}
+      head={site.ledger.head}
+      only={site.ledger.only}
+      all={site.ledger.all}
+    />
+  </div>
+
+  <div class="in">
+    <p class="note proof-note">{site.plain.note}</p>
 
     <div class="cols hair">
       {#each site.plain.columns as column, i (column.head)}
@@ -405,38 +364,31 @@
 
 <style>
   /* ── The band ─────────────────────────────────────────────────────────────
-     A band is the full width of the screen and the column inside it is `.in` (app.css). The air is
-     unchanged from the page this replaces: `--sp-9` each side is 192px between band bodies, which
-     `research-site-reference.md` measured as identical to FirstLook's and three times PostHog's,
-     and concluded was already right. What changed is what fills it. */
+     A band is the full width of the screen and the column inside it is `.in` (app.css).
+
+     THE AIR CAME DOWN AND IT IS THE ONE PLACE LENGTH WAS TAKEN OUT OF SOMETHING THAT WAS RIGHT.
+     `--sp-9` each side is 192px between band bodies, which `research-site-reference.md` measured as
+     identical to FirstLook's and three times PostHog's 64px, and concluded was already right. It
+     was right for seven bands of argument; this page has five and the first three are pictures. The
+     `clamp` runs from 96px between bands on a phone to 176px at 1600 and beyond, which keeps the
+     generous end of the range where a wide screen can afford it and saves about 100px over the four
+     seams on a phone, where the document was 7,042px and length hurts most. */
   .band {
-    padding-block: var(--sp-9);
+    padding-block: clamp(var(--sp-8), 5.5vw, 88px);
   }
 
   /* A HAIRLINE AT EVERY SEAM, which is how PostHog marks a section off: each of the seven stacked
-     sections on `/product-analytics` carries `padding-top: 32px`, `padding-bottom: 32px` and a
-     `1px rgb(191,193,183)` top border, and nothing else. EVERY GROUND CHANGE ON THIS PAGE IS NOW A REAL ONE, WHICH IS WHY
-     THERE ARE FEWER OF THEM. There used to be six and four of those were `--sunk` against `--bg`,
-     which is 1.07:1: a real step in the eye's adaptation and not one a reader can point at, so the
-     page read as one grey field with rules across it. `--sunk` is the application's canvas and it
-     is a half step by design, which is right inside the app and wrong on a page somebody scrolls
-     once. The grounds are `page, page, flip, page, page, flip, brand`: four changes, and THREE of
-     them are inversions rather than all four. Sampled off the built page by reading each band's
-     computed background and running the WCAG formula over the pair, the three inversions are
-     15.41:1 in light and 17.61:1 in dark; the fourth, `flip` to `brand` at the last seam, is the
-     scheme's ink meeting `rgb(215, 32, 101)`, which is 3.42:1 in light and 4.62:1 in dark. That
-     is a fifth of the strength of the other three, and it is a change a reader can see, but the
-     word `every` was doing work the measurement does not support.
+     sections on `/product-analytics` carries a 1px top border and nothing else. THE GROUNDS ARE
+     `page, flip, page, flip, brand`: four changes, and THREE of them are inversions rather than all
+     four. Sampled off the built page by reading each band's computed background and running the
+     WCAG formula over the pair, the three inversions are 15.41:1 in light and 17.61:1 in dark; the
+     fourth, `flip` to `brand` at the last seam, is the scheme's ink meeting the accent, which is a
+     weaker change and a real one.
 
-     AND THE TWO SEAMS THAT DO NOT INVERT ARE MARKED BY THE RULE AND NOTHING ELSE. This comment
-     used to say they open with a picture that runs edge to edge, which was the argument for
-     dropping two of the six ground changes. Measured at 1440 in page coordinates, the 0001/0002
-     hairline is at y=953.06 and the picture's top edge is at y=1188.06, which is 235px below it,
-     behind a mark and a two-column heading; the 0004/0005 hairline is at y=3274.64 and its
-     picture starts at y=3617.27, 342.63px below, behind a mark and the card. A reader meets a
-     1px `--line` and then a third of a screen of the same ground. The rule is what turns a seam
-     into an edge there, and it is doing it alone. `+` rather than a rule on every band, so the
-     first one has no line hanging off the header above it. */
+     EVERY SEAM ON THIS PAGE NOW INVERTS OR LANDS ON THE BRAND, which the page before it could not
+     say: it had two seams marked by the rule alone, one of them 235px above the picture that was
+     supposed to be marking it. Merging four bands into one is what bought that. `+` rather than a
+     rule on every band, so the first one has no line hanging off the header above it. */
   .band + .band {
     border-block-start: 1px solid var(--line);
   }
@@ -447,7 +399,7 @@
 
   /* ── Type ─────────────────────────────────────────────────────────────────
 
-     68px AT 1440, DOWN FROM 86.4px, AND THE `14ch` CAP IS GONE.
+     68px AT 1440, AND THE `14ch` CAP IS GONE.
 
      Both numbers are the reference read's. Measured across the five sites: PostHog 36px, Supabase
      46px, Linear 64px, FirstLook 72px, brain.dog 86.4px. Ours was the biggest and it took the
@@ -471,7 +423,9 @@
   /* THE ONE PHRASE OF COLOUR IN THE HEADLINE, which is the move taken verbatim from PostHog's own
      hero (`text-red dark:text-yellow` on a phrase inside the `h1`, `src/components/Home/Hero.js`).
      `--accent-text` is the token solved for 4.5:1 as text on every declared surface in both
-     schemes, so this is the one accent role that may carry words. */
+     schemes, so this is the one accent role that may carry words. It is a true red now rather than
+     the crimson that read pink, which is DIRECTION §19 and is why the glow under the picture is
+     worth having at all. */
   .hl {
     color: var(--accent-text);
   }
@@ -482,19 +436,6 @@
     font-size: var(--t-xl);
     line-height: var(--lh-tight);
     letter-spacing: var(--tr-tight);
-  }
-
-  /* A HEADING FOR A LIST, at the identifier's volume rather than the title's. It is the label over
-     a specification, which is what `--font-id` is for, and it is deliberately not on the type
-     scale's display steps: `css-rules` refuses that pairing and it is right to. */
-  .sub-head {
-    margin-block: var(--sp-7) var(--sp-4);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .sub,
@@ -547,13 +488,13 @@
     font-size: var(--t-base);
   }
 
-  /* ── 0001 · The hero ──────────────────────────────────────────────────── */
+  /* ── The hero ─────────────────────────────────────────────────────────── */
 
   /* THE SENTENCE AND THE TWO ACTIONS SHARE A ROW, and both halves are text, which is what stops
-     this reading as the copy-beside-widget shape it replaced. `align-items: end` sets them on one
-     baseline at the bottom, so the row reads as one line of the page rather than as two columns
-     that happen to start together. */
-  .hero-say {
+     this reading as the copy-beside-widget shape the page used three times. `align-items: end`
+     sets them on one baseline at the bottom, so the row reads as one line of the page rather than
+     as two columns that happen to start together. */
+  .hero-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-7) var(--sp-8);
@@ -565,103 +506,82 @@
     min-inline-size: 0;
   }
 
-  /* THE STAGE IS THE SCREEN AND THE LEDGER INSIDE IT IS THE READING COLUMN, WHICH IS NOT THE SAME
-     SENTENCE. This comment used to say the ledger was 100 per cent of the screen. It is not: the
-     padding below is `max(--sp-6, (100% - --site-max) / 2)`, so at 1440 it puts 120px on each
-     side and the ledger measures x=120, w=1200, which is the reading column plus its two gutters
-     and 83 per cent of the screen. Measured on the built page: 1200px at x=120 at 1440, 1200px at
-     x=40 at 1280 and 960px at x=32 at 1024, against the `.display` above it at 1136px. Two things
-     on this page really are the width of the screen and this is not either of them: band 0002's
-     figure is 1,440px and band 0005's picture is wider than the window it is seen through.
-
-     WHAT THE CHANGE WAS FOR IS STILL TRUE AND IS THE PART WORTH KEEPING. The rows are five columns
-     of tabular text, and at 1,200px the room goes to `what`, which is the column that was
-     ellipsising first when the component lived in a 540px box: the one element whose job is to
-     prove nothing is overwritten was the one truncating its own sentences.
-     `overflow: hidden` because the rows animate in from the right. */
-  .hero-stage {
-    margin-block-start: var(--sp-8);
-    padding-inline: max(var(--sp-6), calc((100% - var(--site-max)) / 2));
-    overflow: hidden;
+  /**
+   * THE STAGE, AND THE GLOW IS THE ONE PIECE OF DECORATION ON THE WHOLE SITE.
+   *
+   * It is there because the picture's top edge is the seam between a page and a product, and a
+   * hairline alone makes that seam read as the top of a box. It is painted BEHIND the image and
+   * nothing is read through it, so it carries no contrast obligation of its own, and it is the
+   * only decoration on the site that is not also a piece of information.
+   *
+   * IT WAS `--accent-wash` AND `--accent-wash` WAS NOT VISIBLE. The theme's wash is
+   * `color-mix(in srgb, var(--accent) 12%, transparent)`, which is solved for a tint BEHIND TEXT
+   * and is therefore as quiet as a colour can be while still existing. Over 64px of near-black it
+   * came out as nothing at all in the dark capture and as a faint smear in the light one, which is
+   * a decoration that costs a rule and pays nothing. 28 per cent is the same mix at the strength
+   * this job needs. No colour is spelled out either way, and the mix follows the accent wherever
+   * the accent goes: it was a crimson this morning and it is a true red now, and this rule did not
+   * have to know.
+   *
+   * The gradient's stop is at 72 per cent of a 56-per-cent-wide ellipse anchored on the picture's
+   * top edge, which puts the strongest part of it directly under the middle of the product and
+   * nothing at either margin. A wash that reached the margins would read as a band of its own.
+   */
+  .stage {
+    position: relative;
+    margin: var(--sp-8) 0 0;
   }
 
-  .facts {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin-block-start: var(--sp-8);
-    padding: 0;
-    list-style: none;
-  }
-
-  .fact {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-5);
-  }
-
-  /* The figure at a display step and the label at the smallest one, which is the whole hierarchy: a
-     number is worth reading and the words under it are what it means. Tabular figures because
-     `base.css` is explicit that a quantity gets them on a proportional face and identity gets the
-     mono face, and these are quantities. */
-  .fact-fig {
-    color: var(--ink);
-    font-size: var(--t-2xl);
-    font-weight: 600;
-    letter-spacing: var(--tr-tight);
-    line-height: 1;
-  }
-
-  .fact-lab {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    text-wrap: pretty;
-  }
-
-  /* ── 0002 · The full-bleed photograph ─────────────────────────────────── */
-
-  .head-two {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--sp-8);
-    align-items: end;
-  }
-
-  .head-two .lead {
-    margin-block-start: 0;
-  }
-
-  /* The figure is a child of the band rather than of `.in`, which is the whole of how it goes
-     full-bleed: there is no negative margin and nothing to keep in step with the column width. */
-  .bleed {
-    margin: var(--sp-7) 0 0;
+  .stage::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: calc(-1 * var(--sp-8));
+    block-size: var(--sp-8);
+    background: radial-gradient(
+      56% 100% at 50% 100%,
+      color-mix(in srgb, var(--accent) 28%, transparent),
+      transparent 72%
+    );
+    pointer-events: none;
   }
 
   /**
-   * THE PICTURE IS PAINTED AT ITS OWN SIZE AND CROPPED AT THE BOTTOM, which is Linear's move: a
-   * 1344px product shot that starts inside the first screen and runs off it.
+   * THE PICTURE IS PAINTED AT ITS OWN SIZE AND CROPPED AT THE BOTTOM.
    *
    * The capture is 1440 CSS px wide (2880 at a device scale of 2), so at a 1440 viewport this
-   * paints exactly one device pixel per captured pixel and the caption's claim is literal. Above
-   * 1440 the image scales up to keep covering the width, which crops further off the BOTTOM and
-   * never off the side, because `cover` matches the wider axis first.
+   * paints exactly one device pixel per captured pixel. Above 1440 the image scales up to keep
+   * covering the width, which crops further off the BOTTOM and never off the side, because `cover`
+   * matches the wider axis first.
    *
    * `object-position: 0 0` anchors the top-left corner, so the app's own rail is never the thing
    * that gets trimmed. It is the one physical-feeling value on the page and it is deliberate: the
    * photograph is of a left-to-right screen and mirroring it under `dir(rtl)` would show the
    * reader a screenshot of an application that does not exist.
    *
-   * The block size is a clamp rather than the image's own height, because 900px of screenshot on a
-   * 900px viewport is a band a reader has to scroll past rather than look at.
+   * 40vw AND NOT 42vw, AND THE CEILING CAME DOWN FROM 640px TO 584px. The picture is on the first
+   * screen now rather than on the second, so its job changed: it has to leave the headline and the
+   * action above it intact on a 900px viewport and still show enough of the app to be worth
+   * looking at.
+   *
+   * THE CEILING IS NOT THE OPERATIVE TERM AT 1440 AND THIS COMMENT SAID IT WAS. `40vw` is what
+   * decides the height at every width this page has ever been driven at: measured on the built page
+   * at 1440, the frame is 576px and not 584, and 584 is only reached at a 1,460px viewport and
+   * above. So what a reader at 1440 is shown is the top 576 of the 900 CSS px the app was captured
+   * at, which ends inside the list of what falls due rather than at the first heading. The ceiling
+   * is worth keeping for what it does above 1460, which is stop a very wide window turning the
+   * first screen into a photograph.
    */
-  .bleed img {
+  .stage img {
     display: block;
     inline-size: 100%;
-    block-size: clamp(300px, 42vw, 640px);
+    block-size: clamp(300px, 40vw, 584px);
     object-fit: cover;
     object-position: 0 0;
+    border-block-start: 1px solid var(--line);
   }
 
-  /* ── 0003 · The switcher ──────────────────────────────────────────────── */
+  /* ── 0001 · The switcher ──────────────────────────────────────────────── */
 
   /* The heading and the sentence stack, because the control under them is the width of the screen
      and a heading set beside something would put a second column back on the one band that has
@@ -682,68 +602,7 @@
     margin-block-start: var(--sp-5);
   }
 
-  /* ── 0004 · The typed surface ─────────────────────────────────────────── */
-
-  /* SIXTEEN CELLS IN FOUR COLUMNS, the dividers being the grid's own 1px gap (`app.css`, `.hair`).
-     The names are the declaration's, in declaration order, so this grid is a photograph of
-     `packages/mcp/src/index.ts` rather than a drawing of one. */
-  .tools {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .tool {
-    padding: var(--sp-4);
-    color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-  }
-
-  .templates {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A template is a grammar rather than a name, so it is drawn as a chip and not as a cell: a
-     reader should see at a glance that the five are a different kind of thing from the sixteen. */
-  .template {
-    padding: var(--sp-1) var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
-  /* ── 0005 · The specification beside the dashboard ────────────────────── */
-
-  /* THE ONE-LINE OPENER. A `div` and not a `p`, because it carries the band's `h2`: the rest of
-     the page's marks are a paragraph of three spans and cannot be, and a heading inside a
-     paragraph is markup a validator refuses whatever it looks like. The baseline is the shared
-     one, with the rule centred against it, so the number, the words and the tag sit on one line
-     and the rule runs between them. */
-  .band-mark-line {
-    align-items: baseline;
-    gap: var(--sp-4);
-    margin-block-end: var(--sp-4);
-  }
-
-  .band-mark-line .band-rule {
-    align-self: center;
-  }
-
-  /* The measure comes off, because the heading is not setting a column here: it is one item in a
-     row that ends at the far edge. */
-  .title-inline {
-    max-inline-size: none;
-  }
+  /* ── 0002 · The dashboard ─────────────────────────────────────────────── */
 
   /**
    * THE CARD LIES ON THE PICTURE'S TOP EDGE AND NOWHERE ELSE, AND THE PICTURE DECIDED THAT.
@@ -757,13 +616,6 @@
    * sideways. The right edge was no better than the left: it cut `no more than GBP 50,000.00`,
    * which runs from x=2092 to x=2371, in half.
    *
-   * AND THE OTHER EXAMPLE THIS COMMENT USED TO GIVE WAS NOT IN THE PICTURE. It said the card
-   * turned `GBP 28,320.00` into `320.00`. Read off the capture at 1:1, the three figures under
-   * `Across your organisations` are `GBP 24,800.00`, `GBP 0.00` and `GBP 320.00`, and nothing
-   * anywhere in it reads 28,320. `GBP 320.00` is the whole figure for `Going out, 30 days`.
-   * Somebody saw `320.00` beside a card and wrote down what the hidden digits would have been,
-   * which is the exact reading error this paragraph is about, performed by this paragraph.
-   *
    * WHAT IS ACTUALLY FREE IS THE TOP. Nothing above `Across your organisations` is a number: the
    * strip holds the breadcrumb, the page title and two controls. Profiled by ink over three
    * column windows centred on those three percentages, the label row runs 333 to 355 and the
@@ -774,6 +626,11 @@
    * two surfaces overlap. It overlaps by an amount that is measured against the picture rather
    * than chosen against the composition, which means a new capture is checked by looking at where
    * its first number is, not by looking at whether the page still seems fine.
+   *
+   * AND THE CARD IS SHORTER THAN IT WAS, WHICH MAKES THE OVERLAP SAFER RATHER THAN RISKIER. The
+   * four-row report-key specification came off it. A shorter card sits higher against the same
+   * picture, so more of the clear strip is left under it, and nothing about the arithmetic below
+   * had to move.
    */
   .report {
     display: grid;
@@ -782,32 +639,54 @@
 
   /* THE STRIP IS THE READING COLUMN, so the card starts where every heading on the page starts and
      ends where they end, rather than being a block of an invented width parked against one margin.
-     Two columns because the specification is a table and a table beside a sentence reads as one
-     object, where a table under a sentence reads as a second thing that arrived later. */
+     Two columns because a heading alone across 1,136px is the empty-frame fault: the title takes
+     five twelfths and the sentence six, and the pair reaches the far edge. */
   .report-card {
     position: relative;
     z-index: var(--z-raise);
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     gap: var(--sp-6) var(--sp-7);
-    align-items: start;
+    align-items: center;
     inline-size: min(100% - 2 * var(--sp-6), var(--site-max));
-    /* THE OVERLAP, AND IT IS THE ONE NUMBER THIS BAND IS ABOUT. IT IS 72px AT 1440 AND IT WAS
-       WRITTEN DOWN AS 88. `5vw` is five per cent of the window, so the clamp only reaches its
-       ceiling at a 1,760px viewport, and 1,760 was the width the picture used to be painted at
-       rather than the width of the window. Measured `marginBlockEnd` on the built page: -72px at
-       1440, -64px at 1280, -51.2px at 1024, -45px at 900, and 0px below 900, where the narrow
-       treatment stacks the two.
-
-       WHAT MAKES IT SAFE IS THAT THE STRIP AND THE OVERLAP NOW SCALE TOGETHER. The picture is
-       painted so that its right edge is always source column 2556, so a rendered pixel is
-       viewport/2556 of a source pixel, and the first money figure at source row 381 sits
-       381/2556 of the viewport down, which is 14.9 per cent of it against the overlap's 5. The
-       clear strip is 2.98 times the overlap at every width where `5vw` is the operative term, and
-       further clear outside it. Driven, counting the picture's own 1px top rule: 214.6px of strip
-       against 72px of overlap at 1440, and 134.2 against 45 at 900, so 143.65px and 90.15px of
-       clear picture between the card's bottom edge and the top of the first figure. */
-    margin-block-end: calc(-1 * clamp(40px, 5vw, 88px));
+    /**
+     * THE OVERLAP IS A SOURCE ROW NOW, AND IT WAS A LENGTH THAT LANDED THROUGH A HEADING.
+     *
+     * It was `clamp(40px, 5vw, 88px)`, which is -72px at 1440. A rendered pixel is viewport/2556
+     * of a source pixel, so 72px at 1440 is source row 127.8, and source row 127.8 is inside the
+     * capture's page title: the card's bottom edge cut the word `Dashboard` in half, in both
+     * schemes, and it is visible in the review screenshots of 21 September.
+     *
+     * WHAT THE PICTURE ACTUALLY OFFERS, profiled on both captures at 1:1 over the columns this
+     * card covers (source x 213 to 2343, ink being a pixel more than 25 luma steps from the median
+     * of its own row, which is `test/crop.test.ts`'s own definition, and a row counted clear at
+     * four deviating pixels or fewer so the navigation rail's vertical edge does not read as ink
+     * at every height):
+     *
+     *   rows   0..56    clear, the chrome above the breadcrumb
+     *   rows  57..94    the breadcrumb
+     *   rows  95..118   clear
+     *   rows 119..148   THE PAGE TITLE, which is what the old overlap was landing in
+     *   rows 149..255   CLEAR, 107 rows, the widest run anywhere in the top strip
+     *   rows 256..280   `Across your organisations`
+     *   rows 333..355   the three column labels
+     *   rows 381..      the three money figures
+     *
+     * So the edge belongs at source row 202, the middle of the 107-row run, with 53 clear rows
+     * above it and 53 below. Both captures profile identically to within one row.
+     *
+     * AND IT IS WRITTEN AS THE RATIO RATHER THAN AS A LENGTH, which is what makes it hold at every
+     * width. A percentage margin resolves against the containing block's INLINE size, and this
+     * card's containing block is the band, which is the same width the picture's own
+     * `inline-size: calc(100% * 2880 / 2556)` is a percentage of. So the rendered overlap is
+     * bandWidth * 202/2556 and the source row it reaches is that times 2556/bandWidth, which is
+     * 202 with the width cancelled out. The clamp had to go for the same reason its floor and
+     * ceiling existed at all: they were compensating for a picture that used to be painted at a
+     * fixed 1,760px, and nothing has been fixed-width here since that was corrected. Below 900px
+     * the narrow treatment sets this to 0 and stacks the two, because there is no picture behind
+     * the card there.
+     */
+    margin-block-end: calc(-100% * 202 / 2556);
     margin-inline: auto;
     padding: var(--sp-6);
     background: var(--s1);
@@ -815,38 +694,9 @@
     border-radius: var(--r-lg);
   }
 
-  .report-say .lead {
-    max-inline-size: 42ch;
-  }
-
-  .report-spec .sub-head {
+  .report-card .lead {
     margin-block-start: 0;
-  }
-
-  .spec {
-    grid-template-columns: minmax(0, 1fr);
-    margin: 0;
-  }
-
-  .spec-row {
-    display: grid;
-    grid-template-columns: minmax(0, 11ch) minmax(0, 1fr);
-    gap: var(--sp-4);
-    align-items: baseline;
-    padding: var(--sp-3) var(--sp-4);
-  }
-
-  .spec-term {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-  }
-
-  .spec-def {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-sm);
-    text-wrap: pretty;
+    max-inline-size: 46ch;
   }
 
   /**
@@ -885,35 +735,40 @@
    * and 686. Counting ink as a pixel more than 25 luminance steps from the median of its own row,
    * over both captures and over every pixel the frame shows: column 2356 carries 3, column 2095
    * carries 27, column 1473 carries 14, and all four rows carry 79, 27, 50 and 71. Column 2356
-   * at 1440 lands inside the final `0` of `no more than GBP 50,000.00`, which is the second of
-   * the two strings the card was moved off, and rows 736 and 686 land inside the words `Ledger`
-   * and `Overview` in the navigation rail.
+   * at 1440 lands inside the final `0` of `no more than GBP 50,000.00`, and rows 736 and 686 land
+   * inside the words `Ledger` and `Overview` in the navigation rail.
    *
    * SO NEITHER EDGE IS A LENGTH ANY MORE AND NEITHER HAS THE VIEWPORT IN IT.
    * `inline-size: calc(100% * 2880 / 2556)` paints the capture so the figure's own right edge
    * falls on source column 2556, because the figure is the width of the screen and the image is
    * 2880/2556 of it: the width cancels. `aspect-ratio: 2880 / 1214` then makes the box short
    * enough that `object-fit: cover`, whose scale is set by the width, crops the bottom at source
-   * row 1214, or at 1211 to 1212 once the 1px top rule inside this border box is taken off.
-   * Driven at 1440, 1280, 1024, 999 and 900 in both schemes, the right edge lands on 2556.0 every
-   * time and the bottom on 1212.2, 1212.0, 1211.5, 1211.4 and 1211.1, and none of those ten cuts
-   * carries a pixel of ink. Both are ratios of the capture and have no viewport in them, which is
-   * the thing a `clamp` could not do: its own 700px ceiling started moving the bottom cut again
-   * above a 1,591px viewport.
+   * row 1250, or three rows above it once the 1px top rule inside this border box is taken off,
+   * which is why the guard holds the four rows ending at the declared one rather than that one
+   * alone. The figures in the sentence before this one were driven at 1440, 1280, 1024, 999 and
+   * 900 in both schemes against the 1214 cut: the right edge landed on 2556.0 every time and the
+   * bottom within a pixel of 1211.
    *
-   * 2556 AND 1214 ARE THE MIDDLES OF THE WIDEST CLEAR RUNS IN THE PICTURE. Columns 2535 to 2577
-   * carry no ink over the rows this frame shows, which is 43 columns wide; rows 1186 to 1242
-   * carry none over the columns it shows, which is 57 rows. A panel edge that runs the whole
-   * height and a rule that runs the whole width are not ink for this purpose, because a crop that
-   * lands on a rule reads as a rule. The navigation rail counts: the profile that chose the old
-   * numbers was taken over x=640 to x=2820 and the frame plainly shows x=0.
+   * 2556 AND 1250 ARE INSIDE CLEAR RUNS IN THE PICTURE. Columns 2535 to 2577 carry no ink over the
+   * rows this frame shows, which is 43 columns wide. A panel edge that runs the whole height and a
+   * rule that runs the whole width are not ink for this purpose, because a crop that lands on a
+   * rule reads as a rule.
    *
-   * THE PICTURE IS STILL WIDER THAN THE SCREEN, by 12.7 per cent rather than by 22: 1,622.53px
-   * inside 1,440 at 1440, so 182.53px of it falls off the right edge. What it no longer does is
-   * hold its scale while the window moves the cut. The cost is at the narrow end, and it is worth
-   * saying: the capture is a 2x shot, so at a device scale of 2 it keeps a device pixel per
-   * source pixel down to a 1,278px viewport and is downsampled below 1024 and 900. A downsample
-   * is soft; a crop through a glyph is a mistake.
+   * THE ROW MOVED FROM 1214 TO 1250 BECAUSE THE PICTURE GAINED THREE BARS. The capture was taken
+   * against a build whose "Balance by organisation" drew its empty line on a record whose three
+   * organisations each hold an account, which was a defect in the record app (`page-live.ts`, the
+   * linked map keyed by the ULID after `entryOf` began answering the sequence). With the bars back,
+   * everything under them sits about 110 source rows lower and the old cut fell inside a glyph, on
+   * 70 columns of the dark capture. Re-profiled over rows 1150 to 1400, counting ink the way
+   * `test/crop.test.ts` counts it, the rows clear in BOTH schemes are 1177 to 1185, 1245 to 1257,
+   * 1280 to 1281, 1307 to 1341 and 1366 to 1400. 1250 sits in the middle of the nearest run to the
+   * old cut, which keeps the band the height it was designed at rather than moving the composition
+   * to suit an image.
+   *
+   * THIS IS WHY THIS BAND IS STILL THE TALLEST ON THE PAGE AND WHY IT WAS NOT TRIMMED FOR LENGTH.
+   * Every number above was profiled against the pixels of one capture. A shorter frame is a
+   * different rectangle of a different picture and would have to be profiled again, and guessing
+   * at it is how the crop came to land inside a glyph in the first place.
    *
    * A top rule and no side rules, because there is no side for one to be on.
    */
@@ -922,7 +777,7 @@
     inline-size: calc(100% * 2880 / 2556);
     max-inline-size: none;
     block-size: auto;
-    aspect-ratio: 2880 / 1214;
+    aspect-ratio: 2880 / 1250;
     object-fit: cover;
     object-position: 0 0;
     border-block-start: 1px solid var(--line);
@@ -932,11 +787,47 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* ── 0006 · Plain about what it is ────────────────────────────────────── */
+  /* ── 0003 · Plain about what it is ────────────────────────────────────── */
+
+  /* THE ONE-LINE OPENER. A `div` and not a `p`, because it carries the band's `h2`: the rest of
+     the page's marks are a paragraph of three spans and cannot be, and a heading inside a
+     paragraph is markup a validator refuses whatever it looks like. The baseline is the shared
+     one, with the rule centred against it, so the number, the words and the tag sit on one line
+     and the rule runs between them. */
+  .band-mark-line {
+    align-items: baseline;
+    gap: var(--sp-4);
+    margin-block-end: var(--sp-4);
+  }
+
+  .band-mark-line .band-rule {
+    align-self: center;
+  }
+
+  /* The measure comes off, because the heading is not setting a column here: it is one item in a
+     row that ends at the far edge. */
+  .title-inline {
+    max-inline-size: none;
+  }
+
+  /* THE LEDGER'S STAGE IS THE SCREEN AND THE LEDGER INSIDE IT IS THE READING COLUMN. The padding
+     is `max(--sp-6, (100% - --site-max) / 2)`, so at 1440 it puts 120px on each side and the
+     ledger measures x=120, w=1200, which is the reading column plus its two gutters and 83 per
+     cent of the screen. At 1,200px the room goes to `what`, which is the column that was
+     ellipsising first when this component lived in a 540px box. */
+  .proof {
+    margin-block-start: var(--sp-7);
+    padding-inline: max(var(--sp-6), calc((100% - var(--site-max)) / 2));
+    overflow: hidden;
+  }
+
+  .proof-note {
+    margin-block-start: var(--sp-4);
+  }
 
   .cols {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-block-start: var(--sp-6);
+    margin-block-start: var(--sp-7);
   }
 
   .col {
@@ -1018,7 +909,7 @@
     margin-block-start: 0;
   }
 
-  /* ── The one thing that moves ─────────────────────────────────────────────
+  /* ── The two things that move ─────────────────────────────────────────────
 
      FIRSTLOOK REVEALS ALL TEN OF ITS SECTIONS and kills the lot under one `prefers-reduced-motion`
      rule (`firstlook.ai` inline stylesheet, `.reveal` at :228, the media query at :254, the
@@ -1039,6 +930,30 @@
         animation-range: entry 4% cover 18%;
       }
     }
+
+    /**
+     * AND THE PRODUCT ARRIVES ON LOAD, WHICH IS THE ONE THING ON THIS SITE THAT IS NOT A SCROLL
+     * TIMELINE, because the element it is on is already in view when the page opens.
+     *
+     * `view()` resolves against where the element sits in the scrollport, so a `view()` animation
+     * on something that starts on screen resolves near the end of its own range and does nothing
+     * visible. The hero picture is the first thing under the headline and it has to have a moment,
+     * because "an exciting tool to use" is a judgement a reader makes in the first second and a
+     * page where nothing has happened yet has not made its case.
+     *
+     * It is a rise and a fade over 640ms with a 120ms wait, not a scale: a scale on a photograph of
+     * type resamples every glyph in it while it runs, and the whole argument of this picture is
+     * that the type in it is the size the type is. The delay is short enough that the picture is
+     * moving before a reader has finished the headline and long enough that it is a second event
+     * rather than the same one.
+     *
+     * UNDER THE OTHER BRANCH THERE IS NO ANIMATION AT ALL, which matters beyond the preference:
+     * `scripts/shot.mjs` photographs with `reducedMotion: 'reduce'`, so what he is sent is the page
+     * at rest rather than the page mid-entrance.
+     */
+    .stage {
+      animation: stage-in 640ms var(--ease-out) 120ms both;
+    }
   }
 
   @keyframes rise {
@@ -1053,18 +968,24 @@
     }
   }
 
+  @keyframes stage-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--sp-6));
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   /* ── Narrower than a desk ─────────────────────────────────────────────── */
 
   @media (width < 1000px) {
-    .hero-say,
-    .head-two {
+    .hero-row {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-7);
-    }
-
-    .facts,
-    .tools {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .cols {
@@ -1091,6 +1012,8 @@
 
     .report-card {
       grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-4);
+      align-items: start;
       inline-size: 100%;
       /* NO OVERLAP UNDER 900px, because the narrow treatment swaps the wide capture for a phone
          one and lays the two out in a column. There is no picture behind the card to lie on. */
@@ -1122,7 +1045,7 @@
   }
 
   /* THE NARROW PAIR OF CAPTURES IS A WHOLE PHONE SCREEN, so the frame has to be tall enough to be
-     worth looking at. `42vw` is 164px at 390 and the floor was doing all the work, which showed
+     worth looking at. 40vw is 156px at 390 and the floor does all the work there, which would show
      the top third of an 844px screen. 460px is a little over half of it, ending inside the list of
      what falls due this week rather than immediately under the heading.
 
@@ -1132,36 +1055,12 @@
      pixels. The blocks in this section descend, so a wider one never wins a tie on source order
      against a narrower one. */
   @media (width < 700px) {
-    .bleed img {
+    .stage img {
       block-size: 460px;
     }
   }
 
   @media (width < 640px) {
-    .band {
-      padding-block: var(--sp-8);
-    }
-
-    .facts {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .fact {
-      flex-direction: row;
-      align-items: baseline;
-      gap: var(--sp-3);
-      padding: var(--sp-3) var(--sp-4);
-    }
-
-    .fact-fig {
-      min-inline-size: 3ch;
-      font-size: var(--t-xl);
-    }
-
-    .tool {
-      padding: var(--sp-3);
-    }
-
     .col {
       padding: var(--sp-4);
     }

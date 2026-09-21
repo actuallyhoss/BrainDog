@@ -474,6 +474,98 @@ test('every image a page asks for is in the build', when(NO_BUILD), () => {
 });
 
 /**
+ * THE HOME PAGE COUNTS NONE OF THE PRODUCT'S OWN PARTS AT A STRANGER.
+ *
+ * The owner read the page on 2026-09-21 and named the figures on it: *less of those silly ai-looking
+ * stats of tools, templates, etc.* (`loop/DIRECTION.md` §19). Four of them sat in a row under the
+ * hero, `16 tools an agent can call`, `5 resource templates beside them`, `1 file holds your record`
+ * and `30 nightly backups, either host`, and the sixteen tool names were drawn again as a grid two
+ * bands down with five resource-template grammars as chips beside them.
+ *
+ * THIS IS A TEST AND NOT A NOTE IN A DESIGN DOCUMENT BECAUSE THE FIGURES WERE ALL TRUE. Every one
+ * was counted off a real declaration, with the command recorded beside it, which is exactly what
+ * makes them easy to put back: the next pass that wants a number under the headline will find a
+ * correct one in about a minute. What is wrong with them is not arithmetic, and arithmetic is the
+ * only thing the rest of this file checks, so the rule needs stating somewhere a build can read it.
+ *
+ * IT NAMES STRINGS AND ALSO A SHAPE. The five strings are the exact ones that were on the page, so
+ * the test says what it caught. The regex is the general case: a bare figure immediately in front of
+ * one of the product's own countable parts, which is the sentence pattern rather than the sentence.
+ * `12d ago` and `4176` in the ledger are not that shape and are left alone deliberately, because the
+ * ledger's figures are a record's own and not a brochure's.
+ */
+const COUNTED = [
+  'tools an agent can call',
+  'resource templates',
+  'nightly backups',
+  /* ONE TOOL NAME AND ONE TEMPLATE GRAMMAR, as proof the two grids are gone rather than reworded.
+     `record_index` is the first `name:` key of `packages/mcp/src/index.ts` and `schema/{register}`
+     is the first entry of its `TEMPLATES` array, so a grid rebuilt from the declaration in
+     declaration order starts with these two whatever else it drops. */
+  'record_index',
+  'schema/{register}',
+] as const;
+
+test('the home page counts none of the product own parts at a stranger', when(NO_BUILD), () => {
+  const words = readable(read('index.html'));
+
+  for (const phrase of COUNTED) {
+    const hits = around(words, phrase);
+    assert.equal(hits.length, 0, `index.html counts the product's parts at a stranger: ${hits.join(' | ')}`);
+  }
+
+  const shape = /\b\d+\s+(tools?|resource templates?|templates?|backups?|gates?|packages?|registers?)\b/i.exec(words);
+  assert.equal(
+    shape,
+    null,
+    `index.html carries a counted figure of the product's own parts: ${shape ? around(words, shape[0]).join(' | ') : ''}`,
+  );
+});
+
+/**
+ * THE HOME PAGE IS FIVE BANDS, AND THE PRODUCT IS IN THE FIRST ONE.
+ *
+ * Two measurements, one test, because they are the same complaint. `loop/DIRECTION.md` §19:
+ * *i dont like how it's so long, and it's all records and text. i want it to be more graphical, and
+ * shows the value, not what it does technically (at least not for the first blocks).*
+ *
+ * THE LENGTH, AS A NUMBER A BUILD CAN SEE. Driven over `apps/site/build` at 1440 by 900 at a device
+ * scale of 1 with motion reduced, the page he complained about was 5,658px over seven bands of 904,
+ * 966, 630, 726, 1,153, 573 and 397, and 7,042px at 390. Pixels need a browser and this file reads
+ * bytes, so what is held here is the band count, which is the thing the pixels were made of: seven
+ * bands is seven arguments, and a band added to be thorough is how a page gets to 5,658px one
+ * reasonable decision at a time. Six would pass this and be a regression worth arguing about, which
+ * is why the bound is the number the page actually has rather than a round one above it.
+ *
+ * THE ORDER, AS THE ONE THING IN THE MARKUP THAT SHOWS IT. A `<picture>` inside the first band means
+ * the product's own screen is on the first screen. It was in the SECOND band, 235px of mark, heading
+ * and lead below the hairline that opened it, and the first band held a five-row ledger and four
+ * counted figures instead. There is no way to check "graphical" from bytes, but there is a way to
+ * check that the picture is not below the fold of the argument, and that was the fault.
+ */
+test('the home page is five bands and opens on the product', when(NO_BUILD), () => {
+  const html = uncommented(read('index.html'));
+
+  const bands = [...html.matchAll(/<section class="band\b/g)];
+  assert.equal(
+    bands.length <= 5,
+    true,
+    `index.html draws ${bands.length} bands. Seven was the page the owner called too long, and a ` +
+      'band that exists to be thorough is what this bound is against.',
+  );
+  assert.equal(bands.length >= 4, true, `index.html draws ${bands.length} bands, so this check is reading a page it does not recognise`);
+
+  const first = html.slice(bands[0]?.index ?? 0, bands[1]?.index ?? html.length);
+  assert.match(
+    first,
+    /<picture\b/,
+    "the first band of index.html holds no product picture, so the page opens on words again. The " +
+      'screens are the best thing this product has and the fault they were part of was being used ' +
+      'as illustrations beside prose further down.',
+  );
+});
+
+/**
  * NO LICENCE NAME AND NO EM DASH IN THE COPY FILE EITHER. The served-bytes checks above only see
  * what a page renders today, and a key added for a section not drawn yet slips past them.
  *
