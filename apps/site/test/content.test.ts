@@ -44,7 +44,7 @@ const seedSource = (): string =>
  * backtick, a dead href or a missing picture. It is prerendered from `src/routes/404` through the
  * same layout as the rest, so it carries the same nav, the same footer and the same risks.
  */
-const PAGES = ['index.html', 'pricing.html', 'changelog.html', 'legal.html', '404.html'] as const;
+const PAGES = ['index.html', 'pricing.html', 'agents.html', 'changelog.html', 'legal.html', '404.html'] as const;
 
 const absent = PAGES.filter((page) => !existsSync(new URL(page, BUILD)));
 

@@ -62,6 +62,12 @@ export const site = {
         'Two ways to run BrainDog: hosted at $12 a month per record, or self-hosted for free on your ' +
         'own machine. Neither plan is open yet.',
     },
+    agents: {
+      title: 'For agents and services · BrainDog',
+      description:
+        'What an agent reaches over MCP, what a project reports with a key of its own, and the ' +
+        'limits on both. Sixteen tools, ten of which only read.',
+    },
     notFound: {
       title: 'Page not found · BrainDog',
       description: 'There is no page at this address on brain.dog.',
@@ -85,6 +91,7 @@ export const site = {
 
   nav: {
     pricing: 'Pricing',
+    agents: 'For agents',
     changelog: 'Changelog',
     docs: 'Design',
     source: 'GitHub',
@@ -660,6 +667,75 @@ export const site = {
     count: (entries: number, days: number) => `${entries} entries over ${days} days`,
   },
 
+  /**
+   * THE PAGE THE HOME PAGE'S TECHNICAL MATERIAL MOVED TO, which is what `loop/DIRECTION.md` §19 asks
+   * for in the owner's own words: what is worth keeping belongs on a page a curious reader reaches
+   * on purpose. Two things were cut from the home page on 21 September and drawn nowhere for an
+   * hour: a table of what a report key can and cannot do, and the sixteen MCP tool names with five
+   * resource-template grammars. Both are here.
+   *
+   * A READER ARRIVES HERE ON PURPOSE, so it may count. `test/content.test.ts` refuses a counted
+   * figure of the product's own parts on `index.html` and on `index.html` alone, for the reason the
+   * rule was written: a row of figures under a headline is a page filling space, and the same figure
+   * on the page that answers "what can my agent do" is the answer to the question.
+   *
+   * EVERY NUMBER IS READ OFF THE CODE, and where it came from is in the comment beside it. A number
+   * on this page that nobody can check is worse here than anywhere else on the site, because this is
+   * the page written for the reader who checks.
+   */
+  agents: {
+    tag: 'For agents',
+    title: 'What an agent or a service does with a record.',
+    lead: 'The same record and the same rules, whether a model reaches it over MCP or a project posts its own numbers to one address. Every limit below is a value in the code.',
+
+    mcp: {
+      tag: 'Over MCP',
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, ten carrying `writes: false`. */
+      title: 'Sixteen tools, and ten of them only read.',
+      lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
+      readsTitle: 'Read',
+      reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'money', 'governance'],
+      writesTitle: 'Write',
+      writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet'],
+      /* `RESOURCES` in the same file: five `uriTemplate` entries. */
+      resourcesTitle: 'And five addresses a client can read directly',
+      resources: [
+        { uri: 'braindog:schema/{register}', said: 'The fields of one register.' },
+        { uri: 'braindog:page/{slug}', said: 'One page with every block run: rows and figures, never markup.' },
+        { uri: 'braindog:metric/{id}', said: 'One figure, with its target and how it compares.' },
+        { uri: 'braindog:skill/{name}', said: 'The text of one skill, and when to reach for it.' },
+        { uri: 'braindog:declaration/{slug}', said: 'One page as declared, to change and propose back.' },
+      ],
+    },
+
+    report: {
+      tag: 'Reported',
+      title: 'A project reports its own numbers, and can do nothing else.',
+      lead: 'A write token is a key to the whole record. A report key is bound to one register and to the fields it always carries, so the record refuses it everywhere except reporting.',
+      /* Every figure off `packages/record/src/report.ts`: `REPORT_ROWS_MOST`, `REPORT_BYTES_MOST`,
+         `REPORT_ROWS_PER_MINUTE` over `REPORT_WINDOW_MS`, and `REPORT_FIXED_MOST`. */
+      limits: [
+        { what: 'Writes only', said: 'It reads no list, no figure and no person. Every other call is refused.' },
+        { what: 'One register', said: 'The register is fixed when the key is minted, and a label is fixed for a token’s life.' },
+        { what: 'Up to 8 fixed fields', said: 'Values the project cannot change, set by whoever minted the key.' },
+        { what: '100 rows a call', said: 'A batch past it is refused whole, rather than half written.' },
+        { what: '256 KB a call', said: 'Measured as the JSON of its rows.' },
+        { what: '600 rows a minute', said: 'Counted in a window the first report opens. A leaked key was every row the record could hold.' },
+      ],
+    },
+
+    cannot: {
+      tag: 'Refused',
+      title: 'What a token is not allowed to do.',
+      lead: 'Driven against a running record on 21 September, as a scoped token and as five people at every level the product offers.',
+      rows: [
+        { what: 'Answer a decision', said: 'This needs decide, and no token reaches it. A person has to do it, signed in.' },
+        { what: 'Invite anybody', said: 'An invitation, a new token, an export and the list of vault grants all need a browser session.' },
+        { what: 'Read a secret', said: 'The registers index what a key opens, never the key. A value leaves the vault for one call and is never written down.' },
+      ],
+    },
+  },
+
   footer: {
     tagline: 'Give your business a memory',
     columns: [
@@ -667,6 +743,7 @@ export const site = {
         title: 'Product',
         links: [
           { label: 'Pricing', href: '/pricing' },
+          { label: 'For agents', href: '/agents' },
           { label: 'Changelog', href: '/changelog' },
           { label: 'GitHub', href: 'https://github.com/actuallyhoss/BrainDog' },
           /* THE FOOTER AND NOT THE HEADER: the hero says there is no sign-up, and a sign-in beside

@@ -69,6 +69,7 @@ await new Promise((r) => server.listen(PORT, r));
 const ROUTES = [
   ['home', '/'],
   ['pricing', '/pricing'],
+  ['agents', '/agents'],
   ['changelog', '/changelog'],
   ['legal', '/legal'],
   ['404', '/404'],

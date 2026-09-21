@@ -31,6 +31,10 @@
      published ahead of the repository going public, on the owner's word (see `copy.ts`). */
   const links: { href: string; label: string }[] = [
     { href: '/pricing', label: site.nav.pricing },
+    /* THE PAGE THE HOME PAGE'S SPECIFICATIONS MOVED TO, in the bar because §19 asks for a page a
+       curious reader reaches ON PURPOSE, and a link only in the footer is one they reach by
+       scrolling past everything else first. */
+    { href: '/agents', label: site.nav.agents },
     { href: '/changelog', label: site.nav.changelog },
     ...(DOCS ? [{ href: DOCS, label: site.nav.docs }] : []),
     ...(SOURCE ? [{ href: SOURCE, label: site.nav.source }] : []),
