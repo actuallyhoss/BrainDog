@@ -21,6 +21,12 @@ import { conflicted, refused } from '@braindog/ports';
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveVault, servesVault, VAULT_HEADERS, vaultReply, type VaultAsk, type VaultDoor, type VaultGrantSeen } from './vault.ts';
 export { keysReply, serveKeys, servesKeys, type KeysAsk, type KeysDoor } from './keys.ts';
+/* `POST /api/spark/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `spark-ask.ts` carries the measurement: `ROUTES` is the
+   record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
+   this answer comes out of the engine the HOST built. It is exported from here for the reason the vault, key, session and
+   ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
+   is the drift this file's header is about. */
+export { serveSpark, servesSpark, sparkAskDoor, sparkReply, type SparkAskDoor, type SparkAskEngine } from './spark-ask.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
