@@ -1350,7 +1350,7 @@
       kind="error"
       heading
       title={copy.noSuch('settings area', area)}
-      body={copy.theseExist('Settings areas', AREAS.map((a) => a.label))}
+      body={copy.theseExist('Settings areas', AREAS.map((a) => ({ address: a.id, title: a.label })))}
     >
       {#snippet actions()}<Button href="/settings/appearance">{copy.settings}</Button>{/snippet}
     </Empty>

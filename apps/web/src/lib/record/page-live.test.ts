@@ -232,7 +232,15 @@ test('a declaration the record never checked is narrowed before it reaches the r
 
 test('a page the record lacks says so, with the pages it has', async () => {
   const { io } = host(record);
-  assert.deepEqual(await pageReader(BASE, io).read('nowhere'), { from: 'missing', titles: ['Desk', 'Money'] });
+  /* THE ADDRESS AND THE TITLE, because the refusal is read by somebody standing at an address that
+     did not work, and a title is not something they can type. */
+  assert.deepEqual(await pageReader(BASE, io).read('nowhere'), {
+    from: 'missing',
+    held: [
+      { address: 'desk', title: 'Desk' },
+      { address: 'money', title: 'Money' },
+    ],
+  });
 });
 
 test("any other refusal is the record's own sentence", async () => {

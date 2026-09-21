@@ -67,6 +67,23 @@ const article = (noun: string): string => {
  * there to stop the same sentence appearing twice on the one screen. A guard that exists because two
  * strings are equal should not depend on somebody keeping them equal.
  */
+/**
+ * One thing a refusal can list: the address somebody types, and the name they know it by.
+ *
+ * A BARE STRING IS AN ADDRESS AND NOT A NAME, which is the direction that matters. Every caller of
+ * `theseExist` compiled before this type existed, so a screen still handing it titles is a screen
+ * this type cannot catch; what it can do is make the address the only thing an entry is required to
+ * carry, so the next one written cannot offer a name alone.
+ */
+export type Held = string | { address: string; title?: string };
+
+/**
+ * A word with its case and its separators taken off, for asking whether two of them are the same
+ * word. `Agent work` and `agent-work` are; `installments` and `Instalments` are not, and that is
+ * exactly the pair a reader has to be shown both halves of.
+ */
+const folded = (said: string): string => said.toLowerCase().replace(/[^a-z0-9]+/gu, '');
+
 const notReached = 'The record could not be reached, so nothing was saved. Try again in a moment.';
 const updatesTo = (name: string, from: string, to: string): string => `Updates ${name} from ${from} to ${to}`;
 
@@ -1590,12 +1607,42 @@ export const copy = {
    *
    * ORDER IS THE CALLER'S ORDER. Each caller passes the order its own screen shows, so sorting here
    * would make the refusal disagree with the rail the reader arrived from.
+   *
+   * AND AN ENTRY IS AN ADDRESS NOW, BECAUSE THE READER IS STANDING AT AN ADDRESS THAT DID NOT WORK.
+   *
+   * `/p/say-what-it-is-and-who-it-is-for` answered *"There is no page called
+   * say-what-it-is-and-who-it-is-for."* over *"Pages on this record: Your project · Guide."* The
+   * heading names the thing in the alphabet of the URL bar and the half beneath it switched
+   * alphabets without saying so: the page titled "Your project" answers at `/p/home-guide`
+   * (`packages/seed/src/usecases/guide.ts:234`), so both words on offer refuse again when typed.
+   * `/r/<unknown>` is worse, because the mapping is guessable in neither direction. Seven of the
+   * fourteen registers the seed's modules declare are named something other than their address:
+   * `obligations` is Money, `transactions` is Ledger, `things` is Projects, `tracks` is Threads,
+   * and `installments` is Instalments, one letter away and still a refusal. `901a2bb7` settled the
+   * same argument for a row, which is named by the number a person can say.
+   *
+   * THE TITLE RIDES IN BRACKETS ONLY WHERE IT IS NOT THAT ADDRESS IN OTHER CLOTHES. Eight of those
+   * fourteen registers, seven of the seed's fifteen pages and eleven of the thirteen settings areas
+   * differ from their address in case or in a separator alone, and `services (Services)` eleven
+   * times over would bury the five entries where the brackets are the whole point.
+   *
+   * SO THE DE-DUPLICATION IS BY ADDRESS, and that is the half of the same finding that fixing the
+   * names made wrong. The nine titles reduced to six above were nine pages at nine addresses, five
+   * of them titled Overview by five packs, and the six-name sentence left four pages the record
+   * holds unmentioned. Two entries are one entry when they answer in the same place, never because
+   * two authors picked the same word.
    */
-  theseExist: (kind: string, names: readonly string[]) => {
-    const unique = [...new Set(names)];
-    return unique.length === 0
+  theseExist: (kind: string, held: readonly Held[]) => {
+    const shown = new Map<string, string>();
+    for (const one of held) {
+      const address = typeof one === 'string' ? one : one.address;
+      const title = typeof one === 'string' ? undefined : one.title;
+      if (shown.has(address)) continue;
+      shown.set(address, title === undefined || folded(title) === folded(address) ? address : `${address} (${title})`);
+    }
+    return shown.size === 0
       ? `This record has no ${kind.toLowerCase()} yet.`
-      : `${kind} on this record: ${unique.join(' · ')}.`;
+      : `${kind} on this record: ${[...shown.values()].join(' · ')}.`;
   },
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */

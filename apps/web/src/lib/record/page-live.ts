@@ -188,7 +188,7 @@ export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
 export type Opened =
   | { from: 'live'; page: LivePage; now: number }
   | { from: 'sample' }
-  | { from: 'missing'; titles: string[] }
+  | { from: 'missing'; held: { address: string; title?: string }[] }
   | { from: 'refused'; fix: string };
 
 /** What a scope cell reads for a row that applies to every project, as the sample says it. */
@@ -836,8 +836,21 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
   };
 }
 
-const titlesOf = (listed: unknown): string[] =>
-  Array.isArray(listed) ? listed.flatMap((p) => (p !== null && typeof p === 'object' && typeof (p as { title?: unknown }).title === 'string' ? [(p as { title: string }).title] : [])) : [];
+/**
+ * THE PAGES A RECORD HOLDS, AS ADDRESSES WITH THEIR TITLES, because the reader is standing at an
+ * address that did not work. This answered titles alone, so `/p/say-what-it-is-and-who-it-is-for`
+ * offered "Your project" to somebody who had just typed a slug, and the page titled Your project
+ * answers at `/p/home-guide`: both words on offer refuse again when typed.
+ */
+const heldOf = (listed: unknown): { address: string; title?: string }[] =>
+  Array.isArray(listed)
+    ? listed.flatMap((p) => {
+        const said = p !== null && typeof p === 'object' ? (p as { page?: unknown; slug?: unknown; title?: unknown }) : {};
+        const address = typeof said.slug === 'string' ? said.slug : typeof said.page === 'string' ? said.page : null;
+        if (address === null) return [];
+        return [typeof said.title === 'string' ? { address, title: said.title } : { address }];
+      })
+    : [];
 
 export type PageReader = { read(slug: string): Promise<Opened> };
 
@@ -889,7 +902,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         }
         if (out.refusal.code === 'PAGE_UNKNOWN') {
           const listed = await client.pages();
-          return { from: 'missing', titles: listed.ok ? titlesOf(listed.value) : [] };
+          return { from: 'missing', held: listed.ok ? heldOf(listed.value) : [] };
         }
         return { from: 'refused', fix: out.refusal.fix };
       }

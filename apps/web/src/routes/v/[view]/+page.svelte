@@ -276,7 +276,7 @@
       kind="error"
       heading
       title={copy.noSuch('saved view', key)}
-      body={copy.theseExist('Saved views', Object.values(VIEWS).map((v) => v.name))}
+      body={copy.theseExist('Saved views', Object.entries(VIEWS).map(([address, v]) => ({ address, title: v.name })))}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>

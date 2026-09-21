@@ -46,6 +46,92 @@ test('THE CAPTURE FIELD SPELLS ITS OWN ARTICLE, and it said "Add a item" on the 
   assert.equal(copy.captureIn('Service'), 'Add a service');
 });
 
+/**
+ * A REFUSAL LISTS WHAT A PERSON CAN TYPE, AND THIS ONE LISTED WHAT THEY CANNOT.
+ *
+ * `/p/say-what-it-is-and-who-it-is-for` on a Guide record answered *"There is no page called
+ * say-what-it-is-and-who-it-is-for."* over *"Pages on this record: Your project · Guide."* The
+ * heading names the thing in the alphabet of the URL bar and the half underneath switches alphabets
+ * without saying so: the page titled "Your project" answers at `/p/home-guide`
+ * (`packages/seed/src/usecases/guide.ts:234`), and typing either of the two words offered gives the
+ * same refusal again.
+ *
+ * `/r/<unknown>` IS WORSE, BECAUSE THE MAPPING IS NOT GUESSABLE IN EITHER DIRECTION. Of the fourteen
+ * registers the seed's modules declare, seven are named something other than their address:
+ * `obligations` is called Money, `transactions` Ledger, `recurring` Repeating, `things` Projects,
+ * `tracks` Threads, `fx` Exchange rates, and `installments` is called Instalments, one letter away
+ * and still a refusal. `/settings/<unknown>` has two of thirteen, and both are whole phrases:
+ * `people` is "People & sharing" and `delete` is "Delete this record".
+ *
+ * `901a2bb7` is the worked example for what the sentence becomes. A row that is not there is named
+ * by the number a person can say rather than by the list's title, and the button under it agrees. So
+ * an entry here is an ADDRESS, and the title rides in brackets only where it is not that address in
+ * other clothes, because on the seven registers and the five Home pages where they differ the title
+ * is the only part a reader recognises.
+ *
+ * AND DE-DUPLICATION MOVES TO THE ADDRESS, which is the half of finding 4 that fixing the titles
+ * quietly made wrong. Five pages titled Overview are five pages at five addresses, so the nine names
+ * that pass reduced to six were four real pages the record holds and the refusal no longer mentions.
+ * Two entries are the same entry when they answer at the same address and never because two authors
+ * picked the same word. The empty branch and the title-shaped de-duplication live in
+ * `copy-refusals.test.ts` with the findings they came from; this is the other half of one sentence.
+ */
+test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one that did not work', () => {
+  /* The two pages the Guide record holds, in the order its rail draws them. */
+  assert.equal(
+    copy.theseExist('Pages', [
+      { address: 'home-guide', title: 'Your project' },
+      { address: 'guide', title: 'Guide' },
+    ]),
+    'Pages on this record: home-guide (Your project) · guide.',
+  );
+
+  /* A TITLE THAT IS THE ADDRESS IN OTHER CLOTHES ADDS NOTHING, and most of them are: eight of the
+     seed's fourteen registers, seven of its fifteen pages and eleven of the thirteen settings areas
+     differ from their address only in case or in a separator. Printing "services (Services)" on all
+     of those would bury the five or six entries where the brackets carry the whole point. */
+  assert.equal(
+    copy.theseExist('Lists', [
+      { address: 'obligations', title: 'Money' },
+      { address: 'services', title: 'Services' },
+      { address: 'installments', title: 'Instalments' },
+      { address: 'agent-work', title: 'Agent work' },
+    ]),
+    'Lists on this record: obligations (Money) · services · installments (Instalments) · agent-work.',
+    'a name that folds to its own address is noise, and one letter apart is not the same word',
+  );
+
+  /* AN ADDRESS ON ITS OWN IS STILL AN ENTRY, which is what `v/[view]/+page.svelte:264` has always
+     passed: `client.views()` answers addresses of the shape `register.id`, and there is no second
+     name for a saved view to carry. */
+  assert.equal(copy.theseExist('Saved views', ['money.overdue', 'money.due']), 'Saved views on this record: money.overdue · money.due.');
+  assert.equal(copy.theseExist('Pages', [{ address: 'guide' }]), 'Pages on this record: guide.');
+
+  /* TWO ENTRIES ARE ONE ENTRY WHEN THEY ANSWER AT THE SAME ADDRESS, and never because two packs
+     chose the same word. Both halves are the same measurement: the rail after `Clear the examples`
+     listed nine pages of which five read Overview, and those five are five pages. */
+  assert.equal(
+    copy.theseExist('Pages', [
+      { address: 'home-founder', title: 'Overview' },
+      { address: 'home-team', title: 'Overview' },
+    ]),
+    'Pages on this record: home-founder (Overview) · home-team (Overview).',
+    'two pages sharing a title are two pages, and the refusal that hides one sends its reader nowhere',
+  );
+  assert.equal(
+    copy.theseExist('Pages', [
+      { address: 'guide', title: 'Guide' },
+      { address: 'guide', title: 'Guide' },
+    ]),
+    'Pages on this record: guide.',
+  );
+
+  /* AND THE HOUSE VOICE HOLDS WITH A BRACKET IN IT. `access.test.ts` walks this function with
+     strings only, so the shape above is one it has never rendered. */
+  for (const said of [copy.theseExist('Lists', [{ address: 'obligations', title: 'Money' }]), copy.theseExist('Pages', [])])
+    assert.doesNotMatch(said, /register|declaration|projection|predicate|!|sorry|simply|just |easy/u, `"${said}" is not the house voice`);
+});
+
 test('A LIST OF NAMES IS BUILT BY `list()`, and one sentence was joining them by hand', () => {
   /* `diffRefused` used `names.join(' and ')`, so three colliding pack names read
      "Money and Services and People" on the screen that refuses the install. Two names is the

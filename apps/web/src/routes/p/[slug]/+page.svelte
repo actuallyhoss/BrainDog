@@ -566,7 +566,7 @@
       kind="error"
       heading
       title={copy.noSuch('page', slug)}
-      body={copy.theseExist('Pages', got.from === 'missing' ? got.titles : Object.values(readPages()).map((p) => p.title))}
+      body={copy.theseExist('Pages', got.from === 'missing' ? got.held : Object.entries(readPages()).map(([slug, p]) => ({ address: slug, title: p.title })))}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>

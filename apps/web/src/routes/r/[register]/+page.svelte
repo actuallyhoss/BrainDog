@@ -2102,7 +2102,7 @@
       kind="error"
       heading
       title={copy.noSuch('list', id)}
-      body={copy.theseExist('Lists', (booted?.registers ?? []).map((r) => r.name))}
+      body={copy.theseExist('Lists', (booted?.registers ?? []).map((r) => ({ address: r.id, title: r.name })))}
     >
       {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
     </Empty>
