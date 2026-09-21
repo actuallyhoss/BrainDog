@@ -35,6 +35,14 @@ function checked(doc: unknown): UseCase {
  * In the order a tie is broken: one person's own life first, then the most specific, and the business setup last. Personal
  * leads because a sentence that is as much about a person's budget as their coursework is a person's record with their
  * studies beside it (`alongside`), and the record speaks in the voice of the use case proposed, which onboarding writes down.
+ *
+ * EACH ONE'S `version` IS HELD TO WHAT ITS PACK DECLARES by `test/usecase-versions.test.ts`, which fingerprints the
+ * declarations and the settings of the document `useCaseDocument` builds below and refuses a word that moved with the
+ * version left alone. It was written because nothing did: renaming the founder's thirty-day tile with `FOUNDER.version`
+ * left at 1.3.2 kept all 182 tests in this package green, and the only thing holding that version up was a comment
+ * arguing for it (`loop/research-batch-three-audit.md` finding 6). Raising a version there means giving the new one its
+ * own entry in that file; rewording a label under a version nobody has released means appending a line that says which
+ * change moved it, the way `test/pack-versions.test.ts` has asked of the first-party packs since `5ccb06ad`.
  */
 export const USE_CASES: readonly UseCase[] = [checked(PERSONAL), checked(STUDENT), checked(FOUNDER), checked(TEAM), checked(GUIDE), checked(BUSINESS)];
 
