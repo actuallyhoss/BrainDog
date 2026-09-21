@@ -1277,7 +1277,11 @@ export const copy = {
   figureConvertedStale: (day: string) => `Converted at rates as of ${day}. Update the rates for a current figure.`,
   /** A target declared in one currency, said in the one the figure was converted into. */
   targetConverted: (line: string, from: string) => `${line}, converted from ${from} at the latest rate`,
-  blockNeedsOneCurrency: 'This needs its money in one currency, and it is in more than one.',
+  /* `blockNeedsOneCurrency` WAS HERE AND IS DELETED RATHER THAN EXCUSED. It was one of two headings the
+     browser chose between by running `/currenc/` over the record's refusal text, which is the habit that put
+     *This block's filter was not understood, so it matched nothing* over a filter that was understood and
+     matched 216 rows. The app now passes on what the record said, so a second copy of the record's sentence
+     here is a standing invitation to guess again. The record's own words are in `packages/kernel/src/pages.ts`. */
   /** The heading over one currency's chart, when a chart is drawn once per currency. */
   inCurrency: (currency: string) => `In ${currency}`,
   /**

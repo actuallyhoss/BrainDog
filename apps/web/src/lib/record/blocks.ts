@@ -989,11 +989,15 @@ function withRefs(segments: ReturnType<typeof parse>, register: string, entries:
  * heading over a blank rectangle and said nothing at all. That reads as a bug in the product rather
  * than as an answer, and it is the worst of the three cases that reach it:
  *
- *   1. THE FILTER WAS NOT UNDERSTOOD. `compile()` refuses a clause it cannot resolve and `matches`
- *      then admits no row, which is the safe answer and an invisible one. Whoever wrote the
- *      declaration — usually an agent, which cannot see the screen — learns nothing and writes it
- *      the same way again. 10 §7's fourth rule is that the refusal is the teacher, so the words
- *      `explain()` already produces are put on the page.
+ *   1. THE RECORD REFUSED THE BLOCK, and the filter is one of the ways it does. `compile()` refuses
+ *      a clause it cannot resolve and `matches` then admits no row, which is the safe answer and an
+ *      invisible one; a source no build reads, a column naming no field, a bar past what one read
+ *      holds, a figure and a row in two currencies and a thrown error all arrive the same way, each
+ *      with its own sentence. Whoever wrote the declaration — usually an agent, which cannot see the
+ *      screen — learns nothing and writes it the same way again. 10 §7's fourth rule is that the
+ *      refusal is the teacher, so the words the record already produces are put on the page, and the
+ *      heading over them says only that the block drew nothing. THIS FILE NAMING THE REASON IS WHAT
+ *      WENT WRONG: see the heading itself, in `draw()`.
  *   2. THE DECLARATION CONTRADICTS ITSELF: a source and authored rows, where picking one would be a
  *      silent decision about where the block's content comes from.
  *   3. IT ASKED AND THE ANSWER WAS NOTHING. The ordinary case, and the author's own `empty:`
@@ -1115,13 +1119,46 @@ export function draw(
       },
     };
 
+  /**
+   * THE HEADING NAMES THE STATE AND THE RECORD NAMES THE REASON, because this file cannot know the
+   * reason and said it anyway.
+   *
+   * The line here read `This block’s filter was not understood, so it matched nothing.` over every
+   * refusal a block can carry, and over the Ledger's chart of where the money goes it was false
+   * twice in one sentence. Measured in `blocks.test.ts` over a record of 220 rows holding the
+   * shipped `Where it went, 12 months` and its four shipped clauses: the record refuses the bar with
+   * both numbers and the fix — *A bar adds up every row it matched, and ledger matched 216 where a
+   * block that adds up reads 200. Narrow it with where: until it matches 200 or fewer, or draw it as
+   * a list.* — so the heading contradicted the line printed directly beneath it: the four clauses
+   * were understood, and they admitted 216 rows rather than nothing. `ledger` there is the test's
+   * name for the register; on his own page the same sentence names `transactions`, and the seed's 36
+   * rows are under the ceiling, so the refusal is what his own row count brings and not what the
+   * demo shows. The same test page also refuses a table for a column the register does not declare. The filter is ONE of the shapes that reach here, beside a source no build reads, a
+   * column naming no field, a `stale:` that is not a day and a window, a key the record does not
+   * read, a figure and a row in two currencies, and a thrown error, and a reader sent to look for a
+   * fault in four correct clauses spends an afternoon on a filter that was never wrong.
+   *
+   * THE CURRENCY HEADING WENT WITH IT, which was the same guess in its milder form. The test was
+   * `/currenc/` over every line, so `ledger has no field called currency.` — a misspelt column, with
+   * nothing whatever wrong with the money — was headed *This needs its money in one currency, and it
+   * is in more than one.* Measured through the record in the second test. Its other half,
+   * `a walk starts from one amount`, matched no sentence anything in this repository writes: grepped
+   * across `packages/` and `apps/`, the only occurrence of those words was the regex itself.
+   *
+   * AND THE KEY TO A SPECIFIC HEADING DOES NOT ARRIVE HERE. A refusal leaves the record as
+   * `{ code, fix, at }` and both boundaries into this app keep the sentence alone —
+   * `page-live.ts:571` maps `refusals.map((r) => r.fix)` and `api.ts:1966` writes
+   * `['refusal' in got ? got.refusal.fix]` — so `OUT_OF_BOUNDS` and `MIXED_CURRENCY` are the same
+   * string to everything downstream and any heading naming one of them is a guess about prose.
+   * Carrying `code` through those two lines is what would let this heading be specific, and it is a
+   * change in two files this one does not own.
+   */
   if (block.refusals.length)
     return {
       segments: [],
       refusal: {
         kind: 'error',
-        /* A WALK OR A CHART THAT NEEDS ONE CURRENCY says that, not that its filter was misread: the lines name the rate. */
-        title: block.refusals.every((r) => /currenc|a walk starts from one amount/iu.test(r)) ? copy.blockNeedsOneCurrency : 'This block’s filter was not understood, so it matched nothing.',
+        title: 'This block drew nothing, and the record says why.',
         lines: block.refusals,
       },
     };
