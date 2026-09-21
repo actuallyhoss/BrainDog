@@ -13,38 +13,31 @@
  * a picture to look at on a phone rather than a record of pixels: `shots/` keeps the PNGs.
  *
  *   node apps/site/scripts/send-shot.mjs            the home page, both schemes
- *   node apps/site/scripts/send-shot.mjs /pricing   any route the built site serves
+ *   node apps/site/scripts/send-shot.mjs pricing    any shot `shot.mjs` has taken
+ *
+ * Run `node apps/site/scripts/shot.mjs` first: this re-encodes what that wrote.
  *
  * It writes into `%TEMP%/braindog-loop/` and prints the paths, because these are for sending once
  * and not for keeping.
  */
 import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { extname, join } from 'node:path';
+import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 
-const ROOT = join(import.meta.dirname, '..', 'build');
+const SHOTS = join(import.meta.dirname, '..', 'shots');
 const OUT = join(process.env.TEMP ?? '/tmp', 'braindog-loop');
-const ROUTE = process.argv[2] ?? '/';
+const NAME = process.argv[2] ?? 'home';
 const PORT = 5178;
 
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
-
+/* THE PNG IS SERVED RATHER THAN OPENED AS A FILE. A page made with `setContent` has an opaque
+   origin, and an `<img>` at a `file://` URL inside one fails to decode with `EncodingError`, which
+   reads like a corrupt PNG and is not one. One request handler is cheaper than working that out
+   twice. */
 const server = createServer(async (req, res) => {
-  let path = decodeURIComponent(req.url.split('?')[0]);
-  if (path.endsWith('/')) path += 'index.html';
   try {
-    const body = await readFile(join(ROOT, path));
-    res.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream' });
+    const body = await readFile(join(SHOTS, decodeURIComponent(req.url.slice(1))));
+    res.writeHead(200, { 'content-type': 'image/png' });
     res.end(body);
   } catch {
     res.writeHead(404);
@@ -54,22 +47,22 @@ const server = createServer(async (req, res) => {
 
 await mkdir(OUT, { recursive: true });
 await new Promise((resolve) => server.listen(PORT, resolve));
-
 const browser = await chromium.launch();
-const name = ROUTE.replaceAll('/', '') || 'home';
 
 for (const scheme of ['dark', 'light']) {
-  const page = await browser.newPage({
-    viewport: { width: 1200, height: 900 },
-    deviceScaleFactor: 1,
-    colorScheme: scheme,
-  });
-  await page.goto(`http://127.0.0.1:${PORT}${ROUTE}`, { waitUntil: 'networkidle' });
-  /* The ledger animates for four seconds and the reveals are scroll-driven, so a shot taken on
-     `networkidle` catches the page mid-move. This is the same wait `shot.mjs` takes. */
-  await page.waitForTimeout(1600);
-  const file = join(OUT, `${name}-${scheme}-send.jpg`);
-  await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 60 });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  /* THE PNG IS PHOTOGRAPHED AGAIN, rather than the site being visited a second time. The first
+     version of this script did visit the site, and it caught five of the seven bands as bare
+     ground and both product shots as empty frames: the bands arrive on a scroll-driven timeline
+     and the pictures are lazy, and a full-page capture scrolls neither. `shot.mjs` has solved all
+     of that already, so re-encoding what it wrote is one moving part instead of a second copy of
+     its careful ones, and what he is sent cannot drift from what is in `shots/`. */
+  await page.setContent(
+    `<body style="margin:0"><img src="http://127.0.0.1:${PORT}/${NAME}-${scheme}.png" style="display:block;width:1200px"></body>`,
+  );
+  await page.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
+  const file = join(OUT, `${NAME}-${scheme}-send.jpg`);
+  await page.screenshot({ path: file, fullPage: true, type: 'jpeg', quality: 62 });
   await page.close();
   console.log(`  ${file}`);
 }

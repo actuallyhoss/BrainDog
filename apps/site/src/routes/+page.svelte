@@ -235,19 +235,24 @@
   </div>
 </section>
 
-<!-- ── 0004 · Agents, on the flipped ground ─────────────────────────────────
+<!-- ── 0004 · Agents ───────────────────────────────────────────────────────
      The strongest thing this product has to say and the page used to spend three chips on it.
      `loop/research-site-copy.md` ranks it first of eight: an agent gets a typed surface, not a
-     chat window. So the surface itself is the picture, all twenty-one names of it, on the one
-     band that changes the ground out from under the reader. -->
+     chat window. So the surface itself is the picture, all twenty-one names of it.
+
+     AND IT IS THE ONE BAND WHOSE HEADING SHARES A LINE WITH ITS MARK. 0003 and 0004 were the only
+     two bands left opening the same way, mark, then heading, then lead, which is the shape a
+     reader stops seeing the second time. Here the heading sits on the mark's own line and the rule
+     runs from the end of the words to the tag, so the opener is one line instead of three and the
+     tools table starts higher up the band. -->
 <section class="band" data-ground="page" aria-labelledby="agents-title">
   <div class="in reveal">
-    <p class="band-mark">
+    <div class="band-mark band-mark-line">
       <span class="band-seq">0004</span>
+      <h2 class="title title-inline" id="agents-title">{site.agents.title}</h2>
       <span class="band-rule"></span>
       <span class="band-tag">Over MCP</span>
-    </p>
-    <h2 class="title" id="agents-title">{site.agents.title}</h2>
+    </div>
     <p class="lead lead-wide">{site.agents.lead}</p>
 
     <h3 class="sub-head">{site.agents.toolsHead}</h3>
@@ -688,6 +693,27 @@
   }
 
   /* ── 0005 · The specification beside the dashboard ────────────────────── */
+
+  /* THE ONE-LINE OPENER. A `div` and not a `p`, because it carries the band's `h2`: the rest of
+     the page's marks are a paragraph of three spans and cannot be, and a heading inside a
+     paragraph is markup a validator refuses whatever it looks like. The baseline is the shared
+     one, with the rule centred against it, so the number, the words and the tag sit on one line
+     and the rule runs between them. */
+  .band-mark-line {
+    align-items: baseline;
+    gap: var(--sp-4);
+    margin-block-end: var(--sp-4);
+  }
+
+  .band-mark-line .band-rule {
+    align-self: center;
+  }
+
+  /* The measure comes off, because the heading is not setting a column here: it is one item in a
+     row that ends at the far edge. */
+  .title-inline {
+    max-inline-size: none;
+  }
 
   /**
    * THE CARD LIES ON THE PICTURE'S TOP EDGE AND NOWHERE ELSE, AND THE PICTURE DECIDED THAT.
