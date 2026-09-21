@@ -81,6 +81,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
+      '@braindog/spark':
+        specifier: workspace:*
+        version: link:../../packages/spark
     devDependencies:
       '@braindog/client':
         specifier: workspace:*
@@ -186,6 +189,9 @@ importers:
       '@braindog/seed':
         specifier: workspace:*
         version: link:../../packages/seed
+      '@braindog/spark':
+        specifier: workspace:*
+        version: link:../../packages/spark
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260907.1

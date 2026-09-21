@@ -10,7 +10,8 @@
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*",
-    "@braindog/seed": "workspace:*"
+    "@braindog/seed": "workspace:*",
+    "@braindog/spark": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260907.1",

@@ -12,7 +12,8 @@
     "@braindog/mcp": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*",
-    "@braindog/seed": "workspace:*"
+    "@braindog/seed": "workspace:*",
+    "@braindog/spark": "workspace:*"
   },
   "scripts": {
     "start": "node src/main.ts",
