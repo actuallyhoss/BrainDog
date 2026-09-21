@@ -342,3 +342,72 @@ because those tokens are already solved per scheme.
 | Unrendered copy | `tools/gates/dead-copy.mjs` | 1,128 sentences, 18 unrendered, all 18 known |
 | Types and markup | `svelte-check`, 287 files | 0 errors, 0 warnings |
 | The site's own tests | `pnpm --filter @braindog/site test` | 14 pass |
+
+## 6. The third pass, and it is the one he asked for twice
+
+Two passes had been made on this page before he saw it deployed, and he still called it horrible,
+boring and ugly. So this pass was argued from what could be MEASURED about the fault rather than
+from another look at it, and three faults were named before any line was written.
+
+**A card lay across the dashboard's money figures, and neither margin was safe.** This is the
+worst class of defect the product can ship, because a figure with its leading digits behind a card
+is still readable and is wrong: the reports band was drawing `GBP 28,320.00` as `320.00`. It had
+already been moved once, from the left margin to the right, and that only changed which figure it
+hid. Measured on the capture itself, `Cash now` sits at 19 per cent of the width, `Coming in` at 46
+and `Going out` at 72, with the row below repeating at 19, 46 and 73: a figure occupies every third
+of the picture, so no 480px card can be put beside one. What is free is the top, where the picture
+carries a breadcrumb, a title and two controls and no number at all. The first figure starts 341
+source pixels down, which is 208 rendered pixels at the 0.611 scale this band paints at, and the
+overlap is capped at 88. The layer survives, the hazard does not, and the next capture is checked
+by looking at where its first number is.
+
+**Four of the six ground changes were invisible.** `--sunk` against `--bg` is 1.07:1. It is a real
+step in the eye's adaptation and it is the right step inside the application, where it separates a
+canvas from a panel; on a page somebody scrolls once it is nothing, which is why six ground changes
+read as one grey field with rules across it. The grounds are now `page, page, flip, page, page,
+flip, brand`. A flipped band's ground is the scheme's ink against the scheme's background, so each
+of those four changes is the certified body pair: **15.77:1 in dark and 18.51:1 in light**
+(`packages/theme/src/index.ts:83`). At the two seams that do not invert, the band opens with a
+picture that runs edge to edge, which is the change.
+
+**Flipping a band exposed two tokens that did not flip with it.** `--sunk` and `--edge` were not in
+the flipped set, so the parts widget drew its panel in the scheme's own canvas: a near-black panel
+in the middle of a near-white band, the loudest thing on the page and none of it intended. Both are
+now solved on `:root` with the rest of the flipped set, where the mix resolves against the page's
+two colours rather than against the flipped ones. Written inside the flip rule instead, which was
+the first attempt, `mix(--bg 18%, --ink)` lands on the far side of the ground and paints the panel
+in the text colour.
+
+**The hero was the third copy of one armature.** Copy in a 46ch column beside a 540px panel, which
+bands 0002 and 0005 were both doing, and the hero is the one band that cannot look like the others
+because it is the shape a stranger meets. The reference read measures what the pages he pointed at
+put on the first screen: Linear runs a 1,344px product element from y=527 off the bottom of the
+fold (section 3 of `loop/research-site-reference.md`). There is no third capture to run off a fold
+here, and there is something no reference has, which is an element that is actually running. So the
+headline takes the full column, the sentence and the two actions share one row at one baseline, and
+the ledger goes edge to edge underneath at the width of the screen. Its `what` column was the first
+thing to ellipsis inside the old 540px box, which is the component whose entire job is to show that
+nothing is overwritten truncating its own sentences.
+
+### What was measured on the finished page, a third time
+
+| | first pass | second pass | third pass |
+| --- | --- | --- | --- |
+| Distinct layouts before a repeat | 5 in 7 | 7 in 7 | 7 in 7 |
+| Ground changes | 6, four of them 1.07:1 | 6, four of them 1.07:1 | **4, every one 15.77:1 dark and 18.51:1 light** |
+| Money figures covered by a card | 2 | 1 | **0** |
+| Clear picture above the card's lowest edge | not measured | not measured | **120px** |
+| Document height at 1440 | 5,008px | 5,270px | 5,649px |
+| Hero armature | copy beside widget | copy beside widget | headline, text row, full-bleed demo |
+
+| check | how | result |
+| --- | --- | --- |
+| Colour literals | `tools/gates/colour-grep.mjs` | 0 outside the theme |
+| Stylesheet rules | `tools/gates/css-rules.mjs`, 125 files, 145 tokens | 0 findings |
+| Em dashes | `tools/gates/em-dash.mjs`, 417 files | 0 |
+| Types and markup | `svelte-check`, 287 files | 0 errors, 0 warnings |
+| The site's own tests | `pnpm --filter @braindog/site test` | 14 pass |
+| Screenshots | `node apps/site/scripts/shot.mjs` | 20, five routes in both schemes at 1440 and 390 |
+
+The browser gates (`layout`, `a11y`) were not re-run in this pass and are the next thing to run
+against it, which is said here rather than left for somebody to assume either way.

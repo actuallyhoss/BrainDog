@@ -102,9 +102,9 @@
 
     <h1 class="display" id="hero-title">{site.hero.title} <span class="hl">{site.hero.titleAccent}</span></h1>
 
-    <div class="hero-row">
-      <div class="hero-copy">
-        <p class="sub">{site.hero.sub}</p>
+    <div class="hero-say">
+      <p class="sub">{site.hero.sub}</p>
+      <div class="hero-do">
         <div class="actions">
           <!-- THE PAGE'S ONE FILLED PRIMARY, and the only one above the close. -->
           <a class="btn btn-primary btn-lg" href={APP}>{site.hero.primary}<Icon name="arrow" size="s" /></a>
@@ -112,17 +112,35 @@
         </div>
         <p class="note">{site.hero.note}</p>
       </div>
-
-      <!-- THE CLAIM, BEING DEMONSTRATED BESIDE IT. "The log only grows" is a claim about behaviour
-           over time, and no still picture can carry one. A list that only ever grows, watched for
-           four seconds, can. -->
-      <Ledger
-        events={site.ledger.events}
-        head={site.ledger.head}
-        only={site.ledger.only}
-        all={site.ledger.all}
-      />
     </div>
+  </div>
+
+  <!-- THE CLAIM, BEING DEMONSTRATED UNDER IT AND AT THE WIDTH OF THE SCREEN.
+
+       IT WAS A 540px PANEL BESIDE 46ch OF COPY, which is the armature bands 0002 and 0005 were
+       both using: three copies of one shape, and the first one is the shape a stranger meets. The
+       hero is the only band on the page that cannot afford to look like the others.
+
+       The reference read measures what the pages he pointed at put on the first screen instead:
+       Linear runs a 1,344px product element from y=527 off the bottom of the fold, and 25 distinct
+       colours cover the first screen with no single one over 49.8 per cent of it
+       (`loop/research-site-reference.md`, section 3). We have no third capture to run off the fold
+       and we have something no reference has: an element that is actually running. So the demo
+       goes edge to edge under the headline, where the page's widest thing is the one thing on it
+       that moves.
+
+       "The log only grows" is a claim about behaviour over time, and no still picture can carry
+       one. A list that only ever grows, watched for four seconds, can. -->
+  <div class="hero-stage reveal">
+    <Ledger
+      events={site.ledger.events}
+      head={site.ledger.head}
+      only={site.ledger.only}
+      all={site.ledger.all}
+    />
+  </div>
+
+  <div class="in">
 
     <!-- FOUR NUMBERS, EACH ONE COUNTED. `copy.ts` records the command behind every figure and why
          two of the ones asked for are absent: a commit count moves every hour, and this page
@@ -143,7 +161,7 @@
      off the bottom of its first screen; PostHog's wallpaper is full-bleed behind everything;
      FirstLook's section grounds go edge to edge. Ours was 1440 natural pixels inside a 420px
      window, which showed about a third of the picture and asked the reader to scroll a box. -->
-<section class="band" data-ground="sunk" aria-labelledby="typed-title">
+<section class="band" data-ground="page" aria-labelledby="typed-title">
   <div class="in reveal">
     <p class="band-mark">
       <span class="band-seq">0002</span>
@@ -195,7 +213,7 @@
      It is a strip now. The sentence runs the width of the column, the control runs the width of
      the SCREEN between two hairlines, and the thing it redraws sits under it. Nothing is beside
      anything, so there is no short column to leave a hole under. -->
-<section class="band" data-ground="page" aria-labelledby="arrange-title">
+<section class="band" data-ground="flip" aria-labelledby="arrange-title">
   <div class="in reveal">
     <p class="band-mark">
       <span class="band-seq">0003</span>
@@ -222,7 +240,7 @@
      `loop/research-site-copy.md` ranks it first of eight: an agent gets a typed surface, not a
      chat window. So the surface itself is the picture, all twenty-one names of it, on the one
      band that changes the ground out from under the reader. -->
-<section class="band" data-ground="flip" aria-labelledby="agents-title">
+<section class="band" data-ground="page" aria-labelledby="agents-title">
   <div class="in reveal">
     <p class="band-mark">
       <span class="band-seq">0004</span>
@@ -256,10 +274,11 @@
      two are aligned, which is the emptiness this redesign exists to remove.
 
      A CARD LYING ON THE PICTURE IS THE ONE LAYERED THING ON THE PAGE. It is the only place where
-     two surfaces overlap, it needs no second column to be full of something, and it holds its own
-     height rather than borrowing the picture's. The card is opaque `--s1` inside a `--line`
-     hairline, so nothing behind it is read through it and the contrast is the page's own, which is
-     why this costs no new token and no new shadow. -->
+     two surfaces overlap. The card is opaque `--s1` inside a `--line` hairline, so nothing behind
+     it is read through it and the contrast is the page's own, which is why this costs no new token
+     and no new shadow. WHAT IT MAY LIE ON IS THE PICTURE'S TOP STRIP AND NOTHING ELSE: every third
+     of this dashboard holds a money figure, so a card parked against either margin hides one, and
+     it hid one for two passes. The measurement is in the stylesheet beside the overlap. -->
 <section class="band" data-ground="page" aria-labelledby="report-title">
   <div class="in">
     <p class="band-mark">
@@ -273,18 +292,22 @@
          reader meets the heading and then the picture, which is the order the section is written
          in; `z-index` alone decides which of the two grid items is on top. -->
     <div class="report-card">
-      <h2 class="title" id="report-title">{site.report.title}</h2>
-      <p class="lead">{site.report.lead}</p>
+      <div class="report-say">
+        <h2 class="title" id="report-title">{site.report.title}</h2>
+        <p class="lead">{site.report.lead}</p>
+      </div>
 
-      <h3 class="sub-head">{site.report.specHead}</h3>
-      <dl class="spec hair">
-        {#each site.report.spec as row (row.term)}
-          <div class="spec-row">
-            <dt class="spec-term">{row.term}</dt>
-            <dd class="spec-def">{row.def}</dd>
-          </div>
-        {/each}
-      </dl>
+      <div class="report-spec">
+        <h3 class="sub-head">{site.report.specHead}</h3>
+        <dl class="spec hair">
+          {#each site.report.spec as row (row.term)}
+            <div class="spec-row">
+              <dt class="spec-term">{row.term}</dt>
+              <dd class="spec-def">{row.def}</dd>
+            </div>
+          {/each}
+        </dl>
+      </div>
     </div>
 
     <figure class="report-shot">
@@ -324,7 +347,7 @@
 <!-- ── 0006 · Plain about what it is ────────────────────────────────────────
      Three columns at one weight, in a grid whose dividers are the gap. The limits are not a
      footnote; they are the reason the rest is believable. -->
-<section class="band" data-ground="sunk" aria-labelledby="plain-title">
+<section class="band" data-ground="flip" aria-labelledby="plain-title">
   <div class="in reveal">
     <p class="band-mark">
       <span class="band-seq">0006</span>
@@ -379,10 +402,14 @@
 
   /* A HAIRLINE AT EVERY SEAM, which is how PostHog marks a section off: each of the seven stacked
      sections on `/product-analytics` carries `padding-top: 32px`, `padding-bottom: 32px` and a
-     `1px rgb(191,193,183)` top border, and nothing else. Two of the six ground changes on this
-     page are a 15:1 jump and need no help; the other four are `--sunk` against `--bg`, which is
-     1.07:1, a real step in the eye's adaptation and not one a reader can point at. The rule is
-     what turns it into an edge. `+` rather than a rule on every band, so the first one has no line
+     `1px rgb(191,193,183)` top border, and nothing else. EVERY GROUND CHANGE ON THIS PAGE IS NOW A REAL ONE, WHICH IS WHY
+     THERE ARE FEWER OF THEM. There used to be six and four of those were `--sunk` against `--bg`,
+     which is 1.07:1: a real step in the eye's adaptation and not one a reader can point at, so the
+     page read as one grey field with rules across it. `--sunk` is the application's canvas and it
+     is a half step by design, which is right inside the app and wrong on a page somebody scrolls
+     once. The grounds are `page, page, flip, page, page, flip, brand`: four inversions at about
+     15:1, and at the two seams that do not invert the band opens with a picture that runs edge to
+     edge, which is the change. The rule is still what turns a seam into an edge. `+` rather than a rule on every band, so the first one has no line
      hanging off the header above it. */
   .band + .band {
     border-block-start: 1px solid var(--line);
@@ -496,20 +523,31 @@
 
   /* ── 0001 · The hero ──────────────────────────────────────────────────── */
 
-  /* 1.05fr AND NOT 1fr. The left column holds a 46ch sentence and a button row; the right holds
-     the ledger, whose rows are five columns of tabular text. At an even split the ledger's `what`
-     column was the first thing to ellipsis, and a component whose job is to prove that nothing is
-     overwritten should not be the one truncating its own sentences. */
-  .hero-row {
+  /* THE SENTENCE AND THE TWO ACTIONS SHARE A ROW, and both halves are text, which is what stops
+     this reading as the copy-beside-widget shape it replaced. `align-items: end` sets them on one
+     baseline at the bottom, so the row reads as one line of the page rather than as two columns
+     that happen to start together. */
+  .hero-say {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: var(--sp-8);
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-7) var(--sp-8);
+    align-items: end;
     margin-block-start: var(--sp-7);
   }
 
-  .hero-copy {
+  .hero-do {
     min-inline-size: 0;
+  }
+
+  /* THE STAGE IS THE SCREEN, and the ledger inside it is 100 per cent of that rather than a panel
+     of an invented width. Its rows are five columns of tabular text, so the room goes to `what`,
+     which is the column that was ellipsising first when the component lived in a 540px box: the
+     one element whose job is to prove nothing is overwritten was the one truncating its own
+     sentences. `overflow: hidden` because the rows animate in from the right. */
+  .hero-stage {
+    margin-block-start: var(--sp-8);
+    padding-inline: max(var(--sp-6), calc((100% - var(--site-max)) / 2));
+    overflow: hidden;
   }
 
   .facts {
@@ -651,53 +689,64 @@
 
   /* ── 0005 · The specification beside the dashboard ────────────────────── */
 
-  /* ONE CELL WITH TWO THINGS IN IT. Both children are `grid-area: 1 / 1`, so the picture fills the
-     band edge to edge and the card lies on it. `align-items: center` puts the card's middle on the
-     picture's middle, which is the only alignment that does not care how tall either of them ends
-     up being: the fault this band had before was that two columns of different heights always
-     leave the shorter one's foot empty. */
+  /**
+   * THE CARD LIES ON THE PICTURE'S TOP EDGE AND NOWHERE ELSE, AND THE PICTURE DECIDED THAT.
+   *
+   * It lay across the middle of the dashboard for two passes, first on the left and then on the
+   * right, and both of those hide a money figure. Measured on the capture itself
+   * (`static/shots/usecase-founder-dashboard-dark.webp`, 2,880 x 1,800 for a 1,440px app):
+   * `Cash now` sits at 19 per cent of the width, `Coming in, 30 days` at 46 and
+   * `Going out, 30 days` at 72, and the row under them repeats at 19, 46 and 73. A figure occupies
+   * every third of the picture, so a 480px card covers one wherever it is put sideways. The right
+   * edge was no better than the left: it turned `GBP 28,320.00` into `320.00` and cut
+   * `no more than GBP 50,000.00` in half.
+   *
+   * WHAT IS ACTUALLY FREE IS THE TOP. Nothing above `Across your organisations` is a number: the
+   * strip holds the breadcrumb, the page title and two controls. In source pixels the first figure
+   * starts 341px down, which at the 0.611 scale this band paints the capture at is 208 rendered
+   * pixels. The overlap is capped at 88px, so there are 120px of clear picture between the card's
+   * bottom edge and the top of the tallest glyph in `GBP 24,800.00`.
+   *
+   * SO THE LAYER SURVIVES AND THE HAZARD DOES NOT. This is still the one place on the page where
+   * two surfaces overlap. It overlaps by an amount that is measured against the picture rather
+   * than chosen against the composition, which means a new capture is checked by looking at where
+   * its first number is, not by looking at whether the page still seems fine.
+   */
   .report {
     display: grid;
-    align-items: center;
+    gap: 0;
   }
 
-  .report > * {
-    grid-area: 1 / 1;
-  }
-
-  /**
-   * THE CARD, AND ITS LEFT EDGE IS THE READING COLUMN'S LEFT EDGE.
-   *
-   * `max(var(--sp-6), calc((100% - var(--site-max)) / 2 + var(--sp-6)))` is the same expression
-   * `.in` resolves to, written out because this element is not inside `.in`: below 1200px it is
-   * the plain 32px gutter and above it the column's own margin, so the card starts exactly where
-   * every heading on the page starts.
-   *
-   * 480px AND NOT A `ch` MEASURE. The specification under the sentence is a two-column table with
-   * an 11ch term column, and a card sized to the prose put `One register, and a fixed set of
-   * fields.` onto three lines. 480px holds every definition on two lines at most and is still
-   * under half the 1,136px column, so two thirds of the dashboard behind it stays visible.
-   *
-   * `position: relative` AND `z-index` RATHER THAN DOM ORDER, because the heading has to come
-   * first in the markup for a reader who is listening to the page rather than looking at it.
-   */
-  /* THE CARD MOVED TO THE RIGHT, AND IT IS ABOUT WHICH NUMBER IT HIDES. On the left it covered the
-     app's rail AND `Cash now GBP 24,800.00`, which left `GBP 0.00` as the largest figure visible on
-     the band: a marketing page whose biggest number is zero. The picture is 1,760px inside a
-     1,440px screen with `object-position: 0 0`, so its right edge is cut anyway, and a card on that
-     side covers the part the frame was already losing. Cash now reads, and what the card hides is
-     the cut. The left edge of the card still lands inside the reading column's right margin, so
-     the composition keeps its seam. */
+  /* THE STRIP IS THE READING COLUMN, so the card starts where every heading on the page starts and
+     ends where they end, rather than being a block of an invented width parked against one margin.
+     Two columns because the specification is a table and a table beside a sentence reads as one
+     object, where a table under a sentence reads as a second thing that arrived later. */
   .report-card {
     position: relative;
     z-index: var(--z-raise);
-    justify-self: end;
-    inline-size: min(480px, 100% - 2 * var(--sp-6));
-    margin-inline-end: max(var(--sp-6), calc((100% - var(--site-max)) / 2 + var(--sp-6)));
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--sp-6) var(--sp-7);
+    align-items: start;
+    inline-size: min(100% - 2 * var(--sp-6), var(--site-max));
+    /* THE OVERLAP, AND IT IS THE ONE NUMBER THIS BAND IS ABOUT. 88px at 1440 against 208px of
+       clear picture above the first figure. It shrinks with the viewport because the picture does
+       not: the capture is painted at a fixed 1,760px at every width, so the clear strip is 208px
+       everywhere and a smaller overlap is only ever safer. */
+    margin-block-end: calc(-1 * clamp(40px, 5vw, 88px));
+    margin-inline: auto;
     padding: var(--sp-6);
     background: var(--s1);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
+  }
+
+  .report-say .lead {
+    max-inline-size: 42ch;
+  }
+
+  .report-spec .sub-head {
+    margin-block-start: 0;
   }
 
   .spec {
@@ -759,7 +808,8 @@
    * source: 2.36 device pixels per CSS pixel at a scale of 2, which is still above 1:1 and is why
    * the picture stays sharp while being bigger than the window it is seen through. The old
    * treatment painted it at 1:1 in a 700px column, which showed the rail and about 460px of the
-   * page; this shows the rail and roughly 1,200px of it, of which the card covers 480.
+   * page; this shows the rail and roughly 1,200px of it, and the card covers none of it: it laps the top
+   * 88px, where the picture has a breadcrumb and a title and no numbers.
    *
    * A top rule and no side rules, because there is no side for one to be on.
    */
@@ -906,7 +956,7 @@
   /* ── Narrower than a desk ─────────────────────────────────────────────── */
 
   @media (width < 1000px) {
-    .hero-row,
+    .hero-say,
     .head-two {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--sp-7);
@@ -937,7 +987,11 @@
     }
 
     .report-card {
+      grid-template-columns: minmax(0, 1fr);
       inline-size: 100%;
+      /* NO OVERLAP UNDER 900px, because the narrow treatment swaps the wide capture for a phone
+         one and lays the two out in a column. There is no picture behind the card to lie on. */
+      margin-block-end: 0;
       margin-inline-start: 0;
       padding: 0;
       background: none;

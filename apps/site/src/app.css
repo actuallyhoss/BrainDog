@@ -84,6 +84,17 @@
     --flip-dim: color-mix(in srgb, var(--bg) 65%, var(--ink));
     --flip-line: color-mix(in srgb, var(--bg) 22%, var(--ink));
     --flip-s1: color-mix(in srgb, var(--bg) 9%, var(--ink));
+    /* `--flip-sunk` AND `--flip-edge` ARE DECLARED HERE FOR THE REASON THE WHOLE BLOCK IS: the mix
+       has to resolve against the PAGE's two colours. Written inside the flip rule instead, where
+       `--bg` is already the flipped one, `mix(--bg 18%, --ink)` comes out on the far side of the
+       ground and paints a near-white panel on a near-black band, which is what it did.
+       AND SUNK SITS JUST ABOVE THE GROUND HERE RATHER THAN BELOW IT. In the app `sunk` is the
+       canvas a panel sits ON, one step darker than the panel. A flipped band's ground is already
+       the scheme's ink, so there is no step further back to take: 4 per cent is half of what `s1`
+       takes, which keeps the order the app has, ground then sunk then s1, with the two smallest
+       steps nearest the ground. */
+    --flip-sunk: color-mix(in srgb, var(--bg) 4%, var(--ink));
+    --flip-edge: color-mix(in srgb, var(--bg) 30%, var(--ink));
   }
 
   /**
@@ -118,6 +129,21 @@
     --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
     --s1: var(--flip-s1);
     --s2: var(--flip-s1);
+    /**
+     * `--sunk` AND `--edge` FLIP TOO, AND A BAND FOUND THAT OUT THE HARD WAY.
+     *
+     * `--sunk` is the application's canvas, one decisive step BELOW `--bg`, and the parts widget
+     * draws its panel in it on purpose so the panel reads as a piece of the app rather than as a
+     * box on a page. It was not in this list, so on a flipped band it stayed the scheme's own dark
+     * canvas: a black panel sitting in the middle of a near-white field, which is the single
+     * loudest thing on the page and none of it was meant.
+     *
+     * Both are solved with the rest of the flipped set on `:root`, where the mix resolves against
+     * the page's own two colours. That keeps every surface on this band made out of the two
+     * colours the band is made of, rather than out of a third one nobody chose.
+     */
+    --sunk: var(--flip-sunk);
+    --edge: var(--flip-edge);
     /* Re-declared HERE so its `var(--ink)` resolves against this band's ink and not the page's.
        Declared on `:root` it would be a near-white wash on a near-white field in the dark scheme,
        which is not wrong so much as absent, and absent is the harder bug to see. */
