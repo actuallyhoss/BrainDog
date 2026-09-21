@@ -99,52 +99,126 @@ export function ftsQuery(q: string): string | null {
 
 export type Hit = { id: string; register: string; rank: number };
 
+/** What a search is asked: the words, the registers the caller may see, and how many hits to draw. */
+type Ask = { registers?: readonly string[] | undefined; limit?: number };
+
+/**
+ * A search's whole answer: the page of hits, and how many rows there were to have.
+ *
+ * A BARE ARRAY CANNOT TELL A HUNDRED FROM A HUNDRED OF A HUNDRED AND FORTY, AND THE SCREEN PRINTED
+ * THE WRONG ONE. Driven at the owner's size (`loop/research-at-scale.md`, *Wrong, not slow* 3):
+ * `/search?q=revenue` drew **100** under the heading and **"All 100 in Datapoints"** beside the
+ * group when 140 rows matched, counted against the record file itself. `the` matched 304 and said
+ * 100; `bake` matched 577 and said 100. The clamp below is not the fault. `list` clamps above its
+ * own ceiling in silence too, and says so at `packages/record/src/index.ts:2038`, but `list` answers
+ * a page with a cursor and a `matched`, so a clamped read arrives downstream looking like one. This
+ * answered an array, so nothing that received it could know what it was missing, and the surface
+ * that exists to find anything in 2,243 rows stated a number that was not true.
+ *
+ * SO THE COUNT TRAVELS WITH THE HITS, AND IT IS PER REGISTER RATHER THAN ONE NUMBER. The results
+ * screen groups by register and prints a count per group, so a single grand total would fix the
+ * heading and leave every group saying its own ceiling. Per register it also needs no new sentence
+ * anywhere: `allIn(140, 'Datapoints')` and `showingOf(10, 140)` are already written and become true
+ * the moment the number is. The grand total is the sum, and a second field holding it would be one
+ * fact stored twice, which is one fact that can disagree with itself.
+ *
+ * NOT A CURSOR, and this was the tempting one. The order is `bm25`, which is not a resumable key:
+ * rank is a float that repeats constantly on a record whose 1,224 readings are near-identical
+ * sentences, and its value moves for every row when any row is written, because bm25 reads the whole
+ * index's term statistics. "Everything after rank r" would therefore both repeat rows and skip them
+ * between one page and the next. A cursor also answers a question nobody asked at a search box: the
+ * person typing wants to know whether the record holds the thing, not to walk 577 readings.
+ *
+ * NOT AN AT-THE-CAP MARK EITHER. A mark buys "the first 100 of more", which needs a sentence written
+ * for it and still leaves the reader to guess whether "more" is 3 or 477. The mark falls out of the
+ * count anyway, as `sum(matched) > hits.length`.
+ *
+ * WHAT IT COSTS, MEASURED. One more query over the same MATCH, with no `bm25` and no `ORDER BY`. At
+ * the size the survey used, 2,243 rows in `node:sqlite`, median of nine warm runs: the ranked page of
+ * 100 takes 0.31 to 0.73 ms and the count takes 0.24 to 0.76 ms over five queries matching between 0
+ * and 1,122 rows, so the count is cheaper than the page it counts on four of the five and the pair is
+ * about twice one page. The whole `search` route measured 3 ms at that size.
+ */
+export type Searched = {
+  /** The best matches, `limit` of them at most, best first. */
+  hits: Hit[];
+  /** How many live rows matched in each register in scope, whatever the ceiling cut. Sum it for the whole. */
+  matched: Record<string, number>;
+};
+
+/**
+ * The FROM and WHERE both queries share, or `null` for a search there is nothing to run.
+ *
+ * ONE FRAGMENT, BECAUSE A COUNT THAT DOES NOT COUNT THE PAGE IT IS BESIDE IS WORSE THAN NO COUNT.
+ * Two copies of this clause would be two places to add the next condition, and the failure would be
+ * a screen saying 140 over a page of rows drawn from a different 140.
+ *
+ * THE SCOPE IS APPLIED IN THE QUERY rather than to its results: filtering afterwards means a caller
+ * who may read one register gets a short page whenever the matches were mostly in another, and
+ * cannot tell that from there being no matches. The count inherits the same property, so it is a
+ * count of what this caller could have seen and not of the record.
+ *
+ * AN EMPTY SCOPE IS AN EMPTY ANSWER, AND IT USED TO BE THE WHOLE RECORD. `opts.registers?.length`
+ * read an empty array as though no scope had been passed, so a caller that COMPUTED a list of the
+ * registers somebody may read and got none handed that person every row in the record. It is the
+ * worst possible direction for a default to fail in, and it is one character away from the caller
+ * doing everything right: `registers: reachable.filter(...)` is the correct shape and an empty
+ * result is the correct answer to it.
+ *
+ * THE QUESTION IS WHETHER A SCOPE WAS GIVEN, not whether it has anything in it. `undefined` is a
+ * caller who never asked to be scoped, which is the owner's own search; `[]` is a caller who asked
+ * and holds nothing.
+ */
+function matching(q: string, registers: readonly string[] | undefined): { from: string; args: string[] } | null {
+  const query = ftsQuery(q);
+  if (!query) return null;
+  if (registers !== undefined && registers.length === 0) return null;
+  const scope = registers ? ` AND entry_fts.register IN (${registers.map(() => '?').join(', ')})` : '';
+  return {
+    from: `FROM entry_fts
+       JOIN entry ON entry.rowid = entry_fts.rowid
+      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL`,
+    args: [query, ...(registers ?? [])],
+  };
+}
+
 /**
  * Rows whose text matches, best first, within the registers the caller may see.
  *
- * The ceiling is applied IN THE QUERY rather than to its results: filtering afterwards means a
- * caller with access to one register gets a short page whenever the matches were mostly in another,
- * and cannot tell that from there being no matches.
+ * THIS IS THE SHAPE THAT PRINTED A CEILING AS A TOTAL, and it is kept only until its two callers
+ * move to `searchMatched`: `packages/kernel/src/index.ts:3832` hands the array up and
+ * `packages/record/src/index.ts:4347` puts it on the wire, and neither file was this change's to
+ * edit. Anything that states a number to a person wants `searchMatched`, because nothing here can
+ * tell a full page from a whole answer.
  */
-export function search(
-  sql: Sql,
-  q: string,
-  opts: { registers?: readonly string[] | undefined; limit?: number } = {},
-): Hit[] {
-  const query = ftsQuery(q);
-  if (!query) return [];
-  const limit = Math.min(Math.max(1, opts.limit ?? 20), 100);
-
-  /**
-   * AN EMPTY SCOPE IS AN EMPTY ANSWER, AND IT USED TO BE THE WHOLE RECORD.
-   *
-   * `opts.registers?.length` reads an empty array as though no scope had been passed, so a caller
-   * that COMPUTED a list of the registers somebody may read and got none handed that person every
-   * row in the record. It is the worst possible direction for a default to fail in, and it is one
-   * character away from the caller doing everything right: `registers: reachable.filter(...)` is the
-   * correct shape and an empty result is the correct answer to it.
-   *
-   * THE QUESTION IS WHETHER A SCOPE WAS GIVEN, not whether it has anything in it. `undefined` is a
-   * caller who never asked to be scoped, which is the owner's own search; `[]` is a caller who asked
-   * and holds nothing.
-   */
-  if (opts.registers !== undefined && opts.registers.length === 0) return [];
-
-  const scope = opts.registers
-    ? ` AND entry_fts.register IN (${opts.registers.map(() => '?').join(', ')})`
-    : '';
-
+export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
+  const m = matching(q, opts.registers);
+  if (!m) return [];
   return sql.all<Hit>(
     `SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank
-       FROM entry_fts
-       JOIN entry ON entry.rowid = entry_fts.rowid
-      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL
+       ${m.from}
       ORDER BY rank
       LIMIT ?`,
-    query,
-    ...((opts.registers ?? []) as string[]),
-    limit,
+    ...m.args,
+    /* THE CLAMP STAYS, and it is now visible rather than silent: a caller asking for 500 still gets
+       100, and `matched` is what tells them so. */
+    Math.min(Math.max(1, opts.limit ?? 20), 100),
   );
+}
+
+/** The same hits, with the count that makes them tellable from the whole answer. See `Searched`. */
+export function searchMatched(sql: Sql, q: string, opts: Ask = {}): Searched {
+  const m = matching(q, opts.registers);
+  if (!m) return { hits: [], matched: {} };
+  const matched: Record<string, number> = {};
+  for (const row of sql.all<{ register: string; n: number }>(
+    `SELECT entry_fts.register AS register, count(*) AS n
+       ${m.from}
+      GROUP BY entry_fts.register`,
+    ...m.args,
+  ))
+    matched[row.register] = row.n;
+  return { hits: search(sql, q, opts), matched };
 }
 
 /** Every live row's line, rebuilt from nothing. What an import runs once at the end. */

@@ -13,6 +13,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ftsQuery, openRecord, projectedText, type Declaration, type Kernel } from '../src/index.ts';
+/* STRAIGHT FROM THE MODULE, because `searchMatched` has no way up yet: `index.ts:3832` still calls
+   the bare `search` and was not this change's file to edit. The ceiling tests below are about the
+   answer's shape, which is this module's, and they are the evidence for moving that line. */
+import { searchMatched } from '../src/fts.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -167,6 +171,93 @@ test('THE CEILING IS APPLIED IN THE QUERY, not to its results', async () => {
      every row. It is one character away from the caller doing everything right, and it fails in the
      worst possible direction. */
   assert.deepEqual(k.search('secret', { registers: [], limit: 20 }), []);
+  sql.close();
+});
+
+/**
+ * 140 matches in one list and 6 in another, which is the shape `/search?q=revenue` met on the
+ * owner's own record.
+ *
+ * THE SECOND LIST IS DECLARED HERE AND NOT AT THE TOP OF THE FILE, because only one of the two
+ * declared up there can hold a countable match: `POINTS` is a series, and a series is not indexed at
+ * all, which is what `a series is not searched` above asserts. A count is per register, so a fixture
+ * that proves it needs two registers that are both searched.
+ */
+async function crowded(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const { k, sql } = await record();
+  await k.install([
+    { id: 'register.notes', kind: 'register', body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true, search: true }] } as never },
+  ]);
+  sql.transactionSync(() => {
+    for (let n = 1; n <= 140; n++) value(k.create('obligations', { what: `Monthly revenue, project ${n}` }, { actor: 'p_1' }));
+    for (let n = 1; n <= 6; n++) value(k.create('notes', { what: `revenue note ${n}` }, { actor: 'p_1' }));
+  });
+  return { k, sql };
+}
+
+test('A FULL PAGE IS NOT A TOTAL, and the screen printed the page', async () => {
+  /**
+   * `loop/research-at-scale.md`, *Wrong, not slow* 3: `/search?q=revenue` drew **100** under the
+   * heading and **"All 100 in Datapoints"** beside the group while 140 rows matched. `the` matched
+   * 304 and said 100; `bake` matched 577 and said 100. The clamp is not the fault: `list` clamps in
+   * silence too. The fault is that a bare array of 100 is character-for-character the answer to a
+   * query with exactly 100 matches, so nothing downstream could tell the two apart, and the one
+   * surface for finding anything in 2,243 rows stated a number that was not true.
+   *
+   * THE ASSERTION THAT MATTERS IS THE SECOND ONE. The first says the page is still capped, which is
+   * the old behaviour and is fine; the second is what makes the cap tellable from a total.
+   */
+  const { sql } = await crowded();
+  const out = searchMatched(sql, 'revenue', { limit: 100 });
+  assert.equal(out.hits.length, 100, 'the page is no longer the ceiling it was measured at');
+  assert.deepEqual(out.matched, { obligations: 140, notes: 6 }, 'a caller can still print the ceiling as the total');
+  assert.equal(
+    Object.values(out.matched).reduce((n, r) => n + r, 0),
+    146,
+    'the whole answer is the sum, so no second field holds it and no second field can disagree',
+  );
+  sql.close();
+});
+
+test('the count is per list, because the screen that prints it is', async () => {
+  /* "All 140 in Datapoints" is a sentence about ONE register. One grand total would have made the
+     heading true and left every group on the page saying its own ceiling, which is the same defect
+     one line lower down. */
+  const { sql } = await crowded();
+  const out = searchMatched(sql, 'revenue', { limit: 10 });
+  assert.equal(out.hits.length, 10);
+  assert.equal(out.matched.obligations, 140);
+  assert.equal(out.matched.notes, 6);
+  sql.close();
+});
+
+test('the count is counted where the hits are counted: in scope, alive, and under the same words', async () => {
+  const { k, sql } = await crowded();
+  /* SCOPED. A caller who may read one list is told what matched in that list and nothing about the
+     rest of the record, which is the same property the page has and for the same reason. */
+  assert.deepEqual(searchMatched(sql, 'revenue', { registers: ['notes'] }).matched, { notes: 6 });
+  /* AND A SCOPE OF NOTHING COUNTS NOTHING, which is the refusal that used to be the whole record. */
+  assert.deepEqual(searchMatched(sql, 'revenue', { registers: [] }), { hits: [], matched: {} });
+  /* NOTHING TO ASK IS NOTHING FOUND AND NOTHING COUNTED, so a count is never a claim about a query
+     that was never run. */
+  assert.deepEqual(searchMatched(sql, '!!!'), { hits: [], matched: {} });
+
+  /* A DELETED ROW LEAVES THE COUNT THE WAY IT LEAVES THE PAGE. A total that counted rows the page
+     cannot show is the same lie in the other direction. */
+  value(k.update('notes', 'notes#1', { deleted_at: '2026-09-05' }, { actor: 'p_1' }));
+  assert.deepEqual(searchMatched(sql, 'revenue', { registers: ['notes'] }).matched, { notes: 5 });
+  sql.close();
+});
+
+test('under the ceiling the count says exactly what the page holds, so it claims nothing new', async () => {
+  /* A count that only appears above the cap would be a count nobody reads on the ordinary query, and
+     a caller would have to know which case it was in to know whether to trust the array's length. */
+  const { k, sql } = await record();
+  for (const what of ['Invoice 41', 'Invoice 42', 'Retainer']) value(k.create('obligations', { what }, { actor: 'p_1' }));
+  const out = searchMatched(sql, 'invoice');
+  assert.equal(out.hits.length, 2);
+  assert.deepEqual(out.matched, { obligations: 2 });
+  assert.deepEqual(searchMatched(sql, 'nothingatall'), { hits: [], matched: {} });
   sql.close();
 });
 
