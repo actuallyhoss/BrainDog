@@ -22,10 +22,10 @@
    * WHAT IT IS NOW, and the rule each answer came from. `apps/site/DESIGN-NOTES.md` carries the
    * source read, with the URL beside every value.
    *
-   *   - SEVEN BANDS, SEVEN LAYOUTS, no repeat: a hero whose headline runs the width of the column,
-   *     a full-bleed photograph of the product, a switcher, a sixteen-cell grid on a flipped
-   *     ground, a specification beside an image that runs off the edge of the screen, a
-   *     three-column table, and a closing band in the brand colour.
+   *   - SEVEN BANDS, AND SEVEN LAYOUTS AT 1024 AND ABOVE, six below 1000: a hero whose headline
+   *     runs the width of the column, a full-bleed photograph of the product, a switcher, a
+   *     sixteen-cell grid on a flipped ground, a specification beside an image that runs off the
+   *     edge of the screen, a three-column table, and a closing band in the brand colour.
    *
    * WHAT THE SECOND PASS CHANGED, and the sentence in the first pass's own notes that asked for
    * it: "three bands still share one armature". Bands 0001, 0003 and 0005 were all copy on the
@@ -35,12 +35,17 @@
    *
    *   - 0003 IS A STRIP. The sentence runs the column, the control runs the whole screen between
    *     two hairlines, and the rail it redraws sits under it. Nothing is beside anything.
-   *   - 0005 IS A LAYER. The dashboard is the width of the screen and 1,760px wide inside it, and
-   *     the specification lies on the picture in an opaque card rather than in a column next to
-   *     it. It is the only place on the site where two surfaces overlap.
+   *   - 0005 IS A LAYER. The dashboard is the width of the screen and wider than it inside, by
+   *     12.7 per cent at every width, and the specification lies on the picture in an opaque card
+   *     rather than in a column next to it. It is the only place on the site where two surfaces
+   *     overlap.
    *   - The split survives in the hero alone, which is one use of a shape and not a repeat of one.
    *     Counted the way `loop/research-site-reference.md` counts the references, that is seven
-   *     distinct layouts across seven bands, against FirstLook's ten in ten.
+   *     distinct layouts across seven bands AT 1024 AND ABOVE, against FirstLook's ten in ten.
+   *     The width belongs on that claim: `.head-two` collapses to one column under 1000px, and
+   *     bands 0002 and 0003 then open with a mark, a title and a lead at the same coordinates, so
+   *     it is six in seven at 900 and at 390. Measured, both titles land at x=32, y=139 inside
+   *     their band at 900 and the leads differ by 24px of offset and by their measure alone.
    *   - SIX GROUND CHANGES, two of them at the body-text ratio. `app.css` holds the mechanism and
    *     the argument for it; a band names a ground and every component inside it follows.
    *   - THE FRAME IS FILLED. Measured on the built page at 1440, the rightmost ink in each of the
@@ -88,10 +93,12 @@
 </svelte:head>
 
 <!-- ── 0001 · The hero ──────────────────────────────────────────────────────
-     The headline runs the full column on one line at 1440 and the two things under it fill the
-     rest of the row: the sentence and the action on the left, the ledger on the right. The four
-     figures close the band edge to edge, so the first screen has ink from margin to margin at
-     three separate heights rather than at none. -->
+     The headline runs the full column on one line at 1440, and the row under it carries the
+     sentence on the left and the action on the right. THE LEDGER IS NOT ON THE RIGHT, which is
+     what this comment said while the second pass's hero was still here: it runs under both at
+     1,200px, measured at x=120, against the headline's 1,136 at x=152. The four figures close the
+     band at the column's own width, so the first screen has ink from margin to margin at three
+     separate heights rather than at none. -->
 <section class="band hero" data-ground="page" aria-labelledby="hero-title">
   <div class="in reveal">
     <p class="band-mark">
@@ -115,7 +122,7 @@
     </div>
   </div>
 
-  <!-- THE CLAIM, BEING DEMONSTRATED UNDER IT AND AT THE WIDTH OF THE SCREEN.
+  <!-- THE CLAIM, BEING DEMONSTRATED UNDER IT, ACROSS THE WHOLE READING COLUMN AND ITS GUTTERS.
 
        IT WAS A 540px PANEL BESIDE 46ch OF COPY, which is the armature bands 0002 and 0005 were
        both using: three copies of one shape, and the first one is the shape a stranger meets. The
@@ -126,8 +133,9 @@
        colours cover the first screen with no single one over 49.8 per cent of it
        (`loop/research-site-reference.md`, section 3). We have no third capture to run off the fold
        and we have something no reference has: an element that is actually running. So the demo
-       goes edge to edge under the headline, where the page's widest thing is the one thing on it
-       that moves.
+       goes under the headline at 1,200px, measured at x=120 in a 1,440px window, which is 2.2
+       times the 540px box it replaces and 144px under Linear's 1,344. This comment said "at the
+       width of the screen" for two passes and the pixels never said it.
 
        "The log only grows" is a claim about behaviour over time, and no still picture can carry
        one. A list that only ever grows, watched for four seconds, can. -->
@@ -412,10 +420,23 @@
      which is 1.07:1: a real step in the eye's adaptation and not one a reader can point at, so the
      page read as one grey field with rules across it. `--sunk` is the application's canvas and it
      is a half step by design, which is right inside the app and wrong on a page somebody scrolls
-     once. The grounds are `page, page, flip, page, page, flip, brand`: four inversions at about
-     15:1, and at the two seams that do not invert the band opens with a picture that runs edge to
-     edge, which is the change. The rule is still what turns a seam into an edge. `+` rather than a rule on every band, so the first one has no line
-     hanging off the header above it. */
+     once. The grounds are `page, page, flip, page, page, flip, brand`: four changes, and THREE of
+     them are inversions rather than all four. Sampled off the built page by reading each band's
+     computed background and running the WCAG formula over the pair, the three inversions are
+     15.41:1 in light and 17.61:1 in dark; the fourth, `flip` to `brand` at the last seam, is the
+     scheme's ink meeting `rgb(215, 32, 101)`, which is 3.42:1 in light and 4.62:1 in dark. That
+     is a fifth of the strength of the other three, and it is a change a reader can see, but the
+     word `every` was doing work the measurement does not support.
+
+     AND THE TWO SEAMS THAT DO NOT INVERT ARE MARKED BY THE RULE AND NOTHING ELSE. This comment
+     used to say they open with a picture that runs edge to edge, which was the argument for
+     dropping two of the six ground changes. Measured at 1440 in page coordinates, the 0001/0002
+     hairline is at y=953.06 and the picture's top edge is at y=1188.06, which is 235px below it,
+     behind a mark and a two-column heading; the 0004/0005 hairline is at y=3274.64 and its
+     picture starts at y=3617.27, 342.63px below, behind a mark and the card. A reader meets a
+     1px `--line` and then a third of a screen of the same ground. The rule is what turns a seam
+     into an edge there, and it is doing it alone. `+` rather than a rule on every band, so the
+     first one has no line hanging off the header above it. */
   .band + .band {
     border-block-start: 1px solid var(--line);
   }
@@ -544,11 +565,20 @@
     min-inline-size: 0;
   }
 
-  /* THE STAGE IS THE SCREEN, and the ledger inside it is 100 per cent of that rather than a panel
-     of an invented width. Its rows are five columns of tabular text, so the room goes to `what`,
-     which is the column that was ellipsising first when the component lived in a 540px box: the
-     one element whose job is to prove nothing is overwritten was the one truncating its own
-     sentences. `overflow: hidden` because the rows animate in from the right. */
+  /* THE STAGE IS THE SCREEN AND THE LEDGER INSIDE IT IS THE READING COLUMN, WHICH IS NOT THE SAME
+     SENTENCE. This comment used to say the ledger was 100 per cent of the screen. It is not: the
+     padding below is `max(--sp-6, (100% - --site-max) / 2)`, so at 1440 it puts 120px on each
+     side and the ledger measures x=120, w=1200, which is the reading column plus its two gutters
+     and 83 per cent of the screen. Measured on the built page: 1200px at x=120 at 1440, 1200px at
+     x=40 at 1280 and 960px at x=32 at 1024, against the `.display` above it at 1136px. Two things
+     on this page really are the width of the screen and this is not either of them: band 0002's
+     figure is 1,440px and band 0005's picture is wider than the window it is seen through.
+
+     WHAT THE CHANGE WAS FOR IS STILL TRUE AND IS THE PART WORTH KEEPING. The rows are five columns
+     of tabular text, and at 1,200px the room goes to `what`, which is the column that was
+     ellipsising first when the component lived in a 540px box: the one element whose job is to
+     prove nothing is overwritten was the one truncating its own sentences.
+     `overflow: hidden` because the rows animate in from the right. */
   .hero-stage {
     margin-block-start: var(--sp-8);
     padding-inline: max(var(--sp-6), calc((100% - var(--site-max)) / 2));
@@ -720,18 +750,25 @@
    *
    * It lay across the middle of the dashboard for two passes, first on the left and then on the
    * right, and both of those hide a money figure. Measured on the capture itself
-   * (`static/shots/usecase-founder-dashboard-dark.webp`, 2,880 x 1,800 for a 1,440px app):
-   * `Cash now` sits at 19 per cent of the width, `Coming in, 30 days` at 46 and
-   * `Going out, 30 days` at 72, and the row under them repeats at 19, 46 and 73. A figure occupies
-   * every third of the picture, so a 480px card covers one wherever it is put sideways. The right
-   * edge was no better than the left: it turned `GBP 28,320.00` into `320.00` and cut
-   * `no more than GBP 50,000.00` in half.
+   * (`static/shots/usecase-founder-dashboard-light.webp`, 2,880 x 1,800 for a 1,440px app):
+   * the three columns start at x=547, x=1319 and x=2091, which is 19.0, 45.8 and 72.6 per cent of
+   * the width, and the label, the figure and the limit under it all start on the same three. A
+   * figure occupies every third of the picture, so a 480px card covers one wherever it is put
+   * sideways. The right edge was no better than the left: it cut `no more than GBP 50,000.00`,
+   * which runs from x=2092 to x=2371, in half.
+   *
+   * AND THE OTHER EXAMPLE THIS COMMENT USED TO GIVE WAS NOT IN THE PICTURE. It said the card
+   * turned `GBP 28,320.00` into `320.00`. Read off the capture at 1:1, the three figures under
+   * `Across your organisations` are `GBP 24,800.00`, `GBP 0.00` and `GBP 320.00`, and nothing
+   * anywhere in it reads 28,320. `GBP 320.00` is the whole figure for `Going out, 30 days`.
+   * Somebody saw `320.00` beside a card and wrote down what the hidden digits would have been,
+   * which is the exact reading error this paragraph is about, performed by this paragraph.
    *
    * WHAT IS ACTUALLY FREE IS THE TOP. Nothing above `Across your organisations` is a number: the
-   * strip holds the breadcrumb, the page title and two controls. In source pixels the first figure
-   * starts 341px down, which at the 0.611 scale this band paints the capture at is 208 rendered
-   * pixels. The overlap is capped at 88px, so there are 120px of clear picture between the card's
-   * bottom edge and the top of the tallest glyph in `GBP 24,800.00`.
+   * strip holds the breadcrumb, the page title and two controls. Profiled by ink over three
+   * column windows centred on those three percentages, the label row runs 333 to 355 and the
+   * topmost pixel of any of the three figures is source row 381, in the `Coming in` and
+   * `Going out` columns; `GBP 24,800.00` starts at 385.
    *
    * SO THE LAYER SURVIVES AND THE HAZARD DOES NOT. This is still the one place on the page where
    * two surfaces overlap. It overlaps by an amount that is measured against the picture rather
@@ -755,10 +792,21 @@
     gap: var(--sp-6) var(--sp-7);
     align-items: start;
     inline-size: min(100% - 2 * var(--sp-6), var(--site-max));
-    /* THE OVERLAP, AND IT IS THE ONE NUMBER THIS BAND IS ABOUT. 88px at 1440 against 208px of
-       clear picture above the first figure. It shrinks with the viewport because the picture does
-       not: the capture is painted at a fixed 1,760px at every width, so the clear strip is 208px
-       everywhere and a smaller overlap is only ever safer. */
+    /* THE OVERLAP, AND IT IS THE ONE NUMBER THIS BAND IS ABOUT. IT IS 72px AT 1440 AND IT WAS
+       WRITTEN DOWN AS 88. `5vw` is five per cent of the window, so the clamp only reaches its
+       ceiling at a 1,760px viewport, and 1,760 was the width the picture used to be painted at
+       rather than the width of the window. Measured `marginBlockEnd` on the built page: -72px at
+       1440, -64px at 1280, -51.2px at 1024, -45px at 900, and 0px below 900, where the narrow
+       treatment stacks the two.
+
+       WHAT MAKES IT SAFE IS THAT THE STRIP AND THE OVERLAP NOW SCALE TOGETHER. The picture is
+       painted so that its right edge is always source column 2556, so a rendered pixel is
+       viewport/2556 of a source pixel, and the first money figure at source row 381 sits
+       381/2556 of the viewport down, which is 14.9 per cent of it against the overlap's 5. The
+       clear strip is 2.98 times the overlap at every width where `5vw` is the operative term, and
+       further clear outside it. Driven, counting the picture's own 1px top rule: 214.6px of strip
+       against 72px of overlap at 1440, and 134.2 against 45 at 900, so 143.65px and 90.15px of
+       clear picture between the card's bottom edge and the top of the first figure. */
     margin-block-end: calc(-1 * clamp(40px, 5vw, 88px));
     margin-inline: auto;
     padding: var(--sp-6);
@@ -827,28 +875,54 @@
   }
 
   /**
-   * 1,760 NATURAL PIXELS IN A SCREEN OF 1,440, so the dashboard always runs off the right edge
-   * rather than ending inside it.
+   * BOTH EDGES OF THIS FRAME ARE A RECTANGLE OF THE CAPTURE, AND THE CAPTURE CHOSE THE RECTANGLE.
    *
-   * The capture is 1,440 CSS px wide, so painting it at 1,760 is a 1.22x enlargement of a 2,880px
-   * source: 2.36 device pixels per CSS pixel at a scale of 2, which is still above 1:1 and is why
-   * the picture stays sharp while being bigger than the window it is seen through. The old
-   * treatment painted it at 1:1 in a 700px column, which showed the rail and about 460px of the
-   * page; this shows the rail and roughly 1,200px of it, and the card covers none of it: it laps the top
-   * 88px, where the picture has a breadcrumb and a title and no numbers.
+   * THE FRAME WAS CUTTING A MONEY FIGURE, WHICH IS THE ONE HARM THE CARD ABOVE WAS MOVED TO STOP.
+   * The picture used to be painted at a fixed `1760px` with a `clamp` for its height, so the
+   * viewport decided where both edges landed. Driven over `apps/site/build` at a device scale of
+   * 1, motion reduced, in both schemes, the right edge landed at source column 2356 at 1440,
+   * 2095 at 1280, 1676 at 1024 and 1473 at 900, and the bottom edge at source row 1035, 920, 736
+   * and 686. Counting ink as a pixel more than 25 luminance steps from the median of its own row,
+   * over both captures and over every pixel the frame shows: column 2356 carries 3, column 2095
+   * carries 27, column 1473 carries 14, and all four rows carry 79, 27, 50 and 71. Column 2356
+   * at 1440 lands inside the final `0` of `no more than GBP 50,000.00`, which is the second of
+   * the two strings the card was moved off, and rows 736 and 686 land inside the words `Ledger`
+   * and `Overview` in the navigation rail.
+   *
+   * SO NEITHER EDGE IS A LENGTH ANY MORE AND NEITHER HAS THE VIEWPORT IN IT.
+   * `inline-size: calc(100% * 2880 / 2556)` paints the capture so the figure's own right edge
+   * falls on source column 2556, because the figure is the width of the screen and the image is
+   * 2880/2556 of it: the width cancels. `aspect-ratio: 2880 / 1214` then makes the box short
+   * enough that `object-fit: cover`, whose scale is set by the width, crops the bottom at source
+   * row 1214, or at 1211 to 1212 once the 1px top rule inside this border box is taken off.
+   * Driven at 1440, 1280, 1024, 999 and 900 in both schemes, the right edge lands on 2556.0 every
+   * time and the bottom on 1212.2, 1212.0, 1211.5, 1211.4 and 1211.1, and none of those ten cuts
+   * carries a pixel of ink. Both are ratios of the capture and have no viewport in them, which is
+   * the thing a `clamp` could not do: its own 700px ceiling started moving the bottom cut again
+   * above a 1,591px viewport.
+   *
+   * 2556 AND 1214 ARE THE MIDDLES OF THE WIDEST CLEAR RUNS IN THE PICTURE. Columns 2535 to 2577
+   * carry no ink over the rows this frame shows, which is 43 columns wide; rows 1186 to 1242
+   * carry none over the columns it shows, which is 57 rows. A panel edge that runs the whole
+   * height and a rule that runs the whole width are not ink for this purpose, because a crop that
+   * lands on a rule reads as a rule. The navigation rail counts: the profile that chose the old
+   * numbers was taken over x=640 to x=2820 and the frame plainly shows x=0.
+   *
+   * THE PICTURE IS STILL WIDER THAN THE SCREEN, by 12.7 per cent rather than by 22: 1,622.53px
+   * inside 1,440 at 1440, so 182.53px of it falls off the right edge. What it no longer does is
+   * hold its scale while the window moves the cut. The cost is at the narrow end, and it is worth
+   * saying: the capture is a 2x shot, so at a device scale of 2 it keeps a device pixel per
+   * source pixel down to a 1,278px viewport and is downsampled below 1024 and 900. A downsample
+   * is soft; a crop through a glyph is a mistake.
    *
    * A top rule and no side rules, because there is no side for one to be on.
    */
   .report-shot img {
     display: block;
-    inline-size: 1760px;
+    inline-size: calc(100% * 2880 / 2556);
     max-inline-size: none;
-    /* 44vw IS 633px AT 1440, AND THE NUMBER IS WHERE THE PICTURE HAS A SEAM RATHER THAN A ROW.
-       42vw cut the dashboard at 605px, which is nine pixels into the figures under `Active users`,
-       `Monthly recurring revenue` and `Signups`: three numbers sliced along their waists. A crop
-       that ends between two rows reads as a photograph continuing past the frame, and one that
-       ends inside a glyph reads as a mistake. */
-    block-size: clamp(420px, 44vw, 700px);
+    block-size: auto;
+    aspect-ratio: 2880 / 1214;
     object-fit: cover;
     object-position: 0 0;
     border-block-start: 1px solid var(--line);
@@ -999,9 +1073,12 @@
   }
 
   /* THE CARD COMES OFF THE PICTURE AND THE PICTURE STOPS RUNNING OFF THE EDGE. Below 900px a 480px
-     card laid on the screen would cover most of it, and a 1,760px image in a 900px window is a
-     crop of a crop. The two go back to being stacked, and the narrow capture is the dashboard as a
-     phone draws it, at the column's own width, with every figure on it readable. */
+     card laid on the screen would cover most of it, and the wide capture is past the point of
+     being worth looking at: the frame is 427px tall at 900 and the capture is painted at 0.352 of
+     its source pixels there, which is 70 per cent of the size the application itself drew at,
+     because the source is a 2x shot. The two go back to being stacked, and the narrow capture is
+     the dashboard as a phone draws it, at the column's own width, with every figure on it
+     readable. */
   @media (width < 900px) {
     .report {
       display: flex;
@@ -1024,13 +1101,16 @@
       border: 0;
     }
 
-    /* `block-size: auto` UNDOES THE CROP, which is the half that is easy to forget: the wide
-       treatment is a 1,760px image cut to 660px tall, and applying that to a 2532px-tall phone
-       capture would show the reader the dashboard's title and nothing under it. */
+    /* `aspect-ratio: auto` UNDOES THE CROP, which is the half that is easy to forget, and it is
+       the keyword that carries it now rather than `block-size`. The wide treatment is a landscape
+       rectangle of a 2,880 by 1,800 capture; left in place it would squeeze a 1,170 by 2,532
+       phone capture into a 2880/1214 box and `object-fit: fill` would stretch it to match. The
+       narrow captures are a whole phone screen and they keep their own shape. */
     .report-shot img {
       inline-size: 100%;
       max-inline-size: 420px;
       block-size: auto;
+      aspect-ratio: auto;
       object-fit: fill;
       border: 1px solid var(--line);
       border-radius: var(--r-lg);
