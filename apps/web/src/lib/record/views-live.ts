@@ -127,20 +127,21 @@ function valuesOf(v: unknown): string[] | null {
  * One leaf of the record's predicate as one of this app's chips, or nothing.
  *
  * THE OPERATORS ARE THE ONES THE CHIPS CAN RUN, and every one of them is checked against the
- * printer beside it. `copy.filterClause` knows `before`, `after`, `not-in` and
+ * printer beside it. `copy.filterClause` knows `before`, `after`, `has`, `lacks`, `not-in` and
  * everything-else-is-`is`, so a `contains` leaf handed to it would be printed as "Note is invoice" —
  * a clause that reads as an equality over a substring test. `empty` and `present` become the words
  * the register's own filter grammar uses for them (`where.ts`: "points at is empty", "points at is
  * set"), so the sentence a live view prints is one a person could type back.
  *
- * `has` AND `lacks` ARE READ NOW, AND THE PRINTER IS THE HALF STILL OWED. A view whose filter is
- * `{ field: 'repos', has: 'portage' }` answered `null`, which takes the whole Filter line with it,
- * so the view drew its rows under no sentence at all and its chips reached neither `whereOf` nor
- * `treeOf`. `whereOf` spells both words now and the mock answers them, so the chips RUN. What
- * `copy.filterClause` writes for them is `Repositories is portage`, the equality the record itself
- * refuses by name, and the two words have to reach that function before the reading line is right.
- * It is named here rather than worked around, because a printer narrower than the chips it prints
- * is exactly the defect the paragraph above is about, one operator along.
+ * `has` AND `lacks` ARE READ HERE AND PRINTED THERE, AND THE PRINTER WAS THE HALF OWED UNTIL
+ * `03d2ccc3`. A view whose filter is `{ field: 'repos', has: 'portage' }` answered `null`, which takes
+ * the whole Filter line with it, so the view drew its rows under no sentence at all and its chips
+ * reached neither `whereOf` nor `treeOf`. `whereOf` spells both words and the mock answers them, so
+ * the chips RUN; and `copy.filterClause` has a `has || lacks` arm of its own, so the line above a
+ * live view now reads `Repositories has portage` rather than `Repositories is portage`, which is the
+ * equality the record refuses by name. This paragraph said the debt was open for as long as it took
+ * an audit to read the two files side by side, which is the cost of a measured note nobody revisits.
+ * `filter-clause.test.ts` round-trips every clause that printer writes back through `compile`.
  */
 function clauseOf(leaf: Record<string, unknown>): Filter | null {
   const field = typeof leaf.field === 'string' ? leaf.field : '';

@@ -53,7 +53,7 @@ import { day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { LOOKUPS, NOW, REGISTERS, ROWS } from './data.ts';
-import { amountOf, currencyOf, mixedFix } from './money.ts';
+import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
 import { compile, explain, matches, registerHref, resolveDay } from './where.ts';
 import type { Clause, Where } from './where.ts';
 import type { Entry } from './schema.ts';
@@ -437,18 +437,28 @@ function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
 }
 
 /**
- * The mark for "and some of these had no currency at all".
+ * The mark for "and some of these had no currency at all", which is `money.ts`'s and is passed on here.
  *
  * A string that is not a currency code, so it cannot collide with one and cannot be printed as one:
  * `mixedFix` renders the set into a sentence, and this reads as what it is.
  *
  * AND IT IS THE RECORD'S WORD RATHER THAN THIS ENGINE'S. It read `no currency` while
  * `packages/kernel/src/metrics.ts` wrote `no unit` into the same refusal, so the sample and a live
- * record said different things about the same two rows; the assertion in `money.test.ts` that was
- * written to catch that compared this constant with `money.ts`'s and could not see the third copy.
- * It reads the kernel's source now, and all three are held to one word.
+ * record said different things about the same two rows. `money.test.ts`'s first guard compared this
+ * constant with `money.ts`'s and could not see the third copy; it opens a real record and drives the
+ * whole refusal now, which is where the kernel's word is actually held.
+ *
+ * THIS LINE WAS A THIRD COPY OF THE STRING AND IS NOW A RE-EXPORT, which is the repair `money.ts`
+ * asked for in words: *"the way out is for `metrics.ts` to delete its own line and re-export this
+ * one"*. It could not travel the other way — `money.ts` cannot import from this module, because this
+ * module imports from it — so `money.ts` holds the literal and this passes it on. `forecast.ts` reads
+ * it from here and does not change.
+ *
+ * THE KERNEL'S CANNOT BE IMPORTED: `BARE_UNIT` is module-private at `packages/kernel/src/metrics.ts`
+ * and `index.ts` re-exports no such name, so there is nothing on that edge to import. `bare-unit.test.ts`
+ * asserts the two that are left are one string and that the kernel's is still spelled the same.
  */
-export const BARE = 'no unit';
+export { BARE };
 
 /** Every currency any operand of this value expression reads. */
 export function currenciesRead(rows: Entry[], value: Value): Set<string> {

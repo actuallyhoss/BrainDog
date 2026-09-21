@@ -524,11 +524,30 @@ const cannotSay = (text: string): string =>
  * for the four letters `Kiln` in a column holding an id, which parses, compiles and matches nothing,
  * for ever. Four fields in the shipped seed are `list<ref>`.
  *
- * A REF RESOLVES BY THE TITLE AND NOT BY THE NUMBER, which is the one place this parts company with
- * the scalar `is` beside it. `allowed` admits a ref's `seq` there because `registerHref` writes one
- * into a URL and a link must not break when a row is renamed; no chip can carry `has` at all, so
- * there is no number arriving from anywhere, and the record refuses `because has 4` with *"there is no
- * learnings called 4"*. Accepting it here would make the browser answer a sentence the record does not.
+ * A REF RESOLVES BY ITS TITLE OR BY ITS ROW NUMBER, which are the same two spellings `allowed` admits
+ * on the scalar `is` beside it, and the number used to be refused here. The reason written down for
+ * that refusal was *"no chip can carry `has` at all, so there is no number arriving from anywhere"*,
+ * and it stopped being true in the commit that stands beside it: `registerHref` mints
+ * `<field>:has:<element>` below, `whereOf` in `api.ts` reads it back, and `remote.test.ts` drives the
+ * chip `because:has:4` against a real kernel and asserts it answers skills#1 and #4. So the number
+ * arrives, the record answers it, and the sample refused it: one address, two answers, and the wrong
+ * one on the surface the product demonstrates itself on.
+ *
+ * AND FOR THREE OF SEVEN ELEMENTS THE NUMBER IS THE ONLY ADDRESS THERE IS. A comma separates clauses
+ * before any lookup runs, and three of the mirror's seven `learnings` titles carry one, so
+ * `because has Attach the rows a proposal read, or the record refuses it.` comes back as two refusals
+ * naming neither the field nor the element. Refusing the number as well left one of the two shipped
+ * `list<ref>` fields partly unfilterable on this engine alone. `list-ref-element.test.ts` drives all
+ * seven and both fields.
+ *
+ * AND THE NUMBER IS A SUPERSET OF WHAT THE RECORD'S SENTENCE TAKES, DELIBERATELY, WHICH IS WHY IT IS
+ * NOT A DIVERGENCE. The record resolves a ref in a `where:` string through `refByTitle`
+ * (`packages/kernel/src/index.ts`), one indexed read on the title, so `because has 4` is refused
+ * there. It is refused for `thing is 1` too, and `allowed` has taken that number since the day every
+ * Kiln metric's link came back an empty grid: `whereOf` turns a CHIP into a sentence and a chip
+ * carries the row number, so this engine has to read one sentence the record never parses. The record
+ * sees `leafOf`'s structured tree with a ULID in it instead. The superset is exactly the row number,
+ * on both operators, and that is the whole of it.
  */
 function elementValue(register: string, field: string, of: string, said: string, now: number): string | null {
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
@@ -547,8 +566,25 @@ function elementValue(register: string, field: string, of: string, said: string,
     const title = to ? REGISTERS[to]?.title : undefined;
     if (!to || !title) return null;
     /* THE ELEMENT THE COLUMN HOLDS, which on this side is the row's `seq`: `data.ts` numbers the seed
-       by position, so a ref in the mirror is a number where the record keeps a ULID. */
-    const row = (ROWS[to] ?? []).find((e) => String(e.fields[title] ?? '') === said);
+       by position, so a ref in the mirror is a number where the record keeps a ULID.
+
+       THE DIGITS ARE TRIED FIRST BECAUSE THE LIVE READER TRIES THEM FIRST. `valueOf` in `remote.ts`
+       reads `/^\d+$/u.test(said) ? Number(said) : titled(f.to, said)`, so a row whose title is
+       literally `4` is the number there; reading the title first here would make the same address
+       mean two rows on two engines, which is the divergence this pair of files exists to stop.
+
+       AND THE COMPARISON IS THE NUMBER'S AND NOT THE CHARACTERS', for the same reason one line along.
+       It read `String(e.seq) === said`, and `04` is not the characters `4`: measured against the
+       mirror, `because has 04` came back *"there is no learnings called 04"* here while `treeOf` sent
+       the live record `{because: has: <learnings#4's id>}`, because `Number('04')` is `4`. One address
+       and two answers is the whole defect, and a leading zero is enough to make one.
+
+       AND THE NUMBER STILL HAS TO NAME A ROW. `because has 999` is a refusal rather than a comparison
+       against the characters `999`, which is exactly what `allowed` does with a `seq` on the scalar
+       path: an operand that resolves to nothing is this file's whole subject. */
+    const rows = ROWS[to] ?? [];
+    const numbered = /^\d+$/.test(said) ? rows.find((e) => e.seq === Number(said)) : undefined;
+    const row = numbered ?? rows.find((e) => String(e.fields[title] ?? '') === said);
     return row ? String(row.seq) : null;
   }
 
@@ -1051,16 +1087,24 @@ export const explain = (w: Where): string[] => w.bad;
  * neither is a word anybody types. Every other element type resolves to the characters that were
  * written, or to a temporal word this file deliberately leaves alone, so they are already spoken.
  *
- * A TITLE THAT NO LONGER NAMES A ROW KEEPS THE ELEMENT rather than becoming an empty chip: a URL
- * carrying a number that refuses on arrival is a worse answer than one carrying the number, and
- * `registerHref`'s callers would have no way to tell either from a filter that worked.
+ * A TITLE THAT NO LONGER NAMES A ROW KEEPS THE ELEMENT rather than becoming an empty chip, and the
+ * number is now an address both engines read (`elementValue` above, `valueOf` in `remote.ts`), so the
+ * fallback is a working link rather than the least bad one.
+ *
+ * AND A TITLE WITH A COMMA IN IT KEEPS THE NUMBER, because a comma cannot survive the value slot of a
+ * chip. `chipsOf` splits on it, so `because:has:Attach the rows a proposal read, or the record refuses
+ * it.` arrives as two values and `whereOf` writes a sentence out of the first: a link that reads as
+ * the filter it came from and opens a different list, which is the one failure `registerHref` exists
+ * to prevent. Percent-encoding does not help, because `URLSearchParams` decodes before `chipsOf` ever
+ * sees the value. Three of the mirror's seven `learnings` titles carry a comma and none of its four
+ * `things` titles do, which is why a test over `people.projects` alone could not see this.
  */
 const spokenElement = (register: string, field: string, held: string): string => {
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
   if (decl?.of !== 'ref' || !decl.to) return held;
   const title = REGISTERS[decl.to]?.title;
   const said = title ? (ROWS[decl.to] ?? []).find((e) => String(e.seq) === held)?.fields[title] : undefined;
-  return typeof said === 'string' && said ? said : held;
+  return typeof said === 'string' && said && !said.includes(',') ? said : held;
 };
 
 /**
@@ -1115,12 +1159,17 @@ export function registerHref(register: string, where: string | undefined): strin
    * drew instead of the whole register, which is this function's own rule rather than an exception
    * to it.
    *
-   * THE ELEMENT TRAVELS AS SOMEBODY WOULD WRITE IT, which is the one place this differs from the
-   * value branch below. `elementValue` resolves a `list<ref>` element to the target row's `seq`, so
-   * the compiled clause holds a number where the sentence held a name, and `projects:has:1` comes
-   * back as `projects has 1`: refused by both engines, because no chip could carry `has` when that
-   * was decided and so the record refuses `because has 4` with *"there is no learnings called 4"*.
-   * The title is what both engines read, so the title is what the URL carries.
+   * THE ELEMENT TRAVELS AS SOMEBODY WOULD WRITE IT WHERE IT CAN, which is the one place this differs
+   * from the value branch below. `elementValue` resolves a `list<ref>` element to the target row's
+   * `seq`, so the compiled clause holds a number where the sentence held a name, and a title is the
+   * more readable of the two spellings in a URL.
+   *
+   * THE PARAGRAPH HERE USED TO SAY `projects:has:1` WAS REFUSED BY BOTH ENGINES, and that was read
+   * off the refusal `elementValue` used to raise. It does not refuse a row number any more, and its
+   * own paragraph has the measurement and the reason; `valueOf` in `remote.ts` has resolved one since
+   * `remote.test.ts` started driving `because:has:4` against a real kernel. So the number is a working
+   * address on both sides, which is what lets `spokenElement` fall back to it for the three seed titles
+   * a chip's value slot cannot carry.
    */
   const chips = w.clauses.map((c) =>
     c.op === 'empty' || c.op === 'present'
