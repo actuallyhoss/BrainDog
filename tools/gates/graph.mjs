@@ -80,504 +80,521 @@ import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
 
-/* THE WORKING DIRECTORY, LIKE EVERY OTHER GATE, falling back to the repository this file sits in.
-   `self-test.mjs` points a gate at a seeded tree with this variable, and a gate that read only
-   `import.meta.url` would scan the real repository from inside its own negative fixture and pass
-   it. That is the defect that audit found in `stack.mjs` on the first run. */
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const started = performance.now();
-
 /**
- * `31 §2`'s order, READ OUT OF `31 §2`, not transcribed into this file.
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import.
  *
- * IT WAS TRANSCRIBED, and the transcription was wrong within a day. Seventeen names were copied
- * here with a paragraph arguing that only the ORDER needs encoding and not the `Depends on` column;
- * that argument is right and it is not the one that mattered. The table had seventeen rows, the
- * tree had twenty-one workspaces, and `skin`, `seed`, `client` and `site` were in neither list.
- * So this gate reported four packages it could not rank, somebody added four rows to the document,
- * and the gate went on reporting them. Two copies of one list is one list and a memory of it
- * (`30 §2`), and a gate that holds the memory rather than the list is the worse half of the pair.
+ * THE ROOT IS AN ARGUMENT, defaulting to the environment and then to the repository this file sits
+ * in. `self-test.mjs` points a gate at a seeded tree with that variable, and a gate that read only
+ * `import.meta.url` would scan the real repository from inside its own negative fixture and pass
+ * it: that is the defect that audit found in `stack.mjs` on the first run. `run.mjs` passes the root
+ * it derived from its own location, because an imported gate shares the runner's working directory.
  *
- * The table is three columns of Markdown in a file this gate already has to read the section number
- * of. A row is `| <rank> | `<name>` | …`; anything else in the section is prose. If the shape ever
- * changes this goes red on the next run and says the table could not be read, which is the correct
- * failure. A silent fallback to a remembered order is how the drift happened the first time.
- *
- * A ROW MARKED *(unbuilt)* KEEPS ITS RANK. `fixtures` and `spark` are specified and absent from the
- * tree, so nothing ever resolves to them; reserving the rank is what stops every package
- * renumbering on the day one arrives. `connect`, `cli` and `extract` were in that list and have
- * each since arrived at the rank it held for them, which is the mechanism working rather than a
- * note going stale.
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass`
+ * grep rests on: a pass is the end of the function and never a statement inside it.
  */
-const ORDER_DOC = join(root, 'docs/31-STACK.md');
+export default function graph(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const started = performance.now();
 
-const readOrder = () => {
-  let text;
-  try {
-    text = readFileSync(ORDER_DOC, 'utf8');
-  } catch {
-    return [];
-  }
-  const rows = [...text.matchAll(/^\|\s*(\d+)\s*\|\s*`([a-z-]+)`\s*\|/gmu)];
-  /* IN THE ORDER THE TABLE NUMBERS THEM, not in the order they appear. A row moved without its
-     number renumbered is a table that says two different things, and sorting is how that shows up
-     as a duplicate rather than as a silently different order. */
-  const byRank = rows.map((m) => [Number(m[1]), m[2]]).sort((a, b) => a[0] - b[0]);
-  return byRank.map(([, name]) => name);
-};
+  /**
+   * `31 §2`'s order, READ OUT OF `31 §2`, not transcribed into this file.
+   *
+   * IT WAS TRANSCRIBED, and the transcription was wrong within a day. Seventeen names were copied
+   * here with a paragraph arguing that only the ORDER needs encoding and not the `Depends on` column;
+   * that argument is right and it is not the one that mattered. The table had seventeen rows, the
+   * tree had twenty-one workspaces, and `skin`, `seed`, `client` and `site` were in neither list.
+   * So this gate reported four packages it could not rank, somebody added four rows to the document,
+   * and the gate went on reporting them. Two copies of one list is one list and a memory of it
+   * (`30 §2`), and a gate that holds the memory rather than the list is the worse half of the pair.
+   *
+   * The table is three columns of Markdown in a file this gate already has to read the section number
+   * of. A row is `| <rank> | `<name>` | …`; anything else in the section is prose. If the shape ever
+   * changes this goes red on the next run and says the table could not be read, which is the correct
+   * failure. A silent fallback to a remembered order is how the drift happened the first time.
+   *
+   * A ROW MARKED *(unbuilt)* KEEPS ITS RANK. `fixtures` and `spark` are specified and absent from the
+   * tree, so nothing ever resolves to them; reserving the rank is what stops every package
+   * renumbering on the day one arrives. `connect`, `cli` and `extract` were in that list and have
+   * each since arrived at the rank it held for them, which is the mechanism working rather than a
+   * note going stale.
+   */
+  const ORDER_DOC = join(root, 'docs/31-STACK.md');
 
-const ORDER = readOrder();
-
-/** 1-based, so it reads as the table's `#` column. `0` means "not in the order at all". */
-const rankOf = (short) => ORDER.indexOf(short) + 1;
-
-/**
- * `31 §2`'s L3 row: `apps/worker`, `apps/selfhost`, `apps/web`, `apps/cli`. *"apps import packages
- * and never each other"*. The rank check alone cannot say so, because `worker` (16) importing
- * `web` (14) points DOWN the order and is still the thing §2 refuses: `web`'s `build/` is an asset
- * directory to both runtimes, never an import.
- */
-const APPS = new Set(['worker', 'selfhost', 'web', 'cli']);
-
-/**
- * `linkWorkspacePackages: false` (`31 §3`) is load-bearing: *"every internal dep must say
- * `workspace:*`, so a typo'd internal name goes to the registry and **fails loudly** instead of
- * silently linking."* A `@braindog/*` range that is not this one is the case where it does not.
- */
-const WORKSPACE = 'workspace:*';
-
-/** `@braindog/record/directory` is `@braindog/record`; `braindog-render/svelte` is the tarball. */
-const basePackage = (spec) =>
-  spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
-
-/**
- * WHAT COUNTS AS ONE OF OURS, and it is two spellings rather than one. `31 §2`'s compromise ships
- * the renderer as `braindog-render` (unscoped, MIT, the only distribution instrument in the plan),
- * so a gate that recognised `@braindog/*` alone would have nothing to say about in-degree 0 on row
- * 1, which is the one row with a legal consequence.
- */
-const isInternal = (base) => base.startsWith('@braindog/') || base.startsWith('braindog-');
-
-/** `@braindog/kernel` and `braindog-render` are both directories named for their table row. */
-const shortOf = (base) => base.replace(/^@braindog\//, '').replace(/^braindog-/, '');
-
-const posix = (p) => p.replace(/\\/g, '/');
-const lineAt = (text, at) => text.slice(0, at).split('\n').length;
-
-/** The line a manifest names a dependency on, so `where` is `path:line` and not `path`. */
-const keyLine = (text, name) => {
-  const at = text.indexOf(`"${name}":`);
-  return at === -1 ? 1 : lineAt(text, at);
-};
-
-const findings = [];
-const add = (where, what, why) => findings.push({ where, what, why });
-
-/* ── The workspaces ─────────────────────────────────────────────────────────────────────────── */
-
-/**
- * `pnpm-workspace.yaml` says `packages/*` and `apps/*`, and the directory name is the table's name.
- *
- * THE DIRECTORY IS THE IDENTITY, NOT THE `name` FIELD, because `packages/render` publishes as
- * `braindog-render` and `31 §2` calls it `render`. Deriving the short name from the manifest would
- * mean the one package whose boundary has a legal consequence is the one the order cannot find.
- */
-function readWorkspaces() {
-  const out = [];
-  for (const group of ['packages', 'apps']) {
-    let names;
+  const readOrder = () => {
+    let text;
     try {
-      names = readdirSync(join(root, group));
+      text = readFileSync(ORDER_DOC, 'utf8');
     } catch {
-      continue;
+      return [];
     }
-    for (const short of names.sort()) {
-      if (skipDir(short)) continue;
-      const dir = join(root, group, short);
-      const manifest = `${group}/${short}/package.json`;
-      let text;
+    const rows = [...text.matchAll(/^\|\s*(\d+)\s*\|\s*`([a-z-]+)`\s*\|/gmu)];
+    /* IN THE ORDER THE TABLE NUMBERS THEM, not in the order they appear. A row moved without its
+       number renumbered is a table that says two different things, and sorting is how that shows up
+       as a duplicate rather than as a silently different order. */
+    const byRank = rows.map((m) => [Number(m[1]), m[2]]).sort((a, b) => a[0] - b[0]);
+    return byRank.map(([, name]) => name);
+  };
+
+  const ORDER = readOrder();
+
+  /** 1-based, so it reads as the table's `#` column. `0` means "not in the order at all". */
+  const rankOf = (short) => ORDER.indexOf(short) + 1;
+
+  /**
+   * `31 §2`'s L3 row: `apps/worker`, `apps/selfhost`, `apps/web`, `apps/cli`. *"apps import packages
+   * and never each other"*. The rank check alone cannot say so, because `worker` (16) importing
+   * `web` (14) points DOWN the order and is still the thing §2 refuses: `web`'s `build/` is an asset
+   * directory to both runtimes, never an import.
+   */
+  const APPS = new Set(['worker', 'selfhost', 'web', 'cli']);
+
+  /**
+   * `linkWorkspacePackages: false` (`31 §3`) is load-bearing: *"every internal dep must say
+   * `workspace:*`, so a typo'd internal name goes to the registry and **fails loudly** instead of
+   * silently linking."* A `@braindog/*` range that is not this one is the case where it does not.
+   */
+  const WORKSPACE = 'workspace:*';
+
+  /** `@braindog/record/directory` is `@braindog/record`; `braindog-render/svelte` is the tarball. */
+  const basePackage = (spec) =>
+    spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+
+  /**
+   * WHAT COUNTS AS ONE OF OURS, and it is two spellings rather than one. `31 §2`'s compromise ships
+   * the renderer as `braindog-render` (unscoped, MIT, the only distribution instrument in the plan),
+   * so a gate that recognised `@braindog/*` alone would have nothing to say about in-degree 0 on row
+   * 1, which is the one row with a legal consequence.
+   */
+  const isInternal = (base) => base.startsWith('@braindog/') || base.startsWith('braindog-');
+
+  /** `@braindog/kernel` and `braindog-render` are both directories named for their table row. */
+  const shortOf = (base) => base.replace(/^@braindog\//, '').replace(/^braindog-/, '');
+
+  const posix = (p) => p.replace(/\\/g, '/');
+  const lineAt = (text, at) => text.slice(0, at).split('\n').length;
+
+  /** The line a manifest names a dependency on, so `where` is `path:line` and not `path`. */
+  const keyLine = (text, name) => {
+    const at = text.indexOf(`"${name}":`);
+    return at === -1 ? 1 : lineAt(text, at);
+  };
+
+  const findings = [];
+  const add = (where, what, why) => findings.push({ where, what, why });
+
+  /* ── The workspaces ─────────────────────────────────────────────────────────────────────────── */
+
+  /**
+   * `pnpm-workspace.yaml` says `packages/*` and `apps/*`, and the directory name is the table's name.
+   *
+   * THE DIRECTORY IS THE IDENTITY, NOT THE `name` FIELD, because `packages/render` publishes as
+   * `braindog-render` and `31 §2` calls it `render`. Deriving the short name from the manifest would
+   * mean the one package whose boundary has a legal consequence is the one the order cannot find.
+   */
+  function readWorkspaces() {
+    const out = [];
+    for (const group of ['packages', 'apps']) {
+      let names;
       try {
-        if (!statSync(dir).isDirectory()) continue;
-        text = readFileSync(join(dir, 'package.json'), 'utf8');
+        names = readdirSync(join(root, group));
       } catch {
         continue;
       }
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch (e) {
-        /* A MANIFEST THAT DOES NOT PARSE IS NOT AN ABSENT MANIFEST. Skipping it quietly would drop
-           a whole package's edges out of the graph and leave the gate green over a smaller tree. */
-        add(`${manifest}:1`, 'unreadable manifest', `does not parse as JSON: ${e.message}`);
-        continue;
+      for (const short of names.sort()) {
+        if (skipDir(short)) continue;
+        const dir = join(root, group, short);
+        const manifest = `${group}/${short}/package.json`;
+        let text;
+        try {
+          if (!statSync(dir).isDirectory()) continue;
+          text = readFileSync(join(dir, 'package.json'), 'utf8');
+        } catch {
+          continue;
+        }
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          /* A MANIFEST THAT DOES NOT PARSE IS NOT AN ABSENT MANIFEST. Skipping it quietly would drop
+             a whole package's edges out of the graph and leave the gate green over a smaller tree. */
+          add(`${manifest}:1`, 'unreadable manifest', `does not parse as JSON: ${e.message}`);
+          continue;
+        }
+        out.push({ short, group, dir, manifest, text, json, npm: json.name ?? short });
       }
-      out.push({ short, group, dir, manifest, text, json, npm: json.name ?? short });
     }
-  }
-  return out;
-}
-
-const ws = readWorkspaces();
-const byShort = new Map(ws.map((w) => [w.short, w]));
-
-/** A name in the tree knows where it lives; one only the order knows is placed by the order. */
-const groupOf = (short) => byShort.get(short)?.group ?? (APPS.has(short) ? 'apps' : 'packages');
-
-/* ── The edges ──────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * One edge per ordered pair, with the first place it was seen.
- *
- * DECLARED EDGES AND IMPORTED ONES GO IN THE SAME SET. `52 §5.2` derives the graph from the
- * manifests and checks imports against it separately, which is right for "is this declared" and
- * wrong for "is this acyclic": an import that closes a cycle closes it whether or not anybody
- * remembered to write the dependency down, and the undeclared finding beside it does not say so.
- * The union is the graph the code actually has.
- */
-const edges = new Map();
-const addEdge = (from, to, where, via) => {
-  const key = `${from} ${to}`;
-  if (!edges.has(key)) edges.set(key, { from, to, where, via });
-};
-
-/**
- * How the edge is known, on the finding.
- *
- * `where` NAMES ONE PLACE AND AN EDGE USUALLY HAS TWO. `packages/record/package.json:12` and
- * `packages/record/src/index.ts:19` are different repairs: the first is a line to delete, the
- * second is code. A finding that gives the manifest line for an edge the source also makes sends
- * the reader to fix the half that is not the problem.
- */
-const evidence = (e) => (e.via === 'import' ? 'imported' : `declared in ${e.via}`);
-
-/** Every internal name a manifest declares, in any of the three fields, whatever its range. */
-const declared = new Map(ws.map((w) => [w.short, new Set()]));
-
-/**
- * `52 §5.2` step 1 names `dependencies` and `devDependencies`. `peerDependencies` is read too, and
- * the reason is `packages/render`: it is the one manifest here that uses the field at all, for an
- * OPTIONAL peer on `svelte`. The day an internal package appears there (a plugin taking its host
- * as a peer is the ordinary shape), an edge collected from two fields would miss it, and the
- * direction rule would be silently unenforced on exactly the package whose in-degree is the licence
- * boundary. Reading three fields costs one array element.
- */
-const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
-
-for (const w of ws) {
-  for (const field of DEP_FIELDS) {
-    const table = w.json[field];
-    if (!table || typeof table !== 'object') continue;
-    for (const [name, range] of Object.entries(table)) {
-      const base = basePackage(name);
-      if (!isInternal(base)) continue;
-      const at = `${w.manifest}:${keyLine(w.text, name)}`;
-      declared.get(w.short).add(base);
-
-      if (range !== WORKSPACE) {
-        add(
-          at,
-          'internal dependency without workspace:*',
-          `${w.npm} declares ${name} as "${range}". 31 §3 keeps linkWorkspacePackages: false so an internal name that is not "${WORKSPACE}" resolves against the registry.`,
-        );
-      }
-
-      const to = shortOf(base);
-      if (to === w.short) {
-        add(at, 'self-dependency', `${w.npm} declares itself in ${field}.`);
-        continue;
-      }
-
-      /* `31 §2`: *"`fixtures` is a devDependency everywhere"*. It prevents *"402 lines of one
-         person's seed data shipping in a bundle, the exact defect the clean room exists to
-         avoid."* A runtime dependency on it is that bundle. */
-      if (to === 'fixtures' && field === 'dependencies') {
-        add(
-          at,
-          'fixtures is a devDependency everywhere',
-          `${w.npm} takes ${name} as a runtime dependency, and 31 §2 ships it to nobody.`,
-        );
-      }
-
-      addEdge(w.short, to, at, field);
-    }
-  }
-}
-
-/* ── The import specifiers ──────────────────────────────────────────────────────────────────── */
-
-/** Comments blanked rather than removed, so a line number still means the line it names. */
-const blank = (m) => m.replace(/[^\n]/g, ' ');
-const decomment = (text) =>
-  text
-    .replace(/\/\*[\s\S]*?\*\//g, blank)
-    .replace(/<!--[\s\S]*?-->/g, blank)
-    .replace(/(^|[^:])(\/\/.*)$/gm, (_, a, c) => a + blank(c));
-
-/**
- * Every form that makes an edge.
- *
- * A TYPE IMPORT IS AN EDGE AND IS NOT SPELT DIFFERENTLY HERE. `import type { RecordApi } from
- * '@braindog/record'` is erased at build under `verbatimModuleSyntax` and `31 §2` still ranks `mcp`
- * ABOVE `record` for it: *"because a type import is still an edge, it sits above `record` in the
- * order, not below it."* The `from` clause catches both spellings and must keep doing so.
- *
- * THE SIDE-EFFECT FORM IS THE ONE A `from` PATTERN MISSES, and this repository uses it: both apps
- * pull the token layer in with `import '@braindog/skin/tokens.css'` in `+layout.svelte`, which has
- * no `from` and no binding. A gate that knew only the `from` clause would have reported those two
- * apps as importing nothing of `skin` at all.
- */
-const IMPORTS = [
-  /\bfrom\s*['"]([^'"\n]+)['"]/g, // import … from 'x' · import type … from 'x' · export … from 'x'
-  /(?<![\w$.])import\s+['"]([^'"\n]+)['"]/g, // import 'x'
-  /(?<![\w$.])import\s*\(\s*['"]([^'"\n]+)['"]/g, // import('x')
-];
-
-/**
- * `52 §5.2` step 3 says `src/**\/*.{ts,svelte}`.
- *
- * `.test.ts` IS NOT EXEMPT HERE, AND IT IS IN `stack.mjs`. The two exemptions are about different
- * things: `stack` exempts `test/` because that is where the adapter binding the kernel to
- * `node:sqlite` deliberately lives, *"on the other side of the line"*. There is no other side of
- * this line. A test file sitting in `src/` beside the module it tests is inside the package, and an
- * undeclared import from it fails at `pnpm test` exactly as it would anywhere else. Twenty-nine
- * files in this repository are that shape.
- */
-function walk(dir, out = []) {
-  let entries;
-  try {
-    entries = readdirSync(dir);
-  } catch {
     return out;
   }
-  for (const name of entries) {
-    if (skipDir(name)) continue;
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.(ts|svelte)$/.test(name) && !name.endsWith('.d.ts')) out.push(full);
-  }
-  return out;
-}
 
-/** Inside the package, or out of it. `''` is the package root itself. */
-const within = (target, dir) => {
-  const r = relative(dir, target);
-  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
-};
+  const ws = readWorkspaces();
+  const byShort = new Map(ws.map((w) => [w.short, w]));
 
-let scanned = 0;
+  /** A name in the tree knows where it lives; one only the order knows is placed by the order. */
+  const groupOf = (short) => byShort.get(short)?.group ?? (APPS.has(short) ? 'apps' : 'packages');
 
-for (const w of ws) {
-  for (const file of walk(join(w.dir, 'src'))) {
-    scanned++;
-    const text = decomment(readFileSync(file, 'utf8'));
-    const at = (index) => `${posix(relative(root, file))}:${lineAt(text, index)}`;
+  /* ── The edges ──────────────────────────────────────────────────────────────────────────────── */
 
-    for (const re of IMPORTS) {
-      re.lastIndex = 0;
-      for (const hit of text.matchAll(re)) {
-        const spec = hit[1];
+  /**
+   * One edge per ordered pair, with the first place it was seen.
+   *
+   * DECLARED EDGES AND IMPORTED ONES GO IN THE SAME SET. `52 §5.2` derives the graph from the
+   * manifests and checks imports against it separately, which is right for "is this declared" and
+   * wrong for "is this acyclic": an import that closes a cycle closes it whether or not anybody
+   * remembered to write the dependency down, and the undeclared finding beside it does not say so.
+   * The union is the graph the code actually has.
+   */
+  const edges = new Map();
+  const addEdge = (from, to, where, via) => {
+    const key = `${from} ${to}`;
+    if (!edges.has(key)) edges.set(key, { from, to, where, via });
+  };
 
-        /* c · A RELATIVE IMPORT MUST STAY UNDER ITS OWN PACKAGE ROOT (the package, not `src/`).
-           `packages/render/svelte/p/Grid.svelte` reaching `../../src/index.ts` is one package
-           talking to itself across two published subpaths, which is the shape `31 §2`'s "two
-           subpath exports, one package" compromise is made of. Climbing past the package root is
-           the other thing entirely, and it is the import pnpm resolves happily. */
-        if (spec.startsWith('.')) {
-          const target = resolve(dirname(file), spec);
-          if (!within(target, w.dir))
-            add(
-              at(hit.index),
-              'cross-package relative import',
-              `'${spec}' resolves to ${posix(relative(root, target))}, outside ${w.group}/${w.short}. 31 §3 layer 3: this one works fine under pnpm, which is why nothing but a gate can see it.`,
-            );
+  /**
+   * How the edge is known, on the finding.
+   *
+   * `where` NAMES ONE PLACE AND AN EDGE USUALLY HAS TWO. `packages/record/package.json:12` and
+   * `packages/record/src/index.ts:19` are different repairs: the first is a line to delete, the
+   * second is code. A finding that gives the manifest line for an edge the source also makes sends
+   * the reader to fix the half that is not the problem.
+   */
+  const evidence = (e) => (e.via === 'import' ? 'imported' : `declared in ${e.via}`);
+
+  /** Every internal name a manifest declares, in any of the three fields, whatever its range. */
+  const declared = new Map(ws.map((w) => [w.short, new Set()]));
+
+  /**
+   * `52 §5.2` step 1 names `dependencies` and `devDependencies`. `peerDependencies` is read too, and
+   * the reason is `packages/render`: it is the one manifest here that uses the field at all, for an
+   * OPTIONAL peer on `svelte`. The day an internal package appears there (a plugin taking its host
+   * as a peer is the ordinary shape), an edge collected from two fields would miss it, and the
+   * direction rule would be silently unenforced on exactly the package whose in-degree is the licence
+   * boundary. Reading three fields costs one array element.
+   */
+  const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
+
+  for (const w of ws) {
+    for (const field of DEP_FIELDS) {
+      const table = w.json[field];
+      if (!table || typeof table !== 'object') continue;
+      for (const [name, range] of Object.entries(table)) {
+        const base = basePackage(name);
+        if (!isInternal(base)) continue;
+        const at = `${w.manifest}:${keyLine(w.text, name)}`;
+        declared.get(w.short).add(base);
+
+        if (range !== WORKSPACE) {
+          add(
+            at,
+            'internal dependency without workspace:*',
+            `${w.npm} declares ${name} as "${range}". 31 §3 keeps linkWorkspacePackages: false so an internal name that is not "${WORKSPACE}" resolves against the registry.`,
+          );
+        }
+
+        const to = shortOf(base);
+        if (to === w.short) {
+          add(at, 'self-dependency', `${w.npm} declares itself in ${field}.`);
           continue;
         }
 
-        /* Everything that is not ours is somebody else's problem: the registry's, and layer 1's.
-           Narrowing to internal names is also what keeps the `from` pattern honest: it fires inside
-           a string literal or a stretch of Svelte markup as readily as in an import, and no such
-           accident spells `@braindog/`. */
-        const base = basePackage(spec);
-        if (!isInternal(base)) continue;
-        if (base === w.npm) continue; // a package reaching its own exports map
-
-        const to = shortOf(base);
-        if (!declared.get(w.short).has(base))
+        /* `31 §2`: *"`fixtures` is a devDependency everywhere"*. It prevents *"402 lines of one
+           person's seed data shipping in a bundle, the exact defect the clean room exists to
+           avoid."* A runtime dependency on it is that bundle. */
+        if (to === 'fixtures' && field === 'dependencies') {
           add(
-            at(hit.index),
-            'undeclared import',
-            `${w.npm} imports ${spec} and its package.json does not declare ${base}.`,
+            at,
+            'fixtures is a devDependency everywhere',
+            `${w.npm} takes ${name} as a runtime dependency, and 31 §2 ships it to nobody.`,
           );
+        }
 
-        addEdge(w.short, to, at(hit.index), 'import');
+        addEdge(w.short, to, at, field);
       }
     }
   }
-}
 
-/* ── a · Acyclic ────────────────────────────────────────────────────────────────────────────── */
+  /* ── The import specifiers ──────────────────────────────────────────────────────────────────── */
 
-const nodes = new Set([...byShort.keys(), ...[...edges.values()].flatMap((e) => [e.from, e.to])]);
-const out = new Map([...nodes].map((n) => [n, []]));
-for (const e of edges.values()) out.get(e.from).push(e);
+  /** Comments blanked rather than removed, so a line number still means the line it names. */
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  const decomment = (text) =>
+    text
+      .replace(/\/\*[\s\S]*?\*\//g, blank)
+      .replace(/<!--[\s\S]*?-->/g, blank)
+      .replace(/(^|[^:])(\/\/.*)$/gm, (_, a, c) => a + blank(c));
 
-/**
- * Depth-first, white/grey/black, and the grey stack IS the cycle path.
- *
- * THE PATH, NOT THE VERDICT. "there is a cycle" over seventeen packages is a search; `record →
- * declare → kernel → record` is the edge somebody deletes. Each cycle is reported once, keyed on
- * its rotation-invariant form, so a three-node cycle found from three entry points is one finding
- * and not three.
- */
-const GREY = 1;
-const BLACK = 2;
-const colour = new Map();
-const stack = [];
-const cyclesSeen = new Set();
-const cycles = [];
+  /**
+   * Every form that makes an edge.
+   *
+   * A TYPE IMPORT IS AN EDGE AND IS NOT SPELT DIFFERENTLY HERE. `import type { RecordApi } from
+   * '@braindog/record'` is erased at build under `verbatimModuleSyntax` and `31 §2` still ranks `mcp`
+   * ABOVE `record` for it: *"because a type import is still an edge, it sits above `record` in the
+   * order, not below it."* The `from` clause catches both spellings and must keep doing so.
+   *
+   * THE SIDE-EFFECT FORM IS THE ONE A `from` PATTERN MISSES, and this repository uses it: both apps
+   * pull the token layer in with `import '@braindog/skin/tokens.css'` in `+layout.svelte`, which has
+   * no `from` and no binding. A gate that knew only the `from` clause would have reported those two
+   * apps as importing nothing of `skin` at all.
+   */
+  const IMPORTS = [
+    /\bfrom\s*['"]([^'"\n]+)['"]/g, // import … from 'x' · import type … from 'x' · export … from 'x'
+    /(?<![\w$.])import\s+['"]([^'"\n]+)['"]/g, // import 'x'
+    /(?<![\w$.])import\s*\(\s*['"]([^'"\n]+)['"]/g, // import('x')
+  ];
 
-const canonical = (ring) => {
-  const at = ring.indexOf([...ring].sort()[0]);
-  return [...ring.slice(at), ...ring.slice(0, at)].join(' → ');
-};
+  /**
+   * `52 §5.2` step 3 says `src/**\/*.{ts,svelte}`.
+   *
+   * `.test.ts` IS NOT EXEMPT HERE, AND IT IS IN `stack.mjs`. The two exemptions are about different
+   * things: `stack` exempts `test/` because that is where the adapter binding the kernel to
+   * `node:sqlite` deliberately lives, *"on the other side of the line"*. There is no other side of
+   * this line. A test file sitting in `src/` beside the module it tests is inside the package, and an
+   * undeclared import from it fails at `pnpm test` exactly as it would anywhere else. Twenty-nine
+   * files in this repository are that shape.
+   */
+  function walk(dir, out = []) {
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return out;
+    }
+    for (const name of entries) {
+      if (skipDir(name)) continue;
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full, out);
+      else if (/\.(ts|svelte)$/.test(name) && !name.endsWith('.d.ts')) out.push(full);
+    }
+    return out;
+  }
 
-function visit(node) {
-  colour.set(node, GREY);
-  stack.push(node);
-  for (const edge of out.get(node) ?? []) {
-    if (colour.get(edge.to) === GREY) {
-      const ring = stack.slice(stack.indexOf(edge.to));
-      const key = canonical(ring);
-      if (!cyclesSeen.has(key)) {
-        cyclesSeen.add(key);
-        cycles.push({ ring, edge });
+  /** Inside the package, or out of it. `''` is the package root itself. */
+  const within = (target, dir) => {
+    const r = relative(dir, target);
+    return r === '' || (!r.startsWith('..') && !isAbsolute(r));
+  };
+
+  let scanned = 0;
+
+  for (const w of ws) {
+    for (const file of walk(join(w.dir, 'src'))) {
+      scanned++;
+      const text = decomment(readFileSync(file, 'utf8'));
+      const at = (index) => `${posix(relative(root, file))}:${lineAt(text, index)}`;
+
+      for (const re of IMPORTS) {
+        re.lastIndex = 0;
+        for (const hit of text.matchAll(re)) {
+          const spec = hit[1];
+
+          /* c · A RELATIVE IMPORT MUST STAY UNDER ITS OWN PACKAGE ROOT (the package, not `src/`).
+             `packages/render/svelte/p/Grid.svelte` reaching `../../src/index.ts` is one package
+             talking to itself across two published subpaths, which is the shape `31 §2`'s "two
+             subpath exports, one package" compromise is made of. Climbing past the package root is
+             the other thing entirely, and it is the import pnpm resolves happily. */
+          if (spec.startsWith('.')) {
+            const target = resolve(dirname(file), spec);
+            if (!within(target, w.dir))
+              add(
+                at(hit.index),
+                'cross-package relative import',
+                `'${spec}' resolves to ${posix(relative(root, target))}, outside ${w.group}/${w.short}. 31 §3 layer 3: this one works fine under pnpm, which is why nothing but a gate can see it.`,
+              );
+            continue;
+          }
+
+          /* Everything that is not ours is somebody else's problem: the registry's, and layer 1's.
+             Narrowing to internal names is also what keeps the `from` pattern honest: it fires inside
+             a string literal or a stretch of Svelte markup as readily as in an import, and no such
+             accident spells `@braindog/`. */
+          const base = basePackage(spec);
+          if (!isInternal(base)) continue;
+          if (base === w.npm) continue; // a package reaching its own exports map
+
+          const to = shortOf(base);
+          if (!declared.get(w.short).has(base))
+            add(
+              at(hit.index),
+              'undeclared import',
+              `${w.npm} imports ${spec} and its package.json does not declare ${base}.`,
+            );
+
+          addEdge(w.short, to, at(hit.index), 'import');
+        }
       }
-    } else if (colour.get(edge.to) !== BLACK && out.has(edge.to)) {
-      visit(edge.to);
     }
   }
-  stack.pop();
-  colour.set(node, BLACK);
-}
 
-for (const node of [...nodes].sort()) if (!colour.has(node)) visit(node);
+  /* ── a · Acyclic ────────────────────────────────────────────────────────────────────────────── */
 
-for (const { ring, edge } of cycles)
-  add(
-    edge.where,
-    'cycle',
-    `${[...ring, ring[0]].join(' → ')}. ${edge.from} → ${edge.to} closes it, ${evidence(edge)}. 31 §2 proves acyclicity by exhibiting a total order, and no order can hold a ring.`,
-  );
+  const nodes = new Set([...byShort.keys(), ...[...edges.values()].flatMap((e) => [e.from, e.to])]);
+  const out = new Map([...nodes].map((n) => [n, []]));
+  for (const e of edges.values()) out.get(e.from).push(e);
 
-/* ── b · Direction ──────────────────────────────────────────────────────────────────────────── */
+  /**
+   * Depth-first, white/grey/black, and the grey stack IS the cycle path.
+   *
+   * THE PATH, NOT THE VERDICT. "there is a cycle" over seventeen packages is a search; `record →
+   * declare → kernel → record` is the edge somebody deletes. Each cycle is reported once, keyed on
+   * its rotation-invariant form, so a three-node cycle found from three entry points is one finding
+   * and not three.
+   */
+  const GREY = 1;
+  const BLACK = 2;
+  const colour = new Map();
+  const stack = [];
+  const cyclesSeen = new Set();
+  const cycles = [];
 
-/**
- * A name outside the order once, not once per edge.
- *
- * THE REPAIR IS ONE ROW IN `31 §2`, so eleven lines saying so is eleven copies of one sentence. It
- * is still red: a package with no rank is a package whose direction nothing can check, and going
- * green over it would be the gate reporting on a graph smaller than the one that exists.
- */
-const unranked = new Map();
-const noteUnranked = (short, where) => {
-  if (!unranked.has(short)) unranked.set(short, { where, edges: 0 });
-  unranked.get(short).edges++;
-};
+  const canonical = (ring) => {
+    const at = ring.indexOf([...ring].sort()[0]);
+    return [...ring.slice(at), ...ring.slice(0, at)].join(' → ');
+  };
 
-const name = (short) => byShort.get(short)?.npm ?? `@braindog/${short}`;
-
-for (const e of [...edges.values()].sort((a, b) => `${a.from}${a.to}`.localeCompare(`${b.from}${b.to}`))) {
-  const from = rankOf(e.from);
-  const to = rankOf(e.to);
-
-  /* THE APP CHECK IS BEFORE THE RANKS, AND IT WAS BELOW THEM FOR ONE RUN. `31 §2`: *"apps import
-     packages and never each other"*, and rows 16 and 17 both say `web`'s `build/` is *"the asset
-     directory, never an import"*. So `worker` (16) → `web` (14) points DOWN the order and is still
-     refused, which is why the ranks cannot answer it. Written after the unranked `continue` it also
-     could not answer `packages/client` → `@braindog/selfhost`, the single most inverted edge in the
-     tree (a package depending on a runtime), because `client` has no rank to get past the guard.
-     A check reachable only for the cases that were already fine is `52 §9`'s whole subject. */
-  if (groupOf(e.to) === 'apps') {
-    const kind =
-      groupOf(e.from) === 'apps'
-        ? "31 §2: apps import packages and never each other; web's build/ is an asset directory, never an import."
-        : '31 §1: packages/* may name a capability, only apps/* may name a runtime. This package now names one.';
-    add(e.where, 'edge into an app', `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. ${kind}`);
+  function visit(node) {
+    colour.set(node, GREY);
+    stack.push(node);
+    for (const edge of out.get(node) ?? []) {
+      if (colour.get(edge.to) === GREY) {
+        const ring = stack.slice(stack.indexOf(edge.to));
+        const key = canonical(ring);
+        if (!cyclesSeen.has(key)) {
+          cyclesSeen.add(key);
+          cycles.push({ ring, edge });
+        }
+      } else if (colour.get(edge.to) !== BLACK && out.has(edge.to)) {
+        visit(edge.to);
+      }
+    }
+    stack.pop();
+    colour.set(node, BLACK);
   }
 
-  if (from === 0) noteUnranked(e.from, byShort.get(e.from) ? `${byShort.get(e.from).manifest}:1` : e.where);
-  if (to === 0) noteUnranked(e.to, byShort.get(e.to) ? `${byShort.get(e.to).manifest}:1` : e.where);
-  if (from === 0 || to === 0) continue;
+  for (const node of [...nodes].sort()) if (!colour.has(node)) visit(node);
 
-  if (to >= from)
+  for (const { ring, edge } of cycles)
     add(
-      e.where,
-      'import points up the order',
-      `${name(e.from)} → ${name(e.to)} (${e.from} is at rank ${from}, ${e.to} is at rank ${to}), ${evidence(e)}. 31 §2's order is the proof of acyclicity, and every dependency must have a strictly lower index.`,
+      edge.where,
+      'cycle',
+      `${[...ring, ring[0]].join(' → ')}. ${edge.from} → ${edge.to} closes it, ${evidence(edge)}. 31 §2 proves acyclicity by exhibiting a total order, and no order can hold a ring.`,
     );
-}
 
-for (const [short, { where, edges: count }] of [...unranked].sort())
-  add(
-    where,
-    'unknown package',
-    `${byShort.get(short)?.npm ?? short} is not a row of 31 §2's order, so the direction of its ${count} edge(s) cannot be checked. Give it a rank in the table or delete it.`,
-  );
+  /* ── b · Direction ──────────────────────────────────────────────────────────────────────────── */
 
-/* A WORKSPACE WITH NO EDGES AT ALL IS STILL DRIFT, and the loop above cannot see it. `31 §2` is
-   the total order the build order is read from, so a directory absent from it is a package
-   `pnpm -r run build` sequences by luck. */
-for (const w of ws)
-  if (rankOf(w.short) === 0 && !unranked.has(w.short))
+  /**
+   * A name outside the order once, not once per edge.
+   *
+   * THE REPAIR IS ONE ROW IN `31 §2`, so eleven lines saying so is eleven copies of one sentence. It
+   * is still red: a package with no rank is a package whose direction nothing can check, and going
+   * green over it would be the gate reporting on a graph smaller than the one that exists.
+   */
+  const unranked = new Map();
+  const noteUnranked = (short, where) => {
+    if (!unranked.has(short)) unranked.set(short, { where, edges: 0 });
+    unranked.get(short).edges++;
+  };
+
+  const name = (short) => byShort.get(short)?.npm ?? `@braindog/${short}`;
+
+  for (const e of [...edges.values()].sort((a, b) => `${a.from}${a.to}`.localeCompare(`${b.from}${b.to}`))) {
+    const from = rankOf(e.from);
+    const to = rankOf(e.to);
+
+    /* THE APP CHECK IS BEFORE THE RANKS, AND IT WAS BELOW THEM FOR ONE RUN. `31 §2`: *"apps import
+       packages and never each other"*, and rows 16 and 17 both say `web`'s `build/` is *"the asset
+       directory, never an import"*. So `worker` (16) → `web` (14) points DOWN the order and is still
+       refused, which is why the ranks cannot answer it. Written after the unranked `continue` it also
+       could not answer `packages/client` → `@braindog/selfhost`, the single most inverted edge in the
+       tree (a package depending on a runtime), because `client` has no rank to get past the guard.
+       A check reachable only for the cases that were already fine is `52 §9`'s whole subject. */
+    if (groupOf(e.to) === 'apps') {
+      const kind =
+        groupOf(e.from) === 'apps'
+          ? "31 §2: apps import packages and never each other; web's build/ is an asset directory, never an import."
+          : '31 §1: packages/* may name a capability, only apps/* may name a runtime. This package now names one.';
+      add(e.where, 'edge into an app', `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. ${kind}`);
+    }
+
+    if (from === 0) noteUnranked(e.from, byShort.get(e.from) ? `${byShort.get(e.from).manifest}:1` : e.where);
+    if (to === 0) noteUnranked(e.to, byShort.get(e.to) ? `${byShort.get(e.to).manifest}:1` : e.where);
+    if (from === 0 || to === 0) continue;
+
+    if (to >= from)
+      add(
+        e.where,
+        'import points up the order',
+        `${name(e.from)} → ${name(e.to)} (${e.from} is at rank ${from}, ${e.to} is at rank ${to}), ${evidence(e)}. 31 §2's order is the proof of acyclicity, and every dependency must have a strictly lower index.`,
+      );
+  }
+
+  for (const [short, { where, edges: count }] of [...unranked].sort())
     add(
-      `${w.manifest}:1`,
+      where,
       'unknown package',
-      `${w.npm} is a workspace and not a row of 31 §2's order. The order is also the build order.`,
+      `${byShort.get(short)?.npm ?? short} is not a row of 31 §2's order, so the direction of its ${count} edge(s) cannot be checked. Give it a rank in the table or delete it.`,
     );
 
-/* ── The line ───────────────────────────────────────────────────────────────────────────────── */
+  /* A WORKSPACE WITH NO EDGES AT ALL IS STILL DRIFT, and the loop above cannot see it. `31 §2` is
+     the total order the build order is read from, so a directory absent from it is a package
+     `pnpm -r run build` sequences by luck. */
+  for (const w of ws)
+    if (rankOf(w.short) === 0 && !unranked.has(w.short))
+      add(
+        `${w.manifest}:1`,
+        'unknown package',
+        `${w.npm} is a workspace and not a row of 31 §2's order. The order is also the build order.`,
+      );
 
-const ms = Math.round(performance.now() - started);
-const missing = ORDER.filter((short) => !byShort.has(short));
+  /* ── The line ───────────────────────────────────────────────────────────────────────────────── */
 
-/**
- * Exit 3 is a SKIP and not a pass (`run.mjs`), and the order matters: a fixture tree that seeds a
- * violation in a manifest and carries no `src/` must go RED for it, not amber for the half of the
- * gate that had nothing to read.
- */
-if (ws.length === 0) {
-  console.log('  graph: no packages/* or apps/* to read, so nothing was checked.');
-  process.exit(3);
+  const ms = Math.round(performance.now() - started);
+  const missing = ORDER.filter((short) => !byShort.has(short));
+
+  /**
+   * Exit 3 is a SKIP and not a pass (`run.mjs`), and the order matters: a fixture tree that seeds a
+   * violation in a manifest and carries no `src/` must go RED for it, not amber for the half of the
+   * gate that had nothing to read.
+   */
+  if (ws.length === 0) {
+    console.log('  graph: no packages/* or apps/* to read, so nothing was checked.');
+    return 3;
+  }
+
+  /**
+   * What was read, on both lines.
+   *
+   * THE CENSUS IS NOT DECORATION ON THE RED PATH. "5 finding(s)" over a corpus the line does not name
+   * is the same sentence whether the gate walked 177 files or 3, and a walk that quietly collapsed
+   * (a renamed directory, a `skipDir` that grew a name) would look exactly like a clean bill of
+   * health with five known problems on it. `ms` for the same reason `52 §4`'s own worked red line
+   * carries it (`{"gate":"closed-lists","ok":false,"ms":118,…}`).
+   */
+  const census = `${ws.length} workspaces, ${edges.size} workspace edges, ${scanned} source files`;
+
+  if (findings.length) {
+    console.error(`\n  graph: ${findings.length} finding(s) over ${census} in ${ms}ms, against 31 §2 and 31 §3 layers 3 and 5\n`);
+    for (const f of findings) console.error(`    ${f.where}\n        ${f.what}: ${f.why}\n`);
+    console.error(
+      '  The order in 31 §2 IS the proof of acyclicity, and render having in-degree 0 is the row that\n' +
+        '  keeps the published package embeddable. Grafana Loki #13019 is what an unchecked package\n' +
+        '  boundary looks like at day 400: reproduced by staff, and still open two years on.\n',
+    );
+    return 1;
+  } else if (scanned === 0) {
+    /* AND A RUN THAT READ NO SOURCE IS A SKIP. The manifests alone cannot answer layer 3. A relative
+       path that climbs out of a package is invisible in a `dependencies` block, by construction. */
+    console.log(
+      `  graph: ${ws.length} workspaces and ${edges.size} edges, but no src/**/*.{ts,svelte} to read. The import half checked nothing.`,
+    );
+    return 3;
+  } else {
+    const aside = missing.length === 0 ? '' : `; ${missing.length} of 31 §2's rows are unbuilt (${missing.join(', ')})`;
+    console.log(`  graph: ${census}, acyclic and in order${aside}, ${ms}ms`);
+  }
 }
 
-/**
- * What was read, on both lines.
- *
- * THE CENSUS IS NOT DECORATION ON THE RED PATH. "5 finding(s)" over a corpus the line does not name
- * is the same sentence whether the gate walked 177 files or 3, and a walk that quietly collapsed
- * (a renamed directory, a `skipDir` that grew a name) would look exactly like a clean bill of
- * health with five known problems on it. `ms` for the same reason `52 §4`'s own worked red line
- * carries it (`{"gate":"closed-lists","ok":false,"ms":118,…}`).
- */
-const census = `${ws.length} workspaces, ${edges.size} workspace edges, ${scanned} source files`;
-
-if (findings.length) {
-  console.error(`\n  graph: ${findings.length} finding(s) over ${census} in ${ms}ms, against 31 §2 and 31 §3 layers 3 and 5\n`);
-  for (const f of findings) console.error(`    ${f.where}\n        ${f.what}: ${f.why}\n`);
-  console.error(
-    '  The order in 31 §2 IS the proof of acyclicity, and render having in-degree 0 is the row that\n' +
-      '  keeps the published package embeddable. Grafana Loki #13019 is what an unchecked package\n' +
-      '  boundary looks like at day 400: reproduced by staff, and still open two years on.\n',
-  );
-  process.exitCode = 1;
-} else if (scanned === 0) {
-  /* AND A RUN THAT READ NO SOURCE IS A SKIP. The manifests alone cannot answer layer 3. A relative
-     path that climbs out of a package is invisible in a `dependencies` block, by construction. */
-  console.log(
-    `  graph: ${ws.length} workspaces and ${edges.size} edges, but no src/**/*.{ts,svelte} to read. The import half checked nothing.`,
-  );
-  process.exit(3);
-} else {
-  const aside = missing.length === 0 ? '' : `; ${missing.length} of 31 §2's rows are unbuilt (${missing.join(', ')})`;
-  console.log(`  graph: ${census}, acyclic and in order${aside}, ${ms}ms`);
-}
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at four seeded trees with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = graph() ?? 0;

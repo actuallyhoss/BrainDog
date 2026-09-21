@@ -30,8 +30,6 @@ import { fileURLToPath } from 'node:url';
 
 import { skipDir } from './lib.mjs';
 
-const root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
 /**
  * What a plaintext is called. `52 §5.2` names three identifiers and one branded type.
  *
@@ -368,70 +366,92 @@ function enclosing(text, at) {
   return inner;
 }
 
-const findings = [];
-let scanned = 0;
+/**
+ * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
+ * the runner's `IMPORTED OR SPAWNED` header. Nothing in this file happens on import, and everything
+ * above this line is a declaration.
+ *
+ * THE ROOT IS AN ARGUMENT, defaulting to `BRAINDOG_GATE_ROOT`, which is the handle `self-test` aims
+ * this gate at a seeded tree with, and then to the repository this file sits in. `run.mjs` passes
+ * the root it derived from its own location, because an imported gate shares the runner's working
+ * directory and that is wherever the operator was standing.
+ *
+ * IT RETURNS 1 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
+ * rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default function secretGrep(
+  root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
+) {
+  const findings = [];
+  let scanned = 0;
 
-/* `packages/fixtures/**` IS IN SCOPE TOO (52 §6's table): a fixture that carried a real credential
-   would be one committed to a public repository, which is the failure this gate is for at its
-   worst. Everything under `packages` and `apps` is walked, tests included. */
-for (const top of ['packages', 'apps'])
-  for (const file of walk(join(root, top))) {
-    scanned++;
-    const rel = relative(root, file);
-    const text = decomment(readFileSync(file, 'utf8'));
-    const home = BRAND_HOMES.some((h) => h.test(rel));
-    const branded = home ? namesRe(brandedNames(text)) : null;
-    const flowed = heldFrom(text);
+  /* `packages/fixtures/**` IS IN SCOPE TOO (52 §6's table): a fixture that carried a real credential
+     would be one committed to a public repository, which is the failure this gate is for at its
+     worst. Everything under `packages` and `apps` is walked, tests included. */
+  for (const top of ['packages', 'apps'])
+    for (const file of walk(join(root, top))) {
+      scanned++;
+      const rel = relative(root, file);
+      const text = decomment(readFileSync(file, 'utf8'));
+      const home = BRAND_HOMES.some((h) => h.test(rel));
+      const branded = home ? namesRe(brandedNames(text)) : null;
+      const flowed = heldFrom(text);
 
-    for (const sink of SINKS) {
-      sink.re.lastIndex = 0;
-      for (const m of text.matchAll(sink.re)) {
-        const raw = argsOf(text, m.index + m[0].length - 1);
-        const args = sink.bound ? bound(raw) : raw;
-        const plain = sourceIn(args, text) || (branded !== null && branded.test(args));
-        if (plain && EXEMPT.some((e) => e.file.test(rel) && e.sinks.includes(sink.id) && enclosing(text, m.index) === e.fn)) continue;
-        const wire = sink.wire !== false && WIRE.test(args);
-        const code = sink.wire === false ? '' : codeOf(args);
-        const held = HELD.test(code) || (flowed !== null && flowed.test(code));
-        if (plain || wire || held)
-          findings.push({
-            where: `${rel}:${lineOf(text, m.index)}`,
-            why: plain ? `a plaintext reaches ${sink.id}` : wire ? `a sign-in secret reaches ${sink.id}` : `a report key or an opened action key reaches ${sink.id}`,
-            text: `${m[0]}${args.trim().slice(0, 60)}`,
-          });
+      for (const sink of SINKS) {
+        sink.re.lastIndex = 0;
+        for (const m of text.matchAll(sink.re)) {
+          const raw = argsOf(text, m.index + m[0].length - 1);
+          const args = sink.bound ? bound(raw) : raw;
+          const plain = sourceIn(args, text) || (branded !== null && branded.test(args));
+          if (plain && EXEMPT.some((e) => e.file.test(rel) && e.sinks.includes(sink.id) && enclosing(text, m.index) === e.fn)) continue;
+          const wire = sink.wire !== false && WIRE.test(args);
+          const code = sink.wire === false ? '' : codeOf(args);
+          const held = HELD.test(code) || (flowed !== null && flowed.test(code));
+          if (plain || wire || held)
+            findings.push({
+              where: `${rel}:${lineOf(text, m.index)}`,
+              why: plain ? `a plaintext reaches ${sink.id}` : wire ? `a sign-in secret reaches ${sink.id}` : `a report key or an opened action key reaches ${sink.id}`,
+              text: `${m[0]}${args.trim().slice(0, 60)}`,
+            });
+        }
       }
+
+      /* THE BRAND, AND THE THREE MODULES IT LIVES IN. A `Plaintext` in a fourth file is a plaintext that
+         has been handed somewhere it was not unwrapped, and a type travelling is a value travelling. */
+      if (/\bPlaintext\b/.test(text) && !home) {
+        const at = text.search(/\bPlaintext\b/);
+        findings.push({
+          where: `${rel}:${lineOf(text, at)}`,
+          why: 'names the Plaintext brand outside a host vault step',
+          text: 'Plaintext',
+        });
+      }
+
+      /* AND A PROMPT TEMPLATE NEVER NAMES ONE. `52 §5.2` lists any file under a `prompts` directory as a sink of its own:
+         whatever is in one goes to a model, and a template that interpolates a decrypted value is a
+         credential in somebody else's inference log. */
+      if (/[\\/]prompts[\\/]/.test(rel) && SOURCE.test(text))
+        findings.push({
+          where: `${rel}:${lineOf(text, text.search(SOURCE))}`,
+          why: 'a prompt template names a plaintext',
+          text: (SOURCE.exec(text) ?? [''])[0],
+        });
     }
 
-    /* THE BRAND, AND THE THREE MODULES IT LIVES IN. A `Plaintext` in a fourth file is a plaintext that
-       has been handed somewhere it was not unwrapped, and a type travelling is a value travelling. */
-    if (/\bPlaintext\b/.test(text) && !home) {
-      const at = text.search(/\bPlaintext\b/);
-      findings.push({
-        where: `${rel}:${lineOf(text, at)}`,
-        why: 'names the Plaintext brand outside a host vault step',
-        text: 'Plaintext',
-      });
-    }
-
-    /* AND A PROMPT TEMPLATE NEVER NAMES ONE. `52 §5.2` lists any file under a `prompts` directory as a sink of its own:
-       whatever is in one goes to a model, and a template that interpolates a decrypted value is a
-       credential in somebody else's inference log. */
-    if (/[\\/]prompts[\\/]/.test(rel) && SOURCE.test(text))
-      findings.push({
-        where: `${rel}:${lineOf(text, text.search(SOURCE))}`,
-        why: 'a prompt template names a plaintext',
-        text: (SOURCE.exec(text) ?? [''])[0],
-      });
+  if (findings.length === 0) {
+    console.log(`  secret-grep: 0 plaintexts reach a sink, over ${scanned} files`);
+  } else {
+    console.error(`\n  secret-grep: ${findings.length} finding(s) (12 §8, ADR-062)\n`);
+    for (const f of findings) console.error(`    ${f.where}  ${f.why}\n      ${f.text}`);
+    console.error(
+      '\n  A credential never goes in the record, and never in a log. Say what it opened, its id, or\n' +
+        '  the label. Never the value. If it must be used, use it and let it go out of scope.\n',
+    );
+    return 1;
   }
-
-if (findings.length === 0) {
-  console.log(`  secret-grep: 0 plaintexts reach a sink, over ${scanned} files`);
-} else {
-  console.error(`\n  secret-grep: ${findings.length} finding(s) (12 §8, ADR-062)\n`);
-  for (const f of findings) console.error(`    ${f.where}  ${f.why}\n      ${f.text}`);
-  console.error(
-    '\n  A credential never goes in the record, and never in a log. Say what it opened, its id, or\n' +
-      '  the label. Never the value. If it must be used, use it and let it go out of scope.\n',
-  );
-  process.exitCode = 1;
 }
+
+/* AND IT IS STILL A SCRIPT, because `self-test` spawns it at its seeded trees with
+   `BRAINDOG_GATE_ROOT`, and the header documents the command line. `?? 0` because a pass returns
+   nothing. */
+if (import.meta.main) process.exitCode = secretGrep() ?? 0;

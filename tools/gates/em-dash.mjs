@@ -51,12 +51,6 @@ const C = budget('emDash');
 
 const DASH = '\u2014';
 
-/* A ROOT ON THE COMMAND LINE OR IN THE ENVIRONMENT IS OBEYED, the two handles the rest of this
-   directory already answers to: `colour-grep` takes `argv[2]`, `dead-copy` reads
-   `BRAINDOG_GATE_ROOT`, and a gate that knew only one of them is a gate somebody aims and is
-   quietly lied to. `process.cwd()` stays the default, because that is how `run.mjs` spawns it. */
-const ROOT = resolve(process.argv[2] ?? process.env.BRAINDOG_GATE_ROOT ?? process.cwd());
-
 /** The two workspaces, and `src` within each member: shipped source, not tooling or fixtures. */
 const WORKSPACES = ['packages', 'apps'];
 
@@ -152,80 +146,104 @@ async function walk(dir, out) {
   }
 }
 
-const files = [];
-for (const workspace of WORKSPACES) {
-  let members;
-  try {
-    members = await readdir(join(ROOT, workspace), { withFileTypes: true });
-  } catch {
-    continue;
-  }
-  for (const m of members) {
-    if (!m.isDirectory() || skipDir(m.name)) continue;
+/**
+ * THE CHECK IS A FUNCTION, and `run.mjs` imports it rather than spawning this file: `52 §5.1` step
+ * 3, and the runner's `IMPORTED OR SPAWNED` header holds the argument for it. Nothing in this file
+ * happens on import, which is the property that lets the runner ask the module what it needs
+ * instead of reading a declaration out of the source text and hoping the code agrees.
+ *
+ * SO THE ROOT IS AN ARGUMENT, and it still answers to the two handles the rest of this directory
+ * takes: `argv[2]` from the command line, at the foot of this file, and `BRAINDOG_GATE_ROOT`, which
+ * is how `self-test` aims a gate at a seeded tree. `process.cwd()` is the last resort now rather
+ * than the default it was: an imported gate shares the runner's working directory, wherever the
+ * operator was standing, so `run.mjs` passes the root it derived from its own location.
+ *
+ * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass`
+ * grep rests on: a pass is the end of the function and never a statement inside it.
+ */
+export default async function emDash(root = process.env.BRAINDOG_GATE_ROOT ?? process.cwd()) {
+  const ROOT = resolve(root);
+
+  const files = [];
+  for (const workspace of WORKSPACES) {
+    let members;
     try {
-      await walk(join(ROOT, workspace, m.name, 'src'), files);
+      members = await readdir(join(ROOT, workspace), { withFileTypes: true });
     } catch {
-      /* A member with no `src` ships no prose. */
-    }
-    const readme = await publishedReadme(join(ROOT, workspace, m.name));
-    if (readme) files.push(readme);
-  }
-}
-
-/* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run",
-   and it is the difference between a clean tree and a root aimed at the wrong place. */
-if (files.length === 0) {
-  console.log(`  em-dash: no packages/*/src or apps/*/src under ${ROOT}, so no prose was read`);
-  process.exit(3);
-}
-
-const findings = [];
-
-for (const file of files) {
-  const source = await readFile(file, 'utf8');
-  const rel = relative(ROOT, file).replace(/\\/g, '/');
-
-  /* Comments first, then the comments nested one language down inside what is left. */
-  let text;
-  if (file.endsWith('.md')) {
-    text = blankMarkdown(source);
-  } else {
-    text = blankComments(source);
-    text = text.replace(LITERAL, (lit) => (holdsSql(lit) ? blankSqlComments(lit) : lit));
-  }
-
-  const lines = source.split('\n');
-  let line = 1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '\n') {
-      line++;
       continue;
     }
-    if (text[i] !== DASH) continue;
-    /* THE GLYPH RULE, and the whole of it. A space on each side is a clause break somebody did not
-       choose a mark for; anything else is typography. */
-    if (text[i - 1] !== ' ' || text[i + 1] !== ' ') continue;
+    for (const m of members) {
+      if (!m.isDirectory() || skipDir(m.name)) continue;
+      try {
+        await walk(join(ROOT, workspace, m.name, 'src'), files);
+      } catch {
+        /* A member with no `src` ships no prose. */
+      }
+      const readme = await publishedReadme(join(ROOT, workspace, m.name));
+      if (readme) files.push(readme);
+    }
+  }
 
-    /* The excerpt comes from `source`, not from `text`, so a finding shows the real characters
-       rather than the blanks a comment left behind. Windowed on the dash because a refusal's
-       sentence is often longer than the budget and the clause break is what has to be visible. */
-    const column = i - (text.lastIndexOf('\n', i) + 1);
-    const whole = lines[line - 1] ?? '';
-    const from = Math.max(0, column - C.excerptChars);
-    const to = column + C.excerptChars;
-    const clip = `${from > 0 ? '…' : ''}${whole.slice(from, to).trim()}${to < whole.length ? '…' : ''}`;
-    findings.push({ where: `${rel}:${line}`, text: clip });
+  /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is this directory's word for "could not run",
+     and it is the difference between a clean tree and a root aimed at the wrong place. */
+  if (files.length === 0) {
+    console.log(`  em-dash: no packages/*/src or apps/*/src under ${ROOT}, so no prose was read`);
+    return 3;
+  }
+
+  const findings = [];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    const rel = relative(ROOT, file).replace(/\\/g, '/');
+
+    /* Comments first, then the comments nested one language down inside what is left. */
+    let text;
+    if (file.endsWith('.md')) {
+      text = blankMarkdown(source);
+    } else {
+      text = blankComments(source);
+      text = text.replace(LITERAL, (lit) => (holdsSql(lit) ? blankSqlComments(lit) : lit));
+    }
+
+    const lines = source.split('\n');
+    let line = 1;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '\n') {
+        line++;
+        continue;
+      }
+      if (text[i] !== DASH) continue;
+      /* THE GLYPH RULE, and the whole of it. A space on each side is a clause break somebody did not
+         choose a mark for; anything else is typography. */
+      if (text[i - 1] !== ' ' || text[i + 1] !== ' ') continue;
+
+      /* The excerpt comes from `source`, not from `text`, so a finding shows the real characters
+         rather than the blanks a comment left behind. Windowed on the dash because a refusal's
+         sentence is often longer than the budget and the clause break is what has to be visible. */
+      const column = i - (text.lastIndexOf('\n', i) + 1);
+      const whole = lines[line - 1] ?? '';
+      const from = Math.max(0, column - C.excerptChars);
+      const to = column + C.excerptChars;
+      const clip = `${from > 0 ? '…' : ''}${whole.slice(from, to).trim()}${to < whole.length ? '…' : ''}`;
+      findings.push({ where: `${rel}:${line}`, text: clip });
+    }
+  }
+
+  if (findings.length === 0) {
+    console.log(`  em-dash: 0 em dashes used as punctuation, over ${files.length} files`);
+  } else {
+    for (const f of findings) console.error(`  ${f.where}\n      ${f.text}`);
+    console.error(
+      `\n  em-dash: ${findings.length} em dash(es) used as punctuation in prose a stranger reads.\n` +
+        '  Recast the sentence so the break is a full stop, a colon or a semicolon, whichever the\n' +
+        '  clause actually is. A hyphen or an en dash in its place is the same sentence, punctuated worse.',
+    );
+    return 1;
   }
 }
 
-if (findings.length === 0) {
-  console.log(`  em-dash: 0 em dashes used as punctuation, over ${files.length} files`);
-} else {
-  for (const f of findings) console.error(`  ${f.where}\n      ${f.text}`);
-  console.error(
-    `\n  em-dash: ${findings.length} em dash(es) used as punctuation in prose a stranger reads.\n` +
-      '  Recast the sentence so the break is a full stop, a colon or a semicolon, whichever the\n' +
-      '  clause actually is. A hyphen or an en dash in its place is the same sentence, punctuated worse.',
-  );
-  process.exitCode = 1;
-}
+/* AND IT IS STILL A SCRIPT. `self-test` spawns each gate against a seeded tree, and the header above
+   documents `node tools/gates/em-dash.mjs [root]`, so the command line stays exactly where it was.
+   `?? 0` because a pass returns nothing: see the function's own last paragraph. */
+if (import.meta.main) process.exitCode = (await emDash(process.argv[2])) ?? 0;
