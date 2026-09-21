@@ -605,10 +605,15 @@ test('A SUGGESTED ACCENT CAN BE SEEN AGAINST THE SURFACE IT IS PAINTED ON, IN BO
    * against its own label, and the fill itself was measured by nothing. Check R is that
    * measurement, and the test below is the one that holds it for a colour nobody wrote down.
    *
-   * THE HOUSE ACCENT IS IN THE LIST BECAUSE IT IS THE PROOF THE WINDOW EXISTS. #D72065 measures
-   * 3.04 at its worst, which is the whole of the headroom there is: one colour has to clear 3:1
-   * against a near-black at L 0.244 and against a near-white at L 0.999, and the band that does
-   * both is narrow and centred near L 0.57. A suggestion under it is not a taste call.
+   * THE HOUSE ACCENT IS IN THE LIST BECAUSE IT IS THE PROOF THE WINDOW EXISTS. The shipped accent,
+   * `oklch(0.575 0.215 27)`, which is `#DB2527`, measures 3.05 at its worst, on `s3` in dark, and
+   * that is the whole of the headroom there is: one colour has to clear 3:1 against a near-black at
+   * L 0.244 and against a near-white at L 0.999, and the band that does both is narrow and centred
+   * near L 0.57. A suggestion under it is not a taste call.
+   *
+   * THIS PARAGRAPH NAMED `#D72065` UNTIL 21 SEPTEMBER, which was the accent until midday and is a
+   * colour the product no longer holds. It measures 3.04 here, so the argument never moved, but a
+   * comment that proves a window with a colour nobody ships is a comment a reader cannot check.
    */
   const worstFill = (accent: string, neutralHue: number) => {
     let worst = Infinity;

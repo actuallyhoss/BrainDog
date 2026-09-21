@@ -85,9 +85,11 @@ The one className that matters on the whole file: `"text-red dark:text-yellow"`,
 the hero headline. PostHog spends `#F54E00` in light and `#F7A501` in dark on **a word**, and it is
 a different hue per scheme because neither one reads on both grounds.
 
-**Taken, and adapted.** BrainDog's accent is `#D72065` in both schemes, so no per-scheme swap is
-needed; `--accent-text` is already solved per scheme for exactly this job (`#951946` light,
-`#FD7B9B` dark). What was taken is the idea that the headline itself carries the colour.
+**Taken, and adapted.** BrainDog's accent is `#DB2527` in both schemes, so no per-scheme swap is
+needed; `--accent-text` is already solved per scheme for exactly this job (`#981C1B` light,
+`#FF7E72` dark). What was taken is the idea that the headline itself carries the colour. (The three
+values here read `#D72065`, `#951946` and `#FD7B9B` until 21 September, when the accent went back to
+the mark's own red and the generated skins moved with it.)
 
 ### The table, `src/components/OSTable/index.tsx`
 
