@@ -201,7 +201,10 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   for (const b of board) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(board[0]!.rows?.length, 2, 'two tickets are in flight');
   assert.equal(board[1]!.rows?.length, 1, 'one ticket is blocked');
-  assert.equal(board[2]!.rows?.length, 2, 'two tickets are due this week');
+  /* ONE, AND THE SECOND OF THE TWO WAS THE BLOCKED TICKET DRAWN TWICE. Home asks the same tickets
+     three questions in a row, and `Due this week` used to answer about rows `Blocked` and `In flight`
+     had already drawn, so this count was the double count. */
+  assert.equal(board[2]!.rows?.length, 1, 'what is due that the two headings above have not drawn');
   const agentWork = value<{ blocks: Drawn[] }>(team.k.page('agent-work')).blocks;
   assert.deepEqual(agentWork.map((b) => b.kind), ['table', 'agents', 'cards', 'table']);
   for (const b of agentWork) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);

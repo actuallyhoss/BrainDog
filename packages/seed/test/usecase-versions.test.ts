@@ -171,6 +171,27 @@ const DECLARED: Record<string, Version> = {
     declares: '1a10e3c14cb11d31',
     history: ["Raised to 2.3.0 in `520dd7fd`, which makes up the stat row on `page.project` from a team's tasks with money left out: due soon, in review, done this week -> 1a10e3c14cb11d31"],
   },
+  /**
+   * THE SAME IDS AS 2.3.0, WORD FOR WORD, and that is the point of this entry: nothing appeared and nothing vanished,
+   * so `holds` could not have caught this and only the fingerprint did. What moved is inside `page.home-team`: the
+   * clause under Due this week, which now takes out what the two headings above it have already drawn, one column
+   * added to In flight so that a ticket held back from Due this week still says its date, and the empty line under Due
+   * this week, which used to claim nothing was due while two headings above it were full of dates.
+   */
+  'team@2.4.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks
+      setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator
+      setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing
+      setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_nothing_needs_you
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '96ace671f9e7f0e6',
+    history: ['Raised to 2.4.0 because `home-team` drew a blocked ticket due inside the week under Blocked and again under Due this week, and In flight now carries the due day that holding it back would otherwise have taken off the page -> 96ace671f9e7f0e6'],
+  },
   'guide@1.2.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached

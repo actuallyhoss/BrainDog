@@ -26,10 +26,23 @@ const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycl
 /* NO LABEL: the column over a ticket's title is headed by what one ticket is called, so a team that calls them Issues reads Issue. */
 const TICKET = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
+/** A ticket still in play: not finished and not dropped. What Home's Due this week counts before it takes anything out. */
+const LIVE = 'state is not done or dropped';
+
+/**
+ * A TICKET SOMEBODY IS ACTUALLY ON: in progress, or handed back to be checked.
+ *
+ * NAMED RATHER THAN SPELT, because Home's Due this week now says it is what is due and NOT this, and the two sentences
+ * have to stay each other's opposite. They were one copy of one clause and a second copy each; a third drifting would
+ * put a ticket back under two headings on this page without either heading changing.
+ */
+const IN_FLIGHT = 'state is doing or review';
+
 export const TEAM = {
   usecase: 'team',
   /* 2.2.0: a page for each product or project in play, from Projects' template. */
-  version: '2.3.0',
+  /* 2.4.0: Home's three headings stop drawing one ticket twice, and In flight says when each of its tickets is due. */
+  version: '2.4.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -129,16 +142,20 @@ export const TEAM = {
         requires: ['register.tasks'],
         blocks: [
           {
+            /* AND WHEN EACH ONE IS DUE, because Due this week below no longer draws these rows a second time and nothing
+               else on this page carries their date. Without this column a ticket in progress and due tomorrow said
+               neither, which is what the third test in `test/team-home-twice.test.ts` watched happen. */
             kind: 'table',
             heading: '{{config:voice_right_now}}',
             span: 12,
             source: 'register.tasks',
-            where: 'state is doing or review',
+            where: IN_FLIGHT,
             columns: [
               TICKET,
               { field: 'owner', label: 'Owner', width: 'minmax(10ch,16ch)' },
               { field: 'agent', label: 'Agent', width: '10ch' },
-              { field: 'state', label: 'Status', width: '12ch', align: 'end' },
+              { field: 'state', label: 'Status', width: '12ch' },
+              { field: 'by', label: 'Due', width: '13ch', align: 'end' },
             ],
             limit: 8,
             empty: 'Nothing is in flight.',
@@ -155,14 +172,28 @@ export const TEAM = {
           },
           {
             kind: 'table',
+            /* WHAT IS DUE THAT THE TWO HEADINGS ABOVE HAVE NOT ALREADY DRAWN. `state is not doing or review or blocked`
+               is the whole of the difference, and it is three states rather than one because Home asks the same
+               tickets three questions in a row: driven on a record made the way onboarding makes one, Home drew five
+               rows and `Wait on the design for the settings screen` was two of them, under Blocked and again here.
+               `In flight` overlaps by exactly the same construction and did not show it, because both example tickets
+               that are doing or in review carry no due day at all, so every screenshot of this page was clean. Giving
+               the in-progress ticket a date three days out draws `Write the release notes` twice as well, which is
+               what `test/team-home-twice.test.ts` plants rather than trusting the sample. `79f17031` made the same
+               move on the Work pack's Overview, and `loop/research-usability-2026-09-21.md` finding 15 says what the
+               overlap costs: the first reading is that the board is double-counting. */
             heading: 'Due this week',
             span: 12,
             source: 'register.tasks',
-            where: 'state is not done or dropped, by before +8d',
+            where: `${LIVE}, state is not doing or review or blocked, by before +8d`,
             columns: [TICKET, { field: 'priority', label: 'Priority', width: '10ch' }, { field: 'state', label: 'Status', width: '12ch' }, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
             order: [{ field: 'by', dir: 'asc' }],
             limit: 8,
-            empty: 'Nothing is due this week.',
+            /* "ELSE", BECAUSE THE BLOCK CAN NOW BE EMPTY WHILE WORK IS DUE and the old line said the opposite. With the
+               blocked example ticket due in five days and the in-progress one given a date, this block draws one row
+               where it drew two, and on a board where everything due is in flight or blocked it draws none at all
+               directly under two headings full of dates. */
+            empty: 'Nothing else is due this week.',
           },
         ],
       },
