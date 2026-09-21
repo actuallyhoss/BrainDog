@@ -77,7 +77,22 @@ export type Report = {
   plan: Plan;
 };
 
-/** The words a report names a list by. */
+/**
+ * The words a report names a list by.
+ *
+ * THE `satisfies` IS HERE BECAUSE THIS MAP LIVES IN A DIFFERENT FILE FROM THE LIST IT HAS TO COVER, AND THE FALLBACK IS
+ * SILENT. Every lookup of it reads `NAMES[register] ?? register`, so a register added to `ORDER` (`src/legacy.ts`)
+ * and not named here prints the API's own id at a person rather than refusing. It has happened twice. `installments`
+ * printed `installments: 1 added, 0 updated, 0 unchanged.` in the main tally directly beside `Accounts: 1 added`, and
+ * `fx` did it again this week. `PROVIDED_BY`, the other map a new register needs a line in, was filled in the same edit,
+ * and the only difference between the two is that it sits in `legacy.ts` under `ORDER` and this one is a file away
+ * and belongs to a different agent. So the seam is where the maps live, not who was careless. Held as
+ * `satisfies`, a register with no name here is a compile error that names it (measured: `Property 'fx' is missing`),
+ * which whoever adds one reads before any run of the import does. `satisfies` checks an object literal for excess keys
+ * as well, so a name left behind for a register `ORDER` has stopped writing is an error too (measured: `'snapshots'
+ * does not exist in type`). `test/import.test.ts` still holds the printed lines to their words, because the one thing
+ * the compiler cannot check is that a name is the one the product shows a person.
+ */
 const NAMES: Readonly<Record<string, string>> = {
   things: 'Projects',
   people: 'People',
@@ -88,20 +103,22 @@ const NAMES: Readonly<Record<string, string>> = {
   skills: 'Skills',
   tools: 'Tools',
   credentials: 'Keys (the index only)',
+  /* THE WORDS money-core PUTS OVER THIS LIST (`packages/seed/src/modules/money.ts:506`), not "FX" or "Rates": a person
+     reading the report has the same two words over the page the import filled. */
+  fx: 'Exchange rates',
   accounts: 'Accounts',
   categories: 'Categories',
   obligations: 'Money in and out',
-  /* THE WORDS money-core PUTS OVER THESE FOUR LISTS AND NOTHING ELSE (`packages/seed/src/modules/money.ts`): a list
-     with no entry here falls back to the id the API uses, so a real run printed
-     `installments: 1 added, 0 updated, 0 unchanged.` in the main tally directly beside `Accounts: 1 added`. Every
-     register in `ORDER` now has a line in this map, which `test/import.test.ts` holds it to. */
+  /* THE WORDS money-core PUTS OVER THESE FOUR LISTS AND NOTHING ELSE (`packages/seed/src/modules/money.ts`), which is
+     the run that put the sentence above here: `installments` was the register with no entry, and the id it fell back to
+     was what a person read. */
   transactions: 'Ledger',
   recurring: 'Repeating',
   installments: 'Instalments',
   services: 'Services',
   organisations: 'Organisations',
   session: 'Agent runs',
-};
+} satisfies Record<(typeof ORDER)[number], string>;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const fixOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : 'Somebody else changed it at the same moment. Run the import again.');

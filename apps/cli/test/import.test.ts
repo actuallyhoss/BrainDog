@@ -663,11 +663,11 @@ test('the report says every list, the questions, what was left out and that no k
   assert.ok(!text.includes('FAKEFAKE'));
 });
 
-test('THE FOUR LEDGER LISTS ARE NAMED IN WORDS IN THE MAIN TALLY, not by the id an API uses', () => {
+test('THE MONEY LISTS ARE NAMED IN WORDS IN THE MAIN TALLY, not by the id an API uses', () => {
   const one = { added: 1, updated: 0, unchanged: 0 };
   const report: Report = {
     missing: [],
-    tally: { accounts: one, categories: one, transactions: one, recurring: one, installments: one },
+    tally: { fx: one, accounts: one, categories: one, transactions: one, recurring: one, installments: one },
     asked: 0,
     alreadyAsked: 0,
     polls: { filed: 0, before: 0 },
@@ -682,6 +682,10 @@ test('THE FOUR LEDGER LISTS ARE NAMED IN WORDS IN THE MAIN TALLY, not by the id 
   assert.deepEqual(
     said(report, { dryRun: false, file: 'export.json' }).filter((l) => l.includes('1 added')),
     [
+      /* THE WORDS money-core PUTS OVER THE RATES LIST, pinned rather than left to the both-directions check below: that
+         check only proves a line does not begin with the register's id, so `fx: 'FX'` would pass it while putting two
+         letters nobody has seen in the product beside `Accounts`. */
+      'Exchange rates: 1 added, 0 updated, 0 unchanged.',
       'Accounts: 1 added, 0 updated, 0 unchanged.',
       'Categories: 1 added, 0 updated, 0 unchanged.',
       'Ledger: 1 added, 0 updated, 0 unchanged.',
@@ -690,7 +694,9 @@ test('THE FOUR LEDGER LISTS ARE NAMED IN WORDS IN THE MAIN TALLY, not by the id 
     ],
   );
 
-  /* AND EVERY OTHER LIST TOO, so a register added later cannot print its id in the main tally unnoticed. */
+  /* AND EVERY OTHER LIST TOO, so a register added later cannot print its id in the main tally unnoticed. `src/import.ts`
+     now also holds `NAMES` to `ORDER` with `satisfies`, which fails the typecheck rather than a run, and this stays
+     because it is the printed line that a person actually reads. */
   const every = said({ ...report, tally: Object.fromEntries(ORDER.map((r) => [r, one])) }, { dryRun: false, file: 'export.json' }).filter((l) => l.includes('1 added'));
   assert.equal(every.length, ORDER.length);
   assert.deepEqual(
