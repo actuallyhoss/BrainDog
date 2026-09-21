@@ -8,15 +8,22 @@
  * `apps/web/test/refusals-render.test.ts` for `via: render`, and both drive their surface for real.
  * `loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 still say none of the eight exists; both are
  * one day stale. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
- * driver and there is no one place that says which".
+ * driver and there is no one place that says which". Five of nine as of the `where` driver below:
+ * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences.
  *
  * WHAT A DRIVER IS. One async function per `via`, `(input, fixture) => Envelope`, where `Envelope`
- * is `{ kind, code?, at?, fix? }` and `kind` is `refusal`, `conflict` or `accepted`. Nothing else in
- * this file knows what a pack or a predicate is. Adding `install`, `where`, `rpc`, `import`, `pull`
- * or `ask` is writing one such function and one line in `DRIVERS`, which is what `40 §6` means by
- * "the other seven are a day's work each rather than a rewrite".
+ * is `{ kind, code?, at?, fix?, extra? }` and `kind` is `refusal`, `conflict` or `accepted`. Nothing else in
+ * this file knows what a pack or a predicate is. Adding `install`, `rpc`, `import`, `pull` or `ask` is
+ * writing one such function, one reader in `READERS` and one line in `DRIVERS`, which is what `40 §6`
+ * means by "the other seven are a day's work each rather than a rewrite". `where` was the first test
+ * of that claim and it held: the `lint` driver did not move, and the shared half took two edits, both
+ * of them the kind a second caller is supposed to force. `inputFor` held `lint`'s three input keys
+ * inline and now dispatches per `via`, because two families' input formats in one `if` chain is a
+ * chain where nothing says which line belongs to which family. And `compare` gained `extra`, because
+ * `compile` answers with a LIST of refusals where every `lint` surface answers with one, so the shared
+ * comparison had nowhere to put "this input was refused twice over".
  *
- * WHY `lint` IS THE ONE DRIVER HERE. It has the most fixtures of any via with no runner (27 of 119,
+ * WHY `lint` WAS THE FIRST DRIVER HERE. It has the most fixtures of any via with no runner (27 of 119,
  * against `rpc`'s 30 which are already claimed by nothing and need a seeded record and a principal),
  * and its harness is the cheapest measurable: `validate()` in `packages/kernel/src/declare.ts` is a
  * synchronous pure function over one declaration, and `normalise()` in
@@ -40,9 +47,32 @@
  * `(borrowed)` in the output, because a fixture that passes on somebody else's input is still a
  * fixture with no input. `tools/refusals/README.md` says what to fold where.
  *
+ * AND THE `where` FAMILY BORROWS NOTHING, which is what a folded family looks like. All seven
+ * `register:` and `predicate:` bodies are in the fixtures themselves, because this driver and the fold
+ * landed together and `fixtures/refusals` was writable at the time; `borrowed(via)` answers an empty
+ * map for every via but `lint`, and there is no second lending file to write. Held to the format two
+ * ways: `40 §6`'s three keys are all three a `where` fixture may carry, which
+ * `tools/gates/refusal-fixtures.mjs:347` enforces off that table's own column, and `40 §6`'s rule one
+ * says every inline declaration lints clean, which all seven `register:` bodies do through `normalise`
+ * and `validate` as a one-declaration pack.
+ *
+ * WHY `where` IS THE SECOND DRIVER HERE. Same rule as the first, applied to what was left: the largest
+ * family whose surface is a pure function, and after `lint` there is exactly one. Five of the six vias
+ * with no driver anywhere need a materialised record before they answer at all (`install`, `rpc`,
+ * `import`, `pull` and `ask`); `where` needs `compile()` in `packages/where/src/index.ts`, which is
+ * synchronous and answers `{ sql, params, bad }`, and `parseWhere()` in
+ * `packages/where/src/sentence.ts`, whose whole dependency is a number and one callback. Measured in
+ * process over five passes: 0.06 ms to drive all seven once warm, and 0.1 ms of modules on top of what
+ * this file already loads, because `packages/kernel/src/declare.ts` imports `@braindog/where` and the
+ * `lint` chain has therefore already paid for it. Seven fixtures against `rpc`'s 30 is the trade, and
+ * `rpc`'s cost is not its size: its 30 need a hand-written call, principal and seeded record each,
+ * where a `where` fixture needs a register and a predicate against a surface that cannot fail for an
+ * environmental reason. `tools/refusals/README.md` has the figures and what the run found.
+ *
  * Usage:
  *   node --experimental-strip-types tools/refusals/run-via.mjs lint
- *   node --experimental-strip-types tools/refusals/run-via.mjs lint --json
+ *   node --experimental-strip-types tools/refusals/run-via.mjs where
+ *   node --experimental-strip-types tools/refusals/run-via.mjs where --json
  *   node --experimental-strip-types tools/refusals/run-via.mjs rpc        # says what is missing
  *
  * Exit codes: 0 every fixture agreed with its surface; 1 at least one did not; 2 this `via` has no
@@ -217,8 +247,8 @@ const schemaOfRegister = (decl) => ({
  * `ref-unknown.yaml` the one `where` fixture whose code the runner is built to discard.
  *
  * `refByTitle` ANSWERS `null` AND IS NOT LEFT OUT. Omitting it reaches the same refusal by a
- * different road — `packages/where/src/sentence.ts:599` gives up when the callback is absent — and
- * the two roads are not the same claim. A `where` fixture has no record behind it, so a lookup that
+ * different road, because `packages/where/src/sentence.ts:599` gives up when the callback is absent,
+ * and the two roads are not the same claim. A `where` fixture has no record behind it, so a lookup that
  * runs and finds nothing is what the family means, and saying so is what makes the fixture about the
  * name and not about the runner's wiring.
  */
@@ -229,6 +259,28 @@ async function driveWhere(input) {
      No fixture in the corpus carries `subject: inbox_raw` today; the branch is here because `40 §6`
      names the key, and a runner that ignored a documented key would report the first fixture to use
      it as a disagreement about its own code. */
+  /* AND A MISSING `register:` IS SAID IN WORDS, because the alternative is what it said before: a
+     fixture carrying a `predicate:` and no register reached `decl.id` on `undefined`, and the row read
+     "Cannot read properties of undefined (reading 'id')", which names neither the key that is missing
+     nor the reason one is wanted. Measured against a fixture written with a `predicate:` and nothing
+     else, which is exactly the half-finished fold this runner invites. */
+  /* AND A `subject:` OUTSIDE THE TWO IS SAID IN WORDS FOR THE SAME REASON, which the register check
+     below did not cover and which is worse than the case it did. `40 §6` gives this key exactly
+     `entry` and `inbox_raw`, and `tools/gates/refusal-fixtures.mjs` reads that table for the key
+     NAMES only, so nothing anywhere held the value to those two. Measured against
+     `contains-too-long.yaml` rewritten with `subject: inbox-raw`, a hyphen for the underscore: the
+     fixture fell through to the `entry` branch, was driven against its own register, and the run
+     printed `ok` and exited 0. A fixture claiming a subject the grammar does not have and going green
+     is the one outcome this runner exists to stop, and it is silent where the missing register at
+     least threw.
+
+     IT IS CHECKED BEFORE THE REGISTER AND NOT AFTER, because the same typo with no `register:` at all
+     reaches both checks and only one of them names the mistake. The register's message would send the
+     author looking for a key they never meant to write. */
+  if (input.subject !== undefined && input.subject !== 'entry' && input.subject !== 'inbox_raw')
+    throw new Error(`carries \`subject: ${input.subject}\`, and 40 §6 names entry and inbox_raw`);
+  if (input.subject !== 'inbox_raw' && input.register === undefined)
+    throw new Error('carries a `predicate:` and no `register:`, and a predicate is only readable against a register');
   const schema = input.subject === 'inbox_raw' ? INBOX_RAW : schemaOfRegister(input.register);
 
   const bad = [];
@@ -293,10 +345,11 @@ function compare(fixture, answer) {
   if (answer.code !== claims.get('code')) faults.push(`claims code ${claims.get('code')} and the surface said ${answer.code}`);
 
   /* ONE REFUSAL AND NOT THE FIRST OF SEVERAL, which is `40 §6`'s rule two and its `record/test` row
-     in as many words: *"refusals.length === 1"*. A surface that answers with a list — `compile` is
-     the one here, and every install plan is another — lets a fixture agree on `bad[0]` while a second
-     check it never meant to trip sits behind it, and the day the first check moves the fixture starts
-     testing the second silently. Any driver may set `extra`; only one has a list to set it from. */
+     in as many words: *"refusals.length === 1"*. A surface that answers with a LIST lets a fixture
+     agree on `bad[0]` while a second check it never meant to trip sits behind it, and the day the
+     first check moves the fixture starts testing the second silently. `compile` is the one such
+     surface here and every install plan is another, so any driver may set `extra`; only one has a
+     list to set it from today. */
   if (Array.isArray(answer.extra) && answer.extra.length > 0)
     faults.push(`was refused ${answer.extra.length + 1} times over and 40 §6 asks for one: also ${answer.extra.join(', ')}`);
 
