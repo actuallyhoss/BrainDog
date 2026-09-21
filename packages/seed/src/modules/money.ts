@@ -816,6 +816,45 @@ export const MONEY_HOME_SETTING = {
 const HOME_CURRENCY = 'GBP';
 
 /**
+ * THE CURRENCY EVERY FIGURE BELOW IS WRITTEN IN, READ OFF THE ROWS RATHER THAN TYPED AGAIN.
+ *
+ * NINETEEN FIGURES SPELLED IT OUT AND THAT WAS NINETEEN STATEMENTS OF ONE FACT. The fact is the
+ * sample's: `gbp` is what every money row in this module is built with, so the currency the figures
+ * declare is now the currency the rows carry, by construction. A pack re-issued over rows in another
+ * currency moves one line instead of nineteen, and a twentieth figure that spells a currency out is
+ * caught by `test/money.test.ts` rather than read past.
+ *
+ * WHAT THE DECLARED CURRENCY DOES ON A RECORD THAT DOES NOT HOLD IT, MEASURED, because it is more
+ * than a label. A money figure is added up in the home currency when one is chosen and in the
+ * currency its format declares when none is (`packages/kernel/src/metrics.ts:597`, `into: held.home
+ * ?? declared`), and the browser's reader has the same line at `apps/web/src/lib/record/metrics.ts:937`.
+ * So on a founder record holding one account of USD 24,604.47, no home currency chosen, `cash-now`
+ * answered
+ *
+ *     declared GBP   {"value":null,"unit":null,"rows":1,"parts":[{"currency":"USD","amount":2460447}],"into":"GBP"}
+ *     no currency    {"value":2460447,"unit":"USD","rows":1,"met":true}
+ *
+ * which is a record with ONE currency and no number at all, because a sum in a currency the figure is
+ * not added up in is read out one currency at a time even when there is only one. Two records alike
+ * but for that code, each with a single account and the night fired at the hour it was armed for,
+ * wrote: one GBP account, one row in `snapshots`; one USD account, none, because the night skips a figure whose
+ * `value` is `null` (`packages/kernel/src/index.ts:3538`). The Ledger's night-by-night history
+ * therefore never starts on a record whose one currency is not this one.
+ *
+ * AND THE VERDICT GOES THE SAME WAY, ZERO INCLUDED. On his two currencies with a home currency of
+ * EGP and a USD rate, `cash-now` converted to EGP −56,311.23 both ways, and `met` was `null` with
+ * sterling declared against `false` without it: a target is in the declared currency, and with no
+ * rate from sterling there is nothing to carry the bound across, so the one figure that says whether
+ * he is in the red says nothing about it.
+ *
+ * NONE OF THAT IS REACHABLE FROM THIS FILE, which is why the currency stays. The record refuses a
+ * money figure whose format names no currency (`DECLARATION_INVALID`, *"A metric is money.<CUR>"*,
+ * measured through `k.install`), and it is right to: a money figure without a currency is a bare
+ * number. What is wrong is the FALLBACK, in the two lines named above, and a pack cannot mend it.
+ */
+const SAMPLE_MONEY = `money.${gbp(0).currency}`;
+
+/**
  * THE WAY THE BANK HE FORWARDS FROM WRITES A DAY, and it is a declaration rather than a sniff.
  *
  * `29/08/26` AND `08/29/26` ARE BOTH REAL DAYS and nothing in either string says which, so `43 §4.3`
@@ -890,7 +929,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.accounts',
     where: 'liquid is true',
     value: { sum: 'balance' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -947,7 +986,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before +31d`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -970,7 +1009,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before +31d`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 5_000_000 },
     window: '30d',
     compare: 'none',
@@ -1013,7 +1052,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     where: 'state is not written off, direction is owed by me, repeats is monthly or quarterly or yearly',
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 1_500_000 },
     window: '30d',
     compare: 'none',
@@ -1028,7 +1067,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     where: 'state is not written off, direction is owed to me, repeats is monthly or quarterly or yearly',
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1041,7 +1080,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before today`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 0 },
     window: '30d',
     compare: 'none',
@@ -1071,7 +1110,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: { product: ['amount', { lookup: 'per_month', by: 'repeats' }] } },
     lookups: { per_month: LOOKUPS.per_month! },
     group_by: 'category',
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 1_500_000 },
     window: '30d',
     compare: 'none',
@@ -1088,7 +1127,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'settled',
     bucket: 'month',
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1102,7 +1141,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'settled',
     bucket: 'month',
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1118,7 +1157,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1132,7 +1171,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { sum: 'amount' },
     group_by: 'due',
     bucket: 'month',
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -1144,7 +1183,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     /* A receivable book is good when it is SMALL, because every pound in it is a pound somebody
        else is holding. The target is the ceiling on that, not a sales goal. */
     target: { lte: 2_000_000 },
@@ -1171,7 +1210,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     /* A CEILING, AND THE RECORD INSISTS ON ONE: `METRIC_NEEDS_TARGET_OR_WINDOW` refuses a figure with
        neither, in those words — *a number with no target is decoration*. GBP 60,000 is roughly what
        is in the bank plus what is owed to you on this record; past that the book has stopped being a
@@ -1189,7 +1228,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        overdue bill was in this tile and in Overdue at once and the two could not be added. */
     where: `${OPEN}, direction is owed by me, due after yesterday, due before +31d`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 2_500_000 },
     window: '30d',
   },
@@ -1207,7 +1246,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before today`,
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     /* Zero, and it is the one target in the record that is not a judgement call. */
     target: { lte: 0 },
     window: '30d',
@@ -1225,7 +1264,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, direction is out, on after -31d',
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 1_500_000 },
     window: '30d',
     compare: 'previous',
@@ -1237,7 +1276,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.transactions',
     where: 'state is cleared, transfer is false, direction is in, on after -31d',
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { gte: 0 },
     window: '30d',
     compare: 'previous',
@@ -1275,7 +1314,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     source: 'register.installments',
     where: 'state is open, direction is out',
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 2_000_000 },
     window: '30d',
     compare: 'none',
@@ -1292,7 +1331,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        carried the clause already. */
     where: 'state is open, direction is out, due before +31d',
     value: { sum: 'amount' },
-    format: 'money.GBP',
+    format: SAMPLE_MONEY,
     target: { lte: 1_000_000 },
     window: '30d',
     compare: 'none',

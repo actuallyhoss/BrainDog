@@ -10,6 +10,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
@@ -17,7 +18,7 @@ import { openRecord, type Arrived, type Declaration, type Kernel, type Leg } fro
 import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
-import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, installSeed } from '../src/index.ts';
+import { CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, day, firstPartyDocument, gbp, installSeed } from '../src/index.ts';
 import { MONEY_HOME_SETTING, MONEY_INGESTS, MONEY_METRICS, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
@@ -1031,4 +1032,86 @@ test('A SCHEDULE ENDS ON ITS LAST DAY BECAUSE AN HOURLY SWEEP ENDS IT, and the s
   assert.ok(refused(said), 'the recorded repair parses, and it must not');
   assert.equal(said.refusal.code, 'VALUE_MALFORMED');
   assert.match(String(said.refusal.fix), /empty is not a value ends can hold/);
+});
+
+/* ── the currency the figures claim ──────────────────────────────────────── */
+
+/**
+ * NINETEEN FIGURES SPELLED STERLING OUT AND THAT IS NINETEEN CHANCES TO BE WRONG ABOUT ONE FACT.
+ *
+ * A money figure's format is a declaration about how to WRITE it, and the rows are what it is a
+ * figure OF, so a currency typed into the declaration is a claim about rows nobody checked against
+ * them. `research-at-scale.md`'s fourth finding is that claim reaching a screen: on a record holding
+ * Egyptian pounds and dollars and no sterling, every reading came back `fx: {into: 'GBP', home: null}`
+ * and the figures over an empty list printed a pound sign at somebody who holds none.
+ *
+ * SO THE CURRENCY IS READ OFF THE ROWS, ONCE (`SAMPLE_MONEY`), and this is what holds it there. The
+ * scan is over the source rather than over the declarations because that is where the defect lives:
+ * a twentieth figure written `format: 'money.USD'` would be a currency this module's rows do not
+ * carry, and a twentieth written `format: 'money.GBP'` would agree with them today and be left
+ * behind the day the sample is re-issued in another currency. Both read as ordinary lines in a
+ * review, which is how nineteen of them arrived.
+ *
+ * WHAT THIS DOES NOT CATCH, so nobody reads it as a guard against that finding: the fallback that
+ * makes the declared currency a figure's answer when no home currency is chosen is in the kernel and
+ * in the browser's reader, not here. `SAMPLE_MONEY`'s own comment has the two lines and the numbers.
+ */
+test('MONEY-CORE NAMES ITS CURRENCY ONCE, in the rows every figure is a figure of, and no figure spells one out', () => {
+  const source = readFileSync(new URL('../src/modules/money.ts', import.meta.url), 'utf8');
+  /* A COMMENT THAT QUOTES THE SPELLING IS NOT A FIGURE THAT USES IT, and this module's neighbour
+     already writes that sentence: `portfolio.ts:248` explains its figures with the words
+     `format: 'money.GBP'` inside a comment. Scanning the whole source turned that into a red test
+     saying a figure spelled its currency out, measured by pasting the same sentence into a comment
+     beside `cash-now`, so the scan reads code lines only. A comment on the same line as code is
+     still read as code, which is the one spelling this cannot tell apart. */
+  const code = source.split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/u.test(line));
+  const spelled = code.flatMap((line) => [...line.matchAll(/format: '(money\.[A-Z]{3})'/gu)]).map((m) => m[1]);
+  assert.deepEqual(spelled, [], 'a figure spells its currency out where SAMPLE_MONEY would say it once, read off the rows');
+
+  const money = Object.values(MONEY_METRICS).filter((m) => m.format?.startsWith('money.'));
+  assert.ok(money.length >= 19, `money-core declares ${money.length} money figures, and this test needs them to read`);
+  assert.deepEqual(
+    [...new Set(money.map((m) => m.format))],
+    [`money.${gbp(0).currency}`],
+    'every money figure is written in the one currency this module builds its rows with',
+  );
+});
+
+/**
+ * AND THE CLAIM IS CHECKED AGAINST THE ROWS BY READING THEM, not by trusting the line above.
+ *
+ * A SUM IS SPLIT BY CURRENCY AND NEVER REFUSED, which is what makes a wrong declaration quiet. Only
+ * an average, a least or a most over rows in a currency the figure is not added up in says
+ * `MIXED_CURRENCY` (`packages/kernel/src/metrics.ts:624`, and every figure here is a sum), so a
+ * figure declared in a currency the sample does not hold comes back `value: null` with `parts`, which
+ * a tile draws as an amount per currency and a reader takes for a fact about the books. Measured on
+ * this record before the currency was read off the rows: every one of the nineteen came back
+ * `unit: 'GBP'` or, over a list the sample leaves empty, `unit: null` with a zero. That is what this
+ * pins, so the next figure declared in a currency these rows do not carry fails here rather than on
+ * a screen.
+ */
+test('EVERY MONEY FIGURE IT DECLARES COMES BACK IN THE CURRENCY ITS OWN ROWS CARRY, or carries none at all', async () => {
+  const k = await seeded();
+  const sample = gbp(0).currency;
+  const read = Object.values(MONEY_METRICS).filter((m) => m.format?.startsWith('money.'));
+  assert.ok(read.length >= 19, 'no money figure was read, so this test would pass over nothing');
+
+  for (const m of read) {
+    const out = k.metric(m as never);
+    assert.ok(out.ok, `${m.metric}: ${sayOf(out)}`);
+    assert.equal(
+      out.value.parts,
+      undefined,
+      `${m.metric} came back one amount per currency, so its declared currency is not the one its rows are in`,
+    );
+    assert.ok(
+      out.value.unit === null || out.value.unit === sample,
+      `${m.metric} came back in ${String(out.value.unit)} under a declaration that says ${sample}`,
+    );
+    /* A FIGURE OVER AN EMPTY LIST CARRIES NO CURRENCY, AND THAT IS THE ONE CASE THE DECLARATION IS
+       READ FOR: a sum over no rows is zero with `unit: null`, and every renderer in this product
+       writes it in the currency the format names. So a zero is where a wrong declaration is least
+       visible, which is why the unit is asserted beside it rather than instead of it. */
+    if (out.value.unit === null) assert.equal(out.value.value, 0, `${m.metric} has no currency and is not a zero either`);
+  }
 });
