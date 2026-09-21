@@ -78,7 +78,12 @@ export const firstRun = {
     `${cadence ? `${cadence.charAt(0).toUpperCase()}${cadence.slice(1)} invoice` : 'Invoice'}${client ? ` to ${client}` : ''}`,
   shapeMake: 'Make my record',
   shapeFromList: 'Start from a list instead',
-  shapeDescribe: 'Describe your business instead',
+  /* `Describe your business instead`, AND A STUDENT IS NOT A BUSINESS. `shapeQuestion` above stopped
+     asking "What's your business?" for that reason and this button, which is the way back to that very
+     question, went on saying it: on 21 September three of the four people driven through this screen
+     were offered a business to describe on the one screen where they have said nothing yet. It names
+     the question it returns to, which is what a button naming its destination is for. */
+  shapeDescribe: 'Say what this BrainDog is for instead',
   shapeAnd: (items: readonly string[]) =>
     items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`,
   shapeIn: (name: string, list: string) => `${name} in ${list}`,
@@ -88,13 +93,49 @@ export const firstRun = {
   shapeTurnedOn: (names: string) => `Turned on ${names}.`,
   shapeAbsent: (names: string) => `Not installed on this record: ${names}. Nothing was made there.`,
   /* A LIST THE LIVE RECORD DID NOT HAVE, added through its own plan. Its example rows are said,
-     because they are rows the person did not type and will find in the list. */
+     because they are rows the person did not type and will find in the list.
+
+     AND IT IS SAID ONLY OF THE LISTS THAT REALLY CARRY THEM, which is what `addedIn` is for. This
+     was the whole outcome's one sentence: a student record made on 21 September answered "Added
+     Projects, People, Tasks, Courses, Assignments and Study sessions, with example rows marked
+     example." and three of those six lists were empty, because example rows belong to the use case
+     and `MODULE_EXAMPLES` names no student. The feed on the next screen said "3 example rows". */
   shapeAdded: (names: string) => `Added ${names}, with example rows marked example.`,
+  /* A LIST HOLDING THE PLAN FORMED FROM WHAT THE PERSON SAID, which is not an example of anything.
+     Somebody who typed "I want to start a podcast and I do not know where to begin" was told, about
+     the only sixteen rows on their record and on the first screen they had ever seen, that they were
+     example rows. `install.ts` is already explicit that a formed plan is the person's and that
+     Clear the examples must leave it; this is the sentence catching up with it. */
+  shapeAddedFormed: (names: string) => `Added ${names}, holding the plan made from what you said.`,
+  /* A LIST THAT ARRIVED WITH NOTHING IN IT, said rather than left to be found. A module a use case
+     installs carries that use case's examples or none, so a student's Projects and Tasks go in empty,
+     and their pages then read as a product that has lost something. Saying so is the honest half of
+     what `research-usability-2026-09-21.md` finding 2 asks for; the other half is the rail, which
+     keeps a page of an empty list off it, and that is not this file's to fix. */
+  shapeAddedEmpty: (names: string) => `Added ${names}, with nothing in them yet.`,
+  /* AND A LIST WHOSE ONE ROW IS THE PERSON THEMSELVES. People is the only list this screen adds that
+     it also writes a row into, and the sentence about that row is `youAreKnown`, one line below. */
+  shapeAddedPlain: (names: string) => `Added ${names}.`,
   /* A list that could not be added, in one sentence, and nothing is made in it. */
   shapeNotAdded: (name: string, fix: string) => `${name} was not added: ${fix}`,
   shapeNeedsFirst: (name: string, needs: string) => `${name} was not added, because it needs ${needs} first.`,
   shapeChanged: 'the record changed while it was being added, so try again.',
   shapeRefused: (name: string, fix: string) => `${name} was not made. ${fix}`,
+  /**
+   * AND `/start` OPENED AGAIN ON A RECORD THAT IS ALREADY MADE SAYS SO, AND OFFERS THE WAY BACK.
+   *
+   * MEASURED ON 21 September: this screen on an arranged record drew 21 words, five controls and a
+   * blank "Who are you?", with no sign that the BrainDog behind it already had a use case, a name and
+   * four hundred rows, and nothing on it to press to get back to them. The root layout spares
+   * `/start` from the redirect that sends an empty record here, which is right, and it is also what
+   * makes this the one screen somebody can reach with the record already behind it.
+   *
+   * IT IS THREE SHORT SENTENCES AND A DOOR, not a warning. Answering again installs; it deletes
+   * nothing and changes no row, so saying so is what lets somebody who came here on purpose carry on.
+   */
+  againMade: 'This BrainDog is already made.',
+  againMore: 'Answering again adds to it and takes nothing away.',
+  againBack: 'Open this BrainDog',
   /* first run.
 
      THE FIRST SCREEN SETS THE CEILING. It used to open with "What do you want to stop forgetting?"
@@ -363,4 +404,92 @@ export const firstRun = {
  */
 export function firstAsks<F extends { id: string; required?: boolean }>(fields: readonly F[], title: string | undefined, given: Readonly<Record<string, string>> = {}): F[] {
   return fields.filter((f) => f.id === title || (f.required === true && given[f.id] === undefined));
+}
+
+/** A pack the sentence reader answered with, and the phrases it heard for it. Empty `why` is a pack nothing pointed at. */
+type HeardPack = { id: string; why: readonly unknown[] };
+
+/**
+ * WHICH FIRST-PARTY MODULES A SENTENCE ACTUALLY ASKS FOR, and it is fewer than the reader answers.
+ *
+ * MEASURED ON A FRESH SELF-HOST, 21 September, at 390 with a coarse pointer. "Sam, I am a maths
+ * student at Leeds" and "I keep losing track of my coursework deadlines" put Projects, People and
+ * Tasks on the record beside the three student lists, and `/p/portfolio` then drew 157 words, nine
+ * blocks with nothing in any of them, four tiles reading `0` and three money figures of £0.00 on a
+ * maths student's second screen. One of those three modules was in the sentence: `shape.ts` hears
+ * `deadlines` for Tasks, and `shape.ts:286` adds Projects with no `why` at all whenever it hears
+ * anything. `LEANS_ON.work` is empty, so nothing on that record leaned on Projects, and the line
+ * above that rule in `shape.ts` states the rule this applies: Projects is "added with no `why` when
+ * another list leans on it".
+ *
+ * SO A PACK WITH NO PHRASE BEHIND IT IS DROPPED HERE, and the caller's `LEANS_ON` closure puts back
+ * whatever something genuinely needs: Money, Renewals and Agents all lean on Projects and all still
+ * arrive with it. Measured over fifteen sentences, including all four people and all six chips, this
+ * changes exactly one answer, and it is the student's.
+ *
+ * PEOPLE SURVIVES A NAME, because the name is the phrase behind it: the person's own row goes into
+ * that list in the same press, so it is the one module that never arrives empty.
+ *
+ * WHAT IT DOES NOT FIX, said so nobody reads more into it: Tasks still arrives on that record for one
+ * matched word, with `/p/work` at 95 words and `/p/work-board` at 12, both empty. A page whose lists
+ * hold nothing does not belong on the rail (`DIRECTION.md` §6), and the rail is built in
+ * `boot-live.ts`, which this file does not own.
+ */
+export function firstModules(turnOn: readonly string[], packs: readonly HeardPack[], named: boolean): string[] {
+  const pointed = new Set(packs.filter((p) => p.why.length > 0).map((p) => p.id));
+  return turnOn.filter((id) => pointed.has(id) || (id === 'people' && named));
+}
+
+/**
+ * THE WAY ONWARD OFF THE FIRST SCREEN, AND IT IS WHAT THE RECORD HOLDS RATHER THAN WHAT THE PRESS CHANGED.
+ *
+ * `Make my record` pressed twice on a fresh record, 390, measured: the first press answered "Your
+ * lists are ready. Added Courses, Assignments and Study sessions, with example rows marked example."
+ * with `Open Study sessions` under it and 17 controls on the screen; the second answered "Your lists
+ * are ready." with 16, and the control it dropped was the only way off a screen that carries no rail
+ * and no tab bar at either width. Nothing was installed twice and no row was lost: the record was
+ * unharmed and the display had thrown the door away.
+ *
+ * `held` IS THE FACT THAT DECIDES IT: the proposed use case's lists are on the record now, however
+ * they got there. The two fields this no longer reads are `added` and `on`, which are what THIS press
+ * changed, and a second press changes nothing because the lists are already in. They stay in the
+ * parameter because the caller hands over its whole outcome, and the comment above is why nobody
+ * should read them here again.
+ */
+export function onwardFrom(
+  press: { made: readonly { register: string; list: string }[]; added: readonly unknown[]; on: readonly unknown[] },
+  own: { id: string; name: string } | undefined,
+  held: boolean,
+  fallback: { register: string; list: string } | null,
+): { register: string; list: string } | null {
+  return press.made[0] ?? (held && own ? { register: own.id, list: own.name } : fallback);
+}
+
+/**
+ * What a list added by one press holds the moment it arrives: the pack's examples, the plan formed
+ * from what the person said, the person's own row, or nothing at all.
+ */
+export type AddedRows = 'example' | 'formed' | 'own' | 'empty';
+
+/**
+ * WHAT THE PRESS ADDED, GROUPED SO THE OUTCOME CAN SAY ONE SENTENCE PER KIND OF LIST.
+ *
+ * IT WAS ONE SENTENCE FOR ALL OF THEM AND IT WAS FALSE ON TWO RECORDS OUT OF FOUR. A student was told
+ * six lists had arrived "with example rows marked example" when three of them were empty, and the New
+ * project guide was told the same about sixteen rows formed from its own sentence. Both readings are
+ * on the first screen of a one-minute-old record, about the only rows on it.
+ *
+ * THE ORDER IS WHAT THE PERSON CARES ABOUT MOST FIRST: their own plan, then rows somebody else wrote,
+ * then the list their own row went into, then the lists holding nothing.
+ *
+ * IT HOLDS NO SENTENCE, for the reason `firstAsks` above holds none: a key named only in this file is
+ * a key `dead-copy` reads as rendered nowhere, and it is right to, because a renderer is what makes a
+ * sentence a sentence. The screen maps each group to one of the four `shapeAdded*` keys.
+ */
+export function addedIn(added: readonly { name: string; rows: AddedRows }[]): { rows: AddedRows; names: string }[] {
+  const order: readonly AddedRows[] = ['formed', 'example', 'own', 'empty'];
+  return order.flatMap((rows) => {
+    const names = added.filter((a) => a.rows === rows).map((a) => a.name);
+    return names.length > 0 ? [{ rows, names: firstRun.shapeAnd(names) }] : [];
+  });
 }

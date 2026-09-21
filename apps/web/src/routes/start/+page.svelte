@@ -29,7 +29,7 @@
   import { SPEAKS, voiceBatch, voiceWrites, withSpeaks, type SpeakingState } from '$lib/voice.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { firstRun } from '$lib/first-run.ts';
+  import { addedIn, firstModules, firstRun, onwardFrom, type AddedRows } from '$lib/first-run.ts';
   import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, type PackId, type Shape } from '$lib/shape.ts';
   import { USE_CASES, alongside, arrange, listsOf, modulesFor, pagesOf, type UseCase } from '@braindog/seed/usecases';
   import { carriedDocument, claimedBy, dayOf, formedFor, forms, moduleDocument, moduleManifest, plantedRows, withoutRows } from '@braindog/seed/usecases/install';
@@ -58,6 +58,16 @@
      claims can be checked against the rest of it in one pass rather than found in a component. */
   const CHOICES = firstRun.firstChoices;
 
+  /* ONE SENTENCE PER KIND OF LIST THE PRESS ADDED, keyed by what that list holds (`addedIn`). The four
+     are here rather than in `first-run.ts` because this is the renderer, and a sentence named only
+     inside the file that defines it is one nobody reads. */
+  const ADDED_SAID: Record<AddedRows, (names: string) => string> = {
+    formed: firstRun.shapeAddedFormed,
+    example: firstRun.shapeAdded,
+    own: firstRun.shapeAddedPlain,
+    empty: firstRun.shapeAddedEmpty,
+  };
+
   /**
    * WHETHER THERE IS A RECORD BEHIND THIS SCREEN, AND THE SHELL IS WHAT SAYS SO.
    *
@@ -68,6 +78,21 @@
    * refusal, which is a second answer to a question that has one.
    */
   const sampled = $derived(!page.data.live);
+
+  /**
+   * WHETHER THE RECORD BEHIND THIS SCREEN IS ALREADY MADE, and it is asked because this screen is
+   * reachable when it is.
+   *
+   * The root layout sends a record with no lists here and spares `/start` from that redirect, which is
+   * right and is also what lets somebody open it again on a record with a use case, a name and four
+   * hundred rows. Driven on 21 September, that showed them a blank "Who are you?", 21 words, five
+   * controls, no sign of the record and nothing to press to get back to it.
+   *
+   * THE PAGES OR THE RAIL, either of which means there is something to go back to: `pages` is every page
+   * the record holds and `index.registers` is the rail's lists, which are the ones holding rows. A record
+   * this screen has never been through has neither.
+   */
+  const alreadyMade = $derived(Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0));
 
   let picked = $state<string | null>(null);
   /* What the generated form would refuse, bound out of it so the button can be dead while it is
@@ -242,7 +267,11 @@
   function modulesToTurnOn(now: Shape | null, person: boolean, u: UseCase | null): PackId[] {
     /* A PHRASE THE USE CASE CLAIMS ASKS FOR NO MODULE: "an Etsy shop" said to the guide is its project, not Projects. */
     const kept = now && u ? heardFor(now, claimedBy(u, about)) : now;
-    const heardPacks: string[] = kept && kept.declined === null ? toTurnOn(kept, person) : person ? ['people'] : [];
+    /* AND A MODULE THE SENTENCE NEVER POINTED AT IS NOT ONE OF THEM (`firstModules`): the reader answers
+       Projects for any sentence at all, and a maths student's record arrived with an empty Projects page
+       on the rail because of it. What is left leans on what it needs, below, so nothing loses a module
+       it cannot install without. */
+    const heardPacks: string[] = kept && kept.declined === null ? firstModules(toTurnOn(kept, person), kept.packs, person) : person ? ['people'] : [];
     const wanted = new Set<PackId>((u ? [...modulesFor(u, heardPacks), ...beside.flatMap((b) => b.modules)] : heardPacks) as PackId[]);
     for (let grew = true; grew; ) {
       grew = false;
@@ -318,7 +347,9 @@
     }))];
   });
 
-  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: string[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null };
+  /* `added` CARRIES WHAT EACH LIST HOLDS AND NOT ONLY ITS NAME, because the one sentence this screen had
+     for all of them claimed example rows in lists that arrived empty (`addedIn`). */
+  type Outcome = { made: { name: string; list: string; register: string }[]; onward: { register: string; list: string } | null; on: string[]; added: { name: string; rows: AddedRows }[]; absent: string[]; refused: string[]; waiting: boolean; plan: string | null };
   let outcome = $state<Outcome | null>(null);
   let making = $state(false);
   let kept = $state<HTMLDivElement | undefined>(undefined);
@@ -366,7 +397,23 @@
             out.refused.push(refused);
             continue;
           }
-          out.added.push(packName(id));
+          /* WHAT THIS MODULE ARRIVED HOLDING, because it is usually nothing. Example rows belong to the use
+             case and not to the module (`install.ts`), so a module a student or the guide installs carries
+             none, and People carries the person's own row from the same press. With no use case picked the
+             module goes in as it always did, the sample's rows included.
+
+             ASKED OF THE DOCUMENT `addPack` INSTALLS AND NOT INFERRED FROM THE USE CASE'S EXAMPLES, because
+             the inference was wrong about the agents pack, which is one of the six chips. Counted through
+             `moduleDocument` for all six with no use case: Money 6 seeds, Renewals 1, People 1, Tasks 2,
+             Projects 1, and Agents 0, because `install.ts` returns `agentsPackDocument()` before any seed is
+             considered and says it "carries no example rows of anybody's". "I use Claude or Codex" picks no
+             use case, so the outcome said "Added Agents and Projects, with example rows marked example." over
+             four Agents lists with nothing in any of them, which is the reading this whole change is about.
+             `holds` is left out on purpose: it strips link fields and walk legs and never a seed row, so the
+             count here is the count that goes in. */
+          const carries = moduleDocument(u, id, { today: dayOf(Date.now()) });
+          const seeded = ((carries?.seeds ?? []) as unknown[]).length > 0;
+          out.added.push({ name: packName(id), rows: id === 'people' && heard?.name ? 'own' : seeded ? 'example' : 'empty' });
           usable.add(id);
           continue;
         }
@@ -382,6 +429,10 @@
         usable.add(id);
       }
 
+      /* WHETHER THE PROPOSED USE CASE'S LISTS ARE ON THE RECORD WHEN THIS PRESS ENDS, however they got
+         there. It is what the way onward is built from (`onwardFrom`), and a second press has to answer
+         it the same as the first: pressing again added nothing, because everything was already in. */
+      let ownHeld = false;
       /* THE USE CASE'S OWN PACK, after the modules it builds on: its lists, its pages and its voice. A
          pack already here that is off is turned on; one that is here and on is left as it is. Then each use case the
          sentence described beside it, so the proposed one goes in first and its voice is the one the record speaks in. */
@@ -403,23 +454,38 @@
         else if (state && state.disabled_at !== null) {
           const on = await chosen.source.enable(id);
           if (!on.ok) out.refused.push(firstRun.shapeRefused(one.title, on.refusal.fix));
-          else if (on.value.changed) out.on.push(...names);
+          else {
+            if (on.value.changed) out.on.push(...names);
+            if (one === u) ownHeld = true;
+          }
         } else if (!state) {
           const planned = await client.planPack({ doc });
           const planHash = planned.ok ? ((planned.value as { diff?: { planHash?: string } }).diff?.planHash ?? '') : '';
           const done = planned.ok ? await client.call('installPack', { doc, planHash }) : planned;
           if (!done.ok) out.refused.push(firstRun.shapeNotAdded(one.title, 'refusal' in done ? done.refusal.fix : firstRun.shapeChanged));
           else {
-            out.added.push(...names);
+            if (one === u) ownHeld = true;
             if (asksModel) {
               const asked = await client.call<{ formed: boolean; id?: string }>('sparkForm', { usecase: one.usecase, said: String(said).slice(0, 600) });
               if (asked.ok && asked.value.formed && asked.value.id) {
                 out.plan = asked.value.id;
+                /* THE LISTS WENT IN WITH NOTHING IN THEM, and the plan they will hold is waiting on Decide:
+                   `withoutRows` took the seeds out above, so calling these example rows would name rows that
+                   are in neither the lists nor the record yet. */
+                out.added.push(...names.map((name) => ({ name, rows: 'empty' as const })));
                 continue;
               }
               /* NOTHING FORMED: the rows the pack would have seeded, written now, then linked as below. */
               for (const row of plantedRows(one, dayOf(Date.now()), said).rows) await client.create({ register: row.register, fields: row.fields, note: firstRun.usePlanPlanted }).catch(() => null);
             }
+            /* WHAT THESE LISTS HOLD NOW: the plan formed from the person's own sentence, the pack's examples,
+               or nothing. A formed plan is the person's (`install.ts`), so it is never called an example.
+
+               READ OFF `carried` AND NOT `doc`, because those are different documents where a model was asked
+               and formed nothing: `withoutRows` took the seeds out of `doc`, and `plantedRows` has just
+               written them back from the same rows `carried` holds. */
+            const seeded = ((carried?.seeds ?? []) as unknown[]).length > 0;
+            out.added.push(...names.map((name) => ({ name, rows: (plan ? 'formed' : seeded ? 'example' : 'empty') as AddedRows })));
             /* A SEED CARRIES NO LINK (42 §5.2), so the examples are pointed at each other now they are in: a student's
                assignment at its course, a guide's step at its milestone (`links.ts`). A refused link is skipped. */
             await linkExamples(
@@ -434,6 +500,11 @@
               plan ? { links: plan.links } : undefined,
             );
           }
+        } else if (one === u) {
+          /* AND A USE CASE ALREADY HERE AND ALREADY ON IS LEFT EXACTLY AS IT IS, which is what a second press
+             finds. It changes nothing, so nothing is said about it; the lists are on the record all the same,
+             and the way onward is built from that rather than from what this press did (`onwardFrom`). */
+          ownHeld = true;
         }
       }
 
@@ -498,9 +569,12 @@
          list Money happened to need first. */
       const named = [...new Set([...now.packs.filter((p) => p.why.length > 0).map((p) => p.id as string), ...usable])];
       const firstOn = named.filter((id) => usable.has(id)).map((id) => packOf(id)?.registers[0]).find((r): r is string => Boolean(r));
-      /* A USE CASE'S OWN FIRST LIST BEFORE A MODULE IT BUILDS ON, so a student lands on Assignments and not on People. */
-      const ownFirst = u && (out.added.length > 0 || out.on.length > 0) ? listsOf(u).at(-1) : undefined;
-      out.onward = out.made[0] ?? (ownFirst ? { register: ownFirst.id, list: ownFirst.name } : firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
+      /* A USE CASE'S OWN FIRST LIST BEFORE A MODULE IT BUILDS ON, so a student lands on Assignments and not
+         on People, AND FROM WHAT THE RECORD HOLDS RATHER THAN FROM WHAT THIS PRESS CHANGED, which is the
+         whole of `onwardFrom`: a second press adds nothing, and this used to answer that press with a
+         screen that had no way off it. */
+      const ownFirst = u ? listsOf(u).at(-1) : undefined;
+      out.onward = onwardFrom(out, ownFirst, ownHeld, firstOn ? { register: firstOn, list: REGISTERS[firstOn]?.name ?? firstOn } : null);
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new lists and pages and speaks in the new voice. */
       if (!chosen.source.sample) (await import('$lib/record/boot-live.ts')).forget();
       outcome = out;
@@ -871,6 +945,20 @@
       <span class="wordmark">{copy.product}</span>
     </header>
 
+    <!-- AND A RECORD THAT IS ALREADY MADE SAYS SO, WITH THE DOOR BACK INTO IT. This screen carries no rail
+         and no tab bar at either width, so on an arranged record it was a blank question with the browser's
+         own Back as the only way out. It is said before the question, because it is what decides whether
+         somebody wants to answer it again. -->
+    {#if alreadyMade}
+      <section class="again" aria-labelledby="again-h">
+        <p class="again-h" id="again-h">{firstRun.againMade}</p>
+        <p class="again-why">{firstRun.againMore}</p>
+        <div class="actions">
+          <Button weight="quiet" href="/">{firstRun.againBack}</Button>
+        </div>
+      </section>
+    {/if}
+
     {#if !choice}
       <div class="who" role="group" aria-labelledby="who-h" onfocusout={leave}>
         <h1 class="question step" id="who-h">{firstRun.whoQuestion}</h1>
@@ -1005,7 +1093,9 @@
               <p class="kept-what">{known.waiting ? firstRun.youArePending(known.name, copy.markNotWritten) : firstRun.youAreKnown(known.name)}</p>
             {/if}
             {#if outcome.on.length > 0}<p class="kept-why">{firstRun.shapeTurnedOn(firstRun.shapeAnd(outcome.on))}</p>{/if}
-            {#if outcome.added.length > 0}<p class="kept-why">{firstRun.shapeAdded(firstRun.shapeAnd(outcome.added))}</p>{/if}
+            <!-- ONE SENTENCE PER KIND OF LIST, because one sentence for all of them said every list had
+                 arrived with example rows in it and three of a student's six had arrived with nothing. -->
+            {#each addedIn(outcome.added) as part}<p class="kept-why">{ADDED_SAID[part.rows](part.names)}</p>{/each}
             {#if outcome.absent.length > 0}<p class="kept-why">{firstRun.shapeAbsent(firstRun.shapeAnd(outcome.absent))}</p>{/if}
             {#each outcome.refused as r}<p class="kept-why">{r}</p>{/each}
             {#if outcome.plan}
@@ -1594,6 +1684,34 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-2);
+  }
+
+  /* The note over a record that is already made. A card and not a rule with text under it, for the reason
+     the agent card below gives: under a divider it reads as a footnote, and this is the one thing on the
+     screen a person who opened it by accident needs. */
+  .again {
+    /* IT NEEDED A MARGIN UNDER IT AND HAD NONE. `.frame` is not a grid, so nothing here supplies a gap, and
+       the element that follows on the screen this card was added for is `.who`, whose `.question.step`
+       heading sets `margin-block: 0 …`: "Who are you?" sat against the card's bottom border with no space at
+       all. `.agent`, the card this one is modelled on, keeps `var(--sp-6)` off its neighbour for the same
+       reason, and that is the step used here. */
+    margin-block-end: var(--sp-6);
+    padding: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+  }
+
+  .again-h {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  .again-why {
+    margin-block-start: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   /* No rule above it any more. It belongs to the list it follows, and the card below now does the
